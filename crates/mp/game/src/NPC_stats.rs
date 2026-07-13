@@ -348,10 +348,10 @@ pub static ClassTable: [stringID_table_t; 57] = [
 /// Raven `NPC_ReactionTime`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:220-223`
-pub fn NPC_ReactionTime(ctx: GameContext<'_>) -> c_int {
+pub fn NPC_ReactionTime(ctx: &mut GameContext) -> c_int {
     // `NPCInfo` (`NPC.c:34`) is a real `*mut gNPC_t` field on `GameGlobals` now
     // (pass-2 backfill) — deref straight through.
-    unsafe { 200 * (6 - (*(*ctx.world).globals.NPCInfo).stats.reactions) }
+    unsafe { 200 * (6 - (*(*ctx.world_raw()).globals.NPCInfo).stats.reactions) }
 }
 
 /// Raven `TranslateRankName`.
@@ -400,7 +400,7 @@ unsafe fn qstricmp_eq(name: *const c_char, lit: &std::ffi::CStr) -> bool {
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:424-437`
 pub fn G_ParseAnimFileSet(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     filename: *const c_char,
     animCFG: *const c_char,
     animFileIndex: *mut c_int,
@@ -415,11 +415,11 @@ pub fn G_ParseAnimFileSet(
     unsafe {
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            world: ctx.world,
+            world: ctx.world_raw(),
             engine: ctx.engine,
         };
         *animFileIndex = crate::bg_panimate::BG_ParseAnimationFile(
-            &mut (*ctx.world).bg_state,
+            &mut (*ctx.world_raw()).bg_state,
             &traps,
             &mut callbacks,
             filename,
@@ -449,7 +449,7 @@ pub fn NPC_PrecacheAnimationCFG(NPC_type: *const c_char) {
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:551-591`
 pub fn NPC_PrecacheWeapons(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     playerTeam: team_t,
     spawnflags: c_int,
     NPCtype: *mut c_char,
@@ -476,7 +476,7 @@ pub fn NPC_PrecacheWeapons(
 /// Raven `NPC_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:599-873`
-pub fn NPC_Precache(ctx: GameContext<'_>, spawner: EntityId) {
+pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
@@ -495,8 +495,9 @@ pub fn NPC_Precache(ctx: GameContext<'_>, spawner: EntityId) {
         write_cstr_field(&mut custom_skin, "default");
 
         let npc_parms: *const c_char =
-            (&(*ctx.world).globals.NPCParms) as *const _ as *const c_char;
-        let npc_file: *const c_char = (&(*ctx.world).globals.NPCFile) as *const _ as *const c_char;
+            (&(*ctx.world_raw()).globals.NPCParms) as *const _ as *const c_char;
+        let npc_file: *const c_char =
+            (&(*ctx.world_raw()).globals.NPCFile) as *const _ as *const c_char;
         let mut p: *const c_char = npc_parms;
         crate::q_shared::COM_BeginParseSession(npc_file);
 
@@ -756,7 +757,7 @@ pub fn NPC_Precache(ctx: GameContext<'_>, spawner: EntityId) {
 /// Raven `NPC_ParseParms`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:974-3233`
-pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: EntityId) -> qboolean {
+pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: EntityId) -> qboolean {
     use crate::client::render_info::renderInfo_t;
     use crate::npc::g_npcstats_e::gNPCstats_t;
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
@@ -852,8 +853,9 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
         }
 
         let npc_parms: *const c_char =
-            (&(*ctx.world).globals.NPCParms) as *const _ as *const c_char;
-        let npc_file: *const c_char = (&(*ctx.world).globals.NPCFile) as *const _ as *const c_char;
+            (&(*ctx.world_raw()).globals.NPCParms) as *const _ as *const c_char;
+        let npc_file: *const c_char =
+            (&(*ctx.world_raw()).globals.NPCFile) as *const _ as *const c_char;
         let mut p: *const c_char = npc_parms;
         crate::q_shared::COM_BeginParseSession(npc_file);
 
@@ -905,9 +907,12 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                     continue;
                 }
                 if crate::q_shared::Q_stricmp(value, cstr("random").as_ptr()) == 0 {
-                    (*client_ptr).ps.customRGBA[0] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
-                    (*client_ptr).ps.customRGBA[1] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
-                    (*client_ptr).ps.customRGBA[2] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
+                    (*client_ptr).ps.customRGBA[0] =
+                        (*ctx.world_raw()).bg_state.rng.Q_irand(0, 255);
+                    (*client_ptr).ps.customRGBA[1] =
+                        (*ctx.world_raw()).bg_state.rng.Q_irand(0, 255);
+                    (*client_ptr).ps.customRGBA[2] =
+                        (*ctx.world_raw()).bg_state.rng.Q_irand(0, 255);
                     (*client_ptr).ps.customRGBA[3] = 255;
                 } else {
                     (*client_ptr).ps.customRGBA[0] = atoi(value);
@@ -1778,20 +1783,20 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                     continue;
                 }
 
-                let bg = &mut (*ctx.world).bg_state;
+                let bg = &mut (*ctx.world_raw()).bg_state;
                 let saber_name = crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
                 crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
                 crate::bg_saberLoad::WP_SaberParseParms(
                     saber_name,
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
-                    &mut (*ctx.world).bg_state,
+                    &mut (*ctx.world_raw()).bg_state,
                     &GameBgTraps::new(ctx.engine),
                 );
                 let idx_s = format!("@{}", cstr_to_str(saber_name));
                 npcSaber1 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
 
-                crate::bg_misc::BG_TempFree(4096, &mut (*ctx.world).bg_state);
+                crate::bg_misc::BG_TempFree(4096, &mut (*ctx.world_raw()).bg_state);
                 continue;
             }
 
@@ -1804,14 +1809,14 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
 
                 if (*client_ptr).saber[0].saberFlags & SFL_TWO_HANDED == 0 {
                     //can't use a second saber if first one is a two-handed saber...?
-                    let bg = &mut (*ctx.world).bg_state;
+                    let bg = &mut (*ctx.world_raw()).bg_state;
                     let saber_name = crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
                     crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
                     crate::bg_saberLoad::WP_SaberParseParms(
                         saber_name,
                         &mut (*client_ptr).saber[1] as *mut saberInfo_t,
-                        &mut (*ctx.world).bg_state,
+                        &mut (*ctx.world_raw()).bg_state,
                         &GameBgTraps::new(ctx.engine),
                     );
                     if (*client_ptr).saber[1].saberFlags & SFL_TWO_HANDED != 0 {
@@ -1822,7 +1827,7 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                         let idx_s = format!("@{}", cstr_to_str(saber_name));
                         npcSaber2 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
                     }
-                    crate::bg_misc::BG_TempFree(4096, &mut (*ctx.world).bg_state);
+                    crate::bg_misc::BG_TempFree(4096, &mut (*ctx.world_raw()).bg_state);
                 }
                 continue;
             }
@@ -1835,8 +1840,10 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                     continue;
                 }
                 if !client_ptr.is_null() {
-                    let color =
-                        crate::bg_saberLoad::TranslateSaberColor(value, &mut (*ctx.world).bg_state);
+                    let color = crate::bg_saberLoad::TranslateSaberColor(
+                        value,
+                        &mut (*ctx.world_raw()).bg_state,
+                    );
                     for bi in 0..MAX_BLADES {
                         (*client_ptr).saber[0].blade[bi].color = color;
                     }
@@ -1858,7 +1865,7 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                             (*client_ptr).saber[$saber_idx].blade[$blade_idx].color =
                                 crate::bg_saberLoad::TranslateSaberColor(
                                     value,
-                                    &mut (*ctx.world).bg_state,
+                                    &mut (*ctx.world_raw()).bg_state,
                                 );
                         }
                         continue 'parse;
@@ -1878,8 +1885,10 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                     continue;
                 }
                 if !client_ptr.is_null() {
-                    let color =
-                        crate::bg_saberLoad::TranslateSaberColor(value, &mut (*ctx.world).bg_state);
+                    let color = crate::bg_saberLoad::TranslateSaberColor(
+                        value,
+                        &mut (*ctx.world_raw()).bg_state,
+                    );
                     for bi in 0..MAX_BLADES {
                         (*client_ptr).saber[1].blade[bi].color = color;
                     }
@@ -2068,7 +2077,7 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
                 crate::bg_saberLoad::WP_SaberParseParms(
                     cstr("Kyle").as_ptr(),
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
-                    &mut (*ctx.world).bg_state,
+                    &mut (*ctx.world_raw()).bg_state,
                     &GameBgTraps::new(ctx.engine),
                 );
             }
@@ -2128,7 +2137,7 @@ pub fn NPC_ParseParms(ctx: GameContext<'_>, NPCName_in: *const c_char, NPC: Enti
 /// Raven `NPC_LoadParms`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:3241-3302`
-pub fn NPC_LoadParms(ctx: GameContext<'_>) {
+pub fn NPC_LoadParms(ctx: &mut GameContext) {
     use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
     use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
     use mp_abi::game::syscalls::G_FS_GETFILELIST::GFsGetfilelistArgs;
@@ -2142,7 +2151,7 @@ pub fn NPC_LoadParms(ctx: GameContext<'_>) {
         // the globals path pending backfill; see
         // missing_symbols. The `_XBOX` malloc/free of `npcParseBuffer` is
         // dead on this platform and is dropped per porting-rules §20.
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut totallen: c_int = 0;
         let mainblocklen: c_int = 0;
         let _ = mainblocklen;

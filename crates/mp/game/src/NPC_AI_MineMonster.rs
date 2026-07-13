@@ -34,9 +34,9 @@ use mp_bg::public::entity_event::entity_event_t;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -60,7 +60,7 @@ const LSTATE_WAITING: i32 = 1;
 ///
 /// Precaches the MineMonster's sound effects.
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
-pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) {
+pub fn NPC_MineMonster_Precache(ctx: &mut GameContext) {
     unsafe {
         for i in 0..4 {
             let bite_sound = cstr(&format!("sound/chars/mine/misc/bite{}.wav", i + 1));
@@ -74,10 +74,10 @@ pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) {
 /// Raven `MineMonster_Idle`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:35-42`
-pub fn MineMonster_Idle(ctx: GameContext<'_>) {
+pub fn MineMonster_Idle(ctx: &mut GameContext) {
     unsafe {
         if !UpdateGoal(ctx).is_null() {
-            (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
+            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
             NPC_MoveToGoal(ctx, qtrue);
         }
     }
@@ -86,27 +86,27 @@ pub fn MineMonster_Idle(ctx: GameContext<'_>) {
 /// Raven `MineMonster_Patrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:50-83`
-pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
+pub fn MineMonster_Patrol(ctx: &mut GameContext) {
     unsafe {
         let mut dif: vec3_t = [0.0; 3];
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         (*npc_info).localState = LSTATE_CLEAR;
 
         if !UpdateGoal(ctx).is_null() {
-            (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
+            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
             NPC_MoveToGoal(ctx, qtrue);
         } else {
             let patrol_timer_id = cstr("patrolTime");
             if TIMER_Done(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr()) != 0 {
-                let dur = ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+                let dur = ((*ctx.world_raw()).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
                 TIMER_Set(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr(), dur);
             }
         }
 
         _VectorSubtract(
-            (*ctx.world).g_entities[0].r.currentOrigin,
+            (*ctx.world_raw()).g_entities[0].r.currentOrigin,
             (*npc).r.currentOrigin,
             &mut dif,
         );
@@ -125,10 +125,10 @@ pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
 /// Raven `MineMonster_Move`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:90-98`
-pub fn MineMonster_Move(ctx: GameContext<'_>, visible: qboolean) {
+pub fn MineMonster_Move(ctx: &mut GameContext, visible: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if (*npc_info).localState != LSTATE_WAITING {
             (*npc_info).goalEntity = (*npc).enemy;
@@ -141,7 +141,7 @@ pub fn MineMonster_Move(ctx: GameContext<'_>, visible: qboolean) {
 /// Raven `MineMonster_TryDamage`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:101-126`
-pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: Option<EntityId>, damage: c_int) {
+pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let enemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, enemy) };
     unsafe {
@@ -152,7 +152,7 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: Option<EntityId>, dama
         let mut end: vec3_t = [0.0; 3];
         let mut dir: vec3_t = [0.0; 3];
         let mut tr: trace_t = unsafe { core::mem::zeroed() };
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let origin = vec3_origin;
         let start = (*npc).r.currentOrigin;
 
@@ -179,7 +179,7 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: Option<EntityId>, dama
 
         if tr.entityNum >= 0 && (tr.entityNum as c_uint) < ENTITYNUM_NONE as c_uint {
             let damage_entity =
-                &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+                &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
             let mut dir_copy = dir;
             G_Damage(
                 ctx,
@@ -192,12 +192,12 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: Option<EntityId>, dama
                 DAMAGE_NO_KNOCKBACK,
                 MOD_MELEE as c_int,
             );
-            let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
+            let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
             let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
             let sound_idx = G_EffectIndex(bite_str.as_ptr());
             G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
         } else {
-            let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
+            let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
             let miss_str = cstr(&format!("sound/chars/mine/misc/miss{}.wav", idx));
             let sound_idx = G_EffectIndex(miss_str.as_ptr());
             G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
@@ -208,16 +208,18 @@ pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: Option<EntityId>, dama
 /// Raven `MineMonster_Attack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
-pub fn MineMonster_Attack(ctx: GameContext<'_>) {
+pub fn MineMonster_Attack(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let attacking_id = cstr("attacking");
 
         if TIMER_Exists(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr()) == 0 {
-            let rng = &mut (*ctx.world).bg_state.rng;
+            let rng = &mut (*ctx.world_raw()).bg_state.rng;
 
             let enemy_height_diff = if let Some(eid) = (*npc).enemy {
-                (*ctx.world).g_entities[eid.0 as usize].r.currentOrigin[2]
+                (*ctx.world_raw()).g_entities[eid.0 as usize]
+                    .r
+                    .currentOrigin[2]
                     - (*npc).r.currentOrigin[2]
             } else {
                 0.0
@@ -327,13 +329,14 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
 /// Raven `MineMonster_Combat`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
-pub fn MineMonster_Combat(ctx: GameContext<'_>) {
+pub fn MineMonster_Combat(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         let can_see = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr = &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+            let enemy_ptr =
+                &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
             NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) != 0
         } else {
             false
@@ -350,7 +353,8 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
         NPC_FaceEnemy(ctx, qtrue);
 
         let distance = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr = &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+            let enemy_ptr =
+                &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
             DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy_ptr).r.currentOrigin)
         } else {
             0.0
@@ -383,7 +387,7 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
 /// Handles pain/damage response for the MineMonster.
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:234-254`
 pub fn NPC_MineMonster_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -440,10 +444,10 @@ pub fn NPC_MineMonster_Pain(
 /// Raven `NPC_BSMineMonster_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
-pub fn NPC_BSMineMonster_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSMineMonster_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if (*npc).enemy.is_some() {
             MineMonster_Combat(ctx);

@@ -17,9 +17,9 @@ use crate::NPC_reactions::NPC_Pain;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -56,7 +56,7 @@ pub const RIGHT_ARM_HEALTH: c_int = 40;
 ///
 /// Precache weapon and effect resources.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:20-34`
-pub fn NPC_ATST_Precache(ctx: GameContext<'_>) {
+pub fn NPC_ATST_Precache(ctx: &mut GameContext) {
     unsafe {
         // SAFETY: G_SoundIndex, G_EffectIndex, RegisterItem accessed through game context.
         G_SoundIndex(b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
@@ -76,7 +76,7 @@ pub fn NPC_ATST_Precache(ctx: GameContext<'_>) {
 /// Called by NPC's and player in an ATST. Plays a damage sound.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:66-113`
 pub fn G_ATSTCheckPain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     damage: c_int,
@@ -86,7 +86,7 @@ pub fn G_ATSTCheckPain(
     let other: *mut gentity_t = unsafe { ent_resolve_opt(ctx, other) };
     unsafe {
         // SAFETY: self_ accessed through game context, rand() via bg_state.rng.
-        if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
+        if (*ctx.world_raw()).bg_state.rng.rand() & 1 != 0 {
             G_SoundOnEnt(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
@@ -109,7 +109,7 @@ pub fn G_ATSTCheckPain(
 /// Called when ATST takes damage. Plays pain sound and calls NPC pain handler.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:119-123`
 pub fn NPC_ATST_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -138,11 +138,11 @@ pub fn NPC_ATST_Pain(
 ///
 /// Hunt down the enemy. Set goal to enemy and move toward it.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:130-142`
-pub fn ATST_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn ATST_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world_raw()).globals
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if (*npc_info).goalEntity.is_none() {
             // hunt
@@ -160,16 +160,16 @@ pub fn ATST_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
 /// Perform a ranged attack. Check attack delay, fire weapons, chase if needed.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:149-170`
 pub fn ATST_Ranged(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     visible: qboolean,
     advance: qboolean,
     altAttack: qboolean,
 ) {
     unsafe {
-        // PORT-NOTE(ai-context): NPC/NPCInfo/ucmd accessed via (*ctx.world).globals
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
-        let ucmd = &mut (*ctx.world).globals.ucmd;
+        // PORT-NOTE(ai-context): NPC/NPCInfo/ucmd accessed via (*ctx.world_raw()).globals
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world_raw()).globals.ucmd;
 
         if TIMER_Done(
             ctx,
@@ -178,13 +178,10 @@ pub fn ATST_Ranged(
         ) != qfalse
             && visible != qfalse
         {
+            let __h1 = ctx.entity_id_of(npc);
+            let __h2 = (*ctx.world_raw()).bg_state.rng.Q_irand(500, 3000);
             // Attack?
-            TIMER_Set(
-                ctx,
-                ctx.entity_id_of(npc),
-                b"atkDelay\0".as_ptr() as *const c_char,
-                (*ctx.world).bg_state.rng.Q_irand(500, 3000),
-            );
+            TIMER_Set(ctx, __h1, b"atkDelay\0".as_ptr() as *const c_char, __h2);
 
             if altAttack != qfalse {
                 (*ucmd).buttons |= BUTTON_ATTACK | BUTTON_ALT_ATTACK;
@@ -204,11 +201,11 @@ pub fn ATST_Ranged(
 /// Main attack decision logic. Check if enemy still valid, determine distance,
 /// check visibility, and decide weapon type based on distance.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:177-264`
-pub fn ATST_Attack(ctx: GameContext<'_>) {
+pub fn ATST_Attack(ctx: &mut GameContext) {
     unsafe {
-        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world_raw()).globals
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         let mut alt_attack: qboolean = qfalse;
         let mut blaster_test: c_int;
@@ -228,7 +225,7 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
 
         // Rate our distance to the target, and our visibility
         let enemy_id = (*npc).enemy.unwrap();
-        let enemy = &(*ctx.world).g_entities[enemy_id.0 as usize];
+        let enemy = &(*ctx.world_raw()).g_entities[enemy_id.0 as usize];
         distance =
             DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy).r.currentOrigin) as c_int;
         dist_rate = if distance > MIN_MELEE_RANGE_SQR {
@@ -288,7 +285,7 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
                     && charger_test != -1
                     && (charger_test & TURN_OFF) == 0
                 {
-                    weapon = (*ctx.world).bg_state.rng.Q_irand(0, 1); // 0 is blaster, 1 is charger (ALT SIDE)
+                    weapon = (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1); // 0 is blaster, 1 is charger (ALT SIDE)
 
                     if weapon != 0 {
                         // Fire charger
@@ -321,11 +318,11 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
 /// Patrol the area. Check for stealth players, update goal if no enemy,
 /// and move toward goal.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:271-290`
-pub fn ATST_Patrol(ctx: GameContext<'_>) {
+pub fn ATST_Patrol(ctx: &mut GameContext) {
     unsafe {
-        // PORT-NOTE(ai-context): NPC/ucmd accessed via (*ctx.world).globals
-        let npc = (*ctx.world).globals.NPC;
-        let ucmd = &mut (*ctx.world).globals.ucmd;
+        // PORT-NOTE(ai-context): NPC/ucmd accessed via (*ctx.world_raw()).globals
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let ucmd = &mut (*ctx.world_raw()).globals.ucmd;
 
         if NPC_CheckPlayerTeamStealth(ctx) != qfalse {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -347,10 +344,10 @@ pub fn ATST_Patrol(ctx: GameContext<'_>) {
 ///
 /// ATST in idle state. Play idle behavior and set stand animation.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:297-303`
-pub fn ATST_Idle(ctx: GameContext<'_>) {
+pub fn ATST_Idle(ctx: &mut GameContext) {
     unsafe {
-        // PORT-NOTE(ai-context): NPC accessed via (*ctx.world).globals
-        let npc = (*ctx.world).globals.NPC;
+        // PORT-NOTE(ai-context): NPC accessed via (*ctx.world_raw()).globals
+        let npc = (*ctx.world_raw()).globals.NPC;
 
         NPC_BSIdle(ctx);
 
@@ -369,11 +366,11 @@ pub fn ATST_Idle(ctx: GameContext<'_>) {
 /// Main behavior state machine for ATST. Choose between attack, patrol,
 /// and idle based on NPC state.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:310-328`
-pub fn NPC_BSATST_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSATST_Default(ctx: &mut GameContext) {
     unsafe {
-        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world_raw()).globals
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if (*npc).enemy.is_some() {
             if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {

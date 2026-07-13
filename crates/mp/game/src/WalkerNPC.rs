@@ -14,7 +14,7 @@ use crate::trap;
 ///
 /// Registers the turret weapon used by the Walker vehicle.
 /// Source: `oracle/codemp/game/WalkerNPC.c:84-95`
-pub fn RegisterAssets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn RegisterAssets(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         // atst uses turret weapon (#ifdef _JK2MP path — both MP/SP port to same)
         let weapon = crate::bg_misc::BG_FindItemForWeapon(WP_TURRET);
@@ -29,7 +29,7 @@ pub fn RegisterAssets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 ///
 /// Updates vehicle speed based on movement input and vehicle properties.
 /// Source: `oracle/codemp/game/WalkerNPC.c:129-251`
-pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
         let parent = pVeh.m_pParentEntity;
@@ -201,7 +201,7 @@ pub fn WalkerYawAdjust(
 ///
 /// Processes vehicle orientation based on rider input and vehicle properties.
 /// Source: `oracle/codemp/game/WalkerNPC.c:316-411`
-pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
         let parent = pVeh.m_pParentEntity;
@@ -221,7 +221,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         if (*parent).s.owner != ENTITYNUM_NONE {
             // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
             // `ctx` now threads the world, so index the game arena directly.
-            rider = (*ctx.world)
+            rider = (*ctx.world_raw())
                 .g_entities
                 .as_mut_ptr()
                 .add((*parent).s.owner as usize) as *mut bgEntity_t;
@@ -302,7 +302,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 ///
 /// Animates the Walker vehicle based on speed and state.
 /// Source: `oracle/codemp/game/WalkerNPC.c:415-536`
-pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
         let mut anim = BOTH_STAND1;
@@ -391,7 +391,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 ///
 /// Board the Walker vehicle (reached via `crate::veh_dispatch::board`).
 /// Source: `oracle/codemp/game/WalkerNPC.c:106-115`
-pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
+pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
     unsafe {
         // `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
         if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
@@ -399,7 +399,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
         }
 
         // Set the board wait time (they won't be able to do anything, including getting off, for this amount of time).
-        (*pVeh).m_iBoarding = (*ctx.world).level.time + 1500;
+        (*pVeh).m_iBoarding = (*ctx.world_raw()).level.time + 1500;
 
         true
     }
@@ -410,7 +410,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 /// Allocate and initialize a new Walker vehicle.
 /// Source: `oracle/codemp/game/WalkerNPC.c:594-615`
 pub fn G_CreateWalkerNPC(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pVeh: *mut *mut Vehicle_t,
     strAnimalType: *const c_char,
 ) {
@@ -425,10 +425,11 @@ pub fn G_CreateWalkerNPC(
             // Set the vehicle info pointer to the appropriate vehicle type
             let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
                 strAnimalType,
-                &mut (*ctx.world).bg_state,
+                &mut (*ctx.world_raw()).bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
             );
-            (**pVeh).m_pVehicleInfo = &mut (*ctx.world).bg_state.g_vehicleInfo[veh_index as usize];
+            (**pVeh).m_pVehicleInfo =
+                &mut (&mut (*ctx.world_raw()).bg_state.g_vehicleInfo)[veh_index as usize];
         }
     }
 }

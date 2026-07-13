@@ -1149,6 +1149,12 @@ mod saberload {
         init_strap_engine(
             ENGINE.get_or_init(|| Engine::new(game_syscall_trampoline as *const c_void)),
         );
+        // STAGE-2a: the ctx-less boundary fns now reborrow a REAL world from the
+        // strap cell (a &mut field can't be null) — arm it with an owned zeroed
+        // world; the tested path never touches it (same contract as before).
+        let w: &'static mut mp_game::world::GameWorld =
+            Box::leak(mp_game::world::GameWorld::zeroed_boxed());
+        mp_game::g_strap::init_strap_world(w as *mut _);
 
         let dir = oracle_dir().join("fixtures");
         let traps = TestTraps::new(dir);

@@ -48,9 +48,9 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -89,7 +89,7 @@ const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL; // 
 /// Raven `Sniper_ClearTimers`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:44-58`
-pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Sniper_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     TIMER_Set(ctx, ctx.entity_id_of(ent), c"chatter".as_ptr(), 0);
@@ -110,20 +110,17 @@ pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `NPC_Sniper_PlayConfusionSound`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:60-76`
-pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: EntityId) {
+pub fn NPC_Sniper_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).health > 0 {
-            G_AddVoiceEvent(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                (*ctx.world)
-                    .bg_state
-                    .rng
-                    .Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int),
-                2000,
-            );
+            let __h216 = ctx.entity_id_of(self_).unwrap();
+            let __h217 = (*ctx.world_raw())
+                .bg_state
+                .rng
+                .Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int);
+            G_AddVoiceEvent(ctx, __h216, __h217, 2000);
         }
         // reset him to be totally unaware again
         TIMER_Set(
@@ -150,7 +147,7 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:85-98`
 pub fn NPC_Sniper_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -173,16 +170,13 @@ pub fn NPC_Sniper_Pain(
         );
 
         if damage == 0 && (*self_).health > 0 {
+            let __h218 = ctx.entity_id_of(self_).unwrap();
+            let __h219 = (*ctx.world_raw())
+                .bg_state
+                .rng
+                .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int);
             // FIXME: better way to know I was pushed (Raven comment).
-            G_AddVoiceEvent(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                (*ctx.world)
-                    .bg_state
-                    .rng
-                    .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
-                2000,
-            );
+            G_AddVoiceEvent(ctx, __h218, __h219, 2000);
         }
     }
 }
@@ -190,9 +184,9 @@ pub fn NPC_Sniper_Pain(
 /// Raven `Sniper_HoldPosition`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:106-116`
-pub fn Sniper_HoldPosition(ctx: GameContext<'_>) {
+pub fn Sniper_HoldPosition(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
         NPC_FreeCombatPoint(ctx, (*NPCInfo).combatPoint, qtrue);
@@ -203,9 +197,9 @@ pub fn Sniper_HoldPosition(ctx: GameContext<'_>) {
 /// Raven `Sniper_Move`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:124-177`
-pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
+pub fn Sniper_Move(ctx: &mut GameContext) -> qboolean {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -266,9 +260,10 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
                     if cp2 != -1 {
                         // found a combat point that has a clear shot to enemy
                         NPC_SetCombatPoint(ctx, cp2);
+                        let __h220 = ctx.entity_id_of(NPC).unwrap();
                         NPC_SetMoveGoal(
                             ctx,
-                            ctx.entity_id_of(NPC).unwrap(),
+                            __h220,
                             world.level.combatPoints[cp2 as usize].origin,
                             8,
                             qtrue,
@@ -280,9 +275,10 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
                 } else if cp != -1 {
                     // found a combat point that has a clear shot to enemy
                     NPC_SetCombatPoint(ctx, cp);
+                    let __h221 = ctx.entity_id_of(NPC).unwrap();
                     NPC_SetMoveGoal(
                         ctx,
-                        ctx.entity_id_of(NPC).unwrap(),
+                        __h221,
                         world.level.combatPoints[cp as usize].origin,
                         8,
                         qtrue,
@@ -303,9 +299,9 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
 /// Raven `NPC_BSSniper_Patrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:185-275`
-pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
+pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -347,15 +343,12 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
                             // an enemy
                             // G_SetEnemy would need to be called here
                             // G_SetEnemy(ctx, NPC, owner);
-                            TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(NPC),
-                                c"attackDelay".as_ptr(),
-                                (*ctx.world).bg_state.rng.Q_irand(
-                                    (6 - (*NPCInfo).stats.aim) * 100,
-                                    (6 - (*NPCInfo).stats.aim) * 500,
-                                ),
+                            let __h222 = ctx.entity_id_of(NPC);
+                            let __h223 = (*ctx.world_raw()).bg_state.rng.Q_irand(
+                                (6 - (*NPCInfo).stats.aim) * 100,
+                                (6 - (*NPCInfo).stats.aim) * 500,
                             );
+                            TIMER_Set(ctx, __h222, c"attackDelay".as_ptr(), __h223);
                         }
                     } else {
                         // FIXME: get more suspicious over time?
@@ -367,11 +360,11 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
                         (*NPCInfo).investigateGoal[2] =
                             world.level.alertEvents[alertEvent as usize].position[2];
                         (*NPCInfo).investigateDebounceTime =
-                            world.level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1000);
+                            world.level.time + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 1000);
                         if world.level.alertEvents[alertEvent as usize].level as i32 == 1 {
                             // AEL_SUSPICIOUS = 1: suspicious looks longer
                             (*NPCInfo).investigateDebounceTime +=
-                                (*ctx.world).bg_state.rng.Q_irand(500, 2500);
+                                (*ctx.world_raw()).bg_state.rng.Q_irand(500, 2500);
                         }
                     }
                 }
@@ -412,9 +405,9 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
 /// Raven `Sniper_CheckMoveState`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:308-381`
-pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
+pub fn Sniper_CheckMoveState(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -445,6 +438,8 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
             let flying = FlyingCreature(&*NPC);
             let goal_ent =
                 &mut world.g_entities[(*NPCInfo).goalEntity.unwrap().index()] as *mut gentity_t;
+            let __h234 = ctx.entity_id_of(NPC);
+            let __h235 = (*ctx.world_raw()).bg_state.rng.Q_irand(4000, 8000);
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
@@ -461,30 +456,25 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                 let mut newSquadState = SQUAD_STAND_AND_SHOOT;
                 match (*NPCInfo).squadState {
                     2 => {
+                        let __h224 = ctx.entity_id_of(NPC);
                         // SQUAD_RETREAT=2: was running away
                         TIMER_Set(
                             ctx,
-                            ctx.entity_id_of(NPC),
+                            __h224,
                             c"duck".as_ptr(),
                             ((*((*NPC).client as *mut gclient_t)).pers.maxHealth - (*NPC).health)
                                 * 100,
                         );
-                        TIMER_Set(
-                            ctx,
-                            ctx.entity_id_of(NPC),
-                            c"hideTime".as_ptr(),
-                            (*ctx.world).bg_state.rng.Q_irand(3000, 7000),
-                        );
+                        let __h225 = ctx.entity_id_of(NPC);
+                        let __h226 = (*ctx.world_raw()).bg_state.rng.Q_irand(3000, 7000);
+                        TIMER_Set(ctx, __h225, c"hideTime".as_ptr(), __h226);
                         newSquadState = SQUAD_COVER;
                     }
                     4 => {
+                        let __h227 = ctx.entity_id_of(NPC);
+                        let __h228 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
                         // SQUAD_TRANSITION=4: was heading for a combat point
-                        TIMER_Set(
-                            ctx,
-                            ctx.entity_id_of(NPC),
-                            c"hideTime".as_ptr(),
-                            (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
-                        );
+                        TIMER_Set(ctx, __h227, c"hideTime".as_ptr(), __h228);
                     }
                     6 => {
                         // SQUAD_SCOUT=6: was running after player
@@ -492,43 +482,28 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                     _ => {}
                 }
                 NPC_ReachedGoal(ctx);
+                let __h229 = ctx.entity_id_of(NPC);
+                let __h230 = (*ctx.world_raw()).bg_state.rng.Q_irand(
+                    (6 - (*NPCInfo).stats.aim) * 50,
+                    (6 - (*NPCInfo).stats.aim) * 100,
+                );
                 // don't attack right away
-                TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(NPC),
-                    c"attackDelay".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(
-                        (6 - (*NPCInfo).stats.aim) * 50,
-                        (6 - (*NPCInfo).stats.aim) * 100,
-                    ),
-                );
+                TIMER_Set(ctx, __h229, c"attackDelay".as_ptr(), __h230);
+                let __h231 = ctx.entity_id_of(NPC);
+                let __h232 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 4000);
                 // don't do something else just yet
-                TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(NPC),
-                    c"roamTime".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(1000, 4000),
-                );
+                TIMER_Set(ctx, __h231, c"roamTime".as_ptr(), __h232);
                 // stop fleeing
                 if (*NPCInfo).squadState == SQUAD_RETREAT {
-                    TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(NPC),
-                        c"flee".as_ptr(),
-                        -world.level.time,
-                    );
+                    let __h233 = ctx.entity_id_of(NPC);
+                    TIMER_Set(ctx, __h233, c"flee".as_ptr(), -world.level.time);
                     (*NPCInfo).squadState = SQUAD_IDLE;
                 }
                 return;
             }
 
             // keep going, hold of roamTimer until we get there
-            TIMER_Set(
-                ctx,
-                ctx.entity_id_of(NPC),
-                c"roamTime".as_ptr(),
-                (*ctx.world).bg_state.rng.Q_irand(4000, 8000),
-            );
+            TIMER_Set(ctx, __h234, c"roamTime".as_ptr(), __h235);
         }
     }
 }
@@ -536,9 +511,9 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
 /// Raven `Sniper_ResolveBlockedShot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:383-434`
-pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
+pub fn Sniper_ResolveBlockedShot(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -586,9 +561,10 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                         if cp2 != -1 {
                             // found a combat point that has a clear shot to enemy
                             NPC_SetCombatPoint(ctx, cp2);
+                            let __h236 = ctx.entity_id_of(NPC).unwrap();
                             NPC_SetMoveGoal(
                                 ctx,
-                                ctx.entity_id_of(NPC).unwrap(),
+                                __h236,
                                 world.level.combatPoints[cp2 as usize].origin,
                                 8,
                                 qtrue,
@@ -596,20 +572,18 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                                 None,
                             );
                             TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
-                            TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(NPC),
-                                c"attackDelay".as_ptr(),
-                                (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
-                            );
+                            let __h237 = ctx.entity_id_of(NPC);
+                            let __h238 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 3000);
+                            TIMER_Set(ctx, __h237, c"attackDelay".as_ptr(), __h238);
                             return;
                         }
                     } else if cp != -1 {
                         // found a combat point that has a clear shot to enemy
                         NPC_SetCombatPoint(ctx, cp);
+                        let __h239 = ctx.entity_id_of(NPC).unwrap();
                         NPC_SetMoveGoal(
                             ctx,
-                            ctx.entity_id_of(NPC).unwrap(),
+                            __h239,
                             world.level.combatPoints[cp as usize].origin,
                             8,
                             qtrue,
@@ -617,12 +591,9 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                             None,
                         );
                         TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
-                        TIMER_Set(
-                            ctx,
-                            ctx.entity_id_of(NPC),
-                            c"attackDelay".as_ptr(),
-                            (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
-                        );
+                        let __h240 = ctx.entity_id_of(NPC);
+                        let __h241 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 3000);
+                        TIMER_Set(ctx, __h240, c"attackDelay".as_ptr(), __h241);
                         return;
                     }
                 }
@@ -634,9 +605,9 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
 /// Raven `Sniper_CheckFireState`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:442-486`
-pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
+pub fn Sniper_CheckFireState(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -663,7 +634,7 @@ pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
         }
 
         // continue to fire on their last position
-        if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0
+        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0
             && (*NPCInfo).enemyLastSeenTime != 0
             && world.level.time - (*NPCInfo).enemyLastSeenTime < ((5 - (*NPCInfo).stats.aim) * 1000)
         {
@@ -698,9 +669,9 @@ pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
 /// Raven `Sniper_EvaluateShot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:488-506`
-pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
+pub fn Sniper_EvaluateShot(ctx: &mut GameContext, hit: c_int) -> qboolean {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
 
         if (*NPC).enemy == None {
@@ -728,9 +699,9 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
 /// Raven `Sniper_FaceEnemy`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:508-603`
-pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
+pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -776,39 +747,28 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
                         tryMissCount += 1;
                         let enemy_maxs2 = world.g_entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
                         let enemy_mins2 = world.g_entities[(*NPC).enemy.unwrap().index()].r.mins[2];
-                        if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                        if world.bg_state.rng.Q_irand(0, 1) == 0 {
                             aimError = qtrue;
-                            if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                                _VectorMA(
-                                    target,
-                                    enemy_maxs2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
-                                    right,
-                                    &mut target,
-                                );
+                            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                                let __h243 =
+                                    enemy_maxs2 * (*ctx.world_raw()).bg_state.rng.flrand(1.5, 4.0);
+                                _VectorMA(target, __h243, right, &mut target);
                             } else {
-                                _VectorMA(
-                                    target,
-                                    enemy_mins2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
-                                    right,
-                                    &mut target,
-                                );
+                                let __h244 =
+                                    enemy_mins2 * (*ctx.world_raw()).bg_state.rng.flrand(1.5, 4.0);
+                                _VectorMA(target, __h244, right, &mut target);
                             }
                         }
-                        if aimError == qfalse || (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                            if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                                _VectorMA(
-                                    target,
-                                    enemy_maxs2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
-                                    up,
-                                    &mut target,
-                                );
+                        if aimError == qfalse || (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0
+                        {
+                            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                                let __h245 =
+                                    enemy_maxs2 * (*ctx.world_raw()).bg_state.rng.flrand(1.5, 4.0);
+                                _VectorMA(target, __h245, up, &mut target);
                             } else {
-                                _VectorMA(
-                                    target,
-                                    enemy_mins2 * (*ctx.world).bg_state.rng.flrand(1.5, 4.0),
-                                    up,
-                                    &mut target,
-                                );
+                                let __h246 =
+                                    enemy_mins2 * (*ctx.world_raw()).bg_state.rng.flrand(1.5, 4.0);
+                                _VectorMA(target, __h246, up, &mut target);
                             }
                         }
                         trap::Trace(
@@ -850,7 +810,7 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
             // GetAnglesForDirection(muzzle, target, angles);
         } else {
             let enemy_maxs2 = world.g_entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
-            target[2] += (*ctx.world).bg_state.rng.flrand(0.0, enemy_maxs2);
+            target[2] += (*ctx.world_raw()).bg_state.rng.flrand(0.0, enemy_maxs2);
             // CalcEntitySpot((*NPC).enemy, SPOT_HEAD_LEAN, &mut target);
             // GetAnglesForDirection(muzzle, target, angles);
         }
@@ -864,9 +824,9 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
 /// Raven `Sniper_UpdateEnemyPos`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:605-623`
-pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
+pub fn Sniper_UpdateEnemyPos(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
@@ -875,21 +835,17 @@ pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
             let index = (i / ENEMY_POS_LAG_INTERVAL) as usize;
             if index == 0 {
                 let mut spot = [0.0f32; 3];
-                CalcEntitySpot(
-                    ctx,
-                    ctx.entity_id_of(
-                        (*NPC)
-                            .enemy
-                            .map(|id| &world.g_entities[id.index()] as *const gentity_t)
-                            .unwrap_or(core::ptr::null()),
-                    ),
-                    spot_t::SPOT_HEAD_LEAN,
-                    &mut spot,
+                let __h247 = ctx.entity_id_of(
+                    (*NPC)
+                        .enemy
+                        .map(|id| &world.g_entities[id.index()] as *const gentity_t)
+                        .unwrap_or(core::ptr::null()),
                 );
+                CalcEntitySpot(ctx, __h247, spot_t::SPOT_HEAD_LEAN, &mut spot);
                 (*NPCInfo).enemyLaggedPos[index][0] = spot[0];
                 (*NPCInfo).enemyLaggedPos[index][1] = spot[1];
                 (*NPCInfo).enemyLaggedPos[index][2] =
-                    spot[2] - (*ctx.world).bg_state.rng.flrand(2.0, 16.0);
+                    spot[2] - (*ctx.world_raw()).bg_state.rng.flrand(2.0, 16.0);
             } else {
                 (*NPCInfo).enemyLaggedPos[index][0] = (*NPCInfo).enemyLaggedPos[index - 1][0];
                 (*NPCInfo).enemyLaggedPos[index][1] = (*NPCInfo).enemyLaggedPos[index - 1][1];
@@ -903,32 +859,31 @@ pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
 /// Raven `Sniper_StartHide`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:631-638`
-pub fn Sniper_StartHide(ctx: GameContext<'_>) {
+pub fn Sniper_StartHide(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
 
-        let duckTime = (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
+        let duckTime = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 5000);
         TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), duckTime);
         TIMER_Set(ctx, ctx.entity_id_of(NPC), c"watch".as_ptr(), 500);
-        TIMER_Set(
-            ctx,
-            ctx.entity_id_of(NPC),
-            c"attackDelay".as_ptr(),
-            duckTime + (*ctx.world).bg_state.rng.Q_irand(500, 2000),
-        );
+        let __h248 = ctx.entity_id_of(NPC);
+        let __h249 = duckTime + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 2000);
+        TIMER_Set(ctx, __h248, c"attackDelay".as_ptr(), __h249);
     }
 }
 
 /// Raven `NPC_BSSniper_Attack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:640-852`
-pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
+pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
+        let __h250 = ctx.entity_id_of(NPC);
+        let __h775 = NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, 4);
         // Don't do anything if we're hurt
         if (*NPC).painDebounceTime > world.level.time {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -942,9 +897,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             return;
         }
 
-        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flee".as_ptr()) != 0
-            && NPC_CheckForDanger(ctx, NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, 4)) != 0
-        {
+        if TIMER_Done(ctx, __h250, c"flee".as_ptr()) != 0 && NPC_CheckForDanger(ctx, __h775) != 0 {
             // AEL_DANGER = 4, going to run
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
@@ -1006,17 +959,14 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
         }
 
         Sniper_UpdateEnemyPos(ctx);
+        let __h251 = ctx.entity_id_of(
+            (*NPC)
+                .enemy
+                .map(|id| &mut world.g_entities[id.index()] as *mut gentity_t)
+                .unwrap_or(core::ptr::null_mut()),
+        );
         // can we see our target?
-        if NPC_ClearLOS4(
-            ctx,
-            ctx.entity_id_of(
-                (*NPC)
-                    .enemy
-                    .map(|id| &mut world.g_entities[id.index()] as *mut gentity_t)
-                    .unwrap_or(core::ptr::null_mut()),
-            ),
-        ) != 0
-        {
+        if NPC_ClearLOS4(ctx, __h251) != 0 {
             let maxShootDist;
 
             (*NPCInfo).enemyLastSeenTime = world.level.time;
@@ -1089,8 +1039,9 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             // FIXME: what about leaning?
             // FIXME: also, when stop ducking, start looking, if enemy can see me, chance of ducking back down again
         } else {
+            let __h252 = ctx.entity_id_of(NPC);
             // stop ducking!
-            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
+            TIMER_Set(ctx, __h252, c"duck".as_ptr(), -1);
         }
 
         if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) != 0
@@ -1136,15 +1087,17 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
                 }
 
                 // took a shot, now hide
-                if ((*NPC).spawnflags & 0x0100) == 0 && (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0
+                if ((*NPC).spawnflags & 0x0100) == 0
+                    && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0
                 {
                     // SPF_NO_HIDE = 0x0100
                     // FIXME: do this if in combat point and combat point has duck-type cover...
                     Sniper_StartHide(ctx);
                 } else {
+                    let __h253 = ctx.entity_id_of(NPC);
                     TIMER_Set(
                         ctx,
-                        ctx.entity_id_of(NPC),
+                        __h253,
                         c"attackDelay".as_ptr(),
                         (*NPCInfo).shotTime - world.level.time,
                     );
@@ -1157,9 +1110,9 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 /// Raven `NPC_BSSniper_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:854-864`
-pub fn NPC_BSSniper_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSSniper_Default(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC as *mut gentity_t;
 
         if (*NPC).enemy == None {

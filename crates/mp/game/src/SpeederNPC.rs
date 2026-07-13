@@ -50,7 +50,7 @@ pub fn VEH_StartStrafeRam(pVeh: *mut Vehicle_t, Right: qboolean, Duration: c_int
 /// exhaust, and armor-effects code (lines 163-264) is guarded by `#ifndef _JK2MP`
 /// and is SP-only dead code, dropped per porting-rules §10.
 /// Source: `oracle/codemp/game/SpeederNPC.c:149-268`
-pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
         // `g_vehicleInfo[VEHICLE_BASE].Update` — the generic base body.
         if crate::g_vehicles::Update(ctx, pVeh, pUcmd) == qfalse {
@@ -75,7 +75,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_
 ///
 /// Raven: MP RULE - ALL PROCESSMOVECOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE!!!
 /// Source: `oracle/codemp/game/SpeederNPC.c:278-490`
-pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut speedInc: f32;
         let speedIdleDec: f32;
@@ -124,7 +124,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             * (*pVeh).m_fTimeModifier;
 
         // QAGAME MP branch: `curTime = level.time`, reachable through `ctx`.
-        curTime = (*ctx.world).level.time;
+        curTime = (*ctx.world_raw()).level.time;
 
         // Handle turbo/acceleration
         if !(*pVeh).m_pPilot.is_null()
@@ -289,7 +289,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven: the `_JK2MP` branch handles MP vehicle orientation (yaw control via view angles);
 /// the `#else` SP branch (lines 553-594) is dead code and is dropped per porting-rules §10.
 /// Source: `oracle/codemp/game/SpeederNPC.c:505-600`
-pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let riderPS: *mut playerState_t;
         let parentPS: *mut playerState_t;
@@ -351,7 +351,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven: "This function makes sure that the vehicle is properly animated."
 /// The body is empty in the oracle (SpeederNPC.c:609) — a deliberate no-op.
 /// Source: `oracle/codemp/game/SpeederNPC.c:608-610`
-pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {}
+pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {}
 
 /// Raven `AnimateRiders`.
 ///
@@ -361,7 +361,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {}
 /// `#ifdef _JK2MP` with `if (1) return;` at line 741, making it dead code, dropped per
 /// porting-rules §10.
 /// Source: `oracle/codemp/game/SpeederNPC.c:630-1038`
-pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         // Only handle boarding animation in MP build; pilot animation is dead code
         if (*pVeh).m_iBoarding == 0 {
@@ -394,28 +394,29 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             // channel into this dispatch chain, so BG_AnimLength is reachable
             // (game-tier free-function form off `bg_state`).
             iAnimLen = (crate::bg_panimate::BG_AnimLength(
-                &(*ctx.world).bg_state,
+                &(*ctx.world_raw()).bg_state,
                 (*(*pVeh).m_pPilot).localAnimIndex,
                 Anim as c_int,
             ) as f32
                 * 0.4f32) as c_int;
             // MP `BG_GetTime()` is `level.time`, reachable through `ctx`.
-            (*pVeh).m_iBoarding = (*ctx.world).level.time + iAnimLen;
+            (*pVeh).m_iBoarding = (*ctx.world_raw()).level.time + iAnimLen;
 
             // Set the animation which won't be interrupted until completed. `BG_SetAnim`
             // is a `PmoveContext` method (`bgAllAnims` off `BgState`); build a pm-null
             // per-call context from `ctx` (the `BG_ParseAnimationFile` game-tier
             // wrapper precedent; `BG_SetAnimFinal` null-guards the missing `pm`).
             let ps = (*(*pVeh).m_pPilot).playerState;
-            let anims =
-                (*ctx.world).bg_state.bgAllAnims[(*(*pVeh).m_pPilot).localAnimIndex as usize].anims;
+            let anims = (&(*ctx.world_raw()).bg_state.bgAllAnims)
+                [(*(*pVeh).m_pPilot).localAnimIndex as usize]
+                .anims;
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                world: ctx.world,
+                world: ctx.world_raw(),
                 engine: ctx.engine,
             };
             let mut pmc = crate::bg_channel::PmoveContext::new(
-                &mut (*ctx.world).bg_state,
+                &mut (*ctx.world_raw()).bg_state,
                 &traps,
                 &mut callbacks,
             );
@@ -436,7 +437,11 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// The `_JK2MP` build uses `G_AllocateVehicleObject` on the game side (QAGAME branch);
 /// the cgame branch would use `BG_Alloc` (dead code here, dropped).
 /// Source: `oracle/codemp/game/SpeederNPC.c:1092-1113`
-pub fn G_CreateSpeederNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
+pub fn G_CreateSpeederNPC(
+    ctx: &mut GameContext,
+    pVeh: *mut *mut Vehicle_t,
+    strType: *const c_char,
+) {
     unsafe {
         // Allocate the Vehicle object
         // QAGAME branch (_JK2MP with QAGAME compile flag)
@@ -448,10 +453,11 @@ pub fn G_CreateSpeederNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strTy
         // Set the vehicle info pointer based on vehicle type name.
         let vehicleIndex: c_int = BG_VehicleGetIndex(
             strType,
-            &mut (*ctx.world).bg_state,
+            &mut (*ctx.world_raw()).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
-        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[vehicleIndex as usize]
-            as *const _ as *mut vehicleInfo_t;
+        (*(*pVeh)).m_pVehicleInfo = &(&(*ctx.world_raw()).bg_state.g_vehicleInfo)
+            [vehicleIndex as usize] as *const _
+            as *mut vehicleInfo_t;
     }
 }

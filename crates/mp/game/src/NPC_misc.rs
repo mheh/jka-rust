@@ -26,7 +26,7 @@ const DEBUG_LEVEL_ERROR: c_int = 1;
 ///
 /// Source: `oracle/codemp/game/NPC_misc.c:10-35`
 pub fn Debug_Printf(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     cv: *mut vmCvar_t,
     debugLevel: c_int,
     fmt: *mut c_char,
@@ -50,7 +50,7 @@ pub fn Debug_Printf(
             _ => "^1",                   // Default to S_COLOR_RED
         };
 
-        let time = (*ctx.world).level.time;
+        let time = (*ctx.world_raw()).level.time;
         let msg: String = cstr_to_str(fmt);
 
         let output = format!("{}{:5}:{}", color, time, msg);
@@ -68,7 +68,7 @@ pub fn Debug_Printf(
 ///
 /// Source: `oracle/codemp/game/NPC_misc.c:41-73`
 pub fn Debug_NPCPrintf(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     printNPC: EntityId,
     cv: *mut vmCvar_t,
     debugLevel: c_int,
@@ -96,7 +96,7 @@ pub fn Debug_NPCPrintf(
             _ => '1',                   // Default to COLOR_RED
         };
 
-        let time = (*ctx.world).level.time;
+        let time = (*ctx.world_raw()).level.time;
         let msg: String = cstr_to_str(fmt);
         let npc_targetname: String = cstr_to_str((*printNPC).targetname);
 

@@ -16,7 +16,7 @@ use crate::prelude::*;
 /// existed on `GameWorld`; only the accessor was missing).
 ///
 /// Source: `oracle/codemp/game/g_mem.c:16-33`
-pub fn G_Alloc(ctx: GameContext<'_>, size: c_int) -> *mut c_void {
+pub fn G_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
     use crate::g_main::{G_Error, G_Printf};
 
     // Raven `#define POOLSIZE (256 * 1024)` — `g_mem.c` file-local.
@@ -24,7 +24,7 @@ pub fn G_Alloc(ctx: GameContext<'_>, size: c_int) -> *mut c_void {
     const POOLSIZE: c_int = 262144; // 256 * 1024
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
 
         if world.cvars.g_debugAlloc.integer != 0 {
             G_Printf(
@@ -55,23 +55,23 @@ pub fn G_Alloc(ctx: GameContext<'_>, size: c_int) -> *mut c_void {
 /// Raven `G_InitMemory`.
 ///
 /// Source: `oracle/codemp/game/g_mem.c:35-37`
-pub fn G_InitMemory(ctx: GameContext<'_>) {
+pub fn G_InitMemory(ctx: &mut GameContext) {
     // Raven: allocPoint = 0;
     unsafe {
-        (*ctx.world).allocPoint = 0;
+        (*ctx.world_raw()).allocPoint = 0;
     }
 }
 
 /// Raven `Svcmd_GameMem_f`.
 ///
 /// Source: `oracle/codemp/game/g_mem.c:39-41`
-pub fn Svcmd_GameMem_f(ctx: GameContext<'_>) {
+pub fn Svcmd_GameMem_f(ctx: &mut GameContext) {
     use crate::g_main::G_Printf;
     // Raven: G_Printf( "Game memory status: %i out of %i bytes allocated\n", allocPoint, POOLSIZE );
     let poolsize: c_int = 262144; // POOLSIZE = 256 * 1024
     let msg = format!(
         "Game memory status: {} out of {} bytes allocated\n",
-        unsafe { (*ctx.world).allocPoint },
+        unsafe { (*ctx.world_raw()).allocPoint },
         poolsize
     );
     let msg_cstr = cstr(&msg);

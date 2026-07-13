@@ -19,19 +19,19 @@ use crate::trap;
 // resolve an id back to the live pointer needed at raw-pointer call sites
 // (`G_RadiusDamage`, `G_Damage`, …) and build the id at assignment sites.
 #[inline]
-unsafe fn ent_resolve(ctx: GameContext<'_>, id: EntityId) -> *mut gentity_t {
-    unsafe { &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t }
+unsafe fn ent_resolve(ctx: &mut GameContext, id: EntityId) -> *mut gentity_t {
+    unsafe { &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t }
 }
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
         Some(i) => unsafe { ent_resolve(ctx, i) },
         None => core::ptr::null_mut(),
     }
 }
 #[inline]
-unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
-    unsafe { (*ctx.world).g_entities.as_ptr() }
+unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
+    unsafe { (*ctx.world_raw()).g_entities.as_ptr() }
 }
 
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
@@ -41,7 +41,7 @@ use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
 ///
 /// Reflect the missile roughly back at it's owner.
 /// Source: `oracle/codemp/game/g_missile.c:24-89`
-pub fn G_ReflectMissile(ctx: GameContext<'_>, ent: EntityId, missile: EntityId, forward: vec3_t) {
+pub fn G_ReflectMissile(ctx: &mut GameContext, ent: EntityId, missile: EntityId, forward: vec3_t) {
     let mut bounce_dir: vec3_t = [0.0; 3];
     let mut isowner = 0;
 
@@ -114,7 +114,7 @@ pub fn G_ReflectMissile(ctx: GameContext<'_>, ent: EntityId, missile: EntityId, 
         speed,
         &mut ctx.entity_mut(missile).s.pos.trDelta,
     );
-    ctx.entity_mut(missile).s.pos.trTime = ctx.world().level.time;
+    ctx.entity_mut(missile).s.pos.trTime = ctx.world.level.time;
     let missile_origin = ctx.entity(missile).r.currentOrigin;
     crate::q_math::_VectorCopy(missile_origin, &mut ctx.entity_mut(missile).s.pos.trBase);
 
@@ -131,7 +131,7 @@ pub fn G_ReflectMissile(ctx: GameContext<'_>, ent: EntityId, missile: EntityId, 
 /// Raven `G_DeflectMissile`.
 ///
 /// Source: `oracle/codemp/game/g_missile.c:91-140`
-pub fn G_DeflectMissile(ctx: GameContext<'_>, ent: EntityId, missile: EntityId, forward: vec3_t) {
+pub fn G_DeflectMissile(ctx: &mut GameContext, ent: EntityId, missile: EntityId, forward: vec3_t) {
     let mut bounce_dir: vec3_t = [0.0; 3];
     let mut missile_dir: vec3_t = [0.0; 3];
     let mut isowner = 0;
@@ -174,7 +174,7 @@ pub fn G_DeflectMissile(ctx: GameContext<'_>, ent: EntityId, missile: EntityId, 
         speed,
         &mut ctx.entity_mut(missile).s.pos.trDelta,
     );
-    ctx.entity_mut(missile).s.pos.trTime = ctx.world().level.time;
+    ctx.entity_mut(missile).s.pos.trTime = ctx.world.level.time;
     let missile_origin = ctx.entity(missile).r.currentOrigin;
     crate::q_math::_VectorCopy(missile_origin, &mut ctx.entity_mut(missile).s.pos.trBase);
 
@@ -192,13 +192,13 @@ pub fn G_DeflectMissile(ctx: GameContext<'_>, ent: EntityId, missile: EntityId, 
 /// Raven `G_BounceMissile`.
 ///
 /// Source: `oracle/codemp/game/g_missile.c:148-205`
-pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
+pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
     let mut velocity: vec3_t = [0.0; 3];
     let tr = trace;
 
     // Reflect the velocity on the trace plane
     let (prev_time, time) = {
-        let level = &ctx.world().level;
+        let level = &ctx.world.level;
         (level.previousTime, level.time)
     };
     let hitTime = prev_time as c_float + (time - prev_time) as c_float * tr.fraction;
@@ -223,7 +223,7 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
         // Check for stop
         if tr.plane.normal[2] > 0.7 && ctx.entity(ent).s.pos.trDelta[2] < 40.0 {
             G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
-            ctx.entity_mut(ent).nextthink = ctx.world().level.time + 100;
+            ctx.entity_mut(ent).nextthink = ctx.world.level.time + 100;
             return;
         }
     } else if (ctx.entity(ent).flags & FL_BOUNCE_HALF) != 0 {
@@ -246,7 +246,7 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
     if weapon == WP_THERMAL {
         let sound_name = cstr(&format!(
             "sound/weapons/thermal/bounce{}.wav",
-            ctx.world().bg_state.rng.Q_irand(1, 2)
+            ctx.world.bg_state.rng.Q_irand(1, 2)
         ));
         G_Sound(
             ctx,
@@ -257,7 +257,7 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
     } else if weapon == WP_SABER {
         let sound_name = cstr(&format!(
             "sound/weapons/saber/bounce{}.wav",
-            ctx.world().bg_state.rng.Q_irand(1, 3)
+            ctx.world.bg_state.rng.Q_irand(1, 3)
         ));
         G_Sound(
             ctx,
@@ -275,7 +275,7 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
     );
     let currentOrigin = ctx.entity(ent).r.currentOrigin;
     crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(ent).s.pos.trBase);
-    ctx.entity_mut(ent).s.pos.trTime = ctx.world().level.time;
+    ctx.entity_mut(ent).s.pos.trTime = ctx.world.level.time;
 
     if ctx.entity(ent).bounceCount != -5 {
         ctx.entity_mut(ent).bounceCount -= 1;
@@ -286,11 +286,11 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: EntityId, trace: &trace_t) {
 ///
 /// Explode a missile without an impact.
 /// Source: `oracle/codemp/game/g_missile.c:215-257`
-pub fn G_ExplodeMissile(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
     let mut dir: vec3_t = [0.0, 0.0, 1.0];
     let mut origin: vec3_t = [0.0; 3];
 
-    let time = ctx.world().level.time;
+    let time = ctx.world.level.time;
     crate::bg_misc::BG_EvaluateTrajectory(&ctx.entity(ent).s.pos, time, &mut origin);
     trap::SnapVector(
         ctx.engine,
@@ -319,7 +319,7 @@ pub fn G_ExplodeMissile(ctx: GameContext<'_>, ent: EntityId) {
         {
             let owner_num = ctx.entity(ent).r.ownerNum as usize;
             ctx.entity_mut(ent).parent =
-                Some(unsafe { ent_id(ent_base(ctx), &ctx.world().g_entities[owner_num]) });
+                Some(unsafe { ent_id(ent_base(ctx), &ctx.world.g_entities[owner_num]) });
         }
 
         let parent = ctx.entity(ent).parent;
@@ -328,14 +328,21 @@ pub fn G_ExplodeMissile(ctx: GameContext<'_>, ent: EntityId) {
         let splashRadius = ctx.entity(ent).splashRadius;
         let splashMod = ctx.entity(ent).splashMethodOfDeath;
         let parent_ptr = unsafe { ent_resolve_opt(ctx, parent) };
+        // Raw-pointer temps end `entity_mut`'s borrow of `ctx` at the coercion
+        // (raw pointers carry no borrowck lifetime), so the follow-up
+        // `entity_id_of` (which needs `&ctx`) doesn't conflict.
+        let __s951 = ctx.entity_mut(ent) as *mut gentity_t;
+        let __s952 = ctx.entity_id_of(__s951);
+        let __s953 = ctx.entity_mut(ent) as *mut gentity_t;
+        let __s954 = ctx.entity_id_of(__s953);
         if G_RadiusDamage(
             ctx,
             currentOrigin,
             ctx.entity_id_of(parent_ptr),
             splashDamage as f32,
             splashRadius as f32,
-            ctx.entity_id_of(ctx.entity_mut(ent)),
-            ctx.entity_id_of(ctx.entity_mut(ent)),
+            __s952,
+            __s954,
             splashMod,
         ) != 0
         {
@@ -366,7 +373,7 @@ pub fn G_ExplodeMissile(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `G_RunStuckMissile`.
 ///
 /// Source: `oracle/codemp/game/g_missile.c:259-277`
-pub fn G_RunStuckMissile(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_RunStuckMissile(ctx: &mut GameContext, ent: EntityId) {
     if ctx.entity(ent).takedamage != 0 {
         let ground = ctx.entity(ent).s.groundEntityNum;
         if ground >= 0 && (ground as usize) < ENTITYNUM_WORLD as usize {
@@ -380,12 +387,21 @@ pub fn G_RunStuckMissile(ctx: GameContext<'_>, ent: EntityId) {
                     && ctx.entity(other).s.apos.trType != TR_STATIONARY;
 
             if delta_moving || apos_moving {
+                // Raw-pointer temps end each `entity_mut` borrow of `ctx` at the
+                // coercion, so the follow-up `entity_id_of` (which needs `&ctx`)
+                // doesn't conflict.
+                let __h801 = ctx.entity_mut(ent) as *mut gentity_t;
+                let __h578 = ctx.entity_id_of(__h801);
+                let __h802 = ctx.entity_mut(other) as *mut gentity_t;
+                let __h579 = ctx.entity_id_of(__h802);
+                let __h803 = ctx.entity_mut(other) as *mut gentity_t;
+                let __h580 = ctx.entity_id_of(__h803);
                 // Thing I stuck to is moving or rotating now, kill me
                 G_Damage(
                     ctx,
-                    ctx.entity_id_of(ctx.entity_mut(ent)),
-                    ctx.entity_id_of(ctx.entity_mut(other)),
-                    ctx.entity_id_of(ctx.entity_mut(other)),
+                    __h578,
+                    __h579,
+                    __h580,
                     None,
                     crate::q_math::vec3_origin,
                     99999,
@@ -419,7 +435,7 @@ pub fn G_BounceProjectile(start: vec3_t, impact: vec3_t, dir: vec3_t, endout: &m
 ///
 /// Source: `oracle/codemp/game/g_missile.c:298-329`
 pub fn CreateMissile(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     org: vec3_t,
     dir: vec3_t,
     vel: f32,
@@ -433,7 +449,7 @@ pub fn CreateMissile(
     let missile_ptr = G_Spawn(ctx);
     let missile = ctx.entity_id_of(missile_ptr).unwrap();
 
-    ctx.entity_mut(missile).nextthink = ctx.world().level.time + life;
+    ctx.entity_mut(missile).nextthink = ctx.world.level.time + life;
     ctx.entity_mut(missile).think = Some(EntThink::G_FreeEntity).into();
     ctx.entity_mut(missile).s.eType = ET_MISSILE as c_int;
     ctx.entity_mut(missile).r.svFlags = SVF_USE_CURRENT_ORIGIN;
@@ -445,7 +461,7 @@ pub fn CreateMissile(
     }
 
     ctx.entity_mut(missile).s.pos.trType = TR_LINEAR;
-    ctx.entity_mut(missile).s.pos.trTime = ctx.world().level.time;
+    ctx.entity_mut(missile).s.pos.trTime = ctx.world.level.time;
     ctx.entity_mut(missile).target_ent = None;
 
     let mut snapped_org = org;
@@ -469,7 +485,7 @@ pub fn CreateMissile(
 /// Raven `G_MissileBounceEffect`.
 ///
 /// Source: `oracle/codemp/game/g_missile.c:331-354`
-pub fn G_MissileBounceEffect(ctx: GameContext<'_>, ent: EntityId, org: vec3_t, dir: vec3_t) {
+pub fn G_MissileBounceEffect(ctx: &mut GameContext, ent: EntityId, org: vec3_t, dir: vec3_t) {
     //FIXME: have an EV_BOUNCE_MISSILE event that checks the s.weapon and does the appropriate effect
     match ctx.entity(ent).s.weapon {
         WP_BOWCASTER => {
@@ -483,9 +499,8 @@ pub fn G_MissileBounceEffect(ctx: GameContext<'_>, ent: EntityId, org: vec3_t, d
             G_PlayEffectID(fx, currentOrigin, dir);
         }
         _ => {
-            let te = ctx
-                .entity_id_of(G_TempEntity(ctx, org, EV_SABER_BLOCK as c_int))
-                .unwrap();
+            let __h581 = G_TempEntity(ctx, org, EV_SABER_BLOCK as c_int);
+            let te = ctx.entity_id_of(__h581).unwrap();
             let te = ctx.entity_mut(te);
             te.s.origin = org;
             te.s.angles = dir;
@@ -499,7 +514,7 @@ pub fn G_MissileBounceEffect(ctx: GameContext<'_>, ent: EntityId, org: vec3_t, d
 /// Raven `G_MissileImpact`.
 ///
 /// Source: `oracle/codemp/game/g_missile.c:362-801`
-pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t) {
+pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t) {
     // Stage-1 seam: params are handles. This impact routine is saturated with
     // raw `gclient_t`/vehicle seam derefs and calls into still-raw fns, so the
     // verified body stays pointer-based behind the accessor bridge (rule 6):
@@ -510,7 +525,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
         let ent: *mut gentity_t = ctx.entity_mut(ent_id);
         let trace: *mut trace_t = trace;
         let tr = &mut *trace;
-        let mut other = &mut (*ctx.world).g_entities[tr.entityNum as usize];
+        let mut other = &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize];
         let mut hitClient = qfalse;
         let mut isKnockedSaber = qfalse;
 
@@ -553,7 +568,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
 
         // Saber block checks
         if (((*other).r.contents & CONTENTS_LIGHTSABER) != 0) && isKnockedSaber == 0 {
-            let otherOwner = &mut (*ctx.world).g_entities[(*other).r.ownerNum as usize];
+            let otherOwner = &mut (*ctx.world_raw()).g_entities[(*other).r.ownerNum as usize];
             if (*otherOwner).takedamage != 0
                 && !(*otherOwner).client.is_null()
                 && (*((*otherOwner).client as *mut gclient_t))
@@ -592,10 +607,12 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 G_SetOrigin(&mut *(ent), tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
+                    let __s951 = ent_resolve_opt(ctx, (*ent).parent);
+                    let __s952 = ctx.entity_id_of(__s951);
                     if G_RadiusDamage(
                         ctx,
                         tr.endpos,
-                        ctx.entity_id_of(ent_resolve_opt(ctx, (*ent).parent)),
+                        __s952,
                         (*ent).splashDamage as f32,
                         (*ent).splashRadius as f32,
                         ctx.entity_id_of(other),
@@ -604,11 +621,11 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                     ) != 0
                     {
                         if hitClient == 0
-                            && !(*ctx.world).g_entities[(*ent).r.ownerNum as usize]
+                            && !(*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize]
                                 .client
                                 .is_null()
                         {
-                            (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client
+                            (*((*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize].client
                                 as *mut gclient_t))
                                 .accuracy_hits += 1;
                         }
@@ -659,10 +676,12 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 G_SetOrigin(&mut *(ent), tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
+                    let __s953 = ent_resolve_opt(ctx, (*ent).parent);
+                    let __s954 = ctx.entity_id_of(__s953);
                     if G_RadiusDamage(
                         ctx,
                         tr.endpos,
-                        ctx.entity_id_of(ent_resolve_opt(ctx, (*ent).parent)),
+                        __s954,
                         (*ent).splashDamage as f32,
                         (*ent).splashRadius as f32,
                         ctx.entity_id_of(other),
@@ -671,11 +690,11 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                     ) != 0
                     {
                         if hitClient == 0
-                            && !(*ctx.world).g_entities[(*ent).r.ownerNum as usize]
+                            && !(*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize]
                                 .client
                                 .is_null()
                         {
-                            (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client
+                            (*((*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize].client
                                 as *mut gclient_t))
                                 .accuracy_hits += 1;
                         }
@@ -772,7 +791,8 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
             && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int
             && (*ent).methodOfDeath != MOD_CONC as c_int
             && (*ent).methodOfDeath != MOD_CONC_ALT as c_int
-            && (*((*other).client as *mut gclient_t)).ps.saberBlockTime < (*ctx.world).level.time
+            && (*((*other).client as *mut gclient_t)).ps.saberBlockTime
+                < (*ctx.world_raw()).level.time
             && isKnockedSaber == 0
             && WP_SaberCanBlock(
                 ctx,
@@ -819,7 +839,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 G_ReflectMissile(ctx, ctx.entity_id_of(other).unwrap(), ent_id, fwd);
             }
             (*((*other).client as *mut gclient_t)).ps.saberBlockTime =
-                (*ctx.world).level.time + (350 - (adjusted_def_level * 100));
+                (*ctx.world_raw()).level.time + (350 - (adjusted_def_level * 100));
             (*((*other).client as *mut gclient_t)).ps.saberEventFlags |= SEF_DEFLECTED;
 
             if adjusted_def_level == FORCE_LEVEL_3 as c_int {
@@ -832,7 +852,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 return;
             }
         } else if (((*other).r.contents & CONTENTS_LIGHTSABER) != 0) && isKnockedSaber == 0 {
-            let otherOwner = &mut (*ctx.world).g_entities[(*other).r.ownerNum as usize];
+            let otherOwner = &mut (*ctx.world_raw()).g_entities[(*other).r.ownerNum as usize];
             if (*otherOwner).takedamage != 0
                 && !(*otherOwner).client.is_null()
                 && (*ent).s.weapon != WP_ROCKET_LAUNCHER
@@ -897,7 +917,8 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 }
                 (*((*otherOwner).client as *mut gclient_t))
                     .ps
-                    .saberBlockTime = (*ctx.world).level.time + (350 - (other_def_level * 100));
+                    .saberBlockTime =
+                    (*ctx.world_raw()).level.time + (350 - (other_def_level * 100));
                 (*((*otherOwner).client as *mut gclient_t))
                     .ps
                     .saberEventFlags |= SEF_DEFLECTED;
@@ -934,15 +955,15 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                 let mut velocity: vec3_t = [0.0; 3];
                 let mut didDmg = qfalse;
 
-                let owner_ent =
-                    &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
+                let owner_ent = &mut (*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize]
+                    as *mut gentity_t;
                 if LogAccuracyHit(
                     ctx,
                     ctx.entity_id_of(other).unwrap(),
                     ctx.entity_id_of(owner_ent),
                 ) != 0
                 {
-                    (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client
+                    (*((*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize].client
                         as *mut gclient_t))
                         .accuracy_hits += 1;
                     hitClient = qtrue;
@@ -950,7 +971,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
 
                 crate::bg_misc::BG_EvaluateTrajectoryDelta(
                     &(*ent).s.pos,
-                    (*ctx.world).level.time,
+                    (*ctx.world_raw()).level.time,
                     &mut velocity,
                 );
                 if crate::q_math::VectorLength(velocity) == 0.0 {
@@ -1011,10 +1032,10 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                         || npc_class == CLASS_SENTRY
                     {
                         if (*((*other).client as *mut gclient_t)).ps.electrifyTime
-                            < (*ctx.world).level.time + 100
+                            < (*ctx.world_raw()).level.time + 100
                         {
                             (*((*other).client as *mut gclient_t)).ps.electrifyTime =
-                                (*ctx.world).level.time + 450;
+                                (*ctx.world_raw()).level.time + 450;
                         }
                     }
                 }
@@ -1041,20 +1062,20 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                         && (((*other).spawnflags & 2) == 0)
                     {
                         if (*((*other).client as *mut gclient_t)).ps.electrifyTime
-                            > (*ctx.world).level.time
+                            > (*ctx.world_raw()).level.time
                         {
                             (*((*other).client as *mut gclient_t)).ps.electrifyTime +=
-                                (*ctx.world).bg_state.rng.Q_irand(200, 500);
+                                (*ctx.world_raw()).bg_state.rng.Q_irand(200, 500);
                             if (*((*other).client as *mut gclient_t)).ps.electrifyTime
-                                > (*ctx.world).level.time + 4000
+                                > (*ctx.world_raw()).level.time + 4000
                             {
                                 (*((*other).client as *mut gclient_t)).ps.electrifyTime =
-                                    (*ctx.world).level.time + 4000;
+                                    (*ctx.world_raw()).level.time + 4000;
                             }
                         } else {
                             (*((*other).client as *mut gclient_t)).ps.electrifyTime =
-                                (*ctx.world).level.time
-                                    + (*ctx.world).bg_state.rng.Q_irand(200, 500);
+                                (*ctx.world_raw()).level.time
+                                    + (*ctx.world_raw()).bg_state.rng.Q_irand(200, 500);
                         }
                     }
                 } else if !(*other).client.is_null()
@@ -1065,8 +1086,8 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                         (*((*other).client as *mut gclient_t)).cloakToggleTime = Q3_INFINITE;
                     } else {
                         (*((*other).client as *mut gclient_t)).cloakToggleTime =
-                            (*ctx.world).level.time
-                                + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
+                            (*ctx.world_raw()).level.time
+                                + (*ctx.world_raw()).bg_state.rng.Q_irand(3000, 10000);
                     }
                 }
             }
@@ -1106,10 +1127,12 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
         (*ent).takedamage = qfalse;
         // Splash damage
         if (*ent).splashDamage != 0 {
+            let __s955 = ent_resolve_opt(ctx, (*ent).parent);
+            let __s956 = ctx.entity_id_of(__s955);
             if G_RadiusDamage(
                 ctx,
                 tr.endpos,
-                ctx.entity_id_of(ent_resolve_opt(ctx, (*ent).parent)),
+                __s956,
                 (*ent).splashDamage as f32,
                 (*ent).splashRadius as f32,
                 ctx.entity_id_of(other),
@@ -1118,11 +1141,11 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
             ) != 0
             {
                 if hitClient == 0
-                    && !(*ctx.world).g_entities[(*ent).r.ownerNum as usize]
+                    && !(*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize]
                         .client
                         .is_null()
                 {
-                    (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client
+                    (*((*ctx.world_raw()).g_entities[(*ent).r.ownerNum as usize].client
                         as *mut gclient_t))
                         .accuracy_hits += 1;
                 }
@@ -1143,7 +1166,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
 /// Raven `G_RunMissile`.
 ///
 /// Source: `oracle/codemp/game/g_missile.c:808-1019`
-pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
     // Stage-1 seam bridge (rule 6): see G_MissileImpact. The verified body stays
     // pointer-based; `ent` is re-derived and sibling shard calls are bridged to
     // handles. Full accessor conversion is deferred (see report).
@@ -1166,11 +1189,15 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // Get current position
-        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos, (*ctx.world).level.time, &mut origin);
+        crate::bg_misc::BG_EvaluateTrajectory(
+            &(*ent).s.pos,
+            (*ctx.world_raw()).level.time,
+            &mut origin,
+        );
 
         // Determine entity to pass (not collide with)
         if let Some(target_id) = (*ent).target_ent {
-            passent = (*ctx.world).g_entities[target_id.index()].s.number;
+            passent = (*ctx.world_raw()).g_entities[target_id.index()].s.number;
         } else if ((*ent).r.svFlags & SVF_OWNERNOTSHARED) != 0
             && (((*ent).s.eFlags & EF_JETPACK_ACTIVE) != 0)
         {
@@ -1181,7 +1208,7 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // Trace from previous position to current position
-        if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 {
+        if (*ctx.world_raw()).cvars.d_projectileGhoul2Collision.integer != 0 {
             trap::G2Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs::new(
@@ -1196,17 +1223,17 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
                         | G2TRFLAG_GETSURFINDEX
                         | G2TRFLAG_THICK
                         | G2TRFLAG_HITCORPSES,
-                    (*ctx.world).cvars.g_g2TraceLod.integer,
+                    (*ctx.world_raw()).cvars.g_g2TraceLod.integer,
                 ),
             );
 
             if tr.fraction != 1.0 && (tr.entityNum as usize) < ENTITYNUM_WORLD as usize {
-                let g2Hit = &mut (*ctx.world).g_entities[tr.entityNum as usize];
+                let g2Hit = &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize];
                 if (*g2Hit).inuse != 0 && !(*g2Hit).client.is_null() && !(*g2Hit).ghoul2.is_null() {
                     (*((*g2Hit).client as *mut gclient_t)).g2LastSurfaceHit =
                         tr.surfaceFlags as c_int;
                     (*((*g2Hit).client as *mut gclient_t)).g2LastSurfaceTime =
-                        (*ctx.world).level.time;
+                        (*ctx.world_raw()).level.time;
                 }
                 if !(*g2Hit).ghoul2.is_null() {
                     tr.surfaceFlags = 0;
@@ -1322,13 +1349,13 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
                 if (*ent).s.weapon > WP_NONE as c_int
                     && (*ent).s.weapon < WP_NUM_WEAPONS as c_int
                     && ((tr.entityNum as usize) < MAX_CLIENTS
-                        || (*ctx.world).g_entities[tr.entityNum as usize].s.eType
+                        || (*ctx.world_raw()).g_entities[tr.entityNum as usize].s.eType
                             == ET_NPC as c_int)
                 {
                     crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*ent).s.origin);
                     crate::bg_misc::BG_EvaluateTrajectory(
                         &(*ent).s.pos,
-                        (*ctx.world).level.time,
+                        (*ctx.world_raw()).level.time,
                         &mut (*ent).s.origin2,
                     );
 
@@ -1360,14 +1387,14 @@ pub fn G_RunMissile(ctx: GameContext<'_>, ent: EntityId) {
             if (*ent).s.groundEntityNum == ENTITYNUM_WORLD as c_int {
                 (*ent).s.pos.trType = TR_LINEAR;
                 crate::q_math::VectorClear(&mut (*ent).s.pos.trDelta);
-                (*ent).s.pos.trTime = (*ctx.world).level.time;
+                (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
 
                 crate::q_math::_VectorCopy(groundSpot, &mut (*ent).s.pos.trBase);
                 crate::q_math::_VectorCopy(groundSpot, &mut (*ent).r.currentOrigin);
 
                 if (*ent).s.apos.trType != TR_STATIONARY {
                     (*ent).s.apos.trType = TR_STATIONARY;
-                    (*ent).s.apos.trTime = (*ctx.world).level.time;
+                    (*ent).s.apos.trTime = (*ctx.world_raw()).level.time;
 
                     (*ent).s.apos.trBase[ROLL as usize] = 0.0;
                     (*ent).s.apos.trBase[PITCH as usize] = 0.0;

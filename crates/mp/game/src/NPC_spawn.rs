@@ -122,7 +122,7 @@ pub fn NPC_TouchFunc(_ent: &gentity_t) -> Option<crate::ent_fn_enums::EntTouch> 
 /// Raven `NPC_SetMiscDefaultData`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:215-501`
-pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -282,7 +282,7 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: EntityId) {
             && (*ent).activator.is_some()
         {
             // teams already set correctly
-        } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
             && (*ent).s.NPC_class != CLASS_VEHICLE as c_int
         {
             if (*((*ent).client as *mut gclient_t)).enemyTeam == NPCTEAM_PLAYER {
@@ -478,7 +478,7 @@ pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: *const c_ch
 /// Raven `NPC_SetWeapons`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:759-797`
-pub fn NPC_SetWeapons(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_SetWeapons(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -535,13 +535,13 @@ pub fn NPC_SpawnEffect(ent: &gentity_t) {
 /// Raven `NPC_SetFX_SpawnStates`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:817-823`
-pub fn NPC_SetFX_SpawnStates(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_SetFX_SpawnStates(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
         if (*((*ent).NPC as *mut gNPC_t)).aiFlags & NPCAI_CUSTOM_GRAVITY == 0 {
             (*((*ent).client as *mut gclient_t)).ps.gravity =
-                (*ctx.world).cvars.g_gravity.value as c_int;
+                (*ctx.world_raw()).cvars.g_gravity.value as c_int;
         }
     }
 }
@@ -549,7 +549,7 @@ pub fn NPC_SetFX_SpawnStates(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `NPC_SpotWouldTelefrag`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:831-859`
-pub fn NPC_SpotWouldTelefrag(ctx: GameContext<'_>, npc: EntityId) -> qboolean {
+pub fn NPC_SpotWouldTelefrag(ctx: &mut GameContext, npc: EntityId) -> qboolean {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let npc: *mut gentity_t = ctx.entity_mut(npc);
@@ -568,7 +568,7 @@ pub fn NPC_SpotWouldTelefrag(ctx: GameContext<'_>, npc: EntityId) -> qboolean {
             ),
         );
 
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
         for i in 0..num {
             let hit = base.add(touch[i as usize] as usize);
             if (*hit).inuse != 0
@@ -589,7 +589,7 @@ pub fn NPC_SpotWouldTelefrag(ctx: GameContext<'_>, npc: EntityId) -> qboolean {
 /// Raven `NPC_Begin`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:862-1274`
-pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -627,7 +627,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
                         (*ent).target3 as *const c_char,
                     );
                     (*ent).think = Some(EntThink::G_FreeEntity).into();
-                    (*ent).nextthink = (*ctx.world).level.time + 100;
+                    (*ent).nextthink = (*ctx.world_raw()).level.time + 100;
                 } else {
                     let tn = if (*ent).targetname.is_null() {
                         String::new()
@@ -645,7 +645,8 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
                         .as_ptr(),
                     );
                     (*ent).think = Some(EntThink::NPC_Begin).into();
-                    (*ent).nextthink = (((*ctx.world).level.time as f32) + (*ent).wait) as i32;
+                    (*ent).nextthink =
+                        (((*ctx.world_raw()).level.time as f32) + (*ent).wait) as i32;
                 }
                 return;
             }
@@ -662,7 +663,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
         let client = (*ent).client as *mut gclient_t;
 
         (*client).ps.persistant[PERS_SPAWN_COUNT as usize] += 1;
-        (*client).airOutTime = (*ctx.world).level.time + 12000;
+        (*client).airOutTime = (*ctx.world_raw()).level.time + 12000;
         (*client).ps.clientNum = (*ent).s.number;
 
         if (*ent).health != 0 {
@@ -675,7 +676,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
             {
                 (*((*ent).NPC as *mut gNPC_t)).stats.health +=
                     (*((*ent).NPC as *mut gNPC_t)).stats.health / 4
-                        * (*ctx.world).cvars.g_spskill.integer;
+                        * (*ctx.world_raw()).cvars.g_spskill.integer;
             }
             (*client).pers.maxHealth = (*((*ent).NPC as *mut gNPC_t)).stats.health;
             (*client).ps.stats[STAT_MAX_HEALTH as usize] =
@@ -687,15 +688,15 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
 
         let rodian = cstr("rodian");
         if crate::q_shared::Q_stricmp(rodian.as_ptr(), (*ent).NPC_type) == 0 {
-            match (*ctx.world).cvars.g_spskill.integer {
+            match (*ctx.world_raw()).cvars.g_spskill.integer {
                 0 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (1.0) as i32,
                 1 => {
                     (*((*ent).NPC as *mut gNPC_t)).stats.aim =
-                        ((*ctx.world).bg_state.rng.Q_irand(2, 3) as f32) as i32
+                        ((*ctx.world_raw()).bg_state.rng.Q_irand(2, 3) as f32) as i32
                 }
                 2 => {
                     (*((*ent).NPC as *mut gNPC_t)).stats.aim =
-                        ((*ctx.world).bg_state.rng.Q_irand(3, 4) as f32) as i32
+                        ((*ctx.world_raw()).bg_state.rng.Q_irand(3, 4) as f32) as i32
                 }
                 _ => {}
             }
@@ -706,25 +707,25 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
                 || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER
                 || crate::q_shared::Q_stricmp(rodian2.as_ptr(), (*ent).NPC_type) == 0
             {
-                match (*ctx.world).cvars.g_spskill.integer {
+                match (*ctx.world_raw()).cvars.g_spskill.integer {
                     0 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 0.75f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
-                                (*ctx.world).bg_state.rng.Q_irand(3, 6);
+                                (*ctx.world_raw()).bg_state.rng.Q_irand(3, 6);
                         }
                     }
                     1 => {
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
-                                (*ctx.world).bg_state.rng.Q_irand(2, 4);
+                                (*ctx.world_raw()).bg_state.rng.Q_irand(2, 4);
                         }
                     }
                     2 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
-                                (*ctx.world).bg_state.rng.Q_irand(0, 2);
+                                (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2);
                         }
                     }
                     _ => {}
@@ -732,7 +733,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
             } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_REBORN
                 || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER
             {
-                match (*ctx.world).cvars.g_spskill.integer {
+                match (*ctx.world_raw()).cvars.g_spskill.integer {
                     1 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.25f32,
                     2 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32,
                     _ => {}
@@ -801,11 +802,11 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
         (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
         (*client).ps.pm_time = 100;
 
-        (*client).respawnTime = (*ctx.world).level.time;
-        (*client).inactivityTime =
-            (*ctx.world).level.time + ((*ctx.world).cvars.g_inactivity.value as c_int) * 1000;
+        (*client).respawnTime = (*ctx.world_raw()).level.time;
+        (*client).inactivityTime = (*ctx.world_raw()).level.time
+            + ((*ctx.world_raw()).cvars.g_inactivity.value as c_int) * 1000;
         (*client).latched_buttons = 0;
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
         if (*ent).s.m_iVehicleNum != 0 {
             // already have owner set
         } else if (*client).NPC_class == CLASS_SEEKER && (*ent).activator.is_some() {
@@ -838,8 +839,8 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
         SetNPCGlobals(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).enemy = None;
-        (*(*ctx.world).globals.NPCInfo).timeOfDeath = 0;
-        (*(*ctx.world).globals.NPCInfo).shotTime = 0;
+        (*(*ctx.world_raw()).globals.NPCInfo).timeOfDeath = 0;
+        (*(*ctx.world_raw()).globals.NPCInfo).shotTime = 0;
         crate::NPC_goal::NPC_ClearGoal(ctx);
         NPC_ChangeWeapon((*client).ps.weapon);
 
@@ -852,15 +853,16 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
         (*client).ps.ping = (*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50;
 
         if (*ent).s.NPC_class != CLASS_VEHICLE as c_int
-            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+            || (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
         {
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
         (*ent).use_ = Some(EntUse::NPC_Use).into();
         (*ent).think = Some(EntThink::NPC_Think).into();
-        (*ent).nextthink =
-            (*ctx.world).level.time + FRAMETIME + (*ctx.world).bg_state.rng.Q_irand(0, 100);
+        (*ent).nextthink = (*ctx.world_raw()).level.time
+            + FRAMETIME
+            + (*ctx.world_raw()).bg_state.rng.Q_irand(0, 100);
 
         NPC_SetMiscDefaultData(ctx, ctx.entity_id_of(ent).unwrap());
         if (*ent).health <= 0 {
@@ -941,7 +943,7 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
                             droid_npc_type as *const c_char,
                         ) == 0
                     {
-                        droid_npc_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                        droid_npc_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                             cstr("r2d2").into_raw()
                         } else {
                             cstr("r5d2").into_raw()
@@ -1012,20 +1014,21 @@ pub fn NPC_Begin(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `New_NPC_t`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1278-1297`
-pub fn New_NPC_t(ctx: GameContext<'_>, entNum: c_int) -> *mut gNPC_t {
+pub fn New_NPC_t(ctx: &mut GameContext, entNum: c_int) -> *mut gNPC_t {
     unsafe {
-        if (*ctx.world).globals.gNPCPtrs[entNum as usize].is_null() {
+        if (&(*ctx.world_raw()).globals.gNPCPtrs)[entNum as usize].is_null() {
             // `gNPC_t` holds a `*mut AIGroupInfo_t` field (align 8); pad to an
             // 8-byte boundary first (see `BG_AllocPad8`) so every `(*ptr).field`
             // access downstream is safely dereferenceable.
-            crate::bg_misc::BG_AllocPad8(&mut (*ctx.world).bg_state);
-            (*ctx.world).globals.gNPCPtrs[entNum as usize] = BG_Alloc(
+            crate::bg_misc::BG_AllocPad8(&mut (*ctx.world_raw()).bg_state);
+            (&mut (*ctx.world_raw()).globals.gNPCPtrs)[entNum as usize] = BG_Alloc(
                 core::mem::size_of::<gNPC_t>() as c_int,
-                &mut (*ctx.world).bg_state,
-            ) as *mut gNPC_t;
+                &mut (*ctx.world_raw()).bg_state,
+            )
+                as *mut gNPC_t;
         }
 
-        let ptr = (*ctx.world).globals.gNPCPtrs[entNum as usize];
+        let ptr = (&(*ctx.world_raw()).globals.gNPCPtrs)[entNum as usize];
 
         if !ptr.is_null() {
             // Byte-wise, like C's memset: `ptr` is BG_Alloc pool storage (4-byte
@@ -1054,7 +1057,7 @@ pub fn NPC_DefaultScriptFlags(ent: &gentity_t) {
 /// Raven `NPC_Spawn_Do`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1377-1763`
-pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         // Return stays raw `*mut gentity_t` (return conversion is a later pass).
@@ -1132,7 +1135,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
         );
 
         (*((*newent).NPC as *mut gNPC_t)).tempGoal = ent_id_opt(
-            (*ctx.world).g_entities.as_mut_ptr(),
+            (*ctx.world_raw()).g_entities.as_mut_ptr(),
             crate::g_utils::G_Spawn(ctx),
         );
 
@@ -1144,11 +1147,11 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
             return core::ptr::null_mut();
         }
         let temp_goal = ent_id::resolve(
-            (*ctx.world).g_entities.as_mut_ptr(),
+            (*ctx.world_raw()).g_entities.as_mut_ptr(),
             (*((*newent).NPC as *mut gNPC_t)).tempGoal,
         );
         (*temp_goal).classname = c"NPC_goal".as_ptr() as *mut c_char;
-        (*temp_goal).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), newent));
+        (*temp_goal).parent = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), newent));
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
 
         if (*newent).client.is_null() {
@@ -1208,7 +1211,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
         {
             let i_veh_index = BG_VehicleGetIndex(
                 (*ent).NPC_type as *const c_char,
-                &mut (*ctx.world).bg_state,
+                &mut (*ctx.world_raw()).bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
             );
 
@@ -1218,7 +1221,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
                 return core::ptr::null_mut();
             }
 
-            match (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].r#type {
+            match (&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize].r#type {
                 VH_ANIMAL => {
                     crate::AnimalNPC::G_CreateAnimalNPC(
                         ctx,
@@ -1273,7 +1276,9 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
 
             crate::veh_dispatch::register_assets(ctx, (*newent).m_pVehicle as *mut Vehicle_t);
             (*((*newent).client as *mut gclient_t)).NPC_class = CLASS_VEHICLE;
-            if (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].r#type == VH_FIGHTER {
+            if (&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize].r#type
+                == VH_FIGHTER
+            {
                 (*newent).flags |= FL_NO_KNOCKBACK | FL_SHIELDED | FL_DMG_BY_HEAVY_WEAP_ONLY;
             }
             (*(*((*newent).m_pVehicle as *mut Vehicle_t))
@@ -1344,7 +1349,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
             } else if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, test.as_ptr())
                 == 0
             {
-                let base = (*ctx.world).g_entities.as_mut_ptr();
+                let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
                 for n in 0..1 {
                     let e = base.add(n as usize);
                     if (*e).s.eType != (ET_NPC) as i32 && !(*e).client.is_null() {
@@ -1427,12 +1432,12 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
         }
 
         (*newent).s.pos.trType = TR_INTERPOLATE;
-        (*newent).s.pos.trTime = (*ctx.world).level.time;
+        (*newent).s.pos.trTime = (*ctx.world_raw()).level.time;
         crate::q_math::_VectorCopy((*newent).r.currentOrigin, &mut (*newent).s.pos.trBase);
         (*newent).s.pos.trDelta = [0.0; 3];
         (*newent).s.pos.trDuration = 0;
         (*newent).s.apos.trType = TR_INTERPOLATE;
-        (*newent).s.apos.trTime = (*ctx.world).level.time;
+        (*newent).s.apos.trTime = (*ctx.world_raw()).level.time;
         crate::q_math::_VectorCopy((*newent).s.angles, &mut (*newent).s.apos.trBase);
         (*newent).s.apos.trDelta = [0.0; 3];
         (*newent).s.apos.trDuration = 0;
@@ -1443,7 +1448,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
         (*newent).s.eFlags |= EF_NODRAW;
 
         (*newent).think = Some(EntThink::NPC_Begin).into();
-        (*newent).nextthink = (*ctx.world).level.time + FRAMETIME;
+        (*newent).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
         NPC_DefaultScriptFlags(&*newent);
 
         (*newent).s.shouldtarget = (*ent).s.shouldtarget;
@@ -1492,7 +1497,7 @@ pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
 /// Raven `NPC_Spawn_Go`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1765-1768`
-pub fn NPC_Spawn_Go(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_Spawn_Go(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: thin pass-through — `EntityId` forwarded directly (no re-derive).
     NPC_Spawn_Do(ctx, ent);
 }
@@ -1500,14 +1505,14 @@ pub fn NPC_Spawn_Go(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `NPC_ShySpawn`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1814-1831`
-pub fn NPC_ShySpawn(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_ShySpawn(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
-        (*ent).nextthink = (*ctx.world).level.time + SHY_THINK_TIME;
+        (*ent).nextthink = (*ctx.world_raw()).level.time + SHY_THINK_TIME;
         (*ent).think = Some(EntThink::NPC_ShySpawn).into();
 
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
         let player0 = base;
         if crate::q_math::DistanceSquared((*player0).r.currentOrigin, (*ent).r.currentOrigin)
             <= SHY_SPAWN_DISTANCE_SQR as vec_t
@@ -1544,7 +1549,7 @@ pub fn NPC_ShySpawn(ctx: GameContext<'_>, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1839-1873`
 pub fn NPC_Spawn(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -1559,7 +1564,7 @@ pub fn NPC_Spawn(
             } else {
                 (*ent).think = Some(EntThink::NPC_Spawn_Go).into();
             }
-            (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
+            (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).delay;
         } else {
             if (*ent).spawnflags & 2048 != 0 {
                 NPC_ShySpawn(ctx, ctx.entity_id_of(ent).unwrap());
@@ -1573,7 +1578,7 @@ pub fn NPC_Spawn(
 /// Raven `NPC_PrecacheType`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1961-1971`
-pub fn NPC_PrecacheType(ctx: GameContext<'_>, NPC_type: *mut c_char) {
+pub fn NPC_PrecacheType(ctx: &mut GameContext, NPC_type: *mut c_char) {
     unsafe {
         let fakespawner = crate::g_utils::G_Spawn(ctx);
         if !fakespawner.is_null() {
@@ -1587,15 +1592,15 @@ pub fn NPC_PrecacheType(ctx: GameContext<'_>, NPC_type: *mut c_char) {
 /// Raven `SP_NPC_spawner`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1973-2068`
-pub fn SP_NPC_spawner(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut t: c_int = 0;
 
-        if (*ctx.world).cvars.g_allowNPC.integer == 0 {
+        if (*ctx.world_raw()).cvars.g_allowNPC.integer == 0 {
             (*self_).think = Some(EntThink::G_FreeEntity).into();
-            (*self_).nextthink = (*ctx.world).level.time;
+            (*self_).nextthink = (*ctx.world_raw()).level.time;
             return;
         }
         if (*self_).fullName.is_null() || *(*self_).fullName == 0 {
@@ -1649,7 +1654,7 @@ pub fn SP_NPC_spawner(ctx: GameContext<'_>, self_: EntityId) {
             (*self_).use_ = Some(EntUse::NPC_Spawn).into();
         } else {
             (*self_).think = Some(EntThink::NPC_Spawn_Go).into();
-            (*self_).nextthink = (*ctx.world).level.time + START_TIME_REMOVE_ENTS + 50;
+            (*self_).nextthink = (*ctx.world_raw()).level.time + START_TIME_REMOVE_ENTS + 50;
         }
     }
 }
@@ -1657,14 +1662,14 @@ pub fn SP_NPC_spawner(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `NPC_VehiclePrecache`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2103-2173`
-pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: EntityId) -> qboolean {
+pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let spawner: *mut gentity_t = ctx.entity_mut(spawner);
         let mut droid_npc_type: *const c_char = core::ptr::null();
         let i_veh_index = BG_VehicleGetIndex(
             (*spawner).NPC_type as *const c_char,
-            &mut (*ctx.world).bg_state,
+            &mut (*ctx.world_raw()).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
         if i_veh_index == VEHICLE_NONE {
@@ -1679,7 +1684,7 @@ pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: EntityId) -> qboolean 
             .as_ptr(),
         );
 
-        let p_veh_info = &(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize];
+        let p_veh_info = &(&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize];
         if !p_veh_info.model.is_null() && *p_veh_info.model != 0 {
             let mut temp_g2: *mut c_void = core::ptr::null_mut();
             let mut skin: c_int = 0;
@@ -1731,11 +1736,11 @@ pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: EntityId) -> qboolean 
 
                         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
                         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                            world: ctx.world,
+                            world: ctx.world_raw(),
                             engine: ctx.engine,
                         };
                         crate::bg_panimate::BG_ParseAnimationFile(
-                            &mut (*ctx.world).bg_state,
+                            &mut (*ctx.world_raw()).bg_state,
                             &traps,
                             &mut callbacks,
                             gla_name.as_ptr(),
@@ -1755,13 +1760,13 @@ pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: EntityId) -> qboolean 
 
         if !(*spawner).model2.is_null() && *(*spawner).model2 != 0 {
             droid_npc_type = (*spawner).model2 as *const c_char;
-        } else if !(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize]
+        } else if !(&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize]
             .droidNPC
             .is_null()
-            && *(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].droidNPC != 0
+            && *(&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC != 0
         {
-            droid_npc_type =
-                (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].droidNPC as *const c_char;
+            droid_npc_type = (&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize]
+                .droidNPC as *const c_char;
         }
 
         if !droid_npc_type.is_null() {
@@ -1784,7 +1789,7 @@ pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: EntityId) -> qboolean 
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2175-2186`
 pub fn NPC_VehicleSpawnUse(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -1795,7 +1800,7 @@ pub fn NPC_VehicleSpawnUse(
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         if (*self_).delay != 0 {
             (*self_).think = Some(EntThink::G_VehicleSpawn).into();
-            (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
+            (*self_).nextthink = (*ctx.world_raw()).level.time + (*self_).delay;
         } else {
             crate::g_vehicles::G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap());
         }
@@ -1805,7 +1810,7 @@ pub fn NPC_VehicleSpawnUse(
 /// Raven `SP_NPC_Vehicle`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2188-2253`
-pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Vehicle(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1855,7 +1860,7 @@ pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: EntityId) {
                     return;
                 }
                 (*self_).think = Some(EntThink::G_VehicleSpawn).into();
-                (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
+                (*self_).nextthink = (*ctx.world_raw()).level.time + (*self_).delay;
             } else {
                 crate::g_vehicles::G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap());
             }
@@ -1866,7 +1871,7 @@ pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Kyle`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2338-2345`
-pub fn SP_NPC_Kyle(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Kyle(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1879,7 +1884,7 @@ pub fn SP_NPC_Kyle(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Lando`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2354-2359`
-pub fn SP_NPC_Lando(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Lando(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1891,7 +1896,7 @@ pub fn SP_NPC_Lando(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Jan`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2368-2373`
-pub fn SP_NPC_Jan(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Jan(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1903,7 +1908,7 @@ pub fn SP_NPC_Jan(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Luke`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2382-2389`
-pub fn SP_NPC_Luke(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Luke(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1916,7 +1921,7 @@ pub fn SP_NPC_Luke(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_MonMothma`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2398-2403`
-pub fn SP_NPC_MonMothma(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_MonMothma(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1928,7 +1933,7 @@ pub fn SP_NPC_MonMothma(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Tavion`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2412-2419`
-pub fn SP_NPC_Tavion(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Tavion(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1941,7 +1946,7 @@ pub fn SP_NPC_Tavion(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Tavion_New`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2432-2448`
-pub fn SP_NPC_Tavion_New(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Tavion_New(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1959,7 +1964,7 @@ pub fn SP_NPC_Tavion_New(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Alora`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2460-2472`
-pub fn SP_NPC_Alora(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Alora(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1975,7 +1980,7 @@ pub fn SP_NPC_Alora(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Reborn_New`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2487-2524`
-pub fn SP_NPC_Reborn_New(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Reborn_New(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2005,7 +2010,7 @@ pub fn SP_NPC_Reborn_New(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Cultist_Saber`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2542-2593`
-pub fn SP_NPC_Cultist_Saber(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Cultist_Saber(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2043,7 +2048,7 @@ pub fn SP_NPC_Cultist_Saber(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Cultist_Saber_Powers`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2611-2662`
-pub fn SP_NPC_Cultist_Saber_Powers(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Cultist_Saber_Powers(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2081,7 +2086,7 @@ pub fn SP_NPC_Cultist_Saber_Powers(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Cultist`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2679-2725`
-pub fn SP_NPC_Cultist(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Cultist(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2089,13 +2094,13 @@ pub fn SP_NPC_Cultist(ctx: GameContext<'_>, self_: EntityId) {
             if (*self_).spawnflags & 1 != 0 {
                 (*self_).NPC_type = core::ptr::null_mut();
                 (*self_).spawnflags = 0;
-                match (*ctx.world).bg_state.rng.Q_irand(0, 2) {
+                match (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) {
                     0 => (*self_).spawnflags |= 1,
                     1 => (*self_).spawnflags |= 2,
                     2 => (*self_).spawnflags |= 4,
                     _ => {}
                 }
-                if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                     (*self_).spawnflags |= 8;
                 }
                 SP_NPC_Cultist_Saber(ctx, ctx.entity_id_of(self_).unwrap());
@@ -2117,7 +2122,7 @@ pub fn SP_NPC_Cultist(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Cultist_Commando`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2737-2744`
-pub fn SP_NPC_Cultist_Commando(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Cultist_Commando(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2131,7 +2136,7 @@ pub fn SP_NPC_Cultist_Commando(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Cultist_Destroyer`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2755-2759`
-pub fn SP_NPC_Cultist_Destroyer(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Cultist_Destroyer(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2143,7 +2148,7 @@ pub fn SP_NPC_Cultist_Destroyer(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Reelo`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2768-2773`
-pub fn SP_NPC_Reelo(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Reelo(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2155,7 +2160,7 @@ pub fn SP_NPC_Reelo(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Galak`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2784-2797`
-pub fn SP_NPC_Galak(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Galak(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2172,7 +2177,7 @@ pub fn SP_NPC_Galak(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Desann`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2806-2813`
-pub fn SP_NPC_Desann(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Desann(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2185,7 +2190,7 @@ pub fn SP_NPC_Desann(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Bartender`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2822-2827`
-pub fn SP_NPC_Bartender(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Bartender(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2197,7 +2202,7 @@ pub fn SP_NPC_Bartender(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_MorganKatarn`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2836-2841`
-pub fn SP_NPC_MorganKatarn(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_MorganKatarn(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2209,14 +2214,14 @@ pub fn SP_NPC_MorganKatarn(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Jedi`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2857-2887`
-pub fn SP_NPC_Jedi(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Jedi(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
                 (*self_).NPC_type = c"jeditrainer".as_ptr() as *mut c_char;
-            } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                 (*self_).NPC_type = c"Jedi".as_ptr() as *mut c_char;
             } else {
                 (*self_).NPC_type = c"Jedi2".as_ptr() as *mut c_char;
@@ -2230,12 +2235,12 @@ pub fn SP_NPC_Jedi(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Prisoner`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2896-2911`
-pub fn SP_NPC_Prisoner(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Prisoner(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                 c"Prisoner".as_ptr() as *mut c_char
             } else {
                 c"Prisoner2".as_ptr() as *mut c_char
@@ -2248,12 +2253,12 @@ pub fn SP_NPC_Prisoner(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Rebel`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2920-2935`
-pub fn SP_NPC_Rebel(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Rebel(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                 c"Rebel".as_ptr() as *mut c_char
             } else {
                 c"Rebel2".as_ptr() as *mut c_char
@@ -2266,7 +2271,7 @@ pub fn SP_NPC_Rebel(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Stormtrooper`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2955-2986`
-pub fn SP_NPC_Stormtrooper(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Stormtrooper(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2279,7 +2284,7 @@ pub fn SP_NPC_Stormtrooper(ctx: GameContext<'_>, self_: EntityId) {
         } else if (*self_).spawnflags & 1 != 0 {
             (*self_).NPC_type = c"stofficer".as_ptr() as *mut c_char;
         } else {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                 c"StormTrooper".as_ptr() as *mut c_char
             } else {
                 c"StormTrooper2".as_ptr() as *mut c_char
@@ -2292,7 +2297,7 @@ pub fn SP_NPC_Stormtrooper(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_StormtrooperOfficer`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2987-2991`
-pub fn SP_NPC_StormtrooperOfficer(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_StormtrooperOfficer(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2304,7 +2309,7 @@ pub fn SP_NPC_StormtrooperOfficer(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Snowtrooper`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3001-3006`
-pub fn SP_NPC_Snowtrooper(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Snowtrooper(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2316,7 +2321,7 @@ pub fn SP_NPC_Snowtrooper(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Tie_Pilot`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3016-3021`
-pub fn SP_NPC_Tie_Pilot(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Tie_Pilot(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2328,12 +2333,12 @@ pub fn SP_NPC_Tie_Pilot(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Ugnaught`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3030-3045`
-pub fn SP_NPC_Ugnaught(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Ugnaught(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                 c"Ugnaught".as_ptr() as *mut c_char
             } else {
                 c"Ugnaught2".as_ptr() as *mut c_char
@@ -2346,7 +2351,7 @@ pub fn SP_NPC_Ugnaught(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Jawa`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3056-3071`
-pub fn SP_NPC_Jawa(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Jawa(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2364,7 +2369,7 @@ pub fn SP_NPC_Jawa(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Gran`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3084-3110`
-pub fn SP_NPC_Gran(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Gran(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2374,7 +2379,7 @@ pub fn SP_NPC_Gran(ctx: GameContext<'_>, self_: EntityId) {
             } else if (*self_).spawnflags & 2 != 0 {
                 (*self_).NPC_type = c"granboxer".as_ptr() as *mut c_char;
             } else {
-                (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                     c"gran".as_ptr() as *mut c_char
                 } else {
                     c"gran2".as_ptr() as *mut c_char
@@ -2388,7 +2393,7 @@ pub fn SP_NPC_Gran(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Rodian`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3121-3136`
-pub fn SP_NPC_Rodian(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Rodian(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2406,12 +2411,12 @@ pub fn SP_NPC_Rodian(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Weequay`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3145-3167`
-pub fn SP_NPC_Weequay(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Weequay(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = match (*ctx.world).bg_state.rng.Q_irand(0, 3) {
+            (*self_).NPC_type = match (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) {
                 0 => c"Weequay".as_ptr() as *mut c_char,
                 1 => c"Weequay2".as_ptr() as *mut c_char,
                 2 => c"Weequay3".as_ptr() as *mut c_char,
@@ -2425,7 +2430,7 @@ pub fn SP_NPC_Weequay(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Trandoshan`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3176-3184`
-pub fn SP_NPC_Trandoshan(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Trandoshan(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2439,7 +2444,7 @@ pub fn SP_NPC_Trandoshan(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Tusken`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3193-3208`
-pub fn SP_NPC_Tusken(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Tusken(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2457,7 +2462,7 @@ pub fn SP_NPC_Tusken(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Noghri`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3217-3225`
-pub fn SP_NPC_Noghri(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Noghri(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2471,7 +2476,7 @@ pub fn SP_NPC_Noghri(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_SwampTrooper`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3235-3250`
-pub fn SP_NPC_SwampTrooper(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_SwampTrooper(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2489,7 +2494,7 @@ pub fn SP_NPC_SwampTrooper(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Imperial`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3267-3301`
-pub fn SP_NPC_Imperial(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Imperial(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2509,14 +2514,14 @@ pub fn SP_NPC_Imperial(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_ImpWorker`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3310-3329`
-pub fn SP_NPC_ImpWorker(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_ImpWorker(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
                 (*self_).NPC_type = c"ImpWorker".as_ptr() as *mut c_char;
-            } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                 (*self_).NPC_type = c"ImpWorker2".as_ptr() as *mut c_char;
             } else {
                 (*self_).NPC_type = c"ImpWorker3".as_ptr() as *mut c_char;
@@ -2529,12 +2534,12 @@ pub fn SP_NPC_ImpWorker(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_BespinCop`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3338-3353`
-pub fn SP_NPC_BespinCop(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_BespinCop(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                 c"BespinCop".as_ptr() as *mut c_char
             } else {
                 c"BespinCop2".as_ptr() as *mut c_char
@@ -2547,7 +2552,7 @@ pub fn SP_NPC_BespinCop(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Reborn`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3372-3400`
-pub fn SP_NPC_Reborn(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Reborn(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2572,12 +2577,12 @@ pub fn SP_NPC_Reborn(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_ShadowTrooper`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3409-3427`
-pub fn SP_NPC_ShadowTrooper(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_ShadowTrooper(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                 c"ShadowTrooper".as_ptr() as *mut c_char
             } else {
                 c"ShadowTrooper2".as_ptr() as *mut c_char
@@ -2592,7 +2597,7 @@ pub fn SP_NPC_ShadowTrooper(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Murjj`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3439-3444`
-pub fn SP_NPC_Monster_Murjj(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Murjj(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2604,7 +2609,7 @@ pub fn SP_NPC_Monster_Murjj(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Swamp`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3453-3458`
-pub fn SP_NPC_Monster_Swamp(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Swamp(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2616,7 +2621,7 @@ pub fn SP_NPC_Monster_Swamp(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Howler`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3467-3472`
-pub fn SP_NPC_Monster_Howler(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Howler(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2628,7 +2633,7 @@ pub fn SP_NPC_Monster_Howler(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_MineMonster`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3481-3487`
-pub fn SP_NPC_MineMonster(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_MineMonster(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2641,7 +2646,7 @@ pub fn SP_NPC_MineMonster(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Claw`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3496-3501`
-pub fn SP_NPC_Monster_Claw(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Claw(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2653,7 +2658,7 @@ pub fn SP_NPC_Monster_Claw(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Glider`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3510-3515`
-pub fn SP_NPC_Monster_Glider(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Glider(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2665,7 +2670,7 @@ pub fn SP_NPC_Monster_Glider(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Flier2`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3524-3529`
-pub fn SP_NPC_Monster_Flier2(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Flier2(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2677,7 +2682,7 @@ pub fn SP_NPC_Monster_Flier2(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Lizard`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3538-3543`
-pub fn SP_NPC_Monster_Lizard(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Lizard(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2689,7 +2694,7 @@ pub fn SP_NPC_Monster_Lizard(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Fish`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3552-3557`
-pub fn SP_NPC_Monster_Fish(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Fish(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2701,7 +2706,7 @@ pub fn SP_NPC_Monster_Fish(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Wampa`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3568-3575`
-pub fn SP_NPC_Monster_Wampa(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Wampa(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2714,7 +2719,7 @@ pub fn SP_NPC_Monster_Wampa(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Monster_Rancor`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3584-3589`
-pub fn SP_NPC_Monster_Rancor(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Monster_Rancor(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2726,7 +2731,7 @@ pub fn SP_NPC_Monster_Rancor(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Interrogator`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3602-3609`
-pub fn SP_NPC_Droid_Interrogator(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Interrogator(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2739,7 +2744,7 @@ pub fn SP_NPC_Droid_Interrogator(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Probe`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3620-3627`
-pub fn SP_NPC_Droid_Probe(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Probe(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2752,7 +2757,7 @@ pub fn SP_NPC_Droid_Probe(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Mark1`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3639-3646`
-pub fn SP_NPC_Droid_Mark1(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Mark1(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2765,7 +2770,7 @@ pub fn SP_NPC_Droid_Mark1(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Mark2`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3658-3665`
-pub fn SP_NPC_Droid_Mark2(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Mark2(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2778,7 +2783,7 @@ pub fn SP_NPC_Droid_Mark2(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_ATST`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3674-3688`
-pub fn SP_NPC_Droid_ATST(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_ATST(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2795,7 +2800,7 @@ pub fn SP_NPC_Droid_ATST(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Remote`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3699-3706`
-pub fn SP_NPC_Droid_Remote(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Remote(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2808,7 +2813,7 @@ pub fn SP_NPC_Droid_Remote(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Seeker`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3717-3724`
-pub fn SP_NPC_Droid_Seeker(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Seeker(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2821,7 +2826,7 @@ pub fn SP_NPC_Droid_Seeker(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Sentry`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3735-3742`
-pub fn SP_NPC_Droid_Sentry(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Sentry(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2834,7 +2839,7 @@ pub fn SP_NPC_Droid_Sentry(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Gonk`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3755-3763`
-pub fn SP_NPC_Droid_Gonk(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Gonk(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2847,7 +2852,7 @@ pub fn SP_NPC_Droid_Gonk(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Mouse`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3776-3785`
-pub fn SP_NPC_Droid_Mouse(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Mouse(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2860,7 +2865,7 @@ pub fn SP_NPC_Droid_Mouse(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_R2D2`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3798-3812`
-pub fn SP_NPC_Droid_R2D2(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_R2D2(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2877,7 +2882,7 @@ pub fn SP_NPC_Droid_R2D2(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_R5D2`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3826-3840`
-pub fn SP_NPC_Droid_R5D2(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_R5D2(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2894,7 +2899,7 @@ pub fn SP_NPC_Droid_R5D2(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_NPC_Droid_Protocol`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3851-3864`
-pub fn SP_NPC_Droid_Protocol(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_NPC_Droid_Protocol(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2912,7 +2917,7 @@ pub fn SP_NPC_Droid_Protocol(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3872-4018`
 pub fn NPC_SpawnType(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: Option<EntityId>,
     npc_type: *mut c_char,
     targetname: *mut c_char,
@@ -2932,7 +2937,7 @@ pub fn NPC_SpawnType(
 
     unsafe {
         (*npc_spawner).think = Some(EntThink::G_FreeEntity).into();
-        (*npc_spawner).nextthink = (*ctx.world).level.time + 50; // FRAMETIME
+        (*npc_spawner).nextthink = (*ctx.world_raw()).level.time + 50; // FRAMETIME
     }
 
     if npc_type.is_null() {
@@ -3084,7 +3089,7 @@ pub fn NPC_SpawnType(
 /// Raven `NPC_Spawn_f`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4020-4039`
-pub fn NPC_Spawn_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_Spawn_f(ctx: &mut GameContext, ent: EntityId) {
     let mut npc_type: [u8; 1024] = [0; 1024];
     let mut targetname: [u8; 1024] = [0; 1024];
     let mut is_vehicle = 0u32;
@@ -3143,7 +3148,7 @@ pub fn NPC_Spawn_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `NPC_Kill_f`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4045-4170`
-pub fn NPC_Kill_f(ctx: GameContext<'_>) {
+pub fn NPC_Kill_f(ctx: &mut GameContext) {
     // Raven `TeamNames[TEAM_NUM_TEAMS]` (NPC_stats.c:133), the NPC team_t names
     // (the many commented-out Trek-era entries collapse to these three).
     const TEAM_NAMES: [&str; TEAM_NUM_TEAMS as usize] = ["", "player", "enemy", "neutral"];
@@ -3227,7 +3232,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
     }
 
     for n in 1..ENTITYNUM_MAX_NORMAL {
-        let player = unsafe { (*ctx.world).g_entities.get_mut(n as usize) };
+        let player = unsafe { (*ctx.world_raw()).g_entities.get_mut(n as usize) };
         if player.is_none() {
             continue;
         }
@@ -3342,7 +3347,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
 /// Raven `NPC_PrintScore`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4172-4175`
-pub fn NPC_PrintScore(ctx: GameContext<'_>, ent: EntityId) {
+pub fn NPC_PrintScore(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -3360,7 +3365,7 @@ pub fn NPC_PrintScore(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Cmd_NPC_f`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4183-4243`
-pub fn Cmd_NPC_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
     let mut cmd: [u8; 1024] = [0; 1024];
 
     trap::Argv(
@@ -3397,7 +3402,7 @@ pub fn Cmd_NPC_f(ctx: GameContext<'_>, ent: EntityId) {
     ) == 0
     {
         unsafe {
-            (*ctx.world).globals.showBBoxes = if (*ctx.world).globals.showBBoxes != 0 {
+            (*ctx.world_raw()).globals.showBBoxes = if (*ctx.world_raw()).globals.showBBoxes != 0 {
                 0
             } else {
                 1
@@ -3422,7 +3427,7 @@ pub fn Cmd_NPC_f(ctx: GameContext<'_>, ent: EntityId) {
             // Show the score for all NPCs
             Com_Printf(c"SCORE LIST:\n".as_ptr() as *const c_char);
             for i in 0..ENTITYNUM_WORLD as usize {
-                let player = unsafe { (*ctx.world).g_entities.get(i) };
+                let player = unsafe { (*ctx.world_raw()).g_entities.get(i) };
                 if player.is_none() || unsafe { player.unwrap().client.is_null() } {
                     continue;
                 }

@@ -17,11 +17,11 @@ use mp_bg::public::duel_team::duelTeam_t::*;
 /// Raven `G_WriteClientSessionData`.
 ///
 /// Source: `oracle/codemp/game/g_session.c:23-96`
-pub fn G_WriteClientSessionData(ctx: GameContext<'_>, client: usize) {
+pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
     // STAGE-1: client-index param; re-derive the raw pointer the verbatim body
     // still expects (Stage-2 debt). `client_mut(i)` shares `level.clients`'s base,
     // so the body's `client - level.clients` index recomputes to `client`.
-    let client: *mut gclient_t = ctx.world().client_mut(client);
+    let client: *mut gclient_t = ctx.world.client_mut(client);
     let mut siege_class: [c_char; 64] = [0; 64];
     let mut saber_type: [c_char; 64] = [0; 64];
     let mut saber2_type: [c_char; 64] = [0; 64];
@@ -81,7 +81,7 @@ pub fn G_WriteClientSessionData(ctx: GameContext<'_>, client: usize) {
     let saber2_type_str = unsafe { cstr_to_str(saber2_type.as_ptr()) };
 
     let client_idx = unsafe {
-        let base = (*ctx.world).level.clients;
+        let base = (*ctx.world_raw()).level.clients;
         if client >= base {
             (client as usize - base as usize) / std::mem::size_of::<gclient_t>()
         } else {
@@ -117,13 +117,13 @@ pub fn G_WriteClientSessionData(ctx: GameContext<'_>, client: usize) {
 /// Raven `G_ReadSessionData`.
 ///
 /// Source: `oracle/codemp/game/g_session.c:105-177`
-pub fn G_ReadSessionData(ctx: GameContext<'_>, client: usize) {
+pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
     // STAGE-1: client-index param; re-derive the raw pointer the verbatim body
     // still expects (Stage-2 debt).
-    let client: *mut gclient_t = ctx.world().client_mut(client);
+    let client: *mut gclient_t = ctx.world.client_mut(client);
     unsafe {
         let client_idx = {
-            let base = (*ctx.world).level.clients;
+            let base = (*ctx.world_raw()).level.clients;
             if client >= base {
                 (client as usize - base as usize) / std::mem::size_of::<gclient_t>()
             } else {
@@ -249,7 +249,7 @@ pub fn G_ReadSessionData(ctx: GameContext<'_>, client: usize) {
 ///
 /// Source: `oracle/codemp/game/g_session.c:187-282`
 pub fn G_InitSessionData(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     client: usize,
     userinfo: *mut c_char,
     isBot: qboolean,
@@ -257,24 +257,23 @@ pub fn G_InitSessionData(
     // STAGE-1: client-index param; re-derive the raw pointer the verbatim body
     // still expects (Stage-2 debt), keeping the index for the write-back call.
     let client_index: usize = client;
-    let client: *mut gclient_t = ctx.world().client_mut(client);
+    let client: *mut gclient_t = ctx.world.client_mut(client);
     unsafe {
         (*client).sess.siegeDesiredTeam = TEAM_FREE;
 
-        if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM as i32 {
-            if (*ctx.world).cvars.g_teamAutoJoin.integer != 0 {
+        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM as i32 {
+            if (*ctx.world_raw()).cvars.g_teamAutoJoin.integer != 0 {
                 (*client).sess.sessionTeam = PickTeam(ctx, -1);
-                BroadcastTeamChange(
-                    ctx,
-                    EntityId(client.offset_from((*ctx.world).level.clients) as u32),
-                    -1,
-                );
+                let __h615 = EntityId(client.offset_from((*ctx.world_raw()).level.clients) as u32);
+                BroadcastTeamChange(ctx, __h615, -1);
             } else {
                 if isBot == qfalse {
                     (*client).sess.sessionTeam = TEAM_SPECTATOR;
                 } else {
                     let value = Info_ValueForKey(userinfo, cstr("team").as_ptr());
                     let value_char = if value.is_null() { 0 as c_char } else { *value };
+                    let __h616 =
+                        EntityId(client.offset_from((*ctx.world_raw()).level.clients) as u32);
                     if value_char == b'r' as c_char || value_char == b'R' as c_char {
                         (*client).sess.sessionTeam = TEAM_RED;
                     } else if value_char == b'b' as c_char || value_char == b'B' as c_char {
@@ -282,11 +281,7 @@ pub fn G_InitSessionData(
                     } else {
                         (*client).sess.sessionTeam = PickTeam(ctx, -1);
                     }
-                    BroadcastTeamChange(
-                        ctx,
-                        EntityId(client.offset_from((*ctx.world).level.clients) as u32),
-                        -1,
-                    );
+                    BroadcastTeamChange(ctx, __h616, -1);
                 }
             }
         } else {
@@ -295,9 +290,9 @@ pub fn G_InitSessionData(
             if value_char == b's' as c_char {
                 (*client).sess.sessionTeam = TEAM_SPECTATOR;
             } else {
-                match (*ctx.world).cvars.g_gametype.integer {
+                match (*ctx.world_raw()).cvars.g_gametype.integer {
                     x if x == GT_DUEL as i32 => {
-                        if (*ctx.world).level.numNonSpectatorClients >= 2 {
+                        if (*ctx.world_raw()).level.numNonSpectatorClients >= 2 {
                             (*client).sess.sessionTeam = TEAM_SPECTATOR;
                         } else {
                             (*client).sess.sessionTeam = TEAM_FREE;
@@ -315,9 +310,9 @@ pub fn G_InitSessionData(
                         (*client).sess.sessionTeam = TEAM_SPECTATOR;
                     }
                     _ => {
-                        if (*ctx.world).cvars.g_maxGameClients.integer > 0
-                            && (*ctx.world).level.numNonSpectatorClients
-                                >= (*ctx.world).cvars.g_maxGameClients.integer
+                        if (*ctx.world_raw()).cvars.g_maxGameClients.integer > 0
+                            && (*ctx.world_raw()).level.numNonSpectatorClients
+                                >= (*ctx.world_raw()).cvars.g_maxGameClients.integer
                         {
                             (*client).sess.sessionTeam = TEAM_SPECTATOR;
                         } else {
@@ -329,7 +324,7 @@ pub fn G_InitSessionData(
         }
 
         (*client).sess.spectatorState = SPECTATOR_FREE;
-        (*client).sess.spectatorTime = (*ctx.world).level.time;
+        (*client).sess.spectatorTime = (*ctx.world_raw()).level.time;
 
         (*client).sess.siegeClass[0] = 0;
         (*client).sess.saberType[0] = 0;
@@ -342,7 +337,7 @@ pub fn G_InitSessionData(
 /// Raven `G_InitWorldSession`.
 ///
 /// Source: `oracle/codemp/game/g_session.c:291-304`
-pub fn G_InitWorldSession(ctx: GameContext<'_>) {
+pub fn G_InitWorldSession(ctx: &mut GameContext) {
     let mut s: [c_char; MAX_STRING_CHARS as usize] = [0; MAX_STRING_CHARS as usize];
 
     trap::Cvar_VariableStringBuffer(
@@ -357,8 +352,8 @@ pub fn G_InitWorldSession(ctx: GameContext<'_>) {
     let gt: c_int = atoi(s.as_ptr());
 
     unsafe {
-        if (*ctx.world).cvars.g_gametype.integer != gt {
-            (*ctx.world).level.newSession = qtrue;
+        if (*ctx.world_raw()).cvars.g_gametype.integer != gt {
+            (*ctx.world_raw()).level.newSession = qtrue;
             G_Printf(
                 ctx,
                 cstr("Gametype changed, clearing session data.\n").as_ptr(),
@@ -370,13 +365,13 @@ pub fn G_InitWorldSession(ctx: GameContext<'_>) {
 /// Raven `G_WriteSessionData`.
 ///
 /// Source: `oracle/codemp/game/g_session.c:312-322`
-pub fn G_WriteSessionData(ctx: GameContext<'_>) {
+pub fn G_WriteSessionData(ctx: &mut GameContext) {
     unsafe {
-        let s = format!("{}", (*ctx.world).cvars.g_gametype.integer);
+        let s = format!("{}", (*ctx.world_raw()).cvars.g_gametype.integer);
         trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("session"), cstr(&s)));
 
-        for i in 0..(*ctx.world).level.maxclients {
-            let client = (*ctx.world).level.clients.add(i as usize);
+        for i in 0..(*ctx.world_raw()).level.maxclients {
+            let client = (*ctx.world_raw()).level.clients.add(i as usize);
             if (*client).pers.connected == CON_CONNECTED {
                 G_WriteClientSessionData(ctx, i as usize);
             }

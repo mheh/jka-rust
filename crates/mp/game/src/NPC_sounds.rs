@@ -23,7 +23,7 @@ use crate::NPC_combat::G_ClearEnemy;
 ///
 /// Source: `oracle/codemp/game/NPC_sounds.c:23-64`
 pub fn G_AddVoiceEvent(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     event: c_int,
     speakDebounceTime: c_int,
@@ -41,7 +41,9 @@ pub fn G_AddVoiceEvent(
             return;
         }
 
-        if (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime > (*ctx.world).level.time {
+        if (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime
+            > (*ctx.world_raw()).level.time
+        {
             return;
         }
 
@@ -71,7 +73,7 @@ pub fn G_AddVoiceEvent(
 
         G_SpeechEvent(ctx, ctx.entity_id_of(self_).unwrap(), event);
 
-        let new_time = (*ctx.world).level.time
+        let new_time = (*ctx.world_raw()).level.time
             + if speakDebounceTime == 0 {
                 5000
             } else {
@@ -84,7 +86,7 @@ pub fn G_AddVoiceEvent(
 /// Raven `NPC_PlayConfusionSound`.
 ///
 /// Source: `oracle/codemp/game/NPC_sounds.c:66-93`
-pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: EntityId) {
+pub fn NPC_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
@@ -98,19 +100,16 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: EntityId) {
                 || (*((*self_).client as *mut gclient_t)).renderInfo.lookTarget == 0
             {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
-                G_AddVoiceEvent(
-                    ctx,
-                    ctx.entity_id_of(self_).unwrap(),
-                    (*ctx.world)
-                        .bg_state
-                        .rng
-                        .Q_irand(EV_CONFUSE2 as c_int, EV_CONFUSE3 as c_int),
-                    2000,
-                );
+                let __h521 = ctx.entity_id_of(self_).unwrap();
+                let __h522 = (*ctx.world_raw())
+                    .bg_state
+                    .rng
+                    .Q_irand(EV_CONFUSE2 as c_int, EV_CONFUSE3 as c_int);
+                G_AddVoiceEvent(ctx, __h521, __h522, 2000);
             } else if !(*self_).NPC.is_null()
                 && (*((*self_).NPC as *mut gNPC_t)).investigateDebounceTime
                     + (*((*self_).NPC as *mut gNPC_t)).pauseTime
-                    > (*ctx.world).level.time
+                    > (*ctx.world_raw()).level.time
             {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
                 G_AddVoiceEvent(

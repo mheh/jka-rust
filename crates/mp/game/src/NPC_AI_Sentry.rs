@@ -17,9 +17,9 @@ use mp_qshared::shared::surface_flags::{CONTENTS_LIGHTSABER, MASK_SHOT};
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -50,7 +50,7 @@ const LSTATE_ATTACKING: i32 = 5;
 /// `NPC_Sentry_Precache` — Precache sounds and effects for the sentry gun.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:37-57`
-pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
+pub fn NPC_Sentry_Precache(ctx: &mut GameContext) {
     crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_explo").as_ptr());
     crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_pain").as_ptr());
     crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_shield_open").as_ptr());
@@ -76,7 +76,7 @@ pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:64-72`
 pub fn sentry_use(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -108,7 +108,7 @@ pub fn sentry_use(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:79-105`
 pub fn NPC_Sentry_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -117,21 +117,19 @@ pub fn NPC_Sentry_Pain(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let mod_ = world.globals.gPainMOD;
 
-        crate::NPC_reactions::NPC_Pain(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(attacker),
-            damage,
-        );
+        let __h205 = ctx.entity_id_of(self_).unwrap();
+        let __h206 = ctx.entity_id_of(attacker);
+        crate::NPC_reactions::NPC_Pain(ctx, __h205, __h206, damage);
 
         if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
             (*((*self_).NPC as *mut gNPC_t)).burstCount = 0;
+            let __h207 = ctx.entity_id_of(self_);
             crate::g_timer::TIMER_Set(
                 ctx,
-                ctx.entity_id_of(self_),
+                __h207,
                 cstr("attackDelay").as_ptr(),
                 (*world).bg_state.rng.Q_irand(9000, 12000),
             );
@@ -158,9 +156,9 @@ pub fn NPC_Sentry_Pain(
 /// `Sentry_Fire` — Fire a bryar projectile from one of the muzzle bolts.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:112-203`
-pub fn Sentry_Fire(ctx: GameContext<'_>) {
+pub fn Sentry_Fire(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
@@ -176,9 +174,10 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("powerup").as_ptr()) != 0
             {
                 (*NPCInfo).localState = LSTATE_ATTACKING;
+                let __h208 = ctx.entity_id_of(NPC).unwrap();
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(NPC).unwrap(),
+                    __h208,
                     SETANIM_BOTH,
                     BOTH_ATTACK1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -270,15 +269,9 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             forward,
         );
 
-        let missile = crate::g_missile::CreateMissile(
-            ctx,
-            muzzle,
-            forward,
-            1600.0,
-            10000,
-            ctx.entity_id_of(NPC).unwrap(),
-            qfalse,
-        );
+        let __h209 = ctx.entity_id_of(NPC).unwrap();
+        let missile =
+            crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, __h209, qfalse);
 
         (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
         (*missile).s.weapon = WP_BRYAR_PISTOL;
@@ -305,9 +298,9 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
 /// `Sentry_MaintainHeight` — Maintain hover height relative to enemies/goals.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:210-304`
-pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
+pub fn Sentry_MaintainHeight(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
         let ucmd = &mut world.globals.ucmd;
@@ -393,9 +386,9 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
 /// `Sentry_Idle` — Idle behavior; sleeping/waking up states.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:311-331`
-pub fn Sentry_Idle(ctx: GameContext<'_>) {
+pub fn Sentry_Idle(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
@@ -425,9 +418,9 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
 /// `Sentry_Strafe` — Perform a strafe maneuver.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:338-365`
-pub fn Sentry_Strafe(ctx: GameContext<'_>) {
+pub fn Sentry_Strafe(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
@@ -491,9 +484,9 @@ pub fn Sentry_Strafe(ctx: GameContext<'_>) {
 /// `Sentry_Hunt` — Hunt the enemy, either strafing or chasing.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:372-411`
-pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn Sentry_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
@@ -552,9 +545,9 @@ pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
 /// `Sentry_RangedAttack` — Ranged attack behavior.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:418-448`
-pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn Sentry_RangedAttack(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
@@ -572,9 +565,10 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                     (*NPCInfo).localState = LSTATE_ACTIVE;
                     (*NPC).fly_sound_debounce_time = 0;
                     (*NPCInfo).burstCount = 0;
+                    let __h210 = ctx.entity_id_of(NPC);
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        ctx.entity_id_of(NPC),
+                        __h210,
                         cstr("attackDelay").as_ptr(),
                         world.bg_state.rng.Q_irand(2000, 3500),
                     );
@@ -607,9 +601,9 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
 /// `Sentry_AttackDecision` — Decide how to attack the enemy.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:455-510`
-pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
+pub fn Sentry_AttackDecision(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
@@ -624,25 +618,21 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
             cstr("sound/chars/sentry/misc/sentry_hover_2_lp").as_ptr(),
         );
 
+        let __h211 = ctx.entity_id_of(NPC);
         // randomly talk
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("patrolNoise").as_ptr())
-            != qfalse
-        {
+        if crate::g_timer::TIMER_Done(ctx, __h211, cstr("patrolNoise").as_ptr()) != qfalse {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("angerNoise").as_ptr())
                 != qfalse
             {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
-                crate::g_utils::G_SoundOnEnt(
-                    ctx,
-                    ctx.entity_id_of(NPC).unwrap(),
-                    CHAN_AUTO,
-                    cstr(&s).as_ptr(),
-                );
+                let __h212 = ctx.entity_id_of(NPC).unwrap();
+                crate::g_utils::G_SoundOnEnt(ctx, __h212, CHAN_AUTO, cstr(&s).as_ptr());
 
+                let __h213 = ctx.entity_id_of(NPC);
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    ctx.entity_id_of(NPC),
+                    __h213,
                     cstr("patrolNoise").as_ptr(),
                     world.bg_state.rng.Q_irand(4000, 10000),
                 );
@@ -703,9 +693,9 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
 /// `NPC_Sentry_Patrol` — Patrol behavior when no enemy.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:519-550`
-pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
+pub fn NPC_Sentry_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let ucmd = &mut world.globals.ucmd;
 
@@ -730,16 +720,13 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
             {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
-                crate::g_utils::G_SoundOnEnt(
-                    ctx,
-                    ctx.entity_id_of(NPC).unwrap(),
-                    CHAN_AUTO,
-                    cstr(&s).as_ptr(),
-                );
+                let __h214 = ctx.entity_id_of(NPC).unwrap();
+                crate::g_utils::G_SoundOnEnt(ctx, __h214, CHAN_AUTO, cstr(&s).as_ptr());
 
+                let __h215 = ctx.entity_id_of(NPC);
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    ctx.entity_id_of(NPC),
+                    __h215,
                     cstr("patrolNoise").as_ptr(),
                     world.bg_state.rng.Q_irand(2000, 4000),
                 );
@@ -753,9 +740,9 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
 /// `NPC_BSSentry_Default` — Main behavior state for sentry gun.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:557-577`
-pub fn NPC_BSSentry_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSSentry_Default(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 

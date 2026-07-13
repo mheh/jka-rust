@@ -413,7 +413,7 @@ pub fn PM_CheckPullAttack() -> saberMoveName_t {
 /// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
 // The QAGAME branch reads the game-tier `g_entities` arena, which bg code
 // cannot name; callers thread the arena base in — pmove callers from the
-// `pm->baseEnt` overlay, game-tier callers from `(*ctx.world).g_entities`.
+// `pm->baseEnt` overlay, game-tier callers from `(*ctx.world_raw()).g_entities`.
 pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, ents: *mut gentity_t) -> *mut saberInfo_t {
     unsafe {
         // Per oracle C code (QAGAME branch):

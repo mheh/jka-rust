@@ -115,7 +115,7 @@ pub use mp_qshared::common::mp::ent_fn_ids::{
 /// Central `think` dispatch (replaces `ent->think(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
-pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t) {
+pub fn dispatch_think(ctx: &mut GameContext, id: EntThink, self_: *mut gentity_t) {
     match id {
         EntThink::AimAtTarget => AimAtTarget(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::BodyRid => BodyRid(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -241,7 +241,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
 /// Central `reached` dispatch (replaces `ent->reached(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
-pub fn dispatch_reached(ctx: GameContext<'_>, id: EntReached, self_: *mut gentity_t) {
+pub fn dispatch_reached(ctx: &mut GameContext, id: EntReached, self_: *mut gentity_t) {
     match id {
         EntReached::Reached_BinaryMover => {
             Reached_BinaryMover(ctx, ctx.entity_id_of(self_).unwrap())
@@ -258,7 +258,7 @@ pub fn dispatch_reached(ctx: GameContext<'_>, id: EntReached, self_: *mut gentit
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_blocked(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     id: EntBlocked,
     self_: *mut gentity_t,
     other: *mut gentity_t,
@@ -281,7 +281,7 @@ pub fn dispatch_blocked(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_touch(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     id: EntTouch,
     self_: *mut gentity_t,
     other: *mut gentity_t,
@@ -311,11 +311,11 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::SaberBounceSound => SaberBounceSound(
-            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
-            ctx.entity_id_of(other),
-            trace,
-        ),
+        EntTouch::SaberBounceSound => {
+            let __s951 = ctx.entity_id_of(self_).unwrap();
+            let __s952 = ctx.entity_id_of(other);
+            SaberBounceSound(ctx.entity_mut(__s951), __s952, trace)
+        }
         EntTouch::SaberGotHit => SaberGotHit(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -458,7 +458,7 @@ pub fn dispatch_touch(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_use(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     id: EntUse,
     self_: *mut gentity_t,
     other: *mut gentity_t,
@@ -489,22 +489,24 @@ pub fn dispatch_use(
             ctx.entity_id_of(other),
             ctx.entity_id_of(activator),
         ),
-        EntUse::SiegeIconUse => SiegeIconUse(
-            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
-            ctx.entity_id_of(other),
-            ctx.entity_id_of(activator),
-        ),
+        EntUse::SiegeIconUse => {
+            let __s953 = ctx.entity_id_of(self_).unwrap();
+            let __s954 = ctx.entity_id_of(other);
+            let __s955 = ctx.entity_id_of(activator);
+            SiegeIconUse(ctx.entity_mut(__s953), __s954, __s955)
+        }
         EntUse::SiegeItemUse => SiegeItemUse(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
             ctx.entity_id_of(other),
             ctx.entity_id_of(activator),
         ),
-        EntUse::SiegePointUse => SiegePointUse(
-            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
-            ctx.entity_id_of(other),
-            ctx.entity_id_of(activator),
-        ),
+        EntUse::SiegePointUse => {
+            let __s956 = ctx.entity_id_of(self_).unwrap();
+            let __s957 = ctx.entity_id_of(other);
+            let __s958 = ctx.entity_id_of(activator);
+            SiegePointUse(ctx.entity_mut(__s956), __s957, __s958)
+        }
         EntUse::Use_BinaryMover => Use_BinaryMover(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -763,16 +765,18 @@ pub fn dispatch_use(
             ctx.entity_id_of(other),
             ctx.entity_id_of(activator),
         ),
-        EntUse::turretG2_base_use => turretG2_base_use(
-            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
-            ctx.entity_id_of(other),
-            ctx.entity_id_of(activator),
-        ),
-        EntUse::turret_base_use => turret_base_use(
-            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
-            ctx.entity_id_of(other),
-            ctx.entity_id_of(activator),
-        ),
+        EntUse::turretG2_base_use => {
+            let __s959 = ctx.entity_id_of(self_).unwrap();
+            let __s960 = ctx.entity_id_of(other);
+            let __s961 = ctx.entity_id_of(activator);
+            turretG2_base_use(ctx.entity_mut(__s959), __s960, __s961)
+        }
+        EntUse::turret_base_use => {
+            let __s962 = ctx.entity_id_of(self_).unwrap();
+            let __s963 = ctx.entity_id_of(other);
+            let __s964 = ctx.entity_id_of(activator);
+            turret_base_use(ctx.entity_mut(__s962), __s963, __s964)
+        }
         EntUse::use_wall => use_wall(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -786,7 +790,7 @@ pub fn dispatch_use(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     id: EntPain,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -961,7 +965,7 @@ pub fn dispatch_pain(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_die(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     id: EntDie,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
@@ -1702,7 +1706,7 @@ pub fn spawn_for_classname(classname: &str) -> Option<EntSpawn> {
 /// `G_CallSpawn`). Faithful raw-pointer `ent` param for staging; the Land
 /// phase re-shapes to `(world, EntityId)`.
 /// Source: `oracle/codemp/game/g_spawn.c:435-673`
-pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
+pub fn dispatch_spawn(ctx: &mut GameContext, id: EntSpawn, ent: *mut gentity_t) {
     match id {
         EntSpawn::info_player_start => SP_info_player_start(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::info_player_duel => SP_info_player_duel(ctx, ctx.entity_id_of(ent).unwrap()),

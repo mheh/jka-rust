@@ -9,7 +9,7 @@
 //! `NPC_reactions.rs`/`w_force.rs`): logic fns that reach `level`/cvars/traps
 //! thread the `GameContext<'_>` receiver (`.world: *mut GameWorld`, `.engine`)
 //! as an ADDITIVE first parameter (the faithful C signature carries none).
-//! `level` -> `(*ctx.world).level`, cvars -> `(*ctx.world).cvars`. Traps go
+//! `level` -> `(*ctx.world_raw()).level`, cvars -> `(*ctx.world_raw()).cvars`. Traps go
 //! through `trap::X(ctx.engine, ..)`. `vec3_t` (`[f32;3]`) is `Copy`, so
 //! `VectorCopy`/`VectorMA`/`VectorScale`/`VectorAdd`/`VectorSubtract`/
 //! `VectorClear`/`VectorSet`/`DotProduct`/`VectorCompare` (all inline macros
@@ -71,9 +71,9 @@ const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
 /// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
 #[inline]
-unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -117,7 +117,7 @@ pub fn NPC_ClearBlocked(self_: &mut gentity_t) {
 /// Raven `NPC_SetBlocked`.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:43-51`
-pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: EntityId, blocker: Option<EntityId>) {
+pub fn NPC_SetBlocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<EntityId>) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
@@ -128,9 +128,9 @@ pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: EntityId, blocker: Option<Ent
         }
 
         //self->NPC->aiFlags |= NPCAI_BLOCKED;
-        (*npc).blockedSpeechDebounceTime = (*ctx.world).level.time
+        (*npc).blockedSpeechDebounceTime = (*ctx.world_raw()).level.time
             + MIN_BLOCKED_SPEECH_TIME
-            + (((*ctx.world).bg_state.rng.random() * 4000.0) as c_int);
+            + (((*ctx.world_raw()).bg_state.rng.random() * 4000.0) as c_int);
         (*npc).blockingEntNum = (*blocker).s.number;
     }
 }
@@ -139,7 +139,7 @@ pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: EntityId, blocker: Option<Ent
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:58-77`
 pub fn NAVNEW_ClearPathBetweenPoints(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     start: vec3_t,
     end: vec3_t,
     mins: vec3_t,
@@ -187,7 +187,7 @@ pub fn NAVNEW_ClearPathBetweenPoints(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:84-171`
 pub fn NAVNEW_PushBlocker(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     blocker: Option<EntityId>,
     right: vec3_t,
@@ -246,7 +246,7 @@ pub fn NAVNEW_PushBlocker(
         if leftSucc >= 1.0f32 {
             //it's clear, shove him that way
             crate::q_math::_VectorScale(right, -moveamt, &mut (*client).pushVec);
-            (*client).pushVecTime = (*ctx.world).level.time + 2000;
+            (*client).pushVecTime = (*ctx.world_raw()).level.time + 2000;
         } else {
             crate::q_math::_VectorMA((*blocker).r.currentOrigin, moveamt, right, &mut end);
             trap::Trace(
@@ -269,7 +269,7 @@ pub fn NAVNEW_PushBlocker(
 
             if leftSucc == 0.0f32 && rightSucc == 0.0f32 {
                 //both sides failed
-                if (*ctx.world).cvars.d_patched.integer != 0 {
+                if (*ctx.world_raw()).cvars.d_patched.integer != 0 {
                     //use patch-style navigation
                     (*client).pushVecTime = 0;
                 }
@@ -279,16 +279,16 @@ pub fn NAVNEW_PushBlocker(
             if rightSucc >= 1.0f32 {
                 //it's clear, shove him that way
                 crate::q_math::_VectorScale(right, moveamt, &mut (*client).pushVec);
-                (*client).pushVecTime = (*ctx.world).level.time + 2000;
+                (*client).pushVecTime = (*ctx.world_raw()).level.time + 2000;
             }
             //if neither are enough, we probably can't get around him, but keep trying
             else if leftSucc >= rightSucc {
                 //favor the left, all things being equal
                 crate::q_math::_VectorScale(right, -moveamt, &mut (*client).pushVec);
-                (*client).pushVecTime = (*ctx.world).level.time + 2000;
+                (*client).pushVecTime = (*ctx.world_raw()).level.time + 2000;
             } else {
                 crate::q_math::_VectorScale(right, moveamt, &mut (*client).pushVec);
-                (*client).pushVecTime = (*ctx.world).level.time + 2000;
+                (*client).pushVecTime = (*ctx.world_raw()).level.time + 2000;
             }
         }
 
@@ -310,7 +310,7 @@ pub fn NAVNEW_PushBlocker(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:178-215`
 pub fn NAVNEW_DanceWithBlocker(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: Option<EntityId>,
     blocker: Option<EntityId>,
     movedir: &mut vec3_t,
@@ -366,7 +366,7 @@ pub fn NAVNEW_DanceWithBlocker(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:222-340`
 pub fn NAVNEW_SidestepBlocker(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     blocker: Option<EntityId>,
     blocked_dir: vec3_t,
@@ -405,7 +405,7 @@ pub fn NAVNEW_SidestepBlocker(
         let mut avoidAngles = [0.0f32; 3];
 
         //need to stop it from ping-ponging, so we have a bit of a debounce time on which side you try
-        if (*npc).sideStepHoldTime > (*ctx.world).level.time {
+        if (*npc).sideStepHoldTime > (*ctx.world_raw()).level.time {
             let adj_arcAngle = if (*npc).lastSideStepSide == -1 {
                 -arcAngle
             } else {
@@ -476,7 +476,7 @@ pub fn NAVNEW_SidestepBlocker(
                 //all clear, go for it (favor the right if both are equal)
                 crate::q_math::_VectorCopy(avoidRight_dir, movedir);
                 (*npc).lastSideStepSide = 1;
-                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+                (*npc).sideStepHoldTime = (*ctx.world_raw()).level.time + 2000;
                 return qtrue;
             }
             tr.fraction
@@ -515,7 +515,7 @@ pub fn NAVNEW_SidestepBlocker(
                 //all clear, go for it (right side would have already succeeded if as good as this)
                 crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
                 (*npc).lastSideStepSide = -1;
-                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+                (*npc).sideStepHoldTime = (*ctx.world_raw()).level.time + 2000;
                 return qtrue;
             }
             tr.fraction
@@ -534,11 +534,11 @@ pub fn NAVNEW_SidestepBlocker(
                 //favor the right, all things being equal
                 crate::q_math::_VectorCopy(avoidRight_dir, movedir);
                 (*npc).lastSideStepSide = 1;
-                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+                (*npc).sideStepHoldTime = (*ctx.world_raw()).level.time + 2000;
             } else {
                 crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
                 (*npc).lastSideStepSide = -1;
-                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+                (*npc).sideStepHoldTime = (*ctx.world_raw()).level.time + 2000;
             }
             return qtrue;
         }
@@ -552,7 +552,7 @@ pub fn NAVNEW_SidestepBlocker(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:347-377`
 pub fn NAVNEW_Bypass(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     blocker: Option<EntityId>,
     blocked_dir: vec3_t,
@@ -565,7 +565,7 @@ pub fn NAVNEW_Bypass(
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         //Draw debug info if requested
-        if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
+        if (*ctx.world_raw()).globals.NAVDEBUG_showCollision != 0 {
             G_DrawEdge(
                 (*self_).r.currentOrigin,
                 (*blocker).r.currentOrigin,
@@ -646,7 +646,7 @@ pub fn NAVNEW_CheckDoubleBlock(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:399-435`
 pub fn NAVNEW_ResolveEntityCollision(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     blocker: Option<EntityId>,
     movedir: vec3_t,
@@ -716,7 +716,7 @@ pub fn NAVNEW_ResolveEntityCollision(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:442-518`
 pub fn NAVNEW_AvoidCollision(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     goal: Option<EntityId>,
     info: *mut navInfo_t,
@@ -753,8 +753,8 @@ pub fn NAVNEW_AvoidCollision(
         ) == qfalse
         {
             //Get the blocker
-            (*info).blocker =
-                &mut (*ctx.world).g_entities[(*info).trace.entityNum as usize] as *mut gentity_t;
+            (*info).blocker = &mut (*ctx.world_raw()).g_entities[(*info).trace.entityNum as usize]
+                as *mut gentity_t;
             (*info).flags |= NIF_COLLISION;
 
             //Ok to hit our goal entity
@@ -764,7 +764,7 @@ pub fn NAVNEW_AvoidCollision(
 
             if setBlockedInfo != qfalse {
                 if (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves > blockedMovesLimit {
-                    if (*ctx.world).cvars.d_patched.integer != 0 {
+                    if (*ctx.world_raw()).cvars.d_patched.integer != 0 {
                         //use patch-style navigation
                         (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves += 1;
                     }
@@ -823,7 +823,7 @@ pub fn NAVNEW_AvoidCollision(
         }
 
         //Our path is clear, just move there
-        if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
+        if (*ctx.world_raw()).globals.NAVDEBUG_showCollision != 0 {
             G_DrawEdge((*self_).r.currentOrigin, movepos, EDGE_MOVEDIR);
         }
 
@@ -838,7 +838,7 @@ pub fn NAVNEW_AvoidCollision(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:520-572`
 pub fn NAVNEW_TestNodeConnectionBlocked(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     wp1: c_int,
     wp2: c_int,
     ignoreEnt: Option<EntityId>,
@@ -933,7 +933,7 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
 /// Raven `NAVNEW_MoveToGoal`.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:578-865`
-pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navInfo_t) -> c_int {
+pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navInfo_t) -> c_int {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
@@ -963,28 +963,30 @@ pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navIn
             None => return WAYPOINT_NONE,
         };
 
-        if (*self_).waypoint == WAYPOINT_NONE && (*self_).noWaypointTime > (*ctx.world).level.time {
+        if (*self_).waypoint == WAYPOINT_NONE
+            && (*self_).noWaypointTime > (*ctx.world_raw()).level.time
+        {
             //didn't have a valid one in about the past second, don't look again just yet
             return WAYPOINT_NONE;
         }
 
-        let goal_ent_ptr = if goal_entity.0 < (*ctx.world).g_entities.len() as u32 {
-            &mut (*ctx.world).g_entities[goal_entity.0 as usize] as *mut gentity_t
+        let goal_ent_ptr = if goal_entity.0 < (*ctx.world_raw()).g_entities.len() as u32 {
+            &mut (*ctx.world_raw()).g_entities[goal_entity.0 as usize] as *mut gentity_t
         } else {
             core::ptr::null_mut()
         };
 
         if !goal_ent_ptr.is_null()
             && (*goal_ent_ptr).waypoint == WAYPOINT_NONE
-            && (*goal_ent_ptr).noWaypointTime > (*ctx.world).level.time
+            && (*goal_ent_ptr).noWaypointTime > (*ctx.world_raw()).level.time
         {
             //didn't have a valid one in about the past second, don't look again just yet
             return WAYPOINT_NONE;
         }
 
-        if (*self_).noWaypointTime > (*ctx.world).level.time
+        if (*self_).noWaypointTime > (*ctx.world_raw()).level.time
             && !goal_ent_ptr.is_null()
-            && (*goal_ent_ptr).noWaypointTime > (*ctx.world).level.time
+            && (*goal_ent_ptr).noWaypointTime > (*ctx.world_raw()).level.time
         {
             //just use current waypoints
             bestNode = trap::Nav_GetBestNodeAltRoute2(
@@ -1011,19 +1013,21 @@ pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navIn
             //one of us didn't have a valid waypoint!
             if (*self_).waypoint == NODE_NONE {
                 //don't even try to find one again for a bit
-                (*self_).noWaypointTime =
-                    (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+                (*self_).noWaypointTime = (*ctx.world_raw()).level.time
+                    + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 1500);
             }
             if !goal_ent_ptr.is_null() && (*goal_ent_ptr).waypoint == NODE_NONE {
                 //don't even try to find one again for a bit
-                (*goal_ent_ptr).noWaypointTime =
-                    (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+                (*goal_ent_ptr).noWaypointTime = (*ctx.world_raw()).level.time
+                    + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 1500);
             }
             return WAYPOINT_NONE;
         } else {
-            if !goal_ent_ptr.is_null() && (*goal_ent_ptr).noWaypointTime < (*ctx.world).level.time {
-                (*goal_ent_ptr).noWaypointTime =
-                    (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+            if !goal_ent_ptr.is_null()
+                && (*goal_ent_ptr).noWaypointTime < (*ctx.world_raw()).level.time
+            {
+                (*goal_ent_ptr).noWaypointTime = (*ctx.world_raw()).level.time
+                    + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 1500);
             }
         }
 
@@ -1181,12 +1185,12 @@ pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navIn
                     }
                 } else if bestNode != (*self_).waypoint {
                     //we headed toward our next waypoint (instead of our waypoint) and failed
-                    if (*ctx.world).cvars.d_altRoutes.integer != 0 {
+                    if (*ctx.world_raw()).cvars.d_altRoutes.integer != 0 {
                         //mark this edge failed and try our waypoint
                         //NOTE: don't assume there is something blocking the direct path
                         //			between my waypoint and the bestNode... I could be off
                         //			that path because of collision avoidance...
-                        if (*ctx.world).cvars.d_patched.integer != 0 && //use patch-style navigation
+                        if (*ctx.world_raw()).cvars.d_patched.integer != 0 && //use patch-style navigation
                            (trap::Nav_NodesAreNeighbors(
                                ctx.engine,
                                mp_abi::game::syscalls::G_NAV_NODESARENEIGHBORS::GNavNodesareneighborsArgs::new((*self_).waypoint, bestNode),
@@ -1206,7 +1210,7 @@ pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navIn
                     }
                 } else {
                     //we headed for *our* waypoint and couldn't get to it
-                    if (*ctx.world).cvars.d_altRoutes.integer != 0 {
+                    if (*ctx.world_raw()).cvars.d_altRoutes.integer != 0 {
                         //remember that this node is blocked
                         trap::Nav_AddFailedNode(
                             ctx.engine,
@@ -1235,7 +1239,7 @@ pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navIn
         }
 
         //Draw any debug info, if requested
-        if (*ctx.world).globals.NAVDEBUG_showEnemyPath != 0 {
+        if (*ctx.world_raw()).globals.NAVDEBUG_showEnemyPath != 0 {
             let mut dest = [0.0f32; 3];
             let mut start = [0.0f32; 3];
 
@@ -1293,9 +1297,9 @@ pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navIn
         (*((*self_).NPC as *mut gNPC_t)).shoveCount = 0;
 
         //let me keep this waypoint for a while
-        if (*self_).noWaypointTime < (*ctx.world).level.time {
+        if (*self_).noWaypointTime < (*ctx.world_raw()).level.time {
             (*self_).noWaypointTime =
-                (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+                (*ctx.world_raw()).level.time + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 1500);
         }
         bestNode
     }

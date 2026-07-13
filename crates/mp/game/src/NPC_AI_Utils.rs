@@ -5,8 +5,8 @@
 //! manifest, then filled by the jampgame mega-pass. Ambient globals
 //! (`level`, `g_entities`, cvars) are reached through the `GameContext<'_>`
 //! spine (`docs/architecture/engine-seam.md`, precedent: `w_force.rs`) —
-//! `level` -> `(*ctx.world).level`, `g_entities[i]` -> `(*ctx.world).g_entities[i]`,
-//! cvars -> `(*ctx.world).cvars`. Traps go through `trap::X(ctx.engine, …)`.
+//! `level` -> `(*ctx.world_raw()).level`, `g_entities[i]` -> `(*ctx.world_raw()).g_entities[i]`,
+//! cvars -> `(*ctx.world_raw()).cvars`. Traps go through `trap::X(ctx.engine, …)`.
 //! Raw `gentity_t*`/`AIGroupInfo_t*` chains are transcribed as `unsafe`
 //! raw-pointer field access mirroring the C exactly (multi-EntityId
 //! reshaping is deferred to the later integration pass; this pass keeps
@@ -40,9 +40,9 @@ use crate::NPC_move::NAV_GetLastMove;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -58,7 +58,7 @@ use crate::npc::script_flags::SCF_NO_GROUPS;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:23-67`
 pub fn AI_GetGroupSize(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     origin: vec3_t,
     radius: c_int,
     playerTeam: team_t,
@@ -87,8 +87,8 @@ pub fn AI_GetGroupSize(
 
         let mut realCount = 0;
         for j in 0..numEnts {
-            let check =
-                &mut (*ctx.world).g_entities[radiusEnts[j as usize] as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world_raw()).g_entities[radiusEnts[j as usize] as usize]
+                as *mut gentity_t;
 
             if (*check).client.is_null() {
                 continue;
@@ -113,7 +113,7 @@ pub fn AI_GetGroupSize(
 /// Raven `AI_GetGroupSize2` — overload.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:71-77`
-pub fn AI_GetGroupSize2(ctx: GameContext<'_>, ent: Option<EntityId>, radius: c_int) -> c_int {
+pub fn AI_GetGroupSize2(ctx: &mut GameContext, ent: Option<EntityId>, radius: c_int) -> c_int {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { ent_resolve_opt(ctx, ent) };
     unsafe {
@@ -135,7 +135,7 @@ pub fn AI_GetGroupSize2(ctx: GameContext<'_>, ent: Option<EntityId>, radius: c_i
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:80-110`
 pub fn AI_ClosestGroupEntityNumToPoint(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     group: *mut AIGroupInfo_t,
     point: vec3_t,
 ) -> c_int {
@@ -177,7 +177,7 @@ pub fn AI_ClosestGroupEntityNumToPoint(
 /// Raven `AI_SetClosestBuddy`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:112-132`
-pub fn AI_SetClosestBuddy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
+pub fn AI_SetClosestBuddy(ctx: &mut GameContext, group: *mut AIGroupInfo_t) {
     unsafe {
         for i in 0..(*group).numGroup {
             (*group).member[i as usize].closestBuddy = ENTITYNUM_NONE;
@@ -185,10 +185,10 @@ pub fn AI_SetClosestBuddy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
             let mut bestDist: f32 = Q3_INFINITE as f32;
             for j in 0..(*group).numGroup {
                 let dist = DistanceSquared(
-                    (*ctx.world).g_entities[(*group).member[i as usize].number as usize]
+                    (*ctx.world_raw()).g_entities[(*group).member[i as usize].number as usize]
                         .r
                         .currentOrigin,
-                    (*ctx.world).g_entities[(*group).member[j as usize].number as usize]
+                    (*ctx.world_raw()).g_entities[(*group).member[j as usize].number as usize]
                         .r
                         .currentOrigin,
                 );
@@ -204,7 +204,7 @@ pub fn AI_SetClosestBuddy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
 /// Raven `AI_SortGroupByPathCostToEnemy`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:134-210`
-pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
+pub fn AI_SortGroupByPathCostToEnemy(ctx: &mut GameContext, group: *mut AIGroupInfo_t) {
     unsafe {
         let mut bestMembers: [AIGroupMember_t; MAX_GROUP_MEMBERS] =
             [core::mem::zeroed(); MAX_GROUP_MEMBERS];
@@ -298,12 +298,12 @@ pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupIn
 /// Raven: go through other groups made this frame and see if any of those
 /// contain me already.
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:212-230`
-pub fn AI_FindSelfInPreviousGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+pub fn AI_FindSelfInPreviousGroup(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         for i in 0..MAX_FRAME_GROUPS {
-            let group = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
+            let group = &mut (*ctx.world_raw()).level.groups[i] as *mut AIGroupInfo_t;
             if (*group).numGroup != 0 {
                 for j in 0..(*group).numGroup as usize {
                     if (*group).member[j].number == (*self_).s.number {
@@ -364,17 +364,19 @@ pub fn AI_InsertGroupMember(group: *mut AIGroupInfo_t, member: &mut gentity_t) {
 /// Raven: go through other groups made this frame and see if any of those
 /// have the same enemy as me... if so, add me in!
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:259-277`
-pub fn AI_TryJoinPreviousGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+pub fn AI_TryJoinPreviousGroup(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         for i in 0..MAX_FRAME_GROUPS {
-            let group = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
+            let group = &mut (*ctx.world_raw()).level.groups[i] as *mut AIGroupInfo_t;
             if (*group).numGroup != 0
                 && (*group).numGroup < (MAX_GROUP_MEMBERS as c_int - 1)
                 && (*group).enemy
                     == match (*self_).enemy {
-                        Some(id) => &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t,
+                        Some(id) => {
+                            &mut (*ctx.world_raw()).g_entities[id.0 as usize] as *mut gentity_t
+                        }
                         None => core::ptr::null_mut(),
                     }
             {
@@ -393,7 +395,7 @@ pub fn AI_TryJoinPreviousGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolea
 /// Raven `AI_GetNextEmptyGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:279-308`
-pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+pub fn AI_GetNextEmptyGroup(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -409,7 +411,7 @@ pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
 
         //okay, make a whole new one, then
         for i in 0..MAX_FRAME_GROUPS {
-            let group = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
+            let group = &mut (*ctx.world_raw()).level.groups[i] as *mut AIGroupInfo_t;
             if (*group).numGroup == 0 {
                 //make a new one
                 let npc = (*self_).NPC as *mut gNPC_t;
@@ -429,7 +431,7 @@ pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:310-340`
 pub fn AI_ValidateNoEnemyGroupMember(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     group: *mut AIGroupInfo_t,
     member: Option<EntityId>,
 ) -> qboolean {
@@ -449,7 +451,7 @@ pub fn AI_ValidateNoEnemyGroupMember(
                 return 0;
             }
             crate::q_math::_VectorCopy(
-                (*ctx.world).g_entities[(*group).member[0].number as usize]
+                (*ctx.world_raw()).g_entities[(*group).member[0].number as usize]
                     .r
                     .currentOrigin,
                 &mut center,
@@ -479,7 +481,7 @@ pub fn AI_ValidateNoEnemyGroupMember(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:342-435`
 pub fn AI_ValidateGroupMember(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     group: *mut AIGroupInfo_t,
     member: Option<EntityId>,
 ) -> qboolean {
@@ -504,7 +506,7 @@ pub fn AI_ValidateGroupMember(
         let npc = (*member).NPC as *mut gNPC_t;
 
         //must be aware
-        if (*npc).confusionTime > (*ctx.world).level.time {
+        if (*npc).confusionTime > (*ctx.world_raw()).level.time {
             return 0;
         }
 
@@ -562,7 +564,7 @@ pub fn AI_ValidateGroupMember(
 
         //should have same enemy
         if match (*member).enemy {
-            Some(id) => &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.0 as usize] as *mut gentity_t,
             None => core::ptr::null_mut(),
         } != (*group).enemy
         {
@@ -600,7 +602,7 @@ pub fn AI_ValidateGroupMember(
 /// Raven `AI_GetGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:443-551`
-pub fn AI_GetGroup(ctx: GameContext<'_>, self_: Option<EntityId>) {
+pub fn AI_GetGroup(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
@@ -609,7 +611,7 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: Option<EntityId>) {
         }
         let npc = (*self_).NPC as *mut gNPC_t;
 
-        if (*ctx.world).cvars.d_noGroupAI.integer != 0 {
+        if (*ctx.world_raw()).cvars.d_noGroupAI.integer != 0 {
             (*npc).group = core::ptr::null_mut();
             return;
         }
@@ -625,9 +627,10 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: Option<EntityId>) {
         }
 
         if let Some(enemy_id) = (*self_).enemy {
-            let enemy_ent = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
+            let enemy_ent = &mut (*ctx.world_raw()).g_entities[enemy_id.index()] as *mut gentity_t;
             let enemyClient = (*enemy_ent).client;
-            if enemyClient.is_null() || ((*ctx.world).level.time - (*npc).enemyLastSeenTime > 7000)
+            if enemyClient.is_null()
+                || ((*ctx.world_raw()).level.time - (*npc).enemyLastSeenTime > 7000)
             {
                 (*npc).group = core::ptr::null_mut();
                 return;
@@ -645,24 +648,24 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: Option<EntityId>) {
 
         let client = (*self_).client as *mut gclient_t;
         (*group).enemy = match (*self_).enemy {
-            Some(id) => &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.0 as usize] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         (*group).team = (*client).playerTeam;
         (*group).processed = 0;
         (*group).commander = self_;
-        (*group).memberValidateTime = (*ctx.world).level.time + 2000;
+        (*group).memberValidateTime = (*ctx.world_raw()).level.time + 2000;
         (*group).activeMemberNum = 0;
 
         if !(*group).enemy.is_null() {
-            (*group).lastSeenEnemyTime = (*ctx.world).level.time;
-            (*group).lastClearShotTime = (*ctx.world).level.time;
+            (*group).lastSeenEnemyTime = (*ctx.world_raw()).level.time;
+            (*group).lastClearShotTime = (*ctx.world_raw()).level.time;
             (*group).enemyLastSeenPos = (*(*group).enemy).r.currentOrigin;
         }
 
-        let numEntities = (*ctx.world).level.num_entities;
+        let numEntities = (*ctx.world_raw()).level.num_entities;
         for i in 0..numEntities {
-            let member = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
+            let member = &mut (*ctx.world_raw()).g_entities[i as usize] as *mut gentity_t;
 
             if (*member).inuse == 0 {
                 continue;
@@ -697,12 +700,12 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: Option<EntityId>) {
 /// Raven `AI_SetNewGroupCommander`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:553-568`
-pub fn AI_SetNewGroupCommander(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
+pub fn AI_SetNewGroupCommander(ctx: &mut GameContext, group: *mut AIGroupInfo_t) {
     unsafe {
         (*group).commander = core::ptr::null_mut();
         for i in 0..(*group).numGroup as usize {
-            let member =
-                &mut (*ctx.world).g_entities[(*group).member[i].number as usize] as *mut gentity_t;
+            let member = &mut (*ctx.world_raw()).g_entities[(*group).member[i].number as usize]
+                as *mut gentity_t;
 
             let commanderNpc = if (*group).commander.is_null() {
                 core::ptr::null_mut()
@@ -726,14 +729,15 @@ pub fn AI_SetNewGroupCommander(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) 
 /// Raven `AI_DeleteGroupMember`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:570-600`
-pub fn AI_DeleteGroupMember(ctx: GameContext<'_>, group: *mut AIGroupInfo_t, memberNum: c_int) {
+pub fn AI_DeleteGroupMember(ctx: &mut GameContext, group: *mut AIGroupInfo_t, memberNum: c_int) {
     unsafe {
         if !(*group).commander.is_null()
             && (*(*group).commander).s.number == (*group).member[memberNum as usize].number
         {
             (*group).commander = core::ptr::null_mut();
         }
-        let ent = &mut (*ctx.world).g_entities[(*group).member[memberNum as usize].number as usize]
+        let ent = &mut (*ctx.world_raw()).g_entities
+            [(*group).member[memberNum as usize].number as usize]
             as *mut gentity_t;
         if !(*ent).NPC.is_null() {
             let npc = (*ent).NPC as *mut gNPC_t;
@@ -761,7 +765,7 @@ pub fn AI_DeleteGroupMember(ctx: GameContext<'_>, group: *mut AIGroupInfo_t, mem
 /// Raven `AI_DeleteSelfFromGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:602-615`
-pub fn AI_DeleteSelfFromGroup(ctx: GameContext<'_>, self_: EntityId) {
+pub fn AI_DeleteSelfFromGroup(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -780,7 +784,7 @@ pub fn AI_DeleteSelfFromGroup(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `AI_GroupMemberKilled`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:620-697`
-pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
+pub fn AI_GroupMemberKilled(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
@@ -807,8 +811,8 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
         //go through and drop aggression on my teammates (more cover, worse aim)
         let mut noflee = false;
         for i in 0..(*group).numGroup as usize {
-            let member =
-                &mut (*ctx.world).g_entities[(*group).member[i].number as usize] as *mut gentity_t;
+            let member = &mut (*ctx.world_raw()).g_entities[(*group).member[i].number as usize]
+                as *mut gentity_t;
             if member == self_ {
                 continue;
             }
@@ -818,7 +822,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
                 noflee = true;
             } else {
                 ST_AggressionAdjust(&*member, -1);
-                (*memberNpc).currentAim -= (*ctx.world).bg_state.rng.Q_irand(0, 10);
+                (*memberNpc).currentAim -= (*ctx.world_raw()).bg_state.rng.Q_irand(0, 10);
             }
         }
         //okay, if I'm the group commander, make everyone else flee
@@ -830,7 +834,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
         if !noflee {
             (*group).speechDebounceTime = 0;
             for i in 0..(*group).numGroup as usize {
-                let member = &mut (*ctx.world).g_entities[(*group).member[i].number as usize]
+                let member = &mut (*ctx.world_raw()).g_entities[(*group).member[i].number as usize]
                     as *mut gentity_t;
                 if member == self_ {
                     continue;
@@ -869,7 +873,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
                         );
                     } else {
                         //else, maybe just a random chance
-                        if (*ctx.world)
+                        if (*ctx.world_raw())
                             .bg_state
                             .rng
                             .Q_irand(0, (*selfNpc).rank as c_int)
@@ -889,9 +893,9 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
                             ST_MarkToCover(ctx, ctx.entity_id_of(member));
                         }
                     }
-                    (*memberNpc).currentAim -= (*ctx.world).bg_state.rng.Q_irand(1, 15);
+                    (*memberNpc).currentAim -= (*ctx.world_raw()).bg_state.rng.Q_irand(1, 15);
                 }
-                (*memberNpc).currentAim -= (*ctx.world).bg_state.rng.Q_irand(1, 15);
+                (*memberNpc).currentAim -= (*ctx.world_raw()).bg_state.rng.Q_irand(1, 15);
             }
         }
     }
@@ -900,12 +904,12 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
 /// Raven `AI_GroupUpdateEnemyLastSeen`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:699-707`
-pub fn AI_GroupUpdateEnemyLastSeen(ctx: GameContext<'_>, group: *mut AIGroupInfo_t, spot: vec3_t) {
+pub fn AI_GroupUpdateEnemyLastSeen(ctx: &mut GameContext, group: *mut AIGroupInfo_t, spot: vec3_t) {
     unsafe {
         if group.is_null() {
             return;
         }
-        (*group).lastSeenEnemyTime = (*ctx.world).level.time;
+        (*group).lastSeenEnemyTime = (*ctx.world_raw()).level.time;
         (*group).enemyLastSeenPos = spot;
     }
 }
@@ -913,12 +917,12 @@ pub fn AI_GroupUpdateEnemyLastSeen(ctx: GameContext<'_>, group: *mut AIGroupInfo
 /// Raven `AI_GroupUpdateClearShotTime`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:709-716`
-pub fn AI_GroupUpdateClearShotTime(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
+pub fn AI_GroupUpdateClearShotTime(ctx: &mut GameContext, group: *mut AIGroupInfo_t) {
     unsafe {
         if group.is_null() {
             return;
         }
-        (*group).lastClearShotTime = (*ctx.world).level.time;
+        (*group).lastClearShotTime = (*ctx.world_raw()).level.time;
     }
 }
 
@@ -954,11 +958,11 @@ pub fn AI_GroupUpdateSquadstates(
 /// Raven `AI_RefreshGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:740-962`
-pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qboolean {
+pub fn AI_RefreshGroup(ctx: &mut GameContext, group: *mut AIGroupInfo_t) -> qboolean {
     unsafe {
         //see if we should merge with another group
         for i in 0..MAX_FRAME_GROUPS {
-            let other = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
+            let other = &mut (*ctx.world_raw()).level.groups[i] as *mut AIGroupInfo_t;
             if other == group {
                 break;
             } else if (*other).enemy == (*group).enemy {
@@ -970,7 +974,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
 
                     //combine the members of mine into theirs
                     while j < (*group).numGroup {
-                        let member = &mut (*ctx.world).g_entities
+                        let member = &mut (*ctx.world_raw()).g_entities
                             [(*group).member[j as usize].number as usize]
                             as *mut gentity_t;
                         if (*other).enemy.is_null() {
@@ -1007,7 +1011,8 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
         (*group).commander = core::ptr::null_mut();
         let mut i: c_int = 0;
         while i < (*group).numGroup {
-            let member = &mut (*ctx.world).g_entities[(*group).member[i as usize].number as usize]
+            let member = &mut (*ctx.world_raw()).g_entities
+                [(*group).member[i as usize].number as usize]
                 as *mut gentity_t;
 
             //Must be alive
@@ -1015,7 +1020,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                 AI_DeleteGroupMember(ctx, group, i);
                 //keep marker at same place since we deleted this guy and shifted everyone up one
                 i -= 1;
-            } else if (*group).memberValidateTime < (*ctx.world).level.time
+            } else if (*group).memberValidateTime < (*ctx.world_raw()).level.time
                 && AI_ValidateGroupMember(ctx, group, ctx.entity_id_of(member)) == 0
             {
                 //remove this one from the group
@@ -1040,16 +1045,16 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
             }
             i += 1;
         }
-        if (*group).memberValidateTime < (*ctx.world).level.time {
+        if (*group).memberValidateTime < (*ctx.world_raw()).level.time {
             (*group).memberValidateTime =
-                (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 2500);
+                (*ctx.world_raw()).level.time + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 2500);
         }
 
         //calc the morale of this group
         (*group).morale = (*group).moraleAdjust;
         for i in 0..(*group).numGroup as usize {
-            let member =
-                &mut (*ctx.world).g_entities[(*group).member[i].number as usize] as *mut gentity_t;
+            let member = &mut (*ctx.world_raw()).g_entities[(*group).member[i].number as usize]
+                as *mut gentity_t;
             let npc = (*member).NPC as *mut gNPC_t;
             if (*npc).rank < RANK_ENSIGN {
                 //grunts
@@ -1057,7 +1062,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
             } else {
                 (*group).morale += (*npc).rank as c_int;
             }
-            if !(*group).commander.is_null() && (*ctx.world).cvars.debugNPCAI.integer != 0 {
+            if !(*group).commander.is_null() && (*ctx.world_raw()).cvars.debugNPCAI.integer != 0 {
                 G_TestLine(
                     ctx,
                     (*(*group).commander).r.currentOrigin,
@@ -1102,14 +1107,14 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                 (*group).morale -= 8;
             }
         }
-        if (*group).moraleDebounce < (*ctx.world).level.time {
+        if (*group).moraleDebounce < (*ctx.world_raw()).level.time {
             //slowly degrade whatever moraleAdjusters we may have
             if (*group).moraleAdjust > 0 {
                 (*group).moraleAdjust -= 1;
             } else if (*group).moraleAdjust < 0 {
                 (*group).moraleAdjust += 1;
             }
-            (*group).moraleDebounce = (*ctx.world).level.time + 1000; //FIXME: define?
+            (*group).moraleDebounce = (*ctx.world_raw()).level.time + 1000; //FIXME: define?
         }
         //mark this group as not having been run this frame
         (*group).processed = 0;
@@ -1121,14 +1126,14 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
 /// Raven `AI_UpdateGroups`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:964-980`
-pub fn AI_UpdateGroups(ctx: GameContext<'_>) {
+pub fn AI_UpdateGroups(ctx: &mut GameContext) {
     unsafe {
-        if (*ctx.world).cvars.d_noGroupAI.integer != 0 {
+        if (*ctx.world_raw()).cvars.d_noGroupAI.integer != 0 {
             return;
         }
         //Clear all Groups
         for i in 0..MAX_FRAME_GROUPS {
-            let group = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
+            let group = &mut (*ctx.world_raw()).level.groups[i] as *mut AIGroupInfo_t;
             if (*group).numGroup == 0 || AI_RefreshGroup(ctx, group) == 0 {
                 *group = core::mem::zeroed::<AIGroupInfo_t>();
             }
@@ -1157,7 +1162,7 @@ pub fn AI_GroupContainsEntNum(group: *mut AIGroupInfo_t, entNum: c_int) -> qbool
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:1030-1055`
 pub fn AI_CheckEnemyCollision(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: Option<EntityId>,
     takeEnemy: qboolean,
 ) -> qboolean {
@@ -1173,7 +1178,7 @@ pub fn AI_CheckEnemyCollision(
 
         //See if we've hit something
         if !info.blocker.is_null()
-            && ent_id_opt((*ctx.world).g_entities.as_ptr(), info.blocker) != (*ent).enemy
+            && ent_id_opt((*ctx.world_raw()).g_entities.as_ptr(), info.blocker) != (*ent).enemy
         {
             let blockerClient = (*info.blocker).client as *mut gclient_t;
             let entClient = (*ent).client as *mut gclient_t;
@@ -1198,7 +1203,7 @@ pub fn AI_CheckEnemyCollision(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:1065-1139`
 pub fn AI_DistributeAttack(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     attacker: Option<EntityId>,
     enemy: Option<EntityId>,
     team: team_t,
@@ -1218,7 +1223,7 @@ pub fn AI_DistributeAttack(
         );
 
         //First, see if we should look for the player
-        let world0 = &mut (*ctx.world).g_entities[0] as *mut gentity_t;
+        let world0 = &mut (*ctx.world_raw()).g_entities[0] as *mut gentity_t;
         if enemy != world0 {
             //rwwFIXMEFIXME: care about all clients not just 0
             let aroundPlayer = AI_GetGroupSize(
@@ -1264,8 +1269,8 @@ pub fn AI_DistributeAttack(
 
         //Cull this list
         for j in 0..numEnts {
-            let check =
-                &mut (*ctx.world).g_entities[radiusEnts[j as usize] as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world_raw()).g_entities[radiusEnts[j as usize] as usize]
+                as *mut gentity_t;
 
             //Validate clients
             if (*check).client.is_null() {

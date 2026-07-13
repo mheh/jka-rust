@@ -111,7 +111,7 @@ fn sec_raysphere(o: &mut String) {
 // The target always has a (non-NULL) client (a NULL client leaves `tangles`
 // uninitialized in Raven — UB, excluded per porting-rules §19). ctx is unused
 // by G_GetHitLocation but part of its signature.
-fn sec_hitloc(o: &mut String, ctx: GameContext<'_>) {
+fn sec_hitloc(o: &mut String, ctx: &mut GameContext) {
     o.push_str("== hitloc ==\n");
     let text = read_lines("hitloc.txt");
     let mut idx = 0;
@@ -147,7 +147,7 @@ fn sec_hitloc(o: &mut String, ctx: GameContext<'_>) {
 // ------------------------------- armor -------------------------------------
 // Columns: a <armor> <isVehicle 0|1> <electrifyTime> <hasVehicle 0|1>
 //            <levelTime> <damage> <dflags>. isVehicle maps 1 -> CLASS_VEHICLE.
-fn sec_armor(o: &mut String, ctx: GameContext<'_>) {
+fn sec_armor(o: &mut String, ctx: &mut GameContext) {
     o.push_str("== armor ==\n");
     let text = read_lines("armor.txt");
     let mut dummy_veh: u8 = 0;
@@ -197,10 +197,11 @@ fn run() {
     // functions crosses the syscall seam, so the null syscall pointer is safe).
     let mut world = Box::new(GameWorld::zeroed());
     let engine = Engine::new(core::ptr::null::<c_void>());
-    let ctx = GameContext {
-        world: &mut *world as *mut GameWorld,
+    let mut ctx = GameContext {
+        world: &mut *world,
         engine: &engine,
     };
+    let ctx = &mut ctx;
 
     let mut o = String::new();
     o.push_str("== gcombat ==\n");

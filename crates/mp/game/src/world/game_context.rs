@@ -19,46 +19,34 @@ use super::game_world::GameWorld;
 /// because `GameContext` and its impls both live in `mp_game`.
 ///
 /// Source: `docs/architecture/engine-seam.md` § inbound dual (SEAM-Q12 amendment 2026-07-03).
-#[derive(Clone, Copy)]
 pub struct GameContext<'e> {
-    pub world: *mut GameWorld,
+    /// The one owned [`GameWorld`] island, borrowed for the duration of the
+    /// `vmMain` call (safe-state Stage 2a flip: the borrow checker now
+    /// enforces §B4 directly; the transitional raw pointer + `world()`
+    /// accessor are gone).
+    pub world: &'e mut GameWorld,
     pub engine: &'e Engine,
 }
 
 impl GameContext<'_> {
-    /// Reborrow the owned [`GameWorld`] behind the raw `self.world` pointer.
-    ///
-    /// TRANSITIONAL (safe-state migration Stage 0). This is the ONE sanctioned
-    /// deref of the raw `world` pointer; every downstream accessor and rewritten
-    /// call site reaches world state through it (or through [`Self::entity_mut`])
-    /// instead of `unsafe { &mut *ctx.world }`. Stage 2 flips the field to
-    /// `&'a mut GameWorld` and DELETES this method — `world()` becomes a plain
-    /// field reborrow and the borrow checker enforces §B4 directly.
-    ///
-    /// SAFETY: `self.world` is the single owned island instance the `vmMain`
-    /// shell built and keeps alive for the whole call (STATE-D1/D6). The module
-    /// is single-threaded, and every caller follows the STATE-D1 reborrow
-    /// discipline — thread the borrow inward, never hold two live
-    /// `world()`/`entity()`/`entity_mut()` borrows across a nested call. Under
-    /// that discipline no two `&mut` alias, so the reborrow is sound. (Until
-    /// Stage 2 the borrow checker cannot yet enforce this — it is the same
-    /// invariant the raw pointer relied on, now behind one auditable seam.)
+    /// Raw re-derive bridge for the Stage-1 bodies (STAGE-2a: the borrow ends
+    /// at return, so deref-saturated bodies keep their raw-pointer aliasing
+    /// discipline unchanged; Stage 2b dissolves every use into real borrows).
     #[inline]
-    pub fn world(&self) -> &mut GameWorld {
-        unsafe { &mut *self.world }
+    pub fn world_raw(&mut self) -> *mut GameWorld {
+        &raw mut *self.world
     }
 
-    /// Borrow entity `id` out of the owned arena (convenience over
-    /// [`Self::world`]). Same reborrow discipline as [`Self::world`].
+    /// Borrow entity `id` out of the owned arena.
     #[inline]
     pub fn entity(&self, id: EntityId) -> &gentity_t {
-        &self.world().g_entities[id.index()]
+        &self.world.g_entities[id.index()]
     }
 
     /// Mutable [`Self::entity`].
     #[inline]
-    pub fn entity_mut(&self, id: EntityId) -> &mut gentity_t {
-        &mut self.world().g_entities[id.index()]
+    pub fn entity_mut(&mut self, id: EntityId) -> &mut gentity_t {
+        &mut self.world.g_entities[id.index()]
     }
 
     /// Bridge for the Stage-1 mixed world: recover the [`EntityId`] of a legacy
@@ -75,7 +63,7 @@ impl GameContext<'_> {
     /// confined to the [`ent_id_opt`] seam helper.
     #[inline]
     pub fn entity_id_of(&self, ent: *const gentity_t) -> Option<EntityId> {
-        unsafe { ent_id_opt(self.world().g_entities.as_ptr(), ent) }
+        unsafe { ent_id_opt(self.world.g_entities.as_ptr(), ent) }
     }
 }
 
@@ -187,81 +175,81 @@ use crate::q_shared::GetIDForString;
 
 /// `GAME_INIT` → `G_InitGame( arg0, arg1, arg2 )` (`g_main.c:517-519`).
 impl Dispatch<GameInit> for GameContext<'_> {
-    fn dispatch(&self, args: GameInitArgs) {
-        crate::g_init_game::g_init_game(*self, args)
+    fn dispatch(&mut self, args: GameInitArgs) {
+        crate::g_init_game::g_init_game(self, args)
     }
 }
 
 /// `GAME_SHUTDOWN` → `G_ShutdownGame( arg0 )` (`g_main.c:520-522`).
 impl Dispatch<GameShutdown> for GameContext<'_> {
-    fn dispatch(&self, args: GameShutdownArgs) {
-        crate::g_shutdown_game::g_shutdown_game(*self, args)
+    fn dispatch(&mut self, args: GameShutdownArgs) {
+        crate::g_shutdown_game::g_shutdown_game(self, args)
     }
 }
 
 /// `GAME_CLIENT_CONNECT` → `return (int)ClientConnect( arg0, arg1, arg2 )`
 /// (`g_main.c:523-524`).
 impl Dispatch<GameClientConnect> for GameContext<'_> {
-    fn dispatch(&self, args: GameClientConnectArgs) -> *const c_char {
-        crate::g_client::ClientConnect(*self, args.client_num(), args.first_time(), args.is_bot())
+    fn dispatch(&mut self, args: GameClientConnectArgs) -> *const c_char {
+        crate::g_client::ClientConnect(self, args.client_num(), args.first_time(), args.is_bot())
             as *const c_char
     }
 }
 
 /// `GAME_CLIENT_THINK` → `ClientThink( arg0, NULL )` (`g_main.c:525-527`).
 impl Dispatch<GameClientThink> for GameContext<'_> {
-    fn dispatch(&self, args: GameClientThinkArgs) {
-        crate::g_active::ClientThink(*self, args.client_num(), core::ptr::null_mut())
+    fn dispatch(&mut self, args: GameClientThinkArgs) {
+        crate::g_active::ClientThink(self, args.client_num(), core::ptr::null_mut())
     }
 }
 
 /// `GAME_CLIENT_USERINFO_CHANGED` → `ClientUserinfoChanged( arg0 )`
 /// (`g_main.c:528-530`).
 impl Dispatch<GameClientUserinfoChanged> for GameContext<'_> {
-    fn dispatch(&self, args: GameClientUserinfoChangedArgs) {
-        crate::g_client::ClientUserinfoChanged(*self, args.client_num())
+    fn dispatch(&mut self, args: GameClientUserinfoChangedArgs) {
+        crate::g_client::ClientUserinfoChanged(self, args.client_num())
     }
 }
 
 /// `GAME_CLIENT_DISCONNECT` → `ClientDisconnect( arg0 )` (`g_main.c:531-533`).
 impl Dispatch<GameClientDisconnect> for GameContext<'_> {
-    fn dispatch(&self, args: GameClientDisconnectArgs) {
-        crate::g_client::ClientDisconnect(*self, args.client_num())
+    fn dispatch(&mut self, args: GameClientDisconnectArgs) {
+        crate::g_client::ClientDisconnect(self, args.client_num())
     }
 }
 
 /// `GAME_CLIENT_BEGIN` → `ClientBegin( arg0, qtrue )` (`g_main.c:534-536`).
 impl Dispatch<GameClientBegin> for GameContext<'_> {
-    fn dispatch(&self, args: GameClientBeginArgs) {
-        crate::g_client::ClientBegin(*self, args.client_num(), qtrue)
+    fn dispatch(&mut self, args: GameClientBeginArgs) {
+        crate::g_client::ClientBegin(self, args.client_num(), qtrue)
     }
 }
 
 /// `GAME_CLIENT_COMMAND` → `ClientCommand( arg0 )` (`g_main.c:537-539`).
 impl Dispatch<GameClientCommand> for GameContext<'_> {
-    fn dispatch(&self, args: GameClientCommandArgs) {
-        crate::g_cmds::ClientCommand(*self, args.client_num())
+    fn dispatch(&mut self, args: GameClientCommandArgs) {
+        crate::g_cmds::ClientCommand(self, args.client_num())
     }
 }
 
 /// `GAME_RUN_FRAME` → `G_RunFrame( arg0 )` (`g_main.c:540-542`).
 impl Dispatch<GameRunFrame> for GameContext<'_> {
-    fn dispatch(&self, args: GameRunFrameArgs) {
-        crate::g_main::G_RunFrame(*self, args.level_time())
+    fn dispatch(&mut self, args: GameRunFrameArgs) {
+        crate::g_main::G_RunFrame(self, args.level_time())
     }
 }
 
 /// `GAME_CONSOLE_COMMAND` → `return ConsoleCommand()` (`g_main.c:543-544`).
 impl Dispatch<GameConsoleCommand> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> qboolean {
-        crate::g_svcmds::ConsoleCommand(*self)
+    fn dispatch(&mut self, _args: ()) -> qboolean {
+        crate::g_svcmds::ConsoleCommand(self)
     }
 }
 
 /// `BOTAI_START_FRAME` → `return BotAIStartFrame( arg0 )` (`g_main.c:545-546`).
 impl Dispatch<BotAiStartFrame> for GameContext<'_> {
-    fn dispatch(&self, args: BotAiStartFrameArgs) -> c_int {
-        crate::ai_main::BotAIStartFrame(*self, args.time())
+    fn dispatch(&mut self, args: BotAiStartFrameArgs) -> c_int {
+        crate::ai_main::BotAIStartFrame(self, args.time())
     }
 }
 
@@ -269,15 +257,10 @@ impl Dispatch<BotAiStartFrame> for GameContext<'_> {
 /// `G_ROFF_NotetrackCallback( &g_entities[arg0], (const char *)arg1 )`
 /// (`g_main.c:547-549`).
 impl Dispatch<GameRoffNotetrackCallback> for GameContext<'_> {
-    fn dispatch(&self, args: GameRoffNotetrackCallbackArgs) {
+    fn dispatch(&mut self, args: GameRoffNotetrackCallbackArgs) {
         // SAFETY: seam reborrow of the owned entity arena (STATE-D6).
-        let cent =
-            unsafe { &mut (*self.world).g_entities[args.ent_num() as usize] as *mut gentity_t };
-        crate::g_utils::G_ROFF_NotetrackCallback(
-            *self,
-            (*self).entity_id_of(cent),
-            args.notetrack(),
-        )
+        let cent = &mut self.world.g_entities[args.ent_num() as usize] as *mut gentity_t;
+        crate::g_utils::G_ROFF_NotetrackCallback(self, self.entity_id_of(cent), args.notetrack())
     }
 }
 
@@ -285,9 +268,9 @@ impl Dispatch<GameRoffNotetrackCallback> for GameContext<'_> {
 /// `if (G_ParseSpawnVars(qfalse)) { G_SpawnGEntityFromSpawnVars(qfalse); }`
 /// (`g_main.c:550-555`).
 impl Dispatch<GameSpawnRmgEntity> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
-        if crate::g_spawn::G_ParseSpawnVars(*self, qfalse) != qfalse {
-            crate::g_spawn::G_SpawnGEntityFromSpawnVars(*self, qfalse);
+    fn dispatch(&mut self, _args: ()) {
+        if crate::g_spawn::G_ParseSpawnVars(self, qfalse) != qfalse {
+            crate::g_spawn::G_SpawnGEntityFromSpawnVars(self, qfalse);
         }
     }
 }
@@ -296,16 +279,15 @@ impl Dispatch<GameSpawnRmgEntity> for GameContext<'_> {
 /// `return NAV_ClearPathToPoint(&g_entities[arg0], (float *)arg1, (float *)arg2,
 ///  (float *)arg3, arg4, arg5)` (`g_main.c:672-673`).
 impl Dispatch<GameNavClearpathtopoint> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavClearpathtopointArgs) -> qboolean {
+    fn dispatch(&mut self, args: GameNavClearpathtopointArgs) -> qboolean {
         // SAFETY: seam reborrow of the owned entity arena; the `float *` vectors
         // are engine-owned, read by value at the seam (STATE-D6).
-        let self_ =
-            unsafe { &mut (*self.world).g_entities[args.entity_num() as usize] as *mut gentity_t };
+        let self_ = &mut self.world.g_entities[args.entity_num() as usize] as *mut gentity_t;
         let pmins = unsafe { *(args.pmins() as *const vec3_t) };
         let pmaxs = unsafe { *(args.pmaxs() as *const vec3_t) };
         let point = unsafe { *(args.point() as *const vec3_t) };
         crate::g_nav::NAV_ClearPathToPoint(
-            *self,
+            self,
             self.entity_id_of(self_).unwrap(),
             pmins,
             pmaxs,
@@ -320,12 +302,11 @@ impl Dispatch<GameNavClearpathtopoint> for GameContext<'_> {
 /// `return NPC_ClearLOS2(&g_entities[arg0], (const float *)arg1)`
 /// (`g_main.c:674-675`).
 impl Dispatch<GameNavClearlos> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavClearlosArgs) -> qboolean {
+    fn dispatch(&mut self, args: GameNavClearlosArgs) -> qboolean {
         // SAFETY: seam reborrow + engine-owned end vector, read at the seam.
-        let ent =
-            unsafe { &mut (*self.world).g_entities[args.entity_num() as usize] as *mut gentity_t };
+        let ent = &mut self.world.g_entities[args.entity_num() as usize] as *mut gentity_t;
         let end = unsafe { *(args.end() as *const vec3_t) };
-        crate::NPC_utils::NPC_ClearLOS2(*self, self.entity_id_of(ent), end)
+        crate::NPC_utils::NPC_ClearLOS2(self, self.entity_id_of(ent), end)
     }
 }
 
@@ -333,14 +314,14 @@ impl Dispatch<GameNavClearlos> for GameContext<'_> {
 /// `return NAVNEW_ClearPathBetweenPoints((float *)arg0, (float *)arg1,
 ///  (float *)arg2, (float *)arg3, arg4, arg5)` (`g_main.c:676-677`).
 impl Dispatch<GameNavClearpathbetweenpoints> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavClearpathbetweenpointsArgs) -> c_int {
+    fn dispatch(&mut self, args: GameNavClearpathbetweenpointsArgs) -> c_int {
         // SAFETY: the four `float *` vectors are engine-owned, read at the seam.
         let start = unsafe { *(args.start() as *const vec3_t) };
         let end = unsafe { *(args.end() as *const vec3_t) };
         let mins = unsafe { *(args.mins() as *const vec3_t) };
         let maxs = unsafe { *(args.maxs() as *const vec3_t) };
         crate::g_navnew::NAVNEW_ClearPathBetweenPoints(
-            *self,
+            self,
             start,
             end,
             mins,
@@ -355,10 +336,9 @@ impl Dispatch<GameNavClearpathbetweenpoints> for GameContext<'_> {
 /// `return NAV_CheckNodeFailedForEnt(&g_entities[arg0], arg1)`
 /// (`g_main.c:678-679`).
 impl Dispatch<GameNavChecknodefailedforent> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavChecknodefailedforentArgs) -> qboolean {
+    fn dispatch(&mut self, args: GameNavChecknodefailedforentArgs) -> qboolean {
         // SAFETY: seam reborrow of the owned entity arena (STATE-D6).
-        let ent =
-            unsafe { &mut (*self.world).g_entities[args.entity_num() as usize] as *mut gentity_t };
+        let ent = &mut self.world.g_entities[args.entity_num() as usize] as *mut gentity_t;
         crate::g_navnew::NAV_CheckNodeFailedForEnt(unsafe { &*ent }, args.node_num())
     }
 }
@@ -366,46 +346,46 @@ impl Dispatch<GameNavChecknodefailedforent> for GameContext<'_> {
 /// `GAME_NAV_ENTISUNLOCKEDDOOR` → `return G_EntIsUnlockedDoor(arg0)`
 /// (`g_main.c:680-681`).
 impl Dispatch<GameNavEntIsUnlockedDoor> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavEntIsUnlockedDoorArgs) -> qboolean {
-        crate::g_mover::G_EntIsUnlockedDoor(*self, args.entity_num())
+    fn dispatch(&mut self, args: GameNavEntIsUnlockedDoorArgs) -> qboolean {
+        crate::g_mover::G_EntIsUnlockedDoor(self, args.entity_num())
     }
 }
 
 /// `GAME_NAV_ENTISDOOR` → `return G_EntIsDoor(arg0)` (`g_main.c:682-683`).
 impl Dispatch<GameNavEntIsDoor> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavEntIsDoorArgs) -> qboolean {
-        crate::g_mover::G_EntIsDoor(*self, args.entity_num())
+    fn dispatch(&mut self, args: GameNavEntIsDoorArgs) -> qboolean {
+        crate::g_mover::G_EntIsDoor(self, args.entity_num())
     }
 }
 
 /// `GAME_NAV_ENTISBREAKABLE` → `return G_EntIsBreakable(arg0)`
 /// (`g_main.c:684-685`).
 impl Dispatch<GameNavEntIsBreakable> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavEntIsBreakableArgs) -> qboolean {
-        crate::g_mover::G_EntIsBreakable(*self, args.entity_num())
+    fn dispatch(&mut self, args: GameNavEntIsBreakableArgs) -> qboolean {
+        crate::g_mover::G_EntIsBreakable(self, args.entity_num())
     }
 }
 
 /// `GAME_NAV_ENTISREMOVABLEUSABLE` → `return G_EntIsRemovableUsable(arg0)`
 /// (`g_main.c:686-687`).
 impl Dispatch<GameNavEntIsRemovableUsable> for GameContext<'_> {
-    fn dispatch(&self, args: GameNavEntIsRemovableUsableArgs) -> qboolean {
-        crate::g_mover::G_EntIsRemovableUsable(*self, args.entity_num())
+    fn dispatch(&mut self, args: GameNavEntIsRemovableUsableArgs) -> qboolean {
+        crate::g_mover::G_EntIsRemovableUsable(self, args.entity_num())
     }
 }
 
 /// `GAME_NAV_FINDCOMBATPOINTWAYPOINTS` → `CP_FindCombatPointWaypoints()`
 /// (`g_main.c:688-689`).
 impl Dispatch<GameNavFindcombatpointwaypoints> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
-        crate::NPC_combat::CP_FindCombatPointWaypoints(*self)
+    fn dispatch(&mut self, _args: ()) {
+        crate::NPC_combat::CP_FindCombatPointWaypoints(self)
     }
 }
 
 /// `GAME_GETITEMINDEXBYTAG` → `return BG_GetItemIndexByTag(arg0, arg1)`
 /// (`g_main.c:690-691`).
 impl Dispatch<GameGetitemindexbytag> for GameContext<'_> {
-    fn dispatch(&self, args: GameGetitemindexbytagArgs) -> c_int {
+    fn dispatch(&mut self, args: GameGetitemindexbytagArgs) -> c_int {
         crate::bg_misc::BG_GetItemIndexByTag(args.tag(), args.type_())
     }
 }
@@ -439,13 +419,13 @@ unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
 /// `return Q3_PlaySound( m->taskID, m->entID, m->name, m->channel )`
 /// (`g_main.c:558-562`).
 impl Dispatch<GameIcarusPlaysound> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> c_int {
+    fn dispatch(&mut self, _args: ()) -> c_int {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_PLAYSOUND)
         };
         Q3_PlaySound(
-            *self,
+            self,
             m.taskID,
             m.entID,
             m.name.as_ptr() as *const c_char,
@@ -458,13 +438,13 @@ impl Dispatch<GameIcarusPlaysound> for GameContext<'_> {
 /// `return Q3_Set( m->taskID, m->entID, m->type_name, m->data )`
 /// (`g_main.c:563-567`).
 impl Dispatch<GameIcarusSet> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> qboolean {
+    fn dispatch(&mut self, _args: ()) -> qboolean {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SET)
         };
         Q3_Set(
-            *self,
+            self,
             m.taskID,
             m.entID,
             m.type_name.as_ptr() as *const c_char,
@@ -478,17 +458,17 @@ impl Dispatch<GameIcarusSet> for GameContext<'_> {
 /// `else Q3_Lerp2Pos( m->taskID, m->entID, m->origin, m->angles, m->duration );`
 /// (`g_main.c:568-580`).
 impl Dispatch<GameIcarusLerp2Pos> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2POS)
         };
         let (task_id, ent_id, duration) = (m.taskID, m.entID, m.duration);
         if m.nullAngles != qfalse {
-            Q3_Lerp2Pos(*self, task_id, ent_id, &mut m.origin, None, duration);
+            Q3_Lerp2Pos(self, task_id, ent_id, &mut m.origin, None, duration);
         } else {
             Q3_Lerp2Pos(
-                *self,
+                self,
                 task_id,
                 ent_id,
                 &mut m.origin,
@@ -503,12 +483,12 @@ impl Dispatch<GameIcarusLerp2Pos> for GameContext<'_> {
 /// `Q3_Lerp2Origin( m->taskID, m->entID, m->origin, m->duration )`
 /// (`g_main.c:581-586`).
 impl Dispatch<GameIcarusLerp2Origin> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2ORIGIN)
         };
-        Q3_Lerp2Origin(*self, m.taskID, m.entID, m.origin, m.duration);
+        Q3_Lerp2Origin(self, m.taskID, m.entID, m.origin, m.duration);
     }
 }
 
@@ -516,12 +496,12 @@ impl Dispatch<GameIcarusLerp2Origin> for GameContext<'_> {
 /// `Q3_Lerp2Angles( m->taskID, m->entID, m->angles, m->duration )`
 /// (`g_main.c:587-592`).
 impl Dispatch<GameIcarusLerp2Angles> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2ANGLES)
         };
-        Q3_Lerp2Angles(*self, m.taskID, m.entID, m.angles, m.duration);
+        Q3_Lerp2Angles(self, m.taskID, m.entID, m.angles, m.duration);
     }
 }
 
@@ -529,84 +509,84 @@ impl Dispatch<GameIcarusLerp2Angles> for GameContext<'_> {
 /// `return Q3_GetTag( m->entID, m->name, m->lookup, m->info )`
 /// (`g_main.c:593-597`).
 impl Dispatch<GameIcarusGettag> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> c_int {
+    fn dispatch(&mut self, _args: ()) -> c_int {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETTAG)
         };
         let (ent_id, lookup) = (m.entID, m.lookup);
         let name = m.name.as_ptr() as *const c_char;
-        Q3_GetTag(*self, ent_id, name, lookup, &mut m.info)
+        Q3_GetTag(self, ent_id, name, lookup, &mut m.info)
     }
 }
 
 /// `GAME_ICARUS_LERP2START` →
 /// `Q3_Lerp2Start( m->entID, m->taskID, m->duration )` (`g_main.c:598-603`).
 impl Dispatch<GameIcarusLerp2Start> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2START)
         };
-        Q3_Lerp2Start(*self, m.entID, m.taskID, m.duration);
+        Q3_Lerp2Start(self, m.entID, m.taskID, m.duration);
     }
 }
 
 /// `GAME_ICARUS_LERP2END` →
 /// `Q3_Lerp2End( m->entID, m->taskID, m->duration )` (`g_main.c:604-609`).
 impl Dispatch<GameIcarusLerp2End> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_LERP2END)
         };
-        Q3_Lerp2End(*self, m.entID, m.taskID, m.duration);
+        Q3_Lerp2End(self, m.entID, m.taskID, m.duration);
     }
 }
 
 /// `GAME_ICARUS_USE` → `Q3_Use( m->entID, m->target )` (`g_main.c:610-615`).
 impl Dispatch<GameIcarusUse> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_USE)
         };
-        Q3_Use(*self, m.entID, m.target.as_ptr() as *const c_char);
+        Q3_Use(self, m.entID, m.target.as_ptr() as *const c_char);
     }
 }
 
 /// `GAME_ICARUS_KILL` → `Q3_Kill( m->entID, m->name )` (`g_main.c:616-621`).
 impl Dispatch<GameIcarusKill> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_KILL)
         };
-        Q3_Kill(*self, m.entID, m.name.as_ptr() as *const c_char);
+        Q3_Kill(self, m.entID, m.name.as_ptr() as *const c_char);
     }
 }
 
 /// `GAME_ICARUS_REMOVE` → `Q3_Remove( m->entID, m->name )` (`g_main.c:622-627`).
 impl Dispatch<GameIcarusRemove> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_REMOVE)
         };
-        Q3_Remove(*self, m.entID, m.name.as_ptr() as *const c_char);
+        Q3_Remove(self, m.entID, m.name.as_ptr() as *const c_char);
     }
 }
 
 /// `GAME_ICARUS_PLAY` →
 /// `Q3_Play( m->taskID, m->entID, m->type, m->name )` (`g_main.c:628-633`).
 impl Dispatch<GameIcarusPlay> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_PLAY)
         };
         Q3_Play(
-            *self,
+            self,
             m.taskID,
             m.entID,
             m.r#type.as_ptr() as *const c_char,
@@ -619,14 +599,14 @@ impl Dispatch<GameIcarusPlay> for GameContext<'_> {
 /// `return Q3_GetFloat( m->entID, m->type, m->name, &m->value )`
 /// (`g_main.c:634-638`).
 impl Dispatch<GameIcarusGetfloat> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> c_int {
+    fn dispatch(&mut self, _args: ()) -> c_int {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETFLOAT)
         };
         let (ent_id, ty) = (m.entID, m.r#type);
         let name = m.name.as_ptr() as *const c_char;
-        Q3_GetFloat(*self, ent_id, ty, name, &mut m.value as *mut f32)
+        Q3_GetFloat(self, ent_id, ty, name, &mut m.value as *mut f32)
     }
 }
 
@@ -634,14 +614,14 @@ impl Dispatch<GameIcarusGetfloat> for GameContext<'_> {
 /// `return Q3_GetVector( m->entID, m->type, m->name, m->value )`
 /// (`g_main.c:639-643`).
 impl Dispatch<GameIcarusGetvector> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> c_int {
+    fn dispatch(&mut self, _args: ()) -> c_int {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETVECTOR)
         };
         let (ent_id, ty) = (m.entID, m.r#type);
         let name = m.name.as_ptr() as *const c_char;
-        Q3_GetVector(*self, ent_id, ty, name, &mut m.value)
+        Q3_GetVector(self, ent_id, ty, name, &mut m.value)
     }
 }
 
@@ -649,7 +629,7 @@ impl Dispatch<GameIcarusGetvector> for GameContext<'_> {
 /// then `if (crap) strcpy( m->value, crap )`; returns the `Q3_GetString` result
 /// (`g_main.c:644-658`).
 impl Dispatch<GameIcarusGetstring> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> c_int {
+    fn dispatch(&mut self, _args: ()) -> c_int {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_GETSTRING)
@@ -659,7 +639,7 @@ impl Dispatch<GameIcarusGetstring> for GameContext<'_> {
         // Raven's `char *crap = NULL; char **morecrap = &crap;` out-pointer dance.
         let mut crap: *mut c_char = core::ptr::null_mut();
         let morecrap = &mut crap as *mut *mut c_char;
-        let r = Q3_GetString(*self, ent_id, ty, name, morecrap);
+        let r = Q3_GetString(self, ent_id, ty, name, morecrap);
         if !crap.is_null() {
             // SAFETY: on success `crap` points at a valid NUL-terminated string;
             // `m->value` is a 2048-byte buffer (`g_public.h`).
@@ -671,7 +651,7 @@ impl Dispatch<GameIcarusGetstring> for GameContext<'_> {
 
 /// `GAME_ICARUS_SOUNDINDEX` → `G_SoundIndex( m->filename )` (`g_main.c:659-664`).
 impl Dispatch<GameIcarusSoundindex> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) {
+    fn dispatch(&mut self, _args: ()) {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8 as *mut T_G_ICARUS_SOUNDINDEX)
@@ -684,7 +664,7 @@ impl Dispatch<GameIcarusSoundindex> for GameContext<'_> {
 /// `GAME_ICARUS_GETSETIDFORSTRING` →
 /// `return GetIDForString( setTable, m->string )` (`g_main.c:665-669`).
 impl Dispatch<GameIcarusGetsetidforstring> for GameContext<'_> {
-    fn dispatch(&self, _args: ()) -> c_int {
+    fn dispatch(&mut self, _args: ()) -> c_int {
         // SAFETY: overlay-cast of the engine-registered shared buffer (SEAM-D8).
         let m = unsafe {
             &mut *(&mut (*self.world).gSharedBuffer[0] as *mut u8

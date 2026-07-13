@@ -34,9 +34,9 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -74,7 +74,7 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 /// Raven `NPC_Probe_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:21-40`
-pub fn NPC_Probe_Precache(ctx: GameContext<'_>) {
+pub fn NPC_Probe_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let s = format!("sound/chars/probe/misc/probetalk{}", i);
         let c_str = cstr(&s);
@@ -96,9 +96,9 @@ pub fn NPC_Probe_Precache(ctx: GameContext<'_>) {
 /// Raven `ImperialProbe_MaintainHeight`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:49-170`
-pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
+pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -175,9 +175,9 @@ pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
 /// Raven `ImperialProbe_Strafe`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:182-209`
-pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
+pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -240,18 +240,19 @@ pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
 /// Raven `ImperialProbe_Hunt`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:220-261`
-pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
         let mut forward = [0.0; 3];
         let mut distance = 0.0;
 
+        let __h95 = ctx.entity_id_of(npc).unwrap();
         NPC_SetAnim(
             ctx,
-            ctx.entity_id_of(npc).unwrap(),
+            __h95,
             SETANIM_BOTH,
             BOTH_RUN1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -307,9 +308,9 @@ pub fn ImperialProbe_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 /// Raven `ImperialProbe_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:268-324`
-pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
+pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
 
         let mut muzzle1 = [0.0; 3];
@@ -354,25 +355,23 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
             [0.0; 3],
         );
 
+        let __h96 = ctx.entity_id_of(npc);
         G_Sound(
             ctx,
-            ctx.entity_id_of(npc),
+            __h96,
             CHAN_AUTO,
             G_SoundIndex(c"sound/chars/probe/misc/fire".as_ptr()),
         );
 
+        let __h98 = ctx.entity_id_of(npc).unwrap();
         if (*npc).health != 0 {
             let enemy_ptr = if let Some(enemy_id) = (*npc).enemy {
                 &mut world.g_entities[enemy_id.0 as usize] as *mut gentity_t
             } else {
                 core::ptr::null_mut()
             };
-            CalcEntitySpot(
-                ctx,
-                ctx.entity_id_of(enemy_ptr),
-                SPOT_CHEST,
-                &mut enemy_org1,
-            );
+            let __h97 = ctx.entity_id_of(enemy_ptr);
+            CalcEntitySpot(ctx, __h97, SPOT_CHEST, &mut enemy_org1);
             enemy_org1[0] += world.bg_state.rng.Q_irand(0, 10) as f32;
             enemy_org1[1] += world.bg_state.rng.Q_irand(0, 10) as f32;
             _VectorSubtract(enemy_org1, muzzle1, &mut delta1);
@@ -392,15 +391,8 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
             );
         }
 
-        let missile = CreateMissile(
-            ctx,
-            muzzle1,
-            forward,
-            1600.0,
-            10000,
-            ctx.entity_id_of(npc).unwrap(),
-            0,
-        );
+        let __s901 = ctx.entity_id_of(npc).unwrap();
+        let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, __s901, 0);
 
         (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
         (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
@@ -420,9 +412,9 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 /// Raven `ImperialProbe_Ranged`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:331-363`
-pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn ImperialProbe_Ranged(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -435,9 +427,10 @@ pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qb
                 (300, 1500)
             };
 
+            let __h99 = ctx.entity_id_of(npc);
             TIMER_Set(
                 ctx,
-                ctx.entity_id_of(npc),
+                __h99,
                 c"attackDelay".as_ptr(),
                 world.bg_state.rng.Q_irand(500, 3000),
             );
@@ -453,30 +446,29 @@ pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qb
 /// Raven `ImperialProbe_AttackDecision`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:377-426`
-pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
+pub fn ImperialProbe_AttackDecision(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
         // Always keep a good height off the ground
         ImperialProbe_MaintainHeight(ctx);
 
+        let __h100 = ctx.entity_id_of(npc);
+        let __h768 = ctx.entity_id_of(npc).unwrap();
         // randomly talk
-        if TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
+        if TIMER_Done(ctx, __h100, c"patrolNoise".as_ptr()) != 0 {
             if TIMER_Done(ctx, ctx.entity_id_of(npc), c"angerNoise".as_ptr()) != 0 {
                 let sound_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-                G_SoundOnEnt(
-                    ctx,
-                    ctx.entity_id_of(npc).unwrap(),
-                    CHAN_AUTO,
-                    cstr(&s).as_ptr(),
-                );
+                let __h101 = ctx.entity_id_of(npc).unwrap();
+                G_SoundOnEnt(ctx, __h101, CHAN_AUTO, cstr(&s).as_ptr());
 
+                let __h102 = ctx.entity_id_of(npc);
                 TIMER_Set(
                     ctx,
-                    ctx.entity_id_of(npc),
+                    __h102,
                     c"patrolNoise".as_ptr(),
                     world.bg_state.rng.Q_irand(4000, 10000),
                 );
@@ -491,7 +483,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 
         NPC_SetAnim(
             ctx,
-            ctx.entity_id_of(npc).unwrap(),
+            __h768,
             SETANIM_BOTH,
             BOTH_RUN1 as c_int,
             SETANIM_FLAG_NORMAL,
@@ -538,7 +530,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:433-498`
 pub fn NPC_Probe_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -547,7 +539,7 @@ pub fn NPC_Probe_Pain(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
 
         let other = attacker;
         let mod_ = world.globals.gPainMOD;
@@ -585,9 +577,10 @@ pub fn NPC_Probe_Pain(
                 {
                     let mut dir = [0.0; 3];
 
+                    let __h103 = ctx.entity_id_of(self_).unwrap();
                     NPC_SetAnim(
                         ctx,
-                        ctx.entity_id_of(self_).unwrap(),
+                        __h103,
                         SETANIM_BOTH,
                         BOTH_PAIN1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -610,7 +603,8 @@ pub fn NPC_Probe_Pain(
                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_DROP;
             }
         } else {
-            let pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
+            let __h104 = ctx.entity_id_of(self_).unwrap();
+            let pain_chance = NPC_GetPainChance(ctx, __h104, damage);
 
             if world.bg_state.rng.random() < pain_chance {
                 NPC_SetAnim(
@@ -635,7 +629,7 @@ pub fn NPC_Probe_Pain(
 /// Raven `ImperialProbe_Idle`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:506-511`
-pub fn ImperialProbe_Idle(ctx: GameContext<'_>) {
+pub fn ImperialProbe_Idle(ctx: &mut GameContext) {
     ImperialProbe_MaintainHeight(ctx);
     NPC_BSIdle(ctx);
 }
@@ -643,9 +637,9 @@ pub fn ImperialProbe_Idle(ctx: GameContext<'_>) {
 /// Raven `ImperialProbe_Patrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:518-556`
-pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
+pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
 
         ImperialProbe_MaintainHeight(ctx);
@@ -657,9 +651,10 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
 
         // If we have somewhere to go, then do that
         if (*npc).enemy.is_none() {
+            let __h105 = ctx.entity_id_of(npc).unwrap();
             NPC_SetAnim(
                 ctx,
-                ctx.entity_id_of(npc).unwrap(),
+                __h105,
                 SETANIM_BOTH,
                 BOTH_RUN1 as c_int,
                 SETANIM_FLAG_NORMAL,
@@ -676,31 +671,30 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
             if TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
                 let sound_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-                G_SoundOnEnt(
-                    ctx,
-                    ctx.entity_id_of(npc).unwrap(),
-                    CHAN_AUTO,
-                    cstr(&s).as_ptr(),
-                );
+                let __h106 = ctx.entity_id_of(npc).unwrap();
+                G_SoundOnEnt(ctx, __h106, CHAN_AUTO, cstr(&s).as_ptr());
 
+                let __h107 = ctx.entity_id_of(npc);
                 TIMER_Set(
                     ctx,
-                    ctx.entity_id_of(npc),
+                    __h107,
                     c"patrolNoise".as_ptr(),
                     world.bg_state.rng.Q_irand(2000, 4000),
                 );
             }
         } else {
+            let __h108 = ctx.entity_id_of(npc).unwrap();
             // He's got an enemy. Make him angry.
             G_SoundOnEnt(
                 ctx,
-                ctx.entity_id_of(npc).unwrap(),
+                __h108,
                 CHAN_AUTO,
                 c"sound/chars/probe/misc/anger1".as_ptr(),
             );
+            let __h109 = ctx.entity_id_of(npc);
             TIMER_Set(
                 ctx,
-                ctx.entity_id_of(npc),
+                __h109,
                 c"angerNoise".as_ptr(),
                 world.bg_state.rng.Q_irand(2000, 4000),
             );
@@ -713,9 +707,9 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
 /// Raven `ImperialProbe_Wait`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:563-582`
-pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
+pub fn ImperialProbe_Wait(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -769,9 +763,9 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
 /// Raven `NPC_BSImperialProbe_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:589-609`
-pub fn NPC_BSImperialProbe_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSImperialProbe_Default(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 

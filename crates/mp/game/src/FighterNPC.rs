@@ -57,7 +57,7 @@ const VEH_GEARSOPEN: u64 = 0x0000_0040;
 /// Raven `Board`.
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:212-221`
-pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
+pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     unsafe {
         // `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
         if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
@@ -65,7 +65,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
         }
 
         // Set the board wait time (they won't be able to do anything, including getting off, for this amount of time).
-        (*pVeh).m_iBoarding = (*ctx.world).level.time + 1500;
+        (*pVeh).m_iBoarding = (*ctx.world_raw()).level.time + 1500;
 
         qtrue
     }
@@ -75,7 +75,7 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:224-232`
 pub fn Eject(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
     forceEject: qboolean,
@@ -94,7 +94,7 @@ pub fn Eject(
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:99-183`
 pub fn BG_FighterUpdate(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pVeh: *mut Vehicle_t,
     pUcmd: *const usercmd_t,
     trMins: vec3_t,
@@ -105,7 +105,7 @@ pub fn BG_FighterUpdate(
     // `ctx`. So the port threads the same `ctx`-aware, `vec3_t`-by-value shape as
     // `G_VehicleTrace` rather than the C fn-ptr.
     // Source: `oracle/codemp/game/FighterNPC.c:100`
-    traceFunc: fn(GameContext<'_>, *mut trace_t, vec3_t, vec3_t, vec3_t, vec3_t, c_int, c_int),
+    traceFunc: fn(&mut GameContext, *mut trace_t, vec3_t, vec3_t, vec3_t, vec3_t, c_int, c_int),
 ) -> qboolean {
     unsafe {
         let mut bottom = [0.0f32; 3];
@@ -202,18 +202,19 @@ pub fn BG_FighterUpdate(
 /// gentity's `r.mins`/`r.maxs` (Raven's `#define mins r.mins`); gravity is the
 /// `g_gravity` cvar.
 /// Source: `oracle/codemp/game/FighterNPC.c:188-209`
-pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         debug_assert!(!parent.is_null());
 
+        let __s951 = (*ctx.world_raw()).cvars.g_gravity.value;
         if BG_FighterUpdate(
             ctx,
             pVeh,
             pUcmd,
             (*parent).r.mins,
             (*parent).r.maxs,
-            (*ctx.world).cvars.g_gravity.value,
+            __s951,
             G_VehicleTrace,
         ) == qfalse
         {
@@ -452,7 +453,7 @@ pub fn FighterNoseMalfunctionCheck(pVeh: *mut Vehicle_t, parentPS: *mut playerSt
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:935-1089`
 pub fn FighterDamageRoutine(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pVeh: *mut Vehicle_t,
     parent: *mut bgEntity_t,
     parentPS: *mut playerState_t,
@@ -472,14 +473,18 @@ pub fn FighterDamageRoutine(
                 if num % 3 == 0 {
                     // NOT everyone should do this
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
+                        == qfalse
+                    {
                         if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 2 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
+                        == qfalse
+                    {
                         if *(*pVeh).m_vOrientation.add(0) > -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
@@ -508,14 +513,18 @@ pub fn FighterDamageRoutine(
 
                 if num % 3 != 0 {
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
+                        == qfalse
+                    {
                         if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 4 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
+                        == qfalse
+                    {
                         if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
@@ -668,14 +677,14 @@ pub fn FighterPitchAdjust(
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:1352-1370`
 pub fn FighterPitchClamp(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pVeh: *mut Vehicle_t,
     riderPS: *mut playerState_t,
     parentPS: *mut playerState_t,
     curTime: c_int,
 ) {
     unsafe {
-        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse {
             // Cap pitch reasonably
             if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
                 if vi.pitchLimit != -1.0
@@ -702,7 +711,7 @@ pub fn FighterPitchClamp(
 /// The `#ifndef _JK2MP` (SP) branches are dead in this build and dropped
 /// (porting-rules §10). `Inhabited()` dispatches through `veh_dispatch`.
 /// Source: `oracle/codemp/game/FighterNPC.c:370-889`
-pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
         let curTime: c_int = (*pVeh).m_ucmd.serverTime;
@@ -1078,7 +1087,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// `m_ucmd.serverTime` (see `ProcessMoveCommands`). The rider is resolved from the
 /// world arena (the QAGAME `PM_BGEntForNum` result) since no `PmoveContext` is
 /// threaded here. Source: `oracle/codemp/game/FighterNPC.c:1381-1835`
-pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
         let vi = (*pVeh).m_pVehicleInfo;
@@ -1089,7 +1098,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         // Resolve the rider (QAGAME `PM_BGEntForNum` == `&g_entities[owner]`).
         let mut rider: *mut bgEntity_t = core::ptr::null_mut();
         if (*parent).s.owner != ENTITYNUM_NONE {
-            rider = &mut (*ctx.world).g_entities[(*parent).s.owner as usize] as *mut gentity_t
+            rider = &mut (*ctx.world_raw()).g_entities[(*parent).s.owner as usize] as *mut gentity_t
                 as *mut bgEntity_t;
         }
         if rider.is_null() {
@@ -1147,7 +1156,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             return;
         }
 
-        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse {
             *(*pVeh).m_vOrientation.add(2) =
                 PredictedAngularDecrement(0.95, angleTimeMod * 2.0, *(*pVeh).m_vOrientation.add(2));
         }
@@ -1226,7 +1235,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             && (*(*pVeh).m_pPilot).s.number < MAX_CLIENTS as c_int
             && (*parentPS).speed > 0.0
         {
-            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) != qfalse {
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) != qfalse {
                 *(*pVeh).m_vOrientation.add(0) = (*riderPS).viewangles[0];
                 *(*pVeh).m_vOrientation.add(1) = (*riderPS).viewangles[1];
                 *(*pVeh).m_vOrientation.add(2) = (*riderPS).viewangles[2];
@@ -1298,7 +1307,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         {
             (*pVeh).m_ucmd.upmove = 0;
             *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse
                 && *(*pVeh).m_vOrientation.add(0) > 60.0
             {
                 *(*pVeh).m_vOrientation.add(0) = 60.0;
@@ -1314,7 +1323,8 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
                 {
                     // spiralling out of control: leave YAW alone
-                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse
+                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
+                    == qfalse
                 {
                     *(*pVeh).m_vOrientation.add(1) -=
                         (*(*pVeh).m_vOrientation.add(2) * 0.05) * (*pVeh).m_fTimeModifier;
@@ -1325,7 +1335,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             let strafeRoll = ((*parentPS).hackingTime as f32 / MAX_STRAFE_TIME) * (*vi).rollLimit;
             let strafeDif = AngleSubtract(strafeRoll, *(*pVeh).m_vOrientation.add(2));
             *(*pVeh).m_vOrientation.add(2) += (strafeDif * 0.1) * (*pVeh).m_fTimeModifier;
-            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse
                 && (*vi).rollLimit != -1.0
                 && (*pVeh).m_iRemovedSurfaces == 0
                 && (*parentPS).electrifyTime < curTime
@@ -1360,11 +1370,11 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// dispatch entry does not thread, so — as in `SpeederNPC::AnimateRiders` — the
 /// state-flag mutations are ported and the client-anim dispatch is a `PORT-NOTE`.
 /// Source: `oracle/codemp/game/FighterNPC.c:1836-1937`
-pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut Anim: c_int = -1;
         let parentPS: *mut playerState_t = (*(*pVeh).m_pParentEntity).playerState;
-        let curTime: c_int = (*ctx.world).level.time;
+        let curTime: c_int = (*ctx.world_raw()).level.time;
         let vi = (*pVeh).m_pVehicleInfo;
 
         if (*parentPS).hyperSpaceTime != 0 && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
@@ -1432,7 +1442,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven `AnimateRiders` — the `_JK2MP`/`QAGAME` body is empty (a deliberate
 /// no-op, like `SpeederNPC`'s).
 /// Source: `oracle/codemp/game/FighterNPC.c:1938-1944`
-pub fn AnimateRiders(_ctx: GameContext<'_>, _pVeh: *mut Vehicle_t) {}
+pub fn AnimateRiders(_ctx: &mut GameContext, _pVeh: *mut Vehicle_t) {}
 
 // `G_SetFighterVehicleFunctions` retired — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
@@ -1441,7 +1451,11 @@ pub fn AnimateRiders(_ctx: GameContext<'_>, _pVeh: *mut Vehicle_t) {}
 /// Raven `G_CreateFighterNPC`.
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:1994-2014`
-pub fn G_CreateFighterNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
+pub fn G_CreateFighterNPC(
+    ctx: &mut GameContext,
+    pVeh: *mut *mut Vehicle_t,
+    strType: *const c_char,
+) {
     unsafe {
         // Allocate the Vehicle (MP QAGAME path).
         G_AllocateVehicleObject(ctx, pVeh);
@@ -1452,10 +1466,11 @@ pub fn G_CreateFighterNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strTy
         // Set the vehicle info pointer based on vehicle type name.
         let veh_index = BG_VehicleGetIndex(
             strType,
-            &mut (*ctx.world).bg_state,
+            &mut (*ctx.world_raw()).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
-        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize]
-            as *const _ as *mut vehicleInfo_t;
+        (*(*pVeh)).m_pVehicleInfo = &(&(*ctx.world_raw()).bg_state.g_vehicleInfo)
+            [veh_index as usize] as *const _
+            as *mut vehicleInfo_t;
     }
 }

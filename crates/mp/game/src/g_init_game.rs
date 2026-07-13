@@ -55,7 +55,7 @@ use mp_abi::game::syscalls::G_SET_SHARED_BUFFER::GSetSharedBufferArgs;
 /// Raven `void G_InitGame( int levelTime, int randomSeed, int restart )`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:897-1118`
-pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
+pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
     // Arm the ctx-less `strap_*` seam engine cell from the GAME_INIT
     // entrypoint that owns the engine, before any bg logic can call `strap_*`.
     crate::g_strap::init_strap_engine(ctx.engine);
@@ -66,7 +66,7 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
     crate::g_strap::init_strap_world(ctx.world);
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
 
         // Raven: `#ifdef _XBOX` guards `BG_ClearVehicleParseParms()` +
         // `RemoveAllWP()` here (`g_main.c:902-907`) — dead branch on this
@@ -88,7 +88,7 @@ pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
         // BG_InitAnimsets(); //clear it out
         {
             let mut callbacks = GameCallbacksImpl {
-                world: ctx.world,
+                world: ctx.world_raw(),
                 engine: ctx.engine,
             };
             let mut pmc = PmoveContext::new(&mut world.bg_state, &bg_traps, &mut callbacks);

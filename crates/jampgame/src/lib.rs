@@ -153,15 +153,18 @@ fn vm_main_dispatch(
     // sound; a dispatch-spanning `&mut` would be UB (STATE-D6 discipline). The
     // cell holds `Box<GameWorld>`; `&mut **b` reborrows through the Box to the
     // same `*mut GameWorld` the whole downstream (`GameContext`) expects.
-    let world = unsafe {
+    // SAFETY: the single owned island the shell keeps alive for the whole
+    // call (STATE-D1/D6); this is THE seam reborrow — everything downstream
+    // is a checked borrow of it (Stage 2a).
+    let world: &mut GameWorld = unsafe {
         let b = (*WORLD.0.get())
             .as_mut()
             .expect("GAME_INIT built the world");
-        &mut **b as *mut GameWorld
+        &mut **b
     };
     // Per-call receiver from WORLD + ENGINE.get() (SEAM-Q12) — plain struct
     // literal, pub fields (round-5 resolution; WorldPtr precedent, STATE-D8).
-    let ctx = GameContext {
+    let mut ctx = GameContext {
         world,
         engine: ENGINE.get().expect("dllEntry set ENGINE"),
     };
@@ -185,19 +188,19 @@ fn vm_main_dispatch(
         // `case GAME_INIT: G_InitGame( arg0, arg1, arg2 ); return 0;`
         // (g_main.c:517-519).
         MpGameExport::GAME_INIT => GameInit::encode_return(Dispatch::<GameInit>::dispatch(
-            &ctx,
+            &mut ctx,
             GameInit::decode_vm_main(transport),
         )),
         // `case GAME_SHUTDOWN: G_ShutdownGame( arg0 ); return 0;`
         // (g_main.c:520-522).
         MpGameExport::GAME_SHUTDOWN => GameShutdown::encode_return(
-            Dispatch::<GameShutdown>::dispatch(&ctx, GameShutdown::decode_vm_main(transport)),
+            Dispatch::<GameShutdown>::dispatch(&mut ctx, GameShutdown::decode_vm_main(transport)),
         ),
         // `case GAME_CLIENT_CONNECT: return (int)ClientConnect( arg0, arg1, arg2 );`
         // (g_main.c:523-524).
         MpGameExport::GAME_CLIENT_CONNECT => {
             GameClientConnect::encode_return(Dispatch::<GameClientConnect>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameClientConnect::decode_vm_main(transport),
             ))
         }
@@ -205,7 +208,7 @@ fn vm_main_dispatch(
         // (g_main.c:525-527).
         MpGameExport::GAME_CLIENT_THINK => {
             GameClientThink::encode_return(Dispatch::<GameClientThink>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameClientThink::decode_vm_main(transport),
             ))
         }
@@ -213,7 +216,7 @@ fn vm_main_dispatch(
         // (g_main.c:528-530).
         MpGameExport::GAME_CLIENT_USERINFO_CHANGED => GameClientUserinfoChanged::encode_return(
             Dispatch::<GameClientUserinfoChanged>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameClientUserinfoChanged::decode_vm_main(transport),
             ),
         ),
@@ -221,7 +224,7 @@ fn vm_main_dispatch(
         // (g_main.c:531-533).
         MpGameExport::GAME_CLIENT_DISCONNECT => {
             GameClientDisconnect::encode_return(Dispatch::<GameClientDisconnect>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameClientDisconnect::decode_vm_main(transport),
             ))
         }
@@ -229,7 +232,7 @@ fn vm_main_dispatch(
         // (g_main.c:534-536).
         MpGameExport::GAME_CLIENT_BEGIN => {
             GameClientBegin::encode_return(Dispatch::<GameClientBegin>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameClientBegin::decode_vm_main(transport),
             ))
         }
@@ -237,25 +240,25 @@ fn vm_main_dispatch(
         // (g_main.c:537-539).
         MpGameExport::GAME_CLIENT_COMMAND => {
             GameClientCommand::encode_return(Dispatch::<GameClientCommand>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameClientCommand::decode_vm_main(transport),
             ))
         }
         // `case GAME_RUN_FRAME: G_RunFrame( arg0 ); return 0;` (g_main.c:540-542).
         MpGameExport::GAME_RUN_FRAME => GameRunFrame::encode_return(
-            Dispatch::<GameRunFrame>::dispatch(&ctx, GameRunFrame::decode_vm_main(transport)),
+            Dispatch::<GameRunFrame>::dispatch(&mut ctx, GameRunFrame::decode_vm_main(transport)),
         ),
         // `case GAME_CONSOLE_COMMAND: return ConsoleCommand();` (g_main.c:543-544).
         MpGameExport::GAME_CONSOLE_COMMAND => {
             GameConsoleCommand::encode_return(Dispatch::<GameConsoleCommand>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameConsoleCommand::decode_vm_main(transport),
             ))
         }
         // `case BOTAI_START_FRAME: return BotAIStartFrame( arg0 );` (g_main.c:545-546).
         MpGameExport::BOTAI_START_FRAME => {
             BotAiStartFrame::encode_return(Dispatch::<BotAiStartFrame>::dispatch(
-                &ctx,
+                &mut ctx,
                 BotAiStartFrame::decode_vm_main(transport),
             ))
         }
@@ -264,7 +267,7 @@ fn vm_main_dispatch(
         // (g_main.c:547-549).
         MpGameExport::GAME_ROFF_NOTETRACK_CALLBACK => GameRoffNotetrackCallback::encode_return(
             Dispatch::<GameRoffNotetrackCallback>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameRoffNotetrackCallback::decode_vm_main(transport),
             ),
         ),
@@ -273,7 +276,7 @@ fn vm_main_dispatch(
         // (g_main.c:550-555).
         MpGameExport::GAME_SPAWN_RMG_ENTITY => {
             GameSpawnRmgEntity::encode_return(Dispatch::<GameSpawnRmgEntity>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameSpawnRmgEntity::decode_vm_main(transport),
             ))
         }
@@ -287,91 +290,97 @@ fn vm_main_dispatch(
         // Source: oracle/codemp/game/g_main.c:558-668.
         MpGameExport::GAME_ICARUS_PLAYSOUND => {
             GameIcarusPlaysound::encode_return(Dispatch::<GameIcarusPlaysound>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusPlaysound::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_SET => GameIcarusSet::encode_return(
-            Dispatch::<GameIcarusSet>::dispatch(&ctx, GameIcarusSet::decode_vm_main(transport)),
+            Dispatch::<GameIcarusSet>::dispatch(&mut ctx, GameIcarusSet::decode_vm_main(transport)),
         ),
         MpGameExport::GAME_ICARUS_LERP2POS => {
             GameIcarusLerp2Pos::encode_return(Dispatch::<GameIcarusLerp2Pos>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusLerp2Pos::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_LERP2ORIGIN => {
             GameIcarusLerp2Origin::encode_return(Dispatch::<GameIcarusLerp2Origin>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusLerp2Origin::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_LERP2ANGLES => {
             GameIcarusLerp2Angles::encode_return(Dispatch::<GameIcarusLerp2Angles>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusLerp2Angles::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_GETTAG => {
             GameIcarusGettag::encode_return(Dispatch::<GameIcarusGettag>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusGettag::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_LERP2START => {
             GameIcarusLerp2Start::encode_return(Dispatch::<GameIcarusLerp2Start>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusLerp2Start::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_LERP2END => {
             GameIcarusLerp2End::encode_return(Dispatch::<GameIcarusLerp2End>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusLerp2End::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_USE => GameIcarusUse::encode_return(
-            Dispatch::<GameIcarusUse>::dispatch(&ctx, GameIcarusUse::decode_vm_main(transport)),
+            Dispatch::<GameIcarusUse>::dispatch(&mut ctx, GameIcarusUse::decode_vm_main(transport)),
         ),
-        MpGameExport::GAME_ICARUS_KILL => GameIcarusKill::encode_return(
-            Dispatch::<GameIcarusKill>::dispatch(&ctx, GameIcarusKill::decode_vm_main(transport)),
-        ),
+        MpGameExport::GAME_ICARUS_KILL => {
+            GameIcarusKill::encode_return(Dispatch::<GameIcarusKill>::dispatch(
+                &mut ctx,
+                GameIcarusKill::decode_vm_main(transport),
+            ))
+        }
         MpGameExport::GAME_ICARUS_REMOVE => {
             GameIcarusRemove::encode_return(Dispatch::<GameIcarusRemove>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusRemove::decode_vm_main(transport),
             ))
         }
-        MpGameExport::GAME_ICARUS_PLAY => GameIcarusPlay::encode_return(
-            Dispatch::<GameIcarusPlay>::dispatch(&ctx, GameIcarusPlay::decode_vm_main(transport)),
-        ),
+        MpGameExport::GAME_ICARUS_PLAY => {
+            GameIcarusPlay::encode_return(Dispatch::<GameIcarusPlay>::dispatch(
+                &mut ctx,
+                GameIcarusPlay::decode_vm_main(transport),
+            ))
+        }
         MpGameExport::GAME_ICARUS_GETFLOAT => {
             GameIcarusGetfloat::encode_return(Dispatch::<GameIcarusGetfloat>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusGetfloat::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_GETVECTOR => {
             GameIcarusGetvector::encode_return(Dispatch::<GameIcarusGetvector>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusGetvector::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_GETSTRING => {
             GameIcarusGetstring::encode_return(Dispatch::<GameIcarusGetstring>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusGetstring::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_SOUNDINDEX => {
             GameIcarusSoundindex::encode_return(Dispatch::<GameIcarusSoundindex>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusSoundindex::decode_vm_main(transport),
             ))
         }
         MpGameExport::GAME_ICARUS_GETSETIDFORSTRING => GameIcarusGetsetidforstring::encode_return(
             Dispatch::<GameIcarusGetsetidforstring>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameIcarusGetsetidforstring::decode_vm_main(transport),
             ),
         ),
@@ -379,14 +388,14 @@ fn vm_main_dispatch(
         // (g_main.c:672-673).
         MpGameExport::GAME_NAV_CLEARPATHTOPOINT => {
             GameNavClearpathtopoint::encode_return(Dispatch::<GameNavClearpathtopoint>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavClearpathtopoint::decode_vm_main(transport),
             ))
         }
         // `case GAME_NAV_CLEARLOS: return NPC_ClearLOS2(...);` (g_main.c:674-675).
         MpGameExport::GAME_NAV_CLEARLOS => {
             GameNavClearlos::encode_return(Dispatch::<GameNavClearlos>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavClearlos::decode_vm_main(transport),
             ))
         }
@@ -395,7 +404,7 @@ fn vm_main_dispatch(
         MpGameExport::GAME_NAV_CLEARPATHBETWEENPOINTS => {
             GameNavClearpathbetweenpoints::encode_return(
                 Dispatch::<GameNavClearpathbetweenpoints>::dispatch(
-                    &ctx,
+                    &mut ctx,
                     GameNavClearpathbetweenpoints::decode_vm_main(transport),
                 ),
             )
@@ -405,7 +414,7 @@ fn vm_main_dispatch(
         MpGameExport::GAME_NAV_CHECKNODEFAILEDFORENT => {
             GameNavChecknodefailedforent::encode_return(
                 Dispatch::<GameNavChecknodefailedforent>::dispatch(
-                    &ctx,
+                    &mut ctx,
                     GameNavChecknodefailedforent::decode_vm_main(transport),
                 ),
             )
@@ -414,14 +423,14 @@ fn vm_main_dispatch(
         // (g_main.c:680-681).
         MpGameExport::GAME_NAV_ENTISUNLOCKEDDOOR => {
             GameNavEntIsUnlockedDoor::encode_return(Dispatch::<GameNavEntIsUnlockedDoor>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavEntIsUnlockedDoor::decode_vm_main(transport),
             ))
         }
         // `case GAME_NAV_ENTISDOOR: return G_EntIsDoor(arg0);` (g_main.c:682-683).
         MpGameExport::GAME_NAV_ENTISDOOR => {
             GameNavEntIsDoor::encode_return(Dispatch::<GameNavEntIsDoor>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavEntIsDoor::decode_vm_main(transport),
             ))
         }
@@ -429,7 +438,7 @@ fn vm_main_dispatch(
         // (g_main.c:684-685).
         MpGameExport::GAME_NAV_ENTISBREAKABLE => {
             GameNavEntIsBreakable::encode_return(Dispatch::<GameNavEntIsBreakable>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavEntIsBreakable::decode_vm_main(transport),
             ))
         }
@@ -437,7 +446,7 @@ fn vm_main_dispatch(
         // (g_main.c:686-687).
         MpGameExport::GAME_NAV_ENTISREMOVABLEUSABLE => GameNavEntIsRemovableUsable::encode_return(
             Dispatch::<GameNavEntIsRemovableUsable>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavEntIsRemovableUsable::decode_vm_main(transport),
             ),
         ),
@@ -447,7 +456,7 @@ fn vm_main_dispatch(
             GameNavFindcombatpointwaypoints::encode_return(Dispatch::<
                 GameNavFindcombatpointwaypoints,
             >::dispatch(
-                &ctx,
+                &mut ctx,
                 GameNavFindcombatpointwaypoints::decode_vm_main(transport),
             ))
         }
@@ -455,7 +464,7 @@ fn vm_main_dispatch(
         // (g_main.c:690-691).
         MpGameExport::GAME_GETITEMINDEXBYTAG => {
             GameGetitemindexbytag::encode_return(Dispatch::<GameGetitemindexbytag>::dispatch(
-                &ctx,
+                &mut ctx,
                 GameGetitemindexbytag::decode_vm_main(transport),
             ))
         }

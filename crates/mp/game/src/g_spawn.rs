@@ -10,8 +10,8 @@
 //! `g_entities`/traps thread the `GameContext<'_>` receiver (`.world: *mut
 //! GameWorld`, `.engine`) as an ADDED first parameter (not present on the
 //! staged raw-pointer skeleton). Globals are `GameWorld` fields:
-//! `level` -> `(*ctx.world).level`, cvars -> `(*ctx.world).cvars`,
-//! `g_entities[i]` -> `(*ctx.world).g_entities[i]`. Traps go through
+//! `level` -> `(*ctx.world_raw()).level`, cvars -> `(*ctx.world_raw()).cvars`,
+//! `g_entities[i]` -> `(*ctx.world_raw()).g_entities[i]`. Traps go through
 //! `trap::X(ctx.engine, <Name>Args::new(...))`. Cross-file callees are invoked
 //! with the packet's resolved raw-pointer signatures verbatim.
 //!
@@ -118,13 +118,13 @@ const LS_NUM_STYLES: c_int = 32;
 pub const MAX_AMBIENT_SETS: c_int = 256;
 
 pub fn G_SpawnString(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     key: *const c_char,
     defaultString: *const c_char,
     out: *mut *mut c_char,
 ) -> qboolean {
     unsafe {
-        let level = &(*ctx.world).level;
+        let level = &(*ctx.world_raw()).level;
 
         if level.spawning == qfalse {
             *out = defaultString as *mut c_char;
@@ -148,7 +148,7 @@ pub fn G_SpawnString(
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:25-32`
 pub fn G_SpawnFloat(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     key: *const c_char,
     defaultString: *const c_char,
     out: *mut f32,
@@ -165,7 +165,7 @@ pub fn G_SpawnFloat(
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:34-41`
 pub fn G_SpawnInt(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     key: *const c_char,
     defaultString: *const c_char,
     out: *mut c_int,
@@ -182,7 +182,7 @@ pub fn G_SpawnInt(
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:43-50`
 pub fn G_SpawnVector(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     key: *const c_char,
     defaultString: *const c_char,
     out: *mut f32,
@@ -241,7 +241,7 @@ pub fn SP_item_botroam(ent: &mut gentity_t) {}
 /// Raven `SP_gametype_item`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:372-431`
-pub fn SP_gametype_item(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_gametype_item(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
         // pointer (Stage-2 body debt).
@@ -253,7 +253,7 @@ pub fn SP_gametype_item(ctx: GameContext<'_>, ent: EntityId) {
 
         // If a team filter is set then override any team settings for the spawns
         let mut team: c_int = -1;
-        let mTeamFilter = (*ctx.world).level.mTeamFilter.as_ptr();
+        let mTeamFilter = (*ctx.world_raw()).level.mTeamFilter.as_ptr();
         if *mTeamFilter != 0 {
             if Q_stricmp(mTeamFilter, c"red".as_ptr()) == 0 {
                 team = TEAM_RED;
@@ -298,7 +298,7 @@ pub fn SP_gametype_item(ctx: GameContext<'_>, ent: EntityId) {
 /// normal spawn functions (from `spawns[]` table).
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:683-714`
-pub fn G_CallSpawn(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn G_CallSpawn(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     unsafe {
         // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
         // pointer (Stage-2 body debt).
@@ -346,7 +346,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// real linefeeds so message texts can be multi-line.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:724-749`
-pub fn G_NewString(ctx: GameContext<'_>, string: *const c_char) -> *mut c_char {
+pub fn G_NewString(ctx: &mut GameContext, string: *const c_char) -> *mut c_char {
     unsafe {
         let mut l = 0isize;
         while *string.offset(l) != 0 {
@@ -774,7 +774,7 @@ const fn field(name: &'static CStr, ofs: usize, r#type: fieldtype_t) -> BG_field
 /// spawn function.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:766-842`
-pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
+pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
     unsafe {
         // static char *gametypeNames[] — fn-scope const table.
         const GAMETYPE_NAMES: [&CStr; 10] = [
@@ -793,10 +793,10 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         // get the next free entity
         let ent = G_Spawn(ctx);
 
-        let num_spawn_vars = (*ctx.world).level.numSpawnVars;
+        let num_spawn_vars = (*ctx.world_raw()).level.numSpawnVars;
         for i in 0..num_spawn_vars {
-            let key = (*ctx.world).level.spawnVars[i as usize][0];
-            let value = (*ctx.world).level.spawnVars[i as usize][1];
+            let key = (*ctx.world_raw()).level.spawnVars[i as usize][0];
+            let value = (*ctx.world_raw()).level.spawnVars[i as usize][1];
             BG_ParseField(
                 ctx,
                 FIELDS.as_ptr() as *mut BG_field_t,
@@ -808,7 +808,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
 
         // check for "notsingle" flag
         let mut i: c_int = 0;
-        if (*ctx.world).cvars.g_gametype.integer == GT_SINGLE_PLAYER {
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SINGLE_PLAYER {
             G_SpawnInt(ctx, c"notsingle".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
                 G_FreeEntity(ctx, ctx.entity_id_of(ent));
@@ -816,7 +816,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
             }
         }
         // check for "notteam" flag (GT_FFA, GT_DUEL, GT_SINGLE_PLAYER)
-        if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
+        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM {
             G_SpawnInt(ctx, c"notteam".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
                 G_FreeEntity(ctx, ctx.entity_id_of(ent));
@@ -838,7 +838,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
 
         let mut value: *mut c_char = std::ptr::null_mut();
         if G_SpawnString(ctx, c"gametype".as_ptr(), std::ptr::null(), &mut value) != qfalse {
-            let gt = (*ctx.world).cvars.g_gametype.integer;
+            let gt = (*ctx.world_raw()).cvars.g_gametype.integer;
             if gt >= GT_FFA && gt < GT_MAX_GAME_TYPE {
                 let gametype_name = GAMETYPE_NAMES[gt as usize];
                 let value_str = CStr::from_ptr(value).to_string_lossy();
@@ -875,14 +875,14 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
 /// Raven `G_AddSpawnVarToken`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:851-866`
-pub fn G_AddSpawnVarToken(ctx: GameContext<'_>, string: *const c_char) -> *mut c_char {
+pub fn G_AddSpawnVarToken(ctx: &mut GameContext, string: *const c_char) -> *mut c_char {
     unsafe {
         let mut l: isize = 0;
         while *string.offset(l) != 0 {
             l += 1;
         }
 
-        let level = &mut (*ctx.world).level;
+        let level = &mut (*ctx.world_raw()).level;
         if level.numSpawnVarChars + (l as c_int) + 1 > mp_bg::MAX_SPAWN_VARS_CHARS as c_int {
             // G_Error(ctx,  "G_AddSpawnVarToken: MAX_SPAWN_CHARS" ) — fatal, panic
             // per frozen Group A (Com_Error/G_Error -> panic).
@@ -904,23 +904,23 @@ pub fn G_AddSpawnVarToken(ctx: GameContext<'_>, string: *const c_char) -> *mut c
 /// Raven `AddSpawnField`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:868-884`
-pub fn AddSpawnField(ctx: GameContext<'_>, field: *mut c_char, value: *mut c_char) {
+pub fn AddSpawnField(ctx: &mut GameContext, field: *mut c_char, value: *mut c_char) {
     unsafe {
-        let num_spawn_vars = (*ctx.world).level.numSpawnVars;
+        let num_spawn_vars = (*ctx.world_raw()).level.numSpawnVars;
         for i in 0..num_spawn_vars {
-            if Q_stricmp((*ctx.world).level.spawnVars[i as usize][0], field) == 0 {
+            if Q_stricmp((*ctx.world_raw()).level.spawnVars[i as usize][0], field) == 0 {
                 let token = G_AddSpawnVarToken(ctx, value);
-                (*ctx.world).level.spawnVars[i as usize][1] = token;
+                (*ctx.world_raw()).level.spawnVars[i as usize][1] = token;
                 return;
             }
         }
 
-        let n = (*ctx.world).level.numSpawnVars;
+        let n = (*ctx.world_raw()).level.numSpawnVars;
         let key_tok = G_AddSpawnVarToken(ctx, field);
         let val_tok = G_AddSpawnVarToken(ctx, value);
-        (*ctx.world).level.spawnVars[n as usize][0] = key_tok;
-        (*ctx.world).level.spawnVars[n as usize][1] = val_tok;
-        (*ctx.world).level.numSpawnVars += 1;
+        (*ctx.world_raw()).level.spawnVars[n as usize][0] = key_tok;
+        (*ctx.world_raw()).level.spawnVars[n as usize][1] = val_tok;
+        (*ctx.world_raw()).level.numSpawnVars += 1;
     }
 }
 
@@ -930,7 +930,7 @@ pub const NOVALUE: &CStr = c"novalue";
 /// angle/name-prefix rewriting.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:888-1006`
-fn HandleEntityAdjustment(ctx: GameContext<'_>) {
+fn HandleEntityAdjustment(ctx: &mut GameContext) {
     unsafe {
         let mut value: *mut c_char = std::ptr::null_mut();
         let mut new_origin: vec3_t = [0.0; 3];
@@ -947,13 +947,13 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
         // `DEG2RAD(a)` is `(a * M_PI) / 180.0F` in f32; `cos`/`sin` are the double
         // libm functions and each `origin[k]*cos(...)` term evaluates in f64
         // before narrowing to the f32 result.
-        let rotation = ((*ctx.world).level.mRotationAdjust * std::f32::consts::PI) / 180.0;
+        let rotation = ((*ctx.world_raw()).level.mRotationAdjust * std::f32::consts::PI) / 180.0;
         let cos_r = (rotation as f64).cos();
         let sin_r = (rotation as f64).sin();
         new_origin[0] = (origin[0] as f64 * cos_r - origin[1] as f64 * sin_r) as f32;
         new_origin[1] = (origin[0] as f64 * sin_r + origin[1] as f64 * cos_r) as f32;
         new_origin[2] = origin[2];
-        let origin_adjust = (*ctx.world).level.mOriginAdjust;
+        let origin_adjust = (*ctx.world_raw()).level.mOriginAdjust;
         new_origin[0] += origin_adjust[0];
         new_origin[1] += origin_adjust[1];
         new_origin[2] += origin_adjust[2];
@@ -981,7 +981,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             // `fmod` is a double-precision truncated remainder whose sign follows
             // the dividend; `rem_euclid` (least non-negative) differs by 360 for a
             // negative sum.
-            angles[1] = ((angles[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
+            angles[1] =
+                ((angles[1] + (*ctx.world_raw()).level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0} {:.0} {:.0}", angles[0], angles[1], angles[2]);
             let temp_c = CString::new(temp).unwrap();
             AddSpawnField(
@@ -995,7 +996,7 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
                 sscanf_1f(value, &mut angle1);
             }
-            angle1 = ((angle1 + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
+            angle1 = ((angle1 + (*ctx.world_raw()).level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0}", angle1);
             let temp_c = CString::new(temp).unwrap();
             AddSpawnField(
@@ -1012,7 +1013,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
         if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
             sscanf_3f(value, &mut direction);
         }
-        direction[1] = ((direction[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
+        direction[1] =
+            ((direction[1] + (*ctx.world_raw()).level.mRotationAdjust) as f64 % 360.0) as f32;
         let temp = format!(
             "{:.0} {:.0} {:.0}",
             direction[0], direction[1], direction[2]
@@ -1024,7 +1026,7 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             temp_c.as_ptr() as *mut c_char,
         );
 
-        let target_adjust = (*ctx.world).level.mTargetAdjust;
+        let target_adjust = (*ctx.world_raw()).level.mTargetAdjust;
         let target_adjust_str = if target_adjust.is_null() {
             String::new()
         } else {
@@ -1062,15 +1064,15 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
 /// actually spawn an entity.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1018-1067`
-pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
+pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
     unsafe {
         // `MAX_TOKEN_CHARS` (value 1024) canonical in `mp_qshared::shared::limits`,
         // reaches this file via the crate prelude glob.
         let mut keyname = [0 as c_char; MAX_TOKEN_CHARS];
         let mut com_token = [0 as c_char; MAX_TOKEN_CHARS];
 
-        (*ctx.world).level.numSpawnVars = 0;
-        (*ctx.world).level.numSpawnVarChars = 0;
+        (*ctx.world_raw()).level.numSpawnVars = 0;
+        (*ctx.world_raw()).level.numSpawnVarChars = 0;
 
         // parse the opening brace
         if trap::GetEntityToken(
@@ -1112,15 +1114,15 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
             if com_token[0] == b'}' as c_char {
                 panic!("G_ParseSpawnVars: closing brace without data");
             }
-            if (*ctx.world).level.numSpawnVars == mp_bg::MAX_SPAWN_VARS as c_int {
+            if (*ctx.world_raw()).level.numSpawnVars == mp_bg::MAX_SPAWN_VARS as c_int {
                 panic!("G_ParseSpawnVars: MAX_SPAWN_VARS");
             }
-            let n = (*ctx.world).level.numSpawnVars;
+            let n = (*ctx.world_raw()).level.numSpawnVars;
             let key_tok = G_AddSpawnVarToken(ctx, keyname.as_ptr() as *const c_char);
             let val_tok = G_AddSpawnVarToken(ctx, com_token.as_ptr() as *const c_char);
-            (*ctx.world).level.spawnVars[n as usize][0] = key_tok;
-            (*ctx.world).level.spawnVars[n as usize][1] = val_tok;
-            (*ctx.world).level.numSpawnVars += 1;
+            (*ctx.world_raw()).level.spawnVars[n as usize][0] = key_tok;
+            (*ctx.world_raw()).level.spawnVars[n as usize][1] = val_tok;
+            (*ctx.world_raw()).level.numSpawnVars += 1;
         }
 
         if inSubBSP != qfalse {
@@ -1137,7 +1139,7 @@ pub fn G_ParseSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) -> qboolean {
 /// spawn variables, loads animations and ghoul2 models, and sets up configstrings.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1259-1386`
-pub fn SP_worldspawn(ctx: GameContext<'_>) {
+pub fn SP_worldspawn(ctx: &mut GameContext) {
     unsafe {
         let mut text: *mut c_char = std::ptr::null_mut();
         let mut temp = [0i8; 32];
@@ -1145,17 +1147,13 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         let mut lengthBlue: c_int;
         let mut lengthGreen: c_int;
 
+        let __h617 = &mut (*ctx.world_raw()).globals.g_cullDistance;
         // I want to "cull" entities out of net sends to clients to reduce
         // net traffic on our larger open maps -rww
-        G_SpawnFloat(
-            ctx,
-            c"distanceCull".as_ptr(),
-            c"6000.0".as_ptr(),
-            &mut (*ctx.world).globals.g_cullDistance,
-        );
+        G_SpawnFloat(ctx, c"distanceCull".as_ptr(), c"6000.0".as_ptr(), __h617);
         trap::SetServerCull(
             ctx.engine,
-            GSetServerCullArgs::new((*ctx.world).globals.g_cullDistance),
+            GSetServerCullArgs::new((*ctx.world_raw()).globals.g_cullDistance),
         );
 
         G_SpawnString(ctx, c"classname".as_ptr(), c"".as_ptr(), &mut text);
@@ -1166,19 +1164,22 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             );
         }
 
-        for i in 0..(*ctx.world).level.numSpawnVars {
+        for i in 0..(*ctx.world_raw()).level.numSpawnVars {
             if Q_stricmp(
                 c"spawnscript".as_ptr(),
-                (*ctx.world).level.spawnVars[i as usize][0],
+                (*ctx.world_raw()).level.spawnVars[i as usize][0],
             ) == 0
             {
+                let __h618 = (*ctx.world_raw()).level.spawnVars[i as usize][0];
+                let __h619 = (*ctx.world_raw()).level.spawnVars[i as usize][1];
+                let __h620 = (*ctx.world_raw()).g_entities.as_mut_ptr() as *mut byte;
                 // Only let them set spawnscript, we don't want them setting an angle or something on the world.
                 BG_ParseField(
                     ctx,
                     FIELDS.as_ptr() as *mut BG_field_t,
-                    (*ctx.world).level.spawnVars[i as usize][0],
-                    (*ctx.world).level.spawnVars[i as usize][1],
-                    (*ctx.world).g_entities.as_mut_ptr() as *mut byte,
+                    __h618,
+                    __h619,
+                    __h620,
                 );
             }
         }
@@ -1187,29 +1188,32 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         // when the first client connects.
         // PORT-NOTE(bg-panimate-method): BG_ParseAnimationFile is a PmoveContext method in the ported codebase,
         // but needs to be called from game-tier SP_worldspawn; using the resolved freestanding signature.
-        if (*ctx.world).bg_state.BGPAFtextLoaded == qfalse {
+        if (*ctx.world_raw()).bg_state.BGPAFtextLoaded == qfalse {
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                world: ctx.world,
+                world: ctx.world_raw(),
                 engine: ctx.engine,
             };
             BG_ParseAnimationFile(
-                &mut (*ctx.world).bg_state,
+                &mut (*ctx.world_raw()).bg_state,
                 &traps,
                 &mut callbacks,
                 c"models/players/_humanoid/animation.cfg".as_ptr(),
-                (*ctx.world).bg_state.bgHumanoidAnimations.as_mut_ptr(),
+                (*ctx.world_raw())
+                    .bg_state
+                    .bgHumanoidAnimations
+                    .as_mut_ptr(),
                 qtrue,
             );
         }
 
-        if (*ctx.world).globals.precachedKyle.is_null() {
+        if (*ctx.world_raw()).globals.precachedKyle.is_null() {
             let mut defSkin: c_int;
 
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
                 GG2Initghoul2ModelArgs::new(
-                    &mut (*ctx.world).globals.precachedKyle as *mut *mut c_void,
+                    &mut (*ctx.world_raw()).globals.precachedKyle as *mut *mut c_void,
                     c"models/players/kyle/model.glm".to_owned(),
                     0,
                     0,
@@ -1219,23 +1223,28 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ),
             );
 
-            if !(*ctx.world).globals.precachedKyle.is_null() {
+            if !(*ctx.world_raw()).globals.precachedKyle.is_null() {
                 defSkin = trap::R_RegisterSkin(
                     ctx.engine,
                     GR_RegisterSkinArgs::new(c"models/players/kyle/model_default.skin".to_owned()),
                 );
                 trap::G2API_SetSkin(
                     ctx.engine,
-                    GG2SetSkinArgs::new((*ctx.world).globals.precachedKyle, 0, defSkin, defSkin),
+                    GG2SetSkinArgs::new(
+                        (*ctx.world_raw()).globals.precachedKyle,
+                        0,
+                        defSkin,
+                        defSkin,
+                    ),
                 );
             }
         }
 
-        if (*ctx.world).globals.g2SaberInstance.is_null() {
+        if (*ctx.world_raw()).globals.g2SaberInstance.is_null() {
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
                 GG2Initghoul2ModelArgs::new(
-                    &mut (*ctx.world).globals.g2SaberInstance as *mut *mut c_void,
+                    &mut (*ctx.world_raw()).globals.g2SaberInstance as *mut *mut c_void,
                     c"models/weapons2/saber/saber_w.glm".to_owned(),
                     0,
                     0,
@@ -1245,17 +1254,17 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ),
             );
 
-            if !(*ctx.world).globals.g2SaberInstance.is_null() {
+            if !(*ctx.world_raw()).globals.g2SaberInstance.is_null() {
                 // indicate we will be bolted to model 0 (ie the player) on bolt 0 (always the right hand) when we get copied
                 trap::G2API_SetBoltInfo(
                     ctx.engine,
-                    GG2SetBoltInfoArgs::new((*ctx.world).globals.g2SaberInstance, 0, 0),
+                    GG2SetBoltInfoArgs::new((*ctx.world_raw()).globals.g2SaberInstance, 0, 0),
                 );
                 // now set up the gun bolt on it
                 trap::G2API_AddBolt(
                     ctx.engine,
                     GG2AddboltArgs::new(
-                        (*ctx.world).globals.g2SaberInstance,
+                        (*ctx.world_raw()).globals.g2SaberInstance,
                         0,
                         c"*blade1".to_owned(),
                     ),
@@ -1263,7 +1272,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             }
         }
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
             // a tad bit of a hack, but..
             EWebPrecache(ctx);
         }
@@ -1275,7 +1284,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             GSetConfigstringArgs::new(CS_GAME_VERSION, c"basejka-1".to_owned()),
         );
 
-        let level_start_time_str = format!("{}", (*ctx.world).level.startTime);
+        let level_start_time_str = format!("{}", (*ctx.world_raw()).level.startTime);
         let level_start_time_c = CString::new(level_start_time_str).unwrap();
         trap::SetConfigstring(
             ctx.engine,
@@ -1298,7 +1307,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             ctx.engine,
             GSetConfigstringArgs::new(
                 CS_MOTD,
-                CStr::from_ptr((*ctx.world).cvars.g_motd.string.as_ptr()).to_owned(),
+                CStr::from_ptr((*ctx.world_raw()).cvars.g_motd.string.as_ptr()).to_owned(),
             ),
         ); // message of the day
 
@@ -1326,8 +1335,10 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             ),
         );
 
-        (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
-        (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].classname =
+        (*ctx.world_raw()).g_entities[ENTITYNUM_WORLD as usize]
+            .s
+            .number = ENTITYNUM_WORLD;
+        (*ctx.world_raw()).g_entities[ENTITYNUM_WORLD as usize].classname =
             c"worldspawn".as_ptr() as *mut c_char;
 
         // see if we want a warmup time
@@ -1335,12 +1346,12 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             ctx.engine,
             GSetConfigstringArgs::new(CS_WARMUP, c"".to_owned()),
         );
-        if (*ctx.world).cvars.g_restarted.integer != 0 {
+        if (*ctx.world_raw()).cvars.g_restarted.integer != 0 {
             trap::Cvar_Set(
                 ctx.engine,
                 GCvarSetArgs::new(c"g_restarted".to_owned(), c"0".to_owned()),
             );
-            (*ctx.world).level.warmupTime = 0;
+            (*ctx.world_raw()).level.warmupTime = 0;
         }
 
         trap::SetConfigstring(
@@ -1438,12 +1449,12 @@ pub fn SP_bsp_worldspawn() -> qboolean {
 /// Raven `G_PrecacheSoundsets`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1394-1415`
-pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
+pub fn G_PrecacheSoundsets(ctx: &mut GameContext) {
     unsafe {
         let mut counted_sets: c_int = 0;
 
         for i in 0..(mp_qshared::shared::MAX_GENTITIES as usize) {
-            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
 
             if (*ent).inuse != qfalse && !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
                 if counted_sets >= MAX_AMBIENT_SETS {
@@ -1462,11 +1473,11 @@ pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
 /// of an entstring and spawns gentities.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1424-1478`
-pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
+pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
     unsafe {
         // allow calls to G_Spawn*()
-        (*ctx.world).level.spawning = qtrue;
-        (*ctx.world).level.numSpawnVars = 0;
+        (*ctx.world_raw()).level.spawning = qtrue;
+        (*ctx.world_raw()).level.numSpawnVars = 0;
 
         // the worldspawn is not an actual entity, but it still
         // has a "spawn" function to perform any global setup
@@ -1489,20 +1500,22 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
             G_SpawnGEntityFromSpawnVars(ctx, inSubBSP);
         }
 
-        if !(*ctx.world).g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
+        if !(*ctx.world_raw()).g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
             .is_null()
-            && *(*ctx.world).g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
+            && *(*ctx.world_raw()).g_entities[ENTITYNUM_WORLD as usize].behaviorSet
+                [BSET_SPAWN as usize]
                 != 0
         {
             // World has a spawn script, but we don't want the world in ICARUS and running scripts,
             // so make a scriptrunner and start it going.
             let script_runner = G_Spawn(ctx);
             if !script_runner.is_null() {
-                (*script_runner).behaviorSet[1] = (*ctx.world).g_entities[ENTITYNUM_WORLD as usize]
+                (*script_runner).behaviorSet[1] = (*ctx.world_raw()).g_entities
+                    [ENTITYNUM_WORLD as usize]
                     .behaviorSet[BSET_SPAWN as usize];
                 (*script_runner).count = 1;
                 (*script_runner).think = Some(EntThink::scriptrunner_run).into();
-                (*script_runner).nextthink = (*ctx.world).level.time + 100;
+                (*script_runner).nextthink = (*ctx.world_raw()).level.time + 100;
 
                 if (*script_runner).inuse != qfalse {
                     trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(script_runner));
@@ -1511,7 +1524,7 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
         }
 
         if inSubBSP == qfalse {
-            (*ctx.world).level.spawning = qfalse; // any future calls to G_Spawn*() will be errors
+            (*ctx.world_raw()).level.spawning = qfalse; // any future calls to G_Spawn*() will be errors
         }
 
         G_PrecacheSoundsets(ctx);

@@ -29,7 +29,7 @@ use crate::trap;
 /// (`g_main.c:1132`), so it is not reproduced here.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1128-1199`
-pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
+pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
     unsafe {
         let restart = args.restart();
 
@@ -44,7 +44,7 @@ pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
         let mut i: usize = 0;
         while i < MAX_GENTITIES {
             // clean up all the ghoul2 instances
-            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
 
             if !(*ent).ghoul2.is_null()
                 && trap::G2_HaveWeGhoul2Models(
@@ -80,33 +80,33 @@ pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
             }
             i += 1;
         }
-        if !(*ctx.world).globals.g2SaberInstance.is_null()
+        if !(*ctx.world_raw()).globals.g2SaberInstance.is_null()
             && trap::G2_HaveWeGhoul2Models(
                 ctx.engine,
-                GG2HaveweghoulmodelsArgs::new((*ctx.world).globals.g2SaberInstance),
+                GG2HaveweghoulmodelsArgs::new((*ctx.world_raw()).globals.g2SaberInstance),
             ) != qfalse
         {
             trap::G2API_CleanGhoul2Models(
                 ctx.engine,
                 GG2CleanmodelsArgs::new(
-                    &mut (*ctx.world).globals.g2SaberInstance as *mut *mut c_void,
+                    &mut (*ctx.world_raw()).globals.g2SaberInstance as *mut *mut c_void,
                 ),
             );
-            (*ctx.world).globals.g2SaberInstance = core::ptr::null_mut();
+            (*ctx.world_raw()).globals.g2SaberInstance = core::ptr::null_mut();
         }
-        if !(*ctx.world).globals.precachedKyle.is_null()
+        if !(*ctx.world_raw()).globals.precachedKyle.is_null()
             && trap::G2_HaveWeGhoul2Models(
                 ctx.engine,
-                GG2HaveweghoulmodelsArgs::new((*ctx.world).globals.precachedKyle),
+                GG2HaveweghoulmodelsArgs::new((*ctx.world_raw()).globals.precachedKyle),
             ) != qfalse
         {
             trap::G2API_CleanGhoul2Models(
                 ctx.engine,
                 GG2CleanmodelsArgs::new(
-                    &mut (*ctx.world).globals.precachedKyle as *mut *mut c_void,
+                    &mut (*ctx.world_raw()).globals.precachedKyle as *mut *mut c_void,
                 ),
             );
-            (*ctx.world).globals.precachedKyle = core::ptr::null_mut();
+            (*ctx.world_raw()).globals.precachedKyle = core::ptr::null_mut();
         }
 
         // Com_Printf ("... ICARUS_Shutdown\n");
@@ -117,7 +117,7 @@ pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
 
         G_LogWeaponOutput(ctx);
 
-        if (*ctx.world).level.logFile != 0 {
+        if (*ctx.world_raw()).level.logFile != 0 {
             G_LogPrintf(ctx, cstr("ShutdownGame:\n").as_ptr());
             G_LogPrintf(
                 ctx,
@@ -125,7 +125,7 @@ pub fn g_shutdown_game(ctx: GameContext<'_>, args: GameShutdownArgs) {
             );
             trap::FS_FCloseFile(
                 ctx.engine,
-                GFsFcloseFileArgs::new((*ctx.world).level.logFile),
+                GFsFcloseFileArgs::new((*ctx.world_raw()).level.logFile),
             );
         }
 

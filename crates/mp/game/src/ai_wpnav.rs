@@ -53,9 +53,9 @@ use std::ffi::CString;
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
 /// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
 #[inline]
-unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -125,7 +125,7 @@ pub const WPFLAG_NEVERONEWAY: c_int = 0x00800000;
 /// `NULL`). Keeps every trace call site a one-liner.
 #[inline]
 unsafe fn wp_trace(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     tr: *mut trace_t,
     start: &vec3_t,
     mins: *const vec3_t,
@@ -148,7 +148,7 @@ unsafe fn wp_trace(
 /// this function touches no file-scope globals itself.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:25-210`
-pub fn GetFlagStr(ctx: GameContext<'_>, flags: c_int) -> *mut c_char {
+pub fn GetFlagStr(ctx: &mut GameContext, flags: c_int) -> *mut c_char {
     // Raven flag bit values (`ai_main.h:22-38`); not yet ported anywhere else
     // in the crate graph, so defined locally, verbatim.
     const WPFLAG_JUMP: c_int = 0x00000010;
@@ -269,7 +269,7 @@ pub fn GetFlagStr(ctx: GameContext<'_>, flags: c_int) -> *mut c_char {
 /// Raven `G_TestLine`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:212-222`
-pub fn G_TestLine(ctx: GameContext<'_>, start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
+pub fn G_TestLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     let ev_testline = mp_bg::public::entity_event::entity_event_t::EV_TESTLINE as c_int;
     // `SVF_BROADCAST` comes from the prelude (`crate::g_public_consts`).
     unsafe {
@@ -285,12 +285,12 @@ pub fn G_TestLine(ctx: GameContext<'_>, start: vec3_t, end: vec3_t, color: c_int
 /// Raven `BotWaypointRender`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:224-347`
-pub fn BotWaypointRender(ctx: GameContext<'_>) {
+pub fn BotWaypointRender(ctx: &mut GameContext) {
     // `SVF_BROADCAST` comes from the prelude (`crate::g_public_consts`).
     let ev_scoreplum = mp_bg::public::entity_event::entity_event_t::EV_SCOREPLUM as c_int;
 
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         if (*w).globals.gBotEdit == 0.0 {
             return;
@@ -415,9 +415,9 @@ pub fn BotWaypointRender(ctx: GameContext<'_>) {
 /// Copies one waypoint slot onto another (reusing the `B_Alloc`'d memory).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:349-369`
-pub fn TransferWPData(ctx: GameContext<'_>, from: c_int, to: c_int) {
+pub fn TransferWPData(ctx: &mut GameContext, from: c_int, to: c_int) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         if (*w).globals.gWPArray.0[to as usize].is_null() {
             (*w).globals.gWPArray.0[to as usize] =
                 B_Alloc(ctx, size_of::<wpobject_t>() as c_int) as *mut wpobject_t;
@@ -449,9 +449,9 @@ pub fn TransferWPData(ctx: GameContext<'_>, from: c_int, to: c_int) {
 /// slot), so it stays by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:371-401`
-pub fn CreateNewWP(ctx: GameContext<'_>, origin: vec3_t, flags: c_int) {
+pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
             if (*w).cvars.g_RMG.integer == 0 {
                 G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
@@ -491,9 +491,9 @@ pub fn CreateNewWP(ctx: GameContext<'_>, origin: vec3_t, flags: c_int) {
 /// carrying neighbours and re-latching the CTF flag globals.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:403-454`
-pub fn CreateNewWP_FromObject(ctx: GameContext<'_>, wp: *mut wpobject_t) {
+pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
             return;
         }
@@ -549,9 +549,9 @@ pub fn CreateNewWP_FromObject(ctx: GameContext<'_>, wp: *mut wpobject_t) {
 /// `inuse` is cleared; the slot memory is reused, never freed.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:456-482`
-pub fn RemoveWP(ctx: GameContext<'_>) {
+pub fn RemoveWP(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         if (*w).globals.gWPNum <= 0 {
             return;
         }
@@ -573,9 +573,9 @@ pub fn RemoveWP(ctx: GameContext<'_>) {
 /// Raven `RemoveAllWP`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:484-489`
-pub fn RemoveAllWP(ctx: GameContext<'_>) {
+pub fn RemoveAllWP(ctx: &mut GameContext) {
     unsafe {
-        while (*ctx.world).globals.gWPNum != 0 {
+        while (*ctx.world_raw()).globals.gWPNum != 0 {
             RemoveWP(ctx);
         }
     }
@@ -587,9 +587,9 @@ pub fn RemoveAllWP(ctx: GameContext<'_>) {
 /// slot. The pointer-sized `memset` idiom is Raven's (see `RemoveWP`).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:491-557`
-pub fn RemoveWP_InTrail(ctx: GameContext<'_>, afterindex: c_int) {
+pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut foundindex: c_int = 0;
         let mut foundanindex = 0;
         let mut didchange = 0;
@@ -643,13 +643,13 @@ pub fn RemoveWP_InTrail(ctx: GameContext<'_>, afterindex: c_int) {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:559-635`
 pub fn CreateNewWP_InTrail(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     origin: vec3_t,
     flags: c_int,
     afterindex: c_int,
 ) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut foundindex: c_int = 0;
         let mut foundanindex = 0;
         let mut i: c_int = 0;
@@ -725,13 +725,13 @@ pub fn CreateNewWP_InTrail(
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:637-714`
 pub fn CreateNewWP_InsertUnder(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     origin: vec3_t,
     flags: c_int,
     afterindex: c_int,
 ) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut foundindex: c_int = 0;
         let mut foundanindex = 0;
         let mut i: c_int = 0;
@@ -802,11 +802,11 @@ pub fn CreateNewWP_InsertUnder(
 /// Raven `TeleportToWP`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:716-758`
-pub fn TeleportToWP(ctx: GameContext<'_>, pl: Option<EntityId>, afterindex: c_int) {
+pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_int) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let pl: *mut gentity_t = ent_ptr(ctx, pl);
-        let w = ctx.world;
+        let w = ctx.world_raw();
         if pl.is_null() || (*pl).client.is_null() {
             return;
         }
@@ -846,9 +846,9 @@ pub fn TeleportToWP(ctx: GameContext<'_>, pl: Option<EntityId>, afterindex: c_in
 /// Raven `WPFlagsModify`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:760-769`
-pub fn WPFlagsModify(ctx: GameContext<'_>, wpnum: c_int, flags: c_int) {
+pub fn WPFlagsModify(ctx: &mut GameContext, wpnum: c_int, flags: c_int) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let p = if wpnum >= 0 && wpnum < (*w).globals.gWPNum {
             (*w).globals.gWPArray.0[wpnum as usize]
         } else {
@@ -888,9 +888,9 @@ pub fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
 /// ±5. `spot` is read-only, so it stays by-value.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:787-809`
-pub fn NodeHere(ctx: GameContext<'_>, spot: vec3_t) -> c_int {
+pub fn NodeHere(ctx: &mut GameContext, spot: vec3_t) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let sx = spot[0] as c_int;
         let sy = spot[1] as c_int;
         let sz = spot[2] as c_int;
@@ -921,7 +921,7 @@ pub fn NodeHere(ctx: GameContext<'_>, spot: vec3_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:812-824`
 pub fn CanGetToVector(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     org1: vec3_t,
     org2: vec3_t,
     mins: vec3_t,
@@ -959,7 +959,7 @@ pub fn CanGetToVector(
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:883-996`
 pub fn CanGetToVectorTravel(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     org1: vec3_t,
     moveTo: vec3_t,
     mins: vec3_t,
@@ -1115,7 +1115,7 @@ pub fn CanGetToVectorTravel(
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1000-1399`
 pub fn ConnectTrail(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     startindex: c_int,
     endindex: c_int,
     behindTheScenes: qboolean,
@@ -1124,7 +1124,7 @@ pub fn ConnectTrail(
     // when a node was appended (sets `cancontinue`). Mirrors the four repeated
     // X±/Y± blocks in the oracle.
     unsafe fn branch_dir(
-        ctx: GameContext<'_>,
+        ctx: &mut GameContext,
         i: c_int,
         dx: f32,
         dy: f32,
@@ -1132,7 +1132,7 @@ pub fn ConnectTrail(
         mins: vec3_t,
         maxs: vec3_t,
     ) -> bool {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut testspot = (*w).globals.nodetable.0[i as usize].origin;
         testspot[0] += dx;
         testspot[1] += dy;
@@ -1179,7 +1179,7 @@ pub fn ConnectTrail(
     }
 
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut foundit: c_int = 0;
         let mut cancontinue: c_int;
         let mut i: c_int;
@@ -1455,9 +1455,9 @@ pub fn ConnectTrail(
 /// Raven `OpposingEnds`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1402-1416`
-pub fn OpposingEnds(ctx: GameContext<'_>, start: c_int, end: c_int) -> c_int {
+pub fn OpposingEnds(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let sp = (*w).globals.gWPArray.0[start as usize];
         let ep = (*w).globals.gWPArray.0[end as usize];
         if sp.is_null() || (*sp).inuse == 0 || ep.is_null() || (*ep).inuse == 0 {
@@ -1478,9 +1478,9 @@ pub fn OpposingEnds(ctx: GameContext<'_>, start: c_int, end: c_int) -> c_int {
 /// (openable) door and let the two endpoints stay linked.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1418-1463`
-pub fn DoorBlockingSection(ctx: GameContext<'_>, start: c_int, end: c_int) -> c_int {
+pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let sp = (*w).globals.gWPArray.0[start as usize];
         let ep = (*w).globals.gWPArray.0[end as usize];
         if sp.is_null() || (*sp).inuse == 0 || ep.is_null() || (*ep).inuse == 0 {
@@ -1553,9 +1553,9 @@ unsafe fn c_str_contains(s: *const c_char, needle: &[u8]) -> bool {
 /// Raven `RepairPaths`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1466-1523`
-pub fn RepairPaths(ctx: GameContext<'_>, behindTheScenes: qboolean) -> c_int {
+pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         if (*w).globals.gWPNum == 0 {
             return 0;
@@ -1628,7 +1628,7 @@ pub fn RepairPaths(ctx: GameContext<'_>, behindTheScenes: qboolean) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1526-1547`
 pub fn OrgVisibleCurve(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     org1: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
@@ -1666,13 +1666,13 @@ pub fn OrgVisibleCurve(
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1549-1621`
 pub fn CanForceJumpTo(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     baseindex: c_int,
     testingindex: c_int,
     distance: f32,
 ) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let heightdif: f32;
         let mins: vec3_t = [-15.0, -15.0, -15.0];
         let maxs: vec3_t = [15.0, 15.0, 15.0];
@@ -1740,9 +1740,9 @@ pub fn CanForceJumpTo(
 /// Raven `CalculatePaths`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1623-1713`
-pub fn CalculatePaths(ctx: GameContext<'_>) {
+pub fn CalculatePaths(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         if (*w).globals.gWPNum == 0 {
             return;
@@ -1829,7 +1829,7 @@ pub fn CalculatePaths(ctx: GameContext<'_>) {
 /// Raven `GetObjectThatTargets`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1715-1732`
-pub fn GetObjectThatTargets(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+pub fn GetObjectThatTargets(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -1858,9 +1858,9 @@ pub fn GetObjectThatTargets(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity
 /// Raven `CalculateSiegeGoals`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1734-1794`
-pub fn CalculateSiegeGoals(ctx: GameContext<'_>) {
+pub fn CalculateSiegeGoals(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
         while i < (*w).level.num_entities {
@@ -1923,9 +1923,9 @@ pub fn CalculateSiegeGoals(ctx: GameContext<'_>) {
 /// Raven `GetNearestVisibleWPToItem`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1817-1856`
-pub fn GetNearestVisibleWPToItem(ctx: GameContext<'_>, org: vec3_t, ignore: c_int) -> c_int {
+pub fn GetNearestVisibleWPToItem(ctx: &mut GameContext, org: vec3_t, ignore: c_int) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         let mut bestdist: f32 = 64.0; // has to be less than 64 units to the item or it isn't safe enough
         let mut bestindex: c_int = -1;
@@ -1971,10 +1971,10 @@ pub fn GetNearestVisibleWPToItem(ctx: GameContext<'_>, org: vec3_t, ignore: c_in
 /// Raven `CalculateWeightGoals`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1858-1951`
-pub fn CalculateWeightGoals(ctx: GameContext<'_>) {
+pub fn CalculateWeightGoals(ctx: &mut GameContext) {
     // set waypoint weights depending on weapon and item placement
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         // PORT-NOTE(cvar-placement): `bot_wp_clearweight` has no home in
         // `GameCvars` yet (missing_symbols).
@@ -2064,9 +2064,9 @@ pub fn CalculateWeightGoals(ctx: GameContext<'_>) {
 /// the one defined behavior here treats those as null (skip the branch). (§19)
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1953-2005`
-pub fn CalculateJumpRoutes(ctx: GameContext<'_>) {
+pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
         let mut nheightdif: f32;
         let mut pheightdif: f32;
@@ -2132,9 +2132,9 @@ pub fn CalculateJumpRoutes(ctx: GameContext<'_>) {
 /// stay 1:1 with the oracle's char-array walk.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2007-2250`
-pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
+pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: isize = 0;
         let mut i_cv: isize;
 
@@ -2351,9 +2351,9 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
 /// it, latching the `flag*`/`oFlag*`/`eFlag*` globals.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2252-2369`
-pub fn FlagObjects(ctx: GameContext<'_>) {
+pub fn FlagObjects(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
         let mut bestindex: c_int = 0;
         let mut found: c_int = 0;
@@ -2479,9 +2479,9 @@ unsafe fn c_str_eq(s: *const c_char, needle: &[u8]) -> bool {
 /// Raven `SavePathData`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2372-2500`
-pub fn SavePathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
+pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
         if (*w).globals.gWPNum == 0 {
@@ -2646,9 +2646,9 @@ pub fn SavePathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
 /// Nearest grid node to `point` (read-only, passed by-value).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2510-2541`
-pub fn G_NearestNodeToPoint(ctx: GameContext<'_>, point: vec3_t) -> c_int {
+pub fn G_NearestNodeToPoint(ctx: &mut GameContext, point: vec3_t) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut best_index: c_int = -1;
         let mut i: c_int = 0;
         let mut best_dist: f32 = 0.0;
@@ -2679,9 +2679,9 @@ pub fn G_NearestNodeToPoint(ctx: GameContext<'_>, point: vec3_t) -> c_int {
 /// Raven `G_NodeClearForNext`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2545-2556`
-pub fn G_NodeClearForNext(ctx: GameContext<'_>) {
+pub fn G_NodeClearForNext(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
         while i < (*w).globals.nodenum {
             let nt = &mut (*w).globals.nodetable.0[i as usize];
@@ -2695,9 +2695,9 @@ pub fn G_NodeClearForNext(ctx: GameContext<'_>) {
 /// Raven `G_NodeClearFlags`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2558-2568`
-pub fn G_NodeClearFlags(ctx: GameContext<'_>) {
+pub fn G_NodeClearFlags(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
         while i < (*w).globals.nodenum {
             (*w).globals.nodetable.0[i as usize].flags = 0;
@@ -2711,9 +2711,9 @@ pub fn G_NodeClearFlags(ctx: GameContext<'_>) {
 /// First unflagged node with matching X/Y (exact float compare, per oracle).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2570-2587`
-pub fn G_NodeMatchingXY(ctx: GameContext<'_>, x: f32, y: f32) -> c_int {
+pub fn G_NodeMatchingXY(ctx: &mut GameContext, x: f32, y: f32) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
         while i < (*w).globals.nodenum {
             let nt = &(*w).globals.nodetable.0[i as usize];
@@ -2732,9 +2732,9 @@ pub fn G_NodeMatchingXY(ctx: GameContext<'_>, x: f32, y: f32) -> c_int {
 /// returning `final` if reached.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2589-2614`
-pub fn G_NodeMatchingXY_BA(ctx: GameContext<'_>, x: c_int, y: c_int, r#final: c_int) -> c_int {
+pub fn G_NodeMatchingXY_BA(ctx: &mut GameContext, x: c_int, y: c_int, r#final: c_int) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
         let mut bestindex: c_int = -1;
         let mut best_weight: f32 = 9999.0;
@@ -2766,7 +2766,7 @@ pub fn G_NodeMatchingXY_BA(ctx: GameContext<'_>, x: c_int, y: c_int, r#final: c_
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2616-2689`
 pub fn G_RecursiveConnection(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     start: c_int,
     end: c_int,
     weight: c_int,
@@ -2774,7 +2774,7 @@ pub fn G_RecursiveConnection(
     baseHeight: f32,
 ) -> c_int {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         // 0 == down, 1 == up, 2 == left, 3 == right
         let mut index_directions: [c_int; 4] = [-1; 4];
         let mut recursive_index: c_int = -1;
@@ -2859,13 +2859,13 @@ pub fn G_RecursiveConnection(
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2981-3048`
 pub fn G_BackwardAttachment(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     start: c_int,
     finalDestination: c_int,
     insertAfter: c_int,
 ) -> qboolean {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut index_directions: [c_int; 4] = [-1; 4];
         let mut i: c_int = 0;
         let mut lowest_weight: c_int = 9999;
@@ -2952,7 +2952,7 @@ pub fn G_BackwardAttachment(
 /// per §20, including their `trap_Milliseconds`/`Com_Printf` calls.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3055-3250`
-pub fn G_RMGPathing(ctx: GameContext<'_>) {
+pub fn G_RMGPathing(ctx: &mut GameContext) {
     // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
     // (`c_int`, cast here to match the `vec3_t` components they seed).
     // Source: `oracle/codemp/game/bg_public.h:41-42`
@@ -2960,7 +2960,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
     const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         let terrain = G_Find(
             ctx,
@@ -3141,9 +3141,9 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
 /// per §20.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3254-3342`
-pub fn BeginAutoPathRoutine(ctx: GameContext<'_>) {
+pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
         (*w).globals.gSpawnPointNum = 0;
@@ -3224,9 +3224,9 @@ pub fn BeginAutoPathRoutine(ctx: GameContext<'_>) {
 /// Raven `LoadPath_ThisLevel`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3347-3423`
-pub fn LoadPath_ThisLevel(ctx: GameContext<'_>) {
+pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
         let mut mapname: vmCvar_t = vmCvar_t::zeroed();
@@ -3320,11 +3320,11 @@ pub fn LoadPath_ThisLevel(ctx: GameContext<'_>) {
 /// entity range).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3425-3457`
-pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut closest_spawn: *mut gentity_t = core::ptr::null_mut();
         let mut closest_dist: f32 = -1.0;
         let mut i: c_int = MAX_CLIENTS as c_int;
@@ -3358,11 +3358,11 @@ pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
 /// `MAX_CLIENTS` if none follows.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3459-3499`
-pub fn GetNextSpawnInIndex(ctx: GameContext<'_>, currentSpawn: EntityId) -> *mut gentity_t {
+pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mut gentity_t {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let currentSpawn: *mut gentity_t = ctx.entity_mut(currentSpawn);
-        let w = ctx.world;
+        let w = ctx.world_raw();
         let mut next_spawn: *mut gentity_t = core::ptr::null_mut();
         let mut i: c_int = (*currentSpawn).s.number + 1;
 
@@ -3403,11 +3403,11 @@ pub fn GetNextSpawnInIndex(ctx: GameContext<'_>, currentSpawn: EntityId) -> *mut
 /// Raven `AcceptBotCommand`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3501-3813`
-pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: Option<EntityId>) -> c_int {
+pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<EntityId>) -> c_int {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let pl: *mut gentity_t = ent_ptr(ctx, pl);
-        let w = ctx.world;
+        let w = ctx.world_raw();
 
         if (*w).globals.gBotEdit == 0.0 {
             return 0;

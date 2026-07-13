@@ -48,7 +48,7 @@ use crate::NPC_stats::NPC_LoadParms;
 /// Raven `CorpsePhysics`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:46-103`
-pub fn CorpsePhysics(ctx: GameContext<'_>, self_: EntityId) {
+pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
     // `EF_DISINTEGRATION` (entity_effects) and `CONTENTS_TRIGGER` (surface_flags)
     // resolve to their canonical workspace consts through the prelude glob.
     // `ALERT_CLEAR_TIME` — single-owner header, deliberately kept local (not
@@ -59,7 +59,7 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         world.globals.ucmd = usercmd_t::default();
         crate::g_active::ClientThink(
             ctx,
@@ -69,16 +69,18 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: EntityId) {
 
         let client = (*self_).client as *mut gclient_t;
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
-            crate::NPC_AI_GalakMech::GM_Dying(ctx, ctx.entity_id_of(self_).unwrap());
+            let __h733 = ctx.entity_id_of(self_).unwrap();
+            crate::NPC_AI_GalakMech::GM_Dying(ctx, __h733);
         }
 
         //FIXME: match my pitch and roll for the slope of my groundPlane
         if (*client).ps.groundEntityNum != ENTITYNUM_NONE
             && ((*self_).s.eFlags & EF_DISINTEGRATION) == 0
         {
+            let __h734 = ctx.entity_id_of(self_).unwrap();
             //on the ground
             //FIXME: check 4 corners
-            pitch_roll_for_slope(ctx, ctx.entity_id_of(self_).unwrap(), None);
+            pitch_roll_for_slope(ctx, __h734, None);
         }
 
         if world.globals.eventClearTime == world.level.time + ALERT_CLEAR_TIME {
@@ -131,7 +133,7 @@ pub fn CorpsePhysics(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `NPC_RemoveBody`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:115-223`
-pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: EntityId) {
+pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
     // `EF_DISINTEGRATION` (entity_effects) resolves via the prelude glob.
     // Raven `g_local.h:37`: `#define FRAMETIME 100` — single-owner header,
     // deliberately kept local (not consolidated).
@@ -145,7 +147,7 @@ pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: EntityId) {
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         CorpsePhysics(ctx, ctx.entity_id_of(self_).unwrap());
 
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         (*self_).nextthink = world.level.time + FRAMETIME;
 
         let npc = (*self_).NPC as *mut gNPC_t;
@@ -169,7 +171,8 @@ pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: EntityId) {
         // I don't consider this a hack, it's creative coding . . .
         // I agree, very creative... need something like this for ATST and GALAKMECH too!
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_MARK1 {
-            crate::NPC_AI_Mark1::Mark1_dying(ctx, ctx.entity_id_of(self_));
+            let __h735 = ctx.entity_id_of(self_);
+            crate::NPC_AI_Mark1::Mark1_dying(ctx, __h735);
         }
 
         // Since these blow up, remove the bounding box.
@@ -317,9 +320,9 @@ pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
 /// Raven `NPC_RemoveBodyEffect`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:323-378`
-pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
+pub fn NPC_RemoveBodyEffect(ctx: &mut GameContext) {
     unsafe {
-        let world = &*ctx.world;
+        let world = &*ctx.world_raw();
         let npc = world.globals.NPC;
         if npc.is_null() {
             return;
@@ -345,7 +348,7 @@ pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
 /// (`Option<&mut [f32;3]>`) per the mechanical out-param rule.
 /// Source: `oracle/codemp/game/NPC.c:395-470`
 pub fn pitch_roll_for_slope(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     forwhom: EntityId,
     pass_slope: Option<&mut vec3_t>,
 ) {
@@ -479,14 +482,14 @@ pub fn pitch_roll_for_slope(
 /// Raven `DeadThink`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:478-607`
-pub fn DeadThink(ctx: GameContext<'_>) {
+pub fn DeadThink(ctx: &mut GameContext) {
     // `CONTENTS_NODROP` (surface_flags) resolves via the prelude glob.
     // `FRAMETIME` (`g_local.h:37` = 100) — single-owner header, deliberately
     // kept local (not consolidated).
     const FRAMETIME: c_int = 100;
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
         let client = (*npc_ent).client as *mut gclient_t;
@@ -651,11 +654,11 @@ pub fn DeadThink(ctx: GameContext<'_>) {
 /// Raven `SetNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:617-623`
-pub fn SetNPCGlobals(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SetNPCGlobals(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         world.globals.NPC = ent;
         world.globals.NPCInfo = (*ent).NPC as *mut gNPC_t;
         world.globals.client = (*ent).client as *mut gclient_t;
@@ -668,9 +671,9 @@ pub fn SetNPCGlobals(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `SaveNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:630-636`
-pub fn SaveNPCGlobals(ctx: GameContext<'_>) {
+pub fn SaveNPCGlobals(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         world.globals._saved_NPC = world.globals.NPC;
         world.globals._saved_NPCInfo = world.globals.NPCInfo;
         world.globals._saved_client = world.globals.client;
@@ -682,9 +685,9 @@ pub fn SaveNPCGlobals(ctx: GameContext<'_>) {
 /// Raven `RestoreNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:638-644`
-pub fn RestoreNPCGlobals(ctx: GameContext<'_>) {
+pub fn RestoreNPCGlobals(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         world.globals.NPC = world.globals._saved_NPC;
         world.globals.NPCInfo = world.globals._saved_NPCInfo;
         world.globals.client = world.globals._saved_client;
@@ -698,9 +701,9 @@ pub fn RestoreNPCGlobals(ctx: GameContext<'_>) {
 /// Raven: "We MUST do this, other funcs were using NPC illegally when
 /// 'self' wasn't the global NPC" (comment preserved from source).
 /// Source: `oracle/codemp/game/NPC.c:647-652`
-pub fn ClearNPCGlobals(ctx: GameContext<'_>) {
+pub fn ClearNPCGlobals(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         world.globals.NPC = core::ptr::null_mut();
         world.globals.NPCInfo = core::ptr::null_mut();
         world.globals.client = core::ptr::null_mut();
@@ -713,9 +716,9 @@ pub fn ClearNPCGlobals(ctx: GameContext<'_>) {
 /// Raven `NPC_ShowDebugInfo`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:664-681`
-pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
+pub fn NPC_ShowDebugInfo(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         if world.globals.showBBoxes == 0 {
             return;
         }
@@ -726,7 +729,8 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
 
         let mut found: *mut gentity_t = core::ptr::null_mut();
         loop {
-            found = crate::g_utils::G_Find(ctx, ctx.entity_id_of(found), fieldofs, c"NPC".as_ptr());
+            let __h736 = ctx.entity_id_of(found);
+            found = crate::g_utils::G_Find(ctx, __h736, fieldofs, c"NPC".as_ptr());
             if found.is_null() {
                 break;
             }
@@ -760,7 +764,7 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
 /// Raven `NPC_ApplyScriptFlags`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:683-735`
-pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
+pub fn NPC_ApplyScriptFlags(ctx: &mut GameContext) {
     // Raven `b_public.h:27-43` scriptFlags bits (`SCF_*`) resolve to the
     // canonical `crate::npc::script_flags` consts through the prelude glob.
     use mp_qshared::common::mp::qcommon::usercmd_button::{
@@ -768,7 +772,7 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
     };
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_info = world.globals.NPCInfo;
         let scriptFlags = (*npc_info).scriptFlags;
         let level_time = world.level.time;
@@ -821,13 +825,13 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
 /// Raven `NPC_HandleAIFlags`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:738-833`
-pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
+pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
     // `NPCAI_LOST` (b_public.h) resolves to the canonical `crate::npc::ai_flags`
     // const through the prelude glob.
     use mp_bg::public::entity_event::entity_event_t;
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -850,17 +854,13 @@ pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
         if (*npc_info).greetingDebounceTime != 0
             && (*npc_info).greetingDebounceTime < world.level.time
         {
-            let ev = (*ctx.world).bg_state.rng.Q_irand(
+            let ev = (*ctx.world_raw()).bg_state.rng.Q_irand(
                 entity_event_t::EV_VICTORY1 as c_int,
                 entity_event_t::EV_VICTORY3 as c_int,
             );
-            let debounce = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
-            crate::NPC_sounds::G_AddVoiceEvent(
-                ctx,
-                ctx.entity_id_of(npc_ent).unwrap(),
-                ev,
-                debounce,
-            );
+            let debounce = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+            let __h737 = ctx.entity_id_of(npc_ent).unwrap();
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, __h737, ev, debounce);
             (*npc_info).greetingDebounceTime = 0;
         }
 
@@ -892,19 +892,16 @@ pub fn NPC_AvoidWallsAndCliffs() {}
 /// Raven `NPC_CheckAttackScript`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:840-848`
-pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
+pub fn NPC_CheckAttackScript(ctx: &mut GameContext) {
     use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_ATTACK;
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
+        let __h738 = ctx.entity_id_of(world.globals.NPC);
         if (world.globals.ucmd.buttons & BUTTON_ATTACK) == 0 {
             return;
         }
-        crate::NPC_utils::G_ActivateBehavior(
-            ctx,
-            ctx.entity_id_of(world.globals.NPC),
-            bSet_t::BSET_ATTACK as c_int,
-        );
+        crate::NPC_utils::G_ActivateBehavior(ctx, __h738, bSet_t::BSET_ATTACK as c_int);
     }
 }
 
@@ -914,11 +911,11 @@ pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
 /// Raven `NPC_CheckAttackHold`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:851-913`
-pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
+pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
     use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_ATTACK;
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -959,11 +956,11 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
 /// Raven `NPC_KeepCurrentFacing`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:920-931`
-pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
+pub fn NPC_KeepCurrentFacing(ctx: &mut GameContext) {
     // `PITCH`/`YAW` resolve to the canonical `crate::q_math` consts via the prelude.
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let client = world.globals.client;
         let ucmd = &mut world.globals.ucmd;
 
@@ -985,7 +982,7 @@ pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
 /// Raven `NPC_BehaviorSet_Charmed`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:939-963`
-pub fn NPC_BehaviorSet_Charmed(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Charmed(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSFollowLeader(ctx),
         x if x == bState_t::BS_REMOVE as c_int => NPC_BSRemove(ctx),
@@ -999,7 +996,7 @@ pub fn NPC_BehaviorSet_Charmed(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:970-1012`
-pub fn NPC_BehaviorSet_Default(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Default(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_ADVANCE_FIGHT as c_int => NPC_BSAdvanceFight(ctx),
         x if x == bState_t::BS_SLEEP as c_int => NPC_BSSleep(ctx),
@@ -1019,7 +1016,7 @@ pub fn NPC_BehaviorSet_Default(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Interrogator`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1019-1034`
-pub fn NPC_BehaviorSet_Interrogator(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Interrogator(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1036,7 +1033,7 @@ pub fn NPC_BehaviorSet_Interrogator(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_ImperialProbe`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1045-1060`
-pub fn NPC_BehaviorSet_ImperialProbe(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_ImperialProbe(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1053,7 +1050,7 @@ pub fn NPC_BehaviorSet_ImperialProbe(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Seeker`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1070-1085`
-pub fn NPC_BehaviorSet_Seeker(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Seeker(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1070,14 +1067,14 @@ pub fn NPC_BehaviorSet_Seeker(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Remote`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1094-1097`
-pub fn NPC_BehaviorSet_Remote(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Remote(ctx: &mut GameContext, bState: c_int) {
     NPC_BSRemote_Default(ctx);
 }
 
 /// Raven `NPC_BehaviorSet_Sentry`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1106-1121`
-pub fn NPC_BehaviorSet_Sentry(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Sentry(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1094,7 +1091,7 @@ pub fn NPC_BehaviorSet_Sentry(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Grenadier`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1128-1144`
-pub fn NPC_BehaviorSet_Grenadier(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Grenadier(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1111,7 +1108,7 @@ pub fn NPC_BehaviorSet_Grenadier(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Sniper`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1150-1166`
-pub fn NPC_BehaviorSet_Sniper(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Sniper(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1128,7 +1125,7 @@ pub fn NPC_BehaviorSet_Sniper(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Stormtrooper`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1173-1197`
-pub fn NPC_BehaviorSet_Stormtrooper(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Stormtrooper(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1147,7 +1144,7 @@ pub fn NPC_BehaviorSet_Stormtrooper(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Jedi`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1205-1225`
-pub fn NPC_BehaviorSet_Jedi(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Jedi(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1165,7 +1162,7 @@ pub fn NPC_BehaviorSet_Jedi(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Droid`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1232-1245`
-pub fn NPC_BehaviorSet_Droid(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Droid(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_STAND_GUARD as c_int
@@ -1180,7 +1177,7 @@ pub fn NPC_BehaviorSet_Droid(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Mark1`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1252-1265`
-pub fn NPC_BehaviorSet_Mark1(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Mark1(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_STAND_GUARD as c_int
@@ -1195,7 +1192,7 @@ pub fn NPC_BehaviorSet_Mark1(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Mark2`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1272-1286`
-pub fn NPC_BehaviorSet_Mark2(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Mark2(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1211,7 +1208,7 @@ pub fn NPC_BehaviorSet_Mark2(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_ATST`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1293-1307`
-pub fn NPC_BehaviorSet_ATST(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_ATST(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1227,7 +1224,7 @@ pub fn NPC_BehaviorSet_ATST(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_MineMonster`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1314-1329`
-pub fn NPC_BehaviorSet_MineMonster(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_MineMonster(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1244,7 +1241,7 @@ pub fn NPC_BehaviorSet_MineMonster(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Howler`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1336-1351`
-pub fn NPC_BehaviorSet_Howler(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Howler(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1261,7 +1258,7 @@ pub fn NPC_BehaviorSet_Howler(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_BehaviorSet_Rancor`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1358-1373`
-pub fn NPC_BehaviorSet_Rancor(ctx: GameContext<'_>, bState: c_int) {
+pub fn NPC_BehaviorSet_Rancor(ctx: &mut GameContext, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1282,9 +1279,9 @@ pub fn NPC_BehaviorSet_Rancor(ctx: GameContext<'_>, bState: c_int) {
 /// Raven `NPC_RunBehavior`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1384-1564`
-pub fn NPC_RunBehavior(ctx: GameContext<'_>, team: c_int, bState: c_int) {
+pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
         let client = (*npc_ent).client as *mut gclient_t;
@@ -1454,7 +1451,7 @@ pub fn NPC_RunBehavior(ctx: GameContext<'_>, team: c_int, bState: c_int) {
 /// Raven `NPC_ExecuteBState`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1576-1762`
-pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
+pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: `self_` is unused by the body (it drives off the `NPC` global set
     // by the preceding `SetNPCGlobals`); signature is `EntityId`, no re-derive.
     let _ = self_;
@@ -1463,7 +1460,7 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
     use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
 
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
         let client = world.globals.client;
@@ -1473,11 +1470,8 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
         //FIXME: these next three bits could be a function call, some sort of setup/cleanup func
         //Lookmode must be reset every think cycle
         if (*npc_ent).delayScriptTime != 0 && (*npc_ent).delayScriptTime <= world.level.time {
-            crate::NPC_utils::G_ActivateBehavior(
-                ctx,
-                ctx.entity_id_of(npc_ent),
-                bSet_t::BSET_DELAYED as c_int,
-            );
+            let __h739 = ctx.entity_id_of(npc_ent);
+            crate::NPC_utils::G_ActivateBehavior(ctx, __h739, bSet_t::BSET_DELAYED as c_int);
             (*npc_ent).delayScriptTime = 0;
         }
 
@@ -1507,8 +1501,10 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
+            let __h821 = ctx.entity_id_of(npc_ent).unwrap();
+            let __h740 = ctx.entity_mut(__h821);
             crate::NPC_utils::NPC_SetLookTarget(
-                ctx.entity_mut(ctx.entity_id_of(npc_ent).unwrap()),
+                __h740,
                 (*client).ps.saberLockEnemy,
                 world.level.time + 1000,
             );
@@ -1516,8 +1512,10 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
             == 0
         {
             if let Some(enemy_id) = (*npc_ent).enemy {
+                let __h822 = ctx.entity_id_of(npc_ent).unwrap();
+                let __h741 = ctx.entity_mut(__h822);
                 crate::NPC_utils::NPC_SetLookTarget(
-                    ctx.entity_mut(ctx.entity_id_of(npc_ent).unwrap()),
+                    __h741,
                     world.g_entities[enemy_id.index()].s.number,
                     0,
                 );
@@ -1553,19 +1551,21 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
         {
             //We just shot but aren't still shooting, so hold the gun up for a while
             if (*client).ps.weapon == WP_SABER {
+                let __h742 = ctx.entity_id_of(npc_ent).unwrap();
                 //One-handed
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(npc_ent).unwrap(),
+                    __h742,
                     SETANIM_TORSO,
                     animNumber_t::TORSO_WEAPONREADY1 as c_int,
                     SETANIM_FLAG_NORMAL,
                 );
             } else if (*client).ps.weapon == WP_BRYAR_PISTOL {
+                let __h743 = ctx.entity_id_of(npc_ent).unwrap();
                 //Sniper pose
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(npc_ent).unwrap(),
+                    __h743,
                     SETANIM_TORSO,
                     animNumber_t::TORSO_WEAPONREADY3 as c_int,
                     SETANIM_FLAG_NORMAL,
@@ -1576,10 +1576,11 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
             if (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY1 as c_int
                 || (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
             {
+                let __h744 = ctx.entity_id_of(npc_ent).unwrap();
                 //we look ready for action, using one of the first 2 weapon, let's rest our weapon on our shoulder
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(npc_ent).unwrap(),
+                    __h744,
                     SETANIM_TORSO,
                     animNumber_t::TORSO_WEAPONIDLE3 as c_int,
                     SETANIM_FLAG_NORMAL,
@@ -1628,9 +1629,9 @@ pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `NPC_CheckInSolid`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1764-1785`
-pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
+pub fn NPC_CheckInSolid(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
@@ -1666,7 +1667,7 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
 /// Raven `G_DroidSounds`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1787-1814`
-pub fn G_DroidSounds(ctx: GameContext<'_>, self_: EntityId) {
+pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
@@ -1677,28 +1678,28 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: EntityId) {
 
         // Raven: make the noises
         if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"patrolNoise".as_ptr()) != 0
-            && (*ctx.world).bg_state.rng.Q_irand(0, 20) == 0
+            && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 20) == 0
         {
             let npc_class = (*client).NPC_class;
             let sound_path = match npc_class {
                 class_t::CLASS_R2D2 => {
-                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
                     format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx)
                 }
                 class_t::CLASS_R5D2 => {
-                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
+                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
                     format!("sound/chars/r5d2/misc/r5talk{}.wav", idx)
                 }
                 class_t::CLASS_PROBE => {
-                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
                     format!("sound/chars/probe/misc/probetalk{}.wav", idx)
                 }
                 class_t::CLASS_MOUSE => {
-                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
                     format!("sound/chars/mouse/misc/mousego{}.wav", idx)
                 }
                 class_t::CLASS_GONK => {
-                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 2);
+                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2);
                     format!("sound/chars/gonk/misc/gonktalk{}.wav", idx)
                 }
                 _ => return,
@@ -1711,7 +1712,7 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: EntityId) {
                 cstr(&sound_path).as_ptr(),
             );
 
-            let duration = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
+            let duration = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
             crate::g_timer::TIMER_Set(
                 ctx,
                 ctx.entity_id_of(self_),
@@ -1729,7 +1730,7 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `NPC_Think`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1826-1979`
-pub fn NPC_Think(ctx: GameContext<'_>, self_: EntityId) {
+pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
     // `PMF_FOLLOW` (pm_flags) resolves to its canonical const via the prelude glob.
     // `FRAMETIME` (`g_local.h:37` = 100) — single-owner header, deliberately
     // kept local (not consolidated).
@@ -1739,7 +1740,7 @@ pub fn NPC_Think(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         (*self_).nextthink = world.level.time + FRAMETIME;
 
         SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
@@ -1889,7 +1890,7 @@ pub fn NPC_InitAI() {}
 /// Raven `NPC_InitGame`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:2041-2056`
-pub fn NPC_InitGame(ctx: GameContext<'_>) {
+pub fn NPC_InitGame(ctx: &mut GameContext) {
     NPC_LoadParms(ctx);
     NPC_InitAI();
 }
@@ -1901,7 +1902,7 @@ pub fn NPC_InitGame(ctx: GameContext<'_>) {
 /// out upstream, so this is the whole live body.
 /// Source: `oracle/codemp/game/NPC.c:2058-2110`
 pub fn NPC_SetAnim(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     setAnimParts: c_int,
     anim: c_int,

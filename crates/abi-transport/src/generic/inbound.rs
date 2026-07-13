@@ -17,5 +17,5 @@ pub trait InboundVmCall {
 ///
 /// Source: `docs/architecture/engine-seam.md` § inbound dual (SEAM-D8).
 pub trait Dispatch<C: InboundVmCall> {
-    fn dispatch(&self, args: C::Args) -> C::Output;
+    fn dispatch(&mut self, args: C::Args) -> C::Output;
 }

@@ -9,7 +9,7 @@
 //! `w_force.rs`/`NPC_utils.rs`): logic fns that reach `level`/cvars/traps
 //! thread the `GameContext<'_>` receiver (`.world: *mut GameWorld`, `.engine`)
 //! as an ADDITIVE first parameter (the faithful C signature carries none).
-//! `level` → `(*ctx.world).level`, cvars → `(*ctx.world).cvars`. Traps go
+//! `level` → `(*ctx.world_raw()).level`, cvars → `(*ctx.world_raw()).cvars`. Traps go
 //! through `trap::X(ctx.engine, …)`. Cross-file callees are invoked with the
 //! packet's resolved raw-pointer signatures verbatim (their own porters
 //! thread the spine). Raw `gentity_t*`/`gclient_t*`/`gNPC_t*` chains are
@@ -19,9 +19,9 @@
 //!
 //! Ambient-state resolution (formerly parked topics, now bodied): the bot-AI
 //! "current actor" globals Raven's `ai_main.c` think-loop sets per frame
-//! (`NPC`, `NPCInfo`) are threaded as `(*ctx.world).globals.NPC` /
+//! (`NPC`, `NPCInfo`) are threaded as `(*ctx.world_raw()).globals.NPC` /
 //! `.NPCInfo`; `NPC_ChoosePainAnimation` indexes the runtime-populated
-//! `bgAllAnims`/`bgHumanoidAnimations` tables through `(*ctx.world).bg_state`;
+//! `bgAllAnims`/`bgHumanoidAnimations` tables through `(*ctx.world_raw()).bg_state`;
 //! and `NPC_Respond`'s droid-class `va(fmt, …)` sound-path calls are ported
 //! faithfully via `format!()` (they format one `int`, so the string is
 //! byte-identical to Raven's).
@@ -55,9 +55,9 @@ use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
 /// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
 #[inline]
-unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -65,7 +65,7 @@ unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t 
 /// Raven `NPC_CheckAttacker`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:42-131`
-pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c_int) {
+pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: c_int) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let other: *mut gentity_t = unsafe { ent_ptr(ctx, other) };
     unsafe {
@@ -80,7 +80,7 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c
             return;
         }
 
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if other == npc {
             return;
         }
@@ -102,7 +102,7 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c
 
         // We have an enemy, see if he's dead
         if let Some(enemy_id) = (*npc).enemy {
-            let base = (*ctx.world).g_entities.as_mut_ptr();
+            let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
             let enemy_ptr = base.add(enemy_id.0 as usize);
             if (*enemy_ptr).health <= 0 {
                 G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
@@ -112,7 +112,7 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c
         }
 
         // Don't take the same enemy again
-        let other_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), other);
+        let other_id = ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other);
         if (*npc).enemy == Some(other_id) {
             return;
         }
@@ -130,10 +130,10 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c
         }
 
         // Special case player interactions
-        let player = (*ctx.world).g_entities.as_mut_ptr();
+        let player = (*ctx.world_raw()).g_entities.as_mut_ptr();
         if other == player {
             // Account for the skill level to skew the results
-            let luck_threshold = match (*ctx.world).cvars.g_spskill.integer {
+            let luck_threshold = match (*ctx.world_raw()).cvars.g_spskill.integer {
                 0 => 0.9f32, // Easiest difficulty
                 1 => 0.5f32, // Medium difficulty
                 _ => 0.0f32, // Hardest difficulty
@@ -141,9 +141,9 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c
 
             // Randomly pick up the target. Raven `random()` is already in [0,1);
             // `Rng::random` matches it, so no extra /32768 normalization.
-            if (*ctx.world).bg_state.rng.random() > luck_threshold {
+            if (*ctx.world_raw()).bg_state.rng.random() > luck_threshold {
                 G_ClearEnemy(ctx, ctx.entity_id_of(other).unwrap());
-                (*other).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), npc));
+                (*other).enemy = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), npc));
             }
 
             return;
@@ -154,7 +154,7 @@ pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: Option<EntityId>, r#mod: c
 /// Raven `NPC_SetPainEvent`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:133-149`
-pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: EntityId) {
+pub fn NPC_SetPainEvent(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -181,7 +181,7 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `NPC_GetPainChance`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:157-196`
-pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: EntityId, damage: c_int) -> f32 {
+pub fn NPC_GetPainChance(ctx: &mut GameContext, self_: EntityId, damage: c_int) -> f32 {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -203,7 +203,7 @@ pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: EntityId, damage: c_int) -
         let mut pain_chance = (max_health - (*self_).health as f32) / (max_health * 2.0f32)
             + damage as f32 / (max_health / 2.0f32);
 
-        match (*ctx.world).cvars.g_spskill.integer {
+        match (*ctx.world_raw()).cvars.g_spskill.integer {
             0 => {
                 //easy
             }
@@ -224,7 +224,7 @@ pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: EntityId, damage: c_int) -
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:207-356`
 pub fn NPC_ChoosePainAnimation(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     point: vec3_t,
@@ -254,7 +254,7 @@ pub fn NPC_ChoosePainAnimation(
         // resolve through the prelude — no local placeholders.
 
         // If we've already taken pain, then don't take it again
-        if (*ctx.world).level.time < (*self_).painDebounceTime && r#mod != MOD_MELEE {
+        if (*ctx.world_raw()).level.time < (*self_).painDebounceTime && r#mod != MOD_MELEE {
             return;
         }
 
@@ -315,12 +315,12 @@ pub fn NPC_ChoosePainAnimation(
 
         // See if we're going to flinch. Raven `random()` is already in [0,1);
         // `Rng::random` matches it, so no extra /32768 normalization.
-        if (*ctx.world).bg_state.rng.random() < pain_chance {
+        if (*ctx.world_raw()).bg_state.rng.random() < pain_chance {
             let mut pain_anim = -1;
 
             // Pick and play our animation
             if !client.is_null()
-                && (*client).ps.fd.forceGripBeingGripped < (*ctx.world).level.time as f32
+                && (*client).ps.fd.forceGripBeingGripped < (*ctx.world_raw()).level.time as f32
             {
                 // Not being force-gripped or force-drained
                 let legs_anim = (*client).ps.legsAnim;
@@ -341,7 +341,7 @@ pub fn NPC_ChoosePainAnimation(
                         pain_anim = BOTH_PAIN1;
                     } else if r#mod == MOD_MELEE {
                         pain_anim = crate::bg_panimate::BG_PickAnim(
-                            &mut (*ctx.world).bg_state,
+                            &mut (*ctx.world_raw()).bg_state,
                             local_anim_index,
                             BOTH_PAIN2,
                             BOTH_PAIN3,
@@ -349,7 +349,7 @@ pub fn NPC_ChoosePainAnimation(
                     } else if (*self_).s.weapon == WP_SABER {
                         // These are the only 2 pain anims that look good when holding a saber
                         pain_anim = crate::bg_panimate::BG_PickAnim(
-                            &mut (*ctx.world).bg_state,
+                            &mut (*ctx.world_raw()).bg_state,
                             local_anim_index,
                             BOTH_PAIN2,
                             BOTH_PAIN3,
@@ -358,7 +358,7 @@ pub fn NPC_ChoosePainAnimation(
 
                     if pain_anim == -1 {
                         pain_anim = crate::bg_panimate::BG_PickAnim(
-                            &mut (*ctx.world).bg_state,
+                            &mut (*ctx.world_raw()).bg_state,
                             local_anim_index,
                             BOTH_PAIN1,
                             BOTH_PAIN18,
@@ -387,27 +387,21 @@ pub fn NPC_ChoosePainAnimation(
                 }
 
                 if voiceEvent != -1 {
-                    crate::NPC_sounds::G_AddVoiceEvent(
-                        ctx,
-                        ctx.entity_id_of(self_).unwrap(),
-                        voiceEvent,
-                        (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
-                    );
+                    let __h507 = ctx.entity_id_of(self_).unwrap();
+                    let __h508 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+                    crate::NPC_sounds::G_AddVoiceEvent(ctx, __h507, voiceEvent, __h508);
                 } else {
                     NPC_SetPainEvent(ctx, ctx.entity_id_of(self_).unwrap());
                 }
             } else {
+                let __h509 = ctx.entity_id_of(self_).unwrap();
+                let __h510 = (*ctx.world_raw()).bg_state.rng.Q_irand(
+                    entity_event_t::EV_CHOKE1 as c_int,
+                    entity_event_t::EV_CHOKE3 as c_int,
+                );
                 // Being force-gripped. Oracle: `Q_irand(EV_CHOKE1, EV_CHOKE3)`
                 // (the BOTH_PAIN* anim numbers are unrelated).
-                crate::NPC_sounds::G_AddVoiceEvent(
-                    ctx,
-                    ctx.entity_id_of(self_).unwrap(),
-                    (*ctx.world).bg_state.rng.Q_irand(
-                        entity_event_t::EV_CHOKE1 as c_int,
-                        entity_event_t::EV_CHOKE3 as c_int,
-                    ),
-                    0,
-                );
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, __h509, __h510, 0);
             }
 
             // Setup the timing for it
@@ -417,7 +411,7 @@ pub fn NPC_ChoosePainAnimation(
                 //   * fabs((float)(bgHumanoidAnimations[pain_anim].frameLerp));
                 // numFrames comes from the skeleton-specific table, frameLerp from the
                 // humanoid table (they are intentionally different tables in the C source).
-                let bg = &(*ctx.world).bg_state;
+                let bg = &(*ctx.world_raw()).bg_state;
                 let anims = bg.bgAllAnims[local_anim_index as usize].anims;
                 ((*anims.offset(pain_anim as isize)).numFrames as f32
                     * (bg.bgHumanoidAnimations[pain_anim as usize].frameLerp as f32).abs())
@@ -426,7 +420,7 @@ pub fn NPC_ChoosePainAnimation(
                 0
             };
 
-            (*self_).painDebounceTime = (*ctx.world).level.time + num_frames;
+            (*self_).painDebounceTime = (*ctx.world_raw()).level.time + num_frames;
             if !client.is_null() {
                 (*client).ps.weaponTime = 0;
             }
@@ -437,7 +431,7 @@ pub fn NPC_ChoosePainAnimation(
 /// Raven `NPC_Pain`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:363-529`
-pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId>, damage: c_int) {
+pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityId>, damage: c_int) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t = unsafe { ent_ptr(ctx, attacker) };
@@ -460,10 +454,10 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
         let mut other_team = TEAM_FREE;
         let mut voice_event = -1;
         let other = attacker;
-        let r#mod = (*ctx.world).globals.gPainMOD;
-        let hit_loc = (*ctx.world).globals.gPainHitLoc;
+        let r#mod = (*ctx.world_raw()).globals.gPainMOD;
+        let hit_loc = (*ctx.world_raw()).globals.gPainHitLoc;
         let mut point = [0.0f32; 3];
-        crate::q_math::_VectorCopy((*ctx.world).globals.gPainPoint, &mut point);
+        crate::q_math::_VectorCopy((*ctx.world_raw()).globals.gPainPoint, &mut point);
 
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
@@ -496,8 +490,8 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
         {
             // Hit by a teammate. Oracle uses `self`/`other`, not the ambient
             // `NPC` global (SetNPCGlobals(self) is not called until later).
-            let other_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), other);
-            let self_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), self_);
+            let other_id = ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other);
+            let self_id = ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), self_);
 
             if (*self_).enemy != Some(other_id) && (*other).enemy != Some(self_id) {
                 // We weren't already enemies
@@ -516,7 +510,7 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
 
                     if damage != -1 {
                         // Set our proper pain animation
-                        if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                             NPC_ChoosePainAnimation(
                                 ctx,
                                 ctx.entity_id_of(self_).unwrap(),
@@ -547,11 +541,11 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
                         // Mindtricked
                         return;
                     } else if (*npc).ffireCount
-                        < 3 + ((2 - (*ctx.world).cvars.g_spskill.integer) * 2)
+                        < 3 + ((2 - (*ctx.world_raw()).cvars.g_spskill.integer) * 2)
                     {
                         // Not mad enough yet
                         if damage != -1 {
-                            if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                                 NPC_ChoosePainAnimation(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
@@ -601,8 +595,9 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
                             | SCF_FORCED_MARCH);
                         (*npc).scriptFlags |= SCF_CHASE_ENEMIES | SCF_NO_MIND_TRICK;
 
-                        if (*ctx.world).globals.killPlayerTimer == 0 {
-                            (*ctx.world).globals.killPlayerTimer = (*ctx.world).level.time + 10000;
+                        if (*ctx.world_raw()).globals.killPlayerTimer == 0 {
+                            (*ctx.world_raw()).globals.killPlayerTimer =
+                                (*ctx.world_raw()).level.time + 10000;
                         }
                     }
                 }
@@ -613,7 +608,7 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
         SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         // Do extra bits
-        let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+        let npc_info_ptr = (*ctx.world_raw()).globals.NPCInfo;
         if !npc_info_ptr.is_null() && (*npc_info_ptr).ignorePain == 0 {
             (*npc_info_ptr).confusionTime = 0; // Clear any charm or confusion
             if damage != -1 {
@@ -630,8 +625,8 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
             }
 
             // Check to take a new enemy
-            let npc_ptr = (*ctx.world).globals.NPC;
-            if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+            let npc_ptr = (*ctx.world_raw()).globals.NPC;
+            if (*npc_ptr).enemy != Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other))
                 && npc_ptr != other
             {
                 NPC_CheckAttacker(ctx, ctx.entity_id_of(other), r#mod);
@@ -666,7 +661,7 @@ pub fn NPC_Pain(ctx: GameContext<'_>, self_: EntityId, attacker: Option<EntityId
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:537-653`
 pub fn NPC_Touch(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     trace: *mut trace_t,
@@ -699,17 +694,17 @@ pub fn NPC_Touch(
         if !other_client.is_null() {
             // Other has a client (is a player)
             if (*other).health > 0 {
-                let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+                let npc_info_ptr = (*ctx.world_raw()).globals.NPCInfo;
                 if !npc_info_ptr.is_null() {
                     (*npc_info_ptr).touchedByPlayer =
-                        Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
+                        Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other));
                 }
             }
 
-            let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+            let npc_info_ptr = (*ctx.world_raw()).globals.NPCInfo;
             if !npc_info_ptr.is_null()
                 && (*npc_info_ptr).goalEntity
-                    == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+                    == Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other))
             {
                 (*npc_info_ptr).aiFlags |= NPCAI_TOUCHED_GOAL;
             }
@@ -723,14 +718,14 @@ pub fn NPC_Touch(
                     // See if we bumped into an enemy
                     if (*other_client).playerTeam == (*client).enemyTeam {
                         // Bumped into an enemy
-                        let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+                        let npc_info_ptr = (*ctx.world_raw()).globals.NPCInfo;
                         if !npc_info_ptr.is_null()
                             && (*npc_info_ptr).behaviorState != bState_t::BS_HUNT_AND_KILL
                             && (*npc_info_ptr).tempBehavior == bState_t::BS_DEFAULT
                         {
-                            let npc_ptr = (*ctx.world).globals.NPC;
+                            let npc_ptr = (*ctx.world_raw()).globals.NPC;
                             if (*npc_ptr).enemy
-                                != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+                                != Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other))
                             {
                                 G_SetEnemy(
                                     ctx,
@@ -748,18 +743,18 @@ pub fn NPC_Touch(
                 // Non-NPC entity (probably an object)
                 if 0 != 0 {
                     // rwwFIXMEFIXME condition always false
-                    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+                    let npc_info_ptr = (*ctx.world_raw()).globals.NPCInfo;
                     if !npc_info_ptr.is_null() {
                         (*npc_info_ptr).touchedByPlayer =
-                            Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
+                            Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other));
                     }
                 }
             }
 
-            let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+            let npc_info_ptr = (*ctx.world_raw()).globals.NPCInfo;
             if !npc_info_ptr.is_null()
                 && (*npc_info_ptr).goalEntity
-                    == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+                    == Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other))
             {
                 (*npc_info_ptr).aiFlags |= NPCAI_TOUCHED_GOAL;
             }
@@ -773,7 +768,7 @@ pub fn NPC_Touch(
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:661-688`
 pub fn NPC_TempLookTarget(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     lookEntNum: c_int,
     mut minLookTime: c_int,
@@ -806,12 +801,14 @@ pub fn NPC_TempLookTarget(
         if NPC_CheckLookTarget(ctx, ctx.entity_id_of(self_).unwrap()) == 0 {
             //Not already looking at something else
             //Look at him for 1 to 3 seconds
-            let level_time = (*ctx.world).level.time;
-            NPC_SetLookTarget(
-                ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
-                lookEntNum,
-                level_time + (*ctx.world).bg_state.rng.Q_irand(minLookTime, maxLookTime),
-            );
+            let level_time = (*ctx.world_raw()).level.time;
+            let __h512 = level_time
+                + (*ctx.world_raw())
+                    .bg_state
+                    .rng
+                    .Q_irand(minLookTime, maxLookTime);
+            let __h513 = ctx.entity_id_of(self_).unwrap();
+            NPC_SetLookTarget(ctx.entity_mut(__h513), lookEntNum, __h512);
         }
     }
 }
@@ -819,7 +816,7 @@ pub fn NPC_TempLookTarget(
 /// Raven `NPC_Respond`.
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:690-942`
-pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
+pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -857,7 +854,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
 
         let mut event = -1;
 
-        if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
             // Set looktarget to them for a second or two
             NPC_TempLookTarget(ctx, ctx.entity_id_of(self_).unwrap(), userNum, 1000, 3000);
         }
@@ -874,19 +871,25 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
         match npc_class {
             CLASS_JAN => {
                 if (*self_).enemy.is_some() {
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                        event = (*ctx.world)
+                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_CHASE1, EV_CHASE3);
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                        event = (*ctx.world_raw())
                             .bg_state
                             .rng
                             .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                     } else {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_COVER1, EV_COVER5);
                     }
-                } else if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+                } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
                     event = EV_SUSPICIOUS4;
-                } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                     event = EV_SOUND1;
                 } else {
                     event = EV_CONFUSE1;
@@ -894,24 +897,33 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
             }
             CLASS_LANDO => {
                 if (*self_).enemy.is_some() {
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                        event = (*ctx.world)
+                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_CHASE1, EV_CHASE3);
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                        event = (*ctx.world_raw())
                             .bg_state
                             .rng
                             .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                     } else {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_COVER1, EV_COVER5);
                     }
-                } else if (*ctx.world).bg_state.rng.Q_irand(0, 6) == 0 {
+                } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 6) == 0 {
                     event = EV_SIGHT2;
-                } else if (*ctx.world).bg_state.rng.Q_irand(0, 5) == 0 {
+                } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 5) == 0 {
                     event = EV_GIVEUP4;
-                } else if (*ctx.world).bg_state.rng.Q_irand(0, 4) > 1 {
-                    event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
+                } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 4) > 1 {
+                    event = (*ctx.world_raw())
+                        .bg_state
+                        .rng
+                        .Q_irand(EV_SOUND1, EV_SOUND3);
                 } else {
-                    event = (*ctx.world)
+                    event = (*ctx.world_raw())
                         .bg_state
                         .rng
                         .Q_irand(EV_JDETECTED1, EV_JDETECTED2);
@@ -921,45 +933,66 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
                 if (*self_).enemy.is_some() {
                     event = EV_COVER1;
                 } else {
-                    event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
+                    event = (*ctx.world_raw())
+                        .bg_state
+                        .rng
+                        .Q_irand(EV_SOUND1, EV_SOUND3);
                 }
             }
             CLASS_JEDI => {
                 if (*self_).enemy.is_none() {
                     if 0 != 0 {
                         // rwwFIXMEFIXME: support flags!
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_ANGER1, EV_ANGER3);
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_ANGER1, EV_ANGER3);
                     } else {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_TAUNT1, EV_TAUNT2);
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_TAUNT1, EV_TAUNT2);
                     }
                 }
             }
             CLASS_PRISONER => {
                 if (*self_).enemy.is_some() {
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
+                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_CHASE1, EV_CHASE3);
                     } else {
-                        event = (*ctx.world)
+                        event = (*ctx.world_raw())
                             .bg_state
                             .rng
                             .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                     }
                 } else {
-                    event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
+                    event = (*ctx.world_raw())
+                        .bg_state
+                        .rng
+                        .Q_irand(EV_SOUND1, EV_SOUND3);
                 }
             }
             CLASS_REBEL => {
                 if (*self_).enemy.is_some() {
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
+                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_CHASE1, EV_CHASE3);
                     } else {
-                        event = (*ctx.world)
+                        event = (*ctx.world_raw())
                             .bg_state
                             .rng
                             .Q_irand(EV_DETECTED1, EV_DETECTED5);
                     }
                 } else {
-                    event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
+                    event = (*ctx.world_raw())
+                        .bg_state
+                        .rng
+                        .Q_irand(EV_SOUND1, EV_SOUND3);
                 }
             }
             CLASS_BESPIN_COP => {
@@ -973,23 +1006,35 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
                 if is_variant1 {
                     // Variant 1
                     if (*self_).enemy.is_some() {
-                        if (*ctx.world).bg_state.rng.Q_irand(0, 9) > 6 {
-                            event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
-                        } else if (*ctx.world).bg_state.rng.Q_irand(0, 6) > 4 {
-                            event = (*ctx.world)
+                        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 9) > 6 {
+                            event = (*ctx.world_raw())
+                                .bg_state
+                                .rng
+                                .Q_irand(EV_CHASE1, EV_CHASE3);
+                        } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 6) > 4 {
+                            event = (*ctx.world_raw())
                                 .bg_state
                                 .rng
                                 .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                         } else {
-                            event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
+                            event = (*ctx.world_raw())
+                                .bg_state
+                                .rng
+                                .Q_irand(EV_COVER1, EV_COVER5);
                         }
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 3) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_SIGHT2, EV_SIGHT3);
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_SIGHT2, EV_SIGHT3);
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_SOUND1, EV_SOUND3);
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
                         event = EV_LOST1;
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                         event = EV_ESCAPING2;
                     } else {
                         event = EV_GIVEUP4;
@@ -997,23 +1042,35 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
                 } else {
                     // Variant 2
                     if (*self_).enemy.is_some() {
-                        if (*ctx.world).bg_state.rng.Q_irand(0, 9) > 6 {
-                            event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
-                        } else if (*ctx.world).bg_state.rng.Q_irand(0, 6) > 4 {
-                            event = (*ctx.world)
+                        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 9) > 6 {
+                            event = (*ctx.world_raw())
+                                .bg_state
+                                .rng
+                                .Q_irand(EV_CHASE1, EV_CHASE3);
+                        } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 6) > 4 {
+                            event = (*ctx.world_raw())
                                 .bg_state
                                 .rng
                                 .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                         } else {
-                            event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
+                            event = (*ctx.world_raw())
+                                .bg_state
+                                .rng
+                                .Q_irand(EV_COVER1, EV_COVER5);
                         }
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 3) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_SIGHT1, EV_SIGHT2);
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_SIGHT1, EV_SIGHT2);
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                        event = (*ctx.world_raw())
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_SOUND1, EV_SOUND3);
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
                         event = EV_LOST1;
-                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                    } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                         event = EV_GIVEUP3;
                     } else {
                         event = EV_CONFUSE1;
@@ -1025,7 +1082,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
                 // ported to format!() with Rust string construction
                 let sound_path = format!(
                     "sound/chars/r2d2/misc/r2d2talk0{}.wav",
-                    (*ctx.world).bg_state.rng.Q_irand(1, 3)
+                    (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
@@ -1033,7 +1090,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
             CLASS_R5D2 => {
                 let sound_path = format!(
                     "sound/chars/r5d2/misc/r5talk{}.wav",
-                    (*ctx.world).bg_state.rng.Q_irand(1, 4)
+                    (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
@@ -1041,7 +1098,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
             CLASS_MOUSE => {
                 let sound_path = format!(
                     "sound/chars/mouse/misc/mousego{}.wav",
-                    (*ctx.world).bg_state.rng.Q_irand(1, 3)
+                    (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
@@ -1049,7 +1106,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
             CLASS_GONK => {
                 let sound_path = format!(
                     "sound/chars/gonk/misc/gonktalk{}.wav",
-                    (*ctx.world).bg_state.rng.Q_irand(1, 2)
+                    (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2)
                 );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, ctx.entity_id_of(self_), CHAN_AUTO, sound_index);
@@ -1082,7 +1139,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: EntityId, userNum: c_int) {
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:950-999`
 pub fn NPC_UseResponse(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     user: Option<EntityId>,
     useWhenDone: qboolean,
@@ -1117,7 +1174,7 @@ pub fn NPC_UseResponse(
             return;
         }
 
-        if (*npc).blockedSpeechDebounceTime > (*ctx.world).level.time {
+        if (*npc).blockedSpeechDebounceTime > (*ctx.world_raw()).level.time {
             //I'm not responding right now
             return;
         }
@@ -1134,7 +1191,7 @@ pub fn NPC_UseResponse(
 ///
 /// Source: `oracle/codemp/game/NPC_reactions.c:1008-1093`
 pub fn NPC_Use(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,

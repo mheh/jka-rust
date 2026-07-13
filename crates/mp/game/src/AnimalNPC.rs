@@ -22,7 +22,7 @@ use crate::prelude::*;
 /// Raven `DeathUpdate` — update death sequence.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:97-148`
-pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let level_time = level_time(ctx);
         if level_time >= (*pVeh).m_iDieTime {
@@ -39,7 +39,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// vehicle properties.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:151-154`
-pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
         // Animal `Update` delegates to the generic base body.
         crate::g_vehicles::Update(ctx, pVeh, pUcmd)
@@ -53,7 +53,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
 /// Source: `oracle/codemp/game/AnimalNPC.c:168-329`
-pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut speedInc: f32;
         let mut speedIdleDec: f32;
@@ -151,7 +151,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
 /// Source: `oracle/codemp/game/AnimalNPC.c:338-464`
-pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
         let parentPS = (*parent).playerState;
@@ -159,7 +159,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         let rider = if (*parent).s.owner != ENTITYNUM_NONE {
             // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
             // `ctx` now threads the world, so index the game arena directly.
-            (*ctx.world)
+            (*ctx.world_raw())
                 .g_entities
                 .as_mut_ptr()
                 .add((*parent).s.owner as usize) as *mut bgEntity_t
@@ -229,14 +229,14 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// (`_JK2MP` only).
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:467-470`
-pub fn AnimalProcessOri(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn AnimalProcessOri(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     ProcessOrientCommands(ctx, pVeh);
 }
 
 /// Raven `AnimateVehicle`.
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:474-615`
-pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
         let mut iFlags: c_int = SETANIM_FLAG_NORMAL;
@@ -288,7 +288,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 }
 
                 iAnimLen = (crate::bg_panimate::BG_AnimLength(
-                    &(*ctx.world).bg_state,
+                    &(*ctx.world_raw()).bg_state,
                     (*parent).localAnimIndex,
                     anim as c_int,
                 ) as f32
@@ -376,7 +376,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
 /// or it will feel awful and lagged.
 /// Source: `oracle/codemp/game/AnimalNPC.c:620-849`
-pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
         let mut iFlags: c_int = SETANIM_FLAG_NORMAL;
@@ -472,7 +472,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                         // `pilot->enemy` is an `EntityId` arena index (Raven's
                         // `gentity_t*`); `ctx` now threads the world, so index the
                         // game arena directly.
-                        let enemy_ent = (*ctx.world)
+                        let enemy_ent = (*ctx.world_raw())
                             .g_entities
                             .as_mut_ptr()
                             .add((*pilot).enemy.unwrap().0 as usize);
@@ -581,7 +581,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Raven: this is a BG function too in MP so don't un-bg-compatibilify it.
 /// Source: `oracle/codemp/game/AnimalNPC.c:904-925`
 pub fn G_CreateAnimalNPC(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pVeh: *mut *mut Vehicle_t,
     strAnimalType: *const c_char,
 ) {
@@ -590,9 +590,10 @@ pub fn G_CreateAnimalNPC(
         core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
         let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
             strAnimalType,
-            &mut (*ctx.world).bg_state,
+            &mut (*ctx.world_raw()).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         ) as usize;
-        (*(*pVeh)).m_pVehicleInfo = &mut (*ctx.world).bg_state.g_vehicleInfo[veh_index];
+        (*(*pVeh)).m_pVehicleInfo =
+            &mut (&mut (*ctx.world_raw()).bg_state.g_vehicleInfo)[veh_index];
     }
 }

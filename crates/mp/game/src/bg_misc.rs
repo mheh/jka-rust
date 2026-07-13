@@ -252,12 +252,12 @@ pub fn BG_FileExists(fileName: *const c_char, bg: &BgState, traps: &dyn BgTraps)
 /// whatever the hell you want.
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:358-423`
-// PORT-NOTE(ctx-cascade): gained `ctx: GameContext<'_>` so the `F_PARM*` branch
+// PORT-NOTE(ctx-cascade): gained `ctx: &mut GameContext` so the `F_PARM*` branch
 // can forward to the game-tier `Q3_SetParm` (which now reaches the entity arena
 // through `ctx.world`); both call sites (`G_SpawnGEntityFromSpawnVars`,
 // `SP_worldspawn`) already carry `ctx`.
 pub fn BG_ParseField(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     l_fields: *mut BG_field_t,
     key: *const c_char,
     value: *const c_char,

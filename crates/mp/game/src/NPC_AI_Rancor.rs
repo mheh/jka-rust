@@ -18,9 +18,9 @@ use crate::prelude::*;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -40,7 +40,7 @@ const LSTATE_WAITING: c_int = 1;
 /// Raven `Rancor_SetBolts`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:19-29`
-pub fn Rancor_SetBolts(ctx: GameContext<'_>, self_: Option<EntityId>) {
+pub fn Rancor_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
@@ -87,7 +87,7 @@ pub fn Rancor_SetBolts(ctx: GameContext<'_>, self_: Option<EntityId>) {
 /// Raven `NPC_Rancor_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:36-45`
-pub fn NPC_Rancor_Precache(ctx: GameContext<'_>) {
+pub fn NPC_Rancor_Precache(ctx: &mut GameContext) {
     for i in 1..3 {
         crate::g_utils::G_SoundIndex(
             std::ffi::CString::new(format!("sound/chars/rancor/snort_{}.wav", i))
@@ -102,16 +102,16 @@ pub fn NPC_Rancor_Precache(ctx: GameContext<'_>) {
 /// Raven `Rancor_Idle`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:53-63`
-pub fn Rancor_Idle(ctx: GameContext<'_>) {
+pub fn Rancor_Idle(ctx: &mut GameContext) {
     unsafe {
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
         if !npc_info.is_null() {
             (*npc_info).localState = LSTATE_CLEAR;
         }
 
         //If we have somewhere to go, then do that
         if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
-            (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
+            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         }
     }
@@ -120,7 +120,7 @@ pub fn Rancor_Idle(ctx: GameContext<'_>) {
 /// Raven `Rancor_CheckRoar`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:66-77`
-pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+pub fn Rancor_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -150,10 +150,10 @@ pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
 /// Raven `Rancor_Patrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:83-108`
-pub fn Rancor_Patrol(ctx: GameContext<'_>) {
+pub fn Rancor_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if !npc_info.is_null() {
             (*npc_info).localState = LSTATE_CLEAR;
@@ -161,16 +161,13 @@ pub fn Rancor_Patrol(ctx: GameContext<'_>) {
 
         //If we have somewhere to go, then do that
         if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
-            (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
+            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         } else {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolTime".as_ptr()) != 0 {
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"patrolTime".as_ptr(),
-                    ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int,
-                );
+                let __h147 = ctx.entity_id_of(npc);
+                let __h148 = ((*ctx.world_raw()).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+                crate::g_timer::TIMER_Set(ctx, __h147, c"patrolTime".as_ptr(), __h148);
             }
         }
 
@@ -179,22 +176,19 @@ pub fn Rancor_Patrol(ctx: GameContext<'_>) {
             return;
         }
         Rancor_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap());
-        crate::g_timer::TIMER_Set(
-            ctx,
-            ctx.entity_id_of(npc),
-            c"lookForNewEnemy".as_ptr(),
-            (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
-        );
+        let __h149 = ctx.entity_id_of(npc);
+        let __h150 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
+        crate::g_timer::TIMER_Set(ctx, __h149, c"lookForNewEnemy".as_ptr(), __h150);
     }
 }
 
 /// Raven `Rancor_Move`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:115-130`
-pub fn Rancor_Move(ctx: GameContext<'_>, visible: qboolean) {
+pub fn Rancor_Move(ctx: &mut GameContext, visible: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if !npc_info.is_null() && (*npc_info).localState != LSTATE_WAITING {
             (*npc_info).goalEntity = (*npc).enemy;
@@ -211,14 +205,16 @@ pub fn Rancor_Move(ctx: GameContext<'_>, visible: qboolean) {
 /// Raven `Rancor_DropVictim`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:140-194`
-pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: EntityId) {
+pub fn Rancor_DropVictim(ctx: &mut GameContext, self_: EntityId) {
     //FIXME: if Rancor dies, it should drop its victim.
     //FIXME: if Rancor is removed, it must remove its victim.
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let activator =
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator);
+        let activator = crate::ent_id::resolve(
+            (*ctx.world_raw()).g_entities.as_mut_ptr(),
+            (*self_).activator,
+        );
         if !activator.is_null() {
             if !(*activator).client.is_null() {
                 let activator_client = (*activator).client as *mut gclient_t;
@@ -257,7 +253,8 @@ pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: EntityId) {
             } else {
                 if !(*activator).NPC.is_null() {
                     //start thinking again
-                    (*((*activator).NPC as *mut gNPC_t)).nextBStateThink = (*ctx.world).level.time;
+                    (*((*activator).NPC as *mut gNPC_t)).nextBStateThink =
+                        (*ctx.world_raw()).level.time;
                 }
                 //clear their anim and let them fall
                 let activator_client = (*activator).client as *mut gclient_t;
@@ -276,9 +273,9 @@ pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `Rancor_Swing`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:196-306`
-pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
+pub fn Rancor_Swing(ctx: &mut GameContext, tryGrab: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let mut radiusEntNums: [c_int; 128] = [0; 128];
         let radius = 88.0;
         let radiusSquared = radius * radius;
@@ -293,7 +290,7 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
         );
 
         for i in 0..(numEnts as usize) {
-            let radiusEnt = (*ctx.world)
+            let radiusEnt = (*ctx.world_raw())
                 .g_entities
                 .get_unchecked_mut(radiusEntNums[i] as usize)
                 as *mut gentity_t;
@@ -345,21 +342,20 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                         );
                         Rancor_DropVictim(ctx, ctx.entity_id_of(npc).unwrap());
                     }
-                    (*npc).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), radiusEnt); //make him my new best friend
+                    (*npc).enemy =
+                        ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), radiusEnt); //make him my new best friend
                     (*((*radiusEnt).client as *mut gclient_t)).ps.eFlags2 |= EF2_HELD_BY_MONSTER;
                     //FIXME: this makes it so that the victim can't hit us with shots!  Just use activator or something
                     (*((*radiusEnt).client as *mut gclient_t)).ps.hasLookTarget = qtrue;
                     (*((*radiusEnt).client as *mut gclient_t)).ps.lookTarget = (*npc).s.number;
-                    (*npc).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), radiusEnt); //remember him
+                    (*npc).activator =
+                        ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), radiusEnt); //remember him
+                    let __h151 = ctx.entity_id_of(npc);
+                    let __h152 = (*((*npc).client as *mut gclient_t)).ps.legsTimer
+                        + (*ctx.world_raw()).bg_state.rng.Q_irand(500, 2500);
                     (*npc).count = 1; //in my hand
                                       //wait to attack
-                    crate::g_timer::TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(npc),
-                        c"attacking".as_ptr(),
-                        (*((*npc).client as *mut gclient_t)).ps.legsTimer
-                            + (*ctx.world).bg_state.rng.Q_irand(500, 2500),
-                    );
+                    crate::g_timer::TIMER_Set(ctx, __h151, c"attacking".as_ptr(), __h152);
                     if (*radiusEnt).health > 0 && (*radiusEnt).pain.is_some() {
                         //do pain on enemy
                         crate::ent_fn_enums::dispatch_pain(
@@ -407,20 +403,24 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                         (*((*npc).client as *mut gclient_t)).ps.viewangles,
                         &mut angs,
                     );
-                    angs[1] += (*ctx.world).bg_state.rng.flrand(25.0, 50.0);
-                    angs[0] = (*ctx.world).bg_state.rng.flrand(-25.0, -15.0);
+                    angs[1] += (*ctx.world_raw()).bg_state.rng.flrand(25.0, 50.0);
+                    angs[0] = (*ctx.world_raw()).bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
                     if (*((*radiusEnt).client as *mut gclient_t)).NPC_class != CLASS_RANCOR
                         && (*((*radiusEnt).client as *mut gclient_t)).NPC_class != CLASS_ATST
                     {
+                        let __h153 = ctx.entity_id_of(radiusEnt);
+                        let __h154 = ctx.entity_id_of(npc);
+                        let __h155 = ctx.entity_id_of(npc);
+                        let __h156 = (*ctx.world_raw()).bg_state.rng.Q_irand(25, 40);
                         crate::g_combat::G_Damage(
                             ctx,
-                            ctx.entity_id_of(radiusEnt),
-                            ctx.entity_id_of(npc),
-                            ctx.entity_id_of(npc),
+                            __h153,
+                            __h154,
+                            __h155,
                             Some(&mut [0.0; 3]),
                             (*radiusEnt).r.currentOrigin,
-                            (*ctx.world).bg_state.rng.Q_irand(25, 40),
+                            __h156,
                             DAMAGE_NO_ARMOR | DAMAGE_NO_KNOCKBACK,
                             MOD_MELEE as c_int,
                         );
@@ -445,9 +445,9 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
 /// Raven `Rancor_Smash`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:308-367`
-pub fn Rancor_Smash(ctx: GameContext<'_>) {
+pub fn Rancor_Smash(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let mut radiusEntNums: [c_int; 128] = [0; 128];
         let radius = 128.0;
         let halfRadSquared = ((radius / 2.0) * (radius / 2.0));
@@ -472,7 +472,7 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
         );
 
         for i in 0..(numEnts as usize) {
-            let radiusEnt = (*ctx.world)
+            let radiusEnt = (*ctx.world_raw())
                 .g_entities
                 .get_unchecked_mut(radiusEntNums[i] as usize)
                 as *mut gentity_t;
@@ -504,15 +504,19 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
                     crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
                 );
                 if distSq < halfRadSquared {
+                    let __h157 = ctx.entity_id_of(radiusEnt);
+                    let __h158 = ctx.entity_id_of(npc);
+                    let __h159 = ctx.entity_id_of(npc);
+                    let __h160 = (*ctx.world_raw()).bg_state.rng.Q_irand(10, 25);
                     //close enough to do damage, too
                     crate::g_combat::G_Damage(
                         ctx,
-                        ctx.entity_id_of(radiusEnt),
-                        ctx.entity_id_of(npc),
-                        ctx.entity_id_of(npc),
+                        __h157,
+                        __h158,
+                        __h159,
                         Some(&mut [0.0; 3]),
                         (*radiusEnt).r.currentOrigin,
-                        (*ctx.world).bg_state.rng.Q_irand(10, 25),
+                        __h160,
                         DAMAGE_NO_ARMOR | DAMAGE_NO_KNOCKBACK,
                         MOD_MELEE as c_int,
                     );
@@ -541,9 +545,9 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
 /// Raven `Rancor_Bite`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:369-428`
-pub fn Rancor_Bite(ctx: GameContext<'_>) {
+pub fn Rancor_Bite(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let mut radiusEntNums: [c_int; 128] = [0; 128];
         let radius = 100.0;
         let radiusSquared = radius * radius;
@@ -558,7 +562,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
         ); //was gutBolt?
 
         for i in 0..(numEnts as usize) {
-            let radiusEnt = (*ctx.world)
+            let radiusEnt = (*ctx.world_raw())
                 .g_entities
                 .get_unchecked_mut(radiusEntNums[i] as usize)
                 as *mut gentity_t;
@@ -582,22 +586,26 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
             }
 
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
+                let __h161 = ctx.entity_id_of(radiusEnt);
+                let __h162 = ctx.entity_id_of(npc);
+                let __h163 = ctx.entity_id_of(npc);
+                let __h164 = (*ctx.world_raw()).bg_state.rng.Q_irand(15, 30);
                 crate::g_combat::G_Damage(
                     ctx,
-                    ctx.entity_id_of(radiusEnt),
-                    ctx.entity_id_of(npc),
-                    ctx.entity_id_of(npc),
+                    __h161,
+                    __h162,
+                    __h163,
                     Some(&mut [0.0; 3]),
                     (*radiusEnt).r.currentOrigin,
-                    (*ctx.world).bg_state.rng.Q_irand(15, 30),
+                    __h164,
                     DAMAGE_NO_ARMOR | DAMAGE_NO_KNOCKBACK,
                     MOD_MELEE as c_int,
                 );
                 if (*radiusEnt).health <= 0 && !(*radiusEnt).client.is_null() {
                     //killed them, chance of dismembering
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                         //bite something off
-                        let hitLoc = (*ctx.world)
+                        let hitLoc = (*ctx.world_raw())
                             .bg_state
                             .rng
                             .Q_irand(G2_MODELPART_HEAD as c_int, G2_MODELPART_RLEG as c_int);
@@ -648,18 +656,22 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
 /// Raven `Rancor_Attack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:431-614`
-pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
+pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let ent_base = (*ctx.world).g_entities.as_mut_ptr();
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let ent_base = (*ctx.world_raw()).g_entities.as_mut_ptr();
 
         if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == qfalse
         {
+            let __h165 = ctx.entity_id_of(npc);
+            let __h166 = ((*((*npc).client as *mut gclient_t)).ps.legsTimer as f32
+                + (*ctx.world_raw()).bg_state.rng.random() * 200.0)
+                as c_int;
             if (*npc).count == 2 && !(*npc).activator.is_none() {
             } else if (*npc).count == 1 && !(*npc).activator.is_none() {
                 let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                 //holding enemy
-                if (*activator).health > 0 && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                if (*activator).health > 0 && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
                     //quick bite
                     crate::npc_c::NPC_SetAnim(
                         ctx,
@@ -693,7 +705,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     if (*activator).health > 0 && !(*activator).client.is_null() {
                         crate::g_utils::G_AddEvent(
                             &mut *(activator),
-                            (*ctx.world)
+                            (*ctx.world_raw())
                                 .bg_state
                                 .rng
                                 .Q_irand(EV_DEATH1 as c_int, EV_DEATH3 as c_int),
@@ -739,7 +751,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
                 crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 1250);
-            } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+            } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
                 //smash
                 crate::npc_c::NPC_SetAnim(
                     ctx,
@@ -761,13 +773,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 1000);
             }
 
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"attacking".as_ptr(),
-                ((*((*npc).client as *mut gclient_t)).ps.legsTimer as f32
-                    + (*ctx.world).bg_state.rng.random() * 200.0) as c_int,
-            );
+            crate::g_timer::TIMER_Set(ctx, __h165, c"attacking".as_ptr(), __h166);
         }
 
         // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
@@ -808,14 +814,18 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK1 as c_int => {
                     if (*npc).count == 1 && !(*npc).activator.is_none() {
                         let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
+                        let __h167 = ctx.entity_id_of(activator);
+                        let __h168 = ctx.entity_id_of(npc);
+                        let __h169 = ctx.entity_id_of(npc);
+                        let __h170 = (*ctx.world_raw()).bg_state.rng.Q_irand(25, 40);
                         crate::g_combat::G_Damage(
                             ctx,
-                            ctx.entity_id_of(activator),
-                            ctx.entity_id_of(npc),
-                            ctx.entity_id_of(npc),
+                            __h167,
+                            __h168,
+                            __h169,
                             Some(&mut [0.0; 3]),
                             (*activator).r.currentOrigin,
-                            (*ctx.world).bg_state.rng.Q_irand(25, 40),
+                            __h170,
                             DAMAGE_NO_ARMOR | DAMAGE_NO_KNOCKBACK,
                             MOD_MELEE as c_int,
                         );
@@ -1018,7 +1028,7 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
             if (*((*npc).client as *mut gclient_t)).ps.legsTimer >= 1200
                 && (*((*npc).client as *mut gclient_t)).ps.legsTimer <= 1350
             {
-                if (*ctx.world).bg_state.rng.Q_irand(0, 2) != 0 {
+                if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) != 0 {
                     Rancor_Swing(ctx, qfalse);
                 } else {
                     Rancor_Swing(ctx, qtrue);
@@ -1038,11 +1048,14 @@ pub fn Rancor_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
 /// Raven `Rancor_Combat`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:617-695`
-pub fn Rancor_Combat(ctx: GameContext<'_>) {
+pub fn Rancor_Combat(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
+        let __h772 =
+            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
+        let __h171 = ctx.entity_id_of(__h772);
         if (*npc).count != 0 {
             //holding my enemy
             if crate::g_timer::TIMER_Done2(
@@ -1060,14 +1073,7 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
             return;
         }
         // If we cannot see our target or we have somewhere to go, then do that
-        if crate::NPC_utils::NPC_ClearLOS4(
-            ctx,
-            ctx.entity_id_of(crate::ent_id::resolve(
-                (*ctx.world).g_entities.as_mut_ptr(),
-                (*npc).enemy,
-            )),
-        ) == qfalse
-        {
+        if crate::NPC_utils::NPC_ClearLOS4(ctx, __h171) == qfalse {
             //|| UpdateGoal( ))
             (*npc_info).combatMove = qtrue;
             (*npc_info).goalEntity = (*npc).enemy;
@@ -1092,7 +1098,8 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
         crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
         {
-            let enemy = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
+            let enemy =
+                crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
             let distance =
                 crate::q_math::Distance((*npc).r.currentOrigin, (*enemy).r.currentOrigin);
             let mut advance = if distance > ((*npc).r.maxs[0] + MIN_DISTANCE as f32) {
@@ -1115,7 +1122,7 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
                         30,
                     ) != 0
                 {
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 9) == 0 {
+                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 9) == 0 {
                         //go for the charge
                         doCharge = qtrue;
                         advance = qfalse;
@@ -1150,7 +1157,7 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:703-782`
 pub fn NPC_Rancor_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -1167,14 +1174,14 @@ pub fn NPC_Rancor_Pain(
             hitByRancor = qtrue;
         }
         let self_enemy =
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).enemy);
+            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*self_).enemy);
         if !attacker.is_null()
             && (*attacker).inuse != 0
             && attacker != self_enemy
             && ((*attacker).flags & FL_NOTARGET) == 0
         {
             if (*self_).count == 0 {
-                if ((*attacker).s.number == 0 && (*ctx.world).bg_state.rng.Q_irand(0, 3) == 0)
+                if ((*attacker).s.number == 0 && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) == 0)
                     || (*self_).enemy.is_none()
                     || (*self_enemy).health == 0
                     || (!(*self_enemy).client.is_null()
@@ -1194,20 +1201,14 @@ pub fn NPC_Rancor_Pain(
                         ctx.entity_id_of(self_).unwrap(),
                         ctx.entity_id_of(attacker),
                     );
-                    crate::g_timer::TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        c"lookForNewEnemy".as_ptr(),
-                        (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
-                    );
+                    let __h172 = ctx.entity_id_of(self_);
+                    let __h173 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
+                    crate::g_timer::TIMER_Set(ctx, __h172, c"lookForNewEnemy".as_ptr(), __h173);
                     if hitByRancor != 0 {
+                        let __h174 = ctx.entity_id_of(self_);
+                        let __h175 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 5000);
                         //stay mad at this Rancor for 2-5 secs before looking for attacker enemies
-                        crate::g_timer::TIMER_Set(
-                            ctx,
-                            ctx.entity_id_of(self_),
-                            c"rancorInfight".as_ptr(),
-                            (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
-                        );
+                        crate::g_timer::TIMER_Set(ctx, __h174, c"rancorInfight".as_ptr(), __h175);
                     }
                 }
             }
@@ -1215,8 +1216,8 @@ pub fn NPC_Rancor_Pain(
         if (hitByRancor != 0
             || ((*self_).count == 1
                 && !(*self_).activator.is_none()
-                && (*ctx.world).bg_state.rng.Q_irand(0, 4) == 0)
-            || (*ctx.world).bg_state.rng.Q_irand(0, 200) < damage)
+                && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 4) == 0)
+            || (*ctx.world_raw()).bg_state.rng.Q_irand(0, 200) < damage)
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_STAND1TO2 as c_int
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr()) != 0
         {
@@ -1245,6 +1246,9 @@ pub fn NPC_Rancor_Pain(
                                 &mut (*self_).s.angles,
                             );
 
+                            let __h176 = ctx.entity_id_of(self_);
+                            let __h177 = (*((*self_).client as *mut gclient_t)).ps.legsTimer
+                                + (*ctx.world_raw()).bg_state.rng.Q_irand(0, 500);
                             if (*self_).count == 1 {
                                 crate::npc_c::NPC_SetAnim(
                                     ctx,
@@ -1262,13 +1266,7 @@ pub fn NPC_Rancor_Pain(
                                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                                 );
                             }
-                            crate::g_timer::TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(self_),
-                                c"takingPain".as_ptr(),
-                                (*((*self_).client as *mut gclient_t)).ps.legsTimer
-                                    + (*ctx.world).bg_state.rng.Q_irand(0, 500),
-                            );
+                            crate::g_timer::TIMER_Set(ctx, __h176, c"takingPain".as_ptr(), __h177);
 
                             if !(*self_).NPC.is_null() {
                                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;
@@ -1284,11 +1282,11 @@ pub fn NPC_Rancor_Pain(
 /// Raven `Rancor_CheckDropVictim`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:784-802`
-pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
+pub fn Rancor_CheckDropVictim(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let activator =
-            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).activator);
+            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).activator);
         let mins: vec3_t = [
             (*activator).r.mins[0] - 1.0,
             (*activator).r.mins[1] - 1.0,
@@ -1332,9 +1330,9 @@ pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
 /// Raven `Rancor_Crush`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:805-821`
-pub fn Rancor_Crush(ctx: GameContext<'_>) {
+pub fn Rancor_Crush(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
 
         if npc.is_null()
             || (*npc).client.is_null()
@@ -1344,7 +1342,7 @@ pub fn Rancor_Crush(ctx: GameContext<'_>) {
             return;
         }
 
-        let crush = &mut (*ctx.world).g_entities
+        let crush = &mut (*ctx.world_raw()).g_entities
             [(*((*npc).client as *mut gclient_t)).ps.groundEntityNum as usize];
         if crush.inuse != 0 && !crush.client.is_null() && crush.localAnimIndex == 0 {
             //a humanoid, smash them good.
@@ -1366,10 +1364,10 @@ pub fn Rancor_Crush(ctx: GameContext<'_>) {
 /// Raven `NPC_BSRancor_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:828-955`
-pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSRancor_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         crate::NPC_senses::AddSightEvent(
             ctx,
@@ -1404,7 +1402,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             && (*npc).count == 1
             && !(*npc).activator.is_none()
         {
-            if (*ctx.world).bg_state.rng.Q_irand(0, 3) == 0 {
+            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) == 0 {
                 Rancor_CheckDropVictim(ctx);
             }
         }
@@ -1432,25 +1430,19 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             }
             */
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"angrynoise".as_ptr()) != 0 {
-                crate::g_utils::G_Sound(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(
-                        cstr(&format!(
-                            "sound/chars/rancor/misc/anger{}.wav",
-                            (*ctx.world).bg_state.rng.Q_irand(1, 3)
-                        ))
-                        .as_ptr(),
-                    ),
+                let __h178 = ctx.entity_id_of(npc);
+                let __h179 = crate::g_utils::G_SoundIndex(
+                    cstr(&format!(
+                        "sound/chars/rancor/misc/anger{}.wav",
+                        (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3)
+                    ))
+                    .as_ptr(),
                 );
+                crate::g_utils::G_Sound(ctx, __h178, CHAN_AUTO, __h179);
 
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"angrynoise".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(5000, 10000),
-                );
+                let __h180 = ctx.entity_id_of(npc);
+                let __h181 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 10000);
+                crate::g_timer::TIMER_Set(ctx, __h180, c"angrynoise".as_ptr(), __h181);
             } else {
                 crate::NPC_senses::AddSoundEvent(
                     ctx,
@@ -1470,7 +1462,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             }
             //else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
             let npc_enemy =
-                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
+                crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
             if !(*npc_enemy).client.is_null()
                 && (*((*npc_enemy).client as *mut gclient_t)).NPC_class == CLASS_RANCOR
             {
@@ -1481,22 +1473,17 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                     crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue);
                 }
             } else if (*npc).count == 0 {
-                if crate::NPC_combat::ValidEnemy(
-                    ctx,
-                    ctx.entity_id_of(crate::ent_id::resolve(
-                        (*ctx.world).g_entities.as_mut_ptr(),
-                        (*npc).enemy,
-                    )),
-                ) == qfalse
-                {
+                let __s901 = (*ctx.world_raw()).g_entities.as_mut_ptr();
+                let __s902 = ctx.entity_id_of(crate::ent_id::resolve(__s901, (*npc).enemy));
+                if crate::NPC_combat::ValidEnemy(ctx, __s902) == qfalse {
                     crate::g_timer::TIMER_Remove(
                         ctx,
                         ctx.entity_id_of(npc),
                         c"lookForNewEnemy".as_ptr(),
                     ); //make them look again right now
                     if (*npc_enemy).inuse == 0
-                        || (*ctx.world).level.time - (*npc_enemy).s.time
-                            > (*ctx.world).bg_state.rng.Q_irand(10000, 15000)
+                        || (*ctx.world_raw()).level.time - (*npc_enemy).s.time
+                            > (*ctx.world_raw()).bg_state.rng.Q_irand(10000, 15000)
                     {
                         //it's been a while since the enemy died, or enemy is completely gone, get bored with him
                         (*npc).enemy = None;
@@ -1513,15 +1500,13 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                 {
                     let sav_enemy = (*npc).enemy;
                     (*npc).enemy = None;
-                    let newEnemy = crate::NPC_combat::NPC_CheckEnemy(
-                        ctx,
-                        ((*npc_info).confusionTime < (*ctx.world).level.time) as c_int,
-                        qfalse,
-                        qfalse,
-                    );
+                    let __h182 =
+                        ((*npc_info).confusionTime < (*ctx.world_raw()).level.time) as c_int;
+                    let newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, __h182, qfalse, qfalse);
                     (*npc).enemy = sav_enemy;
                     if !newEnemy.is_null()
-                        && ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), newEnemy) != sav_enemy
+                        && ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), newEnemy)
+                            != sav_enemy
                     {
                         //picked up a new enemy!
                         (*npc).lastEnemy = (*npc).enemy;
@@ -1530,46 +1515,34 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                             ctx.entity_id_of(npc).unwrap(),
                             ctx.entity_id_of(newEnemy),
                         );
+                        let __h183 = ctx.entity_id_of(npc);
+                        let __h184 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
                         //hold this one for at least 5-15 seconds
-                        crate::g_timer::TIMER_Set(
-                            ctx,
-                            ctx.entity_id_of(npc),
-                            c"lookForNewEnemy".as_ptr(),
-                            (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
-                        );
+                        crate::g_timer::TIMER_Set(ctx, __h183, c"lookForNewEnemy".as_ptr(), __h184);
                     } else {
+                        let __h185 = ctx.entity_id_of(npc);
+                        let __h186 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 5000);
                         //look again in 2-5 secs
-                        crate::g_timer::TIMER_Set(
-                            ctx,
-                            ctx.entity_id_of(npc),
-                            c"lookForNewEnemy".as_ptr(),
-                            (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
-                        );
+                        crate::g_timer::TIMER_Set(ctx, __h185, c"lookForNewEnemy".as_ptr(), __h186);
                     }
                 }
             }
             Rancor_Combat(ctx);
         } else {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"idlenoise".as_ptr()) != 0 {
-                crate::g_utils::G_Sound(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(
-                        cstr(&format!(
-                            "sound/chars/rancor/snort_{}.wav",
-                            (*ctx.world).bg_state.rng.Q_irand(1, 2)
-                        ))
-                        .as_ptr(),
-                    ),
+                let __h187 = ctx.entity_id_of(npc);
+                let __h188 = crate::g_utils::G_SoundIndex(
+                    cstr(&format!(
+                        "sound/chars/rancor/snort_{}.wav",
+                        (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2)
+                    ))
+                    .as_ptr(),
                 );
+                crate::g_utils::G_Sound(ctx, __h187, CHAN_AUTO, __h188);
 
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"idlenoise".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
-                );
+                let __h189 = ctx.entity_id_of(npc);
+                let __h190 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+                crate::g_timer::TIMER_Set(ctx, __h189, c"idlenoise".as_ptr(), __h190);
                 crate::NPC_senses::AddSoundEvent(
                     ctx,
                     ctx.entity_id_of(npc),

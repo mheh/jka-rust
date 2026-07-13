@@ -55,9 +55,9 @@ const weaponNameFromIndex: [*const c_char; WP_NUM_WEAPONS as usize] = [
 /// level start. Faithfully omits `G_WeaponLogClientTouch` (the oracle's
 /// `memset` list skips it).
 /// Source: `oracle/codemp/game/g_log.c:108-121`
-pub fn G_LogWeaponInit(ctx: GameContext<'_>) {
+pub fn G_LogWeaponInit(ctx: &mut GameContext) {
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogPickups = [[0; WP_NUM_WEAPONS as usize]; MAX_CLIENTS];
         g.G_WeaponLogFired = [[0; WP_NUM_WEAPONS as usize]; MAX_CLIENTS];
         g.G_WeaponLogDamage.0 = [[0; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS];
@@ -73,7 +73,7 @@ pub fn G_LogWeaponInit(ctx: GameContext<'_>) {
 
 /// Raven `G_LogWeaponPickup`.
 /// Source: `oracle/codemp/game/g_log.c:123-129`
-pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
+pub fn G_LogWeaponPickup(ctx: &mut GameContext, client: c_int, weaponid: c_int) {
     // Raven has no guard here and writes `G_WeaponLogPickups[client]` out of
     // bounds for NPC entity numbers (>= MAX_CLIENTS) — UB. Defined behavior:
     // skip logging (porting-rules §19).
@@ -81,7 +81,7 @@ pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogPickups[client as usize][weaponid as usize] += 1;
         g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
@@ -90,7 +90,7 @@ pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 /// Raven `G_LogWeaponFire` — records a shot and the (capped at 5s) time since
 /// this client's last logged weapon action.
 /// Source: `oracle/codemp/game/g_log.c:131-145`
-pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
+pub fn G_LogWeaponFire(ctx: &mut GameContext, client: c_int, weaponid: c_int) {
     // Raven has no guard here and writes `G_WeaponLogFired[client]` out of
     // bounds for NPC entity numbers (>= MAX_CLIENTS) — UB. Defined behavior:
     // skip logging (porting-rules §19).
@@ -98,8 +98,8 @@ pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
         return;
     }
     unsafe {
-        let time = (*ctx.world).level.time;
-        let g = &mut (*ctx.world).globals;
+        let time = (*ctx.world_raw()).level.time;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogFired[client as usize][weaponid as usize] += 1;
         let dur = time - g.G_WeaponLogLastTime[client as usize];
         if dur > 5000 {
@@ -115,12 +115,12 @@ pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 
 /// Raven `G_LogWeaponDamage`.
 /// Source: `oracle/codemp/game/g_log.c:147-155`
-pub fn G_LogWeaponDamage(ctx: GameContext<'_>, client: c_int, r#mod: c_int, amount: c_int) {
+pub fn G_LogWeaponDamage(ctx: &mut GameContext, client: c_int, r#mod: c_int, amount: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogDamage.0[client as usize][r#mod as usize] += amount;
         g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
@@ -128,12 +128,12 @@ pub fn G_LogWeaponDamage(ctx: GameContext<'_>, client: c_int, r#mod: c_int, amou
 
 /// Raven `G_LogWeaponKill`.
 /// Source: `oracle/codemp/game/g_log.c:157-165`
-pub fn G_LogWeaponKill(ctx: GameContext<'_>, client: c_int, r#mod: c_int) {
+pub fn G_LogWeaponKill(ctx: &mut GameContext, client: c_int, r#mod: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogKills.0[client as usize][r#mod as usize] += 1;
         g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
@@ -141,12 +141,12 @@ pub fn G_LogWeaponKill(ctx: GameContext<'_>, client: c_int, r#mod: c_int) {
 
 /// Raven `G_LogWeaponFrag`.
 /// Source: `oracle/codemp/game/g_log.c:167-175`
-pub fn G_LogWeaponFrag(ctx: GameContext<'_>, attacker: c_int, deadguy: c_int) {
+pub fn G_LogWeaponFrag(ctx: &mut GameContext, attacker: c_int, deadguy: c_int) {
     if attacker >= MAX_CLIENTS as c_int || deadguy >= MAX_CLIENTS as c_int {
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogFrags[attacker as usize][deadguy as usize] += 1;
         g.G_WeaponLogClientTouch[attacker as usize] = qtrue;
     }
@@ -154,12 +154,12 @@ pub fn G_LogWeaponFrag(ctx: GameContext<'_>, attacker: c_int, deadguy: c_int) {
 
 /// Raven `G_LogWeaponDeath`.
 /// Source: `oracle/codemp/game/g_log.c:177-185`
-pub fn G_LogWeaponDeath(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
+pub fn G_LogWeaponDeath(ctx: &mut GameContext, client: c_int, weaponid: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogDeaths[client as usize][weaponid as usize] += 1;
         g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
@@ -167,7 +167,7 @@ pub fn G_LogWeaponDeath(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {
 
 /// Raven `G_LogWeaponPowerup`.
 /// Source: `oracle/codemp/game/g_log.c:187-195`
-pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int) {
+pub fn G_LogWeaponPowerup(ctx: &mut GameContext, client: c_int, powerupid: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
     }
@@ -178,7 +178,7 @@ pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int)
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogPowerups[client as usize][powerupid as usize] += 1;
         g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
@@ -186,12 +186,12 @@ pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int)
 
 /// Raven `G_LogWeaponItem`.
 /// Source: `oracle/codemp/game/g_log.c:197-205`
-pub fn G_LogWeaponItem(ctx: GameContext<'_>, client: c_int, itemid: c_int) {
+pub fn G_LogWeaponItem(ctx: &mut GameContext, client: c_int, itemid: c_int) {
     if client >= MAX_CLIENTS as c_int {
         return;
     }
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         g.G_WeaponLogItems[client as usize][itemid as usize] += 1;
         g.G_WeaponLogClientTouch[client as usize] = qtrue;
     }
@@ -201,11 +201,11 @@ pub fn G_LogWeaponItem(ctx: GameContext<'_>, client: c_int, itemid: c_int) {
 /// console log and appends the per-player tables to `g_statLogFile`. Runtime-
 /// gated by the `g_statLog` cvar: returns immediately when it is `0`.
 /// Source: `oracle/codemp/game/g_log.c:227-821`
-pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
+pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
     const WPN: usize = WP_NUM_WEAPONS as usize;
     const MODN: usize = meansOfDeath_t::MOD_MAX as usize;
     unsafe {
-        if (*ctx.world).cvars.g_statLog.integer == 0 {
+        if (*ctx.world_raw()).cvars.g_statLog.integer == 0 {
             return;
         }
 
@@ -224,17 +224,17 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         let mut totalshots = [0i32; WPN];
 
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*ctx.world_raw()).globals.G_WeaponLogClientTouch[i] != qfalse {
                 // Ignore any entity/clients we don't care about!
                 for j in 0..WPN {
-                    totalpickups[j] += (*ctx.world).globals.G_WeaponLogPickups[i][j];
-                    totaltime[j] += (*ctx.world).globals.G_WeaponLogTime[i][j];
-                    totaldeaths[j] += (*ctx.world).globals.G_WeaponLogDeaths[i][j];
-                    totalshots[j] += (*ctx.world).globals.G_WeaponLogFired[i][j];
+                    totalpickups[j] += (*ctx.world_raw()).globals.G_WeaponLogPickups[i][j];
+                    totaltime[j] += (*ctx.world_raw()).globals.G_WeaponLogTime[i][j];
+                    totaldeaths[j] += (*ctx.world_raw()).globals.G_WeaponLogDeaths[i][j];
+                    totalshots[j] += (*ctx.world_raw()).globals.G_WeaponLogFired[i][j];
                 }
                 for j in 0..MODN {
-                    totaldamage_mod[j] += (*ctx.world).globals.G_WeaponLogDamage.0[i][j];
-                    totalkills_mod[j] += (*ctx.world).globals.G_WeaponLogKills.0[i][j];
+                    totaldamage_mod[j] += (*ctx.world_raw()).globals.G_WeaponLogDamage.0[i][j];
+                    totalkills_mod[j] += (*ctx.world_raw()).globals.G_WeaponLogKills.0[i][j];
                 }
             }
         }
@@ -301,9 +301,14 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
 
         // Write the whole weapon statistic log out to a file.
         let mut weaponfile: fileHandle_t = 0;
-        let log_name = CStr::from_ptr((*ctx.world).cvars.g_statLogFile.string.as_ptr()).to_owned();
+        // Decoupled from `ctx` so the `write`/`player_name` closures below don't
+        // need to hold a live `&mut ctx` for their whole (loop-spanning) lifetime
+        // (`world_raw`'s borrow of `ctx` ends the instant it returns the pointer).
+        let world_ptr = ctx.world_raw();
+        let engine = ctx.engine;
+        let log_name = CStr::from_ptr((*world_ptr).cvars.g_statLogFile.string.as_ptr()).to_owned();
         trap::FS_FOpenFile(
-            ctx.engine,
+            engine,
             GFsFopenFileArgs::new(log_name, &mut weaponfile, FS_APPEND),
         );
         if weaponfile == 0 {
@@ -314,14 +319,14 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         let write = |s: &str| {
             let b = s.as_bytes();
             trap::FS_Write(
-                ctx.engine,
+                engine,
                 GFsWriteArgs::new(b.as_ptr(), b.len() as c_int, weaponfile),
             );
         };
 
         // Write out the level name.
         let mut info: [c_char; 1024] = [0; 1024];
-        trap::GetServerinfo(ctx.engine, GGetServerinfoArgs::new(info.as_mut_ptr(), 1024));
+        trap::GetServerinfo(engine, GGetServerinfoArgs::new(info.as_mut_ptr(), 1024));
         let mapname_full =
             cstr_to_str(Info_ValueForKey(info.as_ptr(), cstr("mapname").as_ptr())).to_string();
         // strncpy(mapname, ..., sizeof(mapname)-1) -> 127-byte cap.
@@ -331,7 +336,7 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
 
         // Helper: the player's netname (or "<Unknown>" when clientless).
         let player_name = |i: usize| -> String {
-            let pc = (*ctx.world).g_entities[i].client as *mut gclient_t;
+            let pc = (*world_ptr).g_entities[i].client as *mut gclient_t;
             if !pc.is_null() {
                 cstr_to_str((*pc).pers.netname.as_ptr()).to_string()
             } else {
@@ -347,13 +352,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!(
-                        "\t{}",
-                        (*ctx.world).globals.G_WeaponLogPickups[i][j]
-                    ));
+                    let __h794 = (*world_ptr).globals.G_WeaponLogPickups[i][j];
+                    let __h544 = &format!("\t{}", __h794);
+                    write(__h544);
                 }
                 write("\n");
             }
@@ -372,13 +376,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!(
-                        "\t{}",
-                        (*ctx.world).globals.G_WeaponLogFired[i][j]
-                    ));
+                    let __h795 = (*world_ptr).globals.G_WeaponLogFired[i][j];
+                    let __h545 = &format!("\t{}", __h795);
+                    write(__h545);
                 }
                 write("\n");
             }
@@ -397,10 +400,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!("\t{}", (*ctx.world).globals.G_WeaponLogTime[i][j]));
+                    let __h796 = (*world_ptr).globals.G_WeaponLogTime[i][j];
+                    let __h546 = &format!("\t{}", __h796);
+                    write(__h546);
                 }
                 write("\n");
             }
@@ -419,13 +424,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..WPN {
-                    write(&format!(
-                        "\t{}",
-                        (*ctx.world).globals.G_WeaponLogDeaths[i][j]
-                    ));
+                    let __h797 = (*world_ptr).globals.G_WeaponLogDeaths[i][j];
+                    let __h547 = &format!("\t{}", __h797);
+                    write(__h547);
                 }
                 write("\n");
             }
@@ -444,13 +448,13 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 // Grab the totals from the damage types for the player and map them to the weapons.
                 let mut percharacter = [0i32; WPN];
                 for j in 0..MODN {
                     if j <= MOD_SENTRY as usize {
                         let curwp = weaponFromMOD[j] as usize;
-                        percharacter[curwp] += (*ctx.world).globals.G_WeaponLogDamage.0[i][j];
+                        percharacter[curwp] += (*world_ptr).globals.G_WeaponLogDamage.0[i][j];
                     }
                 }
                 write(&player_name(i));
@@ -474,12 +478,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 let mut percharacter = [0i32; WPN];
                 for j in 0..MODN {
                     if j <= MOD_SENTRY as usize {
                         let curwp = weaponFromMOD[j] as usize;
-                        percharacter[curwp] += (*ctx.world).globals.G_WeaponLogKills.0[i][j];
+                        percharacter[curwp] += (*world_ptr).globals.G_WeaponLogKills.0[i][j];
                     }
                 }
                 write(&player_name(i));
@@ -503,13 +507,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..MODN {
-                    write(&format!(
-                        "\t{}",
-                        (*ctx.world).globals.G_WeaponLogDamage.0[i][j]
-                    ));
+                    let __h798 = (*world_ptr).globals.G_WeaponLogDamage.0[i][j];
+                    let __h548 = &format!("\t{}", __h798);
+                    write(__h548);
                 }
                 write("\n");
             }
@@ -528,13 +531,12 @@ pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
         }
         write("\n");
         for i in 0..MAX_CLIENTS {
-            if (*ctx.world).globals.G_WeaponLogClientTouch[i] != qfalse {
+            if (*world_ptr).globals.G_WeaponLogClientTouch[i] != qfalse {
                 write(&player_name(i));
                 for j in 0..MODN {
-                    write(&format!(
-                        "\t{}",
-                        (*ctx.world).globals.G_WeaponLogKills.0[i][j]
-                    ));
+                    let __h799 = (*world_ptr).globals.G_WeaponLogKills.0[i][j];
+                    let __h549 = &format!("\t{}", __h799);
+                    write(__h549);
                 }
                 write("\n");
             }
@@ -575,18 +577,18 @@ fn weaponName(j: usize) -> String {
 /// tops 50%. Writes the winner's efficiency percentage through `efficiency`.
 /// Source: `oracle/codemp/game/g_log.c:824-863`
 pub fn CalculateEfficiency(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     efficiency: *mut c_int,
 ) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         let mut f_best_ratio = 0.0f32;
         let mut n_best_player: c_int = -1;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             if player.inuse == qfalse {
                 continue;
             }
@@ -617,30 +619,30 @@ pub fn CalculateEfficiency(
 /// Raven `CalculateSharpshooter` — awards the sniper-kills leader if they and
 /// the passed player both averaged at least one sniper kill per minute.
 /// Source: `oracle/codemp/game/g_log.c:866-903`
-pub fn CalculateSharpshooter(ctx: GameContext<'_>, ent: EntityId, frags: *mut c_int) -> qboolean {
+pub fn CalculateSharpshooter(ctx: &mut GameContext, ent: EntityId, frags: *mut c_int) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
-        let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
+        let play_time = ((*ctx.world_raw()).level.time - (*ec).pers.enterTime) / 60000;
         let ent_idx = (*ent).s.number as usize;
 
         // if this guy didn't get one kill per minute, reject him right now
-        let my_kills = (*ctx.world).globals.G_WeaponLogKills.0[ent_idx]
+        let my_kills = (*ctx.world_raw()).globals.G_WeaponLogKills.0[ent_idx]
             [meansOfDeath_t::MOD_DISRUPTOR_SNIPER as usize];
         if (my_kills as f32) / (play_time as f32) < 1.0 {
             return qfalse;
         }
 
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         let mut n_most_kills: c_int = 0;
         let mut n_best_player: c_int = -1;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             if player.inuse == qfalse {
                 continue;
             }
-            let n_kills = (*ctx.world).globals.G_WeaponLogKills.0[i as usize]
+            let n_kills = (*ctx.world_raw()).globals.G_WeaponLogKills.0[i as usize]
                 [meansOfDeath_t::MOD_DISRUPTOR_SNIPER as usize];
             if n_kills > n_most_kills {
                 n_most_kills = n_kills;
@@ -661,14 +663,15 @@ pub fn CalculateSharpshooter(ctx: GameContext<'_>, ent: EntityId, frags: *mut c_
 /// Raven `CalculateUntouchable` — the "perfect game" award: at least two points
 /// per minute and never killed.
 /// Source: `oracle/codemp/game/g_log.c:906-928`
-pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateUntouchable(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
-        let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
+        let play_time = ((*ctx.world_raw()).level.time - (*ec).pers.enterTime) / 60000;
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != qfalse
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_JEDIMASTER
+            && (*ec).ps.isJediMaster != qfalse
         {
             // Jedi Master (was Borg queen) can only be killed once anyway
             return qfalse;
@@ -690,32 +693,32 @@ pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// Raven `CalculateLogistics` — awards the player who used the most items and
 /// powerups, provided they used at least four distinct kinds.
 /// Source: `oracle/codemp/game/g_log.c:931-982`
-pub fn CalculateLogistics(ctx: GameContext<'_>, ent: EntityId, stuffUsed: *mut c_int) -> qboolean {
+pub fn CalculateLogistics(ctx: &mut GameContext, ent: EntityId, stuffUsed: *mut c_int) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         let mut n_best_player: c_int = -1;
         let mut n_most_stuff_used: c_int = 0;
         let mut n_most_different: c_int = 0;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             if player.inuse == qfalse {
                 continue;
             }
             let mut n_stuff_used: c_int = 0;
             let mut n_different: c_int = 0;
             for j in (HI_NONE as usize + 1)..HI_NUM_HOLDABLE as usize {
-                if (*ctx.world).globals.G_WeaponLogPowerups[i as usize][j] != 0 {
+                if (*ctx.world_raw()).globals.G_WeaponLogPowerups[i as usize][j] != 0 {
                     n_different += 1;
                 }
-                n_stuff_used += (*ctx.world).globals.G_WeaponLogPowerups[i as usize][j];
+                n_stuff_used += (*ctx.world_raw()).globals.G_WeaponLogPowerups[i as usize][j];
             }
             for j in (PW_NONE as usize + 1)..PW_NUM_POWERUPS as usize {
-                if (*ctx.world).globals.G_WeaponLogItems[i as usize][j] != 0 {
+                if (*ctx.world_raw()).globals.G_WeaponLogItems[i as usize][j] != 0 {
                     n_different += 1;
                 }
-                n_stuff_used += (*ctx.world).globals.G_WeaponLogItems[i as usize][j];
+                n_stuff_used += (*ctx.world_raw()).globals.G_WeaponLogItems[i as usize][j];
             }
             if n_different >= 4
                 && n_different >= n_most_different
@@ -741,18 +744,19 @@ pub fn CalculateLogistics(ctx: GameContext<'_>, ent: EntityId, stuffUsed: *mut c
 /// weapon available on the map (and the most such kills), given a two-per-minute
 /// score rate and no saber-only / Jedi-Master restriction.
 /// Source: `oracle/codemp/game/g_log.c:988-1081`
-pub fn CalculateTactician(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int) -> qboolean {
+pub fn CalculateTactician(ctx: &mut GameContext, ent: EntityId, kills: *mut c_int) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
-        let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
+        let play_time = ((*ctx.world_raw()).level.time - (*ec).pers.enterTime) / 60000;
 
         if HasSetSaberOnly(ctx) != qfalse {
             // duh, only 1 weapon
             return qfalse;
         }
-        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != qfalse
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_JEDIMASTER
+            && (*ec).ps.isJediMaster != qfalse
         {
             // Jedi Master (was Borg queen) has only 1 weapon
             return qfalse;
@@ -766,13 +770,13 @@ pub fn CalculateTactician(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int
             return qfalse;
         }
 
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
 
         // FOR EVERY WEAPON, ADD UP TOTAL PICKUPS
         let mut was_picked_up = [0i32; WP_NUM_WEAPONS as usize];
         for person in 0..maxclients {
             for weapon in 0..WP_NUM_WEAPONS as usize {
-                if (*ctx.world).globals.G_WeaponLogPickups[person as usize][weapon] > 0 {
+                if (*ctx.world_raw()).globals.G_WeaponLogPickups[person as usize][weapon] > 0 {
                     was_picked_up[weapon] += 1;
                 }
             }
@@ -783,7 +787,7 @@ pub fn CalculateTactician(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int
 
         // FOR EVERY PERSON, CHECK FOR CANDIDATE
         for person in 0..maxclients {
-            let player = &(*ctx.world).g_entities[person as usize];
+            let player = &(*ctx.world_raw()).g_entities[person as usize];
             if player.inuse == qfalse {
                 continue;
             }
@@ -795,7 +799,7 @@ pub fn CalculateTactician(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int
             for i in 0..meansOfDeath_t::MOD_MAX as usize {
                 let weapon = weaponFromMOD[i] as usize;
                 kills_with_weapon[weapon] +=
-                    (*ctx.world).globals.G_WeaponLogKills.0[person as usize][i];
+                    (*ctx.world_raw()).globals.G_WeaponLogKills.0[person as usize][i];
             }
 
             let mut weapon = WP_STUN_BATON;
@@ -824,21 +828,21 @@ pub fn CalculateTactician(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int
 /// they averaged at least two explosive kills per minute (`playTime` measured
 /// from the passed player, a faithful Raven quirk).
 /// Source: `oracle/codemp/game/g_log.c:1087-1134`
-pub fn CalculateDemolitionist(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int) -> qboolean {
+pub fn CalculateDemolitionist(ctx: &mut GameContext, ent: EntityId, kills: *mut c_int) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
-        let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let play_time = ((*ctx.world_raw()).level.time - (*ec).pers.enterTime) / 60000;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         let mut n_most_kills: c_int = 0;
         let mut n_best_player: c_int = -1;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             if player.inuse == qfalse {
                 continue;
             }
-            let k = (*ctx.world).globals.G_WeaponLogKills.0[i as usize];
+            let k = (*ctx.world_raw()).globals.G_WeaponLogKills.0[i as usize];
             let mut n_kills = k[meansOfDeath_t::MOD_THERMAL as usize];
             n_kills += k[meansOfDeath_t::MOD_THERMAL_SPLASH as usize];
             n_kills += k[meansOfDeath_t::MOD_ROCKET as usize];
@@ -882,7 +886,7 @@ pub fn CalculateStreak(ent: &gentity_t) -> c_int {
 /// Raven `CalculateTeamMVP`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1160-1188`
-pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamMVP(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -890,9 +894,9 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
@@ -920,7 +924,7 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// special case is commented out in the oracle (`#if 0`-equivalent
 /// `/* */`) — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1190-1240`
-pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamMVPByRank(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -929,9 +933,9 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         let b_tied = team == 3;
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             if player.inuse == qfalse {
                 continue;
             }
@@ -960,7 +964,7 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// Raven: the `CalculateTeamMVP(ent)` short-circuit is commented out in the
 /// oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1242-1276`
-pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamDefender(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -968,9 +972,9 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
@@ -997,7 +1001,7 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// Raven: the `CalculateTeamMVP(ent) || CalculateTeamDefender(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1278-1312`
-pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamWarrior(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1005,9 +1009,9 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
@@ -1034,7 +1038,7 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// Raven: the `CalculateTeamMVP/Defender/Warrior(ent)` short-circuit is
 /// commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1314-1348`
-pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamCarrier(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1042,9 +1046,9 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
@@ -1071,7 +1075,7 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 /// Raven: the `CalculateTeamMVP/Defender/Warrior/Carrier(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1350-1386`
-pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamInterceptor(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1079,9 +1083,9 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: EntityId) -> qboolean
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
@@ -1109,7 +1113,7 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: EntityId) -> qboolean
 /// Raven: the `CalculateTeamMVP/Defender/Warrior/Carrier/Interceptor(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1388-1424`
-pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateTeamRedShirt(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1117,9 +1121,9 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
@@ -1167,7 +1171,7 @@ pub enum TeamAward_e {
 /// Raven `CalculateTeamAward`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1451-1484`
-pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: EntityId) -> c_int {
+pub fn CalculateTeamAward(ctx: &mut GameContext, ent: EntityId) -> c_int {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1176,8 +1180,8 @@ pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: EntityId) -> c_int {
         if CalculateTeamMVP(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
             team_awards |= 1 << TeamAward_e::TeamMvp as i32;
         }
-        if (*ctx.world).cvars.g_gametype.integer == GT_CTF
-            || (*ctx.world).cvars.g_gametype.integer == GT_CTY
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_CTF
+            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_CTY
         {
             if CalculateTeamDefender(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamDefender as i32;
@@ -1204,15 +1208,15 @@ pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: EntityId) -> c_int {
 /// Raven `CalculateSection31Award` — the all-around "god" award: sharpshooter,
 /// untouchable, and ≥75 efficiency all at once.
 /// Source: `oracle/codemp/game/g_log.c:1486-1514`
-pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CalculateSection31Award(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let maxclients = (*ctx.world_raw()).cvars.g_maxclients.integer;
         let mut efficiency: c_int = 0;
         let mut frags: c_int = 0;
         for i in 0..maxclients {
-            let player = &(*ctx.world).g_entities[i as usize];
+            let player = &(*ctx.world_raw()).g_entities[i as usize];
             if player.inuse == qfalse {
                 continue;
             }
@@ -1255,7 +1259,7 @@ const AWARDS_MSG_LENGTH: usize = 256;
 /// values onto `msg` (a fixed `AWARDS_MSG_LENGTH` buffer, truncated like
 /// `Com_sprintf`).
 /// Source: `oracle/codemp/game/g_log.c:1518-1587`
-pub fn CalculateAwards(ctx: GameContext<'_>, ent: EntityId, msg: *mut c_char) {
+pub fn CalculateAwards(ctx: &mut GameContext, ent: EntityId, msg: *mut c_char) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1295,7 +1299,7 @@ pub fn CalculateAwards(ctx: GameContext<'_>, ent: EntityId, msg: *mut c_char) {
             award_flags |= 1 << awardType_t::AWARD_STREAK as i32;
             buf1 = format!("{} {}", buf1, streak);
         }
-        if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
+        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM {
             let team_awards = CalculateTeamAward(ctx, ctx.entity_id_of(ent).unwrap());
             if team_awards != 0 {
                 award_flags |= 1 << awardType_t::AWARD_TEAM as i32;
@@ -1319,14 +1323,14 @@ pub fn CalculateAwards(ctx: GameContext<'_>, ent: EntityId, msg: *mut c_char) {
 /// Raven `GetMaxDeathsForClient`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1589-1605`
-pub fn GetMaxDeathsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
+pub fn GetMaxDeathsForClient(ctx: &mut GameContext, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
     }
     unsafe {
         let mut n_most_deaths: c_int = 0;
         for i in 0..MAX_CLIENTS as c_int {
-            let v = (*ctx.world).globals.G_WeaponLogFrags[i as usize][nClient as usize];
+            let v = (*ctx.world_raw()).globals.G_WeaponLogFrags[i as usize][nClient as usize];
             if v > n_most_deaths {
                 n_most_deaths = v;
             }
@@ -1338,14 +1342,14 @@ pub fn GetMaxDeathsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
 /// Raven `GetMaxKillsForClient`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1607-1623`
-pub fn GetMaxKillsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
+pub fn GetMaxKillsForClient(ctx: &mut GameContext, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
     }
     unsafe {
         let mut n_most_kills: c_int = 0;
         for i in 0..MAX_CLIENTS as c_int {
-            let v = (*ctx.world).globals.G_WeaponLogFrags[nClient as usize][i as usize];
+            let v = (*ctx.world_raw()).globals.G_WeaponLogFrags[nClient as usize][i as usize];
             if v > n_most_kills {
                 n_most_kills = v;
             }
@@ -1357,7 +1361,7 @@ pub fn GetMaxKillsForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
 /// Raven `GetFavoriteTargetForClient`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1625-1642`
-pub fn GetFavoriteTargetForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
+pub fn GetFavoriteTargetForClient(ctx: &mut GameContext, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
     }
@@ -1365,7 +1369,7 @@ pub fn GetFavoriteTargetForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int
         let mut n_most_kills: c_int = 0;
         let mut n_favorite_target: c_int = -1;
         for i in 0..MAX_CLIENTS as c_int {
-            let v = (*ctx.world).globals.G_WeaponLogFrags[nClient as usize][i as usize];
+            let v = (*ctx.world_raw()).globals.G_WeaponLogFrags[nClient as usize][i as usize];
             if v > n_most_kills {
                 n_most_kills = v;
                 n_favorite_target = i;
@@ -1381,7 +1385,7 @@ pub fn GetFavoriteTargetForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int
 /// else over the client... I.E. Most deaths should not tie with yourself
 /// and have yourself show up..."
 /// Source: `oracle/codemp/game/g_log.c:1644-1666`
-pub fn GetWorstEnemyForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
+pub fn GetWorstEnemyForClient(ctx: &mut GameContext, nClient: c_int) -> c_int {
     if nClient < 0 || nClient >= MAX_CLIENTS as c_int {
         return 0;
     }
@@ -1389,7 +1393,7 @@ pub fn GetWorstEnemyForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
         let mut n_most_deaths: c_int = 0;
         let mut n_worst_enemy: c_int = -1;
         for i in 0..MAX_CLIENTS as c_int {
-            let v = (*ctx.world).globals.G_WeaponLogFrags[i as usize][nClient as usize];
+            let v = (*ctx.world_raw()).globals.G_WeaponLogFrags[i as usize][nClient as usize];
             if v > n_most_deaths || (v == n_most_deaths && i != nClient && n_most_deaths != 0) {
                 n_most_deaths = v;
                 n_worst_enemy = i;
@@ -1456,7 +1460,7 @@ pub const weaponFromMOD: [c_int; meansOfDeath_t::MOD_MAX as usize] = {
 /// Raven `GetFavoriteWeaponForClient`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1668-1702`
-pub fn GetFavoriteWeaponForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
+pub fn GetFavoriteWeaponForClient(ctx: &mut GameContext, nClient: c_int) -> c_int {
     let mut n_most_kills: c_int = 0;
     let mut fav: c_int = 0;
     let mut weapon: c_int;
@@ -1475,7 +1479,7 @@ pub fn GetFavoriteWeaponForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int
 
             if weapon != WP_NONE as c_int {
                 kills_with_weapon[weapon as usize] +=
-                    (*ctx.world).globals.G_WeaponLogKills.0[nClient as usize][i as usize];
+                    (*ctx.world_raw()).globals.G_WeaponLogKills.0[nClient as usize][i as usize];
                 // Store Num Kills With Weapon
             }
         }
@@ -1502,9 +1506,9 @@ pub fn GetFavoriteWeaponForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int
 /// Raven: kef -- if a client leaves the game, clear out all counters he may
 /// have set.
 /// Source: `oracle/codemp/game/g_log.c:1705-1751`
-pub fn G_ClearClientLog(ctx: GameContext<'_>, client: c_int) {
+pub fn G_ClearClientLog(ctx: &mut GameContext, client: c_int) {
     unsafe {
-        let g = &mut (*ctx.world).globals;
+        let g = &mut (*ctx.world_raw()).globals;
         let c = client as usize;
         for i in 0..WP_NUM_WEAPONS as usize {
             g.G_WeaponLogPickups[c][i] = 0;

@@ -5,7 +5,7 @@
 //! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
 //! `gentity_t*`; the pilot is `crate::g_object`. These bodies are saturated
 //! with still-raw seam derefs (gclient walks, `teamchain` chases via
-//! `crate::ent_id::resolve`, the `pushed[]` save-stack, direct `(*ctx.world)`
+//! `crate::ent_id::resolve`, the `pushed[]` save-stack, direct `(*ctx.world_raw())`
 //! access), so per the landed-shard "mega-fn" precedent they convert at the
 //! **signature only**: each fn re-derives its raw `*mut gentity_t` at the top
 //! of the body (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and leaves the
@@ -84,7 +84,7 @@ pub const BMS_END: c_int = 2;
 /// Raven `G_PlayDoorLoopSound`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:45-60`
-pub fn G_PlayDoorLoopSound(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_PlayDoorLoopSound(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -101,7 +101,7 @@ pub fn G_PlayDoorLoopSound(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `G_PlayDoorSound`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:68-78`
-pub fn G_PlayDoorSound(ctx: GameContext<'_>, ent: EntityId, r#type: c_int) {
+pub fn G_PlayDoorSound(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -122,7 +122,7 @@ pub fn G_PlayDoorSound(ctx: GameContext<'_>, ent: EntityId, r#type: c_int) {
 /// Raven `G_TestEntityPosition`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:86-111`
-pub fn G_TestEntityPosition(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+pub fn G_TestEntityPosition(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -167,7 +167,7 @@ pub fn G_TestEntityPosition(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity
         }
 
         if tr.startsolid != 0 {
-            &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t
+            &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t
         } else {
             core::ptr::null_mut()
         }
@@ -241,7 +241,7 @@ pub fn G_RotatePoint(point: &mut vec3_t, matrix: *mut vec3_t) {
 /// they stay by value ("keep by-value only if never written" clause).
 /// Source: `oracle/codemp/game/g_mover.c:159-269`
 pub fn G_TryPushingEntity(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     check: EntityId,
     pusher: EntityId,
     r#move: vec3_t,
@@ -273,7 +273,7 @@ pub fn G_TryPushingEntity(
         }
 
         // save off the old position
-        let world = &mut *ctx.world;
+        let world = &mut *ctx.world_raw();
         let mut entry = PushedEntry {
             ent: check,
             origin: (*check).s.pos.trBase,
@@ -313,6 +313,7 @@ pub fn G_TryPushingEntity(
         G_RotatePoint(&mut org2, matrix.as_mut_ptr());
         let move2 = [org2[0] - org[0], org2[1] - org[1], org2[2] - org[2]];
 
+        let __h582 = ctx.entity_id_of(check).unwrap();
         // add movement
         for i in 0..3 {
             (*check).s.pos.trBase[i] += r#move[i];
@@ -335,7 +336,7 @@ pub fn G_TryPushingEntity(
             (*check).s.groundEntityNum = ENTITYNUM_NONE;
         }
 
-        let mut block = G_TestEntityPosition(ctx, ctx.entity_id_of(check).unwrap());
+        let mut block = G_TestEntityPosition(ctx, __h582);
         if block.is_null() {
             // pushed ok
             if !(*check).client.is_null() {
@@ -380,7 +381,8 @@ pub fn G_TryPushingEntity(
             (*client).ps.origin = last.origin;
         }
         (*check).s.apos.trBase = last.angles;
-        block = G_TestEntityPosition(ctx, ctx.entity_id_of(check).unwrap());
+        let __h583 = ctx.entity_id_of(check).unwrap();
+        block = G_TestEntityPosition(ctx, __h583);
         if block.is_null() {
             (*check).s.groundEntityNum = -1;
             world.globals.pushed_p -= 1;
@@ -398,7 +400,7 @@ pub fn G_TryPushingEntity(
 /// `move`/`amove` are read-only in Raven, so they stay by value.
 /// Source: `oracle/codemp/game/g_mover.c:283-408`
 pub fn G_MoverPush(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     pusher: EntityId,
     r#move: vec3_t,
     amove: vec3_t,
@@ -467,8 +469,8 @@ pub fn G_MoverPush(
 
         // see if any solid entities are inside the final position
         for e in 0..listed_entities {
-            let check =
-                &mut (*ctx.world).g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world_raw()).g_entities[entity_list[e as usize] as usize]
+                as *mut gentity_t;
 
             // only push items and players
             if (*check).s.eType != entityType_t::ET_PLAYER as c_int
@@ -575,7 +577,7 @@ pub fn G_MoverPush(
             // (Raven leaves `pushed_p` itself untouched here — only
             // `G_MoverTeam`'s next call resets it — so this walks the
             // snapshot without popping.)
-            let world = &mut *ctx.world;
+            let world = &mut *ctx.world_raw();
             for i in (0..world.globals.pushed_p).rev() {
                 let p = world.globals.pushed[i];
                 (*p.ent).s.pos.trBase = p.origin;
@@ -600,7 +602,7 @@ pub fn G_MoverPush(
 /// Raven `G_MoverTeam`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:416-471`
-pub fn G_MoverTeam(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -609,14 +611,14 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: EntityId) {
         // make sure all team slaves can move before commiting any moves or
         // calling any think functions — if the move is blocked, all moved
         // objects will be backed out.
-        (*ctx.world).globals.pushed.clear();
-        (*ctx.world).globals.pushed_p = 0;
+        (*ctx.world_raw()).globals.pushed.clear();
+        (*ctx.world_raw()).globals.pushed_p = 0;
 
         let mut part = ent;
         while !part.is_null() {
             let mut origin: vec3_t = [0.0; 3];
             let mut angles: vec3_t = [0.0; 3];
-            let time = (*ctx.world).level.time;
+            let time = (*ctx.world_raw()).level.time;
             crate::bg_misc::BG_EvaluateTrajectory(
                 &(*part).s.pos as *const trajectory_t,
                 time,
@@ -650,17 +652,20 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: EntityId) {
                     break; // move was blocked
                 }
             }
-            part = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*part).teamchain);
+            part = crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*part).teamchain,
+            );
         }
 
         if !part.is_null() {
             // go back to the previous position
             let mut p = ent;
             while !p.is_null() {
-                let dt = (*ctx.world).level.time - (*ctx.world).level.previousTime;
+                let dt = (*ctx.world_raw()).level.time - (*ctx.world_raw()).level.previousTime;
                 (*p).s.pos.trTime += dt;
                 (*p).s.apos.trTime += dt;
-                let time = (*ctx.world).level.time;
+                let time = (*ctx.world_raw()).level.time;
                 let mut cur_origin = (*p).r.currentOrigin;
                 let mut cur_angles = (*p).r.currentAngles;
                 crate::bg_misc::BG_EvaluateTrajectory(
@@ -676,7 +681,10 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: EntityId) {
                 (*p).r.currentOrigin = cur_origin;
                 (*p).r.currentAngles = cur_angles;
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(p));
-                p = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*p).teamchain);
+                p = crate::ent_id::resolve(
+                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                    (*p).teamchain,
+                );
             }
 
             // if the pusher has a "blocked" function, call it
@@ -693,13 +701,13 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: EntityId) {
             if (*p).s.pos.trType == trType_t::TR_LINEAR_STOP
                 || (*p).s.pos.trType == trType_t::TR_NONLINEAR_STOP
             {
-                if (*ctx.world).level.time >= (*p).s.pos.trTime + (*p).s.pos.trDuration {
+                if (*ctx.world_raw()).level.time >= (*p).s.pos.trTime + (*p).s.pos.trDuration {
                     if let Some(reached) = (*p).reached.get() {
                         crate::ent_fn_enums::dispatch_reached(ctx, reached, p);
                     }
                 }
             }
-            p = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*p).teamchain);
+            p = crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*p).teamchain);
         }
     }
 }
@@ -707,7 +715,7 @@ pub fn G_MoverTeam(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `G_RunMover`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:479-493`
-pub fn G_RunMover(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_RunMover(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -735,7 +743,7 @@ pub fn G_RunMover(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `CalcTeamDoorCenter`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:511-528`
-pub fn CalcTeamDoorCenter(ctx: GameContext<'_>, ent: EntityId, center: &mut vec3_t) {
+pub fn CalcTeamDoorCenter(ctx: &mut GameContext, ent: EntityId, center: &mut vec3_t) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -745,7 +753,7 @@ pub fn CalcTeamDoorCenter(ctx: GameContext<'_>, ent: EntityId, center: &mut vec3
         }
         let mut slave = (*ent).teamchain;
         while let Some(slave_id) = slave {
-            let slave_ptr = &mut (*ctx.world).g_entities[slave_id.index()] as *mut gentity_t;
+            let slave_ptr = &mut (*ctx.world_raw()).g_entities[slave_id.index()] as *mut gentity_t;
             // find slave's center
             let mut slave_center = [0.0f32; 3];
             for i in 0..3 {
@@ -763,7 +771,7 @@ pub fn CalcTeamDoorCenter(ctx: GameContext<'_>, ent: EntityId, center: &mut vec3
 /// Raven `SetMoverState`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:535-590`
-pub fn SetMoverState(ctx: GameContext<'_>, ent: EntityId, moverState: moverState_t, time: c_int) {
+pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverState_t, time: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -816,7 +824,7 @@ pub fn SetMoverState(ctx: GameContext<'_>, ent: EntityId, moverState: moverState
             }
             _ => {}
         }
-        let time = (*ctx.world).level.time;
+        let time = (*ctx.world_raw()).level.time;
         let mut cur_origin = (*ent).r.currentOrigin;
         crate::bg_misc::BG_EvaluateTrajectory(
             &(*ent).s.pos as *const trajectory_t,
@@ -833,7 +841,7 @@ pub fn SetMoverState(ctx: GameContext<'_>, ent: EntityId, moverState: moverState
 /// All entities in a mover team move from pos1 to pos2 in the same amount
 /// of time.
 /// Source: `oracle/codemp/game/g_mover.c:600-606`
-pub fn MatchTeam(ctx: GameContext<'_>, teamLeader: EntityId, moverState: c_int, time: c_int) {
+pub fn MatchTeam(ctx: &mut GameContext, teamLeader: EntityId, moverState: c_int, time: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let teamLeader: *mut gentity_t = ctx.entity_mut(teamLeader);
     unsafe {
@@ -845,8 +853,10 @@ pub fn MatchTeam(ctx: GameContext<'_>, teamLeader: EntityId, moverState: c_int, 
                 moverState as moverState_t,
                 time,
             );
-            slave =
-                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*slave).teamchain);
+            slave = crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*slave).teamchain,
+            );
         }
     }
 }
@@ -854,20 +864,17 @@ pub fn MatchTeam(ctx: GameContext<'_>, teamLeader: EntityId, moverState: c_int, 
 /// Raven `ReturnToPos1`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:615-625`
-pub fn ReturnToPos1(ctx: GameContext<'_>, ent: EntityId) {
+pub fn ReturnToPos1(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         (*ent).think = FnId::NONE;
         (*ent).nextthink = 0;
-        (*ent).s.time = (*ctx.world).level.time;
+        (*ent).s.time = (*ctx.world_raw()).level.time;
 
-        MatchTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            MOVER_2TO1,
-            (*ctx.world).level.time,
-        );
+        let __h584 = ctx.entity_id_of(ent).unwrap();
+        let __h585 = (*ctx.world_raw()).level.time;
+        MatchTeam(ctx, __h584, MOVER_2TO1, __h585);
 
         // starting sound
         G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
@@ -878,7 +885,7 @@ pub fn ReturnToPos1(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Reached_BinaryMover`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:634-702`
-pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -890,15 +897,18 @@ pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: EntityId) {
             // reached open
             let mut doorcenter: vec3_t = [0.0; 3];
 
-            SetMoverState(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                MOVER_POS2,
-                (*ctx.world).level.time,
-            );
+            let __h586 = ctx.entity_id_of(ent).unwrap();
+            let __h587 = (*ctx.world_raw()).level.time;
+            SetMoverState(ctx, __h586, MOVER_POS2, __h587);
             CalcTeamDoorCenter(ctx, ctx.entity_id_of(ent).unwrap(), &mut doorcenter);
             G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_END);
 
+            let __h588 = ctx.entity_id_of(ent);
+            let __h804 = crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*ent).activator,
+            );
+            let __h589 = ctx.entity_id_of(__h804);
             if (*ent).wait < 0.0 {
                 // done for good
                 (*ent).think = FnId::NONE;
@@ -911,39 +921,36 @@ pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: EntityId) {
                     // toggle, keep think, wait for next use
                     (*ent).nextthink = -1;
                 } else {
-                    (*ent).nextthink = (*ctx.world).level.time + (*ent).wait as c_int;
+                    (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).wait as c_int;
                 }
             }
 
             // fire targets
             if (*ent).activator.is_none() {
-                (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
+                (*ent).activator = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), ent);
             }
-            G_UseTargets2(
-                ctx,
-                ctx.entity_id_of(ent),
-                ctx.entity_id_of(crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
-                    (*ent).activator,
-                )),
-                (*ent).opentarget,
-            );
+            G_UseTargets2(ctx, __h588, __h589, (*ent).opentarget);
         } else if (*ent).moverState == MOVER_2TO1 {
             // closed
             let mut doorcenter: vec3_t = [0.0; 3];
 
-            SetMoverState(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                MOVER_POS1,
-                (*ctx.world).level.time,
-            );
+            let __h590 = ctx.entity_id_of(ent).unwrap();
+            let __h591 = (*ctx.world_raw()).level.time;
+            SetMoverState(ctx, __h590, MOVER_POS1, __h591);
             CalcTeamDoorCenter(ctx, ctx.entity_id_of(ent).unwrap(), &mut doorcenter);
             G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_END);
 
+            let __h592 = ctx.entity_id_of(ent);
+            let __h805 = crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*ent).activator,
+            );
+            let __h593 = ctx.entity_id_of(__h805);
             // close areaportals
-            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster)
-                == ent
+            if crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*ent).teammaster,
+            ) == ent
                 || (*ent).teammaster.is_none()
             {
                 trap::AdjustAreaPortalState(
@@ -951,15 +958,7 @@ pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: EntityId) {
                     GAdjustAreaPortalStateArgs::new(ent, qfalse),
                 );
             }
-            G_UseTargets2(
-                ctx,
-                ctx.entity_id_of(ent),
-                ctx.entity_id_of(crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
-                    (*ent).activator,
-                )),
-                (*ent).closetarget,
-            );
+            G_UseTargets2(ctx, __h592, __h593, (*ent).closetarget);
         } else {
             G_Error(ctx, c"Reached_BinaryMover: bad moverState".as_ptr());
         }
@@ -969,7 +968,7 @@ pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Use_BinaryMover_Go`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:710-828`
-pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -979,24 +978,29 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: EntityId) {
         if (*ent).moverState == MOVER_POS1 {
             let mut doorcenter: vec3_t = [0.0; 3];
 
+            let __h594 = ctx.entity_id_of(ent).unwrap();
+            let __h595 = (*ctx.world_raw()).level.time + 50;
             // start moving 50 msec later, because if this was player
             // triggered, level.time hasn't been advanced yet
-            MatchTeam(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                MOVER_1TO2,
-                (*ctx.world).level.time + 50,
-            );
+            MatchTeam(ctx, __h594, MOVER_1TO2, __h595);
             CalcTeamDoorCenter(ctx, ctx.entity_id_of(ent).unwrap(), &mut doorcenter);
 
             // starting sound
             G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
             G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
-            (*ent).s.time = (*ctx.world).level.time;
+            (*ent).s.time = (*ctx.world_raw()).level.time;
 
+            let __h596 = ctx.entity_id_of(ent);
+            let __h806 = crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*ent).activator,
+            );
+            let __h597 = ctx.entity_id_of(__h806);
             // open areaportal
-            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster)
-                == ent
+            if crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*ent).teammaster,
+            ) == ent
                 || (*ent).teammaster.is_none()
             {
                 trap::AdjustAreaPortalState(
@@ -1004,14 +1008,7 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: EntityId) {
                     GAdjustAreaPortalStateArgs::new(ent, qtrue),
                 );
             }
-            G_UseTargets(
-                ctx,
-                ctx.entity_id_of(ent),
-                ctx.entity_id_of(crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
-                    (*ent).activator,
-                )),
-            );
+            G_UseTargets(ctx, __h596, __h597);
             return;
         }
 
@@ -1019,21 +1016,19 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: EntityId) {
         if (*ent).moverState == MOVER_POS2 {
             // have to do this because the delay sets our think to Use_BinaryMover_Go
             (*ent).think = Some(EntThink::ReturnToPos1).into();
+            let __h598 = ctx.entity_id_of(ent);
+            let __h807 = crate::ent_id::resolve(
+                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                (*ent).activator,
+            );
+            let __h599 = ctx.entity_id_of(__h807);
             if (*ent).spawnflags & 8 != 0 {
                 // TOGGLE doors don't use wait!
-                (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
+                (*ent).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
             } else {
-                (*ent).nextthink = (*ctx.world).level.time + (*ent).wait as c_int;
+                (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).wait as c_int;
             }
-            G_UseTargets2(
-                ctx,
-                ctx.entity_id_of(ent),
-                ctx.entity_id_of(crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
-                    (*ent).activator,
-                )),
-                (*ent).target2,
-            );
+            G_UseTargets2(ctx, __h598, __h599, (*ent).target2);
             return;
         }
 
@@ -1061,11 +1056,11 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: EntityId) {
                 partial = total - f_partial.floor() as c_int;
             } else {
                 total = (*ent).s.pos.trDuration;
-                partial = (*ctx.world).level.time - (*ent).s.pos.trTime;
+                partial = (*ctx.world_raw()).level.time - (*ent).s.pos.trTime;
             }
 
             let partial = if partial > total { total } else { partial };
-            (*ent).s.pos.trTime = (*ctx.world).level.time - (total - partial);
+            (*ent).s.pos.trTime = (*ctx.world_raw()).level.time - (total - partial);
 
             MatchTeam(
                 ctx,
@@ -1101,11 +1096,11 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: EntityId) {
                 partial = total - f_partial.floor() as c_int;
             } else {
                 total = (*ent).s.pos.trDuration;
-                partial = (*ctx.world).level.time - (*ent).s.pos.trTime;
+                partial = (*ctx.world_raw()).level.time - (*ent).s.pos.trTime;
             }
 
             let partial = if partial > total { total } else { partial };
-            (*ent).s.pos.trTime = (*ctx.world).level.time - (total - partial);
+            (*ent).s.pos.trTime = (*ctx.world_raw()).level.time - (total - partial);
 
             MatchTeam(
                 ctx,
@@ -1178,7 +1173,7 @@ pub fn LockDoors(ent: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:863-901`
 pub fn Use_BinaryMover(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -1186,9 +1181,9 @@ pub fn Use_BinaryMover(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
     unsafe {
         if (*ent).use_.is_none() {
             // I cannot be used anymore, must be a door with a wait of -1 that's opened.
@@ -1218,11 +1213,11 @@ pub fn Use_BinaryMover(
 
         G_ActivateBehavior(ctx, ctx.entity_id_of(ent), bSet_t::BSET_USE as c_int);
 
-        (*ent).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
-        (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
+        (*ent).enemy = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), other);
+        (*ent).activator = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), activator);
         if (*ent).delay != 0 {
             (*ent).think = Some(EntThink::Use_BinaryMover_Go).into();
-            (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
+            (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).delay;
         } else {
             Use_BinaryMover_Go(ctx, ctx.entity_id_of(ent).unwrap());
         }
@@ -1259,7 +1254,7 @@ pub fn InitMoverTrData(ent: &mut gentity_t) {
 /// Raven `InitMover`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:936-999`
-pub fn InitMover(ctx: GameContext<'_>, ent: EntityId) {
+pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1337,11 +1332,11 @@ pub fn InitMover(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Blocked_Door`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1018-1029`
-pub fn Blocked_Door(ctx: GameContext<'_>, ent: EntityId, other: Option<EntityId>) {
+pub fn Blocked_Door(ctx: &mut GameContext, ent: EntityId, other: Option<EntityId>) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*ent).damage != 0 {
             // Resolved `G_Damage` takes `dir`/`point` by value (Raven passes
@@ -1377,7 +1372,7 @@ pub fn Blocked_Door(ctx: GameContext<'_>, ent: EntityId, other: Option<EntityId>
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1037-1071`
 pub fn Touch_DoorTriggerSpectator(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     _trace: *mut trace_t,
@@ -1385,7 +1380,7 @@ pub fn Touch_DoorTriggerSpectator(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in
         // `mp_bg::public::viewheight` (`c_int`, cast here to match the
@@ -1449,7 +1444,7 @@ pub fn Touch_DoorTriggerSpectator(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1078-1158`
 pub fn Touch_DoorTrigger(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     trace: *mut trace_t,
@@ -1457,11 +1452,11 @@ pub fn Touch_DoorTrigger(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         let mut relock_ent: *mut gentity_t = core::ptr::null_mut();
         let parent = match (*ent).parent {
-            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
 
@@ -1516,12 +1511,16 @@ pub fn Touch_DoorTrigger(
                 // doesn't unlock all the doors in this team)
                 if (*parent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                     relock_ent = match (*parent).teammaster {
-                        Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+                        Some(id) => {
+                            &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t
+                        }
                         None => core::ptr::null_mut(),
                     };
                 } else {
-                    relock_ent =
-                        crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent);
+                    relock_ent = crate::ent_id::resolve(
+                        (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                        (*ent).parent,
+                    );
                 }
                 if !relock_ent.is_null() {
                     (*relock_ent).spawnflags &= !MOVER_LOCKED;
@@ -1550,7 +1549,7 @@ pub fn Touch_DoorTrigger(
 /// All of the parts of a door have been spawned, so create a trigger that
 /// encloses all of them.
 /// Source: `oracle/codemp/game/g_mover.c:1168-1215`
-pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Think_SpawnNewDoorTrigger(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1560,7 +1559,7 @@ pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: EntityId) {
             while !other.is_null() {
                 (*other).takedamage = qtrue;
                 other = crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
+                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
                     (*other).teamchain,
                 );
             }
@@ -1571,14 +1570,14 @@ pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: EntityId) {
         let mut maxs = (*ent).r.absmax;
 
         let mut other = match (*ent).teamchain {
-            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         while !other.is_null() {
             AddPointToBounds((*other).r.absmin, &mut mins, &mut maxs);
             AddPointToBounds((*other).r.absmax, &mut mins, &mut maxs);
             other = match (*other).teamchain {
-                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
                 None => core::ptr::null_mut(),
             };
         }
@@ -1597,7 +1596,7 @@ pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: EntityId) {
         let other = G_Spawn(ctx);
         (*other).r.mins = mins;
         (*other).r.maxs = maxs;
-        (*other).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
+        (*other).parent = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), ent);
         (*other).r.contents = CONTENTS_TRIGGER;
         (*other).touch = Some(EntTouch::Touch_DoorTrigger).into();
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(other));
@@ -1605,41 +1604,35 @@ pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: EntityId) {
         // remember the thinnest axis
         (*other).count = best as c_int;
 
-        MatchTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            (*ent).moverState,
-            (*ctx.world).level.time,
-        );
+        let __h600 = ctx.entity_id_of(ent).unwrap();
+        let __h601 = (*ctx.world_raw()).level.time;
+        MatchTeam(ctx, __h600, (*ent).moverState, __h601);
     }
 }
 
 /// Raven `Think_MatchTeam`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1217-1220`
-pub fn Think_MatchTeam(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Think_MatchTeam(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        MatchTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            (*ent).moverState,
-            (*ctx.world).level.time,
-        );
+        let __h602 = ctx.entity_id_of(ent).unwrap();
+        let __h603 = (*ctx.world_raw()).level.time;
+        MatchTeam(ctx, __h602, (*ent).moverState, __h603);
     }
 }
 
 /// Raven `G_EntIsDoor`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1222-1237`
-pub fn G_EntIsDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
+pub fn G_EntIsDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
     unsafe {
         if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
             return qfalse;
         }
 
-        let ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world_raw()).g_entities[entityNum as usize] as *mut gentity_t;
         if crate::q_shared::Q_stricmp((*ent).classname, c"func_door".as_ptr()) == 0 {
             // blocked by a door
             return qtrue;
@@ -1651,7 +1644,7 @@ pub fn G_EntIsDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
 /// Raven `G_FindDoorTrigger`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1239-1280`
-pub fn G_FindDoorTrigger(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1663,7 +1656,7 @@ pub fn G_FindDoorTrigger(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t 
                 && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0
             {
                 door = crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
+                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
                     (*door).teammaster,
                 );
             }
@@ -1712,7 +1705,8 @@ pub fn G_FindDoorTrigger(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t 
             if owner.is_null() {
                 break;
             }
-            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*owner).parent) == door
+            if crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*owner).parent)
+                == door
             {
                 return owner;
             }
@@ -1725,14 +1719,14 @@ pub fn G_FindDoorTrigger(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t 
 /// Raven `G_EntIsUnlockedDoor`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1282-1346`
-pub fn G_EntIsUnlockedDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
+pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
     unsafe {
         if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
             return qfalse;
         }
 
         if G_EntIsDoor(ctx, entityNum) != 0 {
-            let mut ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
+            let mut ent = &mut (*ctx.world_raw()).g_entities[entityNum as usize] as *mut gentity_t;
             let mut owner: *mut gentity_t;
             if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                 // not the master door, get the master door
@@ -1740,7 +1734,7 @@ pub fn G_EntIsUnlockedDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
                     && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0
                 {
                     ent = crate::ent_id::resolve(
-                        (*ctx.world).g_entities.as_mut_ptr(),
+                        (*ctx.world_raw()).g_entities.as_mut_ptr(),
                         (*ent).teammaster,
                     );
                 }
@@ -1808,7 +1802,7 @@ pub fn G_EntIsUnlockedDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
 /// Raven `SP_func_door`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1380-1472`
-pub fn SP_func_door(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_door(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -1895,7 +1889,7 @@ pub fn SP_func_door(ctx: GameContext<'_>, ent: EntityId) {
         }
         InitMover(ctx, ctx.entity_id_of(ent).unwrap());
 
-        (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
+        (*ent).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
 
         if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE == 0 {
             let mut health = 0;
@@ -1936,7 +1930,7 @@ pub fn SP_func_door(ctx: GameContext<'_>, ent: EntityId) {
 /// Don't allow decent if a living player is on it.
 /// Source: `oracle/codemp/game/g_mover.c:1489-1498`
 pub fn Touch_Plat(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     trace: *mut trace_t,
@@ -1944,7 +1938,7 @@ pub fn Touch_Plat(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*other).client.is_null()
             || (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize]
@@ -1955,7 +1949,7 @@ pub fn Touch_Plat(
 
         // delay return-to-pos1 by one second
         if (*ent).moverState == MOVER_POS2 {
-            (*ent).nextthink = (*ctx.world).level.time + 1000;
+            (*ent).nextthink = (*ctx.world_raw()).level.time + 1000;
         }
     }
 }
@@ -1965,7 +1959,7 @@ pub fn Touch_Plat(
 /// If the plat is at the bottom position, start it going up.
 /// Source: `oracle/codemp/game/g_mover.c:1507-1515`
 pub fn Touch_PlatCenterTrigger(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     trace: *mut trace_t,
@@ -1973,14 +1967,14 @@ pub fn Touch_PlatCenterTrigger(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*other).client.is_null() {
             return;
         }
 
         let parent = match (*ent).parent {
-            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         if (*parent).moverState == MOVER_POS1 {
@@ -2000,7 +1994,7 @@ pub fn Touch_PlatCenterTrigger(
 /// require that the trigger extend through the entire low position, not
 /// just sit on top of it.
 /// Source: `oracle/codemp/game/g_mover.c:1527-1559`
-pub fn SpawnPlatTrigger(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SpawnPlatTrigger(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2009,7 +2003,7 @@ pub fn SpawnPlatTrigger(ctx: GameContext<'_>, ent: EntityId) {
         let trigger = G_Spawn(ctx);
         (*trigger).touch = Some(EntTouch::Touch_PlatCenterTrigger).into();
         (*trigger).r.contents = CONTENTS_TRIGGER;
-        (*trigger).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
+        (*trigger).parent = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), ent);
 
         let mut tmin = [0.0f32; 3];
         let mut tmax = [0.0f32; 3];
@@ -2040,7 +2034,7 @@ pub fn SpawnPlatTrigger(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `SP_func_plat`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1576-1617`
-pub fn SP_func_plat(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_plat(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2099,7 +2093,7 @@ pub fn SP_func_plat(ctx: GameContext<'_>, ent: EntityId) {
 
         (*ent).blocked = Some(EntBlocked::Blocked_Door).into();
 
-        (*ent).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent); // so it can be treated as a door
+        (*ent).parent = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), ent); // so it can be treated as a door
 
         // spawn the trigger if one hasn't been custom made
         if (*ent).targetname.is_null() {
@@ -2112,7 +2106,7 @@ pub fn SP_func_plat(ctx: GameContext<'_>, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1633-1641`
 pub fn Touch_Button(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     trace: *mut trace_t,
@@ -2120,7 +2114,7 @@ pub fn Touch_Button(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*other).client.is_null() {
             return;
@@ -2140,7 +2134,7 @@ pub fn Touch_Button(
 /// Raven `SP_func_button`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1660-1702`
-pub fn SP_func_button(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_button(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2197,13 +2191,13 @@ pub fn SP_func_button(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Think_BeginMoving`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1727-1732`
-pub fn Think_BeginMoving(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Think_BeginMoving(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
         G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
-        (*ent).s.pos.trTime = (*ctx.world).level.time;
+        (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
         (*ent).s.pos.trType = trType_t::TR_LINEAR_STOP;
     }
 }
@@ -2211,13 +2205,13 @@ pub fn Think_BeginMoving(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Reached_Train`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1739-1793`
-pub fn Reached_Train(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Reached_Train(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // copy the appropriate values
         let next = match (*ent).nextTrain {
-            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
             None => return, // just stop
         };
         if (*next).nextTrain.is_none() {
@@ -2234,8 +2228,8 @@ pub fn Reached_Train(ctx: GameContext<'_>, ent: EntityId) {
         // set the new trajectory
         (*ent).nextTrain = (*next).nextTrain;
         (*ent).pos1 = (*next).s.origin;
-        let next_next =
-            &mut (*ctx.world).g_entities[(*next).nextTrain.unwrap().index()] as *mut gentity_t;
+        let next_next = &mut (*ctx.world_raw()).g_entities[(*next).nextTrain.unwrap().index()]
+            as *mut gentity_t;
         (*ent).pos2 = (*next_next).s.origin;
 
         // if the path_corner has a speed, use that
@@ -2260,13 +2254,10 @@ pub fn Reached_Train(ctx: GameContext<'_>, ent: EntityId) {
 
         (*ent).s.pos.trDuration = (length * 1000.0 / speed) as c_int;
 
+        let __h604 = ctx.entity_id_of(ent).unwrap();
+        let __h605 = (*ctx.world_raw()).level.time;
         // start it going
-        SetMoverState(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            MOVER_1TO2,
-            (*ctx.world).level.time,
-        );
+        SetMoverState(ctx, __h604, MOVER_1TO2, __h605);
 
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_END);
 
@@ -2274,7 +2265,7 @@ pub fn Reached_Train(ctx: GameContext<'_>, ent: EntityId) {
         if (*next).wait != 0.0 {
             (*ent).s.loopSound = 0;
             (*ent).s.loopIsSoundset = qfalse;
-            (*ent).nextthink = (*ctx.world).level.time + ((*next).wait * 1000.0) as c_int;
+            (*ent).nextthink = (*ctx.world_raw()).level.time + ((*next).wait * 1000.0) as c_int;
             (*ent).think = Some(EntThink::Think_BeginMoving).into();
             (*ent).s.pos.trType = trType_t::TR_STATIONARY;
         } else {
@@ -2286,12 +2277,12 @@ pub fn Reached_Train(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `Think_SetupTrainTargets`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1802-1864`
-pub fn Think_SetupTrainTargets(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         (*ent).nextTrain = ent_id_opt(
-            (*ctx.world).g_entities.as_mut_ptr(),
+            (*ctx.world_raw()).g_entities.as_mut_ptr(),
             G_Find(
                 ctx,
                 ctx.entity_id_of(core::ptr::null_mut()),
@@ -2312,7 +2303,7 @@ pub fn Think_SetupTrainTargets(ctx: GameContext<'_>, ent: EntityId) {
         //           \_____|
         let mut start: *mut gentity_t = core::ptr::null_mut();
         let mut path = match (*ent).nextTrain {
-            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         while path != start {
@@ -2349,7 +2340,7 @@ pub fn Think_SetupTrainTargets(ctx: GameContext<'_>, ent: EntityId) {
             }
 
             if !next.is_null() {
-                (*path).nextTrain = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), next);
+                (*path).nextTrain = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), next);
             } else {
                 break;
             }
@@ -2371,7 +2362,7 @@ pub fn Think_SetupTrainTargets(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `SP_path_corner`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1873-1880`
-pub fn SP_path_corner(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_path_corner(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2388,7 +2379,7 @@ pub fn SP_path_corner(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_func_train`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1897-1927`
-pub fn SP_func_train(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2426,7 +2417,7 @@ pub fn SP_func_train(ctx: GameContext<'_>, self_: EntityId) {
 
         // start trains on the second frame, to make sure their targets have
         // had a chance to spawn
-        (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
+        (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
         (*self_).think = Some(EntThink::Think_SetupTrainTargets).into();
     }
 }
@@ -2434,7 +2425,7 @@ pub fn SP_func_train(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SP_func_static`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1956-2019`
-pub fn SP_func_static(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_static(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2500,7 +2491,7 @@ pub fn SP_func_static(ctx: GameContext<'_>, ent: EntityId) {
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
-        if (*ctx.world).level.mBSPInstanceDepth != 0 {
+        if (*ctx.world_raw()).level.mBSPInstanceDepth != 0 {
             // this means that this guy will never be updated, moved, changed, etc.
             (*ent).s.eFlags = EF_PERMANENT;
         }
@@ -2511,7 +2502,7 @@ pub fn SP_func_static(ctx: GameContext<'_>, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2021-2030`
 pub fn func_static_use(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -2519,9 +2510,9 @@ pub fn func_static_use(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
     unsafe {
         G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
 
@@ -2536,7 +2527,7 @@ pub fn func_static_use(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2040-2066`
 pub fn func_rotating_use(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -2578,7 +2569,7 @@ pub fn func_rotating_use(
 /// Raven `SP_func_rotating`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2133-2209`
-pub fn SP_func_rotating(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_rotating(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2663,7 +2654,7 @@ pub fn SP_func_rotating(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `SP_func_bobbing`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2231-2258`
-pub fn SP_func_bobbing(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_bobbing(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2722,7 +2713,7 @@ pub fn SP_func_bobbing(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `SP_func_pendulum`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2280-2313`
-pub fn SP_func_pendulum(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_pendulum(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2762,7 +2753,7 @@ pub fn SP_func_pendulum(ctx: GameContext<'_>, ent: EntityId) {
         // Raven: `1 / ( M_PI * 2 ) * sqrt( g_gravity.value / ( 3 * length ) )`. The ratio
         // is a float divide, but sqrt is the double libm call and 1/(M_PI*2) is double;
         // the product narrows to float.
-        let ratio = (*ctx.world).cvars.g_gravity.value / (3.0 * length);
+        let ratio = (*ctx.world_raw()).cvars.g_gravity.value / (3.0 * length);
         let freq = (1.0f64 / (core::f64::consts::PI * 2.0) * (ratio as f64).sqrt()) as f32;
 
         (*ent).s.pos.trDuration = (1000.0 / freq) as c_int;
@@ -2784,7 +2775,7 @@ pub fn SP_func_pendulum(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `CacheChunkEffects`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2323-2361`
-pub fn CacheChunkEffects(ctx: GameContext<'_>, material: material_t) {
+pub fn CacheChunkEffects(ctx: &mut GameContext, material: material_t) {
     match material {
         MAT_GLASS => {
             G_EffectIndex(c"chunks/glassbreak".as_ptr());
@@ -2817,7 +2808,7 @@ pub fn CacheChunkEffects(ctx: GameContext<'_>, material: material_t) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2363-2377`
 pub fn G_MiscModelExplosion(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     mins: vec3_t,
     maxs: vec3_t,
     size: c_int,
@@ -2843,7 +2834,7 @@ pub fn G_MiscModelExplosion(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2379-2395`
 pub fn G_Chunks(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     owner: c_int,
     origin: vec3_t,
     normal: vec3_t,
@@ -2876,7 +2867,7 @@ pub fn G_Chunks(
 /// Raven `funcBBrushDieGo`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2398-2498`
-pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
+pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2885,7 +2876,7 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
 
         // if a missile is stuck to us, blow it up so we don't look dumb
         for i in 0..mp_qshared::shared::MAX_GENTITIES {
-            let other = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let other = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
             if (*other).s.groundEntityNum == (*self_).s.number
                 && (*other).s.eFlags & EF_MISSILE_STICK != 0
             {
@@ -2912,13 +2903,12 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
         let up = [0.0f32, 0.0, 1.0];
 
         if !(*self_).target.is_null() && !attacker.is_none() {
-            G_UseTargets(
-                ctx,
-                ctx.entity_id_of(self_),
-                ctx.entity_id_of(attacker.map_or(std::ptr::null_mut(), |id| {
-                    &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
-                })),
-            );
+            let __s951 = ctx.entity_id_of(self_);
+            let __s952 = attacker.map_or(std::ptr::null_mut(), |id| {
+                &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t
+            });
+            let __s953 = ctx.entity_id_of(__s952);
+            G_UseTargets(ctx, __s951, __s953);
         }
 
         let org_size = [
@@ -2928,7 +2918,7 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
         ];
 
         // Raven `random()` macro == `(rand()&RAND_MAX)/(float)RAND_MAX`.
-        let mut num_chunks = ((*ctx.world).bg_state.rng.random() * 6.0 + 18.0) as c_int;
+        let mut num_chunks = ((*ctx.world_raw()).bg_state.rng.random() * 6.0 + 18.0) as c_int;
 
         // this formula really has no logical basis other than the fact
         // that it seemed to be the closest to yielding the results that I
@@ -2970,7 +2960,8 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         let dir = if let Some(attacker_id) = attacker {
-            let attacker_ptr = &mut (*ctx.world).g_entities[attacker_id.index()] as *mut gentity_t;
+            let attacker_ptr =
+                &mut (*ctx.world_raw()).g_entities[attacker_id.index()] as *mut gentity_t;
             if !(*attacker_ptr).client.is_null() {
                 let mut d = [
                     org[0] - (*attacker_ptr).r.currentOrigin[0],
@@ -3031,7 +3022,7 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
 
         trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(self_, qtrue));
         (*self_).think = Some(EntThink::G_FreeEntity).into();
-        (*self_).nextthink = (*ctx.world).level.time + 50;
+        (*self_).nextthink = (*ctx.world_raw()).level.time + 50;
     }
 }
 
@@ -3039,7 +3030,7 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2500-2514`
 pub fn funcBBrushDie(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
@@ -3050,15 +3041,15 @@ pub fn funcBBrushDie(
     // body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
         (*self_).takedamage = qfalse; // stop chain reaction runaway loops
-        (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), attacker);
+        (*self_).enemy = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), attacker);
 
         if (*self_).delay != 0 {
             (*self_).think = Some(EntThink::funcBBrushDieGo).into();
             (*self_).nextthink =
-                (*ctx.world).level.time + ((*self_).delay as f32 * 1000.0).floor() as c_int;
+                (*ctx.world_raw()).level.time + ((*self_).delay as f32 * 1000.0).floor() as c_int;
             return;
         }
 
@@ -3070,7 +3061,7 @@ pub fn funcBBrushDie(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2516-2530`
 pub fn funcBBrushUse(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -3078,9 +3069,9 @@ pub fn funcBBrushUse(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
     unsafe {
         G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
         if (*self_).spawnflags & 64 != 0 {
@@ -3105,7 +3096,7 @@ pub fn funcBBrushUse(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2532-2597`
 pub fn funcBBrushPain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -3113,9 +3104,9 @@ pub fn funcBBrushPain(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
-        if (*self_).painDebounceTime > (*ctx.world).level.time {
+        if (*self_).painDebounceTime > (*ctx.world_raw()).level.time {
             return;
         }
 
@@ -3130,15 +3121,13 @@ pub fn funcBBrushPain(
                     );
                 }
             } else {
-                G_UseTargets2(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    ctx.entity_id_of(crate::ent_id::resolve(
-                        (*ctx.world).g_entities.as_mut_ptr(),
-                        (*self_).activator,
-                    )),
-                    (*self_).paintarget,
+                let __h606 = ctx.entity_id_of(self_);
+                let __h808 = crate::ent_id::resolve(
+                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                    (*self_).activator,
                 );
+                let __h607 = ctx.entity_id_of(__h808);
+                G_UseTargets2(ctx, __h606, __h607, (*self_).paintarget);
             }
         }
 
@@ -3183,7 +3172,7 @@ pub fn funcBBrushPain(
                 [0.0, 0.0, 1.0]
             };
 
-            let mut numChunks = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+            let mut numChunks = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
             if (*self_).radius > 0.0 {
                 // designer wants to scale number of chunks, helpful because
                 // the above scale code is far from perfect — I do this
@@ -3213,14 +3202,14 @@ pub fn funcBBrushPain(
             return;
         }
 
-        (*self_).painDebounceTime = (*ctx.world).level.time + (*self_).wait as c_int;
+        (*self_).painDebounceTime = (*ctx.world_raw()).level.time + (*self_).wait as c_int;
     }
 }
 
 /// Raven `InitBBrush`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2599-2661`
-pub fn InitBBrush(ctx: GameContext<'_>, ent: EntityId) {
+pub fn InitBBrush(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -3297,7 +3286,7 @@ pub fn funcBBrushTouch(ent: EntityId, other: Option<EntityId>, trace: *mut trace
 /// Raven `SP_func_breakable`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2731-2829`
-pub fn SP_func_breakable(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -3382,7 +3371,7 @@ pub fn SP_func_breakable(ctx: GameContext<'_>, self_: EntityId) {
 
         if !(*self_).team.is_null()
             && *(*self_).team != 0
-            && (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+            && (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
             && (*self_).teamnodmg == 0
         {
             (*self_).teamnodmg = atoi((*self_).team);
@@ -3408,13 +3397,13 @@ pub fn SP_func_breakable(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `G_EntIsBreakable`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2831-2866`
-pub fn G_EntIsBreakable(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
+pub fn G_EntIsBreakable(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
     unsafe {
         if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
             return qfalse;
         }
 
-        let ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world_raw()).g_entities[entityNum as usize] as *mut gentity_t;
 
         if (*ent).r.svFlags & SVF_GLASS_BRUSH != 0 {
             return qtrue;
@@ -3439,7 +3428,7 @@ pub fn G_EntIsBreakable(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2875-2903`
 pub fn GlassDie(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
@@ -3450,7 +3439,7 @@ pub fn GlassDie(
     // body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
         if (*self_).genericValue5 != 0 {
             // was already destroyed, do not retrigger it
@@ -3484,7 +3473,7 @@ pub fn GlassDie(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2905-2922`
 pub fn GlassDie_Old(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
@@ -3495,7 +3484,7 @@ pub fn GlassDie_Old(
     // body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
         let dif = [
             ((*self_).r.absmax[0] + (*self_).r.absmin[0]) / 2.0,
@@ -3527,7 +3516,7 @@ pub fn GlassPain(self_: EntityId, attacker: Option<EntityId>, damage: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2930-2948`
 pub fn GlassUse(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -3535,9 +3524,9 @@ pub fn GlassUse(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
     unsafe {
         // no direct object to blame for the break, so fill the values with
         // whatever
@@ -3584,7 +3573,7 @@ pub fn GlassUse(
 /// Raven `SP_func_glass`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2957-2990`
-pub fn SP_func_glass(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_glass(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -3628,7 +3617,7 @@ pub fn SP_func_glass(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `func_wait_return_solid`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2995-3025`
-pub fn func_wait_return_solid(ctx: GameContext<'_>, self_: EntityId) {
+pub fn func_wait_return_solid(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -3649,20 +3638,18 @@ pub fn func_wait_return_solid(ctx: GameContext<'_>, self_: EntityId) {
             (*self_).use_ = Some(EntUse::func_usable_use).into();
             (*self_).clipmask = 0;
             if !(*self_).target2.is_null() && *(*self_).target2 != 0 {
-                G_UseTargets2(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    ctx.entity_id_of(crate::ent_id::resolve(
-                        (*ctx.world).g_entities.as_mut_ptr(),
-                        (*self_).activator,
-                    )),
-                    (*self_).target2,
+                let __h608 = ctx.entity_id_of(self_);
+                let __h809 = crate::ent_id::resolve(
+                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                    (*self_).activator,
                 );
+                let __h609 = ctx.entity_id_of(__h809);
+                G_UseTargets2(ctx, __h608, __h609, (*self_).target2);
             }
         } else {
             (*self_).clipmask = 0;
             (*self_).think = Some(EntThink::func_wait_return_solid).into();
-            (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
+            (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
         }
     }
 }
@@ -3681,9 +3668,9 @@ pub fn func_usable_think(self_: &mut gentity_t) {
 /// Raven `G_EntIsRemovableUsable`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3037-3048`
-pub fn G_EntIsRemovableUsable(ctx: GameContext<'_>, entNum: c_int) -> qboolean {
+pub fn G_EntIsRemovableUsable(ctx: &mut GameContext, entNum: c_int) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world_raw()).g_entities[entNum as usize] as *mut gentity_t;
         if !(*ent).classname.is_null()
             && crate::q_shared::Q_stricmp((*ent).classname, c"func_usable".as_ptr()) == 0
         {
@@ -3703,7 +3690,7 @@ pub fn G_EntIsRemovableUsable(ctx: GameContext<'_>, entNum: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3050-3106`
 pub fn func_usable_use(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     _other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -3711,7 +3698,7 @@ pub fn func_usable_use(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), activator) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
     unsafe {
         // Toggle on and off
         G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
@@ -3738,7 +3725,8 @@ pub fn func_usable_use(
 
             if (*self_).wait != 0.0 {
                 (*self_).think = Some(EntThink::func_usable_think).into();
-                (*self_).nextthink = (*ctx.world).level.time + ((*self_).wait * 1000.0) as c_int;
+                (*self_).nextthink =
+                    (*ctx.world_raw()).level.time + ((*self_).wait * 1000.0) as c_int;
             }
 
             return;
@@ -3767,7 +3755,7 @@ pub fn func_usable_use(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3108-3111`
 pub fn func_usable_pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -3775,7 +3763,7 @@ pub fn func_usable_pain(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
         GlobalUse(
             ctx,
@@ -3790,7 +3778,7 @@ pub fn func_usable_pain(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3113-3117`
 pub fn func_usable_die(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
@@ -3800,9 +3788,9 @@ pub fn func_usable_die(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let inflictor: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), inflictor) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), inflictor) };
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
         (*self_).takedamage = qfalse;
         GlobalUse(
@@ -3817,7 +3805,7 @@ pub fn func_usable_die(
 /// Raven `SP_func_usable`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3140-3203`
-pub fn SP_func_usable(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -3884,7 +3872,7 @@ pub fn SP_func_usable(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3215-3241`
 pub fn use_wall(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -3926,7 +3914,7 @@ pub fn use_wall(
 /// Raven `SP_func_wall`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3256-3279`
-pub fn SP_func_wall(ctx: GameContext<'_>, ent: EntityId) {
+pub fn SP_func_wall(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {

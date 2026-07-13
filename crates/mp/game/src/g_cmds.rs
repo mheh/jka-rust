@@ -84,8 +84,8 @@ unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
 
 /// `ent - g_entities` — the entity's slot index (client number for players).
 #[inline]
-unsafe fn ent_index(ctx: GameContext<'_>, ent: *const gentity_t) -> c_int {
-    ent.offset_from((*ctx.world).g_entities.as_ptr()) as c_int
+unsafe fn ent_index(ctx: &mut GameContext, ent: *const gentity_t) -> c_int {
+    ent.offset_from((*ctx.world_raw()).g_entities.as_ptr()) as c_int
 }
 
 /// Raven `DeathmatchScoreboardMessage`.
@@ -95,7 +95,7 @@ unsafe fn ent_index(ctx: GameContext<'_>, ent: *const gentity_t) -> c_int {
 // `level.clients`, `level.sortedClients`, `level.teamScores`, `g_entities`, and calls
 // `trap_SendServerCommand`; the staged raw-pointer signature carries no
 // GameWorld/engine handle to reach any of these.
-pub fn DeathmatchScoreboardMessage(ctx: GameContext<'_>, ent: EntityId) {
+pub fn DeathmatchScoreboardMessage(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_qshared::common::mp::playerstate::{
@@ -104,7 +104,7 @@ pub fn DeathmatchScoreboardMessage(ctx: GameContext<'_>, ent: EntityId) {
     };
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut string = String::new();
         let mut stringlength: usize = 0;
         let scoreFlags: c_int = 0;
@@ -197,7 +197,7 @@ const MAX_CLIENT_SCORE_SEND: c_int = 20;
 /// Raven `Cmd_Score_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:98-100`
-pub fn Cmd_Score_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Score_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     DeathmatchScoreboardMessage(ctx, ctx.entity_id_of(ent).unwrap());
@@ -209,11 +209,11 @@ pub fn Cmd_Score_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_cheats` cvar and
 // calls `trap_SendServerCommand`/`G_GetStringEdString`+`ent-g_entities`; no
 // GameCvars/engine handle is reachable from this raw-pointer signature.
-pub fn CheatsOk(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn CheatsOk(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        if (*ctx.world).cvars.g_cheats.integer == 0 {
+        if (*ctx.world_raw()).cvars.g_cheats.integer == 0 {
             // PORT-NOTE(G_GetStringEdString): OPEN fn (g_main.rs) — called with the
             // packet's cited fixed args; the localized string is substituted into the
             // print command per the va mapping table.
@@ -261,7 +261,7 @@ pub fn CheatsOk(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 // presumably-'static pointer into file-scope storage) — can't own a `String` and
 // return a raw pointer to it without leaking/aliasing. Also needs `trap_Argc`/
 // `trap_Argv`, unreachable without an engine handle.
-pub fn ConcatArgs(ctx: GameContext<'_>, start: c_int) -> *mut c_char {
+pub fn ConcatArgs(ctx: &mut GameContext, start: c_int) -> *mut c_char {
     // DIVERGENCE: Raven returns a pointer into file-scope
     // `static char line[MAX_STRING_CHARS]`; ported callers all consume the
     // result immediately (as `*const c_char`), so a `ctx`-owned scratch buffer
@@ -294,9 +294,9 @@ pub fn ConcatArgs(ctx: GameContext<'_>, start: c_int) -> *mut c_char {
                 len += 1;
             }
         }
-        (*ctx.world).bg_state.concat_args_line = out;
-        (*ctx.world).bg_state.concat_args_line.push(0);
-        (*ctx.world).bg_state.concat_args_line.as_mut_ptr() as *mut c_char
+        (*ctx.world_raw()).bg_state.concat_args_line = out;
+        (*ctx.world_raw()).bg_state.concat_args_line.push(0);
+        (*ctx.world_raw()).bg_state.concat_args_line.as_mut_ptr() as *mut c_char
     }
 }
 
@@ -339,11 +339,11 @@ pub fn SanitizeString(r#in: *mut c_char, out: *mut c_char) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
 // `level.clients`, and calls `trap_SendServerCommand`; no GameWorld/engine handle
 // reachable from this raw-pointer signature.
-pub fn ClientNumberFromString(ctx: GameContext<'_>, to: EntityId, s: *mut c_char) -> c_int {
+pub fn ClientNumberFromString(ctx: &mut GameContext, to: EntityId, s: *mut c_char) -> c_int {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let to: *mut gentity_t = ctx.entity_mut(to);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let ss = cstr_to_str(s);
 
         if let Some(c0) = ss.as_bytes().first() {
@@ -414,7 +414,7 @@ pub fn ClientNumberFromString(ctx: GameContext<'_>, to: EntityId, s: *mut c_char
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` (itself
 // parked), reads `g_entities`, calls `trap_Argv`/`trap_Argc`/`Com_Printf`; no
 // GameWorld/engine handle reachable from this raw-pointer signature.
-pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: EntityId, baseArg: c_int) {
+pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let cmdent: *mut gentity_t = ctx.entity_mut(cmdent);
     unsafe {
@@ -449,7 +449,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: EntityId, baseArg: c_int) {
                 return;
             }
 
-            ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
+            ent = &mut (*ctx.world_raw()).g_entities[i as usize] as *mut gentity_t;
 
             if (*ent).inuse == qfalse || (*ent).client.is_null() {
                 crate::g_main::Com_Printf(
@@ -634,7 +634,7 @@ pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: EntityId, baseArg: c_int) {
 /// Source: `oracle/codemp/game/g_cmds.c:403-418`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_God_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_God_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -669,7 +669,7 @@ pub fn Cmd_God_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_cmds.c:430-444`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_Notarget_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Notarget_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -702,7 +702,7 @@ pub fn Cmd_Notarget_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_cmds.c:454-469`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_Noclip_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Noclip_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -740,7 +740,7 @@ pub fn Cmd_Noclip_f(ctx: GameContext<'_>, ent: EntityId) {
 /// resize the view, hide the scoreboard, and take a special screenshot.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:482-496`
-pub fn Cmd_LevelShot_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_LevelShot_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -749,7 +749,7 @@ pub fn Cmd_LevelShot_f(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // doesn't work in single player
-        if (*ctx.world).cvars.g_gametype.integer != 0 {
+        if (*ctx.world_raw()).cvars.g_gametype.integer != 0 {
             trap::SendServerCommand(
                 ctx.engine,
                 mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
@@ -779,7 +779,7 @@ pub fn Cmd_LevelShot_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.clients` and
 // calls `trap_Argc`/`trap_Argv`/`trap_GetUserinfo`/`trap_SetUserinfo`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_TeamTask_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_TeamTask_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     // Canonical in `mp_qshared::shared::limits` (value 1024).
@@ -788,7 +788,7 @@ pub fn Cmd_TeamTask_f(ctx: GameContext<'_>, ent: EntityId) {
 
     unsafe {
         let client = (*ent).client as *mut gclient_t;
-        let clientNum = client.offset_from((*ctx.world).level.clients) as c_int;
+        let clientNum = client.offset_from((*ctx.world_raw()).level.clients) as c_int;
 
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) != 2 {
             return;
@@ -836,7 +836,7 @@ pub fn Cmd_TeamTask_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_autoKickTKSpammers`/
 // `g_autoBanTKSpammers` cvars and calls `AddIP`/`trap_SendServerCommand`/
 // `trap_SendConsoleCommand`; no GameWorld/engine handle reachable here.
-pub fn G_CheckTKAutoKickBan(ctx: GameContext<'_>, ent: EntityId) {
+pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -845,7 +845,7 @@ pub fn G_CheckTKAutoKickBan(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         let client = (*ent).client as *mut gclient_t;
-        let cvars = &(*ctx.world).cvars;
+        let cvars = &(*ctx.world_raw()).cvars;
 
         if cvars.g_autoKickTKSpammers.integer > 0 || cvars.g_autoBanTKSpammers.integer > 0 {
             (*client).sess.TKCount += 1;
@@ -958,14 +958,14 @@ pub fn G_CheckTKAutoKickBan(ctx: GameContext<'_>, ent: EntityId) {
 // `g_allowDuelSuicide`/`g_autoKickKillSpammers`/`g_autoBanKillSpammers` cvars and
 // `level.numPlayingClients`/`level.warmupTime`; no GameWorld/engine handle
 // reachable here.
-pub fn Cmd_Kill_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
         let client = (*ent).client as *mut gclient_t;
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let cvars = &(*world).cvars;
 
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
@@ -1113,11 +1113,11 @@ pub fn Cmd_Kill_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `G_GetDuelWinner`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:645-661`
-pub fn G_GetDuelWinner(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     // STAGE-1: gclient param -> owning EntityId; raw client re-derived verbatim (Stage-2 debt).
     let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         for i in 0..(*world).level.maxclients {
             let wCl = (*world).level.clients.add(i as usize);
 
@@ -1144,7 +1144,7 @@ pub fn G_GetDuelWinner(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_gametype` cvar
 // and calls `trap_SendServerCommand`/`G_LogPrintf`/`TeamName`; no GameWorld/
 // engine handle reachable here.
-pub fn BroadcastTeamChange(ctx: GameContext<'_>, ent: EntityId, oldTeam: c_int) {
+pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int) {
     // STAGE-1: gclient param -> owning EntityId; raw client re-derived verbatim (Stage-2 debt).
     let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
     use mp_bg::public::gametype::GT_SIEGE;
@@ -1152,7 +1152,7 @@ pub fn BroadcastTeamChange(ctx: GameContext<'_>, ent: EntityId, oldTeam: c_int) 
     unsafe {
         (*client).ps.fd.forceDoInit = 1;
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
             return;
         }
 
@@ -1216,8 +1216,8 @@ pub fn BroadcastTeamChange(ctx: GameContext<'_>, ent: EntityId, oldTeam: c_int) 
             );
         } else if (*client).sess.sessionTeam == TEAM_FREE {
             use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
-            if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
-                || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+            if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
+                || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
             {
                 // NOTE: Just doing a vs. once it counts two players up — Raven leaves
                 // this branch as commented-out dead code (a currentWinner vs. print).
@@ -1243,7 +1243,7 @@ pub fn BroadcastTeamChange(ctx: GameContext<'_>, ent: EntityId, oldTeam: c_int) 
             }
         }
 
-        let idx = client.offset_from((*ctx.world).level.clients) as c_int;
+        let idx = client.offset_from((*ctx.world_raw()).level.clients) as c_int;
         let msg = format!(
             "setteam:  {} {} {}\n",
             idx,
@@ -1259,7 +1259,7 @@ pub fn BroadcastTeamChange(ctx: GameContext<'_>, ent: EntityId, oldTeam: c_int) 
 /// Raven `G_PowerDuelCheckFail`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:720-743`
-pub fn G_PowerDuelCheckFail(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn G_PowerDuelCheckFail(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     // Raven `duelTeam_t` (`bg_public.h:1019-1025`); `gclient_t::sess.duelTeam` is
@@ -1300,14 +1300,14 @@ pub fn G_PowerDuelCheckFail(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 // a dozen trap_*/G_* helpers; no GameWorld/engine handle reachable here. Also
 // mutates the file-scope `g_dontPenalizeTeam qboolean` global; becomes a
 // GameWorld field once threaded.
-pub fn SetTeam(ctx: GameContext<'_>, ent: EntityId, s: *mut c_char) {
+pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: *mut c_char) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
         let clientNum = client.offset_from((*world).level.clients) as c_int;
         let mut specClient: c_int = 0;
@@ -1522,7 +1522,7 @@ pub fn SetTeam(ctx: GameContext<'_>, ent: EntityId, s: *mut c_char) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): computes `ent - g_entities`
 // (client slot index) to set `ps.clientNum`; no GameWorld/engine handle reachable
 // to locate the `g_entities` base here.
-pub fn StopFollowing(ctx: GameContext<'_>, ent: EntityId) {
+pub fn StopFollowing(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
@@ -1557,13 +1557,13 @@ pub fn StopFollowing(ctx: GameContext<'_>, ent: EntityId) {
 // `gEscaping`, `g_gametype`/`g_allowDuelSuicide` cvars, calls `trap_Argc`/
 // `trap_Argv`/`trap_SendServerCommand`/`SetTeam`; no GameWorld/engine handle
 // reachable here.
-pub fn Cmd_Team_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Team_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) != 2 {
@@ -1658,7 +1658,7 @@ pub fn Cmd_Team_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar and
 // `level.time`, calls `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_Damage`/
 // `ClientUserinfoChanged`; no GameWorld/engine handle reachable here.
-pub fn Cmd_DuelTeam_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_DuelTeam_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::GT_POWERDUEL;
@@ -1668,7 +1668,7 @@ pub fn Cmd_DuelTeam_f(ctx: GameContext<'_>, ent: EntityId) {
     const DUELTEAM_DOUBLE: c_int = 2;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_gametype.integer != GT_POWERDUEL {
@@ -1774,7 +1774,7 @@ pub fn Cmd_DuelTeam_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `G_TeamForSiegeClass`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1206-1244`
-pub fn G_TeamForSiegeClass(ctx: GameContext<'_>, clName: *const c_char) -> c_int {
+pub fn G_TeamForSiegeClass(ctx: &mut GameContext, clName: *const c_char) -> c_int {
     // Siege team ids (distinct from `team_t` RED/BLUE) and the 128-class cap,
     // canonical in `mp_bg::saga`. The former local `MAX_SIEGE_CLASSES` was
     // wrongly 12 (oracle is 128).
@@ -1783,7 +1783,7 @@ pub fn G_TeamForSiegeClass(ctx: GameContext<'_>, clName: *const c_char) -> c_int
     use mp_bg::saga::siege_team_t::{SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
 
     unsafe {
-        let bg = &(*ctx.world).bg_state;
+        let bg = &(*ctx.world_raw()).bg_state;
         let mut team = SIEGETEAM_TEAM1;
         let mut i: c_int = 0;
         let mut stm = crate::bg_saga::BG_SiegeFindThemeForTeam(team, bg);
@@ -1824,13 +1824,13 @@ pub fn G_TeamForSiegeClass(ctx: GameContext<'_>, clName: *const c_char) -> c_int
 // `BG_SiegeCheckClassLegality`/`ClientUserinfoChanged`/`player_die`/`ClientBegin`;
 // no GameWorld/engine handle reachable here. Also mutates file-scope
 // `g_preventTeamBegin`.
-pub fn Cmd_SiegeClass_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut className = [0 as c_char; 64];
         let mut startedAsSpec = qfalse;
 
@@ -1965,13 +1965,13 @@ pub fn Cmd_SiegeClass_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar,
 // calls `WP_InitForcePowers`/`G_GetStringEdString`/`trap_SendServerCommand`/
 // `trap_Argc`/`trap_Argv`/`Cmd_Team_f`; no GameWorld/engine handle reachable here.
-pub fn Cmd_ForceChanged_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_ForceChanged_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         // Raven's `goto argCheck` is preserved here as the natural fall-through of
@@ -2032,7 +2032,7 @@ pub fn Cmd_ForceChanged_f(ctx: GameContext<'_>, ent: EntityId) {
 // and the file-scope `bgSiegeClasses` table (becomes a GameWorld/bg-shared
 // field once threaded); no GameWorld/engine handle reachable here.
 pub fn G_SetSaber(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     saberNum: c_int,
     saberName: *mut c_char,
@@ -2043,7 +2043,7 @@ pub fn G_SetSaber(
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
         let mut truncSaberName = [0 as c_char; 64];
         let mut i: usize = 0;
@@ -2081,7 +2081,7 @@ pub fn G_SetSaber(
             saberNum,
             truncSaberName.as_ptr(),
             &mut (*world).bg_state,
-            &crate::bg_channel::traps::GameBgTraps { ctx },
+            &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
 
         if (*client).saber[0].model[0] == 0 {
@@ -2127,7 +2127,7 @@ pub fn G_SetSaber(
 /// Raven `Cmd_Follow_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1462-1503`
-pub fn Cmd_Follow_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Follow_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use crate::client::spectator_state::spectatorState_t::*;
@@ -2157,7 +2157,7 @@ pub fn Cmd_Follow_f(ctx: GameContext<'_>, ent: EntityId) {
             return;
         }
 
-        let clients = (*ctx.world).level.clients;
+        let clients = (*ctx.world_raw()).level.clients;
         // can't follow self
         if clients.add(i as usize) == client {
             return;
@@ -2169,8 +2169,8 @@ pub fn Cmd_Follow_f(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // if they are playing a tournement game, count as a loss
-        if ((*ctx.world).cvars.g_gametype.integer == GT_DUEL
-            || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL)
+        if ((*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
+            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL)
             && (*client).sess.sessionTeam == TEAM_FREE
         {
             //WTF???
@@ -2197,14 +2197,14 @@ pub fn Cmd_Follow_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.clients`/
 // `level.maxclients` and `g_gametype` cvar, calls `SetTeam`/`G_Error`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_FollowCycle_f(ctx: GameContext<'_>, ent: EntityId, dir: c_int) {
+pub fn Cmd_FollowCycle_f(ctx: &mut GameContext, ent: EntityId, dir: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if ((*world).cvars.g_gametype.integer == GT_DUEL
@@ -2275,7 +2275,7 @@ pub fn Cmd_FollowCycle_f(ctx: GameContext<'_>, ent: EntityId, dir: c_int) {
 // `level.time`, calls `trap_SendServerCommand`/`OnSameTeam`; no GameWorld/engine
 // handle reachable here.
 pub fn G_SayTo(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     other: Option<EntityId>,
     mode: c_int,
@@ -2288,11 +2288,11 @@ pub fn G_SayTo(
     // raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
 
         if other.is_null() {
             return;
@@ -2371,7 +2371,7 @@ pub fn G_SayTo(
 // `Team_GetLocationMsg`/`G_Printf`/`G_SayTo`; no GameWorld/engine handle
 // reachable here.
 pub fn G_Say(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     ent: EntityId,
     target: Option<EntityId>,
     mode: c_int,
@@ -2381,11 +2381,11 @@ pub fn G_Say(
     // raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     let target: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world().g_entities.as_mut_ptr(), target) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), target) };
     use mp_bg::public::gametype::GT_TEAM;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
         let mut mode = mode;
 
@@ -2529,7 +2529,7 @@ pub fn G_Say(
 /// Raven `Cmd_Say_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1695-1712`
-pub fn Cmd_Say_f(ctx: GameContext<'_>, ent: EntityId, mode: c_int, arg0: qboolean) {
+pub fn Cmd_Say_f(ctx: &mut GameContext, ent: EntityId, mode: c_int, arg0: qboolean) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2561,11 +2561,11 @@ pub fn Cmd_Say_f(ctx: GameContext<'_>, ent: EntityId, mode: c_int, arg0: qboolea
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
 // `g_entities`, calls `trap_Argc`/`trap_Argv`/`ConcatArgs`/`G_LogPrintf`/`G_Say`;
 // no GameWorld/engine handle reachable here.
-pub fn Cmd_Tell_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Tell_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
 
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) < 2 {
             return;
@@ -2636,7 +2636,7 @@ pub fn Cmd_Tell_f(ctx: GameContext<'_>, ent: EntityId) {
 // `level.time`, the file-scope `bg_customSiegeSoundNames` table, calls
 // `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_TempEntity`/`G_SoundIndex`;
 // no GameWorld/engine handle reachable here.
-pub fn Cmd_VoiceCommand_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::GT_TEAM;
@@ -2649,7 +2649,7 @@ pub fn Cmd_VoiceCommand_f(ctx: GameContext<'_>, ent: EntityId) {
     const MAX_CUSTOM_SIEGE_SOUNDS: usize = 30;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_gametype.integer < GT_TEAM {
@@ -2723,11 +2723,11 @@ pub fn Cmd_VoiceCommand_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_cmds.c:1822-1840`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`, calls
 // `trap_Argv`/`G_Say`; no GameWorld/engine handle reachable here.
-pub fn Cmd_GameCommand_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_GameCommand_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut s = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
@@ -2781,7 +2781,7 @@ pub fn Cmd_GameCommand_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): computes `ent - g_entities`
 // and calls `trap_SendServerCommand`/`vtos`; no GameWorld/engine handle reachable
 // here.
-pub fn Cmd_Where_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Where_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -2802,15 +2802,15 @@ pub fn Cmd_Where_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Finds the client number of the client with the given name.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1871-1890`
-pub fn G_ClientNumberFromName(ctx: GameContext<'_>, name: *const c_char) -> c_int {
+pub fn G_ClientNumberFromName(ctx: &mut GameContext, name: *const c_char) -> c_int {
     unsafe {
         let mut s2 = [0 as c_char; MAX_STRING_CHARS];
         let mut n2 = [0 as c_char; MAX_STRING_CHARS];
 
         // check for a name match
         SanitizeString(name as *mut c_char, s2.as_mut_ptr());
-        let clients = (*ctx.world).level.clients;
-        for i in 0..(*ctx.world).level.numConnectedClients {
+        let clients = (*ctx.world_raw()).level.clients;
+        for i in 0..(*ctx.world_raw()).level.numConnectedClients {
             let cl = clients.add(i as usize);
             SanitizeString((*cl).pers.netname.as_ptr() as *mut c_char, n2.as_mut_ptr());
             if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
@@ -2875,15 +2875,15 @@ pub fn SanitizeString2(r#in: *mut c_char, out: *mut c_char) {
 /// names before comparing.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1946-1965`
-pub fn G_ClientNumberFromStrippedName(ctx: GameContext<'_>, name: *const c_char) -> c_int {
+pub fn G_ClientNumberFromStrippedName(ctx: &mut GameContext, name: *const c_char) -> c_int {
     unsafe {
         let mut s2 = [0 as c_char; MAX_STRING_CHARS];
         let mut n2 = [0 as c_char; MAX_STRING_CHARS];
 
         // check for a name match
         SanitizeString2(name as *mut c_char, s2.as_mut_ptr());
-        let clients = (*ctx.world).level.clients;
-        for i in 0..(*ctx.world).level.numConnectedClients {
+        let clients = (*ctx.world_raw()).level.clients;
+        for i in 0..(*ctx.world_raw()).level.numConnectedClients {
             let cl = clients.add(i as usize);
             SanitizeString2((*cl).pers.netname.as_ptr() as *mut c_char, n2.as_mut_ptr());
             if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
@@ -2901,7 +2901,7 @@ pub fn G_ClientNumberFromStrippedName(ctx: GameContext<'_>, name: *const c_char)
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes many `level.vote*`
 // fields, `g_allowVote` cvar, calls a dozen trap_*/G_* helpers; no GameWorld/
 // engine handle reachable here.
-pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::{
@@ -2913,7 +2913,7 @@ pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: EntityId) {
     use crate::client::client_persistant::MAX_VOTE_COUNT;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_allowVote.integer == 0 {
@@ -3284,13 +3284,13 @@ pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes `level.voteTime`/
 // `voteYes`/`voteNo`, `g_gametype` cvar, calls `trap_Argv`/`trap_SendServerCommand`/
 // `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
-pub fn Cmd_Vote_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_Vote_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).level.voteTime == 0 {
@@ -3398,7 +3398,7 @@ pub fn Cmd_Vote_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes many
 // `level.teamVote*` fields, `g_gametype`/`g_allowTeamVote` cvars, `level.clients`;
 // no GameWorld/engine handle reachable here.
-pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::GT_TEAM;
@@ -3410,7 +3410,7 @@ pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: EntityId) {
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_gametype.integer < GT_TEAM {
@@ -3742,11 +3742,11 @@ pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes
 // `level.teamVote*` fields, calls `trap_Argv`/`trap_SendServerCommand`/
 // `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
-pub fn Cmd_TeamVote_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_TeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).sess.sessionTeam;
         let cs_offset: c_int = if team == TEAM_RED {
@@ -3864,11 +3864,11 @@ pub fn Cmd_TeamVote_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_cheats` cvar, calls
 // `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`TeleportPlayer`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_SetViewpos_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut origin: vec3_t = [0.0, 0.0, 0.0];
         let mut angles: vec3_t = [0.0, 0.0, 0.0];
         let mut buffer = [0 as c_char; MAX_TOKEN_CHARS];
@@ -3941,9 +3941,9 @@ pub fn Cmd_Stats_f(ent: &gentity_t) {}
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities` (via
 // `G_AddEvent(&g_entities[ps->clientNum], ...)`) and calls `trap_Trace`; no
 // GameWorld/engine handle reachable here.
-pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
+pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut forcedUse = forcedUse;
 
         if (*ps).m_iVehicleNum != 0 {
@@ -4105,12 +4105,12 @@ pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_i
 /// Raven `Cmd_ToggleSaber_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2595-2670`
-pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_ToggleSaber_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*client).ps.fd.forceGripCripple != 0 {
             // if they are being gripped, don't let them unholster their saber
@@ -4122,7 +4122,8 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: EntityId) {
         if (*client).ps.saberInFlight != qfalse {
             if (*client).ps.saberEntityNum != 0 {
                 // turn it off in midair
-                let saberent = &mut (*ctx.world).g_entities[(*client).ps.saberEntityNum as usize]
+                let saberent = &mut (*ctx.world_raw()).g_entities
+                    [(*client).ps.saberEntityNum as usize]
                     as *mut gentity_t;
                 crate::w_saber::saberKnockDown(
                     ctx,
@@ -4201,13 +4202,13 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
 // `d_saberStanceDebug` cvars, the file-scope `bgSiegeClasses` table, calls
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let mut selectLevel: c_int = 0;
         let mut usingSiegeStyle = qfalse;
 
@@ -4331,7 +4332,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: EntityId) {
         // `(*world).bg_state.bgSiegeClasses`.
         if (*world).cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
-            && (*world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].saberStance != 0
+            && (&(*world).bg_state.bgSiegeClasses)[(*client).siegeClass as usize].saberStance != 0
         {
             let mut i = selectLevel + 1;
             usingSiegeStyle = qtrue;
@@ -4341,7 +4342,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: EntityId) {
                     i = saber_styles_t::SS_FAST as c_int;
                 }
 
-                if (*world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].saberStance
+                if (&(*world).bg_state.bgSiegeClasses)[(*client).siegeClass as usize].saberStance
                     & (1 << i)
                     != 0
                 {
@@ -4400,10 +4401,10 @@ pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: EntityId) {
 /// Raven `G_OtherPlayersDueling`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2875-2892`
-pub fn G_OtherPlayersDueling(ctx: GameContext<'_>) -> qboolean {
+pub fn G_OtherPlayersDueling(ctx: &mut GameContext) -> qboolean {
     unsafe {
         for i in 0..MAX_CLIENTS {
-            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
 
             if (*ent).inuse != qfalse && !client.is_null() && (*client).ps.duelInProgress != qfalse
@@ -4423,13 +4424,13 @@ pub fn G_OtherPlayersDueling(ctx: GameContext<'_>) -> qboolean {
 // `g_gametype` cvars, `level.time`, `g_entities`, calls `trap_SendServerCommand`/
 // `trap_Trace`/`G_OtherPlayersDueling`/`OnSameTeam`/`G_AddEvent`/`G_Sound`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: EntityId) {
+pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_privateDuel.integer == 0 {
@@ -4704,11 +4705,11 @@ pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Argc`/
 // `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`/`saberMoveData`
 // tables; no GameWorld/engine handle reachable here.
-pub fn Cmd_DebugSetSaberMove_f(ctx: GameContext<'_>, self_: EntityId) {
+pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let argNum = trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new());
         let mut arg = [0 as c_char; MAX_STRING_CHARS];
 
@@ -4753,11 +4754,11 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: GameContext<'_>, self_: EntityId) {
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Argc`/
 // `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`; no GameWorld/engine
 // handle reachable here.
-pub fn Cmd_DebugSetBodyAnim_f(ctx: GameContext<'_>, self_: EntityId, flags: c_int) {
+pub fn Cmd_DebugSetBodyAnim_f(ctx: &mut GameContext, self_: EntityId, flags: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let argNum = trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new());
         let mut arg = [0 as c_char; MAX_STRING_CHARS];
         let mut i: c_int = 0;
@@ -4810,7 +4811,7 @@ pub fn Cmd_DebugSetBodyAnim_f(ctx: GameContext<'_>, self_: EntityId, flags: c_in
 /// Raven `StandardSetBodyAnim`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:3114-3117`
-pub fn StandardSetBodyAnim(ctx: GameContext<'_>, self_: EntityId, anim: c_int, flags: c_int) {
+pub fn StandardSetBodyAnim(ctx: &mut GameContext, self_: EntityId, anim: c_int, flags: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     // Raven `SETANIM_BOTH` == `SETANIM_TORSO|SETANIM_LEGS` == 3 (was wrongly 2),
@@ -4831,10 +4832,10 @@ pub fn StandardSetBodyAnim(ctx: GameContext<'_>, self_: EntityId, anim: c_int, f
 /// Raven `G_ClientNumFromNetname`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:3128-3146`
-pub fn G_ClientNumFromNetname(ctx: GameContext<'_>, name: *mut c_char) -> c_int {
+pub fn G_ClientNumFromNetname(ctx: &mut GameContext, name: *mut c_char) -> c_int {
     unsafe {
         for i in 0..MAX_CLIENTS {
-            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
 
             if (*ent).inuse != qfalse
@@ -4852,7 +4853,7 @@ pub fn G_ClientNumFromNetname(ctx: GameContext<'_>, name: *mut c_char) -> c_int 
 /// Raven `TryGrapple`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:3148-3191`
-pub fn TryGrapple(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+pub fn TryGrapple(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     use mp_bg::public::anim_number::animNumber_t;
@@ -4915,9 +4916,9 @@ pub fn TryGrapple(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
 // and many other `level.*`/cvar globals, and dispatches to every other `Cmd_*_f`
 // in this file (nearly all themselves parked); no GameWorld/engine handle
 // reachable from this raw-pointer signature.
-pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
+pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
     unsafe {
-        let world = ctx.world;
+        let world = ctx.world_raw();
         let ent = &mut (*world).g_entities[clientNum as usize] as *mut gentity_t;
         if (*ent).client.is_null() {
             return; // not fully in game yet

@@ -18,9 +18,9 @@ use crate::prelude::*;
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
 /// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
 #[inline]
-unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -31,25 +31,25 @@ unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t 
 /// Raven `SetGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:10-24`
-pub fn SetGoal(ctx: GameContext<'_>, goal: Option<EntityId>, rating: f32) {
+pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
-        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
-        npc_info.goalEntity = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), goal);
-        npc_info.goalTime = (*ctx.world).level.time;
+        let npc_info = &mut *(*ctx.world_raw()).globals.NPCInfo;
+        npc_info.goalEntity = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), goal);
+        npc_info.goalTime = (*ctx.world_raw()).level.time;
     }
 }
 
 /// Raven `NPC_SetGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:31-58`
-pub fn NPC_SetGoal(ctx: GameContext<'_>, goal: Option<EntityId>, rating: f32) {
+pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
-        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
-        let entity_base = (*ctx.world).g_entities.as_mut_ptr();
+        let npc_info = &mut *(*ctx.world_raw()).globals.NPCInfo;
+        let entity_base = (*ctx.world_raw()).g_entities.as_mut_ptr();
         let goal_id = ent_id_opt(entity_base, goal);
 
         if goal_id == npc_info.goalEntity {
@@ -75,9 +75,9 @@ pub fn NPC_SetGoal(ctx: GameContext<'_>, goal: Option<EntityId>, rating: f32) {
 /// Raven `NPC_ClearGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:65-86`
-pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
+pub fn NPC_ClearGoal(ctx: &mut GameContext) {
     unsafe {
-        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
+        let npc_info = &mut *(*ctx.world_raw()).globals.NPCInfo;
 
         if npc_info.lastGoalEntity.is_none() {
             SetGoal(ctx, ctx.entity_id_of(core::ptr::null_mut()), 0.0);
@@ -88,7 +88,7 @@ pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
         npc_info.lastGoalEntity = None;
 
         if let Some(goal_id) = last_goal_id {
-            let entity_base = (*ctx.world).g_entities.as_mut_ptr();
+            let entity_base = (*ctx.world_raw()).g_entities.as_mut_ptr();
             let goal = entity_base.add(goal_id.0 as usize);
 
             if (*goal).inuse != 0 && ((*goal).s.eFlags & EF_NODRAW) == 0 {
@@ -137,17 +137,17 @@ pub fn G_BoundsOverlap(mins1: vec3_t, maxs1: vec3_t, mins2: vec3_t, maxs2: vec3_
 /// Raven `NPC_ReachedGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:117-129`
-pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
+pub fn NPC_ReachedGoal(ctx: &mut GameContext) {
     NPC_ClearGoal(ctx);
 
     unsafe {
-        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
-        npc_info.goalTime = (*ctx.world).level.time;
+        let npc_info = &mut *(*ctx.world_raw()).globals.NPCInfo;
+        npc_info.goalTime = (*ctx.world_raw()).level.time;
 
         npc_info.aiFlags &= !NPCAI_MOVING;
-        (*ctx.world).globals.ucmd.forwardmove = 0;
+        (*ctx.world_raw()).globals.ucmd.forwardmove = 0;
 
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
@@ -165,18 +165,18 @@ pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
 /// logic is commented out; only the final nav-system check is active.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:136-231`
-pub fn ReachedGoal(ctx: GameContext<'_>, goal: Option<EntityId>) -> qboolean {
+pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
-        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
+        let npc_info = &mut *(*ctx.world_raw()).globals.NPCInfo;
 
         if (npc_info.aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
             npc_info.aiFlags &= !NPCAI_TOUCHED_GOAL;
             return qtrue;
         }
 
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         let flying = FlyingCreature(&*npc);
 
         NAV_HitNavGoal(
@@ -197,16 +197,16 @@ pub fn ReachedGoal(ctx: GameContext<'_>, goal: Option<EntityId>) -> qboolean {
 /// reached.
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:243-267`
-pub fn UpdateGoal(ctx: GameContext<'_>) -> *mut gentity_t {
+pub fn UpdateGoal(ctx: &mut GameContext) -> *mut gentity_t {
     unsafe {
-        let npc_info = &*(*ctx.world).globals.NPCInfo;
+        let npc_info = &*(*ctx.world_raw()).globals.NPCInfo;
 
         if npc_info.goalEntity.is_none() {
             return core::ptr::null_mut();
         }
 
         let goal_id = npc_info.goalEntity.unwrap();
-        let entity_base = (*ctx.world).g_entities.as_mut_ptr();
+        let entity_base = (*ctx.world_raw()).g_entities.as_mut_ptr();
         let goal = entity_base.add(goal_id.0 as usize);
 
         if (*goal).inuse == 0 {

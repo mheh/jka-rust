@@ -8,8 +8,8 @@
 //! reach `level`/cvars/`g_entities`/traps thread the `GameContext<'_>` receiver
 //! (`.world: *mut GameWorld`, `.engine`) — the only ported-logic precedent
 //! (`g_init_game`). Globals are `GameWorld` fields: `level` →
-//! `(*ctx.world).level`, cvars → `(*ctx.world).cvars`, `g_entities[i]` →
-//! `(*ctx.world).g_entities[i]`. Traps go through `trap::X(ctx.engine, …)`.
+//! `(*ctx.world_raw()).level`, cvars → `(*ctx.world_raw()).cvars`, `g_entities[i]` →
+//! `(*ctx.world_raw()).g_entities[i]`. Traps go through `trap::X(ctx.engine, …)`.
 //! Cross-file callees are invoked with the packet's resolved raw-pointer
 //! signatures verbatim (their own porters thread the spine).
 //!
@@ -44,8 +44,8 @@ use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 /// Per-file `g_entities` base-pointer helper for `EntityId` arena resolution
 /// (matches the `g_missile.rs`/`g_trigger.rs`/`NPC_combat.rs` precedent).
 #[inline]
-unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
-    unsafe { (*ctx.world).g_entities.as_ptr() }
+unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
+    unsafe { (*ctx.world_raw()).g_entities.as_ptr() }
 }
 
 // Raven force-mastery-level anonymous enum (bg_public.h) → int-wide consts per
@@ -126,7 +126,7 @@ pub const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 /// Raven `G_PreDefSound` — spawn a predefined-sound temp entity at `org`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:40-49`
-pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
+pub fn G_PreDefSound(ctx: &mut GameContext, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
     unsafe {
         let te = G_TempEntity(ctx, org, EV_PREDEFSOUND as c_int);
         (*te).s.eventParm = pdSound;
@@ -140,12 +140,12 @@ pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut 
 /// Source: `oracle/codemp/game/w_force.c:147-572`
 // MISSING-SYMBOL: `bgSiegeClasses` (siege-class force table) is referenced by
 // its faithful Raven name; not yet a real GameWorld/BgState field.
-pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
+pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
     unsafe {
-        let mut maxRank = (*ctx.world).cvars.g_maxForceRank.integer;
+        let mut maxRank = (*ctx.world_raw()).cvars.g_maxForceRank.integer;
         let mut warnClient = qfalse;
         let warnClientLimit = qfalse;
         let mut lastFPKnown: c_int = -1;
@@ -180,30 +180,30 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
             (*cl).ps.fd.saberAnimLevel = FORCE_LEVEL_1 as c_int;
         }
 
-        if (*ctx.world).speedLoopSound == 0 {
+        if (*ctx.world_raw()).speedLoopSound == 0 {
             //so that the client configstring is already modified with this when we need it
             let s = cstr("sound/weapons/force/speedloop.wav");
-            (*ctx.world).speedLoopSound = G_SoundIndex(s.as_ptr());
+            (*ctx.world_raw()).speedLoopSound = G_SoundIndex(s.as_ptr());
         }
-        if (*ctx.world).rageLoopSound == 0 {
+        if (*ctx.world_raw()).rageLoopSound == 0 {
             let s = cstr("sound/weapons/force/rageloop.wav");
-            (*ctx.world).rageLoopSound = G_SoundIndex(s.as_ptr());
+            (*ctx.world_raw()).rageLoopSound = G_SoundIndex(s.as_ptr());
         }
-        if (*ctx.world).absorbLoopSound == 0 {
+        if (*ctx.world_raw()).absorbLoopSound == 0 {
             let s = cstr("sound/weapons/force/absorbloop.wav");
-            (*ctx.world).absorbLoopSound = G_SoundIndex(s.as_ptr());
+            (*ctx.world_raw()).absorbLoopSound = G_SoundIndex(s.as_ptr());
         }
-        if (*ctx.world).protectLoopSound == 0 {
+        if (*ctx.world_raw()).protectLoopSound == 0 {
             let s = cstr("sound/weapons/force/protectloop.wav");
-            (*ctx.world).protectLoopSound = G_SoundIndex(s.as_ptr());
+            (*ctx.world_raw()).protectLoopSound = G_SoundIndex(s.as_ptr());
         }
-        if (*ctx.world).seeLoopSound == 0 {
+        if (*ctx.world_raw()).seeLoopSound == 0 {
             let s = cstr("sound/weapons/force/seeloop.wav");
-            (*ctx.world).seeLoopSound = G_SoundIndex(s.as_ptr());
+            (*ctx.world_raw()).seeLoopSound = G_SoundIndex(s.as_ptr());
         }
-        if (*ctx.world).ysalamiriLoopSound == 0 {
+        if (*ctx.world_raw()).ysalamiriLoopSound == 0 {
             let s = cstr("sound/player/nullifyloop.wav");
-            (*ctx.world).ysalamiriLoopSound = G_SoundIndex(s.as_ptr());
+            (*ctx.world_raw()).ysalamiriLoopSound = G_SoundIndex(s.as_ptr());
         }
 
         if (*ent).s.eType == ET_NPC as c_int {
@@ -219,13 +219,13 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
         (*cl).ps.fd.forcePowerSelected = -1;
         (*cl).ps.fd.forceSide = 0;
 
-        let gametype = (*ctx.world).cvars.g_gametype.integer;
+        let gametype = (*ctx.world_raw()).cvars.g_gametype.integer;
 
         if gametype == GT_SIEGE as c_int && (*cl).siegeClass != -1 {
             //Then use the powers for this class, and skip all this nonsense.
             // MISSING-SYMBOL: `bgSiegeClasses` — siege-class force table.
             for i in 0..NUM_FORCE_POWERS as usize {
-                (*cl).ps.fd.forcePowerLevel[i] = (*ctx.world).bg_state.bgSiegeClasses
+                (*cl).ps.fd.forcePowerLevel[i] = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
                     [(*cl).siegeClass as usize]
                     .forcePowerLevels[i];
                 if (*cl).ps.fd.forcePowerLevel[i] == 0 {
@@ -275,11 +275,11 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
         // PORT-NOTE(bot-forcepowers): `(*ent).r.svFlags & SVF_BOT` + `botstates`
         // branch overwrites `forcePowers` from the bot's personality file.
         if (*ent).r.svFlags & SVF_BOT != 0
-            && !(*ctx.world).globals.botstates[(*ent).s.number as usize].is_null()
+            && !(&(*ctx.world_raw()).globals.botstates)[(*ent).s.number as usize].is_null()
         {
             //if it's a bot just copy the info directly from its personality
             let bot_forceinfo = cstr_to_str(
-                (*(*ctx.world).globals.botstates[(*ent).s.number as usize])
+                (*(&(*ctx.world_raw()).globals.botstates)[(*ent).s.number as usize])
                     .forceinfo
                     .as_ptr() as *const c_char,
             );
@@ -289,7 +289,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
         //rww - parse through the string manually and eat out all the appropriate data
         let mut i: usize = 0;
 
-        if (*ctx.world).cvars.g_forceBasedTeams.integer != 0 {
+        if (*ctx.world_raw()).cvars.g_forceBasedTeams.integer != 0 {
             if (*cl).sess.sessionTeam == TEAM_RED {
                 warnClient = (BG_LegalizedForcePowers(
                     forcePowers.as_mut_ptr(),
@@ -297,7 +297,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                     HasSetSaberOnly(ctx),
                     FORCE_DARKSIDE as c_int,
                     gametype,
-                    (*ctx.world).cvars.g_forcePowerDisable.integer,
+                    (*ctx.world_raw()).cvars.g_forcePowerDisable.integer,
                 ) == 0) as qboolean;
             } else if (*cl).sess.sessionTeam == TEAM_BLUE {
                 warnClient = (BG_LegalizedForcePowers(
@@ -306,7 +306,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                     HasSetSaberOnly(ctx),
                     FORCE_LIGHTSIDE as c_int,
                     gametype,
-                    (*ctx.world).cvars.g_forcePowerDisable.integer,
+                    (*ctx.world_raw()).cvars.g_forcePowerDisable.integer,
                 ) == 0) as qboolean;
             } else {
                 warnClient = (BG_LegalizedForcePowers(
@@ -315,7 +315,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                     HasSetSaberOnly(ctx),
                     0,
                     gametype,
-                    (*ctx.world).cvars.g_forcePowerDisable.integer,
+                    (*ctx.world_raw()).cvars.g_forcePowerDisable.integer,
                 ) == 0) as qboolean;
             }
         } else {
@@ -325,7 +325,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 HasSetSaberOnly(ctx),
                 0,
                 gametype,
-                (*ctx.world).cvars.g_forcePowerDisable.integer,
+                (*ctx.world_raw()).cvars.g_forcePowerDisable.integer,
             ) == 0) as qboolean;
         }
 
@@ -364,7 +364,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
         let mut fp_bytes = fp_bytes;
         if gametype != GT_SIEGE as c_int
             && (*ent).r.svFlags & SVF_BOT != 0
-            && !(*ctx.world).globals.botstates[(*ent).s.number as usize].is_null()
+            && !(&(*ctx.world_raw()).globals.botstates)[(*ent).s.number as usize].is_null()
         {
             //hmm..I'm going to cheat here.
             let oldI = i;
@@ -377,7 +377,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                     if i_r as c_int == FP_ABSORB {
                         fp_bytes[i] = b'3';
                     }
-                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize])
+                    if (*(&(*ctx.world_raw()).globals.botstates)[(*ent).s.number as usize])
                         .settings
                         .skill
                         >= 4.0
@@ -390,7 +390,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                         }
                     }
                 } else if (*cl).ps.fd.forceSide == FORCE_DARKSIDE as c_int {
-                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize])
+                    if (*(&(*ctx.world_raw()).globals.botstates)[(*ent).s.number as usize])
                         .settings
                         .skill
                         >= 4.0
@@ -453,7 +453,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 (*te).s.eventParm = 0;
             }
 
-            if (*ctx.world).cvars.g_forcePowerDisable.integer != 0 {
+            if (*ctx.world_raw()).cvars.g_forcePowerDisable.integer != 0 {
                 let te = G_TempEntity(ctx, vec3_origin, EV_SET_FORCE_DISABLE as c_int);
                 (*te).r.svFlags |= SVF_BROADCAST;
                 (*te).s.eventParm = 1;
@@ -482,7 +482,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
                     didEvent = qtrue;
 
                     if (*ent).r.svFlags & SVF_BOT == 0 && (*ent).s.eType != ET_NPC as c_int {
-                        if (*ctx.world).cvars.g_teamAutoJoin.integer == 0 {
+                        if (*ctx.world_raw()).cvars.g_teamAutoJoin.integer == 0 {
                             //Make them a spectator so they can set their powerups up without being bothered.
                             (*cl).sess.sessionTeam = TEAM_SPECTATOR;
                             (*cl).sess.spectatorState =
@@ -570,7 +570,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: Option<EntityId>) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:574-691`
 // MISSING-SYMBOL: `bgSiegeClasses` (siege-class force table).
-pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: EntityId) {
+pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
@@ -601,7 +601,7 @@ pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: EntityId) {
             (*cl).ps.holocronsCarried[i] = 0.0;
         }
 
-        let gametype = (*ctx.world).cvars.g_gametype.integer;
+        let gametype = (*ctx.world_raw()).cvars.g_gametype.integer;
 
         if gametype == GT_HOLOCRON as c_int {
             for i in 0..NUM_FORCE_POWERS as usize {
@@ -650,7 +650,7 @@ pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: EntityId) {
             //Then use the powers for this class.
             // MISSING-SYMBOL: `bgSiegeClasses`.
             for i in 0..NUM_FORCE_POWERS as usize {
-                (*cl).ps.fd.forcePowerLevel[i] = (*ctx.world).bg_state.bgSiegeClasses
+                (*cl).ps.fd.forcePowerLevel[i] = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
                     [(*cl).siegeClass as usize]
                     .forcePowerLevels[i];
                 if (*cl).ps.fd.forcePowerLevel[i] == 0 {
@@ -667,19 +667,19 @@ pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:697-772`
 pub fn ForcePowerUsableOn(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     attacker: Option<EntityId>,
     other: Option<EntityId>,
     forcePower: forcePowers_t,
 ) -> c_int {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), attacker) };
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), other) };
     unsafe {
-        let gametype = (*ctx.world).cvars.g_gametype.integer;
-        let level_time = (*ctx.world).level.time;
+        let gametype = (*ctx.world_raw()).cvars.g_gametype.integer;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if !other.is_null()
             && !(*other).client.is_null()
@@ -788,7 +788,7 @@ pub fn ForcePowerUsableOn(
 /// Source: `oracle/codemp/game/w_force.c:774-801`
 // MISSING-SYMBOL: `forcePowerNeeded` (per-level force-cost table).
 pub fn WP_ForcePowerAvailable(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     forcePower: forcePowers_t,
     overrideAmt: c_int,
@@ -850,7 +850,7 @@ pub fn WP_ForcePowerInUse(self_: &gentity_t, forcePower: forcePowers_t) -> qbool
 ///
 /// Source: `oracle/codemp/game/w_force.c:813-938`
 pub fn WP_ForcePowerUsable(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     forcePower: forcePowers_t,
 ) -> qboolean {
@@ -858,8 +858,8 @@ pub fn WP_ForcePowerUsable(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let gametype = (*ctx.world).cvars.g_gametype.integer;
-        let level_time = (*ctx.world).level.time;
+        let gametype = (*ctx.world_raw()).cvars.g_gametype.integer;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if BG_HasYsalamiri(gametype, &mut (*cl).ps) != 0 {
             return qfalse;
@@ -907,7 +907,7 @@ pub fn WP_ForcePowerUsable(
             return qfalse;
         }
 
-        if (*ctx.world).cvars.g_debugMelee.integer != 0 {
+        if (*ctx.world_raw()).cvars.g_debugMelee.integer != 0 {
             if (*cl).ps.pm_flags & PMF_STUCK_TO_WALL != 0 {
                 //no offensive force powers when stuck to wall
                 match forcePower {
@@ -920,7 +920,7 @@ pub fn WP_ForcePowerUsable(
 
         if (*cl).ps.saberHolstered == 0 {
             if (*cl).saber[0].saberFlags & SFL_TWO_HANDED != 0 {
-                if (*ctx.world).cvars.g_saberRestrictForce.integer != 0 {
+                if (*ctx.world_raw()).cvars.g_saberRestrictForce.integer != 0 {
                     match forcePower {
                         FP_PUSH | FP_PULL | FP_TELEPATHY | FP_GRIP | FP_LIGHTNING | FP_DRAIN => {
                             return qfalse
@@ -940,7 +940,7 @@ pub fn WP_ForcePowerUsable(
 
             if (*cl).saber[0].model[0] != 0 {
                 //both sabers on
-                if (*ctx.world).cvars.g_saberRestrictForce.integer != 0 {
+                if (*ctx.world_raw()).cvars.g_saberRestrictForce.integer != 0 {
                     match forcePower {
                         FP_PUSH | FP_PULL | FP_TELEPATHY | FP_GRIP | FP_LIGHTNING | FP_DRAIN => {
                             return qfalse
@@ -964,7 +964,7 @@ pub fn WP_ForcePowerUsable(
 ///
 /// Source: `oracle/codemp/game/w_force.c:940-997`
 pub fn WP_AbsorbConversion(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     attacked: EntityId,
     atdAbsLevel: c_int,
     attacker: Option<EntityId>,
@@ -975,7 +975,7 @@ pub fn WP_AbsorbConversion(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacked: *mut gentity_t = ctx.entity_mut(attacked);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), attacker) };
     unsafe {
         let mut getLevel;
         let mut addTot;
@@ -1021,7 +1021,7 @@ pub fn WP_AbsorbConversion(
         }
 
         //play sound indicating that attack was absorbed
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         if (*atcl).forcePowerSoundDebounce < level_time {
             let abSound = G_PreDefSound(ctx, (*atcl).ps.origin, PDSOUND_ABSORBHIT as c_int);
             (*abSound).s.trickedentindex = (*attacked).s.number;
@@ -1064,7 +1064,7 @@ pub fn WP_ForcePowerRegenerate(self_: &gentity_t, overrideAmt: c_int) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:1021-1234`
 pub fn WP_ForcePowerStart(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     forcePower: forcePowers_t,
     mut overrideAmt: c_int,
@@ -1073,7 +1073,7 @@ pub fn WP_ForcePowerStart(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let mut duration: c_int = 0;
         let mut hearable = qfalse;
         let mut hearDist: f32 = 0.0;
@@ -1258,7 +1258,7 @@ pub fn WP_ForcePowerStart(
 /// Raven `ForceHeal`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1236-1292`
-pub fn ForceHeal(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceHeal(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -1335,13 +1335,13 @@ pub fn WP_AddToClientBitflags(ent: Option<&mut gentity_t>, entNum: c_int) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:1319-1422`
 // MISSING-SYMBOL: `forcePowerNeeded`.
-pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut radius: f32 = 256.0;
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let mut numpl: usize = 0;
         let mut pl: [usize; MAX_CLIENTS as usize] = [0; MAX_CLIENTS as usize];
         let healthadd: c_int;
@@ -1367,7 +1367,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         for i in 0..MAX_CLIENTS as usize {
-            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
 
             if !(*ent).client.is_null()
                 && self_ != ent
@@ -1417,7 +1417,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: EntityId) {
         (*cl).ps.fd.forcePowerDebounce[FP_TEAM_HEAL as usize] = level_time + 2000;
 
         for i in 0..numpl {
-            let ent = &mut (*ctx.world).g_entities[pl[i]] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[pl[i]] as *mut gentity_t;
             let ocl = (*ent).client as *mut gclient_t;
             if (*ocl).ps.stats[STAT_HEALTH as usize] > 0 && (*ent).health > 0 {
                 (*ocl).ps.stats[STAT_HEALTH as usize] += healthadd;
@@ -1455,13 +1455,13 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:1424-1521`
 // MISSING-SYMBOL: `forcePowerNeeded`.
-pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut radius: f32 = 256.0;
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let mut numpl: usize = 0;
         let mut pl: [usize; MAX_CLIENTS as usize] = [0; MAX_CLIENTS as usize];
         let poweradd: c_int;
@@ -1487,7 +1487,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         for i in 0..MAX_CLIENTS as usize {
-            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
 
             if !(*ent).client.is_null()
                 && self_ != ent
@@ -1541,7 +1541,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: EntityId) {
         );
 
         for i in 0..numpl {
-            let ent = &mut (*ctx.world).g_entities[pl[i]] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[pl[i]] as *mut gentity_t;
             let ocl = (*ent).client as *mut gclient_t;
             (*ocl).ps.fd.forcePower += poweradd;
             if (*ocl).ps.fd.forcePower > 100 {
@@ -1563,12 +1563,12 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceGrip`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1523-1594`
-pub fn ForceGrip(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1616,15 +1616,15 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: EntityId) {
 
         if tr.fraction != 1.0
             && tr.entityNum != (ENTITYNUM_NONE) as i16
-            && !(*ctx.world).g_entities[tr.entityNum as usize]
+            && !(*ctx.world_raw()).g_entities[tr.entityNum as usize]
                 .client
                 .is_null()
-            && (*((*ctx.world).g_entities[tr.entityNum as usize].client as *mut gclient_t))
+            && (*((*ctx.world_raw()).g_entities[tr.entityNum as usize].client as *mut gclient_t))
                 .ps
                 .fd
                 .forceGripCripple
                 == 0
-            && (*((*ctx.world).g_entities[tr.entityNum as usize].client as *mut gclient_t))
+            && (*((*ctx.world_raw()).g_entities[tr.entityNum as usize].client as *mut gclient_t))
                 .ps
                 .fd
                 .forceGripBeingGripped
@@ -1635,7 +1635,7 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: EntityId) {
                 Some(EntityId((tr.entityNum) as u32)),
                 FP_GRIP,
             ) != 0
-            && ((*ctx.world).cvars.g_friendlyFire.integer != 0
+            && ((*ctx.world_raw()).cvars.g_friendlyFire.integer != 0
                 || OnSameTeam(
                     ctx,
                     ctx.entity_id_of(self_),
@@ -1643,12 +1643,13 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: EntityId) {
                 ) == 0)
         //don't grip someone who's still crippled
         {
-            let target = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+            let target =
+                &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
             let tcl = (*target).client as *mut gclient_t;
 
             if (*target).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0 {
                 //a player on a vehicle
-                let vehEnt = &mut (*ctx.world).g_entities[(*tcl).ps.m_iVehicleNum as usize]
+                let vehEnt = &mut (*ctx.world_raw()).g_entities[(*tcl).ps.m_iVehicleNum as usize]
                     as *mut gentity_t;
                 if (*vehEnt).inuse != qfalse
                     && !(*vehEnt).client.is_null()
@@ -1679,12 +1680,12 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceSpeed`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1596-1629`
-pub fn ForceSpeed(ctx: GameContext<'_>, self_: EntityId, forceDuration: c_int) {
+pub fn ForceSpeed(ctx: &mut GameContext, self_: EntityId, forceDuration: c_int) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1705,7 +1706,9 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: EntityId, forceDuration: c_int) {
             && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
         {
             //holding Siege item
-            if (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0 {
+            if (*ctx.world_raw()).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15
+                != 0
+            {
                 //disables force powers
                 return;
             }
@@ -1726,11 +1729,12 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: EntityId, forceDuration: c_int) {
             CHAN_BODY,
             G_SoundIndex(snd.as_ptr()),
         );
+        let __s951 = (*ctx.world_raw()).speedLoopSound;
         G_Sound(
             ctx,
             ctx.entity_id_of(self_),
             TRACK_CHANNEL_2 as c_int,
-            (*ctx.world).speedLoopSound,
+            __s951,
         );
     }
 }
@@ -1738,12 +1742,12 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: EntityId, forceDuration: c_int) {
 /// Raven `ForceSeeing`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1631-1656`
-pub fn ForceSeeing(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceSeeing(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1771,11 +1775,12 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: EntityId) {
             CHAN_AUTO,
             G_SoundIndex(snd.as_ptr()),
         );
+        let __s951 = (*ctx.world_raw()).seeLoopSound;
         G_Sound(
             ctx,
             ctx.entity_id_of(self_),
             TRACK_CHANNEL_5 as c_int,
-            (*ctx.world).seeLoopSound,
+            __s951,
         );
     }
 }
@@ -1783,12 +1788,12 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceProtect`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1658-1692`
-pub fn ForceProtect(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceProtect(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1817,11 +1822,12 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: EntityId) {
 
         WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), FP_PROTECT, 0);
         G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_PROTECT as c_int);
+        let __s951 = (*ctx.world_raw()).protectLoopSound;
         G_Sound(
             ctx,
             ctx.entity_id_of(self_),
             TRACK_CHANNEL_3 as c_int,
-            (*ctx.world).protectLoopSound,
+            __s951,
         );
     }
 }
@@ -1829,12 +1835,12 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceAbsorb`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1694-1728`
-pub fn ForceAbsorb(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceAbsorb(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1863,11 +1869,12 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: EntityId) {
 
         WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), FP_ABSORB, 0);
         G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_ABSORB as c_int);
+        let __s951 = (*ctx.world_raw()).absorbLoopSound;
         G_Sound(
             ctx,
             ctx.entity_id_of(self_),
             TRACK_CHANNEL_3 as c_int,
-            (*ctx.world).absorbLoopSound,
+            __s951,
         );
     }
 }
@@ -1875,12 +1882,12 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceRage`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1730-1775`
-pub fn ForceRage(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceRage(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1924,11 +1931,12 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: EntityId) {
             TRACK_CHANNEL_4 as c_int,
             G_SoundIndex(snd.as_ptr()),
         );
+        let __s951 = (*ctx.world_raw()).rageLoopSound;
         G_Sound(
             ctx,
             ctx.entity_id_of(self_),
             TRACK_CHANNEL_3 as c_int,
-            (*ctx.world).rageLoopSound,
+            __s951,
         );
     }
 }
@@ -1936,12 +1944,12 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceLightning`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1777-1810`
-pub fn ForceLightning(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceLightning(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -1985,7 +1993,7 @@ pub fn ForceLightning(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:1812-1900`
 pub fn ForceLightningDamage(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     traceEnt: Option<EntityId>,
     mut dir: vec3_t,
@@ -1994,10 +2002,10 @@ pub fn ForceLightningDamage(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let traceEnt: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), traceEnt) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), traceEnt) };
     unsafe {
         let scl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         (*scl).dangerTime = level_time;
         (*scl).ps.eFlags &= !EF_INVULNERABLE;
@@ -2028,7 +2036,7 @@ pub fn ForceLightningDamage(
                     FP_LIGHTNING,
                 ) != 0
                 {
-                    let mut dmg = (*ctx.world).bg_state.rng.Q_irand(1, 2); //(*ctx.world).bg_state.rng.Q_irand( 1, 3 );
+                    let mut dmg = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2); //(*ctx.world_raw()).bg_state.rng.Q_irand( 1, 3 );
 
                     let mut modPowerLevel = -1;
 
@@ -2080,10 +2088,10 @@ pub fn ForceLightningDamage(
                         );
                     }
                     if !(*traceEnt).client.is_null() {
-                        if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+                        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
                             let snd = std::ffi::CString::new(format!(
                                 "sound/weapons/force/lightninghit{}",
-                                (*ctx.world).bg_state.rng.Q_irand(1, 3)
+                                (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3)
                             ))
                             .unwrap();
                             G_Sound(
@@ -2102,7 +2110,7 @@ pub fn ForceLightningDamage(
                             //disable cloak temporarily
                             Jedi_Decloak(ctx, ctx.entity_id_of(traceEnt));
                             (*tcl).cloakToggleTime =
-                                level_time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
+                                level_time + (*ctx.world_raw()).bg_state.rng.Q_irand(3000, 10000);
                         }
                     }
                 }
@@ -2114,7 +2122,7 @@ pub fn ForceLightningDamage(
 /// Raven `ForceShootLightning`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1902-2020`
-pub fn ForceShootLightning(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -2151,7 +2159,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: EntityId) {
             );
 
             for e in 0..numListedEntities {
-                let traceEnt = &mut (*ctx.world).g_entities[iEntityList[e as usize] as usize]
+                let traceEnt = &mut (*ctx.world_raw()).g_entities[iEntityList[e as usize] as usize]
                     as *mut gentity_t;
 
                 if traceEnt == self_ {
@@ -2172,7 +2180,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: EntityId) {
                     //no torturing corpses
                     continue;
                 }
-                if (*ctx.world).cvars.g_friendlyFire.integer == 0
+                if (*ctx.world_raw()).cvars.g_friendlyFire.integer == 0
                     && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) != 0
                 {
                     continue;
@@ -2288,7 +2296,8 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: EntityId) {
                 return;
             }
 
-            let traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+            let traceEnt =
+                &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
             ForceLightningDamage(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
@@ -2303,12 +2312,12 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `ForceDrain`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2022-2056`
-pub fn ForceDrain(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceDrain(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*self_).health <= 0 {
             return;
@@ -2351,7 +2360,7 @@ pub fn ForceDrain(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:2058-2182`
 pub fn ForceDrainDamage(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     traceEnt: Option<EntityId>,
     dir: vec3_t,
@@ -2360,10 +2369,10 @@ pub fn ForceDrainDamage(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let traceEnt: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), traceEnt) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), traceEnt) };
     unsafe {
         let scl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         (*scl).dangerTime = level_time;
         (*scl).ps.eFlags &= !EF_INVULNERABLE;
@@ -2373,7 +2382,7 @@ pub fn ForceDrainDamage(
             let tcl = (*traceEnt).client as *mut gclient_t;
             if !(*traceEnt).client.is_null()
                 && (OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) == 0
-                    || (*ctx.world).cvars.g_friendlyFire.integer != 0)
+                    || (*ctx.world_raw()).cvars.g_friendlyFire.integer != 0)
                 && (*scl).ps.fd.forceDrainTime < (level_time) as f32
                 && (*tcl).ps.fd.forcePower != 0
             {
@@ -2392,7 +2401,7 @@ pub fn ForceDrainDamage(
                 ) != 0
                 {
                     let mut modPowerLevel = -1;
-                    let mut dmg = 0; //(*ctx.world).bg_state.rng.Q_irand( 1, 3 );
+                    let mut dmg = 0; //(*ctx.world_raw()).bg_state.rng.Q_irand( 1, 3 );
                     if (*scl).ps.fd.forcePowerLevel[FP_DRAIN as usize] == FORCE_LEVEL_1 {
                         dmg = 2; //because it's one-shot
                     } else if (*scl).ps.fd.forcePowerLevel[FP_DRAIN as usize] == FORCE_LEVEL_2 {
@@ -2462,12 +2471,12 @@ pub fn ForceDrainDamage(
 /// Raven `ForceShootDrain`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2184-2315`
-pub fn ForceShootDrain(ctx: GameContext<'_>, self_: EntityId) -> c_int {
+pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let scl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let mut gotOneOrMore = 0;
 
         if (*self_).health <= 0 {
@@ -2501,7 +2510,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: EntityId) -> c_int {
             );
 
             for e in 0..numListedEntities {
-                let traceEnt = &mut (*ctx.world).g_entities[iEntityList[e as usize] as usize]
+                let traceEnt = &mut (*ctx.world_raw()).g_entities[iEntityList[e as usize] as usize]
                     as *mut gentity_t;
 
                 if traceEnt == self_ {
@@ -2525,7 +2534,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: EntityId) -> c_int {
                     continue;
                 }
                 if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) != 0
-                    && (*ctx.world).cvars.g_friendlyFire.integer == 0
+                    && (*ctx.world_raw()).cvars.g_friendlyFire.integer == 0
                 {
                     continue;
                 }
@@ -2630,15 +2639,16 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: EntityId) -> c_int {
                 || tr.fraction == 1.0
                 || tr.allsolid != 0
                 || tr.startsolid != 0
-                || (*ctx.world).g_entities[tr.entityNum as usize]
+                || (*ctx.world_raw()).g_entities[tr.entityNum as usize]
                     .client
                     .is_null()
-                || (*ctx.world).g_entities[tr.entityNum as usize].inuse == 0
+                || (*ctx.world_raw()).g_entities[tr.entityNum as usize].inuse == 0
             {
                 return 0;
             }
 
-            let traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+            let traceEnt =
+                &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
             ForceDrainDamage(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
@@ -2664,12 +2674,12 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: EntityId) -> c_int {
 ///
 /// Source: `oracle/codemp/game/w_force.c:2317-2375`
 // MISSING-SYMBOL: `forcePowerNeeded`.
-pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: EntityId, ucmd: *mut usercmd_t) {
+pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let forceJumpChargeInterval: f32 =
             forceJumpStrength[0] / (FORCE_JUMP_CHARGE_TIME as f32 / FRAMETIME as f32);
 
@@ -2757,7 +2767,7 @@ pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: EntityId, ucmd: *mut usercmd
 // `jumpVel` is a written-through out-param (`VectorMA(... jumpVel)`); the
 // out-param reshape turns the by-value `vec3_t` into `&mut vec3_t`.
 pub fn WP_GetVelocityForForceJump(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     jumpVel: &mut vec3_t,
     ucmd: *mut usercmd_t,
@@ -2841,12 +2851,12 @@ pub fn WP_GetVelocityForForceJump(
 ///
 /// Source: `oracle/codemp/game/w_force.c:2462-2500`
 // MISSING-SYMBOL: `forcePowerNeeded`.
-pub fn ForceJump(ctx: GameContext<'_>, self_: EntityId, ucmd: *mut usercmd_t) {
+pub fn ForceJump(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*cl).ps.fd.forcePowerDuration[FP_LEVITATION as usize] > level_time {
             return;
@@ -2922,7 +2932,7 @@ pub fn WP_AddAsMindtricked(fd: *mut forcedata_t, entNum: c_int) {
 // transcribed against the faithful Raven `gNPC_t` shape and cast the
 // placeholder pointer, per the zero-park missing-symbol rule.
 pub fn ForceTelepathyCheckDirectNPCTarget(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     tr: *mut trace_t,
     tookPower: *mut qboolean,
@@ -2967,7 +2977,8 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
             return qfalse;
         }
 
-        let traceEnt = &mut (*ctx.world).g_entities[(*tr).entityNum as usize] as *mut gentity_t;
+        let traceEnt =
+            &mut (*ctx.world_raw()).g_entities[(*tr).entityNum as usize] as *mut gentity_t;
 
         if !(*traceEnt).NPC.is_null()
             && (*((*traceEnt).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_FORCE != 0
@@ -3058,14 +3069,14 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                             (*tcl).enemyTeam = newEnemyTeam;
                             (*traceEnt).s.teamowner = newPlayerTeam;
                             //FIXME: need a *charmed* timer on this...?  Or do TEAM_PLAYERS assume that "confusion" means they should switch to team_enemy when done?
-                            (*npc).charmedTime = (*ctx.world).level.time
+                            (*npc).charmedTime = (*ctx.world_raw()).level.time
                                 + mindTrickTime
                                     [(*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] as usize];
                         }
                     } else {
                         //just confuse them
                         //somehow confuse them?  Set don't fire to true for a while?  Drop their aggression?  Maybe just take their enemy away and don't let them pick one up for a while unless shot?
-                        (*npc).confusionTime = (*ctx.world).level.time
+                        (*npc).confusionTime = (*ctx.world_raw()).level.time
                             + mindTrickTime
                                 [(*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] as usize]; //confused for about 10 seconds
                         crate::NPC_sounds::NPC_PlayConfusionSound(
@@ -3161,12 +3172,12 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 /// Raven `ForceTelepathy`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2723-2893`
-pub fn ForceTelepathy(ctx: GameContext<'_>, self_: EntityId) {
+pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         let mut tr: trace_t = core::mem::zeroed();
         let mut visionArc: f32 = 0.0;
@@ -3245,7 +3256,7 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         if (*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] == FORCE_LEVEL_1 {
-            let ent = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
             if tr.fraction != 1.0
                 && tr.entityNum != (ENTITYNUM_NONE) as i16
                 && (*ent).inuse != 0
@@ -3285,8 +3296,8 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: EntityId) {
             );
 
             for e in 0..numListedEntities {
-                let mut ent =
-                    &mut (*ctx.world).g_entities[entityList[e as usize] as usize] as *mut gentity_t;
+                let mut ent = &mut (*ctx.world_raw()).g_entities[entityList[e as usize] as usize]
+                    as *mut gentity_t;
 
                 {
                     let mut thispush_org: vec3_t;
@@ -3322,8 +3333,8 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: EntityId) {
                         entityList[e as usize] = ENTITYNUM_NONE;
                     }
                 }
-                ent =
-                    &mut (*ctx.world).g_entities[entityList[e as usize] as usize] as *mut gentity_t;
+                ent = &mut (*ctx.world_raw()).g_entities[entityList[e as usize] as usize]
+                    as *mut gentity_t;
                 if ent != self_ && !(*ent).client.is_null() {
                     gotatleastone = qtrue;
                     WP_AddAsMindtricked(&mut (*cl).ps.fd, (*ent).s.number);
@@ -3356,7 +3367,7 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:2895-2898`
 pub fn GEntity_UseFunc(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     other: Option<EntityId>,
     activator: Option<EntityId>,
@@ -3368,7 +3379,7 @@ pub fn GEntity_UseFunc(
 ///
 /// Source: `oracle/codemp/game/w_force.c:2900-2968`
 pub fn CanCounterThrow(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     thrower: Option<EntityId>,
     pull: qboolean,
@@ -3376,10 +3387,10 @@ pub fn CanCounterThrow(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let thrower: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), thrower) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), thrower) };
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let powerUse: forcePowers_t;
 
         if (*cl).ps.forceHandExtend != HANDEXTEND_NONE as c_int {
@@ -3405,7 +3416,7 @@ pub fn CanCounterThrow(
             return 0;
         }
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
             && pull != 0
             && !thrower.is_null()
             && !(*thrower).client.is_null()
@@ -3509,10 +3520,10 @@ pub fn G_InGetUpAnim(ps: *mut playerState_t) -> qboolean {
 /// Raven `G_LetGoOfWall`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:3025-3042`
-pub fn G_LetGoOfWall(ctx: GameContext<'_>, ent: Option<EntityId>) {
+pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -3537,12 +3548,12 @@ pub fn G_LetGoOfWall(ctx: GameContext<'_>, ent: Option<EntityId>) {
 // and uses `VectorCompare` (marked unresolved in the packet). Multiple genuinely
 // un-ported deps — parked.
 // MISSING-SYMBOL: `forcePowerNeeded`.
-pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
+pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
         let mut push_list: [*mut gentity_t; MAX_GENTITIES as usize] =
             [std::ptr::null_mut(); MAX_GENTITIES as usize];
@@ -3562,7 +3573,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
             return;
         }
 
-        if (*ctx.world).cvars.g_useWhileThrowing.integer == 0 && (*cl).ps.saberInFlight != 0 {
+        if (*ctx.world_raw()).cvars.g_useWhileThrowing.integer == 0 && (*cl).ps.saberInFlight != 0 {
             return;
         }
 
@@ -3611,7 +3622,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
             );
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
-                if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE as c_int
+                if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE as c_int
                     && (*cl).ps.weapon == WP_SABER as c_int
                 {
                     //hold less so can attack right after a pull
@@ -3703,7 +3714,8 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
             );
 
             if tr.fraction != 1.0 && tr.entityNum != (ENTITYNUM_NONE) as i16 {
-                let hit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+                let hit =
+                    &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
                 if (*hit).client.is_null() && (*hit).s.eType == ET_NPC as c_int {
                     //g2animent
                     if (*hit).s.genericenemyindex < level_time {
@@ -3753,7 +3765,8 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
 
             let mut e: usize = 0;
             while (e as c_int) < numListedEntities {
-                let ent = &mut (*ctx.world).g_entities[entityList[e] as usize] as *mut gentity_t;
+                let ent =
+                    &mut (*ctx.world_raw()).g_entities[entityList[e] as usize] as *mut gentity_t;
 
                 if (*ent).client.is_null() && (*ent).s.eType == ET_NPC as c_int {
                     //g2animent
@@ -3821,7 +3834,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
                 && entityList[e] >= 0
                 && entityList[e] < MAX_GENTITIES as c_int
             {
-                &mut (*ctx.world).g_entities[entityList[e] as usize] as *mut gentity_t
+                &mut (*ctx.world_raw()).g_entities[entityList[e] as usize] as *mut gentity_t
             } else {
                 std::ptr::null_mut()
             };
@@ -4031,7 +4044,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
                     let mut canPullWeapon = qtrue;
                     let mut dirLen: f32 = 0.0;
 
-                    if (*ctx.world).cvars.g_debugMelee.integer != 0 {
+                    if (*ctx.world_raw()).cvars.g_debugMelee.integer != 0 {
                         if (*pcl).ps.pm_flags & PMF_STUCK_TO_WALL != 0 {
                             //no resistance if stuck to wall
                             //push/pull them off the wall
@@ -4145,7 +4158,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
                                 ctx.entity_id_of(self_),
                                 ctx.entity_id_of(push_list[x]),
                             ) == 0
-                                && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= randfact
+                                && (*ctx.world_raw()).bg_state.rng.Q_irand(1, 10) <= randfact
                                 && canPullWeapon != 0
                             {
                                 let mut uorg: vec3_t = (*cl).ps.origin;
@@ -4196,7 +4209,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
                                 && dirLen <= 128.0
                             {
                                 //a player on a vehicle
-                                let vehEnt = &mut (*ctx.world).g_entities
+                                let vehEnt = &mut (*ctx.world_raw()).g_entities
                                     [(*pcl).ps.m_iVehicleNum as usize]
                                     as *mut gentity_t;
                                 if (*vehEnt).inuse != qfalse
@@ -4460,12 +4473,12 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
 /// Raven `WP_ForcePowerStop`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:3822-3946`
-pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: EntityId, forcePower: forcePowers_t) {
+pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let wasActive = (*cl).ps.fd.forcePowersActive;
 
         (*cl).ps.fd.forcePowersActive &= !(1 << forcePower);
@@ -4515,7 +4528,7 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: EntityId, forcePower: forc
             FP_GRIP => {
                 (*cl).ps.fd.forceGripUseTime = level_time + 3000;
                 let gripIdx = (*cl).ps.fd.forceGripEntityNum as usize;
-                let gripEnt = &mut (*ctx.world).g_entities[gripIdx] as *mut gentity_t;
+                let gripEnt = &mut (*ctx.world_raw()).g_entities[gripIdx] as *mut gentity_t;
                 if (*cl).ps.fd.forcePowerLevel[FP_GRIP as usize] > FORCE_LEVEL_1
                     && !(*gripEnt).client.is_null()
                     && (*gripEnt).health > 0
@@ -4620,19 +4633,19 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: EntityId, forcePower: forc
 // (const table not yet ported; values absent from packet). Parked like
 // the other `forcePowerNeeded` consumers.
 // MISSING-SYMBOL: `forcePowerNeeded`.
-pub fn DoGripAction(ctx: GameContext<'_>, self_: EntityId, forcePower: forcePowers_t) {
+pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         (*cl).dangerTime = level_time;
         (*cl).ps.eFlags &= !EF_INVULNERABLE;
         (*cl).invulnerableTimer = 0;
 
-        let gripEnt =
-            &mut (*ctx.world).g_entities[(*cl).ps.fd.forceGripEntityNum as usize] as *mut gentity_t;
+        let gripEnt = &mut (*ctx.world_raw()).g_entities[(*cl).ps.fd.forceGripEntityNum as usize]
+            as *mut gentity_t;
 
         if gripEnt.is_null()
             || (*gripEnt).client.is_null()
@@ -4777,7 +4790,10 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: EntityId, forcePower: forcePowe
                 );
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
-                let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
+                let snd = format!(
+                    "*choke{}.wav",
+                    (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3)
+                );
                 G_EntitySound(
                     ctx,
                     ctx.entity_id_of(gripEnt).unwrap(),
@@ -4877,7 +4893,10 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: EntityId, forcePower: forcePowe
                 );
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
-                let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
+                let snd = format!(
+                    "*choke{}.wav",
+                    (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3)
+                );
                 G_EntitySound(
                     ctx,
                     ctx.entity_id_of(gripEnt).unwrap(),
@@ -4962,19 +4981,19 @@ fn RemoveTrickedEnt(fd: *mut forcedata_t, client: c_int) {
 /// Raven `WP_UpdateMindtrickEnts`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:4236-4280`
-fn WP_UpdateMindtrickEnts(ctx: GameContext<'_>, self_: EntityId) {
+fn WP_UpdateMindtrickEnts(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
-        let g_time_since = (*ctx.world).globals.g_TimeSinceLastFrame;
-        let gametype = (*ctx.world).cvars.g_gametype.integer;
+        let level_time = (*ctx.world_raw()).level.time;
+        let g_time_since = (*ctx.world_raw()).globals.g_TimeSinceLastFrame;
+        let gametype = (*ctx.world_raw()).cvars.g_gametype.integer;
 
         let mut i: c_int = 0;
         while i < MAX_CLIENTS as c_int {
             if G_IsMindTricked(&mut (*cl).ps.fd, i) != 0 {
-                let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
+                let ent = &mut (*ctx.world_raw()).g_entities[i as usize] as *mut gentity_t;
 
                 if (*ent).client.is_null()
                     || (*ent).inuse == 0
@@ -5027,7 +5046,7 @@ fn WP_UpdateMindtrickEnts(ctx: GameContext<'_>, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/w_force.c:4282-4506`
 fn WP_ForcePowerRun(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     forcePower: forcePowers_t,
     cmd: *mut usercmd_t,
@@ -5037,7 +5056,7 @@ fn WP_ForcePowerRun(
     // Raven declares `extern usercmd_t ucmd;` here but never references it.
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         match forcePower {
             FP_HEAL => {
@@ -5085,7 +5104,8 @@ fn WP_ForcePowerRun(
                 if (*cl).holdingObjectiveItem >= MAX_CLIENTS as c_int
                     && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
                 {
-                    if (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15
+                    if (*ctx.world_raw()).g_entities[(*cl).holdingObjectiveItem as usize]
+                        .genericValue15
                         != 0
                     {
                         //disables force powers
@@ -5204,7 +5224,8 @@ fn WP_ForcePowerRun(
             FP_TELEPATHY => {
                 if (*cl).holdingObjectiveItem >= MAX_CLIENTS as c_int
                     && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
-                    && (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15
+                    && (*ctx.world_raw()).g_entities[(*cl).holdingObjectiveItem as usize]
+                        .genericValue15
                         != 0
                 {
                     //if force hindered can't mindtrick whilst carrying a siege item
@@ -5245,7 +5266,7 @@ fn WP_ForcePowerRun(
 ///
 /// Source: `oracle/codemp/game/w_force.c:4508-4671`
 pub fn WP_DoSpecificPower(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: EntityId,
     ucmd: *mut usercmd_t,
     forcepower: forcePowers_t,
@@ -5388,7 +5409,7 @@ pub fn WP_DoSpecificPower(
 /// Raven `FindGenericEnemyIndex`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:4673-4709`
-pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: EntityId) {
+pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     //Find another client that would be considered a threat.
@@ -5399,7 +5420,7 @@ pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: EntityId) {
 
         let mut i: c_int = 0;
         while i < MAX_CLIENTS as c_int {
-            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world_raw()).g_entities[i as usize] as *mut gentity_t;
 
             if !(*ent).client.is_null()
                 && (*ent).s.number != (*self_).s.number
@@ -5444,12 +5465,12 @@ pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `SeekerDroneUpdate`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:4711-4868`
-pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: EntityId) {
+pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
 
         if (*cl).ps.eFlags & EF_SEEKERDRONE == 0 {
             (*cl).ps.genericEnemyIndex = -1;
@@ -5548,8 +5569,8 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         if (*cl).ps.genericEnemyIndex != ENTITYNUM_NONE && (*cl).ps.genericEnemyIndex != -1 {
-            let en =
-                &mut (*ctx.world).g_entities[(*cl).ps.genericEnemyIndex as usize] as *mut gentity_t;
+            let en = &mut (*ctx.world_raw()).g_entities[(*cl).ps.genericEnemyIndex as usize]
+                as *mut gentity_t;
 
             if (*en).client.is_null() {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
@@ -5575,8 +5596,8 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: EntityId) {
         }
 
         if (*cl).ps.genericEnemyIndex != ENTITYNUM_NONE && (*cl).ps.genericEnemyIndex != -1 {
-            let en =
-                &mut (*ctx.world).g_entities[(*cl).ps.genericEnemyIndex as usize] as *mut gentity_t;
+            let en = &mut (*ctx.world_raw()).g_entities[(*cl).ps.genericEnemyIndex as usize]
+                as *mut gentity_t;
 
             let mut elevated: vec3_t = (*cl).ps.origin;
             elevated[2] += 40.0;
@@ -5634,7 +5655,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: EntityId) {
                     G_SoundAtLoc(ctx, org, CHAN_WEAPON, G_SoundIndex(snd.as_ptr()));
 
                     (*cl).ps.droneFireTime =
-                        (level_time + (*ctx.world).bg_state.rng.Q_irand(400, 700)) as f32;
+                        (level_time + (*ctx.world_raw()).bg_state.rng.Q_irand(400, 700)) as f32;
                 }
             }
         }
@@ -5644,7 +5665,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `HolocronUpdate`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:4870-4956`
-pub fn HolocronUpdate(ctx: GameContext<'_>, self_: EntityId) {
+pub fn HolocronUpdate(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     //keep holocron status updated in holocron mode
@@ -5662,7 +5683,7 @@ pub fn HolocronUpdate(ctx: GameContext<'_>, self_: EntityId) {
 
         trap::Cvar_Update(
             ctx.engine,
-            GCvarUpdateArgs::new(&mut (*ctx.world).cvars.g_MaxHolocronCarry as *mut vmCvar_t),
+            GCvarUpdateArgs::new(&mut (*ctx.world_raw()).cvars.g_MaxHolocronCarry as *mut vmCvar_t),
         );
 
         let mut i = 0;
@@ -5730,7 +5751,7 @@ pub fn HolocronUpdate(ctx: GameContext<'_>, self_: EntityId) {
 /// Raven `JediMasterUpdate`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:4958-5011`
-pub fn JediMasterUpdate(ctx: GameContext<'_>, self_: EntityId) {
+pub fn JediMasterUpdate(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     //keep jedi master status updated for JM gametype
@@ -5739,7 +5760,7 @@ pub fn JediMasterUpdate(ctx: GameContext<'_>, self_: EntityId) {
 
         trap::Cvar_Update(
             ctx.engine,
-            GCvarUpdateArgs::new(&mut (*ctx.world).cvars.g_MaxHolocronCarry as *mut vmCvar_t),
+            GCvarUpdateArgs::new(&mut (*ctx.world_raw()).cvars.g_MaxHolocronCarry as *mut vmCvar_t),
         );
 
         let mut i = 0;
@@ -5808,12 +5829,12 @@ pub fn WP_HasForcePowers(ps: *const playerState_t) -> qboolean {
 /// Raven `G_SpecialRollGetup`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:5037-5092`
-pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+pub fn G_SpecialRollGetup(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
+        let level_time = (*ctx.world_raw()).level.time;
         let mut rolled: qboolean = qfalse;
         let cmd = &mut (*cl).pers.cmd as *mut usercmd_t;
 
@@ -5893,10 +5914,10 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
 // MISSING-SYMBOL: `WP_ForcePowerRun` — not yet ported anywhere in the crate
 // (resolved call surface lists it as "ported: w_force.rs" but no definition
 // exists yet); called exactly as the packet cites it.
-pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd: *mut usercmd_t) {
+pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd: *mut usercmd_t) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), self_) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), self_) };
     unsafe {
         let mut usingForce = qfalse;
         let mut prepower: c_int = 0;
@@ -5908,8 +5929,8 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
             return;
         }
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
-        let gametype = (*ctx.world).cvars.g_gametype.integer;
+        let level_time = (*ctx.world_raw()).level.time;
+        let gametype = (*ctx.world_raw()).cvars.g_gametype.integer;
 
         if (*cl).ps.pm_flags & PMF_FOLLOW != 0 {
             //not a "real" game client, it's a spectator following someone
@@ -5951,8 +5972,8 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
             }
         }
 
-        if (*ctx.world).globals.g_LastFrameTime == 0 {
-            (*ctx.world).globals.g_LastFrameTime = level_time;
+        if (*ctx.world_raw()).globals.g_LastFrameTime == 0 {
+            (*ctx.world_raw()).globals.g_LastFrameTime = level_time;
         }
 
         if (*cl).ps.forceHandExtend == HANDEXTEND_KNOCKDOWN as c_int {
@@ -6333,7 +6354,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
                 //don't regen force power while throwing saber
                 if (*cl).ps.saberEntityNum < ENTITYNUM_NONE && (*cl).ps.saberEntityNum > 0 {
                     //player is 0
-                    if (*ctx.world).g_entities[(*cl).ps.saberEntityNum as usize]
+                    if (*ctx.world_raw()).g_entities[(*cl).ps.saberEntityNum as usize]
                         .s
                         .pos
                         .trType
@@ -6354,7 +6375,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
                         || BG_SaberInSpecial((*cl).ps.saberMove) == 0)
                 {
                     if gametype != GT_HOLOCRON as c_int
-                        || (*ctx.world).cvars.g_MaxHolocronCarry.value != 0.0
+                        || (*ctx.world_raw()).cvars.g_MaxHolocronCarry.value != 0.0
                     {
                         if (*cl).ps.powerups[PW_FORCE_BOON as usize] != 0 {
                             WP_ForcePowerRegenerate(&*(self_), 6);
@@ -6377,9 +6398,10 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
 
                     if gametype == GT_SIEGE as c_int {
                         if (*cl).holdingObjectiveItem != 0
-                            && (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].inuse
+                            && (*ctx.world_raw()).g_entities[(*cl).holdingObjectiveItem as usize]
+                                .inuse
                                 != 0
-                            && (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize]
+                            && (*ctx.world_raw()).g_entities[(*cl).holdingObjectiveItem as usize]
                                 .genericValue15
                                 != 0
                         {
@@ -6387,41 +6409,42 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time + 7000;
                         } else if (*cl).siegeClass != -1
                             // MISSING-SYMBOL: `bgSiegeClasses`.
-                            && (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN as c_int) != 0
+                            && (&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN as c_int) != 0
                         {
                             //if this is siege and our player class has the fast force regen ability, then recharge with 1/5th the usual delay
                             // Raven's `0.2` is a double literal, so the multiply runs in f64.
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
-                                + ((*ctx.world).cvars.g_forceRegenTime.integer as f64 * 0.2)
+                                + ((*ctx.world_raw()).cvars.g_forceRegenTime.integer as f64 * 0.2)
                                     as c_int;
                         } else {
                             (*cl).ps.fd.forcePowerRegenDebounceTime =
-                                level_time + (*ctx.world).cvars.g_forceRegenTime.integer;
+                                level_time + (*ctx.world_raw()).cvars.g_forceRegenTime.integer;
                         }
                     } else {
                         if gametype == GT_POWERDUEL as c_int
                             && (*cl).sess.duelTeam == DUELTEAM_LONE as c_int
                         {
-                            if (*ctx.world).cvars.g_duel_fraglimit.integer != 0 {
+                            if (*ctx.world_raw()).cvars.g_duel_fraglimit.integer != 0 {
                                 // Raven's `0.6`/`.3` are double literals, so the whole
                                 // multiply runs in f64; `(float)wins`/`(float)fraglimit`
                                 // narrow to f32 before promoting into that f64 divide.
                                 (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
-                                    + ((*ctx.world).cvars.g_forceRegenTime.integer as f64
+                                    + ((*ctx.world_raw()).cvars.g_forceRegenTime.integer as f64
                                         * (0.6
                                             + (0.3 * (*cl).sess.wins as f32 as f64
-                                                / (*ctx.world).cvars.g_duel_fraglimit.integer as f32
+                                                / (*ctx.world_raw()).cvars.g_duel_fraglimit.integer
+                                                    as f32
                                                     as f64)))
                                         as c_int;
                             } else {
                                 // Raven's `0.7` is a double literal, so the multiply runs in f64.
                                 (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
-                                    + ((*ctx.world).cvars.g_forceRegenTime.integer as f64 * 0.7)
-                                        as c_int;
+                                    + ((*ctx.world_raw()).cvars.g_forceRegenTime.integer as f64
+                                        * 0.7) as c_int;
                             }
                         } else {
                             (*cl).ps.fd.forcePowerRegenDebounceTime =
-                                level_time + (*ctx.world).cvars.g_forceRegenTime.integer;
+                                level_time + (*ctx.world_raw()).cvars.g_forceRegenTime.integer;
                         }
                     }
                 }
@@ -6445,7 +6468,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: Option<EntityId>, ucmd:
 ///
 /// Source: `oracle/codemp/game/w_force.c:5673-5801`
 pub fn Jedi_DodgeEvasion(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: Option<EntityId>,
     shooter: Option<EntityId>,
     tr: *mut trace_t,
@@ -6453,9 +6476,9 @@ pub fn Jedi_DodgeEvasion(
 ) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), self_) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), self_) };
     let shooter: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), shooter) };
+        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), shooter) };
     unsafe {
         let mut dodgeAnim: c_int = -1;
 
@@ -6463,8 +6486,8 @@ pub fn Jedi_DodgeEvasion(
             return qfalse;
         }
         let cl = (*self_).client as *mut gclient_t;
-        let level_time = (*ctx.world).level.time;
-        let g_forceDodge = (*ctx.world).cvars.g_forceDodge.integer;
+        let level_time = (*ctx.world_raw()).level.time;
+        let g_forceDodge = (*ctx.world_raw()).cvars.g_forceDodge.integer;
 
         if g_forceDodge == 0 {
             return qfalse;
@@ -6501,7 +6524,7 @@ pub fn Jedi_DodgeEvasion(
         }
 
         if g_forceDodge == 2 {
-            if (*ctx.world).bg_state.rng.Q_irand(1, 7)
+            if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 7)
                 > (*cl).ps.fd.forcePowerLevel[FP_SPEED as usize]
             {
                 //more likely to fail on lower force speed level

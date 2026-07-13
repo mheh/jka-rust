@@ -29,9 +29,9 @@ use mp_bg::public::anim_number::animNumber_t::*;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -82,7 +82,7 @@ pub const LSTATE_FIRED4: c_int = 7;
 /// Raven `NPC_Mark1_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:50-74`
-pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
+pub fn NPC_Mark1_Precache(ctx: &mut GameContext) {
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/shutdown".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/walk".as_ptr());
@@ -125,7 +125,7 @@ pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
 /// Raven `NPC_Mark1_Part_Explode`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:81-102`
-pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: EntityId, bolt: c_int) {
+pub fn NPC_Mark1_Part_Explode(ctx: &mut GameContext, self_: EntityId, bolt: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     if bolt >= 0 {
@@ -143,7 +143,7 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: EntityId, bolt: c_int
                     &mut boltMatrix,
                     &(*self_).r.currentAngles,
                     &(*self_).r.currentOrigin,
-                    (*ctx.world).level.time,
+                    (*ctx.world_raw()).level.time,
                     core::ptr::null_mut(),
                     &(*self_).modelScale,
                 ),
@@ -172,10 +172,10 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: EntityId, bolt: c_int
 /// Raven `Mark1_Idle`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:109-115`
-pub fn Mark1_Idle(ctx: GameContext<'_>) {
+pub fn Mark1_Idle(ctx: &mut GameContext) {
     unsafe {
         crate::NPC_AI_Default::NPC_BSIdle(ctx);
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if !npc.is_null() {
             NPC_SetAnim(
                 ctx,
@@ -194,9 +194,9 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
 /// Raven `Mark1Dead_FireRocket`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:123-163`
-pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
+pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if npc.is_null() {
             return;
         }
@@ -224,7 +224,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
                 &mut boltMatrix,
                 &(*npc).r.currentAngles,
                 &(*npc).r.currentOrigin,
-                (*ctx.world).level.time,
+                (*ctx.world_raw()).level.time,
                 core::ptr::null_mut(),
                 &(*npc).modelScale,
             ),
@@ -285,9 +285,9 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
 /// Raven `Mark1Dead_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:171-202`
-pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
+pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if npc.is_null() {
             return;
         }
@@ -314,7 +314,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
                 &mut boltMatrix,
                 &(*npc).r.currentAngles,
                 &(*npc).r.currentOrigin,
-                (*ctx.world).level.time,
+                (*ctx.world_raw()).level.time,
                 core::ptr::null_mut(),
                 &(*npc).modelScale,
             ),
@@ -359,16 +359,16 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
 }
 
 // PORT-NOTE(variadic-c-abi): the live body's only non-trivial call is
-// `G_SoundIndex(va("...death%d.wav", (*ctx.world).bg_state.rng.Q_irand(1,2)))` — `va`'s packet-resolved
+// `G_SoundIndex(va("...death%d.wav", (*ctx.world_raw()).bg_state.rng.Q_irand(1,2)))` — `va`'s packet-resolved
 // signature is the parked `fn va(format: *const c_char) -> *mut c_char`
 // stub with C varargs dropped (seam decision pending, see `q_shared.rs`), so
-// there is no channel to pass the `(*ctx.world).bg_state.rng.Q_irand(1,2)` substitution argument
+// there is no channel to pass the `(*ctx.world_raw()).bg_state.rng.Q_irand(1,2)` substitution argument
 // through it.
 /// Raven `Mark1_die`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:209-243`
 pub fn Mark1_die(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: Option<EntityId>,
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
@@ -382,25 +382,22 @@ pub fn Mark1_die(
     let inflictor: *mut gentity_t = unsafe { ent_resolve_opt(ctx, inflictor) };
     let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
+        let __h120 = ctx.entity_id_of(self_);
+        let __h121 = crate::g_utils::G_SoundIndex(
+            cstr(&format!(
+                "sound/chars/mark1/misc/death{}.wav",
+                (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2),
+            ))
+            .as_ptr(),
+        );
         if self_.is_null() {
             return;
         }
 
-        crate::g_utils::G_Sound(
-            ctx,
-            ctx.entity_id_of(self_),
-            CHAN_AUTO,
-            crate::g_utils::G_SoundIndex(
-                cstr(&format!(
-                    "sound/chars/mark1/misc/death{}.wav",
-                    (*ctx.world).bg_state.rng.Q_irand(1, 2),
-                ))
-                .as_ptr(),
-            ),
-        );
+        crate::g_utils::G_Sound(ctx, __h120, CHAN_AUTO, __h121);
 
         // Choose a death anim
-        if (*ctx.world).bg_state.rng.Q_irand(1, 10) > 5 {
+        if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 10) > 5 {
             NPC_SetAnim(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
@@ -427,7 +424,7 @@ pub fn Mark1_die(
 /// Raven `Mark1_dying`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:250-312`
-pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
+pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
@@ -439,11 +436,13 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"dyingExplosion".as_ptr())
                 != 0
             {
-                let num = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                let num = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
 
+                let __h122 = ctx.entity_id_of(self_);
+                let __h123 = (*ctx.world_raw()).bg_state.rng.Q_irand(300, 1000);
                 // Find place to generate explosion
                 if num == 1 {
-                    let random_num = (*ctx.world).bg_state.rng.Q_irand(8, 10);
+                    let random_num = (*ctx.world_raw()).bg_state.rng.Q_irand(8, 10);
                     let newBolt = trap::G2API_AddBolt(
                         ctx.engine,
                         mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
@@ -454,7 +453,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
                     );
                     NPC_Mark1_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), newBolt);
                 } else {
-                    let random_num = (*ctx.world).bg_state.rng.Q_irand(1, 6);
+                    let random_num = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 6);
                     let newBolt = trap::G2API_AddBolt(
                         ctx.engine,
                         mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
@@ -472,18 +471,13 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
                     );
                 }
 
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"dyingExplosion".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(300, 1000),
-                );
+                crate::g_timer::TIMER_Set(ctx, __h122, c"dyingExplosion".as_ptr(), __h123);
             }
 
             // See which weapons are there
             // Randomly fire blaster
             if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"l_arm".to_owned())) == 0 {
-                if (*ctx.world).bg_state.rng.Q_irand(1, 5) == 1 {
+                if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 5) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
                     crate::npc_c::SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
                     Mark1Dead_FireBlaster(ctx);
@@ -493,7 +487,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
 
             // Randomly fire rocket
             if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"r_arm".to_owned())) == 0 {
-                if (*ctx.world).bg_state.rng.Q_irand(1, 10) == 1 {
+                if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 10) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
                     crate::npc_c::SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
                     Mark1Dead_FireRocket(ctx);
@@ -511,7 +505,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:320-396`
 pub fn NPC_Mark1_Pain(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: Option<EntityId>,
     attacker: Option<EntityId>,
     damage: c_int,
@@ -538,11 +532,11 @@ pub fn NPC_Mark1_Pain(
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_pain".as_ptr()),
         );
 
-        let hitLoc = (*ctx.world).globals.gPainHitLoc;
+        let hitLoc = (*ctx.world_raw()).globals.gPainHitLoc;
 
         // Hit in the CHEST???
         if hitLoc == HL_CHEST {
-            let chance = (*ctx.world).bg_state.rng.Q_irand(1, 4);
+            let chance = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
 
             if chance == 1 && damage > 5 {
                 NPC_SetAnim(
@@ -667,10 +661,10 @@ pub fn NPC_Mark1_Pain(
 /// Raven `Mark1_Hunt`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:404-416`
-pub fn Mark1_Hunt(ctx: GameContext<'_>) {
+pub fn Mark1_Hunt(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if !npc_info.is_null() {
             if (*npc_info).goalEntity.is_none() {
@@ -695,10 +689,10 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
 /// Raven `Mark1_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:424-488`
-pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
+pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if npc.is_null() || npc_info.is_null() {
             return;
@@ -766,7 +760,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
                 &mut boltMatrix,
                 &(*npc).r.currentAngles,
                 &(*npc).r.currentOrigin,
-                (*ctx.world).level.time,
+                (*ctx.world_raw()).level.time,
                 core::ptr::null_mut(),
                 &(*npc).modelScale,
             ),
@@ -775,15 +769,10 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
         if (*npc).health != 0 {
-            crate::NPC_utils::CalcEntitySpot(
-                ctx,
-                ctx.entity_id_of(crate::ent_id::resolve(
-                    (*ctx.world).g_entities.as_mut_ptr(),
-                    (*npc).enemy,
-                )),
-                spot_t::SPOT_HEAD,
-                &mut enemy_org1,
-            );
+            let __h769 =
+                crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
+            let __h124 = ctx.entity_id_of(__h769);
+            crate::NPC_utils::CalcEntitySpot(ctx, __h124, spot_t::SPOT_HEAD, &mut enemy_org1);
             delta1[0] = enemy_org1[0] - muzzle1[0];
             delta1[1] = enemy_org1[1] - muzzle1[1];
             delta1[2] = enemy_org1[2] - muzzle1[2];
@@ -843,17 +832,17 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
 /// Raven `Mark1_BlasterAttack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:495-548`
-pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
+pub fn Mark1_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if npc.is_null() || npc_info.is_null() {
             return;
         }
 
         if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
-            let mut chance = (*ctx.world).bg_state.rng.Q_irand(1, 5);
+            let mut chance = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 5);
 
             (*npc_info).burstCount += 1;
 
@@ -869,23 +858,17 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
             // Stop firing.
             if chance == 1 {
                 (*npc_info).burstCount = 0;
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"attackDelay".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
-                );
+                let __h125 = ctx.entity_id_of(npc);
+                let __h126 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 3000);
+                crate::g_timer::TIMER_Set(ctx, __h125, c"attackDelay".as_ptr(), __h126);
                 (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
             } else {
                 if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay2".as_ptr())
                     != 0
                 {
-                    crate::g_timer::TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(npc),
-                        c"attackDelay2".as_ptr(),
-                        (*ctx.world).bg_state.rng.Q_irand(50, 50),
-                    );
+                    let __h127 = ctx.entity_id_of(npc);
+                    let __h128 = (*ctx.world_raw()).bg_state.rng.Q_irand(50, 50);
+                    crate::g_timer::TIMER_Set(ctx, __h127, c"attackDelay2".as_ptr(), __h128);
                     Mark1_FireBlaster(ctx);
                     NPC_SetAnim(
                         ctx,
@@ -917,9 +900,9 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
 /// Raven `Mark1_FireRocket`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:555-599`
-pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
+pub fn Mark1_FireRocket(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if npc.is_null() {
             return;
         }
@@ -952,7 +935,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
                 &mut boltMatrix,
                 &(*npc).r.currentAngles,
                 &(*npc).r.currentOrigin,
-                (*ctx.world).level.time,
+                (*ctx.world_raw()).level.time,
                 core::ptr::null_mut(),
                 &(*npc).modelScale,
             ),
@@ -960,15 +943,10 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 
         BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
-        crate::NPC_utils::CalcEntitySpot(
-            ctx,
-            ctx.entity_id_of(crate::ent_id::resolve(
-                (*ctx.world).g_entities.as_mut_ptr(),
-                (*npc).enemy,
-            )),
-            spot_t::SPOT_HEAD,
-            &mut enemy_org1,
-        );
+        let __h770 =
+            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
+        let __h129 = ctx.entity_id_of(__h770);
+        crate::NPC_utils::CalcEntitySpot(ctx, __h129, spot_t::SPOT_HEAD, &mut enemy_org1);
         delta1[0] = enemy_org1[0] - muzzle1[0];
         delta1[1] = enemy_org1[1] - muzzle1[1];
         delta1[2] = enemy_org1[2] - muzzle1[2];
@@ -1025,20 +1003,17 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 /// Raven `Mark1_RocketAttack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:606-618`
-pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
+pub fn Mark1_RocketAttack(ctx: &mut GameContext, advance: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if npc.is_null() {
             return;
         }
 
         if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"attackDelay".as_ptr(),
-                (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
-            );
+            let __h130 = ctx.entity_id_of(npc);
+            let __h131 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 3000);
+            crate::g_timer::TIMER_Set(ctx, __h130, c"attackDelay".as_ptr(), __h131);
             NPC_SetAnim(
                 ctx,
                 ctx.entity_id_of(npc).unwrap(),
@@ -1059,10 +1034,10 @@ pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
 /// Raven `Mark1_AttackDecision`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:625-704`
-pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
+pub fn Mark1_AttackDecision(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if npc.is_null() || npc_info.is_null() {
             return;
@@ -1071,17 +1046,15 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         // Randomly talk
         if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"angerNoise".as_ptr()) != 0 {
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"patrolNoise".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(4000, 10000),
-                );
+                let __h132 = ctx.entity_id_of(npc);
+                let __h133 = (*ctx.world_raw()).bg_state.rng.Q_irand(4000, 10000);
+                crate::g_timer::TIMER_Set(ctx, __h132, c"patrolNoise".as_ptr(), __h133);
             }
         }
 
         // Enemy is dead or he has no enemy.
-        let npc_enemy = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
+        let npc_enemy =
+            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
         if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
             (*npc).enemy = None;
             return;
@@ -1097,13 +1070,10 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         } else {
             DIST_MELEE
         };
-        let visible = crate::NPC_utils::NPC_ClearLOS4(
-            ctx,
-            ctx.entity_id_of(crate::ent_id::resolve(
-                (*ctx.world).g_entities.as_mut_ptr(),
-                (*npc).enemy,
-            )),
-        );
+        let __h771 =
+            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
+        let __h134 = ctx.entity_id_of(__h771);
+        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, __h134);
         let advance = if distance > MIN_DISTANCE_SQR {
             qtrue
         } else {
@@ -1173,9 +1143,9 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 /// Raven `Mark1_Patrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:711-739`
-pub fn Mark1_Patrol(ctx: GameContext<'_>) {
+pub fn Mark1_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
         if npc.is_null() {
             return;
         }
@@ -1195,7 +1165,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
         if (*npc).enemy.is_none() {
             let goal = crate::NPC_goal::UpdateGoal(ctx);
             if !goal.is_null() {
-                (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
+                (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
                 crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
                 crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
             }
@@ -1208,10 +1178,10 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
 /// Raven `NPC_BSMark1_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:747-764`
-pub fn NPC_BSMark1_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSMark1_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         if npc.is_null() || npc_info.is_null() {
             return;

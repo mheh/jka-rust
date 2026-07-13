@@ -25,22 +25,17 @@ use crate::prelude::*;
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
 
-/// The game-side `BgTraps` implementation: holds the `GameContext` from which
-/// engine syscalls are issued via `crate::trap` wrappers.
+/// The game-side `BgTraps` implementation: holds the `&Engine` from which
+/// engine syscalls are issued via `crate::trap` wrappers (Stage 2a: the former
+/// null-world placeholder `GameContext` is impossible with a borrowed world —
+/// and was never needed; only the engine channel is).
 pub struct GameBgTraps<'a> {
-    pub ctx: GameContext<'a>,
+    pub engine: &'a Engine,
 }
 
 impl<'a> GameBgTraps<'a> {
     pub fn new(engine: &'a Engine) -> Self {
-        // Create a temporary GameContext just for the engine; world is unreachable
-        // from BgTraps methods (seam boundary).
-        Self {
-            ctx: GameContext {
-                world: std::ptr::null_mut(),
-                engine,
-            },
-        }
+        Self { engine }
     }
 }
 
@@ -58,7 +53,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Mechanical delegation. Raven: `trap_Trace` (`G_TRACE`).
         use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
         crate::trap::Trace(
-            self.ctx.engine,
+            self.engine,
             GTraceArgs::new(results, start, mins, maxs, end, passEntityNum, contentMask),
         )
     }
@@ -67,10 +62,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Real delegation — the pmove slice's PM_SetWaterLevel drives this.
         // Raven: `trap_PointContents` (`G_POINT_CONTENTS`).
         use mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs;
-        crate::trap::PointContents(
-            self.ctx.engine,
-            GPointContentsArgs::new(point, passEntityNum),
-        )
+        crate::trap::PointContents(self.engine, GPointContentsArgs::new(point, passEntityNum))
     }
 
     fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
@@ -78,7 +70,7 @@ impl BgTraps for GameBgTraps<'_> {
         // (raw out-param `f`); the caller guarantees `f` is valid.
         use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
         let qpath = unsafe { std::ffi::CStr::from_ptr(qpath) }.to_owned();
-        crate::trap::FS_FOpenFile(self.ctx.engine, unsafe {
+        crate::trap::FS_FOpenFile(self.engine, unsafe {
             GFsFopenFileArgs::new(qpath, f, mode)
         })
     }
@@ -86,20 +78,17 @@ impl BgTraps for GameBgTraps<'_> {
         // Mechanical delegation — matches the proven `pointcontents`
         // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
         use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
-        crate::trap::FS_Read(self.ctx.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
+        crate::trap::FS_Read(self.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
     }
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
         // Raven: `trap_FS_Write` (`G_FS_WRITE`).
         use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
-        crate::trap::FS_Write(
-            self.ctx.engine,
-            GFsWriteArgs::new(buffer as *const u8, len, f),
-        )
+        crate::trap::FS_Write(self.engine, GFsWriteArgs::new(buffer as *const u8, len, f))
     }
     fn fs_fclose(&self, f: fileHandle_t) {
         // Raven: `trap_FS_FCloseFile` (`G_FS_FCLOSE_FILE`).
         use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-        crate::trap::FS_FCloseFile(self.ctx.engine, GFsFcloseFileArgs::new(f as c_int))
+        crate::trap::FS_FCloseFile(self.engine, GFsFcloseFileArgs::new(f as c_int))
     }
     fn fs_getfilelist(
         &self,
@@ -113,7 +102,7 @@ impl BgTraps for GameBgTraps<'_> {
         let path = unsafe { std::ffi::CStr::from_ptr(path) }.to_owned();
         let extension = unsafe { std::ffi::CStr::from_ptr(extension) }.to_owned();
         crate::trap::FS_GetFileList(
-            self.ctx.engine,
+            self.engine,
             GFsGetfilelistArgs::new(path, extension, listbuf as *mut u8, bufsize),
         )
     }
@@ -123,7 +112,7 @@ impl BgTraps for GameBgTraps<'_> {
         // CString-conversion shape. Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
         let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_owned();
         crate::trap::R_RegisterSkin(
-            self.ctx.engine,
+            self.engine,
             mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(name),
         )
     }
@@ -142,7 +131,7 @@ impl BgTraps for GameBgTraps<'_> {
         // (`G_G2_INITGHOUL2MODEL`).
         let file_name = unsafe { std::ffi::CStr::from_ptr(fileName) }.to_owned();
         crate::trap::G2API_InitGhoul2Model(
-            self.ctx.engine,
+            self.engine,
             mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
                 ghoul2Ptr,
                 file_name,
@@ -158,7 +147,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Mechanical delegation. Raven: `trap_G2API_CleanGhoul2Models`
         // (`G_G2_CLEANMODELS`).
         crate::trap::G2API_CleanGhoul2Models(
-            self.ctx.engine,
+            self.engine,
             mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(ghoul2Ptr),
         )
     }
@@ -173,7 +162,7 @@ impl BgTraps for GameBgTraps<'_> {
         // only carry `&dyn BgTraps`, not `&Engine`.
         let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
         crate::trap::G2API_AddBolt(
-            self.ctx.engine,
+            self.engine,
             mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
                 ghoul2, modelIndex, bone_name,
             ),
@@ -194,7 +183,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_G2API_GetBoltMatrix` (`G_G2_GETBOLT`).
         use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
         crate::trap::G2API_GetBoltMatrix(
-            self.ctx.engine,
+            self.engine,
             GG2GetboltArgs::new(
                 ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale,
             ),
@@ -217,7 +206,7 @@ impl BgTraps for GameBgTraps<'_> {
         // `*const`, so cast at the seam (the engine never mutates it here).
         use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC::GG2GetboltNorecArgs;
         crate::trap::G2API_GetBoltMatrix_NoReconstruct(
-            self.ctx.engine,
+            self.engine,
             GG2GetboltNorecArgs::new(
                 ghoul2,
                 modelIndex,
@@ -246,7 +235,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_G2API_GetBoltMatrix_NoRecNoRot` (`G_G2_GETBOLT_NOREC_NOROT`).
         use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC_NOROT::GG2GetboltNorecNorotArgs;
         crate::trap::G2API_GetBoltMatrix_NoRecNoRot(
-            self.ctx.engine,
+            self.engine,
             GG2GetboltNorecNorotArgs::new(
                 ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale,
             ),
@@ -270,7 +259,7 @@ impl BgTraps for GameBgTraps<'_> {
         use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
         let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
         crate::trap::G2API_SetBoneAngles(
-            self.ctx.engine,
+            self.engine,
             GG2AngleoverrideArgs::new(
                 ghoul2,
                 modelIndex,
@@ -302,7 +291,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_G2API_SetBoneAnim` (`G_G2_PLAYANIM`).
         use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs;
         crate::trap::G2API_SetBoneAnim(
-            self.ctx.engine,
+            self.engine,
             GG2PlayanimArgs::new(
                 ghoul2,
                 modelIndex,
@@ -334,7 +323,7 @@ impl BgTraps for GameBgTraps<'_> {
         use mp_abi::game::syscalls::G_G2_GETBONEANIM::GG2GetboneanimArgs;
         let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
         crate::trap::G2API_GetBoneAnim(
-            self.ctx.engine,
+            self.engine,
             GG2GetboneanimArgs::new(
                 ghoul2,
                 bone_name,
@@ -352,7 +341,7 @@ impl BgTraps for GameBgTraps<'_> {
     fn g2api_set_rag_doll(&self, ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
         // Raven: `trap_G2API_SetRagDoll` (`G_G2_SETRAGDOLL`).
         use mp_abi::game::syscalls::G_G2_SETRAGDOLL::GG2SetragdollArgs;
-        crate::trap::G2API_SetRagDoll(self.ctx.engine, GG2SetragdollArgs::new(ghoul2, params))
+        crate::trap::G2API_SetRagDoll(self.engine, GG2SetragdollArgs::new(ghoul2, params))
     }
     fn g2api_animate_g2_models(
         &self,
@@ -363,7 +352,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_G2API_AnimateG2Models` (`G_G2_ANIMATEG2MODELS`).
         use mp_abi::game::syscalls::G_G2_ANIMATEG2MODELS::GG2Animateg2ModelsArgs;
         crate::trap::G2API_AnimateG2Models(
-            self.ctx.engine,
+            self.engine,
             GG2Animateg2ModelsArgs::new(ghoul2, time, params),
         )
     }
@@ -379,7 +368,7 @@ impl BgTraps for GameBgTraps<'_> {
         use mp_abi::game::syscalls::G_G2_SETBONEIKSTATE::GG2SetboneikstateArgs;
         let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
         crate::trap::G2API_SetBoneIKState(
-            self.ctx.engine,
+            self.engine,
             GG2SetboneikstateArgs::new(ghoul2, time, bone_name, ikState, params),
         )
     }
@@ -391,7 +380,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> qboolean {
         // Raven: `trap_G2API_IKMove` (`G_G2_IKMOVE`).
         use mp_abi::game::syscalls::G_G2_IKMOVE::GG2IkmoveArgs;
-        crate::trap::G2API_IKMove(self.ctx.engine, GG2IkmoveArgs::new(ghoul2, time, params))
+        crate::trap::G2API_IKMove(self.engine, GG2IkmoveArgs::new(ghoul2, time, params))
     }
     fn g2api_get_surface_render_status(
         &self,
@@ -404,7 +393,7 @@ impl BgTraps for GameBgTraps<'_> {
         // args ABI wants an owned `CString`, so the borrowed C string is copied.
         let surface_name = unsafe { core::ffi::CStr::from_ptr(surfaceName) }.to_owned();
         crate::trap::G2API_GetSurfaceRenderStatus(
-            self.ctx.engine,
+            self.engine,
             GG2GetsurfacerenderstatusArgs::new(ghoul2, modelIndex, surface_name),
         )
     }
@@ -432,7 +421,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
         // 3-float buffer (`*mut f32` head == `*mut [f32;3]`).
         use mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs;
-        crate::trap::SnapVector(self.ctx.engine, GSnapvectorArgs::new(v as *mut vec3_t))
+        crate::trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
     }
     fn cvar_register(
         &self,
@@ -447,7 +436,7 @@ impl BgTraps for GameBgTraps<'_> {
         let var_name = unsafe { std::ffi::CStr::from_ptr(var_name) }.to_owned();
         let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_owned();
         crate::trap::Cvar_Register(
-            self.ctx.engine,
+            self.engine,
             GCvarRegisterArgs::new(cvar, var_name, value, flags),
         )
     }
@@ -485,8 +474,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // and `point` by value. Every bg caller passes `dir = null` and a non-null
         // `point`. Source: `oracle/codemp/game/g_combat.c` (`G_Damage`).
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let targ = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
@@ -497,16 +486,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             } else {
                 Some(&mut *(dir as *mut vec3_t))
             };
+            let __h830 = ctx.entity_id_of(targ);
+            let __h831 = ctx.entity_id_of(inflictor);
+            let __h832 = ctx.entity_id_of(attacker);
             crate::g_combat::G_Damage(
-                ctx,
-                ctx.entity_id_of(targ),
-                ctx.entity_id_of(inflictor),
-                ctx.entity_id_of(attacker),
-                dir,
-                *point,
-                damage,
-                dflags,
-                mod_,
+                &mut ctx, __h830, __h831, __h832, dir, *point, damage, dflags, mod_,
             );
         }
     }
@@ -530,22 +514,18 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Source: `oracle/codemp/game/g_combat.c` (`G_DamageFromKiller`).
         let _ = (killerNum, dir);
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let pEnt = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
             let pVehEnt = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
             let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
+            let __h833 = ctx.entity_id_of(pEnt);
+            let __h834 = ctx.entity_id_of(pVehEnt);
+            let __h835 = ctx.entity_id_of(attacker);
             crate::g_combat::G_DamageFromKiller(
-                ctx,
-                ctx.entity_id_of(pEnt),
-                ctx.entity_id_of(pVehEnt),
-                ctx.entity_id_of(attacker),
-                *point,
-                damage,
-                dflags,
-                mod_,
+                &mut ctx, __h833, __h834, __h835, *point, damage, dflags, mod_,
             );
         }
     }
@@ -567,20 +547,24 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `G_Alloc` bumps the game pool via `ctx.world`; rebuild the ctx from the
         // impl's owned `world`/`engine` (STATE-D6 leaf reborrow).
         // Source: `oracle/codemp/game/g_mem.c` (`G_Alloc`).
-        let ctx = GameContext {
-            world: self.world,
+        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
+        // single-threaded module, no live sibling borrow across this call.
+        let mut ctx = GameContext {
+            world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_mem::G_Alloc(ctx, size)
+        crate::g_mem::G_Alloc(&mut ctx, size)
     }
     fn new_string(&mut self, string: *const c_char) -> *mut c_char {
         // `G_NewString` copies into the game pool via `ctx.world`.
         // Source: `oracle/codemp/game/g_spawn.c` (`G_NewString`).
-        let ctx = GameContext {
-            world: self.world,
+        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
+        // single-threaded module, no live sibling borrow across this call.
+        let mut ctx = GameContext {
+            world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_spawn::G_NewString(ctx, string)
+        crate::g_spawn::G_NewString(&mut ctx, string)
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
         // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned
@@ -618,27 +602,27 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
         // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.
         // Source: `oracle/codemp/game/g_active.c` (`G_CheapWeaponFire`).
-        let ctx = GameContext {
-            world: self.world,
+        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
+        // single-threaded module, no live sibling borrow across this call.
+        let mut ctx = GameContext {
+            world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_active::G_CheapWeaponFire(ctx, entNum, weapon);
+        crate::g_active::G_CheapWeaponFire(&mut ctx, entNum, weapon);
     }
     fn client_check_impact_bbrush(&mut self, entNum: c_int, impactNum: c_int) {
         // Raven `Client_CheckImpactBBrush(self, other)`; resolve both nums.
         // Source: `oracle/codemp/game/g_active.c` (`Client_CheckImpactBBrush`).
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let other = &mut (*self.world).g_entities[impactNum as usize] as *mut gentity_t;
-            crate::g_active::Client_CheckImpactBBrush(
-                ctx,
-                ctx.entity_id_of(self_),
-                ctx.entity_id_of(other),
-            );
+            let __h836 = ctx.entity_id_of(self_);
+            let __h837 = ctx.entity_id_of(other);
+            crate::g_active::Client_CheckImpactBBrush(&mut ctx, __h836, __h837);
         }
     }
     fn flyveh_surface_destruction(
@@ -652,12 +636,14 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `G_FlyVehicleSurfaceDestruction` with the bg-supplied impact `trace` and
         // `force` flag. Source: `oracle/codemp/game/g_vehicles.c:3190`;
         // `bg_slidemove.c:472`.
-        let ctx = GameContext {
-            world: self.world,
+        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
+        // single-threaded module, no live sibling borrow across this call.
+        let mut ctx = GameContext {
+            world: unsafe { &mut *self.world },
             engine: self.engine,
         };
         crate::g_vehicles::G_FlyVehicleSurfaceDestruction(
-            ctx,
+            &mut ctx,
             EntityId(entNum as u32),
             trace,
             magnitude,
@@ -677,14 +663,15 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `entNum`, rebuild `ctx`, and pass the bg-owned `ucmd` through.
         // Source: `g_utils.c` (`G_SetAnim`).
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let __h838 = ctx.entity_id_of(ent).unwrap();
             crate::g_utils::G_SetAnim(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
+                &mut ctx,
+                __h838,
                 ucmd,
                 setAnimParts,
                 anim,
@@ -697,12 +684,13 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Raven `NPC_SetAnim(ent, setAnimParts=type, anim, setFlags=priority)`;
         // resolve `entNum` and rebuild `ctx`. Source: `npc.cpp` (`NPC_SetAnim`).
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::npc_c::NPC_SetAnim(ctx, ctx.entity_id_of(ent).unwrap(), type_, anim, priority);
+            let __h839 = ctx.entity_id_of(ent).unwrap();
+            crate::npc_c::NPC_SetAnim(&mut ctx, __h839, type_, anim, priority);
         }
     }
     fn wp_get_vehicle_cam_pos(
@@ -715,35 +703,30 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // module `GameContext`, and delegates to the ported `WP_GetVehicleCamPos`.
         // Source: `oracle/codemp/game/g_weapon.c:3961-4020`.
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pilot = &mut (*self.world).g_entities[pilotEntNum as usize] as *mut gentity_t;
-            crate::g_weapon::WP_GetVehicleCamPos(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                ctx.entity_id_of(pilot).unwrap(),
-                &mut *camPos,
-            );
+            let __h840 = ctx.entity_id_of(ent).unwrap();
+            let __h841 = ctx.entity_id_of(pilot).unwrap();
+            crate::g_weapon::WP_GetVehicleCamPos(&mut ctx, __h840, __h841, &mut *camPos);
         }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
         // Raven `G_CanBeEnemy(self, enemy)`; resolve both nums.
         // Source: `oracle/codemp/game/w_saber.c` (`G_CanBeEnemy`).
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let enemy = &mut (*self.world).g_entities[otherNum as usize] as *mut gentity_t;
-            crate::w_saber::G_CanBeEnemy(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                ctx.entity_id_of(enemy).unwrap(),
-            )
+            let self_id = ctx.entity_id_of(self_).unwrap();
+            let enemy_id = ctx.entity_id_of(enemy).unwrap();
+            crate::w_saber::G_CanBeEnemy(&mut ctx, self_id, enemy_id)
         }
     }
     fn get_time(&self) -> c_int {
@@ -756,22 +739,25 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // ported `TryGrapple` body.
         // Source: `oracle/codemp/game/g_cmds.c:3148-3191` (`TryGrapple`).
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_cmds::TryGrapple(ctx, ctx.entity_id_of(ent).unwrap())
+            let ent_id = ctx.entity_id_of(ent).unwrap();
+            crate::g_cmds::TryGrapple(&mut ctx, ent_id)
         }
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
         // `Q3_SetParm` takes `entID` as a raw index and resolves it internally.
         // Source: `oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`).
-        let ctx = GameContext {
-            world: self.world,
+        // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
+        // single-threaded module, no live sibling borrow across this call.
+        let mut ctx = GameContext {
+            world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_ICARUScb::Q3_SetParm(ctx, entID, parmNum, parmValue);
+        crate::g_ICARUScb::Q3_SetParm(&mut ctx, entID, parmNum, parmValue);
     }
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
         // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
@@ -779,41 +765,41 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // impl holds, and delegates to `crate::veh_dispatch::board` (now that the
         // dispatch chain threads `ctx`). Source: `oracle/codemp/game/g_vehicles.c:630`.
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
             let pEnt =
                 &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t as *mut bgEntity_t;
-            crate::veh_dispatch::board(ctx, pVeh, pEnt)
+            crate::veh_dispatch::board(&mut ctx, pVeh, pEnt)
         }
     }
     fn update_vehicle(&mut self, vehEntNum: c_int, ucmd: *const usercmd_t) {
         // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
         // generic-base `Update` dispatch. Source: `bg_pmove.c:10919-10944`.
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
-            crate::veh_dispatch::update(ctx, pVeh, ucmd);
+            crate::veh_dispatch::update(&mut ctx, pVeh, ucmd);
         }
     }
     fn pm_animate_vehicle(&mut self, vehEntNum: c_int) {
         // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
         // generic-base `Animate` dispatch. Source: `bg_pmove.c:10921-10945`.
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
-            crate::veh_dispatch::animate(ctx, pVeh);
+            crate::veh_dispatch::animate(&mut ctx, pVeh);
         }
     }
     fn update_rider(&mut self, vehEntNum: c_int, riderEntNum: c_int, ucmd: *mut usercmd_t) {
@@ -821,8 +807,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Passenger path: bg passes null, so guard `inuse && client` and use the
         // rider's own `client->pers.cmd` (game-side). Source: `bg_pmove.c:10947-10961`.
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
@@ -836,20 +822,20 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             } else {
                 ucmd
             };
-            crate::veh_dispatch::update_rider(ctx, pVeh, rider as *mut bgEntity_t, cmd);
+            crate::veh_dispatch::update_rider(&mut ctx, pVeh, rider as *mut bgEntity_t, cmd);
         }
     }
     fn attach_riders(&mut self, vehEntNum: c_int) {
         // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
         // generic-base `AttachRiders` dispatch. Source: `bg_pmove.c:11146-11149`.
         unsafe {
-            let ctx = GameContext {
-                world: self.world,
+            let mut ctx = GameContext {
+                world: &mut *self.world,
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
-            crate::veh_dispatch::attach_riders(ctx, pVeh);
+            crate::veh_dispatch::attach_riders(&mut ctx, pVeh);
         }
     }
 }

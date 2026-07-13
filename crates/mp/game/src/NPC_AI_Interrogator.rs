@@ -16,9 +16,9 @@ use crate::trap;
 // verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
 // precedent.
 #[inline]
-unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -63,7 +63,7 @@ const MIN_DISTANCE: c_int = 64;
 ///
 /// Precache sounds and effects for the Interrogator NPC.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
-pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: Option<EntityId>) {
+pub fn NPC_Interrogator_Precache(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param (unused by the body; caller may pass null/`None`).
     G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/mark1/misc/anger.wav".as_ptr() as *const c_char);
@@ -78,7 +78,7 @@ pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: Option<EntityId>) 
 /// Death behavior for Interrogator NPC. Sets velocity and clears flying flag.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:34-57`
 pub fn Interrogator_die(
-    ctx: GameContext<'_>,
+    ctx: &mut GameContext,
     self_: Option<EntityId>,
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
@@ -103,8 +103,8 @@ pub fn Interrogator_die(
                 // Raven passes the range reversed — `Q_irand(-10, -20)` — and irand's
                 // arithmetic gives different values for a reversed range; keep it verbatim.
                 // Source: `oracle/codemp/game/NPC_AI_Interrogator.c:49-50`
-                client.ps.velocity[0] = (*ctx.world).bg_state.rng.Q_irand(-10, -20) as f32;
-                client.ps.velocity[1] = (*ctx.world).bg_state.rng.Q_irand(-10, -20) as f32;
+                client.ps.velocity[0] = (*ctx.world_raw()).bg_state.rng.Q_irand(-10, -20) as f32;
+                client.ps.velocity[1] = (*ctx.world_raw()).bg_state.rng.Q_irand(-10, -20) as f32;
                 client.ps.velocity[2] = -100.0;
             }
         });
@@ -115,21 +115,21 @@ pub fn Interrogator_die(
 ///
 /// Move the syringe, scalpel, and claw parts of the Interrogator.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:64-127`
-pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
+pub fn Interrogator_PartsMove(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         // Syringe
         if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"syringeDelay".as_ptr()) != 0 {
             (*npc).pos1[1] = crate::q_math::AngleNormalize360((*npc).pos1[1]);
 
             if ((*npc).pos1[1] < 60.0) || ((*npc).pos1[1] > 300.0) {
-                (*npc).pos1[1] += (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
+                (*npc).pos1[1] += (*ctx.world_raw()).bg_state.rng.Q_irand(-20, 20) as f32;
             } else if (*npc).pos1[1] > 180.0 {
-                (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(300, 360) as f32;
+                (*npc).pos1[1] = (*ctx.world_raw()).bg_state.rng.Q_irand(300, 360) as f32;
             } else {
-                (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(0, 60) as f32;
+                (*npc).pos1[1] = (*ctx.world_raw()).bg_state.rng.Q_irand(0, 60) as f32;
             }
 
             crate::NPC_utils::NPC_SetBoneAngles(
@@ -139,12 +139,9 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
                 (*npc).pos1,
             );
 
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"syringeDelay".as_ptr(),
-                (*ctx.world).bg_state.rng.Q_irand(100, 1000),
-            );
+            let __h110 = ctx.entity_id_of(npc);
+            let __h111 = (*ctx.world_raw()).bg_state.rng.Q_irand(100, 1000);
+            crate::g_timer::TIMER_Set(ctx, __h110, c"syringeDelay".as_ptr(), __h111);
         }
 
         // Scalpel
@@ -162,13 +159,10 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
                 (*npc).pos2[0] += 30.0;
                 if (*npc).pos2[0] >= 360.0 {
                     (*npc).pos2[0] = 360.0;
+                    let __h112 = ctx.entity_id_of(npc);
+                    let __h113 = (*ctx.world_raw()).bg_state.rng.Q_irand(100, 1000);
                     (*npc_info).localState = LSTATE_BLADEDOWN; // Make it move down
-                    crate::g_timer::TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(npc),
-                        c"scalpelDelay".as_ptr(),
-                        (*ctx.world).bg_state.rng.Q_irand(100, 1000),
-                    );
+                    crate::g_timer::TIMER_Set(ctx, __h112, c"scalpelDelay".as_ptr(), __h113);
                 }
             }
 
@@ -183,7 +177,7 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
         }
 
         // Claw
-        (*npc).pos3[1] += (*ctx.world).bg_state.rng.Q_irand(10, 30) as f32;
+        (*npc).pos3[1] += (*ctx.world_raw()).bg_state.rng.Q_irand(10, 30) as f32;
         (*npc).pos3[1] = crate::q_math::AngleNormalize360((*npc).pos3[1]);
         crate::NPC_utils::NPC_SetBoneAngles(
             ctx,
@@ -198,12 +192,12 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
 ///
 /// Maintain hover height relative to enemy or goal.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:137-229`
-pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
+pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
-        let ucmd = &mut (*ctx.world).globals.ucmd;
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world_raw()).globals.ucmd;
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
 
         (*npc).s.loopSound = crate::g_utils::G_SoundIndex(
             c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr(),
@@ -300,11 +294,11 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
 ///
 /// Perform a strafe movement away from the target.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:238-279`
-pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
+pub fn Interrogator_Strafe(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
 
         let mut end: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
@@ -319,7 +313,7 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
 
         // Pick a random strafe direction, then check to see if doing a strafe would be
         // reasonable valid
-        let dir = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 {
+        let dir = if ((*ctx.world_raw()).bg_state.rng.rand() & 1) != 0 {
             -1
         } else {
             1
@@ -379,9 +373,9 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
             }
 
             // Set the strafe start time
-            (*npc_info).standTime = (*ctx.world).level.time
+            (*npc_info).standTime = (*ctx.world_raw()).level.time
                 + 3000
-                + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
+                + ((*ctx.world_raw()).bg_state.rng.random() * 500.0) as c_int;
         }
     }
 }
@@ -390,22 +384,22 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
 ///
 /// Hunt the enemy, using strafe and movement.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:290-336`
-pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn Interrogator_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
 
         Interrogator_PartsMove(ctx);
 
         crate::NPC_utils::NPC_FaceEnemy(ctx, 0);
 
         // If we're not supposed to stand still, pursue the player
-        if (*npc_info).standTime < (*ctx.world).level.time {
+        if (*npc_info).standTime < (*ctx.world_raw()).level.time {
             // Only strafe when we can see the player
             if visible != 0 {
                 Interrogator_Strafe(ctx);
-                if (*npc_info).standTime > (*ctx.world).level.time {
+                if (*npc_info).standTime > (*ctx.world_raw()).level.time {
                     // successfully strafed
                     return;
                 }
@@ -448,7 +442,8 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
         }
 
         let speed = HUNTER_FORWARD_BASE_SPEED as f32
-            + (HUNTER_FORWARD_MULTIPLIER as f32) * (*ctx.world).cvars.g_spskill.integer as f32;
+            + (HUNTER_FORWARD_MULTIPLIER as f32)
+                * (*ctx.world_raw()).cvars.g_spskill.integer as f32;
         crate::q_math::_VectorMA(
             (*((*npc).client as *mut gclient_t)).ps.velocity,
             speed,
@@ -462,11 +457,11 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
 ///
 /// Perform melee attack if close enough and within height range.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:345-374`
-pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+pub fn Interrogator_Melee(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
-        let base = (*ctx.world).g_entities.as_mut_ptr();
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
 
         if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
             let enemy_ptr = match (*npc).enemy {
@@ -481,12 +476,9 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
                     && (*npc).r.currentOrigin[2] + (*npc).r.mins[2] + 8.0
                         < (*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.maxs[2]
                 {
-                    crate::g_timer::TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(npc),
-                        c"attackDelay".as_ptr(),
-                        (*ctx.world).bg_state.rng.Q_irand(500, 3000),
-                    );
+                    let __h114 = ctx.entity_id_of(npc);
+                    let __h115 = (*ctx.world_raw()).bg_state.rng.Q_irand(500, 3000);
+                    crate::g_timer::TIMER_Set(ctx, __h114, c"attackDelay".as_ptr(), __h115);
                     crate::g_combat::G_Damage(
                         ctx,
                         ctx.entity_id_of(enemy_ptr),
@@ -521,10 +513,10 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 ///
 /// Main attack function - handles distance, visibility, and attack selection.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:381-428`
-pub fn Interrogator_Attack(ctx: GameContext<'_>) {
+pub fn Interrogator_Attack(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
-        let npc_info = (*ctx.world).globals.NPCInfo;
+        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
 
         // Always keep a good height off the ground
         Interrogator_MaintainHeight(ctx);
@@ -536,7 +528,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
                 // format string has no specifier, so the value is discarded, but the
                 // Q_irand still advances the holdrand stream; keep the draw.
                 // Source: `oracle/codemp/game/NPC_AI_Interrogator.c:395`
-                let _ = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                let _ = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
                 crate::g_utils::G_SoundOnEnt(
                     ctx,
                     ctx.entity_id_of(npc).unwrap(),
@@ -544,12 +536,9 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
                     c"sound/chars/probe/misc/talk.wav".as_ptr(),
                 );
 
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"patrolNoise".as_ptr(),
-                    (*ctx.world).bg_state.rng.Q_irand(4000, 10000),
-                );
+                let __h116 = ctx.entity_id_of(npc);
+                let __h117 = (*ctx.world_raw()).bg_state.rng.Q_irand(4000, 10000);
+                crate::g_timer::TIMER_Set(ctx, __h116, c"patrolNoise".as_ptr(), __h117);
             }
         }
 
@@ -564,7 +553,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
             (*npc).r.currentOrigin,
             match (*npc).enemy {
                 Some(id) => {
-                    let base = (*ctx.world).g_entities.as_mut_ptr();
+                    let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
                     (*base.add(id.index())).r.currentOrigin
                 }
                 None => (*npc).r.currentOrigin,
@@ -599,9 +588,9 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
 ///
 /// Idle behavior - check for stealth enemies and maintain height.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:435-447`
-pub fn Interrogator_Idle(ctx: GameContext<'_>) {
+pub fn Interrogator_Idle(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
 
         if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != 0 {
             crate::g_utils::G_SoundOnEnt(
@@ -624,9 +613,9 @@ pub fn Interrogator_Idle(ctx: GameContext<'_>) {
 ///
 /// Default behavior state selector - attacks if enemy present, otherwise idles.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:454-467`
-pub fn NPC_BSInterrogator_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSInterrogator_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world).globals.NPC;
+        let npc = (*ctx.world_raw()).globals.NPC;
 
         if (*npc).enemy.is_some() {
             Interrogator_Attack(ctx);

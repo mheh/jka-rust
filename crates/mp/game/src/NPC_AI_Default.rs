@@ -1,8 +1,8 @@
 //! NPC AI Default behavior states for `oracle/codemp/game/NPC_AI_Default.c`.
 //!
 //! Pass-3 port: 15/15 functions transcribed from oracle source with settled
-//! rulings 12-22. Game-tier functions thread `ctx: GameContext<'_>` as first param;
-//! reach ambient AI state through `(*ctx.world).globals.*` (NPC, NPCInfo, client,
+//! rulings 12-22. Game-tier functions thread `ctx: &mut GameContext` as first param;
+//! reach ambient AI state through `(*ctx.world_raw()).globals.*` (NPC, NPCInfo, client,
 //! ucmd, enemyVisibility).
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -12,11 +12,12 @@ use crate::trap;
 /// Raven `NPC_LostEnemyDecideChase`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:18-35`
-pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_LostEnemyDecideChase(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
     let npc = unsafe { &mut *(*world).globals.NPC };
 
+    let __h3 = ctx.entity_id_of((*world).globals.NPC).unwrap();
     match npc_info.behaviorState {
         BS_HUNT_AND_KILL => {
             // Oracle: `NPC->enemy == NPCInfo->goalEntity && NPC->enemy->lastWaypoint != WAYPOINT_NONE`.
@@ -32,7 +33,7 @@ pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
         _ => {}
     }
 
-    G_ClearEnemy(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap());
+    G_ClearEnemy(ctx, __h3);
 }
 
 /// Raven `NPC_StandIdle`.
@@ -45,10 +46,10 @@ pub fn NPC_StandIdle() {
 /// Raven `NPC_StandTrackAndShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:87-158`
-pub fn NPC_StandTrackAndShoot(ctx: GameContext<'_>, NPC: EntityId, canDuck: qboolean) -> qboolean {
+pub fn NPC_StandTrackAndShoot(ctx: &mut GameContext, NPC: EntityId, canDuck: qboolean) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let NPC: *mut gentity_t = ctx.entity_mut(NPC);
-    let world = unsafe { &mut *ctx.world };
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *NPC };
     let client = unsafe { &mut *(*world).globals.client };
 
@@ -107,8 +108,8 @@ pub fn NPC_StandTrackAndShoot(ctx: GameContext<'_>, NPC: EntityId, canDuck: qboo
 /// Raven `NPC_BSIdle`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:161-177`
-pub fn NPC_BSIdle(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSIdle(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
 
     if UpdateGoal(ctx) != core::ptr::null_mut() {
         NPC_MoveToGoal(ctx, qtrue);
@@ -128,7 +129,7 @@ pub fn NPC_BSIdle(ctx: GameContext<'_>) {
 /// Raven `NPC_BSRun`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:179-189`
-pub fn NPC_BSRun(ctx: GameContext<'_>) {
+pub fn NPC_BSRun(ctx: &mut GameContext) {
     if UpdateGoal(ctx) != core::ptr::null_mut() {
         NPC_MoveToGoal(ctx, qtrue);
     }
@@ -139,8 +140,8 @@ pub fn NPC_BSRun(ctx: GameContext<'_>) {
 /// Raven `NPC_BSStandGuard`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:191-224`
-pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSStandGuard(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let client = unsafe { &mut *(*world).globals.client };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
@@ -148,20 +149,19 @@ pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
     if npc.enemy.is_none() {
         if (*world).bg_state.rng.random() < 0.5 {
             if client.enemyTeam != 0 {
+                let __h4 = ctx.entity_id_of((*world).globals.NPC);
                 let new_enemy = NPC_PickEnemy(
                     ctx,
-                    ctx.entity_id_of((*world).globals.NPC),
+                    __h4,
                     client.enemyTeam as c_int,
                     (npc.cantHitEnemyCounter < 10) as qboolean,
                     (client.enemyTeam as c_int == NPCTEAM_PLAYER) as qboolean,
                     qtrue,
                 );
                 if !new_enemy.is_null() {
-                    G_SetEnemy(
-                        ctx,
-                        ctx.entity_id_of((*world).globals.NPC).unwrap(),
-                        ctx.entity_id_of(new_enemy),
-                    );
+                    let __h5 = ctx.entity_id_of((*world).globals.NPC).unwrap();
+                    let __h6 = ctx.entity_id_of(new_enemy);
+                    G_SetEnemy(ctx, __h5, __h6);
                 }
             }
         }
@@ -183,8 +183,8 @@ pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
 /// Raven `NPC_BSHuntAndKill`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:232-304`
-pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
 
@@ -202,11 +202,8 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
 
     if let Some(enemy_id) = npc.enemy {
         let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-        o_evis = NPC_CheckVisibility(
-            ctx,
-            ctx.entity_id_of(enemy as *const _ as *mut _),
-            CHECK_FOV | CHECK_SHOOT,
-        );
+        let __h7 = ctx.entity_id_of(enemy as *const _ as *mut _);
+        o_evis = NPC_CheckVisibility(ctx, __h7, CHECK_FOV | CHECK_SHOOT);
         (*world).globals.enemyVisibility = o_evis;
 
         if o_evis as i32 > VIS_PVS as i32 {
@@ -283,8 +280,8 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
 /// Raven `NPC_BSStandAndShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:306-392`
-pub fn NPC_BSStandAndShoot(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSStandAndShoot(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let client = unsafe { &mut *(*world).globals.client };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
@@ -321,8 +318,8 @@ pub fn NPC_BSStandAndShoot(ctx: GameContext<'_>) {
 /// Raven `NPC_BSRunAndShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:394-487`
-pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSRunAndShoot(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
 
@@ -338,7 +335,8 @@ pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
 
     if npc.enemy.is_some() {
         let monitor = npc.cantHitEnemyCounter;
-        NPC_StandTrackAndShoot(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap(), qfalse);
+        let __h8 = ctx.entity_id_of((*world).globals.NPC).unwrap();
+        NPC_StandTrackAndShoot(ctx, __h8, qfalse);
 
         if (unsafe { &*ctx.world }.globals.ucmd.buttons & BUTTON_ATTACK as i32) == 0
             && unsafe { &*ctx.world }.globals.ucmd.upmove >= 0
@@ -386,8 +384,8 @@ pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
 /// Raven `NPC_BSFace`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:490-503`
-pub fn NPC_BSFace(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSFace(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
     let client = unsafe { &mut *(*world).globals.client };
 
@@ -410,8 +408,8 @@ pub fn NPC_BSFace(ctx: GameContext<'_>) {
 /// Raven `NPC_BSPointShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:505-610`
-pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let client = unsafe { &mut *(*world).globals.client };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
@@ -421,6 +419,7 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
     let mut angles = [0.0; 3];
     let mut org = [0.0; 3];
 
+    let __h9 = ctx.entity_id_of((*world).globals.NPC);
     if npc.enemy.is_none() {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
@@ -454,20 +453,11 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
         }
     }
 
-    CalcEntitySpot(
-        ctx,
-        ctx.entity_id_of((*world).globals.NPC),
-        SPOT_WEAPON,
-        &mut muzzle,
-    );
+    CalcEntitySpot(ctx, __h9, SPOT_WEAPON, &mut muzzle);
     if let Some(enemy_id) = npc.enemy {
         let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-        CalcEntitySpot(
-            ctx,
-            ctx.entity_id_of(enemy as *const _ as *mut _),
-            SPOT_HEAD,
-            &mut org,
-        );
+        let __h10 = ctx.entity_id_of(enemy as *const _ as *mut _);
+        CalcEntitySpot(ctx, __h10, SPOT_HEAD, &mut org);
 
         if !unsafe { &*enemy }.client.is_null() {
             org[2] -= 12.0;
@@ -513,8 +503,8 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
 /// Raven `NPC_BSMove`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:616-637`
-pub fn NPC_BSMove(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSMove(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
 
     NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
@@ -532,8 +522,8 @@ pub fn NPC_BSMove(ctx: GameContext<'_>) {
 /// Raven `NPC_BSShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:644-656`
-pub fn NPC_BSShoot(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSShoot(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let client = unsafe { &mut *(*world).globals.client };
 
     (*world).globals.enemyVisibility = VIS_SHOOT;
@@ -541,7 +531,7 @@ pub fn NPC_BSShoot(ctx: GameContext<'_>) {
     if client.ps.weaponstate as i32 != WEAPON_READY as i32
         && client.ps.weaponstate as i32 != WEAPON_FIRING as i32
     {
-        unsafe { (*(*ctx.world).globals.client).ps.weaponstate = WEAPON_READY as i32 };
+        unsafe { (*(*ctx.world_raw()).globals.client).ps.weaponstate = WEAPON_READY as i32 };
     }
 
     WeaponThink(ctx, qtrue);
@@ -550,8 +540,8 @@ pub fn NPC_BSShoot(ctx: GameContext<'_>) {
 /// Raven `NPC_BSPatrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:664-703`
-pub fn NPC_BSPatrol(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSPatrol(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
 
@@ -579,8 +569,8 @@ pub fn NPC_BSPatrol(ctx: GameContext<'_>) {
 /// Raven `NPC_BSDefault`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:712-957`
-pub fn NPC_BSDefault(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn NPC_BSDefault(ctx: &mut GameContext) {
+    let world = unsafe { &mut *ctx.world_raw() };
     let npc = unsafe { &mut *(*world).globals.NPC };
     let client = unsafe { &mut *(*world).globals.client };
     let npc_info = unsafe { &mut *(*world).globals.NPCInfo };
@@ -593,9 +583,10 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
 
     if (npc_info.scriptFlags & SCF_FORCED_MARCH) != 0 {
         if client.ps.torsoAnim as i32 != TORSO_SURRENDER_START as i32 {
+            let __h11 = ctx.entity_id_of((*world).globals.NPC).unwrap();
             NPC_SetAnim(
                 ctx,
-                ctx.entity_id_of((*world).globals.NPC).unwrap(),
+                __h11,
                 SETANIM_TORSO as i32,
                 TORSO_SURRENDER_START as i32,
                 SETANIM_FLAG_HOLD as i32,
@@ -627,11 +618,9 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
                             if unsafe { &*(alert_owner.client as *mut gclient_t) }.playerTeam
                                 == client.enemyTeam
                             {
-                                G_SetEnemy(
-                                    ctx,
-                                    ctx.entity_id_of((*world).globals.NPC).unwrap(),
-                                    ctx.entity_id_of(alert_entry.owner),
-                                );
+                                let __h12 = ctx.entity_id_of((*world).globals.NPC).unwrap();
+                                let __h13 = ctx.entity_id_of(alert_entry.owner);
+                                G_SetEnemy(ctx, __h12, __h13);
                             }
                         }
                     }

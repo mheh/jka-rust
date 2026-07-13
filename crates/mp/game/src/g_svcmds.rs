@@ -8,6 +8,7 @@
 use crate::g_main::G_Printf;
 use crate::prelude::*;
 use crate::trap;
+use crate::world::GameWorld;
 use mp_abi::game::syscalls::G_ARGC::GArgcArgs;
 use mp_abi::game::syscalls::G_ARGV::GArgvArgs;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
@@ -34,7 +35,7 @@ pub const MAX_IPFILTERS: usize = 1024;
 /// Parse an IP address string into mask and compare values for IP filtering.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:62-102`
-pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> qboolean {
+pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut c_void) -> qboolean {
     let mut num = [0u8; 128];
     let mut i: c_int = 0;
     let mut b = [0u8; 4];
@@ -102,7 +103,7 @@ pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> q
 /// Rebuild the `g_banIPs` cvar from the active IP filters.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:109-127`
-pub fn UpdateIPBans(ctx: GameContext<'_>) {
+pub fn UpdateIPBans(ctx: &mut GameContext) {
     let mut iplist = String::new();
     let world = unsafe { &mut *ctx.world };
 
@@ -129,7 +130,7 @@ pub fn UpdateIPBans(ctx: GameContext<'_>) {
 /// Check if a packet from the given address should be filtered.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:134-166`
-pub fn G_FilterPacket(ctx: GameContext<'_>, from: *mut c_char) -> qboolean {
+pub fn G_FilterPacket(ctx: &mut GameContext, from: *mut c_char) -> qboolean {
     let mut m = [0u8; 4];
     let mut i: c_int = 0;
     let mut in_: c_uint;
@@ -183,34 +184,39 @@ pub fn G_FilterPacket(ctx: GameContext<'_>, from: *mut c_char) -> qboolean {
 /// Add an IP filter entry.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:173-194`
-pub fn AddIP(ctx: GameContext<'_>, str: *mut c_char) {
-    let world = unsafe { &mut *ctx.world };
+pub fn AddIP(ctx: &mut GameContext, str: *mut c_char) {
+    // Raw pointer (not a tracked borrow) so `ctx` stays free for the
+    // `StringToFilter`/`G_Printf`/`UpdateIPBans` calls below — mirrors the
+    // Stage-1 `ctx.world_raw()` idiom (see `g_object.rs`).
+    let world: *mut GameWorld = ctx.world_raw();
 
     // Oracle's index runs to `numIPFilters` when no free slot is found, so the
     // `i == numIPFilters` test below appends a new slot (g_svcmds.c:177-179).
     let mut i: c_int = 0;
-    while i < world.globals.numIPFilters {
-        if world.globals.ipFilters[i as usize].compare == 0xffffffff {
-            break; // free spot
+    unsafe {
+        while i < (*world).globals.numIPFilters {
+            if (&(*world).globals.ipFilters)[i as usize].compare == 0xffffffff {
+                break; // free spot
+            }
+            i += 1;
         }
-        i += 1;
-    }
 
-    if i == world.globals.numIPFilters {
-        if world.globals.numIPFilters as usize == MAX_IPFILTERS {
-            G_Printf(ctx, c"IP filter list is full\n".as_ptr());
-            return;
+        if i == (*world).globals.numIPFilters {
+            if (*world).globals.numIPFilters as usize == MAX_IPFILTERS {
+                G_Printf(ctx, c"IP filter list is full\n".as_ptr());
+                return;
+            }
+            (*world).globals.numIPFilters += 1;
         }
-        world.globals.numIPFilters += 1;
-    }
 
-    if StringToFilter(
-        ctx,
-        str,
-        &mut world.globals.ipFilters[i as usize] as *mut _ as *mut c_void,
-    ) == qfalse
-    {
-        world.globals.ipFilters[i as usize].compare = 0xffffffffu32;
+        if StringToFilter(
+            ctx,
+            str,
+            &mut (&mut (*world).globals.ipFilters)[i as usize] as *mut _ as *mut c_void,
+        ) == qfalse
+        {
+            (&mut (*world).globals.ipFilters)[i as usize].compare = 0xffffffffu32;
+        }
     }
 
     UpdateIPBans(ctx);
@@ -221,7 +227,7 @@ pub fn AddIP(ctx: GameContext<'_>, str: *mut c_char) {
 /// Parse space-separated IP addresses from g_banIPs cvar and add them to filters.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:201-218`
-pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
+pub fn G_ProcessIPBans(ctx: &mut GameContext) {
     let world = unsafe { &*ctx.world };
     let ban_ips_str = unsafe { cstr_to_str(world.cvars.g_banIPs.string.as_ptr()) };
 
@@ -252,7 +258,7 @@ pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
 /// Console command: addip <ip-mask>
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:226-239`
-pub fn Svcmd_AddIP_f(ctx: GameContext<'_>) {
+pub fn Svcmd_AddIP_f(ctx: &mut GameContext) {
     let argc = trap::Argc(ctx.engine, GArgcArgs::new());
     if argc < 2 {
         G_Printf(ctx, c"Usage:  addip <ip-mask>\n".as_ptr());
@@ -270,7 +276,7 @@ pub fn Svcmd_AddIP_f(ctx: GameContext<'_>) {
 /// Console command: sv removeip <ip-mask>
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:246-274`
-pub fn Svcmd_RemoveIP_f(ctx: GameContext<'_>) {
+pub fn Svcmd_RemoveIP_f(ctx: &mut GameContext) {
     let argc = trap::Argc(ctx.engine, GArgcArgs::new());
     if argc < 2 {
         G_Printf(ctx, c"Usage:  sv removeip <ip-mask>\n".as_ptr());
@@ -317,28 +323,37 @@ pub fn Svcmd_RemoveIP_f(ctx: GameContext<'_>) {
 /// Console command: list currently banned IPs.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:276-297`
-pub fn Svcmd_ListIPs_f(ctx: GameContext<'_>) {
-    let world = unsafe { &*ctx.world };
+pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
+    // Raw pointer (not a tracked borrow) so `ctx` stays free for the `G_Printf`
+    // calls inside the loop below — mirrors the Stage-1 `ctx.world_raw()`
+    // idiom (see `g_object.rs`).
+    let world: *mut GameWorld = ctx.world_raw();
 
-    G_Printf(
-        ctx,
-        cstr(&format!("{} IP slots used.\n", world.globals.numIPFilters)).as_ptr(),
-    );
+    unsafe {
+        G_Printf(
+            ctx,
+            cstr(&format!(
+                "{} IP slots used.\n",
+                (*world).globals.numIPFilters
+            ))
+            .as_ptr(),
+        );
 
-    for i in 0..(world.globals.numIPFilters as usize) {
-        G_Printf(ctx, cstr(&format!("{}: ", i as c_int)).as_ptr());
-        if world.globals.ipFilters[i].compare == 0xffffffff {
-            G_Printf(ctx, c"unused\n".as_ptr());
-        } else {
-            let b_ptr = &world.globals.ipFilters[i].compare as *const c_uint as *const u8;
-            let b0 = unsafe { *b_ptr };
-            let b1 = unsafe { *b_ptr.offset(1) };
-            let b2 = unsafe { *b_ptr.offset(2) };
-            let b3 = unsafe { *b_ptr.offset(3) };
+        for i in 0..((*world).globals.numIPFilters as usize) {
+            G_Printf(ctx, cstr(&format!("{}: ", i as c_int)).as_ptr());
+            if (&(*world).globals.ipFilters)[i].compare == 0xffffffff {
+                G_Printf(ctx, c"unused\n".as_ptr());
+            } else {
+                let b_ptr = &(&(*world).globals.ipFilters)[i].compare as *const c_uint as *const u8;
+                let b0 = *b_ptr;
+                let b1 = *b_ptr.offset(1);
+                let b2 = *b_ptr.offset(2);
+                let b3 = *b_ptr.offset(3);
 
-            let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
-            let s_cstr = cstr(&s);
-            G_Printf(ctx, cstr(&format!("{}\n", s)).as_ptr());
+                let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
+                let s_cstr = cstr(&s);
+                G_Printf(ctx, cstr(&format!("{}\n", s)).as_ptr());
+            }
         }
     }
 }
@@ -348,7 +363,7 @@ pub fn Svcmd_ListIPs_f(ctx: GameContext<'_>) {
 /// Save IP filters to "banip.txt" file.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:299-331`
-pub fn G_SaveBanIP(ctx: GameContext<'_>) {
+pub fn G_SaveBanIP(ctx: &mut GameContext) {
     let world = unsafe { &*ctx.world };
     let mut fh: i32 = 0;
 
@@ -401,8 +416,11 @@ pub fn G_SaveBanIP(ctx: GameContext<'_>) {
 /// Load IP filters from "banip.txt" file.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:333-379`
-pub fn G_LoadIPBans(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+pub fn G_LoadIPBans(ctx: &mut GameContext) {
+    // Raw pointer (not a tracked borrow) so `ctx` stays free for the
+    // `StringToFilter`/`G_Printf` calls below — mirrors the Stage-1
+    // `ctx.world_raw()` idiom (see `g_object.rs`).
+    let world: *mut GameWorld = ctx.world_raw();
     let mut fh: i32 = 0;
     let mut ban_ip_buffer = vec![0 as c_char; 32 * 1024]; // MAX_IPFILTERS * 32
 
@@ -432,20 +450,22 @@ pub fn G_LoadIPBans(ctx: GameContext<'_>) {
     let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
 
     if !token.is_null() {
-        world.globals.numIPFilters = atoi(token);
+        unsafe {
+            (*world).globals.numIPFilters = atoi(token);
+        }
 
-        for i in 0..(world.globals.numIPFilters as usize) {
+        for i in 0..(unsafe { (*world).globals.numIPFilters } as usize) {
             let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
             if !token.is_null() {
                 let token_str = unsafe { std::ffi::CStr::from_ptr(token).to_string_lossy() };
                 if token_str.to_lowercase() == "unused" {
-                    world.globals.ipFilters[i].compare = 0xffffffffu32;
+                    unsafe {
+                        (&mut (*world).globals.ipFilters)[i].compare = 0xffffffffu32;
+                    }
                 } else {
-                    StringToFilter(
-                        ctx,
-                        token as *mut c_char,
-                        &mut world.globals.ipFilters[i] as *mut _ as *mut c_void,
-                    );
+                    StringToFilter(ctx, token as *mut c_char, unsafe {
+                        &mut (&mut (*world).globals.ipFilters)[i] as *mut _ as *mut c_void
+                    });
                 }
             } else {
                 break;
@@ -459,11 +479,14 @@ pub fn G_LoadIPBans(ctx: GameContext<'_>) {
 /// Console command: list entities on the server.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:386-443`
-pub fn Svcmd_EntityList_f(ctx: GameContext<'_>) {
-    let world = unsafe { &*ctx.world };
+pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
+    // Raw pointer (not a tracked borrow) so `ctx` stays free for the `G_Printf`
+    // calls inside the loop below — mirrors the Stage-1 `ctx.world_raw()`
+    // idiom (see `g_object.rs`).
+    let world: *mut GameWorld = ctx.world_raw();
 
-    for e in 1..(world.level.num_entities as usize) {
-        let check = unsafe { &(*world.g_entities.as_ptr().add(e)) };
+    for e in 1..(unsafe { (*world).level.num_entities } as usize) {
+        let check = unsafe { &(*(*world).g_entities.as_ptr().add(e)) };
 
         if check.inuse == qfalse {
             continue;
@@ -512,7 +535,7 @@ pub fn Svcmd_EntityList_f(ctx: GameContext<'_>) {
 /// Look up a client by slot number or player name.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:445-480`
-pub fn ClientForString(ctx: GameContext<'_>, s: *const c_char) -> *mut gclient_t {
+pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_t {
     let world = unsafe { &*ctx.world };
 
     // Check if it's a numeric slot
@@ -568,9 +591,12 @@ pub fn ClientForString(ctx: GameContext<'_>, s: *const c_char) -> *mut gclient_t
 /// Console command: force a player to a team.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:489-503`
-pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
+pub fn Svcmd_ForceTeam_f(ctx: &mut GameContext) {
     let mut str = [0 as c_char; 128];
-    let world = unsafe { &*ctx.world };
+    // Raw pointer (not a tracked borrow) so `ctx` stays free for the
+    // `ClientForString`/`SetTeam` calls below — mirrors the Stage-1
+    // `ctx.world_raw()` idiom (see `g_object.rs`).
+    let world: *mut GameWorld = ctx.world_raw();
 
     // Get the player identifier
     trap::Argv(ctx.engine, GArgvArgs::new(1, str.as_mut_ptr(), 128));
@@ -583,10 +609,11 @@ pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
     trap::Argv(ctx.engine, GArgvArgs::new(2, str.as_mut_ptr(), 128));
 
     // Calculate the entity index from the client pointer
-    let cl_idx =
-        unsafe { (cl as usize - world.level.clients as usize) / std::mem::size_of::<gclient_t>() };
+    let cl_idx = unsafe {
+        (cl as usize - (*world).level.clients as usize) / std::mem::size_of::<gclient_t>()
+    };
 
-    let ent = unsafe { world.g_entities.as_ptr().add(cl_idx) as *mut gentity_t };
+    let ent = unsafe { (*world).g_entities.as_ptr().add(cl_idx) as *mut gentity_t };
     crate::g_cmds::SetTeam(ctx, ctx.entity_id_of(ent).unwrap(), str.as_mut_ptr());
 }
 
@@ -595,7 +622,7 @@ pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
 /// Dispatcher for server console commands.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:513-575`
-pub fn ConsoleCommand(ctx: GameContext<'_>) -> qboolean {
+pub fn ConsoleCommand(ctx: &mut GameContext) -> qboolean {
     let world = unsafe { &*ctx.world };
     let mut cmd = [0 as c_char; 128];
 
