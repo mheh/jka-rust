@@ -50,6 +50,7 @@ use crate::sv_bot::{
     BotImport_DebugLineCreate, BotImport_DebugLineDelete, BotImport_DebugLineShow,
     BotImport_DebugPolygonCreate, BotImport_DebugPolygonDelete,
 };
+use crate::sv_client::SV_ExecuteClientCommand;
 use crate::sv_game::SV_inPVS;
 use crate::sv_world::SV_PointContents;
 use crate::Server;
@@ -299,19 +300,37 @@ extern "C" fn bot_import_debug_polygon_delete(id: c_int) {
     BotImport_DebugPolygonDelete(unsafe { &mut *ctx().sv }, id);
 }
 
+/// Raven `BotClientCommand` (`sv_bot.cpp:577-579`) —
+/// `SV_ExecuteClientCommand(&svs.clients[client], command, qtrue)`. The bot
+/// commands routed here ("say"/game-forwarded strings) never reach the
+/// `ucmds[]` arms that need the view's null `rmg` slot (pak verify /
+/// download — human-client-only).
+extern "C" fn bot_import_bot_client_command(client: c_int, command: *mut c_char) {
+    let c = ctx();
+    // SAFETY: armed-slot islands (see `ctx`); single-threaded dispatch.
+    unsafe {
+        let mut view = ctx_view(c);
+        let sv = &mut *c.sv;
+        let cl = sv.svs.clients.offset(client as isize);
+        SV_ExecuteClientCommand(&mut view, sv, cl, command, qtrue);
+    }
+}
+
 /// Build the `botlib_import_t` table Raven fills in `SV_BotInitBotLib`
 /// (`sv_bot.cpp:691-720`). The slot must already be armed (`arm_botlib_slot`).
 ///
-/// Four fields stay `None`, deferred to a later slice, because their real bodies
-/// reach engine state not threaded to `SV_BotInitBotLib`'s call site:
+/// Three fields stay `None`, deferred to a later slice, because their real
+/// bodies reach engine state not threaded to `SV_BotInitBotLib`'s call site:
 /// - `Trace`/`EntityTrace` — `SV_Trace`/`SV_ClipToEntity` need the `RmManager`
 ///   and `Ghoul2System` islands, which `SV_Init`/`SV_BotInitBotLib` do not
-///   receive.
-/// - `BotClientCommand` — `SV_ExecuteClientCommand` needs the `RmManager`
-///   island, likewise not threaded here.
-/// - `BSPModelMinsMaxsOrigin` — `CM_ModelBounds` is ported with the by-value
-///   out-param convention and does not propagate the computed bounds back, so a
-///   faithful body cannot be assembled without touching that seam.
+///   receive. (JKA MP bots navigate via the game's waypoint nav, not Q3 AAS,
+///   so no live caller has reached these yet.)
+/// - `BSPModelMinsMaxsOrigin` — no live caller yet (Q3-AAS-only); wireable now
+///   that `CM_ModelBounds` has real out-params (2026-07-13), left for the first
+///   caller.
+///
+/// `BotClientCommand` is wired (first live caller: bot chat via `EA_Say`,
+/// 2026-07-13); `ctx_view` supplies the once-missing island threading.
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:691-720`
 pub fn botlib_import_table() -> botlib_import_t {
@@ -323,7 +342,7 @@ pub fn botlib_import_table() -> botlib_import_t {
         inPVS: Some(bot_import_in_pvs),
         BSPEntityData: Some(bot_import_bsp_entity_data),
         BSPModelMinsMaxsOrigin: None,
-        BotClientCommand: None,
+        BotClientCommand: Some(bot_import_bot_client_command),
         GetMemory: Some(bot_import_get_memory),
         FreeMemory: Some(bot_import_free_memory),
         AvailableMemory: Some(bot_import_available_memory),
