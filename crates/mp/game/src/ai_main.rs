@@ -7005,7 +7005,12 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
             let currentEnemy = resolve((*bs).currentEnemy);
             if !currentEnemy.is_null()
                 && !(*currentEnemy).client.is_null()
-                && ForcePowerUsableOn(ctx, me, currentEnemy, (*cl).ps.fd.forcePowerSelected) == 0
+                && ForcePowerUsableOn(
+                    ctx,
+                    ctx.entity_id_of(me),
+                    ctx.entity_id_of(currentEnemy),
+                    (*cl).ps.fd.forcePowerSelected,
+                ) == 0
             {
                 useTheForce = 0;
                 forceHostile = 0;

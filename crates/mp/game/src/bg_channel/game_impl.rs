@@ -736,7 +736,11 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let enemy = &mut (*self.world).g_entities[otherNum as usize] as *mut gentity_t;
-            crate::w_saber::G_CanBeEnemy(ctx, self_, enemy)
+            crate::w_saber::G_CanBeEnemy(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(enemy).unwrap(),
+            )
         }
     }
     fn get_time(&self) -> c_int {

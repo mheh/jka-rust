@@ -774,7 +774,15 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
             && (*ent).methodOfDeath != MOD_CONC_ALT as c_int
             && (*((*other).client as *mut gclient_t)).ps.saberBlockTime < (*ctx.world).level.time
             && isKnockedSaber == 0
-            && WP_SaberCanBlock(ctx, other, (*ent).r.currentOrigin, 0, 0, qtrue, 0) != 0
+            && WP_SaberCanBlock(
+                ctx,
+                ctx.entity_id_of(other),
+                (*ent).r.currentOrigin,
+                0,
+                0,
+                qtrue,
+                0,
+            ) != 0
         {
             let mut fwd: vec3_t = [0.0; 3];
             let otherDefLevel = (*((*other).client as *mut gclient_t)).ps.fd.forcePowerLevel
@@ -844,7 +852,7 @@ pub fn G_MissileImpact(ctx: GameContext<'_>, ent: EntityId, trace: &mut trace_t)
                     && (*((*otherOwner).client as *mut gclient_t)).ps.weaponTime <= 0
                 {
                     crate::w_saber::WP_SaberBlockNonRandom(
-                        otherOwner as *mut gentity_t,
+                        &*(otherOwner as *mut gentity_t),
                         (*ent).r.currentOrigin,
                         qtrue,
                     );

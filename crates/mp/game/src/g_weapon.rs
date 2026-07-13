@@ -689,8 +689,8 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: EntityId) {
 
             if crate::w_force::Jedi_DodgeEvasion(
                 ctx,
-                traceEnt,
-                ent,
+                ctx.entity_id_of(traceEnt),
+                ctx.entity_id_of(ent),
                 &mut tr,
                 crate::g_combat::G_GetHitLocation(
                     ctx,
@@ -714,7 +714,7 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: EntityId) {
             {
                 if crate::w_saber::WP_SaberCanBlock(
                     ctx,
-                    traceEnt,
+                    ctx.entity_id_of(traceEnt),
                     tr.endpos,
                     0,
                     MOD_DISRUPTOR as c_int,
@@ -971,8 +971,8 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: EntityId) {
 
             if crate::w_force::Jedi_DodgeEvasion(
                 ctx,
-                traceEnt,
-                ent,
+                ctx.entity_id_of(traceEnt),
+                ctx.entity_id_of(ent),
                 &mut tr,
                 crate::g_combat::G_GetHitLocation(
                     ctx,
@@ -994,7 +994,7 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: EntityId) {
             {
                 if crate::w_saber::WP_SaberCanBlock(
                     ctx,
-                    traceEnt,
+                    ctx.entity_id_of(traceEnt),
                     tr.endpos,
                     0,
                     MOD_DISRUPTOR_SNIPER as c_int,
@@ -3947,7 +3947,13 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: EntityId) {
 
             if (*traceEnt).s.weapon == WP_SABER {
                 // FIXME: need a more reliable way to know we hit a jedi?
-                hitDodged = crate::w_force::Jedi_DodgeEvasion(ctx, traceEnt, ent, &mut tr, HL_NONE);
+                hitDodged = crate::w_force::Jedi_DodgeEvasion(
+                    ctx,
+                    ctx.entity_id_of(traceEnt),
+                    ctx.entity_id_of(ent),
+                    &mut tr,
+                    HL_NONE,
+                );
                 // acts like we didn't even hit him
             }
             if hitDodged == qfalse {

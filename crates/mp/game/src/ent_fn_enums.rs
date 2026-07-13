@@ -126,10 +126,10 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::DEMP2_AltRadiusDamage => {
             DEMP2_AltRadiusDamage(ctx, ctx.entity_id_of(self_).unwrap())
         }
-        EntThink::DeadSaberThink => DeadSaberThink(ctx, self_),
+        EntThink::DeadSaberThink => DeadSaberThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::DetPackBlow => DetPackBlow(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Disappear => Disappear(self_),
-        EntThink::DownedSaberThink => DownedSaberThink(ctx, self_),
+        EntThink::DownedSaberThink => DownedSaberThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::EWebThink => EWebThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::FinishSpawningItem => FinishSpawningItem(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::G_ExplodeMissile => G_ExplodeMissile(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -149,7 +149,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::NPC_Think => NPC_Think(ctx, self_),
         EntThink::RespawnItem => RespawnItem(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ReturnToPos1 => ReturnToPos1(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::SaberUpdateSelf => SaberUpdateSelf(ctx, self_),
+        EntThink::SaberUpdateSelf => SaberUpdateSelf(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ShieldGoSolid => ShieldGoSolid(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ShieldThink => ShieldThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::SiegeItemThink => SiegeItemThink(ctx, self_),
@@ -206,8 +206,8 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::proxMineThink => proxMineThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ref_link => ref_link(ctx, self_),
         EntThink::rocketThink => rocketThink(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::saberBackToOwner => saberBackToOwner(ctx, self_),
-        EntThink::saberFirstThrown => saberFirstThrown(ctx, self_),
+        EntThink::saberBackToOwner => saberBackToOwner(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::saberFirstThrown => saberFirstThrown(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::scriptrunner_run => scriptrunner_run(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::sentryExpire => sentryExpire(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::shipboundary_think => shipboundary_think(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -290,8 +290,17 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::SaberBounceSound => SaberBounceSound(self_, other, trace),
-        EntTouch::SaberGotHit => SaberGotHit(ctx, self_, other, trace),
+        EntTouch::SaberBounceSound => SaberBounceSound(
+            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
+            ctx.entity_id_of(other),
+            trace,
+        ),
+        EntTouch::SaberGotHit => SaberGotHit(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::SentryTouch => SentryTouch(
             ctx.entity_id_of(self_).unwrap(),
             ctx.entity_id_of(other),
@@ -382,7 +391,12 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::thrownSaberTouch => thrownSaberTouch(ctx, self_, other, trace),
+        EntTouch::thrownSaberTouch => thrownSaberTouch(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::touchLaserTrap => touchLaserTrap(
             ctx,
             ctx.entity_id_of(self_).unwrap(),

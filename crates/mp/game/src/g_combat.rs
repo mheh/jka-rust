@@ -4088,7 +4088,7 @@ pub fn G_GetHitLocFromSurfName(
                     let renderAng: vec3_t = [0.0, (*client).ps.viewangles[YAW], 0.0];
                     crate::w_saber::UpdateClientRenderBolts(
                         ctx,
-                        ent,
+                        ctx.entity_id_of(ent).unwrap(),
                         (*client).ps.origin,
                         renderAng,
                     );
@@ -6009,7 +6009,7 @@ pub fn G_Damage(
                         && ((*((*targ).client as *mut gclient_t)).ps.pm_flags & PMF_STUCK_TO_WALL)
                             != 0
                     {
-                        crate::w_force::G_LetGoOfWall(ctx, targ);
+                        crate::w_force::G_LetGoOfWall(ctx, ctx.entity_id_of(targ));
                     }
                 }
                 if (*targ).pain.is_some() {

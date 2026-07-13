@@ -1974,7 +1974,7 @@ pub fn Cmd_ForceChanged_f(ctx: GameContext<'_>, ent: EntityId) {
         // Raven's `goto argCheck` is preserved here as the natural fall-through of
         // the if/else below (both arms reach the same trailing logic) — see §C10.
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-            crate::w_force::WP_InitForcePowers(ctx, ent);
+            crate::w_force::WP_InitForcePowers(ctx, ctx.entity_id_of(ent));
         } else {
             let buf = crate::g_main::G_GetStringEdString(
                 ctx,
@@ -4109,7 +4109,12 @@ pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: EntityId) {
                 // turn it off in midair
                 let saberent = &mut (*ctx.world).g_entities[(*client).ps.saberEntityNum as usize]
                     as *mut gentity_t;
-                crate::w_saber::saberKnockDown(ctx, saberent, ent, ent);
+                crate::w_saber::saberKnockDown(
+                    ctx,
+                    ctx.entity_id_of(saberent).unwrap(),
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(ent).unwrap(),
+                );
             }
             return;
         }
@@ -5263,9 +5268,8 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
             {
                 crate::w_saber::saberKnockOutOfHand(
                     ctx,
-                    &mut (*world).g_entities[(*client).ps.saberEntityNum as usize]
-                        as *mut gentity_t,
-                    ent,
+                    Some(EntityId(((*client).ps.saberEntityNum) as u32)),
+                    ctx.entity_id_of(ent),
                     vec3_origin,
                 );
             }

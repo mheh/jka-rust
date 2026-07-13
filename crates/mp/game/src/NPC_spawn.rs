@@ -173,13 +173,13 @@ pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_DONT_FIRE;
         }
         if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER {
-            crate::w_saber::WP_SaberInitBladeData(ctx, ent);
+            crate::w_saber::WP_SaberInitBladeData(ctx, ctx.entity_id_of(ent).unwrap());
             (*((*ent).client as *mut gclient_t)).ps.saberHolstered = 2;
             crate::NPC_AI_Jedi::Jedi_ClearTimers(ctx, ent);
         }
         if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersKnown != 0 {
-            crate::w_force::WP_InitForcePowers(ctx, ent);
-            crate::w_force::WP_SpawnInitForcePowers(ctx, ent);
+            crate::w_force::WP_InitForcePowers(ctx, ctx.entity_id_of(ent));
+            crate::w_force::WP_SpawnInitForcePowers(ctx, ctx.entity_id_of(ent).unwrap());
         }
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SEEKER {
             (*((*ent).NPC as *mut gNPC_t)).defaultBehavior = BS_DEFAULT;

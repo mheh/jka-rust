@@ -460,7 +460,7 @@ pub fn ThrowSaberToAttacker(ctx: GameContext<'_>, self_: EntityId, attacker: Opt
 
         crate::w_saber::WP_SaberAddG2Model(
             ctx,
-            ent,
+            ctx.entity_id_of(ent).unwrap(),
             (*client).saber[0].model.as_ptr(),
             (*client).saber[0].skin,
         );
@@ -2093,7 +2093,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
         let mut i = 0;
         while i < NUM_FORCE_POWERS {
             if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << i) != 0 {
-                WP_ForcePowerStop(ctx, ent, i as forcePowers_t);
+                WP_ForcePowerStop(ctx, ctx.entity_id_of(ent).unwrap(), i as forcePowers_t);
             }
             i += 1;
         }
@@ -2122,10 +2122,10 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
         (*client).ps.hasDetPackPlanted = qfalse;
 
         // first-time force power initialization
-        WP_InitForcePowers(ctx, ent);
+        WP_InitForcePowers(ctx, ctx.entity_id_of(ent));
 
         // init saber ent
-        crate::w_saber::WP_SaberInitBladeData(ctx, ent);
+        crate::w_saber::WP_SaberInitBladeData(ctx, ctx.entity_id_of(ent).unwrap());
 
         // First time model setup for that player.
         let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
@@ -2789,7 +2789,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: EntityId) {
 
         if (*client).ps.fd.forceDoInit != 0 {
             // force a reread of force powers
-            WP_InitForcePowers(ctx, ent);
+            WP_InitForcePowers(ctx, ctx.entity_id_of(ent));
             (*client).ps.fd.forceDoInit = 0;
         }
 
@@ -3256,7 +3256,7 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: EntityId) {
         }
 
         // Do per-spawn force power initialization
-        crate::w_force::WP_SpawnInitForcePowers(ctx, ent);
+        crate::w_force::WP_SpawnInitForcePowers(ctx, ctx.entity_id_of(ent).unwrap());
 
         // health will count down towards max_health
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
@@ -3474,7 +3474,7 @@ pub fn ClientDisconnect(ctx: GameContext<'_>, clientNum: c_int) {
         let mut i: c_int = 0;
         while i < (NUM_FORCE_POWERS) as i32 {
             if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << i) != 0 {
-                WP_ForcePowerStop(ctx, ent, i as forcePowers_t);
+                WP_ForcePowerStop(ctx, ctx.entity_id_of(ent).unwrap(), i as forcePowers_t);
             }
             i += 1;
         }

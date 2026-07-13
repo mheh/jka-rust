@@ -354,7 +354,7 @@ pub fn Boba_StopKnockdown(
             if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                 //flip
                 (*client).ps.fd.forceJumpCharge = 280.0; //FIXME: calc this intelligently?
-                crate::w_force::ForceJump(ctx, self_, &mut tempCmd);
+                crate::w_force::ForceJump(ctx, ctx.entity_id_of(self_).unwrap(), &mut tempCmd);
             } else {
                 //roll
                 crate::g_timer::TIMER_Set(ctx, self_, c"duck".as_ptr(), strafeTime);
@@ -1090,7 +1090,7 @@ pub fn Jedi_AggressionErosion(ctx: GameContext<'_>, amt: c_int) {
             || ((*npc_info).stats.aggression < 6 && (*client).NPC_class == CLASS_DESANN)
         {
             //turn off the saber
-            crate::w_saber::WP_DeactivateSaber(ctx, npc, qfalse);
+            crate::w_saber::WP_DeactivateSaber(ctx, ctx.entity_id_of(npc), qfalse);
         }
     }
 }
@@ -1172,7 +1172,7 @@ pub fn Jedi_Rage(ctx: GameContext<'_>) {
         crate::g_timer::TIMER_Set(ctx, npc, c"movenone".as_ptr(), 0);
         crate::g_timer::TIMER_Set(ctx, npc, c"movecenter".as_ptr(), 0);
         crate::g_timer::TIMER_Set(ctx, npc, c"noturn".as_ptr(), 0);
-        crate::w_force::ForceRage(ctx, npc);
+        crate::w_force::ForceRage(ctx, ctx.entity_id_of(npc).unwrap());
     }
 }
 
@@ -1609,7 +1609,7 @@ pub fn Jedi_Advance(ctx: GameContext<'_>) {
         let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         if (*client).ps.saberInFlight == qfalse {
-            crate::w_saber::WP_ActivateSaber(ctx, npc);
+            crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
         }
         let enemy: *mut gentity_t = match (*npc).enemy {
             Some(id) => ge.add(id.0 as usize),
@@ -1812,7 +1812,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 //he's getting too close
                 (*world).globals.ucmd.buttons |= BUTTON_ATTACK;
                 if (*client).ps.saberInFlight == qfalse {
-                    crate::w_saber::WP_ActivateSaber(ctx, npc);
+                    crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
                 }
                 crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), -(*world).level.time);
             } else if (*client).ps.forceHandExtend == HANDEXTEND_JEDITAUNT as c_int
@@ -1820,7 +1820,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
             {
                 //we're almost done with our special taunt
                 if (*client).ps.saberInFlight == qfalse {
-                    crate::w_saber::WP_ActivateSaber(ctx, npc);
+                    crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
                 }
             }
         } else if (*client).ps.saberEventFlags & SEF_LOCK_WON as c_int != 0 {
@@ -1868,7 +1868,12 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     || (*client).pers.maxHealth - (*npc).health
                         > ((*client).pers.maxHealth as f32 * 0.25f32) as c_int)
                     && (*client).ps.fd.forcePowersKnown & (1 << FP_DRAIN) != 0
-                    && crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_DRAIN, 20) != qfalse
+                    && crate::w_force::WP_ForcePowerAvailable(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        FP_DRAIN,
+                        20,
+                    ) != qfalse
                     && (*world).bg_state.rng.Q_irand(0, 2) == 0
                 {
                     //drain
@@ -1877,7 +1882,7 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     Jedi_Advance(ctx);
                     return;
                 } else {
-                    crate::w_force::ForceThrow(ctx, npc, qfalse);
+                    crate::w_force::ForceThrow(ctx, ctx.entity_id_of(npc).unwrap(), qfalse);
                 }
             }
             Jedi_Retreat(ctx);
@@ -1885,7 +1890,12 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
             && (*client).pers.maxHealth - (*npc).health
                 > ((*client).pers.maxHealth as f32 * 0.25f32) as c_int
             && (*client).ps.fd.forcePowersKnown & (1 << FP_DRAIN) != 0
-            && crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_DRAIN, 20) != qfalse
+            && crate::w_force::WP_ForcePowerAvailable(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                FP_DRAIN,
+                20,
+            ) != qfalse
             && (*world).bg_state.rng.Q_irand(0, 10) == 0
             && crate::NPC_senses::InFront(
                 (*enemy).r.currentOrigin,
@@ -1919,19 +1929,19 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     && ((*client).ps.fd.forcePowersActive & (1 << FP_HEAL)) == 0
                     && (*world).bg_state.rng.Q_irand(0, 1) != 0
                 {
-                    crate::w_force::ForceHeal(ctx, npc);
+                    crate::w_force::ForceHeal(ctx, ctx.entity_id_of(npc).unwrap());
                     usedForce = qtrue;
                 } else if ((*client).ps.fd.forcePowersKnown & (1 << FP_PROTECT)) != 0
                     && ((*client).ps.fd.forcePowersActive & (1 << FP_PROTECT)) == 0
                     && (*world).bg_state.rng.Q_irand(0, 1) != 0
                 {
-                    crate::w_force::ForceProtect(ctx, npc);
+                    crate::w_force::ForceProtect(ctx, ctx.entity_id_of(npc).unwrap());
                     usedForce = qtrue;
                 } else if ((*client).ps.fd.forcePowersKnown & (1 << FP_ABSORB)) != 0
                     && ((*client).ps.fd.forcePowersActive & (1 << FP_ABSORB)) == 0
                     && (*world).bg_state.rng.Q_irand(0, 1) != 0
                 {
-                    crate::w_force::ForceAbsorb(ctx, npc);
+                    crate::w_force::ForceAbsorb(ctx, ctx.entity_id_of(npc).unwrap());
                     usedForce = qtrue;
                 } else if ((*client).ps.fd.forcePowersKnown & (1 << FP_RAGE)) != 0
                     && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
@@ -2000,7 +2010,12 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 && (*enemy_client).ps.saberInFlight != qfalse
                 && (*enemy_client).ps.saberEntityNum != 0
                 && (*client).ps.weaponTime <= 0
-                && crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_GRIP, 0) != qfalse
+                && crate::w_force::WP_ForcePowerAvailable(
+                    ctx,
+                    ctx.entity_id_of(npc).unwrap(),
+                    FP_GRIP,
+                    0,
+                ) != qfalse
                 && (*world).bg_state.rng.Q_irand(0, 10) == 0
                 && (*world).bg_state.rng.Q_irand(0, 6) < (*world).cvars.g_spskill.integer
                 && (*world)
@@ -2078,20 +2093,29 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                         || (*npc_info).rank as c_int > RANK_LT_JG as c_int)
                         && (*world).bg_state.rng.Q_irand(0, 1) == 0
                     {
-                        if crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_PULL, 0) != qfalse
+                        if crate::w_force::WP_ForcePowerAvailable(
+                            ctx,
+                            ctx.entity_id_of(npc).unwrap(),
+                            FP_PULL,
+                            0,
+                        ) != qfalse
                             && (*world).bg_state.rng.Q_irand(0, 2) == 0
                         {
                             //force pull the guy to me!
-                            crate::w_force::ForceThrow(ctx, npc, qtrue);
+                            crate::w_force::ForceThrow(ctx, ctx.entity_id_of(npc).unwrap(), qtrue);
                             crate::g_timer::TIMER_Set(ctx, npc, c"duck".as_ptr(), enemy_dist * 3);
                             if (*world).bg_state.rng.Q_irand(0, 1) != 0 {
                                 (*world).globals.ucmd.buttons |= BUTTON_ATTACK;
                             }
-                        } else if crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_LIGHTNING, 0)
-                            != qfalse
+                        } else if crate::w_force::WP_ForcePowerAvailable(
+                            ctx,
+                            ctx.entity_id_of(npc).unwrap(),
+                            FP_LIGHTNING,
+                            0,
+                        ) != qfalse
                             && (*world).bg_state.rng.Q_irand(0, 1) != 0
                         {
-                            crate::w_force::ForceLightning(ctx, npc);
+                            crate::w_force::ForceLightning(ctx, ctx.entity_id_of(npc).unwrap());
                             if (*client).ps.fd.forcePowerLevel[FP_LIGHTNING as usize]
                                 > FORCE_LEVEL_1
                             {
@@ -2112,8 +2136,12 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                                 c"attackDelay".as_ptr(),
                                 (*client).ps.weaponTime,
                             );
-                        } else if crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_GRIP, 0)
-                            != qfalse
+                        } else if crate::w_force::WP_ForcePowerAvailable(
+                            ctx,
+                            ctx.entity_id_of(npc).unwrap(),
+                            FP_GRIP,
+                            0,
+                        ) != qfalse
                         {
                             //taunt
                             if crate::g_timer::TIMER_Done(ctx, npc, c"chatter".as_ptr()) != qfalse
@@ -2140,8 +2168,12 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                             crate::g_timer::TIMER_Set(ctx, npc, c"gripping".as_ptr(), 3000);
                             crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), 3000);
                         } else {
-                            if crate::w_force::WP_ForcePowerAvailable(ctx, npc, FP_SABERTHROW, 0)
-                                != qfalse
+                            if crate::w_force::WP_ForcePowerAvailable(
+                                ctx,
+                                ctx.entity_id_of(npc).unwrap(),
+                                FP_SABERTHROW,
+                                0,
+                            ) != qfalse
                                 && ((*client).ps.fd.forcePowersActive & (1 << FP_SPEED)) == 0
                                 && ((*client).ps.saberEventFlags & SEF_INWATER as c_int) == 0
                             {
@@ -3437,10 +3469,10 @@ pub fn Jedi_SaberBlockGo(
         crate::g_timer::TIMER_Set(ctx, self_, c"taunting".as_ptr(), 0);
         //stop gripping
         crate::g_timer::TIMER_Set(ctx, self_, c"gripping".as_ptr(), -(*world).level.time);
-        crate::w_force::WP_ForcePowerStop(ctx, self_, FP_GRIP);
+        crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_GRIP);
         //stop draining
         crate::g_timer::TIMER_Set(ctx, self_, c"draining".as_ptr(), -(*world).level.time);
-        crate::w_force::WP_ForcePowerStop(ctx, self_, FP_DRAIN);
+        crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_DRAIN);
 
         if dodgeAnim != -1 {
             //dodged
@@ -3679,7 +3711,7 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
             let parryReCalcTime: c_int;
 
             if (*client).ps.saberInFlight == qfalse {
-                crate::w_saber::WP_ActivateSaber(ctx, npc);
+                crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
             }
 
             parryReCalcTime = Jedi_ReCalcParryTime(ctx, npc, evasionType);
@@ -3790,7 +3822,7 @@ pub fn Jedi_EvasionSaber(
             //if he's throwing his saber, stop taunting
             crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), -(*world).level.time);
             if (*client).ps.saberInFlight == qfalse {
-                crate::w_saber::WP_ActivateSaber(ctx, npc);
+                crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
             }
         }
 
@@ -3950,7 +3982,7 @@ pub fn Jedi_EvasionSaber(
                             || (*npc_info).rank as c_int > RANK_LT_JG as c_int)
                             && crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse
                         {
-                            crate::w_force::ForceThrow(ctx, npc, qfalse);
+                            crate::w_force::ForceThrow(ctx, ctx.entity_id_of(npc).unwrap(), qfalse);
                         }
                     }
                     4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 => {
@@ -3981,7 +4013,11 @@ pub fn Jedi_EvasionSaber(
                                         && shooting_lightning == qfalse
                                         && (*world).bg_state.rng.Q_irand(0, 2) != 0
                                     {
-                                        crate::w_force::ForceThrow(ctx, npc, qfalse);
+                                        crate::w_force::ForceThrow(
+                                            ctx,
+                                            ctx.entity_id_of(npc).unwrap(),
+                                            qfalse,
+                                        );
                                     } else if ((*npc_info).rank as c_int == RANK_CREWMAN as c_int
                                         || (*npc_info).rank as c_int > RANK_LT_JG as c_int)
                                         && ((*npc_info).scriptFlags & SCF_NO_ACROBATICS) == 0
@@ -4755,7 +4791,7 @@ pub fn Jedi_CombatIdle(ctx: GameContext<'_>, enemy_dist: c_int) {
                         && (*world).bg_state.rng.Q_irand(0, 5) == 0
                     {
                         //taunt even more, turn off the saber
-                        crate::w_saber::WP_DeactivateSaber(ctx, npc, qfalse);
+                        crate::w_saber::WP_DeactivateSaber(ctx, ctx.entity_id_of(npc), qfalse);
                         (*npc_info).stats.aggression = 3;
                         if (*client).playerTeam != NPCTEAM_PLAYER as c_int
                             && (*world).bg_state.rng.Q_irand(0, 1) == 0
@@ -5558,7 +5594,7 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
         if (*client).ps.fd.forceJumpCharge != 0.0 {
             crate::w_force::WP_GetVelocityForForceJump(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 &mut jumpVel,
                 &mut (*world).globals.ucmd,
             );
@@ -5970,7 +6006,7 @@ pub fn NPC_Jedi_Pain(
 
         (*snpc).enemyCheckDebounceTime = 0;
 
-        crate::w_force::WP_ForcePowerStop(ctx, self_, FP_GRIP);
+        crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_GRIP);
 
         crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
 
@@ -6178,7 +6214,7 @@ pub fn Jedi_Ambush(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
         (*client).ps.weaponTime = (*client).ps.torsoTimer;
         if (*client).NPC_class != CLASS_BOBAFETT {
-            crate::w_saber::WP_ActivateSaber(ctx, self_);
+            crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(self_));
         }
         Jedi_Decloak(ctx, self_);
         crate::NPC_sounds::G_AddVoiceEvent(
@@ -6370,7 +6406,10 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                     if best_enemy_dist < (330.0 * 330.0) {
                                         //stage four: turn on the saber
                                         if (*client).ps.saberInFlight == qfalse {
-                                            crate::w_saber::WP_ActivateSaber(ctx, npc);
+                                            crate::w_saber::WP_ActivateSaber(
+                                                ctx,
+                                                ctx.entity_id_of(npc),
+                                            );
                                         }
                                     }
                                 } else if best_enemy_dist < (550.0 * 550.0)
@@ -6575,7 +6614,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                 && (*client).ps.saberLockTime < (*world).level.time + 5000
                 && (*world).bg_state.rng.Q_irand(0, 10) == 0
             {
-                crate::w_force::ForceThrow(ctx, npc, qfalse);
+                crate::w_force::ForceThrow(ctx, ctx.entity_id_of(npc).unwrap(), qfalse);
             } else {
                 let chance: f32;
                 if (*client).NPC_class == CLASS_DESANN
@@ -6750,7 +6789,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                                 && ((*client).ps.fd.forcePowersKnown & (1 << FP_HEAL)) != 0
                                 && ((*client).ps.fd.forcePowersActive & (1 << FP_HEAL)) == 0
                             {
-                                crate::w_force::ForceHeal(ctx, npc);
+                                crate::w_force::ForceHeal(ctx, ctx.entity_id_of(npc).unwrap());
                             }
                         }
                         Jedi_FaceEnemy(ctx, qtrue);
@@ -6931,7 +6970,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                         _ => {}
                     }
                     if (*world).bg_state.rng.Q_irand(0, chance) == 0 {
-                        crate::w_force::ForceSpeed(ctx, npc, 0);
+                        crate::w_force::ForceSpeed(ctx, ctx.entity_id_of(npc).unwrap(), 0);
                     }
                 }
             }

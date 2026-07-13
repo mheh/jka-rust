@@ -3453,7 +3453,12 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     let saberEnt = &mut (*ctx.world).g_entities
                         [(*clClient).ps.saberEntityNum as usize]
                         as *mut gentity_t;
-                    saberCheckKnockdown_DuelLoss(ctx, saberEnt, clientLost, ent);
+                    saberCheckKnockdown_DuelLoss(
+                        ctx,
+                        ctx.entity_id_of(saberEnt),
+                        ctx.entity_id_of(clientLost),
+                        ctx.entity_id_of(ent),
+                    );
                 }
             }
 
@@ -3517,27 +3522,27 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     Cmd_EngageDuel_f(ctx, ctx.entity_id_of(ent).unwrap());
                 }
             } else if gc == GENCMD_FORCE_HEAL as c_int {
-                ForceHeal(ctx, ent);
+                ForceHeal(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_SPEED as c_int {
-                ForceSpeed(ctx, ent, 0);
+                ForceSpeed(ctx, ctx.entity_id_of(ent).unwrap(), 0);
             } else if gc == GENCMD_FORCE_THROW as c_int {
-                ForceThrow(ctx, ent, qfalse);
+                ForceThrow(ctx, ctx.entity_id_of(ent).unwrap(), qfalse);
             } else if gc == GENCMD_FORCE_PULL as c_int {
-                ForceThrow(ctx, ent, qtrue);
+                ForceThrow(ctx, ctx.entity_id_of(ent).unwrap(), qtrue);
             } else if gc == GENCMD_FORCE_DISTRACT as c_int {
-                ForceTelepathy(ctx, ent);
+                ForceTelepathy(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_RAGE as c_int {
-                ForceRage(ctx, ent);
+                ForceRage(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_PROTECT as c_int {
-                ForceProtect(ctx, ent);
+                ForceProtect(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_ABSORB as c_int {
-                ForceAbsorb(ctx, ent);
+                ForceAbsorb(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_HEALOTHER as c_int {
-                ForceTeamHeal(ctx, ent);
+                ForceTeamHeal(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_FORCEPOWEROTHER as c_int {
-                ForceTeamForceReplenish(ctx, ent);
+                ForceTeamForceReplenish(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_SEEING as c_int {
-                ForceSeeing(ctx, ent);
+                ForceSeeing(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_USE_SEEKER as c_int {
                 if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_SEEKER as c_int) != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SEEKER as c_int) != 0

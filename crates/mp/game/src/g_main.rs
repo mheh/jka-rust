@@ -3931,9 +3931,13 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                     && (*client).ps.pm_flags & PMF_FOLLOW == 0
                     && (*client).sess.sessionTeam != TEAM_SPECTATOR
                 {
-                    WP_ForcePowersUpdate(ctx, ent, &mut (*client).pers.cmd);
-                    WP_SaberPositionUpdate(ctx, ent, &mut (*client).pers.cmd);
-                    WP_SaberStartMissileBlockCheck(ctx, ent, &mut (*client).pers.cmd);
+                    WP_ForcePowersUpdate(ctx, ctx.entity_id_of(ent), &mut (*client).pers.cmd);
+                    WP_SaberPositionUpdate(ctx, ctx.entity_id_of(ent), &mut (*client).pers.cmd);
+                    WP_SaberStartMissileBlockCheck(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        &mut (*client).pers.cmd,
+                    );
                 }
 
                 if world.cvars.g_allowNPC.integer != 0 {
@@ -3961,9 +3965,13 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                     j += 1;
                 }
 
-                WP_ForcePowersUpdate(ctx, ent, &mut (*client).pers.cmd);
-                WP_SaberPositionUpdate(ctx, ent, &mut (*client).pers.cmd);
-                WP_SaberStartMissileBlockCheck(ctx, ent, &mut (*client).pers.cmd);
+                WP_ForcePowersUpdate(ctx, ctx.entity_id_of(ent), &mut (*client).pers.cmd);
+                WP_SaberPositionUpdate(ctx, ctx.entity_id_of(ent), &mut (*client).pers.cmd);
+                WP_SaberStartMissileBlockCheck(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    &mut (*client).pers.cmd,
+                );
             }
 
             G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
