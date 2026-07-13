@@ -12,6 +12,17 @@
 
 use crate::prelude::*;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Raven's file-scope combat/movement tuning defines.
 // Source: `oracle/codemp/game/NPC_AI_Remote.c:6,130-132,170-171,282-283`
 const VELOCITY_DECAY: f32 = 0.85;
@@ -39,10 +50,13 @@ pub fn NPC_Remote_Precache(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:29-37`
 pub fn NPC_Remote_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     crate::npc_c::SaveNPCGlobals(ctx);
     crate::npc_c::SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
     Remote_Strafe(ctx);

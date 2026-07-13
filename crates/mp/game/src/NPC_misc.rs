@@ -69,7 +69,7 @@ pub fn Debug_Printf(
 /// Source: `oracle/codemp/game/NPC_misc.c:41-73`
 pub fn Debug_NPCPrintf(
     ctx: GameContext<'_>,
-    printNPC: *mut gentity_t,
+    printNPC: EntityId,
     cv: *mut vmCvar_t,
     debugLevel: c_int,
     fmt: *mut c_char,
@@ -78,6 +78,8 @@ pub fn Debug_NPCPrintf(
     // PORT-NOTE(varargs): C varargs cannot be captured in safe Rust functions.
     // In actual Rust call sites, this is called with pre-formatted strings.
 
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let printNPC: *mut gentity_t = ctx.entity_mut(printNPC);
     unsafe {
         // Check if cvar value is less than debug level; if so, don't print
         if (*cv).value < debugLevel as f32 {

@@ -7,8 +7,7 @@
 //! FAITHFUL port of `oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
-//! Generated from the `fnskel.py` signature skeleton; bodies transcribed per the
-//! settled jampgame fork rulings. STAGING ONLY — not yet wired into crates/.
+//! Filled by the jampgame mega-pass.
 //!
 //! Parking pattern in this file (see the workflow's recurring escalations):
 //! - `raw-ptr-skeleton-no-world-handle`: reads `level.time`/`g_entities`/cvar
@@ -1318,7 +1317,12 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
             // QAGAME turrets
             let mut i: c_int = 0;
             while i < MAX_VEHICLE_TURRETS as c_int {
-                crate::g_vehicleTurret::VEH_TurretThink(ctx, pVeh, parent, i);
+                crate::g_vehicleTurret::VEH_TurretThink(
+                    ctx,
+                    pVeh,
+                    ctx.entity_id_of(parent).unwrap(),
+                    i,
+                );
                 i += 1;
             }
         }

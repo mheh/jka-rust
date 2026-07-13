@@ -2118,7 +2118,7 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: EntityId) {
             // this means we want to run physics on the object
             G_RunExPhys(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 (*ent).radius,
                 (*ent).mass,
                 (*ent).random,

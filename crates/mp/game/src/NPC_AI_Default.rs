@@ -45,11 +45,9 @@ pub fn NPC_StandIdle() {
 /// Raven `NPC_StandTrackAndShoot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:87-158`
-pub fn NPC_StandTrackAndShoot(
-    ctx: GameContext<'_>,
-    NPC: *mut gentity_t,
-    canDuck: qboolean,
-) -> qboolean {
+pub fn NPC_StandTrackAndShoot(ctx: GameContext<'_>, NPC: EntityId, canDuck: qboolean) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let NPC: *mut gentity_t = ctx.entity_mut(NPC);
     let world = unsafe { &mut *ctx.world };
     let npc = unsafe { &mut *NPC };
     let client = unsafe { &mut *(*world).globals.client };
@@ -307,7 +305,8 @@ pub fn NPC_BSStandAndShoot(ctx: GameContext<'_>) {
     }
 
     if npc.enemy.is_some() {
-        if NPC_StandTrackAndShoot(ctx, (*world).globals.NPC, qtrue) == 0 {
+        if NPC_StandTrackAndShoot(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap(), qtrue) == 0
+        {
             npc_info.desiredYaw = client.ps.viewangles[YAW];
             npc_info.desiredPitch = client.ps.viewangles[PITCH];
             NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -339,7 +338,7 @@ pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
 
     if npc.enemy.is_some() {
         let monitor = npc.cantHitEnemyCounter;
-        NPC_StandTrackAndShoot(ctx, (*world).globals.NPC, qfalse);
+        NPC_StandTrackAndShoot(ctx, ctx.entity_id_of((*world).globals.NPC).unwrap(), qfalse);
 
         if (unsafe { &*ctx.world }.globals.ucmd.buttons & BUTTON_ATTACK as i32) == 0
             && unsafe { &*ctx.world }.globals.ucmd.upmove >= 0

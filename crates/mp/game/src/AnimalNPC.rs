@@ -2,9 +2,7 @@
 //! FAITHFUL port of `oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
-//! Generated from the `fnskel.py` signature skeleton; bodies transcribed per
-//! the settled jampgame fork rulings. STAGING ONLY — not yet wired into
-//! crates/.
+//! Filled by the jampgame mega-pass.
 //!
 //! Parking pattern in this file (mirrors `SpeederNPC.rs`/`g_vehicles.rs`):
 //! - `raw-ptr-skeleton-no-world-handle` / `ambient-global (level.time)`: reads

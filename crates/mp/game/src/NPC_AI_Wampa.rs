@@ -20,6 +20,17 @@ use crate::prelude::*;
 use crate::trap;
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
 
@@ -40,7 +51,9 @@ const LSTATE_WAITING: c_int = 1;
 /// Raven `Wampa_SetBolts`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:16-36`
-pub fn Wampa_SetBolts(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn Wampa_SetBolts(ctx: GameContext<'_>, self_: Option<EntityId>) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
             let ri = &mut (*((*self_).client as *mut gclient_t)).renderInfo;
@@ -135,7 +148,9 @@ pub fn Wampa_Idle(ctx: GameContext<'_>) {
 /// Raven `Wampa_CheckRoar`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:78-88`
-pub fn Wampa_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn Wampa_CheckRoar(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let level_time = (*ctx.world).level.time as f32;
         if (*self_).wait < level_time {
@@ -193,7 +208,7 @@ pub fn Wampa_Patrol(ctx: GameContext<'_>) {
             Wampa_Idle(ctx);
             return;
         }
-        Wampa_CheckRoar(ctx, npc);
+        Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap());
         crate::g_timer::TIMER_Set(
             ctx,
             ctx.entity_id_of(npc),
@@ -628,7 +643,7 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
             == 0
         {
             if (*ctx.world).bg_state.rng.Q_irand(0, 10) == 0 {
-                if Wampa_CheckRoar(ctx, npc) != 0 {
+                if Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap()) != 0 {
                     return;
                 }
             }
@@ -702,7 +717,7 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
             } else {
                 if (*ctx.world).bg_state.rng.Q_irand(0, 20) == 0 {
                     // FIXME: only do this if we just damaged them or vice-versa?
-                    if Wampa_CheckRoar(ctx, npc) != 0 {
+                    if Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap()) != 0 {
                         return;
                     }
                 }
@@ -720,10 +735,13 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:433-499`
 pub fn NPC_Wampa_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let mut hitByWampa = qfalse;
         if !attacker.is_null()
@@ -788,7 +806,7 @@ pub fn NPC_Wampa_Pain(
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr()) != 0
         {
-            if Wampa_CheckRoar(ctx, self_) == 0 {
+            if Wampa_CheckRoar(ctx, ctx.entity_id_of(self_).unwrap()) == 0 {
                 if (*((*self_).client as *mut gclient_t)).ps.legsAnim
                     != (crate::prelude::BOTH_ATTACK1) as i32
                     && (*((*self_).client as *mut gclient_t)).ps.legsAnim
@@ -1081,7 +1099,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                     if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue) == qfalse {
                         Wampa_Idle(ctx);
                     } else {
-                        Wampa_CheckRoar(ctx, npc);
+                        Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap());
                         crate::g_timer::TIMER_Set(
                             ctx,
                             ctx.entity_id_of(npc),

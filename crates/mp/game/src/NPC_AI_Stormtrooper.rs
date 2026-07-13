@@ -607,7 +607,7 @@ pub fn ST_HoldPosition(ctx: GameContext<'_>) {
         {
             // don't have a script waiting for me to get to my point, okay to stop
             // trying and stand
-            AI_GroupUpdateSquadstates((*NPCInfo).group, NPC, SQUAD_STAND_AND_SHOOT);
+            AI_GroupUpdateSquadstates((*NPCInfo).group, &mut *NPC, SQUAD_STAND_AND_SHOOT);
             (*NPCInfo).goalEntity = None;
         }
 
@@ -1495,7 +1495,7 @@ pub fn NPC_BSST_Investigate(ctx: GameContext<'_>) {
 
         // get group- mainly for group speech debouncing, but may use for group
         // scouting/investigating AI, too
-        AI_GetGroup(ctx, NPC);
+        AI_GetGroup(ctx, ctx.entity_id_of(NPC));
 
         if ((*NPCInfo).scriptFlags & SCF_FIRE_WEAPON) != 0 {
             WeaponThink(ctx, qtrue);
@@ -1605,7 +1605,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
 
         // get group- mainly for group speech debouncing, but may use for group
         // scouting/investigating AI, too
-        AI_GetGroup(ctx, NPC);
+        AI_GetGroup(ctx, ctx.entity_id_of(NPC));
 
         if (*NPCInfo).confusionTime < world.level.time {
             // Look for any enemies
@@ -1747,7 +1747,11 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
                 if world.globals.enemyCS != qfalse {
                     // if we're going after our enemy, we can stop now
                     if (*NPCInfo).goalEntity == (*NPC).enemy {
-                        AI_GroupUpdateSquadstates((*NPCInfo).group, NPC, SQUAD_STAND_AND_SHOOT);
+                        AI_GroupUpdateSquadstates(
+                            (*NPCInfo).group,
+                            &mut *NPC,
+                            SQUAD_STAND_AND_SHOOT,
+                        );
                         world.globals.r#move = qfalse;
                         return;
                     }
@@ -1785,7 +1789,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
         } else if (*NPCInfo).squadState == SQUAD_POINT {
             // see if we're at point, duck and fire
             if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr()) != 0 {
-                AI_GroupUpdateSquadstates((*NPCInfo).group, NPC, SQUAD_STAND_AND_SHOOT);
+                AI_GroupUpdateSquadstates((*NPCInfo).group, &mut *NPC, SQUAD_STAND_AND_SHOOT);
                 return;
             }
 
@@ -1876,7 +1880,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
                     }
                     _ => {}
                 }
-                AI_GroupUpdateSquadstates((*NPCInfo).group, NPC, newSquadState);
+                AI_GroupUpdateSquadstates((*NPCInfo).group, &mut *NPC, newSquadState);
                 NPC_ReachedGoal(ctx);
                 // don't attack right away
                 TIMER_Set(
@@ -2339,7 +2343,7 @@ pub fn ST_TransferMoveGoal(ctx: GameContext<'_>, self_: EntityId, other: EntityI
             }
         }
         // give him my squadstate
-        AI_GroupUpdateSquadstates((*selfNpc).group, other, (*NPCInfo).squadState);
+        AI_GroupUpdateSquadstates((*selfNpc).group, &mut *other, (*NPCInfo).squadState);
 
         // give him my timers and clear mine
         ST_TransferTimers(
@@ -2349,7 +2353,7 @@ pub fn ST_TransferMoveGoal(ctx: GameContext<'_>, self_: EntityId, other: EntityI
         );
 
         // now make me stand around for a second or two at least
-        AI_GroupUpdateSquadstates((*selfNpc).group, self_, SQUAD_STAND_AND_SHOOT);
+        AI_GroupUpdateSquadstates((*selfNpc).group, &mut *self_, SQUAD_STAND_AND_SHOOT);
         TIMER_Set(
             ctx,
             ctx.entity_id_of(self_),
@@ -2871,7 +2875,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                             (*group).enemyLastSeenPos,
                         );
                         // set me into scout mode
-                        AI_GroupUpdateSquadstates(group, NPC, SQUAD_SCOUT);
+                        AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
                         // we're not using a cp, so we need to set runner to true
                         // right here
                         runner = qtrue;
@@ -2889,7 +2893,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                             // feel like it
                             cpFlags |= ST_ApproachEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                             // set me into scout mode
-                            AI_GroupUpdateSquadstates(group, NPC, SQUAD_SCOUT);
+                            AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
                         }
                     } else {
                         // group can see and has been shooting at the enemy — see
@@ -2940,7 +2944,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                             c"duck".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(3000, 4000),
                                         );
-                                        AI_GroupUpdateSquadstates(group, NPC, SQUAD_POINT);
+                                        AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_POINT);
                                     }
                                 } else if i == (*group).numGroup - 1 {
                                     // farthest from the enemy
@@ -2963,7 +2967,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                         cpFlags |=
                                             ST_ApproachEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                                         // set me into scout mode
-                                        AI_GroupUpdateSquadstates(group, NPC, SQUAD_SCOUT);
+                                        AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
                                     } else {
                                         // use normal decision making process
                                         cpFlags |= ST_GetCPFlags(ctx);
@@ -3159,13 +3163,13 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                         // info... (Raven comment). set us up so others know
                         // we're on the move
                         if squadState != SQUAD_IDLE {
-                            AI_GroupUpdateSquadstates(group, NPC, squadState);
+                            AI_GroupUpdateSquadstates(group, &mut *NPC, squadState);
                         } else if (cpFlags & CP_FLEE) != 0 {
                             // outright running for your life
-                            AI_GroupUpdateSquadstates(group, NPC, SQUAD_RETREAT);
+                            AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_RETREAT);
                         } else {
                             // any other kind of transition between combat points
-                            AI_GroupUpdateSquadstates(group, NPC, SQUAD_TRANSITION);
+                            AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_TRANSITION);
                         }
 
                         // unless we're trying to flee, walk slowly
@@ -3243,7 +3247,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                     // after him directly
                     ST_HuntEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                     // set me into scout mode
-                    AI_GroupUpdateSquadstates(group, NPC, SQUAD_SCOUT);
+                    AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
                     // AI should take care of rest
                 }
             }
@@ -3286,7 +3290,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
 
         // Get our group info
         if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"interrogating".as_ptr()) != 0 {
-            AI_GetGroup(ctx, NPC); // , 45, 512, NPC->enemy ); (Raven, commented out).
+            AI_GetGroup(ctx, ctx.entity_id_of(NPC)); // , 45, 512, NPC->enemy ); (Raven, commented out).
         } else {
             // FIXME: when done interrogating, I should send out a team alert! (Raven comment).
         }

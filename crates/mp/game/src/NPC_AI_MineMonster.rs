@@ -2,9 +2,7 @@
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_MineMonster.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
-//! Generated from the `fnskel.py` signature skeleton; bodies transcribed per
-//! the settled jampgame fork rulings. STAGING ONLY — not yet wired into
-//! crates/.
+//! Filled by the jampgame mega-pass.
 //!
 //! Parking pattern (mirrors `NPC_AI_Stormtrooper.rs`):
 //! - `ai-context`: reads the file-static ambient globals `NPC`, `NPCInfo`,
@@ -31,6 +29,17 @@ use crate::NPC_utils::{
 };
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::entity_event::entity_event_t;
+
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
 
 // Raven's working combat range defines (NPC_AI_MineMonster.c:3-8):
 // These define the working combat range for these suckers
@@ -132,7 +141,9 @@ pub fn MineMonster_Move(ctx: GameContext<'_>, visible: qboolean) {
 /// Raven `MineMonster_TryDamage`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:101-126`
-pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage: c_int) {
+pub fn MineMonster_TryDamage(ctx: GameContext<'_>, enemy: Option<EntityId>, damage: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let enemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, enemy) };
     unsafe {
         if enemy.is_null() {
             return;
@@ -289,9 +300,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
             ) != 0
             {
                 if let Some(enemy_id) = (*npc).enemy {
-                    let enemy_ptr =
-                        &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
-                    MineMonster_TryDamage(ctx, enemy_ptr, 5);
+                    MineMonster_TryDamage(ctx, Some(enemy_id), 5);
                 }
             } else if TIMER_Done2(
                 ctx,
@@ -301,9 +310,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
             ) != 0
             {
                 if let Some(enemy_id) = (*npc).enemy {
-                    let enemy_ptr =
-                        &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
-                    MineMonster_TryDamage(ctx, enemy_ptr, 10);
+                    MineMonster_TryDamage(ctx, Some(enemy_id), 10);
                 }
             }
         }
@@ -377,10 +384,13 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:234-254`
 pub fn NPC_MineMonster_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let parm = ((((*self_).health as f32)
             / ((*((*self_).client as *mut gclient_t)).pers.maxHealth as f32))

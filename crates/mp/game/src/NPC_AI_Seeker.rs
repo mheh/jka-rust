@@ -11,6 +11,17 @@ use crate::npc::script_flags::SCF_CHASE_ENEMIES;
 use crate::prelude::*;
 use mp_qshared::shared::{CONTENTS_LIGHTSABER, MASK_SHOT};
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Raven `#define VELOCITY_DECAY 0.7f32` (oracle/codemp/game/NPC_AI_Seeker.c:8).
 const VELOCITY_DECAY: f32 = 0.7f32;
 
@@ -61,10 +72,13 @@ pub fn NPC_Seeker_Precache(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_Seeker.c:34-46`
 pub fn NPC_Seeker_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         if (*((*self_).NPC as *mut gNPC_t)).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY
             == 0

@@ -1063,7 +1063,7 @@ pub fn G_AddBot(
 
             (*cl).ps.persistant[PERS_TEAM as usize] = (*cl).sess.sessionTeam;
 
-            G_ReadSessionData(ctx, cl);
+            G_ReadSessionData(ctx, clientNum as usize);
             ClientUserinfoChanged(ctx, clientNum);
         }
 

@@ -30,6 +30,17 @@ use crate::NPC_utils::{
 };
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Local state enums
 // Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17
 const LSTATE_NONE: i32 = 0;
@@ -528,10 +539,13 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:433-498`
 pub fn NPC_Probe_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let world = &mut *ctx.world;
 

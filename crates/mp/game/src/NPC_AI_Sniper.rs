@@ -44,6 +44,17 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_WALKING,
 };
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
 // (file-scope local state, `gNPC_t::localState`) — not a central type, ported
 // as file-local consts matching the C values.
@@ -78,7 +89,9 @@ const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL; // 
 /// Raven `Sniper_ClearTimers`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:44-58`
-pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     TIMER_Set(ctx, ctx.entity_id_of(ent), c"chatter".as_ptr(), 0);
     TIMER_Set(ctx, ctx.entity_id_of(ent), c"duck".as_ptr(), 0);
     TIMER_Set(ctx, ctx.entity_id_of(ent), c"stand".as_ptr(), 0);
@@ -97,7 +110,9 @@ pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `NPC_Sniper_PlayConfusionSound`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:60-76`
-pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).health > 0 {
             G_AddVoiceEvent(
@@ -136,10 +151,13 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:85-98`
 pub fn NPC_Sniper_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;

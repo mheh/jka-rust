@@ -36,6 +36,17 @@ use crate::NPC_AI_Stormtrooper::{ST_AggressionAdjust, ST_MarkToCover, ST_StartFl
 use crate::NPC_combat::G_SetEnemy;
 use crate::NPC_move::NAV_GetLastMove;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 pub const MAX_RADIUS_ENTS: usize = 128;
 
 use crate::npc::script_flags::SCF_NO_GROUPS;
@@ -51,8 +62,10 @@ pub fn AI_GetGroupSize(
     origin: vec3_t,
     radius: c_int,
     playerTeam: team_t,
-    avoid: *mut gentity_t,
+    avoid: Option<EntityId>,
 ) -> c_int {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let avoid: *mut gentity_t = unsafe { ent_resolve_opt(ctx, avoid) };
     unsafe {
         let mut radiusEnts = [0i32; MAX_RADIUS_ENTS];
         let mut mins: vec3_t = [0.0; 3];
@@ -100,7 +113,9 @@ pub fn AI_GetGroupSize(
 /// Raven `AI_GetGroupSize2` — overload.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:71-77`
-pub fn AI_GetGroupSize2(ctx: GameContext<'_>, ent: *mut gentity_t, radius: c_int) -> c_int {
+pub fn AI_GetGroupSize2(ctx: GameContext<'_>, ent: Option<EntityId>, radius: c_int) -> c_int {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { ent_resolve_opt(ctx, ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return -1;
@@ -111,7 +126,7 @@ pub fn AI_GetGroupSize2(ctx: GameContext<'_>, ent: *mut gentity_t, radius: c_int
             (*ent).r.currentOrigin,
             radius,
             (*client).playerTeam,
-            ent,
+            ctx.entity_id_of(ent),
         )
     }
 }
@@ -283,7 +298,9 @@ pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupIn
 /// Raven: go through other groups made this frame and see if any of those
 /// contain me already.
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:212-230`
-pub fn AI_FindSelfInPreviousGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn AI_FindSelfInPreviousGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         for i in 0..MAX_FRAME_GROUPS {
             let group = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
@@ -304,7 +321,10 @@ pub fn AI_FindSelfInPreviousGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -
 /// Raven `AI_InsertGroupMember`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:232-257`
-pub fn AI_InsertGroupMember(group: *mut AIGroupInfo_t, member: *mut gentity_t) {
+pub fn AI_InsertGroupMember(group: *mut AIGroupInfo_t, member: &mut gentity_t) {
+    // STAGE-1: ctx-free leaf takes `&mut gentity_t`; re-derive the raw pointer the
+    // verbatim body (and the stored `commander` seam field) still expects.
+    let member: *mut gentity_t = member;
     unsafe {
         let mut i: usize = 0;
         while (i as c_int) < (*group).numGroup {
@@ -344,7 +364,9 @@ pub fn AI_InsertGroupMember(group: *mut AIGroupInfo_t, member: *mut gentity_t) {
 /// Raven: go through other groups made this frame and see if any of those
 /// have the same enemy as me... if so, add me in!
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:259-277`
-pub fn AI_TryJoinPreviousGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn AI_TryJoinPreviousGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         for i in 0..MAX_FRAME_GROUPS {
             let group = &mut (*ctx.world).level.groups[i] as *mut AIGroupInfo_t;
@@ -357,9 +379,9 @@ pub fn AI_TryJoinPreviousGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> q
                     }
             {
                 //has members, not full and has my enemy
-                if AI_ValidateGroupMember(ctx, group, self_) != 0 {
+                if AI_ValidateGroupMember(ctx, group, ctx.entity_id_of(self_)) != 0 {
                     //I am a valid member for this group
-                    AI_InsertGroupMember(group, self_);
+                    AI_InsertGroupMember(group, &mut *self_);
                     return 1;
                 }
             }
@@ -371,14 +393,16 @@ pub fn AI_TryJoinPreviousGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> q
 /// Raven `AI_GetNextEmptyGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:279-308`
-pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        if AI_FindSelfInPreviousGroup(ctx, self_) != 0 {
+        if AI_FindSelfInPreviousGroup(ctx, ctx.entity_id_of(self_).unwrap()) != 0 {
             //already in one, no need to make a new one
             return 0;
         }
 
-        if AI_TryJoinPreviousGroup(ctx, self_) != 0 {
+        if AI_TryJoinPreviousGroup(ctx, ctx.entity_id_of(self_).unwrap()) != 0 {
             //try to just put us in one that already exists
             return 0;
         }
@@ -407,8 +431,10 @@ pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboo
 pub fn AI_ValidateNoEnemyGroupMember(
     ctx: GameContext<'_>,
     group: *mut AIGroupInfo_t,
-    member: *mut gentity_t,
+    member: Option<EntityId>,
 ) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let member: *mut gentity_t = unsafe { ent_resolve_opt(ctx, member) };
     unsafe {
         let mut center: vec3_t = [0.0; 3];
 
@@ -455,8 +481,10 @@ pub fn AI_ValidateNoEnemyGroupMember(
 pub fn AI_ValidateGroupMember(
     ctx: GameContext<'_>,
     group: *mut AIGroupInfo_t,
-    member: *mut gentity_t,
+    member: Option<EntityId>,
 ) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let member: *mut gentity_t = unsafe { ent_resolve_opt(ctx, member) };
     unsafe {
         //Validate ents
         if member.is_null() {
@@ -556,7 +584,7 @@ pub fn AI_ValidateGroupMember(
             }
         } else if (*group).enemy.is_null() {
             //if the group is a patrol group, only take those within the room and radius
-            if AI_ValidateNoEnemyGroupMember(ctx, group, member) == 0 {
+            if AI_ValidateNoEnemyGroupMember(ctx, group, ctx.entity_id_of(member)) == 0 {
                 return 0;
             }
         }
@@ -572,7 +600,9 @@ pub fn AI_ValidateGroupMember(
 /// Raven `AI_GetGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:443-551`
-pub fn AI_GetGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn AI_GetGroup(ctx: GameContext<'_>, self_: Option<EntityId>) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
         if self_.is_null() || (*self_).NPC.is_null() {
             return;
@@ -604,7 +634,7 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         }
 
-        if AI_GetNextEmptyGroup(ctx, self_) == 0 {
+        if AI_GetNextEmptyGroup(ctx, ctx.entity_id_of(self_).unwrap()) == 0 {
             //either no more groups left or we're already in a group built earlier
             return;
         }
@@ -638,14 +668,14 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 continue;
             }
 
-            if AI_ValidateGroupMember(ctx, group, member) == 0 {
+            if AI_ValidateGroupMember(ctx, group, ctx.entity_id_of(member)) == 0 {
                 //FIXME: keep track of those who aren't angry yet and see if we should
                 //wake them after we assemble the core group
                 continue;
             }
 
             //store it
-            AI_InsertGroupMember(group, member);
+            AI_InsertGroupMember(group, &mut *member);
 
             if (*group).numGroup >= (MAX_GROUP_MEMBERS as c_int - 1) {
                 //full
@@ -731,7 +761,9 @@ pub fn AI_DeleteGroupMember(ctx: GameContext<'_>, group: *mut AIGroupInfo_t, mem
 /// Raven `AI_DeleteSelfFromGroup`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:602-615`
-pub fn AI_DeleteSelfFromGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn AI_DeleteSelfFromGroup(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         //FIXME: if killed, keep track of how many in group killed?  To affect morale?
         let npc = (*self_).NPC as *mut gNPC_t;
@@ -748,7 +780,9 @@ pub fn AI_DeleteSelfFromGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `AI_GroupMemberKilled`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:620-697`
-pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: Option<EntityId>) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
         if self_.is_null() {
             return;
@@ -893,9 +927,12 @@ pub fn AI_GroupUpdateClearShotTime(ctx: GameContext<'_>, group: *mut AIGroupInfo
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:718-738`
 pub fn AI_GroupUpdateSquadstates(
     group: *mut AIGroupInfo_t,
-    member: *mut gentity_t,
+    member: &mut gentity_t,
     newSquadState: c_int,
 ) {
+    // STAGE-1: ctx-free leaf takes `&mut gentity_t`; re-derive the raw pointer the
+    // verbatim body still expects.
+    let member: *mut gentity_t = member;
     unsafe {
         let npc = (*member).NPC as *mut gNPC_t;
         if group.is_null() {
@@ -938,7 +975,9 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                             as *mut gentity_t;
                         if (*other).enemy.is_null() {
                             //special case for groups without enemies, must be in range
-                            if AI_ValidateNoEnemyGroupMember(ctx, other, member) == 0 {
+                            if AI_ValidateNoEnemyGroupMember(ctx, other, ctx.entity_id_of(member))
+                                == 0
+                            {
                                 deleteWhenDone = false;
                                 j += 1;
                                 continue;
@@ -949,7 +988,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                         //keep marker at same place since we deleted this guy and shifted everyone up one
                         j -= 1;
                         //add them to the earlier group
-                        AI_InsertGroupMember(other, member);
+                        AI_InsertGroupMember(other, &mut *member);
                         j += 1;
                     }
                     //return and delete this group
@@ -977,7 +1016,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                 //keep marker at same place since we deleted this guy and shifted everyone up one
                 i -= 1;
             } else if (*group).memberValidateTime < (*ctx.world).level.time
-                && AI_ValidateGroupMember(ctx, group, member) == 0
+                && AI_ValidateGroupMember(ctx, group, ctx.entity_id_of(member)) == 0
             {
                 //remove this one from the group
                 AI_DeleteGroupMember(ctx, group, i);
@@ -1119,9 +1158,11 @@ pub fn AI_GroupContainsEntNum(group: *mut AIGroupInfo_t, entNum: c_int) -> qbool
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:1030-1055`
 pub fn AI_CheckEnemyCollision(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     takeEnemy: qboolean,
 ) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { ent_resolve_opt(ctx, ent) };
     unsafe {
         if ent.is_null() {
             return 0;
@@ -1158,20 +1199,35 @@ pub fn AI_CheckEnemyCollision(
 /// Source: `oracle/codemp/game/NPC_AI_Utils.c:1065-1139`
 pub fn AI_DistributeAttack(
     ctx: GameContext<'_>,
-    attacker: *mut gentity_t,
-    enemy: *mut gentity_t,
+    attacker: Option<EntityId>,
+    enemy: Option<EntityId>,
     team: team_t,
     threshold: c_int,
 ) -> *mut gentity_t {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
+    let enemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, enemy) };
     unsafe {
         //Don't take new targets
-        let numSurrounding = AI_GetGroupSize(ctx, (*enemy).r.currentOrigin, 48, team, attacker);
+        let numSurrounding = AI_GetGroupSize(
+            ctx,
+            (*enemy).r.currentOrigin,
+            48,
+            team,
+            ctx.entity_id_of(attacker),
+        );
 
         //First, see if we should look for the player
         let world0 = &mut (*ctx.world).g_entities[0] as *mut gentity_t;
         if enemy != world0 {
             //rwwFIXMEFIXME: care about all clients not just 0
-            let aroundPlayer = AI_GetGroupSize(ctx, (*world0).r.currentOrigin, 48, team, attacker);
+            let aroundPlayer = AI_GetGroupSize(
+                ctx,
+                (*world0).r.currentOrigin,
+                48,
+                team,
+                ctx.entity_id_of(attacker),
+            );
 
             //See if we're above our threshold
             if aroundPlayer < threshold {
@@ -1234,7 +1290,14 @@ pub fn AI_DistributeAttack(
             }
 
             //Must not be overwhelmed
-            if AI_GetGroupSize(ctx, (*check).r.currentOrigin, 48, team, attacker) > threshold {
+            if AI_GetGroupSize(
+                ctx,
+                (*check).r.currentOrigin,
+                48,
+                team,
+                ctx.entity_id_of(attacker),
+            ) > threshold
+            {
                 continue;
             }
 

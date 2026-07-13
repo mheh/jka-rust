@@ -16,6 +16,17 @@ use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Raven's file-scope `#define`s (`NPC_AI_GalakMech.c:24-26`) — not central
 // constants, ported as file-local consts matching the C values.
 pub const TURN_ON: c_int = 0x00000000;
@@ -118,7 +129,9 @@ pub fn NPC_GalakMech_Precache(ctx: GameContext<'_>) {
 /// Raven `NPC_GalakMech_Init`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:59-98`
-pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let npc = (*ent).NPC as *mut gNPC_t;
         let behavior_state = *((&(*npc).behaviorState) as *const bState_t as *const c_int);
@@ -223,12 +236,9 @@ pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `GM_CreateExplosion`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:101-125`
-pub fn GM_CreateExplosion(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    boltID: c_int,
-    doSmall: qboolean,
-) {
+pub fn GM_CreateExplosion(ctx: GameContext<'_>, self_: EntityId, boltID: c_int, doSmall: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if boltID >= 0 {
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -277,7 +287,9 @@ pub fn GM_CreateExplosion(
 /// Raven `GM_Dying`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:133-229`
-pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn GM_Dying(ctx: GameContext<'_>, self_: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let level_time = (*ctx.world).level.time;
         // Raven `vec3_origin` — resolved via the crate prelude (pass-3 symbol
@@ -313,7 +325,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                     std::ffi::CString::new("*flasha").unwrap(),
                                 ),
                             );
-                            GM_CreateExplosion(ctx, self_, newBolt, 1);
+                            GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 1);
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"r_hand".as_ptr(), TURN_OFF);
                         } else if trap::G2API_GetSurfaceRenderStatus(
                             ctx.engine,
@@ -356,7 +368,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                     std::ffi::CString::new("*flashc").unwrap(),
                                 ),
                             );
-                            GM_CreateExplosion(ctx, self_, newBolt, 0);
+                            GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 0);
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), c"l_hand".as_ptr(), TURN_OFF);
                         } else if trap::G2API_GetSurfaceRenderStatus(
                             ctx.engine,
@@ -426,7 +438,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*hip_fr").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 0);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 0);
                     }
                     5 | 6 => {
                         newBolt = trap::G2API_AddBolt(
@@ -437,7 +449,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*shldr_l").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 0);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 0);
                     }
                     7 | 8 => {
                         newBolt = trap::G2API_AddBolt(
@@ -448,11 +460,11 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*uchest_r").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 0);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 0);
                     }
                     9 | 10 => {
                         let head_bolt = (*(*self_).client.cast::<gclient_t>()).renderInfo.headBolt;
-                        GM_CreateExplosion(ctx, self_, head_bolt, 0);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), head_bolt, 0);
                     }
                     11 => {
                         newBolt = trap::G2API_AddBolt(
@@ -463,7 +475,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*l_leg_knee").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 1);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 1);
                     }
                     12 => {
                         newBolt = trap::G2API_AddBolt(
@@ -474,7 +486,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*r_leg_knee").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 1);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 1);
                     }
                     13 => {
                         newBolt = trap::G2API_AddBolt(
@@ -485,7 +497,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*l_leg_foot").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 1);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 1);
                     }
                     14 => {
                         newBolt = trap::G2API_AddBolt(
@@ -496,7 +508,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 std::ffi::CString::new("*r_leg_foot").unwrap(),
                             ),
                         );
-                        GM_CreateExplosion(ctx, self_, newBolt, 1);
+                        GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 1);
                     }
                     _ => {}
                 }
@@ -533,10 +545,13 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 // live behavior, ported faithfully.
 pub fn NPC_GM_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let inflictor = attacker;
         let hitLoc: c_int = 1; // Raven: `int hitLoc = 1;` — never reassigned in this fn

@@ -12,6 +12,17 @@ use crate::g_utils::{G_EffectIndex, G_SoundIndex};
 use crate::prelude::*;
 use crate::trap;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Local state enums for Interrogator blade movement.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:8-13`
 const LSTATE_BLADESTOP: c_int = 0;
@@ -52,7 +63,8 @@ const MIN_DISTANCE: c_int = 64;
 ///
 /// Precache sounds and effects for the Interrogator NPC.
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
-pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: Option<EntityId>) {
+    // STAGE-1: EntityId param (unused by the body; caller may pass null/`None`).
     G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/mark1/misc/anger.wav".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/probe/misc/talk".as_ptr() as *const c_char);
@@ -67,14 +79,18 @@ pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:34-57`
 pub fn Interrogator_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: Option<EntityId>,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
     dFlags: c_int,
     hitLoc: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
+    let inflictor: *mut gentity_t = unsafe { ent_resolve_opt(ctx, inflictor) };
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         // SAFETY: self_ accessed through game context.
         self_.as_mut().map(|ent| {

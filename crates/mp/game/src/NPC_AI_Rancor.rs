@@ -14,6 +14,17 @@
 
 use crate::prelude::*;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // These define the working combat range for these suckers (`NPC_AI_Rancor.c:10-17`).
 const MIN_DISTANCE: c_int = 128;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
@@ -29,7 +40,9 @@ const LSTATE_WAITING: c_int = 1;
 /// Raven `Rancor_SetBolts`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:19-29`
-pub fn Rancor_SetBolts(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn Rancor_SetBolts(ctx: GameContext<'_>, self_: Option<EntityId>) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
             // `gentity_t.client` stays `*mut c_void` per the deferral; overlay-cast to
@@ -107,7 +120,9 @@ pub fn Rancor_Idle(ctx: GameContext<'_>) {
 /// Raven `Rancor_CheckRoar`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:66-77`
-pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn Rancor_CheckRoar(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).wait == 0.0 {
             //haven't ever gotten mad yet
@@ -163,7 +178,7 @@ pub fn Rancor_Patrol(ctx: GameContext<'_>) {
             Rancor_Idle(ctx);
             return;
         }
-        Rancor_CheckRoar(ctx, npc);
+        Rancor_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap());
         crate::g_timer::TIMER_Set(
             ctx,
             ctx.entity_id_of(npc),
@@ -196,9 +211,11 @@ pub fn Rancor_Move(ctx: GameContext<'_>, visible: qboolean) {
 /// Raven `Rancor_DropVictim`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:140-194`
-pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn Rancor_DropVictim(ctx: GameContext<'_>, self_: EntityId) {
     //FIXME: if Rancor dies, it should drop its victim.
     //FIXME: if Rancor is removed, it must remove its victim.
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let activator =
             crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator);
@@ -326,7 +343,7 @@ pub fn Rancor_Swing(ctx: GameContext<'_>, tryGrab: qboolean) {
                             ctx.entity_id_of(npc),
                             c"clearGrabbed".as_ptr(),
                         );
-                        Rancor_DropVictim(ctx, npc);
+                        Rancor_DropVictim(ctx, ctx.entity_id_of(npc).unwrap());
                     }
                     (*npc).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), radiusEnt); //make him my new best friend
                     (*((*radiusEnt).client as *mut gclient_t)).ps.eFlags2 |= EF2_HELD_BY_MONSTER;
@@ -1134,10 +1151,13 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:703-782`
 pub fn NPC_Rancor_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let mut hitByRancor = qfalse;
         if !attacker.is_null()
@@ -1200,7 +1220,7 @@ pub fn NPC_Rancor_Pain(
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_STAND1TO2 as c_int
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr()) != 0
         {
-            if Rancor_CheckRoar(ctx, self_) == qfalse {
+            if Rancor_CheckRoar(ctx, ctx.entity_id_of(self_).unwrap()) == qfalse {
                 if (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE1 as c_int
                     && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE2 as c_int
                     && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_ATTACK2 as c_int
@@ -1304,7 +1324,7 @@ pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
             ),
         );
         if trace.allsolid == 0 && trace.startsolid == 0 && trace.fraction >= 1.0 {
-            Rancor_DropVictim(ctx, npc);
+            Rancor_DropVictim(ctx, ctx.entity_id_of(npc).unwrap());
         }
     }
 }
@@ -1379,7 +1399,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
         if crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"clearGrabbed".as_ptr(), qtrue)
             != 0
         {
-            Rancor_DropVictim(ctx, npc);
+            Rancor_DropVictim(ctx, ctx.entity_id_of(npc).unwrap());
         } else if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_PAIN2 as c_int
             && (*npc).count == 1
             && !(*npc).activator.is_none()

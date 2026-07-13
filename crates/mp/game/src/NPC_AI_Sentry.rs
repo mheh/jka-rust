@@ -13,6 +13,17 @@ use crate::prelude::*;
 // `mp_qshared::shared::surface_flags`.
 use mp_qshared::shared::surface_flags::{CONTENTS_LIGHTSABER, MASK_SHOT};
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Sentry hover height constants.
 const SENTRY_HOVER_HEIGHT: f32 = 24.0f32;
 const SENTRY_VELOCITY_DECAY: f32 = 0.85f32;
@@ -66,10 +77,14 @@ pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:64-72`
 pub fn sentry_use(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { ent_resolve_opt(ctx, other) };
+    let activator: *mut gentity_t = unsafe { ent_resolve_opt(ctx, activator) };
     unsafe {
         crate::NPC_utils::G_ActivateBehavior(
             ctx,
@@ -94,10 +109,13 @@ pub fn sentry_use(
 /// Source: `oracle/codemp/game/NPC_AI_Sentry.c:79-105`
 pub fn NPC_Sentry_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         let world = &mut *ctx.world;
         let mod_ = world.globals.gPainMOD;

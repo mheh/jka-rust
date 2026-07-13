@@ -2234,8 +2234,8 @@ pub fn player_die(
             }
             crate::NPC_combat::NPC_FreeCombatPoint(ctx, (*npc).combatPoint, qfalse);
             if !(*npc).group.is_null() {
-                crate::NPC_AI_Utils::AI_GroupMemberKilled(ctx, self_);
-                crate::NPC_AI_Utils::AI_DeleteSelfFromGroup(ctx, self_);
+                crate::NPC_AI_Utils::AI_GroupMemberKilled(ctx, ctx.entity_id_of(self_));
+                crate::NPC_AI_Utils::AI_DeleteSelfFromGroup(ctx, ctx.entity_id_of(self_).unwrap());
             }
 
             if (*npc).tempGoal.is_some() {
@@ -2247,7 +2247,7 @@ pub fn player_die(
                 crate::NPC_AI_Jedi::Boba_FlyStop(ctx, ctx.entity_id_of(self_).unwrap());
             }
             if (*self_).s.NPC_class == class_t::CLASS_RANCOR as c_int {
-                crate::NPC_AI_Rancor::Rancor_DropVictim(ctx, self_);
+                crate::NPC_AI_Rancor::Rancor_DropVictim(ctx, ctx.entity_id_of(self_).unwrap());
             }
         }
         if !attacker.is_null() && !(*attacker).NPC.is_null() {
@@ -3396,7 +3396,7 @@ pub fn LimbThink(ctx: GameContext<'_>, ent: EntityId) {
             // this will be every frame by standard, but we want to compensate in case sv_fps is not 20.
             crate::g_exphysics::G_RunExPhys(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 gravity,
                 mass,
                 bounce,

@@ -25,6 +25,17 @@ use crate::prelude::*;
 use crate::trap;
 use mp_bg::public::anim_number::animNumber_t::*;
 
+// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
+// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
+// precedent.
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // `DIST_MELEE`/`DIST_LONG` are the canonical `crate::ai::distance` enum variants,
 // reached via the prelude glob (the former per-file duplicate `pub const`
 // copies caused a glob-glob ambiguity with the canonical import at every call
@@ -114,7 +125,9 @@ pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
 /// Raven `NPC_Mark1_Part_Explode`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:81-102`
-pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt: c_int) {
+pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: EntityId, bolt: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     if bolt >= 0 {
         unsafe {
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -356,14 +369,18 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:209-243`
 pub fn Mark1_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: Option<EntityId>,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     r#mod: c_int,
     dFlags: c_int,
     hitLoc: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
+    let inflictor: *mut gentity_t = unsafe { ent_resolve_opt(ctx, inflictor) };
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         if self_.is_null() {
             return;
@@ -410,7 +427,9 @@ pub fn Mark1_die(
 /// Raven `Mark1_dying`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:250-312`
-pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn Mark1_dying(ctx: GameContext<'_>, self_: Option<EntityId>) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
         if self_.is_null() {
             return;
@@ -433,7 +452,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                             std::ffi::CString::new(format!("*flash{}", random_num)).unwrap(),
                         ),
                     );
-                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                    NPC_Mark1_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), newBolt);
                 } else {
                     let random_num = (*ctx.world).bg_state.rng.Q_irand(1, 6);
                     let newBolt = trap::G2API_AddBolt(
@@ -444,7 +463,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                             std::ffi::CString::new(format!("*torso_tube{}", random_num)).unwrap(),
                         ),
                     );
-                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                    NPC_Mark1_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), newBolt);
                     crate::NPC_utils::NPC_SetSurfaceOnOff(
                         ctx,
                         ctx.entity_id_of(self_).unwrap(),
@@ -493,10 +512,13 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:320-396`
 pub fn NPC_Mark1_Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
+    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
         if self_.is_null() {
             return;
@@ -546,7 +568,7 @@ pub fn NPC_Mark1_Pain(
                     ),
                 );
                 if newBolt != -1 {
-                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                    NPC_Mark1_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), newBolt);
                 }
 
                 crate::NPC_utils::NPC_SetSurfaceOnOff(
@@ -571,7 +593,7 @@ pub fn NPC_Mark1_Pain(
                     ),
                 );
                 if newBolt != -1 {
-                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                    NPC_Mark1_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), newBolt);
                 }
 
                 crate::NPC_utils::NPC_SetSurfaceOnOff(
@@ -600,7 +622,7 @@ pub fn NPC_Mark1_Pain(
                             ),
                         );
                         if newBolt != -1 {
-                            NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                            NPC_Mark1_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), newBolt);
                         }
                         crate::NPC_utils::NPC_SetSurfaceOnOff(
                             ctx,

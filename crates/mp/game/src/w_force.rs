@@ -1311,7 +1311,9 @@ pub fn ForceHeal(ctx: GameContext<'_>, self_: EntityId) {
 /// bitfields.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1294-1317`
-pub fn WP_AddToClientBitflags(ent: *mut gentity_t, entNum: c_int) {
+pub fn WP_AddToClientBitflags(ent: Option<&mut gentity_t>, entNum: c_int) {
+    // STAGE-1: nullable ctx-free leaf Option<&mut gentity_t>; raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ent.map_or(core::ptr::null_mut(), |r| r as *mut gentity_t);
     unsafe {
         if ent.is_null() {
             return;
@@ -1442,7 +1444,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: EntityId) {
                     );
                 }
 
-                WP_AddToClientBitflags(te, pl[i] as c_int);
+                WP_AddToClientBitflags(te.as_mut(), pl[i] as c_int);
                 //Now cramming it all into one event.. doing this many g_sound events at once was a Bad Thing.
             }
         }
@@ -1552,7 +1554,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: EntityId) {
                 (*te).s.eventParm = 2; //eventParm 1 is heal, eventParm 2 is force regen
             }
 
-            WP_AddToClientBitflags(te, pl[i] as c_int);
+            WP_AddToClientBitflags(te.as_mut(), pl[i] as c_int);
             //Now cramming it all into one event.. doing this many g_sound events at once was a Bad Thing.
         }
     }
