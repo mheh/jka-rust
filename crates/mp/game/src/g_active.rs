@@ -3785,7 +3785,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                 as *mut gentity_t;
 
             if !(*faceKicked).client.is_null()
-                && (OnSameTeam(ctx, ent, faceKicked) == qfalse
+                && (OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(faceKicked)) == qfalse
                     || (*ctx.world).cvars.g_friendlyFire.integer != 0)
                 && ((*((*faceKicked).client as *mut gclient_t))
                     .ps

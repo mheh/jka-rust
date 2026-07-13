@@ -152,7 +152,7 @@ pub fn Wampa_CheckRoar(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean 
             );
             crate::g_timer::TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 c"rageTime".as_ptr(),
                 (*((*self_).client as *mut gclient_t)).ps.legsTimer,
             );
@@ -179,10 +179,10 @@ pub fn Wampa_Patrol(ctx: GameContext<'_>) {
             (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         } else {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"patrolTime".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolTime".as_ptr()) != 0 {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"patrolTime".as_ptr(),
                     ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int,
                 );
@@ -196,7 +196,7 @@ pub fn Wampa_Patrol(ctx: GameContext<'_>) {
         Wampa_CheckRoar(ctx, npc);
         crate::g_timer::TIMER_Set(
             ctx,
-            npc,
+            ctx.entity_id_of(npc),
             c"lookForNewEnemy".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
         );
@@ -218,11 +218,14 @@ pub fn Wampa_Move(ctx: GameContext<'_>, visible: qboolean) {
                 // pick correct movement speed and anim
                 // run by default
                 (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
-                if crate::g_timer::TIMER_Done(ctx, npc, c"runfar".as_ptr()) == 0
-                    || crate::g_timer::TIMER_Done(ctx, npc, c"runclose".as_ptr()) == 0
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"runfar".as_ptr()) == 0
+                    || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"runclose".as_ptr())
+                        == 0
                 {
                     // keep running with this anim & speed for a bit
-                } else if crate::g_timer::TIMER_Done(ctx, npc, c"walk".as_ptr()) == 0 {
+                } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"walk".as_ptr())
+                    == 0
+                {
                     // keep walking for a bit
                     (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
                 } else if visible != 0
@@ -233,7 +236,7 @@ pub fn Wampa_Move(ctx: GameContext<'_>, visible: qboolean) {
                     (*npc_info).stats.runSpeed = 300;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"runfar".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -244,7 +247,7 @@ pub fn Wampa_Move(ctx: GameContext<'_>, visible: qboolean) {
                     (*npc_info).stats.runSpeed = 180;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"runclose".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(3000, 5000),
                     );
@@ -254,7 +257,7 @@ pub fn Wampa_Move(ctx: GameContext<'_>, visible: qboolean) {
                     (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"walk".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(4000, 6000),
                     );
@@ -449,7 +452,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
 pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
-        if crate::g_timer::TIMER_Exists(ctx, npc, c"attacking".as_ptr()) == 0 {
+        if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == 0 {
             if (*ctx.world).bg_state.rng.Q_irand(0, 2) != 0 && doCharge == 0 {
                 // double slash
                 crate::npc_c::NPC_SetAnim(
@@ -459,7 +462,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     crate::prelude::BOTH_ATTACK1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 750);
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 750);
             } else if doCharge != 0
                 || (distance > 270.0
                     && distance < 430.0
@@ -482,7 +485,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     crate::prelude::BOTH_ATTACK2 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 500);
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 500);
                 crate::q_math::AngleVectors(yawAng, Some(&mut fwd), None, None);
                 crate::q_math::_VectorScale(
                     fwd,
@@ -501,25 +504,27 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                     crate::prelude::BOTH_ATTACK3 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 250);
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 250);
             }
 
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"attacking".as_ptr(),
                 (*((*npc).client as *mut gclient_t)).ps.legsTimer as c_int
                     + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int,
             );
             // allow us to re-evaluate our running speed/anim
-            crate::g_timer::TIMER_Set(ctx, npc, c"runfar".as_ptr(), -1);
-            crate::g_timer::TIMER_Set(ctx, npc, c"runclose".as_ptr(), -1);
-            crate::g_timer::TIMER_Set(ctx, npc, c"walk".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"runfar".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"runclose".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"walk".as_ptr(), -1);
         }
 
         // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
 
-        if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg".as_ptr(), qtrue) != 0 {
+        if crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), qtrue)
+            != 0
+        {
             match (*((*npc).client as *mut gclient_t)).ps.legsAnim {
                 _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
                     == crate::prelude::BOTH_ATTACK1 as c_int =>
@@ -530,7 +535,12 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         qfalse,
                     );
                     // do second hit
-                    crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 100);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"attack_dmg2".as_ptr(),
+                        100,
+                    );
                 }
                 _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
                     == crate::prelude::BOTH_ATTACK2 as c_int =>
@@ -540,7 +550,12 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                         (*((*npc).client as *mut gclient_t)).renderInfo.handRBolt,
                         qfalse,
                     );
-                    crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 100);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"attack_dmg2".as_ptr(),
+                        100,
+                    );
                 }
                 _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
                     == crate::prelude::BOTH_ATTACK3 as c_int =>
@@ -553,7 +568,13 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
                 }
                 _ => {}
             }
-        } else if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg2".as_ptr(), qtrue) != 0 {
+        } else if crate::g_timer::TIMER_Done2(
+            ctx,
+            ctx.entity_id_of(npc),
+            c"attack_dmg2".as_ptr(),
+            qtrue,
+        ) != 0
+        {
             match (*((*npc).client as *mut gclient_t)).ps.legsAnim {
                 _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
                     == crate::prelude::BOTH_ATTACK1 as c_int =>
@@ -578,7 +599,7 @@ pub fn Wampa_Attack(ctx: GameContext<'_>, distance: f32, doCharge: qboolean) {
         }
 
         // Just using this to remove the attacking flag at the right time
-        crate::g_timer::TIMER_Done2(ctx, npc, c"attacking".as_ptr(), qtrue);
+        crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr(), qtrue);
 
         if (*((*npc).client as *mut gclient_t)).ps.legsAnim == crate::prelude::BOTH_ATTACK1 as c_int
             && distance > ((*npc).r.maxs[0] as f32 + MIN_DISTANCE as f32)
@@ -663,10 +684,17 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
             }
 
             if (advance != 0 || (*npc_info).localState == LSTATE_WAITING)
-                && crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0
+                && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr())
+                    != 0
             {
                 // waiting monsters can't attack
-                if crate::g_timer::TIMER_Done2(ctx, npc, c"takingPain".as_ptr(), qtrue) != 0 {
+                if crate::g_timer::TIMER_Done2(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"takingPain".as_ptr(),
+                    qtrue,
+                ) != 0
+                {
                     (*npc_info).localState = LSTATE_CLEAR;
                 } else {
                     Wampa_Move(ctx, 1);
@@ -736,7 +764,7 @@ pub fn NPC_Wampa_Pain(
                 crate::NPC_combat::G_SetEnemy(ctx, self_, attacker);
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     c"lookForNewEnemy".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
                 );
@@ -744,7 +772,7 @@ pub fn NPC_Wampa_Pain(
                     // stay mad at this Wampa for 2-5 secs before looking for attacker enemies
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"wampaInfight".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
                     );
@@ -754,7 +782,7 @@ pub fn NPC_Wampa_Pain(
         if (hitByWampa != 0 || (*ctx.world).bg_state.rng.Q_irand(0, 100) < damage) // hit by wampa, hit while holding live victim, or took a lot of damage
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE1) as i32
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
-            && crate::g_timer::TIMER_Done(ctx, self_, c"takingPain".as_ptr()) != 0
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr()) != 0
         {
             if Wampa_CheckRoar(ctx, self_) == 0 {
                 if (*((*self_).client as *mut gclient_t)).ps.legsAnim
@@ -766,7 +794,11 @@ pub fn NPC_Wampa_Pain(
                 {
                     // cant interrupt one of the big attack anims
                     if (*self_).health > 100 || hitByWampa != 0 {
-                        crate::g_timer::TIMER_Remove(ctx, self_, c"attacking".as_ptr());
+                        crate::g_timer::TIMER_Remove(
+                            ctx,
+                            ctx.entity_id_of(self_),
+                            c"attacking".as_ptr(),
+                        );
 
                         crate::q_math::_VectorCopy(
                             (*((*self_).NPC as *mut gNPC_t)).lastPathAngles,
@@ -792,15 +824,30 @@ pub fn NPC_Wampa_Pain(
                         }
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_),
                             c"takingPain".as_ptr(),
                             (*((*self_).client as *mut gclient_t)).ps.legsTimer
                                 + (*ctx.world).bg_state.rng.Q_irand(0, 500),
                         );
                         // allow us to re-evaluate our running speed/anim
-                        crate::g_timer::TIMER_Set(ctx, self_, c"runfar".as_ptr(), -1);
-                        crate::g_timer::TIMER_Set(ctx, self_, c"runclose".as_ptr(), -1);
-                        crate::g_timer::TIMER_Set(ctx, self_, c"walk".as_ptr(), -1);
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(self_),
+                            c"runfar".as_ptr(),
+                            -1,
+                        );
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(self_),
+                            c"runclose".as_ptr(),
+                            -1,
+                        );
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(self_),
+                            c"walk".as_ptr(),
+                            -1,
+                        );
 
                         if !(*self_).NPC.is_null() {
                             (*((*self_).NPC as *mut crate::npc::g_npc_t::gNPC_t)).localState =
@@ -835,7 +882,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
         // walk3_drag = walk5 - walk with drag
         // stand2 = hold victim
         // stand2to1 = drop victim
-        if crate::g_timer::TIMER_Done(ctx, npc, c"rageTime".as_ptr()) == 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"rageTime".as_ptr()) == 0 {
             // do nothing but roar first time we see an enemy
             crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
             return;
@@ -845,7 +892,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
             // Raven's unguarded `NPC->enemy->x` once `NPC->enemy` is known set).
             let enemy_ptr =
                 &mut (*ctx.world).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
-            if crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) == 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == 0 {
                 // in middle of attack
                 // face enemy
                 crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
@@ -855,7 +902,9 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                 Wampa_Attack(ctx, (*ctx.world).globals.enemyDist, qfalse);
                 return;
             } else {
-                if crate::g_timer::TIMER_Done(ctx, npc, c"angrynoise".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"angrynoise".as_ptr())
+                    != 0
+                {
                     let angrynoise_snd = crate::cstr_util::cstr(&format!(
                         "sound/chars/wampa/misc/anger{}.wav",
                         (*ctx.world).bg_state.rng.Q_irand(1, 2)
@@ -869,7 +918,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
 
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"angrynoise".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(5000, 10000),
                     );
@@ -881,7 +930,12 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         == crate::prelude::CLASS_WAMPA
                 {
                     // got mad at another Wampa, look for a valid enemy
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"wampaInfight".as_ptr()) != 0 {
+                    if crate::g_timer::TIMER_Done(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"wampaInfight".as_ptr(),
+                    ) != 0
+                    {
                         crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue);
                     }
                 } else {
@@ -890,7 +944,11 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         None => core::ptr::null_mut(),
                     };
                     if crate::NPC_combat::ValidEnemy(ctx, enemy_for_valid) == qfalse {
-                        crate::g_timer::TIMER_Remove(ctx, npc, c"lookForNewEnemy".as_ptr()); // make them look again right now
+                        crate::g_timer::TIMER_Remove(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"lookForNewEnemy".as_ptr(),
+                        ); // make them look again right now
                         if (*enemy_ptr).inuse == 0
                             || (*ctx.world).level.time - (*enemy_ptr).s.time
                                 > (*ctx.world).bg_state.rng.Q_irand(10000, 15000)
@@ -920,7 +978,12 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                             return;
                         }
                     }
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"lookForNewEnemy".as_ptr()) != 0 {
+                    if crate::g_timer::TIMER_Done(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"lookForNewEnemy".as_ptr(),
+                    ) != 0
+                    {
                         let newEnemy;
                         let sav_enemy = (*npc).enemy; // FIXME: what about NPC->lastEnemy?
                         (*npc).enemy = None;
@@ -944,7 +1007,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                             // hold this one for at least 5-15 seconds
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"lookForNewEnemy".as_ptr(),
                                 (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
                             );
@@ -952,7 +1015,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                             // look again in 2-5 secs
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"lookForNewEnemy".as_ptr(),
                                 (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
                             );
@@ -963,7 +1026,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                 return;
             }
         } else {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"idlenoise".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"idlenoise".as_ptr()) != 0 {
                 crate::g_utils::G_Sound(
                     ctx,
                     ctx.entity_id_of(npc),
@@ -973,7 +1036,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"idlenoise".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                 );
@@ -1011,7 +1074,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         Wampa_CheckRoar(ctx, npc);
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc),
                             c"lookForNewEnemy".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(5000, 15000),
                         );

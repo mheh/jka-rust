@@ -51,19 +51,79 @@ const SQUAD_SCOUT: i32 = 6;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Grenadier.c:49-63`
 pub fn Grenadier_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    TIMER_Set(ctx, ent, c"chatter".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"duck".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"stand".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"shuffleTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"sleepTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"enemyLastVisible".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"roamTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"hideTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"chatter".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"duck".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"stand".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"shuffleTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"sleepTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"enemyLastVisible".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"roamTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"hideTime".as_ptr() as *const c_char,
+        0,
+    );
     // FIXME: Slant for difficulty levels (Raven comment).
-    TIMER_Set(ctx, ent, c"attackDelay".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"stick".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"scoutTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"flee".as_ptr() as *const c_char, 0);
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"attackDelay".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"stick".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"scoutTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"flee".as_ptr() as *const c_char,
+        0,
+    );
 }
 
 /// Raven `NPC_Grenadier_PlayConfusionSound`.
@@ -84,8 +144,18 @@ pub fn NPC_Grenadier_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentit
             );
         }
         // reset him to be totally unaware again
-        TIMER_Set(ctx, self_, c"enemyLastVisible".as_ptr() as *const c_char, 0);
-        TIMER_Set(ctx, self_, c"flee".as_ptr() as *const c_char, 0);
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"enemyLastVisible".as_ptr() as *const c_char,
+            0,
+        );
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"flee".as_ptr() as *const c_char,
+            0,
+        );
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).squadState = SQUAD_IDLE;
         (*npc).tempBehavior = bState_t::BS_DEFAULT;
@@ -107,8 +177,18 @@ pub fn NPC_Grenadier_Pain(
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(ctx, self_, c"duck".as_ptr() as *const c_char, -1);
-        TIMER_Set(ctx, self_, c"stand".as_ptr() as *const c_char, 2000);
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"duck".as_ptr() as *const c_char,
+            -1,
+        );
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"stand".as_ptr() as *const c_char,
+            2000,
+        );
 
         NPC_Pain(ctx, self_, attacker, damage);
 
@@ -303,7 +383,7 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                                 );
                                 TIMER_Set(
                                     ctx,
-                                    npc_ptr,
+                                    ctx.entity_id_of(npc_ptr),
                                     c"attackDelay".as_ptr() as *const c_char,
                                     (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                                 );
@@ -387,7 +467,12 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
         }
         // See if we're running away
         else if (*npc_info_ptr).squadState == SQUAD_RETREAT {
-            if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != qfalse {
+            if TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc_ptr),
+                c"flee".as_ptr() as *const c_char,
+            ) != qfalse
+            {
                 (*npc_info_ptr).squadState = SQUAD_IDLE;
             } else {
                 world.globals.faceEnemy3 = qfalse;
@@ -422,7 +507,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                         // was running away
                         TIMER_Set(
                             ctx,
-                            npc_ptr,
+                            ctx.entity_id_of(npc_ptr),
                             c"duck".as_ptr() as *const c_char,
                             ((*npc_ptr).client as *mut gclient_t)
                                 .as_ref()
@@ -431,7 +516,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                         );
                         TIMER_Set(
                             ctx,
-                            npc_ptr,
+                            ctx.entity_id_of(npc_ptr),
                             c"hideTime".as_ptr() as *const c_char,
                             (*ctx.world).bg_state.rng.Q_irand(3000, 7000),
                         );
@@ -441,7 +526,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                         // was heading for a combat point
                         TIMER_Set(
                             ctx,
-                            npc_ptr,
+                            ctx.entity_id_of(npc_ptr),
                             c"hideTime".as_ptr() as *const c_char,
                             (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                         );
@@ -455,14 +540,14 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                 // don't attack right away
                 TIMER_Set(
                     ctx,
-                    npc_ptr,
+                    ctx.entity_id_of(npc_ptr),
                     c"attackDelay".as_ptr() as *const c_char,
                     (*ctx.world).bg_state.rng.Q_irand(250, 500),
                 );
                 // don't do something else just yet
                 TIMER_Set(
                     ctx,
-                    npc_ptr,
+                    ctx.entity_id_of(npc_ptr),
                     c"roamTime".as_ptr() as *const c_char,
                     (*ctx.world).bg_state.rng.Q_irand(1000, 4000),
                 );
@@ -470,7 +555,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                 if (*npc_info_ptr).squadState == SQUAD_RETREAT {
                     TIMER_Set(
                         ctx,
-                        npc_ptr,
+                        ctx.entity_id_of(npc_ptr),
                         c"flee".as_ptr() as *const c_char,
                         -world.level.time,
                     );
@@ -482,7 +567,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
             // keep going, hold of roamTimer until we get there
             TIMER_Set(
                 ctx,
-                npc_ptr,
+                ctx.entity_id_of(npc_ptr),
                 c"roamTime".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(4000, 8000),
             );
@@ -588,7 +673,11 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             return;
         }
 
-        if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != qfalse
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc_ptr),
+            c"flee".as_ptr() as *const c_char,
+        ) != qfalse
             && NPC_CheckForDanger(
                 ctx,
                 NPC_CheckAlertEvents(
@@ -774,12 +863,22 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         }
 
         if world.globals.move3 == qfalse {
-            if TIMER_Done(ctx, npc_ptr, c"duck".as_ptr() as *const c_char) == qfalse {
+            if TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc_ptr),
+                c"duck".as_ptr() as *const c_char,
+            ) == qfalse
+            {
                 world.globals.ucmd.upmove = -127;
             }
         } else {
             // stop ducking!
-            TIMER_Set(ctx, npc_ptr, c"duck".as_ptr() as *const c_char, -1);
+            TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc_ptr),
+                c"duck".as_ptr() as *const c_char,
+                -1,
+            );
         }
 
         if world.globals.faceEnemy3 == qfalse {
@@ -803,13 +902,18 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         // FIXME: don't shoot right away!
         if world.globals.shoot3 != qfalse {
             // try to shoot if it's time
-            if TIMER_Done(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char) != qfalse {
+            if TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc_ptr),
+                c"attackDelay".as_ptr() as *const c_char,
+            ) != qfalse
+            {
                 if ((*npc_info_ptr).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                     // we've already fired, no need to do it again here
                     WeaponThink(ctx, qtrue);
                     TIMER_Set(
                         ctx,
-                        npc_ptr,
+                        ctx.entity_id_of(npc_ptr),
                         c"attackDelay".as_ptr() as *const c_char,
                         (*npc_info_ptr).shotTime - world.level.time,
                     );

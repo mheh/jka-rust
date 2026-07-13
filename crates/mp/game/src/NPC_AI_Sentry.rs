@@ -104,7 +104,7 @@ pub fn NPC_Sentry_Pain(
             (*((*self_).NPC as *mut gNPC_t)).burstCount = 0;
             crate::g_timer::TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 cstr("attackDelay").as_ptr(),
                 (*world).bg_state.rng.Q_irand(9000, 12000),
             );
@@ -146,7 +146,8 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
         (*NPC).flags &= !FL_SHIELDED;
 
         if (*NPCInfo).localState == LSTATE_POWERING_UP {
-            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("powerup").as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("powerup").as_ptr()) != 0
+            {
                 (*NPCInfo).localState = LSTATE_ATTACKING;
                 crate::npc_c::NPC_SetAnim(
                     ctx,
@@ -176,7 +177,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
                 BOTH_POWERUP1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
-            crate::g_timer::TIMER_Set(ctx, NPC, cstr("powerup").as_ptr(), 250);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(NPC), cstr("powerup").as_ptr(), 250);
             return;
         } else if (*NPCInfo).localState != LSTATE_ATTACKING {
             (*NPCInfo).localState = LSTATE_ACTIVE;
@@ -530,7 +531,8 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
-        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("attackDelay").as_ptr()) != qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("attackDelay").as_ptr())
+            != qfalse
             && (*NPC).attackDebounceTime < world.level.time
             && visible != qfalse
         {
@@ -545,7 +547,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                     (*NPCInfo).burstCount = 0;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         cstr("attackDelay").as_ptr(),
                         world.bg_state.rng.Q_irand(2000, 3500),
                     );
@@ -596,8 +598,12 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
         );
 
         // randomly talk
-        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) != qfalse {
-            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("angerNoise").as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("patrolNoise").as_ptr())
+            != qfalse
+        {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("angerNoise").as_ptr())
+                != qfalse
+            {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
                 crate::g_utils::G_SoundOnEnt(
@@ -609,7 +615,7 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     cstr("patrolNoise").as_ptr(),
                     world.bg_state.rng.Q_irand(4000, 10000),
                 );
@@ -690,7 +696,9 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
             }
 
             // randomly talk
-            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) != qfalse {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), cstr("patrolNoise").as_ptr())
+                != qfalse
+            {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
                 crate::g_utils::G_SoundOnEnt(
@@ -702,7 +710,7 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     cstr("patrolNoise").as_ptr(),
                     world.bg_state.rng.Q_irand(2000, 4000),
                 );

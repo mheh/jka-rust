@@ -3922,7 +3922,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 {
                     // see if it's time to send this guy an update of extended info
                     if (*client).siegeEDataSend < world.level.time {
-                        G_SiegeClientExData(ctx, ent);
+                        G_SiegeClientExData(ctx, ctx.entity_id_of(ent).unwrap());
                         (*client).siegeEDataSend = world.level.time + 1000; // once every sec seems ok
                     }
                 }

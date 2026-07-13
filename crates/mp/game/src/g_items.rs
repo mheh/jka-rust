@@ -444,7 +444,7 @@ pub fn ShieldTouch(
             // let teammates through
             // compare the parent's team to the "other's" team
             if !parent.is_null() && !(*parent).client.is_null() && !(*other).client.is_null() {
-                if OnSameTeam(ctx, parent, other) != 0 {
+                if OnSameTeam(ctx, ctx.entity_id_of(parent), ctx.entity_id_of(other)) != 0 {
                     ShieldGoNotSolid(ctx, ctx.entity_id_of(self_).unwrap());
                 }
             }
@@ -3727,7 +3727,11 @@ pub fn Touch_Item(
                 predict = qfalse;
             }
             x if x == IT_TEAM => {
-                respawn = Pickup_Team(ctx, ent, other);
+                respawn = Pickup_Team(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    ctx.entity_id_of(other).unwrap(),
+                );
             }
             x if x == IT_HOLDABLE => {
                 respawn = Pickup_Holdable(
@@ -3906,7 +3910,7 @@ pub fn LaunchItem(
             // Special case for CTF flags
             (*dropped).think = Some(EntThink::Team_DroppedFlagThink).into();
             (*dropped).nextthink = (*ctx.world).level.time + 30000;
-            Team_CheckDroppedItem(ctx, dropped);
+            Team_CheckDroppedItem(ctx, ctx.entity_id_of(dropped).unwrap());
 
             // rww - so bots know
             let classname = core::ffi::CStr::from_ptr((*dropped).classname);
@@ -4511,7 +4515,7 @@ pub fn G_RunItem(ctx: GameContext<'_>, ent: EntityId) {
         );
         if (contents & CONTENTS_NODROP) != 0 {
             if !(*ent).item.is_null() && (*(*ent).item).giType == IT_TEAM {
-                Team_FreeEntity(ctx, ent);
+                Team_FreeEntity(ctx, ctx.entity_id_of(ent).unwrap());
             } else {
                 G_FreeEntity(ctx, ctx.entity_id_of(ent));
             }

@@ -146,13 +146,17 @@ pub fn ATST_Ranged(
         let npc_info = (*ctx.world).globals.NPCInfo;
         let ucmd = &mut (*ctx.world).globals.ucmd;
 
-        if TIMER_Done(ctx, npc, b"atkDelay\0".as_ptr() as *const c_char) != qfalse
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc),
+            b"atkDelay\0".as_ptr() as *const c_char,
+        ) != qfalse
             && visible != qfalse
         {
             // Attack?
             TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 b"atkDelay\0".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(500, 3000),
             );

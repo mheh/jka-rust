@@ -285,7 +285,7 @@ pub fn G_CanBeEnemy(ctx: GameContext<'_>, self_: EntityId, enemy: EntityId) -> q
             return qtrue;
         }
 
-        if crate::g_team::OnSameTeam(ctx, self_, enemy) != 0 {
+        if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(enemy)) != 0 {
             // ff not on, don't hurt teammates
             return qfalse;
         }
@@ -862,12 +862,12 @@ pub fn G_CheckLookTarget(
             && (*ent).s.NPC_class != CLASS_VEHICLE as c_int
         {
             let look_around = cstr("lookAround");
-            if TIMER_Done(ctx, ent, look_around.as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(ent), look_around.as_ptr()) != 0 {
                 let npc = (*ent).NPC as *mut gNPC_t;
                 (*npc).shootAngles[YAW as usize] = (*ctx.world).bg_state.rng.flrand(0.0, 360.0);
                 TIMER_Set(
                     ctx,
-                    ent,
+                    ctx.entity_id_of(ent),
                     look_around.as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(500, 3000),
                 );
@@ -5435,7 +5435,7 @@ pub fn CheckSaberDamage(
 
             if idleDamage != 0
                 && !(*trEnt).client.is_null()
-                && OnSameTeam(ctx, self_, trEnt) != 0
+                && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(trEnt)) != 0
                 && (*ctx.world).cvars.g_friendlySaber.integer == 0
             {
                 return qfalse;
@@ -5693,7 +5693,7 @@ pub fn CheckSaberDamage(
                 }
             }
 
-            if OnSameTeam(ctx, self_, otherOwner) != 0
+            if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(otherOwner)) != 0
                 && (*ctx.world).cvars.g_friendlySaber.integer == 0
             {
                 return qfalse;
@@ -6687,7 +6687,7 @@ pub fn WP_SaberStartMissileBlockCheck(ctx: GameContext<'_>, self_: EntityId, ucm
             if (*self_).s.eType == ET_PLAYER as c_int
                 && !(*ent).client.is_null()
                 && ((*ent).s.eType == ET_NPC as c_int || (*ent).s.eType == ET_PLAYER as c_int)
-                && OnSameTeam(ctx, ent, self_) == 0
+                && OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(self_)) == 0
                 && (*ec).sess.sessionTeam != TEAM_SPECTATOR
                 && (*ec).ps.pm_flags & PMF_FOLLOW == 0
                 && ((*ent).s.eType != ET_NPC as c_int || (*ent).s.NPC_class != CLASS_VEHICLE as c_int) //don't look at vehicle NPCs
@@ -6949,7 +6949,7 @@ pub fn WP_SaberStartMissileBlockCheck(ctx: GameContext<'_>, self_: EntityId, ucm
                         let ident = cstr("heightChange");
                         TIMER_Set(
                             ctx,
-                            self_,
+                            ctx.entity_id_of(self_),
                             ident.as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                         );

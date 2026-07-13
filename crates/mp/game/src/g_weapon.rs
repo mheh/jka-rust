@@ -2344,7 +2344,11 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: EntityId, altFire: qboolean) {
 
                 if !(*enemy).client.is_null()
                     && (*enemy).health > 0
-                    && crate::g_team::OnSameTeam(ctx, ent, enemy) == qfalse
+                    && crate::g_team::OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(ent),
+                        ctx.entity_id_of(enemy),
+                    ) == qfalse
                 {
                     // if enemy became invalid, died, or is on the same team, then don't seek it
                     (*missile).angle = 0.5;
@@ -2753,7 +2757,11 @@ pub fn WP_LobFire(
                                     as *mut gentity_t;
                                 if !traceEnt.is_null()
                                     && (*traceEnt).takedamage != 0
-                                    && crate::g_team::OnSameTeam(ctx, self_, traceEnt) == qfalse
+                                    && crate::g_team::OnSameTeam(
+                                        ctx,
+                                        ctx.entity_id_of(self_),
+                                        ctx.entity_id_of(traceEnt),
+                                    ) == qfalse
                                 {
                                     // hit something breakable, so that's okay
                                     // we haven't found a clear shot yet so use this as the failcase
@@ -2985,7 +2993,8 @@ pub fn proxMineThink(ctx: GameContext<'_>, ent: EntityId) {
                 && (*((*cl).client as *mut gclient_t)).tempSpectate < world.level.time
                 && (*cl).health > 0
             {
-                if crate::g_team::OnSameTeam(ctx, owner, cl) == qfalse
+                if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(owner), ctx.entity_id_of(cl))
+                    == qfalse
                     || world.cvars.g_friendlyFire.integer != 0
                 {
                     // not on the same team, or friendly fire is enabled
@@ -4474,7 +4483,9 @@ pub fn LogAccuracyHit(
             return qfalse;
         }
 
-        if crate::g_team::OnSameTeam(ctx, target, attacker) != qfalse {
+        if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(target), ctx.entity_id_of(attacker))
+            != qfalse
+        {
             return qfalse;
         }
 
@@ -4844,7 +4855,11 @@ pub fn WP_FireVehicleWeapon(
 
                         if !(*enemy).client.is_null()
                             && (*enemy).health > 0
-                            && crate::g_team::OnSameTeam(ctx, ent, enemy) == qfalse
+                            && crate::g_team::OnSameTeam(
+                                ctx,
+                                ctx.entity_id_of(ent),
+                                ctx.entity_id_of(enemy),
+                            ) == qfalse
                         {
                             // if enemy became invalid, died, or is on the same team, then don't seek it
                             (*missile).spawnflags |= 1; // just to let it know it should be faster...

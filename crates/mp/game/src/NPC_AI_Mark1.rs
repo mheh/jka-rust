@@ -417,7 +417,9 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         if (*((*self_).client as *mut gclient_t)).ps.torsoTimer > 0 {
-            if crate::g_timer::TIMER_Done(ctx, self_, c"dyingExplosion".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"dyingExplosion".as_ptr())
+                != 0
+            {
                 let num = (*ctx.world).bg_state.rng.Q_irand(1, 3);
 
                 // Find place to generate explosion
@@ -453,7 +455,7 @@ pub fn Mark1_dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     c"dyingExplosion".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(300, 1000),
                 );
@@ -810,7 +812,7 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
             return;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
             let mut chance = (*ctx.world).bg_state.rng.Q_irand(1, 5);
 
             (*npc_info).burstCount += 1;
@@ -829,16 +831,18 @@ pub fn Mark1_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
                 (*npc_info).burstCount = 0;
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                 );
                 (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
             } else {
-                if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay2".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay2".as_ptr())
+                    != 0
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"attackDelay2".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(50, 50),
                     );
@@ -985,10 +989,10 @@ pub fn Mark1_RocketAttack(ctx: GameContext<'_>, advance: qboolean) {
             return;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"attackDelay".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
             );
@@ -1022,11 +1026,11 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         }
 
         // Randomly talk
-        if crate::g_timer::TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"angerNoise".as_ptr()) != 0 {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"patrolNoise".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(4000, 10000),
                 );

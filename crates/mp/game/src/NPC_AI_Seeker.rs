@@ -108,12 +108,13 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
 
         // If we have an enemy, we should try to hover at or a little below enemy eye level
         if !(*NPC).enemy.is_none() {
-            if crate::g_timer::TIMER_Done(ctx, NPC, c"heightChange".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), c"heightChange".as_ptr()) != 0
+            {
                 let mut difFactor: f32 = 1.0f32;
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"heightChange".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                 );
@@ -128,7 +129,9 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
                     - (*NPC).r.currentOrigin[2];
 
                 if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-                    if crate::g_timer::TIMER_Done(ctx, NPC, c"flameTime".as_ptr()) != 0 {
+                    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flameTime".as_ptr())
+                        != 0
+                    {
                         difFactor = 10.0f32;
                     }
                 }
@@ -495,10 +498,12 @@ pub fn Seeker_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean)
 
         if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
             if (*NPC).count > 0 {
-                if crate::g_timer::TIMER_Done(ctx, NPC, c"attackDelay".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr())
+                    != 0
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         c"attackDelay".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(250, 2500),
                     );
@@ -681,7 +686,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         minDistSqr = MIN_DISTANCE_SQR as f32;
 
         if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-            if crate::g_timer::TIMER_Done(ctx, NPC, c"flameTime".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flameTime".as_ptr()) != 0 {
                 minDistSqr = 200.0f32 * 200.0f32;
             }
         }
@@ -723,10 +728,12 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
             }
         } else {
             if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
-                if crate::g_timer::TIMER_Done(ctx, NPC, c"seekerhiss".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(NPC), c"seekerhiss".as_ptr())
+                    != 0
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         c"seekerhiss".as_ptr(),
                         (1000.0f32 + (*ctx.world).bg_state.rng.random() * 1000.0f32) as c_int,
                     );

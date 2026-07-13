@@ -570,9 +570,11 @@ fn weaponName(j: usize) -> String {
 /// Source: `oracle/codemp/game/g_log.c:824-863`
 pub fn CalculateEfficiency(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     efficiency: *mut c_int,
 ) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         let mut f_best_ratio = 0.0f32;
@@ -609,11 +611,9 @@ pub fn CalculateEfficiency(
 /// Raven `CalculateSharpshooter` — awards the sniper-kills leader if they and
 /// the passed player both averaged at least one sniper kill per minute.
 /// Source: `oracle/codemp/game/g_log.c:866-903`
-pub fn CalculateSharpshooter(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    frags: *mut c_int,
-) -> qboolean {
+pub fn CalculateSharpshooter(ctx: GameContext<'_>, ent: EntityId, frags: *mut c_int) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
         let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
@@ -655,7 +655,9 @@ pub fn CalculateSharpshooter(
 /// Raven `CalculateUntouchable` — the "perfect game" award: at least two points
 /// per minute and never killed.
 /// Source: `oracle/codemp/game/g_log.c:906-928`
-pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
         let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
@@ -682,11 +684,9 @@ pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
 /// Raven `CalculateLogistics` — awards the player who used the most items and
 /// powerups, provided they used at least four distinct kinds.
 /// Source: `oracle/codemp/game/g_log.c:931-982`
-pub fn CalculateLogistics(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    stuffUsed: *mut c_int,
-) -> qboolean {
+pub fn CalculateLogistics(ctx: GameContext<'_>, ent: EntityId, stuffUsed: *mut c_int) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         let mut n_best_player: c_int = -1;
@@ -735,11 +735,9 @@ pub fn CalculateLogistics(
 /// weapon available on the map (and the most such kills), given a two-per-minute
 /// score rate and no saber-only / Jedi-Master restriction.
 /// Source: `oracle/codemp/game/g_log.c:988-1081`
-pub fn CalculateTactician(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    kills: *mut c_int,
-) -> qboolean {
+pub fn CalculateTactician(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
         let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
@@ -820,11 +818,9 @@ pub fn CalculateTactician(
 /// they averaged at least two explosive kills per minute (`playTime` measured
 /// from the passed player, a faithful Raven quirk).
 /// Source: `oracle/codemp/game/g_log.c:1087-1134`
-pub fn CalculateDemolitionist(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    kills: *mut c_int,
-) -> qboolean {
+pub fn CalculateDemolitionist(ctx: GameContext<'_>, ent: EntityId, kills: *mut c_int) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let ec = (*ent).client as *mut gclient_t;
         let play_time = ((*ctx.world).level.time - (*ec).pers.enterTime) / 60000;
@@ -873,14 +869,16 @@ pub fn CalculateDemolitionist(
 /// comment above it says "No streak calculation, at least for now"); the
 /// only compiled statement is the trailing `return 0`.
 /// Source: `oracle/codemp/game/g_log.c:1136-1158`
-pub fn CalculateStreak(ent: *mut gentity_t) -> c_int {
+pub fn CalculateStreak(ent: &gentity_t) -> c_int {
     0
 }
 
 /// Raven `CalculateTeamMVP`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1160-1188`
-pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
@@ -916,7 +914,9 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// special case is commented out in the oracle (`#if 0`-equivalent
 /// `/* */`) — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1190-1240`
-pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_RANK as usize] + 1;
@@ -954,7 +954,9 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
 /// Raven: the `CalculateTeamMVP(ent)` short-circuit is commented out in the
 /// oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1242-1276`
-pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
@@ -989,7 +991,9 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
 /// Raven: the `CalculateTeamMVP(ent) || CalculateTeamDefender(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1278-1312`
-pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
@@ -1024,7 +1028,9 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
 /// Raven: the `CalculateTeamMVP/Defender/Warrior(ent)` short-circuit is
 /// commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1314-1348`
-pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
@@ -1059,7 +1065,9 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
 /// Raven: the `CalculateTeamMVP/Defender/Warrior/Carrier(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1350-1386`
-pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
@@ -1095,7 +1103,9 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qb
 /// Raven: the `CalculateTeamMVP/Defender/Warrior/Carrier/Interceptor(ent)`
 /// short-circuit is commented out in the oracle — dead source, not ported.
 /// Source: `oracle/codemp/game/g_log.c:1388-1424`
-pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
@@ -1151,30 +1161,33 @@ pub enum TeamAward_e {
 /// Raven `CalculateTeamAward`.
 ///
 /// Source: `oracle/codemp/game/g_log.c:1451-1484`
-pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
+pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: EntityId) -> c_int {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut team_awards: c_int = 0;
 
-        if CalculateTeamMVP(ctx, ent) != qfalse {
+        if CalculateTeamMVP(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
             team_awards |= 1 << TeamAward_e::TeamMvp as i32;
         }
         if (*ctx.world).cvars.g_gametype.integer == GT_CTF
             || (*ctx.world).cvars.g_gametype.integer == GT_CTY
         {
-            if CalculateTeamDefender(ctx, ent) != qfalse {
+            if CalculateTeamDefender(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamDefender as i32;
             }
-            if CalculateTeamWarrior(ctx, ent) != qfalse {
+            if CalculateTeamWarrior(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamWarrior as i32;
             }
-            if CalculateTeamCarrier(ctx, ent) != qfalse {
+            if CalculateTeamCarrier(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamCarrier as i32;
             }
-            if CalculateTeamInterceptor(ctx, ent) != qfalse {
+            if CalculateTeamInterceptor(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
                 team_awards |= 1 << TeamAward_e::TeamInterceptor as i32;
             }
         }
-        if team_awards == 0 && CalculateTeamRedShirt(ctx, ent) != qfalse {
+        if team_awards == 0 && CalculateTeamRedShirt(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse
+        {
             // if you got nothing else and died a lot, at least get bravery
             team_awards |= 1 << TeamAward_e::TeamBravery as i32;
         }
@@ -1185,7 +1198,9 @@ pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
 /// Raven `CalculateSection31Award` — the all-around "god" award: sharpshooter,
 /// untouchable, and ≥75 efficiency all at once.
 /// Source: `oracle/codemp/game/g_log.c:1486-1514`
-pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
+pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: EntityId) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         let mut efficiency: c_int = 0;
@@ -1195,9 +1210,9 @@ pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbo
             if player.inuse == qfalse {
                 continue;
             }
-            CalculateEfficiency(ctx, ent, &mut efficiency);
-            if CalculateSharpshooter(ctx, ent, &mut frags) == qfalse
-                || CalculateUntouchable(ctx, ent) == qfalse
+            CalculateEfficiency(ctx, ctx.entity_id_of(ent).unwrap(), &mut efficiency);
+            if CalculateSharpshooter(ctx, ctx.entity_id_of(ent).unwrap(), &mut frags) == qfalse
+                || CalculateUntouchable(ctx, ctx.entity_id_of(ent).unwrap()) == qfalse
                 || efficiency < 75
             {
                 continue;
@@ -1234,7 +1249,9 @@ const AWARDS_MSG_LENGTH: usize = 256;
 /// values onto `msg` (a fixed `AWARDS_MSG_LENGTH` buffer, truncated like
 /// `Com_sprintf`).
 /// Source: `oracle/codemp/game/g_log.c:1518-1587`
-pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_char) {
+pub fn CalculateAwards(ctx: GameContext<'_>, ent: EntityId, msg: *mut c_char) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let old = cstr_to_str(msg).to_string();
         let mut buf1 = String::new();
@@ -1243,43 +1260,43 @@ pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_ch
         let mut stuff_used: c_int = 0;
         let mut kills: c_int = 0;
 
-        if CalculateEfficiency(ctx, ent, &mut efficiency) != qfalse {
+        if CalculateEfficiency(ctx, ctx.entity_id_of(ent).unwrap(), &mut efficiency) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_EFFICIENCY as i32;
             buf1 = format!(" {}", efficiency);
         }
-        if CalculateSharpshooter(ctx, ent, &mut kills) != qfalse {
+        if CalculateSharpshooter(ctx, ctx.entity_id_of(ent).unwrap(), &mut kills) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_SHARPSHOOTER as i32;
             buf1 = format!("{} {}", buf1, kills);
         }
-        if CalculateUntouchable(ctx, ent) != qfalse {
+        if CalculateUntouchable(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_UNTOUCHABLE as i32;
             buf1 = format!("{} {}", buf1, 0);
         }
-        if CalculateLogistics(ctx, ent, &mut stuff_used) != qfalse {
+        if CalculateLogistics(ctx, ctx.entity_id_of(ent).unwrap(), &mut stuff_used) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_LOGISTICS as i32;
             buf1 = format!("{} {}", buf1, stuff_used);
         }
-        if CalculateTactician(ctx, ent, &mut kills) != qfalse {
+        if CalculateTactician(ctx, ctx.entity_id_of(ent).unwrap(), &mut kills) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_TACTICIAN as i32;
             buf1 = format!("{} {}", buf1, kills);
         }
-        if CalculateDemolitionist(ctx, ent, &mut kills) != qfalse {
+        if CalculateDemolitionist(ctx, ctx.entity_id_of(ent).unwrap(), &mut kills) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_DEMOLITIONIST as i32;
             buf1 = format!("{} {}", buf1, kills);
         }
-        let streak = CalculateStreak(ent);
+        let streak = CalculateStreak(&*ent);
         if streak != 0 {
             award_flags |= 1 << awardType_t::AWARD_STREAK as i32;
             buf1 = format!("{} {}", buf1, streak);
         }
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
-            let team_awards = CalculateTeamAward(ctx, ent);
+            let team_awards = CalculateTeamAward(ctx, ctx.entity_id_of(ent).unwrap());
             if team_awards != 0 {
                 award_flags |= 1 << awardType_t::AWARD_TEAM as i32;
                 buf1 = format!("{} {}", buf1, team_awards);
             }
         }
-        if CalculateSection31Award(ctx, ent) != qfalse {
+        if CalculateSection31Award(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
             award_flags |= 1 << awardType_t::AWARD_SECTION31 as i32;
             buf1 = format!("{} {}", buf1, 0);
         }

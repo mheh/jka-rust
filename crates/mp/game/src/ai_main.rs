@@ -210,7 +210,13 @@ pub fn BotOrder(ctx: GameContext<'_>, ent: *mut gentity_t, clientnum: c_int, ord
             return;
         }
 
-        if clientnum != -1 && OnSameTeam(ctx, ent, base.add(clientnum as usize)) == qfalse {
+        if clientnum != -1
+            && OnSameTeam(
+                ctx,
+                ctx.entity_id_of(ent),
+                ctx.entity_id_of(base.add(clientnum as usize)),
+            ) == qfalse
+        {
             return;
         }
 
@@ -252,7 +258,10 @@ pub fn BotOrder(ctx: GameContext<'_>, ent: *mut gentity_t, clientnum: c_int, ord
             let mut i: usize = 0;
             while i < MAX_CLIENTS {
                 let bi = botstates[i];
-                if !bi.is_null() && OnSameTeam(ctx, ent, base.add(i)) != qfalse {
+                if !bi.is_null()
+                    && OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(base.add(i)))
+                        != qfalse
+                {
                     if ordernum == -1 {
                         BotReportStatus(ctx, bi);
                     } else {
@@ -1155,7 +1164,7 @@ pub fn WPOrgVisible(
                 {
                     let ownent = crate::ent_id::resolve(base, (*hitent).parent);
 
-                    if OnSameTeam(ctx, bot, ownent) != qfalse
+                    if OnSameTeam(ctx, ctx.entity_id_of(bot), ctx.entity_id_of(ownent)) != qfalse
                         || (*bot).s.number == (*ownent).s.number
                     {
                         return 1;
@@ -2030,7 +2039,12 @@ pub fn PassStandardEnemyChecks(
             return 0;
         }
 
-        if OnSameTeam(ctx, base.add((*bs).client as usize), en) != qfalse {
+        if OnSameTeam(
+            ctx,
+            ctx.entity_id_of(base.add((*bs).client as usize)),
+            ctx.entity_id_of(en),
+        ) != qfalse
+        {
             // don't attack teammates
             return 0;
         }
@@ -2336,8 +2350,8 @@ pub fn PassLovedOneCheck(ctx: GameContext<'_>, bs: *mut bot_state_t, ent: *mut g
                 } else if IsTeamplay(ctx) != 0
                     && OnSameTeam(
                         ctx,
-                        base.add((*bs).client as usize),
-                        base.add((*loved).client as usize),
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(base.add((*loved).client as usize)),
                     ) == qfalse
                     && (*bs).loved[i as usize].level < 2
                 {
@@ -2401,7 +2415,11 @@ pub fn ScanForEnemies(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
             let ent = base.add(i as usize);
             if i != (*bs).client
                 && !(*ent).client.is_null()
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == qfalse
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) == qfalse
                 && PassStandardEnemyChecks(ctx, bs, ent) != 0
                 && BotPVSCheck(
                     ctx,
@@ -2668,8 +2686,8 @@ pub fn GetNearestBadThing(ctx: GameContext<'_>, bs: *mut bot_state_t) -> *mut ge
                     && !(*base.add((*ent).genericValue3 as usize)).client.is_null()
                     && OnSameTeam(
                         ctx,
-                        base.add((*bs).client as usize),
-                        base.add((*ent).genericValue3 as usize),
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(base.add((*ent).genericValue3 as usize)),
                     ) == qfalse)
             {
                 // try to escape from dangerous projectiles, or a sentry gun.
@@ -2698,8 +2716,8 @@ pub fn GetNearestBadThing(ctx: GameContext<'_>, bs: *mut bot_state_t) -> *mut ge
                             && !(*base.add((*ent).r.ownerNum as usize)).client.is_null()
                             && OnSameTeam(
                                 ctx,
-                                base.add((*bs).client as usize),
-                                base.add((*ent).r.ownerNum as usize),
+                                ctx.entity_id_of(base.add((*bs).client as usize)),
+                                ctx.entity_id_of(base.add((*ent).r.ownerNum as usize)),
                             ) != qfalse))
                 {
                     // don't be afraid of your own rockets or your teammates' rockets
@@ -2867,7 +2885,11 @@ pub fn BotGetFlagBack(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
 
             if !(*ent).client.is_null()
                 && (*((*ent).client as *mut gclient_t)).ps.powerups[myFlag as usize] != 0
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == qfalse
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) == qfalse
             {
                 foundCarrier = 1;
                 break;
@@ -2934,7 +2956,11 @@ pub fn BotGuardFlagCarrier(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int 
 
             if !(*ent).client.is_null()
                 && (*((*ent).client as *mut gclient_t)).ps.powerups[enemyFlag as usize] != 0
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != qfalse
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != qfalse
             {
                 foundCarrier = 1;
                 break;
@@ -3220,16 +3246,29 @@ pub fn CTFTakesPriority(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
             if !ent.is_null() && !(*ent).client.is_null() {
                 let cl = (*ent).client as *mut gclient_t;
                 if (*cl).ps.powerups[enemyFlag as usize] != 0
-                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                    && OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(ent),
+                    ) != 0
                 {
                     weHaveEnemyFlag = 1;
                 } else if (*cl).ps.powerups[myFlag as usize] != 0
-                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == 0
+                    && OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(ent),
+                    ) == 0
                 {
                     enemyHasOurFlag = 1;
                 }
 
-                if OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0 {
+                if OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
+                {
                     numOnMyTeam += 1;
                 } else {
                     numOnEnemyTeam += 1;
@@ -4335,16 +4374,29 @@ pub fn CommanderBotCTFAI(ctx: GameContext<'_>, bs: *mut bot_state_t) {
             if !ent.is_null() && !(*ent).client.is_null() {
                 let cl = (*ent).client as *mut gclient_t;
                 if (*cl).ps.powerups[enemyFlag as usize] != 0
-                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                    && OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(ent),
+                    ) != 0
                 {
                     weHaveEnemyFlag = 1;
                 } else if (*cl).ps.powerups[myFlag as usize] != 0
-                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == 0
+                    && OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(ent),
+                    ) == 0
                 {
                     enemyHasOurFlag = 1;
                 }
 
-                if OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0 {
+                if OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
+                {
                     numOnMyTeam += 1;
                 } else {
                     numOnEnemyTeam += 1;
@@ -4473,7 +4525,11 @@ pub fn CommanderBotSiegeAI(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
                 && !(*world).globals.botstates[(*ent).s.number as usize].is_null()
             {
                 bst = (*world).globals.botstates[(*ent).s.number as usize];
@@ -4489,7 +4545,11 @@ pub fn CommanderBotSiegeAI(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
             {
                 teammates += 1;
             }
@@ -4565,7 +4625,11 @@ pub fn CommanderBotTeamplayAI(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
                 && !(*world).globals.botstates[(*ent).s.number as usize].is_null()
             {
                 bst = (*world).globals.botstates[(*ent).s.number as usize];
@@ -4585,7 +4649,11 @@ pub fn CommanderBotTeamplayAI(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
-                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                && OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
             {
                 teammates += 1;
 
@@ -5767,7 +5835,12 @@ pub fn BotLovedOneDied(
             if lovelevel < 2 {
                 return;
             }
-        } else if OnSameTeam(ctx, base.add((*bs).client as usize), loved_lastHurt) != 0 {
+        } else if OnSameTeam(
+            ctx,
+            ctx.entity_id_of(base.add((*bs).client as usize)),
+            ctx.entity_id_of(loved_lastHurt),
+        ) != 0
+        {
             //don't hate teammates no matter what
             return;
         }
@@ -6053,7 +6126,11 @@ pub fn CheckForFriendInLOF(ctx: GameContext<'_>, bs: *mut bot_state_t) -> *mut g
 
             if !trent.is_null() && !(*trent).client.is_null() {
                 if IsTeamplay(ctx) != 0
-                    && OnSameTeam(ctx, base.add((*bs).client as usize), trent) != 0
+                    && OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(base.add((*bs).client as usize)),
+                        ctx.entity_id_of(trent),
+                    ) != 0
                 {
                     return trent;
                 }
@@ -6095,7 +6172,12 @@ pub fn BotScanForLeader(ctx: GameContext<'_>, bs: *mut bot_state_t) {
                 && (*bstate).isSquadLeader != 0
                 && (*bs).client != i as c_int
             {
-                if OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0 {
+                if OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(base.add((*bs).client as usize)),
+                    ctx.entity_id_of(ent),
+                ) != 0
+                {
                     (*bs).squadLeader = Some(ent_id(base, ent));
                     break;
                 }

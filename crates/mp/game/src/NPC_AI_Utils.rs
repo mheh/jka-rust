@@ -554,7 +554,7 @@ pub fn AI_ValidateGroupMember(
             }
         }
         //must be actually in combat mode
-        if TIMER_Done(ctx, member, c"interrogating".as_ptr()) == 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(member), c"interrogating".as_ptr()) == 0 {
             return 0;
         }
         //FIXME: need to have a route to enemy and/or clear shot?

@@ -1648,7 +1648,7 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         // Raven: make the noises
-        if crate::g_timer::TIMER_Done(ctx, self_, c"patrolNoise".as_ptr()) != 0
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"patrolNoise".as_ptr()) != 0
             && (*ctx.world).bg_state.rng.Q_irand(0, 20) == 0
         {
             let npc_class = (*client).NPC_class;
@@ -1684,7 +1684,12 @@ pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
             );
 
             let duration = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
-            crate::g_timer::TIMER_Set(ctx, self_, c"patrolNoise".as_ptr(), duration);
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(self_),
+                c"patrolNoise".as_ptr(),
+                duration,
+            );
         }
     }
 }

@@ -2040,7 +2040,7 @@ pub fn TryUse(ctx: GameContext<'_>, ent: Option<EntityId>) {
                 && (*target).inuse != qfalse
                 && !(*target).client.is_null()
                 && (*target).health > 0
-                && OnSameTeam(ctx, ent, target) != qfalse
+                && OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(target)) != qfalse
                 && (G_CanUseDispOn(ctx, ctx.entity_id_of(target), HI_HEALTHDISP) != 0
                     || G_CanUseDispOn(ctx, ctx.entity_id_of(target), HI_AMMODISP) != 0)
             {

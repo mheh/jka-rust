@@ -79,19 +79,19 @@ const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL; // 
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Sniper.c:44-58`
 pub fn Sniper_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    TIMER_Set(ctx, ent, c"chatter".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"duck".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"stand".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"shuffleTime".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"sleepTime".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"enemyLastVisible".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"roamTime".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"hideTime".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"chatter".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"duck".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"stand".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"shuffleTime".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"sleepTime".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"enemyLastVisible".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"roamTime".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"hideTime".as_ptr(), 0);
     // FIXME: Slant for difficulty levels (Raven comment).
-    TIMER_Set(ctx, ent, c"attackDelay".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"stick".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"scoutTime".as_ptr(), 0);
-    TIMER_Set(ctx, ent, c"flee".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"attackDelay".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"stick".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"scoutTime".as_ptr(), 0);
+    TIMER_Set(ctx, ctx.entity_id_of(ent), c"flee".as_ptr(), 0);
 }
 
 /// Raven `NPC_Sniper_PlayConfusionSound`.
@@ -111,8 +111,13 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t
             );
         }
         // reset him to be totally unaware again
-        TIMER_Set(ctx, self_, c"enemyLastVisible".as_ptr(), 0);
-        TIMER_Set(ctx, self_, c"flee".as_ptr(), 0);
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"enemyLastVisible".as_ptr(),
+            0,
+        );
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"flee".as_ptr(), 0);
 
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).squadState = SQUAD_IDLE;
@@ -139,8 +144,8 @@ pub fn NPC_Sniper_Pain(
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(ctx, self_, c"duck".as_ptr(), -1);
-        TIMER_Set(ctx, self_, c"stand".as_ptr(), 2000);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"duck".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"stand".as_ptr(), 2000);
 
         NPC_Pain(ctx, self_, attacker, damage);
 
@@ -321,7 +326,7 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
                             // G_SetEnemy(ctx, NPC, owner);
                             TIMER_Set(
                                 ctx,
-                                NPC,
+                                ctx.entity_id_of(NPC),
                                 c"attackDelay".as_ptr(),
                                 (*ctx.world).bg_state.rng.Q_irand(
                                     (6 - (*NPCInfo).stats.aim) * 100,
@@ -399,7 +404,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
             }
         } else if (*NPCInfo).squadState == SQUAD_RETREAT {
             // See if we're running away
-            if TIMER_Done(ctx, NPC, c"flee".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flee".as_ptr()) != 0 {
                 (*NPCInfo).squadState = SQUAD_IDLE;
             } else {
                 world.globals.faceEnemy2 = qfalse;
@@ -436,14 +441,14 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                         // SQUAD_RETREAT=2: was running away
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"duck".as_ptr(),
                             ((*((*NPC).client as *mut gclient_t)).pers.maxHealth - (*NPC).health)
                                 * 100,
                         );
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"hideTime".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(3000, 7000),
                         );
@@ -453,7 +458,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                         // SQUAD_TRANSITION=4: was heading for a combat point
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"hideTime".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                         );
@@ -467,7 +472,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                 // don't attack right away
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(
                         (6 - (*NPCInfo).stats.aim) * 50,
@@ -477,13 +482,18 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                 // don't do something else just yet
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"roamTime".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(1000, 4000),
                 );
                 // stop fleeing
                 if (*NPCInfo).squadState == SQUAD_RETREAT {
-                    TIMER_Set(ctx, NPC, c"flee".as_ptr(), -world.level.time);
+                    TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(NPC),
+                        c"flee".as_ptr(),
+                        -world.level.time,
+                    );
                     (*NPCInfo).squadState = SQUAD_IDLE;
                 }
                 return;
@@ -492,7 +502,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
             // keep going, hold of roamTimer until we get there
             TIMER_Set(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC),
                 c"roamTime".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(4000, 8000),
             );
@@ -509,9 +519,9 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
-        if TIMER_Done(ctx, NPC, c"duck".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) != 0 {
             // we're not ducking
-            if TIMER_Done(ctx, NPC, c"roamTime".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr()) != 0 {
                 // not roaming
                 // FIXME: try to find another spot from which to hit the enemy
                 if ((*NPCInfo).scriptFlags & 0x00000400) != 0
@@ -562,10 +572,10 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                                 cp2,
                                 core::ptr::null_mut(),
                             );
-                            TIMER_Set(ctx, NPC, c"duck".as_ptr(), -1);
+                            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
                             TIMER_Set(
                                 ctx,
-                                NPC,
+                                ctx.entity_id_of(NPC),
                                 c"attackDelay".as_ptr(),
                                 (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                             );
@@ -583,10 +593,10 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                             cp,
                             core::ptr::null_mut(),
                         );
-                        TIMER_Set(ctx, NPC, c"duck".as_ptr(), -1);
+                        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"attackDelay".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                         );
@@ -727,7 +737,7 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
             if (*NPC).count < (5 - (*NPCInfo).stats.aim) {
                 // miss a few times first
                 if world.globals.shoot2 != 0
-                    && TIMER_Done(ctx, NPC, c"attackDelay".as_ptr()) != 0
+                    && TIMER_Done(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr()) != 0
                     && world.level.time >= (*NPCInfo).shotTime
                 {
                     // ready to fire again
@@ -874,11 +884,11 @@ pub fn Sniper_StartHide(ctx: GameContext<'_>) {
         let NPC = world.globals.NPC as *mut gentity_t;
 
         let duckTime = (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
-        TIMER_Set(ctx, NPC, c"duck".as_ptr(), duckTime);
-        TIMER_Set(ctx, NPC, c"watch".as_ptr(), 500);
+        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), duckTime);
+        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"watch".as_ptr(), 500);
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             c"attackDelay".as_ptr(),
             duckTime + (*ctx.world).bg_state.rng.Q_irand(500, 2000),
         );
@@ -907,7 +917,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             return;
         }
 
-        if TIMER_Done(ctx, NPC, c"flee".as_ptr()) != 0
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flee".as_ptr()) != 0
             && NPC_CheckForDanger(ctx, NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, 4)) != 0
         {
             // AEL_DANGER = 4, going to run
@@ -1042,9 +1052,9 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
         }
 
         if world.globals.move2 == qfalse {
-            if TIMER_Done(ctx, NPC, c"duck".as_ptr()) == 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) == 0 {
                 // not TIMER_Done
-                if TIMER_Done(ctx, NPC, c"watch".as_ptr()) != 0 {
+                if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"watch".as_ptr()) != 0 {
                     // not while watching
                     world.globals.ucmd.upmove = -127;
                 }
@@ -1053,12 +1063,13 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             // FIXME: also, when stop ducking, start looking, if enemy can see me, chance of ducking back down again
         } else {
             // stop ducking!
-            TIMER_Set(ctx, NPC, c"duck".as_ptr(), -1);
+            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
         }
 
-        if TIMER_Done(ctx, NPC, c"duck".as_ptr()) != 0
-            && TIMER_Done(ctx, NPC, c"watch".as_ptr()) != 0
-            && (TIMER_Get(ctx, NPC, c"attackDelay".as_ptr()) - world.level.time) > 1000
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) != 0
+            && TIMER_Done(ctx, ctx.entity_id_of(NPC), c"watch".as_ptr()) != 0
+            && (TIMER_Get(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr()) - world.level.time)
+                > 1000
             && (*NPC).attackDebounceTime < world.level.time
         {
             if world.globals.enemyLOS2 != 0 && ((*NPCInfo).scriptFlags & 0x00000040) != 0 {
@@ -1091,7 +1102,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
         // FIXME: don't shoot right away!
         if world.globals.shoot2 != 0 {
             // try to shoot if it's time
-            if TIMER_Done(ctx, NPC, c"attackDelay".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr()) != 0 {
                 WeaponThink(ctx, qtrue);
                 if (world.globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) != 0 {
                     // G_SoundOnEnt(ctx, NPC, CHAN_WEAPON, "sound/null.wav");
@@ -1106,7 +1117,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
                 } else {
                     TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         c"attackDelay".as_ptr(),
                         (*NPCInfo).shotTime - world.level.time,
                     );

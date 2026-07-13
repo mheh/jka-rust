@@ -117,7 +117,12 @@ pub fn G_AngerAlert(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 return;
             }
         }
-        if TIMER_Done(ctx, self_, c"interrogating".as_ptr() as *const c_char) == 0 {
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"interrogating".as_ptr() as *const c_char,
+        ) == 0
+        {
             //I'm interrogating, don't wake everyone else up yet...
             return;
         }
@@ -343,7 +348,7 @@ pub fn G_AttackDelay(ctx: GameContext<'_>, self_: *mut gentity_t, enemy: *mut ge
         }
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"attackDelay".as_ptr() as *const c_char,
             attDelay,
         ); //(*ctx.world).bg_state.rng.Q_irand( 1500, 4500 ) );
@@ -354,7 +359,12 @@ pub fn G_AttackDelay(ctx: GameContext<'_>, self_: *mut gentity_t, enemy: *mut ge
             attDelay -= (*ctx.world).bg_state.rng.Q_irand(500, 1500);
         }
 
-        TIMER_Set(ctx, self_, c"roamTime".as_ptr() as *const c_char, attDelay); //was (*ctx.world).bg_state.rng.Q_irand( 1000, 3500 );
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"roamTime".as_ptr() as *const c_char,
+            attDelay,
+        ); //was (*ctx.world).bg_state.rng.Q_irand( 1000, 3500 );
     }
 }
 
@@ -3000,7 +3010,11 @@ pub fn NPC_CheckGetNewWeapon(ctx: GameContext<'_>) {
                     }
                 }
             }
-            if TIMER_Done(ctx, npc, c"panic".as_ptr() as *const c_char) != qfalse
+            if TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"panic".as_ptr() as *const c_char,
+            ) != qfalse
                 && (*npc_info).goalEntity.is_none()
             {
                 //need a weapon, any lying around?
@@ -3024,17 +3038,27 @@ pub fn NPC_AimAdjust(ctx: GameContext<'_>, change: c_int) {
         let npc_info = world.globals.NPCInfo;
         let g_spskill = world.cvars.g_spskill.integer;
 
-        if TIMER_Exists(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) == qfalse {
+        if TIMER_Exists(
+            ctx,
+            ctx.entity_id_of(npc),
+            c"aimDebounce".as_ptr() as *const c_char,
+        ) == qfalse
+        {
             let debounce = 500 + (3 - g_spskill) * 100;
             TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"aimDebounce".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(debounce, debounce + 1000),
             );
             return;
         }
-        if TIMER_Done(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) != qfalse {
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc),
+            c"aimDebounce".as_ptr() as *const c_char,
+        ) != qfalse
+        {
             (*npc_info).currentAim += change;
             if (*npc_info).currentAim > (*npc_info).stats.aim {
                 //can never be better than max aim
@@ -3049,7 +3073,7 @@ pub fn NPC_AimAdjust(ctx: GameContext<'_>, change: c_int) {
             let debounce = 500 + (3 - g_spskill) * 100;
             TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"aimDebounce".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(debounce, debounce + 1000),
             );
@@ -3071,7 +3095,7 @@ pub fn G_AimSet(ctx: GameContext<'_>, self_: *mut gentity_t, aim: c_int) {
             let debounce = 500 + (3 - g_spskill) * 100;
             TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 c"aimDebounce".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(debounce, debounce + 1000),
             );

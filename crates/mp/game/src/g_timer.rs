@@ -6,6 +6,7 @@
 //! are reached through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::ent_id::resolve;
 use crate::prelude::*;
 use crate::q_shared::Q_stricmp;
 use core::ffi::c_char;
@@ -68,7 +69,9 @@ pub fn TIMER_Clear(ctx: GameContext<'_>) {
 /// Raven `TIMER_Clear2`.
 ///
 /// Source: `oracle/codemp/game/g_timer.c:49-74`
-pub fn TIMER_Clear2(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn TIMER_Clear2(ctx: GameContext<'_>, ent: Option<EntityId>) {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         let world = &mut *ctx.world;
 
@@ -165,10 +168,12 @@ pub fn TIMER_GetExisting(
 /// Source: `oracle/codemp/game/g_timer.c:129-139`
 pub fn TIMER_Set(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     identifier: *const c_char,
     duration: c_int,
 ) {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return;
@@ -188,7 +193,9 @@ pub fn TIMER_Set(
 /// Raven `TIMER_Get`.
 ///
 /// Source: `oracle/codemp/game/g_timer.c:147-157`
-pub fn TIMER_Get(ctx: GameContext<'_>, ent: *mut gentity_t, identifier: *const c_char) -> c_int {
+pub fn TIMER_Get(ctx: GameContext<'_>, ent: Option<EntityId>, identifier: *const c_char) -> c_int {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return -1;
@@ -209,9 +216,11 @@ pub fn TIMER_Get(ctx: GameContext<'_>, ent: *mut gentity_t, identifier: *const c
 /// Source: `oracle/codemp/game/g_timer.c:165-175`
 pub fn TIMER_Done(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     identifier: *const c_char,
 ) -> qboolean {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return qtrue;
@@ -279,10 +288,12 @@ pub fn TIMER_RemoveHelper(ctx: GameContext<'_>, num: c_int, timer: *mut c_void) 
 /// Source: `oracle/codemp/game/g_timer.c:223-242`
 pub fn TIMER_Done2(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     identifier: *const c_char,
     remove: qboolean,
 ) -> qboolean {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return qfalse;
@@ -314,9 +325,11 @@ pub fn TIMER_Done2(
 /// Source: `oracle/codemp/game/g_timer.c:249-259`
 pub fn TIMER_Exists(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: Option<EntityId>,
     identifier: *const c_char,
 ) -> qboolean {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return qfalse;
@@ -337,7 +350,9 @@ pub fn TIMER_Exists(
 /// Utility to get rid of any timer.
 ///
 /// Source: `oracle/codemp/game/g_timer.c:267-278`
-pub fn TIMER_Remove(ctx: GameContext<'_>, ent: *mut gentity_t, identifier: *const c_char) {
+pub fn TIMER_Remove(ctx: GameContext<'_>, ent: Option<EntityId>, identifier: *const c_char) {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve((*ctx.world).g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return;
@@ -359,10 +374,11 @@ pub fn TIMER_Remove(ctx: GameContext<'_>, ent: *mut gentity_t, identifier: *cons
 /// Source: `oracle/codemp/game/g_timer.c:286-294`
 pub fn TIMER_Start(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
+    self_: Option<EntityId>,
     identifier: *const c_char,
     duration: c_int,
 ) -> qboolean {
+    // STAGE-1: Option<EntityId> self_ passed through to TIMER_Done/TIMER_Set.
     if TIMER_Done(ctx, self_, identifier) == qtrue {
         TIMER_Set(ctx, self_, identifier, duration);
         qtrue

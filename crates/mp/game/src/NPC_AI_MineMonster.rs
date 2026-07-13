@@ -90,9 +90,9 @@ pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
             NPC_MoveToGoal(ctx, qtrue);
         } else {
             let patrol_timer_id = cstr("patrolTime");
-            if TIMER_Done(ctx, npc, patrol_timer_id.as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr()) != 0 {
                 let dur = ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
-                TIMER_Set(ctx, npc, patrol_timer_id.as_ptr(), dur);
+                TIMER_Set(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr(), dur);
             }
         }
 
@@ -202,7 +202,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
         let npc = (*ctx.world).globals.NPC;
         let attacking_id = cstr("attacking");
 
-        if TIMER_Exists(ctx, npc, attacking_id.as_ptr()) == 0 {
+        if TIMER_Exists(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr()) == 0 {
             let rng = &mut (*ctx.world).bg_state.rng;
 
             let enemy_height_diff = if let Some(eid) = (*npc).enemy {
@@ -218,7 +218,7 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
 
             if do_attack4 {
                 let dur = (1750.0 + rng.random() as f32 * 200.0) as c_int;
-                TIMER_Set(ctx, npc, attacking_id.as_ptr(), dur);
+                TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), dur);
                 NPC_SetAnim(
                     ctx,
                     npc,
@@ -226,10 +226,15 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                     BOTH_ATTACK4 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                TIMER_Set(ctx, npc, cstr("attack2_dmg").as_ptr(), 950);
+                TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    cstr("attack2_dmg").as_ptr(),
+                    950,
+                );
             } else if rng.random() as f32 > 0.5f32 {
                 if rng.random() as f32 > 0.8f32 {
-                    TIMER_Set(ctx, npc, attacking_id.as_ptr(), 850);
+                    TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 850);
                     NPC_SetAnim(
                         ctx,
                         npc,
@@ -237,9 +242,14 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                         BOTH_ATTACK3 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                     );
-                    TIMER_Set(ctx, npc, cstr("attack2_dmg").as_ptr(), 400);
+                    TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        cstr("attack2_dmg").as_ptr(),
+                        400,
+                    );
                 } else {
-                    TIMER_Set(ctx, npc, attacking_id.as_ptr(), 850);
+                    TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 850);
                     NPC_SetAnim(
                         ctx,
                         npc,
@@ -247,10 +257,15 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                         BOTH_ATTACK1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                     );
-                    TIMER_Set(ctx, npc, cstr("attack1_dmg").as_ptr(), 450);
+                    TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        cstr("attack1_dmg").as_ptr(),
+                        450,
+                    );
                 }
             } else {
-                TIMER_Set(ctx, npc, attacking_id.as_ptr(), 1250);
+                TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 1250);
                 NPC_SetAnim(
                     ctx,
                     npc,
@@ -258,16 +273,33 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
                     BOTH_ATTACK2 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                TIMER_Set(ctx, npc, cstr("attack1_dmg").as_ptr(), 700);
+                TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    cstr("attack1_dmg").as_ptr(),
+                    700,
+                );
             }
         } else {
-            if TIMER_Done2(ctx, npc, cstr("attack1_dmg").as_ptr(), qtrue) != 0 {
+            if TIMER_Done2(
+                ctx,
+                ctx.entity_id_of(npc),
+                cstr("attack1_dmg").as_ptr(),
+                qtrue,
+            ) != 0
+            {
                 if let Some(enemy_id) = (*npc).enemy {
                     let enemy_ptr =
                         &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
                     MineMonster_TryDamage(ctx, enemy_ptr, 5);
                 }
-            } else if TIMER_Done2(ctx, npc, cstr("attack2_dmg").as_ptr(), qtrue) != 0 {
+            } else if TIMER_Done2(
+                ctx,
+                ctx.entity_id_of(npc),
+                cstr("attack2_dmg").as_ptr(),
+                qtrue,
+            ) != 0
+            {
                 if let Some(enemy_id) = (*npc).enemy {
                     let enemy_ptr =
                         &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
@@ -276,7 +308,12 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
             }
         }
 
-        TIMER_Done2(ctx, npc, cstr("attacking").as_ptr(), qtrue);
+        TIMER_Done2(
+            ctx,
+            ctx.entity_id_of(npc),
+            cstr("attacking").as_ptr(),
+            qtrue,
+        );
     }
 }
 
@@ -315,9 +352,15 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
         let advance = distance > (MIN_DISTANCE_SQR as f32);
 
         if (advance || (*npc_info).localState == LSTATE_WAITING)
-            && TIMER_Done(ctx, npc, cstr("attacking").as_ptr()) != 0
+            && TIMER_Done(ctx, ctx.entity_id_of(npc), cstr("attacking").as_ptr()) != 0
         {
-            if TIMER_Done2(ctx, npc, cstr("takingPain").as_ptr(), qtrue) != 0 {
+            if TIMER_Done2(
+                ctx,
+                ctx.entity_id_of(npc),
+                cstr("takingPain").as_ptr(),
+                qtrue,
+            ) != 0
+            {
                 (*npc_info).localState = LSTATE_CLEAR;
             } else {
                 MineMonster_Move(ctx, 1);
@@ -346,10 +389,23 @@ pub fn NPC_MineMonster_Pain(
         G_AddEvent(&mut *(self_), EV_PAIN as c_int, parm);
 
         if damage >= 10 {
-            TIMER_Remove(ctx, self_, cstr("attacking").as_ptr());
-            TIMER_Remove(ctx, self_, cstr("attacking1_dmg").as_ptr());
-            TIMER_Remove(ctx, self_, cstr("attacking2_dmg").as_ptr());
-            TIMER_Set(ctx, self_, cstr("takingPain").as_ptr(), 1350);
+            TIMER_Remove(ctx, ctx.entity_id_of(self_), cstr("attacking").as_ptr());
+            TIMER_Remove(
+                ctx,
+                ctx.entity_id_of(self_),
+                cstr("attacking1_dmg").as_ptr(),
+            );
+            TIMER_Remove(
+                ctx,
+                ctx.entity_id_of(self_),
+                cstr("attacking2_dmg").as_ptr(),
+            );
+            TIMER_Set(
+                ctx,
+                ctx.entity_id_of(self_),
+                cstr("takingPain").as_ptr(),
+                1350,
+            );
 
             _VectorCopy(
                 (*((*self_).NPC as *mut gNPC_t)).lastPathAngles,

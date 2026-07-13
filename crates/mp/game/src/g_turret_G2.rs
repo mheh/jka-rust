@@ -334,7 +334,7 @@ pub fn turretG2_die(
 
         if !attacker.is_null()
             && (*attacker).s.number < MAX_CLIENTS as c_int
-            && OnSameTeam(ctx, attacker, self_) == 0
+            && OnSameTeam(ctx, ctx.entity_id_of(attacker), ctx.entity_id_of(self_)) == 0
         {
             // give them a point for the kill
             AddScore(

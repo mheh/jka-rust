@@ -34,6 +34,7 @@ use crate::client::gclient::gclient_t;
 use crate::client::player_team_state::playerTeamStateState_t;
 use crate::client::spectator_state::spectatorState_t;
 use crate::client::CON_CONNECTED;
+use crate::ent_id::resolve;
 use crate::g_client::{ClientBegin, ClientSpawn, ClientUserinfoChanged};
 use crate::g_combat::AddScore;
 use crate::g_exphysics::G_RunExPhys;
@@ -726,10 +727,14 @@ pub fn G_SiegeGetCompletionStatus(ctx: GameContext<'_>, team: c_int, objective: 
 /// Source: `oracle/codemp/game/g_saga.c:482-526`
 pub fn UseSiegeTarget(
     ctx: GameContext<'_>,
-    other: *mut gentity_t,
-    en: *mut gentity_t,
+    other: Option<EntityId>,
+    en: Option<EntityId>,
     target: *mut c_char,
 ) {
+    // STAGE-1: Option<EntityId> params, raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let en: *mut gentity_t = unsafe { resolve(base, en) };
     unsafe {
         // Raven: "looks like we don't have access to a player, so just use
         // the activating entity" — when `en` has no client, all three uses
@@ -957,9 +962,9 @@ pub fn SiegeDoTeamAssign(ctx: GameContext<'_>) {
                 }
 
                 if (*cl).sess.sessionTeam == SIEGETEAM_TEAM1 {
-                    SetTeamQuick(ctx, ent, SIEGETEAM_TEAM2, qfalse);
+                    SetTeamQuick(ctx, EntityId(i as u32), SIEGETEAM_TEAM2, qfalse);
                 } else if (*cl).sess.sessionTeam == SIEGETEAM_TEAM2 {
-                    SetTeamQuick(ctx, ent, SIEGETEAM_TEAM1, qfalse);
+                    SetTeamQuick(ctx, EntityId(i as u32), SIEGETEAM_TEAM1, qfalse);
                 }
             }
             i += 1;
@@ -1135,7 +1140,9 @@ pub fn SiegeRoundComplete(ctx: GameContext<'_>, winningteam: c_int, winningclien
 /// Raven `G_ValidateSiegeClassForTeam`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:744-784`
-pub fn G_ValidateSiegeClassForTeam(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int) {
+pub fn G_ValidateSiegeClassForTeam(ctx: GameContext<'_>, ent: EntityId, team: c_int) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut newClassIndex: c_int = -1;
         let cl = (*ent).client as *mut gclient_t;
@@ -1193,7 +1200,9 @@ pub fn G_ValidateSiegeClassForTeam(ctx: GameContext<'_>, ent: *mut gentity_t, te
 /// Raven `SetTeamQuick` — bypass most of the normal checks in SetTeam.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:787-834`
-pub fn SetTeamQuick(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int, doBegin: qboolean) {
+pub fn SetTeamQuick(ctx: GameContext<'_>, ent: EntityId, team: c_int, doBegin: qboolean) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         // Raven's `MAX_INFO_STRING` is not yet a ported const (see
         // `q_shared.rs`'s `Info_SetValueForKey` precedent); hardcoded 1024
@@ -1210,7 +1219,7 @@ pub fn SetTeamQuick(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int, doBe
         );
 
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
-            G_ValidateSiegeClassForTeam(ctx, ent, team);
+            G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);
         }
 
         let cl = (*ent).client as *mut gclient_t;
@@ -1272,12 +1281,19 @@ pub fn SetTeamQuick(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int, doBe
 /// Raven `SiegeRespawn` — respawn a siege player, honoring a pending team switch.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:836-851`
-pub fn SiegeRespawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SiegeRespawn(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let client = (*ent).client as *mut gclient_t;
 
         if (*client).sess.sessionTeam != (*client).sess.siegeDesiredTeam {
-            SetTeamQuick(ctx, ent, (*client).sess.siegeDesiredTeam, qtrue);
+            SetTeamQuick(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                (*client).sess.siegeDesiredTeam,
+                qtrue,
+            );
         } else {
             ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
             // add a teleportation effect
@@ -1329,7 +1345,7 @@ pub fn SiegeBeginRound(ctx: GameContext<'_>, entNum: c_int) {
                 }
 
                 if spawnEnt != 0 {
-                    SiegeRespawn(ctx, ent);
+                    SiegeRespawn(ctx, EntityId(i as u32));
                     spawnEnt = qfalse;
                 }
                 i += 1;
@@ -1549,10 +1565,16 @@ pub fn SiegeObjectiveCompleted(
 /// Source: `oracle/codemp/game/g_saga.c:1060-1128`
 pub fn siegeTriggerUse(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; raw body
+    // re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = unsafe { resolve(base, other) };
+    let activator: *mut gentity_t = unsafe { resolve(base, activator) };
     unsafe {
         let mut teamstr: [c_char; 64] = [0; 64];
         let mut objectivestr: [c_char; 64] = [0; 64];
@@ -1626,12 +1648,22 @@ pub fn siegeTriggerUse(
                         }
                         i += 1;
                     }
-                    UseSiegeTarget(ctx, other, activator, teamstr.as_mut_ptr());
+                    UseSiegeTarget(
+                        ctx,
+                        ctx.entity_id_of(other),
+                        ctx.entity_id_of(activator),
+                        teamstr.as_mut_ptr(),
+                    );
                 }
 
                 if !(*ent).target.is_null() && *(*ent).target != 0 {
                     // use this too
-                    UseSiegeTarget(ctx, other, activator, (*ent).target);
+                    UseSiegeTarget(
+                        ctx,
+                        ctx.entity_id_of(other),
+                        ctx.entity_id_of(activator),
+                        (*ent).target,
+                    );
                 }
 
                 SiegeObjectiveCompleted(ctx, (*ent).side, (*ent).objective, r#final, clUser);
@@ -1646,8 +1678,10 @@ pub fn siegeTriggerUse(
 /// Raven `SP_info_siege_objective`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1137-1179`
-pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let mut s: *mut c_char = core::ptr::null_mut();
 
         if (*ctx.world).bg_state.siege_valid == 0
@@ -1719,7 +1753,10 @@ pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SiegeIconUse` — toggle it on and off.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1182-1194`
-pub fn SiegeIconUse(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn SiegeIconUse(ent: &mut gentity_t, other: Option<EntityId>, activator: Option<EntityId>) {
+    // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; `other`/`activator`
+    // are unused handler params kept as Option<EntityId>; raw re-derived (Stage-2 debt).
+    let ent: *mut gentity_t = ent;
     // toggle it on and off
     unsafe {
         if (*ent).s.eFlags & EF_RADAROBJECT != 0 {
@@ -1739,8 +1776,10 @@ pub fn SiegeIconUse(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut 
 /// Raven `SP_info_siege_radaricon`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1203-1234`
-pub fn SP_info_siege_radaricon(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_siege_radaricon(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let mut s: *mut c_char = core::ptr::null_mut();
         let mut i: c_int = 0;
 
@@ -1797,10 +1836,13 @@ pub fn SP_info_siege_radaricon(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_saga.c:1236-1291`
 pub fn decompTriggerUse(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator (unused); raw
+    // body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut r#final: c_int = 0;
         let mut teamstr: [c_char; 1024] = [0; 1024];
@@ -1874,8 +1916,10 @@ pub fn decompTriggerUse(
 /// Raven `SP_info_siege_decomplete`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1297-1315`
-pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
@@ -1915,10 +1959,12 @@ pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_saga.c:1317-1320`
 pub fn siegeEndUse(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator; all unused (body
+    // is a bare LogExit) — no re-derive needed.
     LogExit(ctx, b"Round ended\0".as_ptr() as *const c_char);
 }
 
@@ -1927,8 +1973,10 @@ pub fn siegeEndUse(
 /// Raven `SP_target_siege_end`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1325-1334`
-pub fn SP_target_siege_end(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_target_siege_end(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         if (*ctx.world).bg_state.siege_valid == 0
             || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
         {
@@ -1943,7 +1991,14 @@ pub fn SP_target_siege_end(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `SiegeItemRemoveOwner`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1338-1349`
-pub fn SiegeItemRemoveOwner(ent: *mut gentity_t, carrier: *mut gentity_t) {
+pub fn SiegeItemRemoveOwner(ent: &mut gentity_t, carrier: Option<&mut gentity_t>) {
+    // STAGE-1: ctx-free leaf borrows &mut gentity_t / Option<&mut gentity_t>;
+    // raw re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ent;
+    let carrier: *mut gentity_t = match carrier {
+        Some(c) => c,
+        None => core::ptr::null_mut(),
+    };
     unsafe {
         (*ent).genericValue2 = 0; // Remove picked-up flag
         (*ent).genericValue8 = ENTITYNUM_NONE; // Mark entity carrying us as none
@@ -1960,7 +2015,9 @@ pub fn SiegeItemRemoveOwner(ent: *mut gentity_t, carrier: *mut gentity_t) {
 /// fire its respawn target.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1351-1370`
-pub fn SiegeItemRespawnEffect(ctx: GameContext<'_>, ent: *mut gentity_t, newOrg: vec3_t) {
+pub fn SiegeItemRespawnEffect(ctx: GameContext<'_>, ent: EntityId, newOrg: vec3_t) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         if !(*ent).target5.is_null() && *(*ent).target5 != 0 {
             G_UseTargets2(
@@ -1990,13 +2047,24 @@ pub fn SiegeItemRespawnEffect(ctx: GameContext<'_>, ent: *mut gentity_t, newOrg:
 /// Source: `oracle/codemp/game/g_saga.c:1372-1380`
 pub fn SiegeItemRespawnOnOriginalSpot(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    carrier: *mut gentity_t,
+    ent: EntityId,
+    carrier: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> carrier; raw body re-derived
+    // verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let carrier: *mut gentity_t = unsafe { resolve(ctx.world().g_entities.as_mut_ptr(), carrier) };
     unsafe {
-        SiegeItemRespawnEffect(ctx, ent, (*ent).pos1);
+        SiegeItemRespawnEffect(ctx, ctx.entity_id_of(ent).unwrap(), (*ent).pos1);
         G_SetOrigin(&mut *(ent), (*ent).pos1);
-        SiegeItemRemoveOwner(ent, carrier);
+        SiegeItemRemoveOwner(
+            &mut *ent,
+            if carrier.is_null() {
+                None
+            } else {
+                Some(&mut *carrier)
+            },
+        );
 
         // Stop the item from flashing on the radar
         (*ent).s.time2 = 0;
@@ -2011,8 +2079,10 @@ pub fn SiegeItemRespawnOnOriginalSpot(
 /// Raven `SiegeItemThink`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1382-1475`
-pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SiegeItemThink(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         // PORT-NOTE(unported-const): `SIEGE_ITEM_RESPAWN_TIME` has no ported
         // home yet; referenced verbatim (missing_symbols).
         let mut carrier: *mut gentity_t = core::ptr::null_mut();
@@ -2079,7 +2149,7 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 || ((*((*carrier).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW != 0)
             {
                 // respawn on the original spot; oracle passes NULL here (g_saga.c:1435)
-                SiegeItemRespawnOnOriginalSpot(ctx, ent, core::ptr::null_mut());
+                SiegeItemRespawnOnOriginalSpot(ctx, ctx.entity_id_of(ent).unwrap(), None);
             } else if (*carrier).health < 1 {
                 // The carrier died so pop out where he is (unless in nodrop).
                 if !(*ent).target6.is_null() && *(*ent).target6 != 0 {
@@ -2101,7 +2171,11 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 );
                 if contents & CONTENTS_NODROP != 0 {
                     // In nodrop land, go back to the original spot.
-                    SiegeItemRespawnOnOriginalSpot(ctx, ent, carrier);
+                    SiegeItemRespawnOnOriginalSpot(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        ctx.entity_id_of(carrier),
+                    );
                 } else {
                     G_SetOrigin(&mut *(ent), carrier_origin);
                     (*ent).epVelocity[0] = (*ctx.world).bg_state.rng.Q_irand(-80, 80) as f32;
@@ -2113,14 +2187,21 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // and respawn on the original spot.
                     (*ent).genericValue9 = (*ctx.world).level.time + SIEGE_ITEM_RESPAWN_TIME;
 
-                    SiegeItemRemoveOwner(ent, carrier);
+                    SiegeItemRemoveOwner(
+                        &mut *ent,
+                        if carrier.is_null() {
+                            None
+                        } else {
+                            Some(&mut *carrier)
+                        },
+                    );
                 }
             }
         }
 
         if (*ent).genericValue9 != 0 && (*ent).genericValue9 < (*ctx.world).level.time {
             // time to respawn on the original spot then
-            SiegeItemRespawnEffect(ctx, ent, (*ent).pos1);
+            SiegeItemRespawnEffect(ctx, ctx.entity_id_of(ent).unwrap(), (*ent).pos1);
             G_SetOrigin(&mut *(ent), (*ent).pos1);
             (*ent).genericValue9 = 0;
 
@@ -2137,10 +2218,14 @@ pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_saga.c:1477-1545`
 pub fn SiegeItemTouch(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
+    self_: EntityId,
+    other: Option<EntityId>,
     trace: *mut trace_t,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> other; raw body re-derived
+    // verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    let other: *mut gentity_t = unsafe { resolve(ctx.world().g_entities.as_mut_ptr(), other) };
     unsafe {
         if other.is_null()
             || (*other).inuse == 0
@@ -2234,10 +2319,13 @@ pub fn SiegeItemTouch(
 /// Source: `oracle/codemp/game/g_saga.c:1547-1551`
 pub fn SiegeItemPain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> attacker (unused); raw body
+    // re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).s.time2 = (*ctx.world).level.time;
     }
@@ -2248,12 +2336,15 @@ pub fn SiegeItemPain(
 /// Source: `oracle/codemp/game/g_saga.c:1553-1574`
 pub fn SiegeItemDie(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     meansOfDeath: c_int,
 ) {
+    // STAGE-1: EntityId self_ + Option<EntityId> inflictor/attacker (unused);
+    // raw body re-derived verbatim (Stage-2 debt).
+    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         (*self_).takedamage = qfalse; // don't die more than once
 
@@ -2287,10 +2378,13 @@ pub fn SiegeItemDie(
 /// Source: `oracle/codemp/game/g_saga.c:1576-1623`
 pub fn SiegeItemUse(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
+    ent: EntityId,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId ent + Option<EntityId> other/activator (unused); raw
+    // body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     // once used, become active
     unsafe {
         if (*ent).spawnflags & SIEGEITEM_STARTOFFRADAR != 0 {
@@ -2352,8 +2446,10 @@ pub fn SiegeItemUse(
 /// Raven `SP_misc_siege_item`.
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1676-1835`
-pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let mut canpickup: c_int = 0;
         let mut noradar: c_int = 0;
         let mut s: *mut c_char = core::ptr::null_mut();
@@ -2626,8 +2722,10 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// client's PVS (support guy, etc.).
 ///
 /// Source: `oracle/codemp/game/g_saga.c:1845-1886`
-pub fn G_SiegeClientExData(ctx: GameContext<'_>, msgTarg: *mut gentity_t) {
+pub fn G_SiegeClientExData(ctx: GameContext<'_>, msgTarg: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let msgTarg: *mut gentity_t = ctx.entity_mut(msgTarg);
         // PORT-NOTE(unported-const): `MAX_EXDATA_ENTS_TO_SEND` has no ported
         // home yet; referenced verbatim (missing_symbols). `weaponData` is
         // resolved via the prelude re-export.

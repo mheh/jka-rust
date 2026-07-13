@@ -1415,7 +1415,12 @@ pub fn SetTeam(ctx: GameContext<'_>, ent: EntityId, s: *mut c_char) {
                 }
 
                 if (*client).sess.sessionTeam != (*client).sess.siegeDesiredTeam {
-                    crate::g_saga::SetTeamQuick(ctx, ent, (*client).sess.siegeDesiredTeam, qfalse);
+                    crate::g_saga::SetTeamQuick(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        (*client).sess.siegeDesiredTeam,
+                        qfalse,
+                    );
                 }
 
                 return;
@@ -2304,7 +2309,10 @@ pub fn G_SayTo(
         if (*otherClient).pers.connected != CON_CONNECTED {
             return;
         }
-        if mode == SAY_TEAM && crate::g_team::OnSameTeam(ctx, ent, other) == qfalse {
+        if mode == SAY_TEAM
+            && crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(other))
+                == qfalse
+        {
             return;
         }
 
@@ -2399,7 +2407,12 @@ pub fn G_Say(
                 crate::g_main::G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
 
                 let mut location = [0 as c_char; 64];
-                if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64) != qfalse
+                if crate::g_team::Team_GetLocationMsg(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    location.as_mut_ptr(),
+                    64,
+                ) != qfalse
                 {
                     // Raven's EC macro is the literal byte 0x19, distinct from
                     // the ^7 color escape (Q_COLOR_ESCAPE + COLOR_WHITE).
@@ -2422,8 +2435,12 @@ pub fn G_Say(
                     && (*targetClient).sess.sessionTeam == (*client).sess.sessionTeam
                 {
                     let mut location = [0 as c_char; 64];
-                    if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64)
-                        != qfalse
+                    if crate::g_team::Team_GetLocationMsg(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        location.as_mut_ptr(),
+                        64,
+                    ) != qfalse
                     {
                         // EC is the literal byte 0x19, distinct from the ^7
                         // color escape (Q_COLOR_ESCAPE + COLOR_WHITE).
@@ -4550,7 +4567,11 @@ pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: EntityId) {
             }
 
             if (*world).cvars.g_gametype.integer >= GT_TEAM
-                && crate::g_team::OnSameTeam(ctx, ent, challenged) != qfalse
+                && crate::g_team::OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(ent),
+                    ctx.entity_id_of(challenged),
+                ) != qfalse
             {
                 return;
             }

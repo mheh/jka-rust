@@ -298,18 +298,23 @@ pub fn Mark2_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
         let npc_ptr = (*ctx.world).globals.NPC;
         let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
-        if TIMER_Done(ctx, npc_ptr, b"attackDelay\0".as_ptr() as *const c_char) == qtrue {
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc_ptr),
+            b"attackDelay\0".as_ptr() as *const c_char,
+        ) == qtrue
+        {
             if (*npc_info_ptr).localState == LSTATE_NONE {
                 TIMER_Set(
                     ctx,
-                    npc_ptr,
+                    ctx.entity_id_of(npc_ptr),
                     b"attackDelay\0".as_ptr() as *const c_char,
                     (*ctx.world).bg_state.rng.Q_irand(500, 2000),
                 );
             } else {
                 TIMER_Set(
                     ctx,
-                    npc_ptr,
+                    ctx.entity_id_of(npc_ptr),
                     b"attackDelay\0".as_ptr() as *const c_char,
                     (*ctx.world).bg_state.rng.Q_irand(100, 500),
                 );
@@ -371,7 +376,12 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
             if (*npc_info_ptr).localState == LSTATE_DOWN
                 || (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN
             {
-                if TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue {
+                if TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc_ptr),
+                    b"downTime\0".as_ptr() as *const c_char,
+                ) == qtrue
+                {
                     (*npc_info_ptr).localState = LSTATE_RISINGUP;
                     NPC_SetAnim(
                         ctx,
@@ -382,7 +392,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
                     );
                     TIMER_Set(
                         ctx,
-                        npc_ptr,
+                        ctx.entity_id_of(npc_ptr),
                         b"runTime\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(3000, 8000),
                     );
@@ -394,7 +404,11 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
         }
 
         if advance == qtrue
-            && TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue
+            && TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc_ptr),
+                b"downTime\0".as_ptr() as *const c_char,
+            ) == qtrue
             && (*npc_info_ptr).localState == LSTATE_DOWN
         {
             (*npc_info_ptr).localState = LSTATE_RISINGUP;
@@ -407,7 +421,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
             );
             TIMER_Set(
                 ctx,
-                npc_ptr,
+                ctx.entity_id_of(npc_ptr),
                 b"runTime\0".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(3000, 8000),
             );
@@ -425,7 +439,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
             );
             TIMER_Set(
                 ctx,
-                npc_ptr,
+                ctx.entity_id_of(npc_ptr),
                 b"downTime\0".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(3000, 9000),
             );
@@ -439,7 +453,12 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
         } else if (*npc_info_ptr).localState == LSTATE_DOWN {
             (*npc_ptr).flags |= FL_SHIELDED;
             Mark2_BlasterAttack(ctx, qfalse);
-        } else if TIMER_Done(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char) == qtrue {
+        } else if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc_ptr),
+            b"runTime\0".as_ptr() as *const c_char,
+        ) == qtrue
+        {
             (*npc_info_ptr).localState = LSTATE_DROPPINGDOWN;
         } else if advance == qtrue {
             Mark2_BlasterAttack(ctx, advance);
@@ -466,10 +485,15 @@ pub fn Mark2_Patrol(ctx: GameContext<'_>) {
                 NPC_UpdateAngles(ctx, qtrue, qtrue);
             }
 
-            if TIMER_Done(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char) == qtrue {
+            if TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc_ptr),
+                b"patrolNoise\0".as_ptr() as *const c_char,
+            ) == qtrue
+            {
                 TIMER_Set(
                     ctx,
-                    npc_ptr,
+                    ctx.entity_id_of(npc_ptr),
                     b"patrolNoise\0".as_ptr() as *const c_char,
                     (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                 );

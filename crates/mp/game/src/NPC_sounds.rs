@@ -82,7 +82,11 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).health > 0 {
             if (*self_).enemy.is_some()
-                || TIMER_Done(ctx, self_, cstr("enemyLastVisible").as_ptr()) == qfalse
+                || TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    cstr("enemyLastVisible").as_ptr(),
+                ) == qfalse
                 || (*((*self_).client as *mut gclient_t)).renderInfo.lookTarget == 0
             {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
@@ -105,7 +109,12 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         }
 
-        TIMER_Set(ctx, self_, cstr("enemyLastVisible").as_ptr(), 0);
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            cstr("enemyLastVisible").as_ptr(),
+            0,
+        );
         (*((*self_).NPC as *mut gNPC_t)).tempBehavior = BS_DEFAULT;
 
         G_ClearEnemy(ctx, self_);

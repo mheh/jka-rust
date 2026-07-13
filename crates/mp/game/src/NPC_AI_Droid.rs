@@ -52,7 +52,12 @@ pub fn R2D2_PartsMove(ctx: GameContext<'_>) {
             return;
         }
 
-        if TIMER_Done(ctx, npc, b"eyeDelay\0".as_ptr() as *const c_char) != 0 {
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc),
+            b"eyeDelay\0".as_ptr() as *const c_char,
+        ) != 0
+        {
             (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
 
             (*npc).pos1[0] += (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
@@ -63,7 +68,7 @@ pub fn R2D2_PartsMove(ctx: GameContext<'_>) {
 
             TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 b"eyeDelay\0".as_ptr() as *const c_char,
                 (*ctx.world).bg_state.rng.Q_irand(100, 1000),
             );
@@ -170,7 +175,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                     + ((*ctx.world).level.time as f64 * 0.5).sin() * 25.0)
                     as f32;
 
-                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                if TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                ) != 0
+                {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
                     G_SoundOnEnt(
@@ -182,7 +192,7 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
 
                     TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         b"patrolNoise\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -191,7 +201,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2
             {
                 // CLASS_R2D2
-                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                if TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                ) != 0
+                {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
                     G_SoundOnEnt(
@@ -203,7 +218,7 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
 
                     TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         b"patrolNoise\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -212,7 +227,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2
             {
                 // CLASS_R5D2
-                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                if TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                ) != 0
+                {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
                     let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
                     G_SoundOnEnt(
@@ -224,7 +244,7 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
 
                     TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         b"patrolNoise\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -234,7 +254,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_GONK
             {
                 // CLASS_GONK
-                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                if TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                ) != 0
+                {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 2);
                     let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
                     G_SoundOnEnt(
@@ -246,7 +271,7 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
 
                     TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         b"patrolNoise\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
@@ -324,31 +349,36 @@ pub fn Droid_Spin(ctx: GameContext<'_>) {
                     c"head".to_owned(),
                 ),
             ) > 0 {
-                if TIMER_Done(ctx, npc, b"smoke\0".as_ptr() as *const c_char) != 0 && TIMER_Done(ctx, npc, b"droidsmoketotal\0".as_ptr() as *const c_char) == 0 {
-                    TIMER_Set(ctx, npc, b"smoke\0".as_ptr() as *const c_char, 100);
+                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"smoke\0".as_ptr() as *const c_char) != 0 && TIMER_Done(ctx, ctx.entity_id_of(npc), b"droidsmoketotal\0".as_ptr() as *const c_char) == 0 {
+                    TIMER_Set(ctx, ctx.entity_id_of(npc), b"smoke\0".as_ptr() as *const c_char, 100);
                     G_PlayEffectID(G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
                 }
 
-                if TIMER_Done(ctx, npc, b"droidspark\0".as_ptr() as *const c_char) != 0 {
-                    TIMER_Set(ctx, npc, b"droidspark\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(100, 500));
+                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"droidspark\0".as_ptr() as *const c_char) != 0 {
+                    TIMER_Set(ctx, ctx.entity_id_of(npc), b"droidspark\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(100, 500));
                     G_PlayEffectID(G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
                 }
 
                 ucmd.forwardmove = (*ctx.world).bg_state.rng.Q_irand(-64, 64) as c_int as i8;
 
-                if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
-                    TIMER_Set(ctx, npc, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(250, 1000));
+                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char) != 0 {
+                    TIMER_Set(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(250, 1000));
                     (*npc_info).desiredYaw = (*ctx.world).bg_state.rng.Q_irand(0, 360) as f32;
                 }
             } else {
-                if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
+                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char) != 0 {
                     (*npc_info).localState = LSTATE_NONE;
                 } else {
                     (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
                 }
             }
         } else {
-            if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
+            if TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc),
+                b"roam\0".as_ptr() as *const c_char,
+            ) != 0
+            {
                 (*npc_info).localState = LSTATE_NONE;
             } else {
                 (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
@@ -414,8 +444,8 @@ pub fn NPC_Droid_Pain(
 
                             (*((*self_).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + 3000;
 
-                            TIMER_Set(ctx, self_, b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
-                            TIMER_Set(ctx, self_, b"droidspark\0".as_ptr() as *const c_char, 100);
+                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
+                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
                             (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                         }
                     }
@@ -443,7 +473,7 @@ pub fn NPC_Droid_Pain(
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                     TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         b"roam\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
@@ -496,8 +526,8 @@ pub fn NPC_Droid_Pain(
 
                             (*((*self_).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + 3000;
 
-                            TIMER_Set(ctx, self_, b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
-                            TIMER_Set(ctx, self_, b"droidspark\0".as_ptr() as *const c_char, 100);
+                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
+                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
                             (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                         }
                     }
@@ -525,7 +555,7 @@ pub fn NPC_Droid_Pain(
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                     TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         b"roam\0".as_ptr() as *const c_char,
                         (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
@@ -568,7 +598,12 @@ pub fn Droid_Pain(ctx: GameContext<'_>) {
             return;
         }
 
-        if TIMER_Done(ctx, npc, b"droidpain\0".as_ptr() as *const c_char) != 0 {
+        if TIMER_Done(
+            ctx,
+            ctx.entity_id_of(npc),
+            b"droidpain\0".as_ptr() as *const c_char,
+        ) != 0
+        {
             (*npc_info).localState = LSTATE_NONE;
         }
     }

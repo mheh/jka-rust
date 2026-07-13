@@ -53,29 +53,34 @@ pub fn NPC_ShadowTrooper_Precache(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:110-135`
 pub fn Jedi_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    crate::g_timer::TIMER_Set(ctx, ent, c"roamTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"chatter".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"strafeLeft".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"strafeRight".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"noStrafe".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"walking".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"taunting".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"parryTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"parryReCalcTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"forceJumpChasing".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"jumpChaseDebounce".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"moveforward".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"moveback".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"movenone".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"moveright".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"moveleft".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"movecenter".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"saberLevelDebounce".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"noRetreat".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"holdLightning".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"gripping".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"draining".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ent, c"noturn".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"roamTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"chatter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"strafeLeft".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"strafeRight".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noStrafe".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"walking".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"taunting".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"parryTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"parryReCalcTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"forceJumpChasing".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"jumpChaseDebounce".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveforward".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveback".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"movenone".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveright".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveleft".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"movecenter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"saberLevelDebounce".as_ptr(),
+        0,
+    );
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noRetreat".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"holdLightning".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"gripping".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"draining".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noturn".as_ptr(), 0);
 }
 
 /// Raven `Jedi_PlayBlockedPushSound`.
@@ -337,18 +342,43 @@ pub fn Boba_StopKnockdown(
             let mut tempCmd: usercmd_t = core::mem::zeroed();
             if fDot >= 0.4 {
                 tempCmd.forwardmove = 127;
-                crate::g_timer::TIMER_Set(ctx, self_, c"moveforward".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    c"moveforward".as_ptr(),
+                    strafeTime,
+                );
             } else if fDot <= -0.4 {
                 tempCmd.forwardmove = -127;
-                crate::g_timer::TIMER_Set(ctx, self_, c"moveback".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    c"moveback".as_ptr(),
+                    strafeTime,
+                );
             } else if rDot > 0.0 {
                 tempCmd.rightmove = 127;
-                crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), strafeTime);
-                crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), -1);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    c"strafeRight".as_ptr(),
+                    strafeTime,
+                );
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"strafeLeft".as_ptr(), -1);
             } else {
                 tempCmd.rightmove = -127;
-                crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), strafeTime);
-                crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), -1);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    c"strafeLeft".as_ptr(),
+                    strafeTime,
+                );
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    c"strafeRight".as_ptr(),
+                    -1,
+                );
             }
             crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
             if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
@@ -357,7 +387,12 @@ pub fn Boba_StopKnockdown(
                 crate::w_force::ForceJump(ctx, ctx.entity_id_of(self_).unwrap(), &mut tempCmd);
             } else {
                 //roll
-                crate::g_timer::TIMER_Set(ctx, self_, c"duck".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    c"duck".as_ptr(),
+                    strafeTime,
+                );
             }
             (*self_).painDebounceTime = 0; //so we do something
         } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 && forceKnockdown != qfalse {
@@ -379,7 +414,9 @@ pub fn Boba_FlyStart(ctx: GameContext<'_>, self_: *mut gentity_t) {
     //switch to seeker AI for a while
     unsafe {
         let world = ctx.world;
-        if crate::g_timer::TIMER_Done(ctx, self_, c"jetRecharge".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"jetRecharge".as_ptr())
+            != qfalse
+        {
             let client = (*self_).client as *mut gclient_t;
             (*client).ps.gravity = 0;
             if !(*self_).NPC.is_null() {
@@ -426,13 +463,13 @@ pub fn Boba_FlyStop(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*self_).count = 0; // SEEKER shot ammo count
             crate::g_timer::TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 c"jetRecharge".as_ptr(),
                 (*world).bg_state.rng.Q_irand(1000, 5000),
             );
             crate::g_timer::TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 c"jumpChaseDebounce".as_ptr(),
                 (*world).bg_state.rng.Q_irand(500, 2000),
             );
@@ -536,10 +573,20 @@ pub fn Boba_StartFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         (*client).ps.torsoTimer = flameTime; //+1000;
         if !(*self_).NPC.is_null() {
-            crate::g_timer::TIMER_Set(ctx, self_, c"nextAttackDelay".as_ptr(), flameTime);
-            crate::g_timer::TIMER_Set(ctx, self_, c"walking".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(self_),
+                c"nextAttackDelay".as_ptr(),
+                flameTime,
+            );
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"walking".as_ptr(), 0);
         }
-        crate::g_timer::TIMER_Set(ctx, self_, c"flameTime".as_ptr(), flameTime);
+        crate::g_timer::TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"flameTime".as_ptr(),
+            flameTime,
+        );
         crate::g_utils::G_SoundOnEnt(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -586,8 +633,10 @@ pub fn Boba_DoFlameThrower(ctx: GameContext<'_>, self_: *mut gentity_t) {
             animNumber_t::BOTH_FORCELIGHTNING_HOLD as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
-        if crate::g_timer::TIMER_Done(ctx, self_, c"nextAttackDelay".as_ptr()) != qfalse
-            && crate::g_timer::TIMER_Done(ctx, self_, c"flameTime".as_ptr()) != qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"nextAttackDelay".as_ptr())
+            != qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"flameTime".as_ptr())
+                != qfalse
         {
             Boba_StartFlameThrower(ctx, self_);
         }
@@ -669,7 +718,8 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
         }
 
         if (enemyDist < (128.0 * 128.0) && enemyInFOV != qfalse)
-            || crate::g_timer::TIMER_Done(ctx, npc, c"flameTime".as_ptr()) == qfalse
+            || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"flameTime".as_ptr())
+                == qfalse
         {
             //flamethrower
             Boba_DoFlameThrower(ctx, npc);
@@ -704,8 +754,10 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
         }
 
         //can we see our target?
-        if crate::g_timer::TIMER_Done(ctx, npc, c"nextAttackDelay".as_ptr()) != qfalse
-            && crate::g_timer::TIMER_Done(ctx, npc, c"flameTime".as_ptr()) != qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"nextAttackDelay".as_ptr())
+            != qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"flameTime".as_ptr())
+                != qfalse
         {
             if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy) != qfalse {
                 (*npc_info).enemyLastSeenTime = (*world).level.time;
@@ -916,7 +968,7 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                         //delay our next attempt
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc),
                             c"nextAttackDelay".as_ptr(),
                             (*world).bg_state.rng.Q_irand(500, 1000),
                         );
@@ -924,7 +976,12 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                 }
             } else if shoot != qfalse {
                 //try to shoot if it's time
-                if crate::g_timer::TIMER_Done(ctx, npc, c"nextAttackDelay".as_ptr()) != qfalse {
+                if crate::g_timer::TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"nextAttackDelay".as_ptr(),
+                ) != qfalse
+                {
                     if ((*npc_info).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                         // we've already fired, no need to do it again here
                         crate::NPC_combat::WeaponThink(ctx, qtrue);
@@ -1075,11 +1132,11 @@ pub fn Jedi_AggressionErosion(ctx: GameContext<'_>, amt: c_int) {
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
         let client = (*npc).client as *mut gclient_t;
-        if crate::g_timer::TIMER_Done(ctx, npc, c"roamTime".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"roamTime".as_ptr()) != qfalse {
             //the longer we're not alerted and have no enemy, the more our aggression goes down
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"roamTime".as_ptr(),
                 (*world).bg_state.rng.Q_irand(2000, 5000),
             );
@@ -1145,7 +1202,7 @@ pub fn NPC_Jedi_RateNewEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemy:
         //don't taunt right away
         crate::g_timer::TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"chatter".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(4000, 7000),
         );
@@ -1164,14 +1221,14 @@ pub fn Jedi_Rage(ctx: GameContext<'_>) {
             npc,
             10 - (*npc_info).stats.aggression + (*world).bg_state.rng.Q_irand(-2, 2),
         );
-        crate::g_timer::TIMER_Set(ctx, npc, c"roamTime".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"chatter".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"walking".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"jumpChaseDebounce".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"movenone".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"movecenter".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, npc, c"noturn".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"roamTime".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"walking".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"taunting".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"jumpChaseDebounce".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"movenone".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"movecenter".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"noturn".as_ptr(), 0);
         crate::w_force::ForceRage(ctx, ctx.entity_id_of(npc).unwrap());
     }
 }
@@ -1183,7 +1240,7 @@ pub fn Jedi_RageStop(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if !(*self_).NPC.is_null() {
             //calm down and back off
-            crate::g_timer::TIMER_Set(ctx, self_, c"roamTime".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"roamTime".as_ptr(), 0);
             Jedi_Aggression(self_, (*ctx.world).bg_state.rng.Q_irand(-5, 0));
         }
     }
@@ -1201,7 +1258,7 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
         let client = (*npc).client as *mut gclient_t;
         // PORT-NOTE(jediSpeechDebounceTime): field is a `()` placeholder in
         // game_globals.rs; needs porting to `[c_int; TEAM_NUM_TEAMS]`.
-        if crate::g_timer::TIMER_Done(ctx, npc, c"chatter".as_ptr()) != qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr()) != qfalse
             && (*world).bg_state.rng.Q_irand(0, 3) == 0
             && (*npc_info).blockedSpeechDebounceTime < (*world).level.time
             && (*world).globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
@@ -1244,7 +1301,7 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
                     (*world).level.time + 6000;
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"chatter".as_ptr(),
                     (*world).bg_state.rng.Q_irand(5000, 10000),
                 );
@@ -1587,7 +1644,7 @@ pub fn Jedi_Retreat(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let ge = (*world).g_entities.as_mut_ptr();
-        if crate::g_timer::TIMER_Done(ctx, npc, c"noRetreat".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"noRetreat".as_ptr()) == qfalse {
             //don't actually move
             return;
         }
@@ -1698,7 +1755,11 @@ pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: GameContext<'_>) {
             && ((*world).globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) == 0
         {
             //not attacking
-            if crate::g_timer::TIMER_Done(ctx, npc, c"saberLevelDebounce".as_ptr()) != qfalse
+            if crate::g_timer::TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"saberLevelDebounce".as_ptr(),
+            ) != qfalse
                 && (*world).bg_state.rng.Q_irand(0, 10) == 0
             {
                 Jedi_AdjustSaberAnimLevel(
@@ -1708,7 +1769,7 @@ pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: GameContext<'_>) {
                 );
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"saberLevelDebounce".as_ptr(),
                     (*world).bg_state.rng.Q_irand(3000, 10000),
                 );
@@ -1716,7 +1777,7 @@ pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: GameContext<'_>) {
         } else {
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"saberLevelDebounce".as_ptr(),
                 (*world).bg_state.rng.Q_irand(1000, 5000),
             );
@@ -1749,12 +1810,19 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
         {
             //when gripping, don't move
             return;
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"gripping".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"gripping".as_ptr())
+            == qfalse
+        {
             //stopped gripping, clear timers just in case
-            crate::g_timer::TIMER_Set(ctx, npc, c"gripping".as_ptr(), -(*world).level.time);
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
+                c"gripping".as_ptr(),
+                -(*world).level.time,
+            );
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc),
                 c"attackDelay".as_ptr(),
                 (*world).bg_state.rng.Q_irand(0, 1000),
             );
@@ -1765,19 +1833,28 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
         {
             //when draining, don't move
             return;
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"draining".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"draining".as_ptr())
+            == qfalse
+        {
             //stopped draining, clear timers just in case
-            crate::g_timer::TIMER_Set(ctx, npc, c"draining".as_ptr(), -(*world).level.time);
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
+                c"draining".as_ptr(),
+                -(*world).level.time,
+            );
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc),
                 c"attackDelay".as_ptr(),
                 (*world).bg_state.rng.Q_irand(0, 1000),
             );
         }
 
         if (*client).NPC_class == CLASS_BOBAFETT {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"flameTime".as_ptr()) == qfalse {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"flameTime".as_ptr())
+                == qfalse
+            {
                 if enemy_dist > 50 {
                     Jedi_Advance(ctx);
                 } else if enemy_dist <= 0 {
@@ -1807,14 +1884,21 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 //hold it out there
                 (*world).globals.ucmd.buttons |= BUTTON_ALT_ATTACK;
             }
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"taunting".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"taunting".as_ptr())
+            == qfalse
+        {
             if enemy_dist <= 64 {
                 //he's getting too close
                 (*world).globals.ucmd.buttons |= BUTTON_ATTACK;
                 if (*client).ps.saberInFlight == qfalse {
                     crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
                 }
-                crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), -(*world).level.time);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"taunting".as_ptr(),
+                    -(*world).level.time,
+                );
             } else if (*client).ps.forceHandExtend == HANDEXTEND_JEDITAUNT as c_int
                 && ((*client).ps.forceHandExtendTime - (*world).level.time) < 200
             {
@@ -1838,8 +1922,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 (*client).ps.saberEventFlags &= !SEF_LOCK_WON as c_int;
             }
             //don't strafe?
-            crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), -1);
-            crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"strafeLeft".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"strafeRight".as_ptr(), -1);
         } else if !enemy.is_null()
             && !(*enemy).client.is_null()
             && (*enemy).s.weapon == WP_SABER as c_int
@@ -1877,8 +1961,18 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     && (*world).bg_state.rng.Q_irand(0, 2) == 0
                 {
                     //drain
-                    crate::g_timer::TIMER_Set(ctx, npc, c"draining".as_ptr(), 3000);
-                    crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), 3000);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"draining".as_ptr(),
+                        3000,
+                    );
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"attackDelay".as_ptr(),
+                        3000,
+                    );
                     Jedi_Advance(ctx);
                     return;
                 } else {
@@ -1904,8 +1998,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 0.2f32,
             ) != qfalse
         {
-            crate::g_timer::TIMER_Set(ctx, npc, c"draining".as_ptr(), 3000);
-            crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), 3000);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"draining".as_ptr(), 3000);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr(), 3000);
             Jedi_Advance(ctx);
             return;
         } else if enemy_dist <= -16 {
@@ -1989,7 +2083,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
             {
                 //They're being gripped, rush them!
                 if (*enemy_client).ps.groundEntityNum != ENTITYNUM_NONE {
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse
+                    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr())
+                        != qfalse
                         || (*npc_info).rank as c_int > RANK_LT as c_int
                     {
                         if enemy_dist > 200 || ((*npc_info).scriptFlags & SCF_DONT_FIRE) == 0 {
@@ -2025,7 +2120,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     < (*npc_info).rank as c_int
             {
                 //They're throwing their saber, grip them!
-                if crate::g_timer::TIMER_Done(ctx, npc, c"chatter".as_ptr()) != qfalse
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr())
+                    != qfalse
                     && (*world).globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
                         < (*world).level.time
                     && (*npc_info).blockedSpeechDebounceTime < (*world).level.time
@@ -2042,11 +2138,21 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                     (*npc_info).blockedSpeechDebounceTime = (*world).level.time + 3000;
                     (*world).globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
                         (*world).level.time + 3000;
-                    crate::g_timer::TIMER_Set(ctx, npc, c"chatter".as_ptr(), 3000);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"chatter".as_ptr(),
+                        3000,
+                    );
                 }
                 //grip
-                crate::g_timer::TIMER_Set(ctx, npc, c"gripping".as_ptr(), 3000);
-                crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), 3000);
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"gripping".as_ptr(), 3000);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"attackDelay".as_ptr(),
+                    3000,
+                );
             } else {
                 let chanceScale: c_int;
 
@@ -2056,7 +2162,11 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 {
                     //They're choking someone, run at them
                     if (*enemy_client).ps.groundEntityNum != ENTITYNUM_NONE {
-                        if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse
+                        if crate::g_timer::TIMER_Done(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"parryTime".as_ptr(),
+                        ) != qfalse
                             || (*npc_info).rank as c_int > RANK_LT as c_int
                         {
                             if enemy_dist > 200 || ((*npc_info).scriptFlags & SCF_DONT_FIRE) == 0 {
@@ -2103,7 +2213,12 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                         {
                             //force pull the guy to me!
                             crate::w_force::ForceThrow(ctx, ctx.entity_id_of(npc).unwrap(), qtrue);
-                            crate::g_timer::TIMER_Set(ctx, npc, c"duck".as_ptr(), enemy_dist * 3);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"duck".as_ptr(),
+                                enemy_dist * 3,
+                            );
                             if (*world).bg_state.rng.Q_irand(0, 1) != 0 {
                                 (*world).globals.ucmd.buttons |= BUTTON_ATTACK;
                             }
@@ -2125,14 +2240,14 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                                     .Q_irand(1000, 3000 + ((*world).cvars.g_spskill.integer * 500));
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    npc,
+                                    ctx.entity_id_of(npc),
                                     c"holdLightning".as_ptr(),
                                     (*client).ps.weaponTime,
                                 );
                             }
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"attackDelay".as_ptr(),
                                 (*client).ps.weaponTime,
                             );
@@ -2144,7 +2259,11 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                         ) != qfalse
                         {
                             //taunt
-                            if crate::g_timer::TIMER_Done(ctx, npc, c"chatter".as_ptr()) != qfalse
+                            if crate::g_timer::TIMER_Done(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"chatter".as_ptr(),
+                            ) != qfalse
                                 && (*world).globals.jediSpeechDebounceTime
                                     [(*client).playerTeam as usize]
                                     < (*world).level.time
@@ -2162,11 +2281,26 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                                 (*npc_info).blockedSpeechDebounceTime = (*world).level.time + 3000;
                                 (*world).globals.jediSpeechDebounceTime
                                     [(*client).playerTeam as usize] = (*world).level.time + 3000;
-                                crate::g_timer::TIMER_Set(ctx, npc, c"chatter".as_ptr(), 3000);
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(npc),
+                                    c"chatter".as_ptr(),
+                                    3000,
+                                );
                             }
                             //grip
-                            crate::g_timer::TIMER_Set(ctx, npc, c"gripping".as_ptr(), 3000);
-                            crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), 3000);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"gripping".as_ptr(),
+                                3000,
+                            );
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"attackDelay".as_ptr(),
+                                3000,
+                            );
                         } else {
                             if crate::w_force::WP_ForcePowerAvailable(
                                 ctx,
@@ -2193,7 +2327,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
                 }
                 //see if we should advance now
                 else if (*npc_info).stats.aggression > 5 {
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse
+                    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr())
+                        != qfalse
                         || (*npc_info).rank as c_int > RANK_LT as c_int
                     {
                         if enemy.is_null()
@@ -2215,7 +2350,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
             } else if (*npc_info).stats.aggression > 5 {
                 //try to get closer
                 if enemy_dist > 0 && ((*npc_info).scriptFlags & SCF_DONT_FIRE) == 0 {
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse
+                    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr())
+                        != qfalse
                         || (*npc_info).rank as c_int > RANK_LT as c_int
                     {
                         if enemy.is_null()
@@ -2270,8 +2406,9 @@ pub fn Jedi_Strafe(
             //don't strafe if pressing the advantage of winning a saberLock
             return qfalse;
         }
-        if crate::g_timer::TIMER_Done(ctx, npc, c"strafeLeft".as_ptr()) != qfalse
-            && crate::g_timer::TIMER_Done(ctx, npc, c"strafeRight".as_ptr()) != qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"strafeLeft".as_ptr()) != qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"strafeRight".as_ptr())
+                != qfalse
         {
             let mut strafed: qboolean = qfalse;
             let strafeTime = (*world).bg_state.rng.Q_irand(strafeTimeMin, strafeTimeMax);
@@ -2284,7 +2421,12 @@ pub fn Jedi_Strafe(
                     qfalse,
                 ) != qfalse
                 {
-                    crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), strafeTime);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"strafeLeft".as_ptr(),
+                        strafeTime,
+                    );
                     strafed = qtrue;
                 } else if NPC_MoveDirClear(
                     ctx,
@@ -2293,14 +2435,24 @@ pub fn Jedi_Strafe(
                     qfalse,
                 ) != qfalse
                 {
-                    crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), strafeTime);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"strafeRight".as_ptr(),
+                        strafeTime,
+                    );
                     strafed = qtrue;
                 }
             } else {
                 if NPC_MoveDirClear(ctx, (*world).globals.ucmd.forwardmove as c_int, 127, qfalse)
                     != qfalse
                 {
-                    crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), strafeTime);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"strafeRight".as_ptr(),
+                        strafeTime,
+                    );
                     strafed = qtrue;
                 } else if NPC_MoveDirClear(
                     ctx,
@@ -2309,7 +2461,12 @@ pub fn Jedi_Strafe(
                     qfalse,
                 ) != qfalse
                 {
-                    crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), strafeTime);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"strafeLeft".as_ptr(),
+                        strafeTime,
+                    );
                     strafed = qtrue;
                 }
             }
@@ -2317,7 +2474,7 @@ pub fn Jedi_Strafe(
             if strafed != qfalse {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"noStrafe".as_ptr(),
                     strafeTime
                         + (*world)
@@ -2327,7 +2484,12 @@ pub fn Jedi_Strafe(
                 );
                 if walking != qfalse {
                     //should be a slow strafe
-                    crate::g_timer::TIMER_Set(ctx, npc, c"walking".as_ptr(), strafeTime);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"walking".as_ptr(),
+                        strafeTime,
+                    );
                 }
                 return qtrue;
             }
@@ -2957,7 +3119,8 @@ pub fn Jedi_SaberBlockGo(
                 if (*client).ps.groundEntityNum != ENTITYNUM_NONE
                     && ((*client).ps.pm_flags & PMF_DUCKED) == 0
                     && (*cmd).upmove >= 0
-                    && crate::g_timer::TIMER_Done(ctx, self_, c"duck".as_ptr()) != qfalse
+                    && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"duck".as_ptr())
+                        != qfalse
                     && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
                         == qfalse
                     && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
@@ -3002,17 +3165,22 @@ pub fn Jedi_SaberBlockGo(
                             //roll!
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 c"duck".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(500, 1500),
                             );
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 c"strafeLeft".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(500, 1500),
                             );
-                            crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), 0);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(self_),
+                                c"strafeRight".as_ptr(),
+                                0,
+                            );
                             evasionType = evasionType_t::EVASION_DUCK;
                             evaded = qtrue;
                         } else if (*world).bg_state.rng.Q_irand(0, 1) != 0 {
@@ -3027,7 +3195,7 @@ pub fn Jedi_SaberBlockGo(
                             if zdiff > 5.0 {
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_),
                                     c"duck".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(500, 1500),
                                 );
@@ -3056,17 +3224,22 @@ pub fn Jedi_SaberBlockGo(
                             //roll!
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 c"duck".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(500, 1500),
                             );
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 c"strafeRight".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(500, 1500),
                             );
-                            crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), 0);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(self_),
+                                c"strafeLeft".as_ptr(),
+                                0,
+                            );
                             evasionType = evasionType_t::EVASION_DUCK;
                             evaded = qtrue;
                         } else if (*world).bg_state.rng.Q_irand(0, 1) != 0 {
@@ -3081,7 +3254,7 @@ pub fn Jedi_SaberBlockGo(
                             if zdiff > 5.0 {
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_),
                                     c"duck".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(500, 1500),
                                 );
@@ -3113,7 +3286,7 @@ pub fn Jedi_SaberBlockGo(
                 if (*client).ps.groundEntityNum != ENTITYNUM_NONE {
                     crate::g_timer::TIMER_Start(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"duck".as_ptr(),
                         (*world).bg_state.rng.Q_irand(500, 1500),
                     );
@@ -3129,7 +3302,7 @@ pub fn Jedi_SaberBlockGo(
             if (*client).ps.groundEntityNum != ENTITYNUM_NONE {
                 crate::g_timer::TIMER_Start(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     c"duck".as_ptr(),
                     (*world).bg_state.rng.Q_irand(500, 1500),
                 );
@@ -3147,11 +3320,16 @@ pub fn Jedi_SaberBlockGo(
                         {
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 c"strafeLeft".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(500, 1500),
                             );
-                            crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), 0);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(self_),
+                                c"strafeRight".as_ptr(),
+                                0,
+                            );
                         } else {
                             dodgeAnim = BOTH_DODGE_L as c_int;
                         }
@@ -3173,11 +3351,16 @@ pub fn Jedi_SaberBlockGo(
                         {
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                self_,
+                                ctx.entity_id_of(self_),
                                 c"strafeLeft".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(500, 1500),
                             );
-                            crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), 0);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(self_),
+                                c"strafeRight".as_ptr(),
+                                0,
+                            );
                         } else {
                             dodgeAnim = BOTH_DODGE_R as c_int;
                         }
@@ -3214,7 +3397,7 @@ pub fn Jedi_SaberBlockGo(
                 //already in air, duck to pull up legs
                 crate::g_timer::TIMER_Start(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     c"duck".as_ptr(),
                     (*world).bg_state.rng.Q_irand(500, 1500),
                 );
@@ -3276,21 +3459,41 @@ pub fn Jedi_SaberBlockGo(
                             if rightdot > 0.0 {
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_),
                                     c"strafeLeft".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(500, 1500),
                                 );
-                                crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), 0);
-                                crate::g_timer::TIMER_Set(ctx, self_, c"walking".as_ptr(), 0);
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(self_),
+                                    c"strafeRight".as_ptr(),
+                                    0,
+                                );
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(self_),
+                                    c"walking".as_ptr(),
+                                    0,
+                                );
                             } else {
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    self_,
+                                    ctx.entity_id_of(self_),
                                     c"strafeRight".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(500, 1500),
                                 );
-                                crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), 0);
-                                crate::g_timer::TIMER_Set(ctx, self_, c"walking".as_ptr(), 0);
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(self_),
+                                    c"strafeLeft".as_ptr(),
+                                    0,
+                                );
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(self_),
+                                    c"walking".as_ptr(),
+                                    0,
+                                );
                             }
                         } else {
                             if self_ == npc {
@@ -3466,12 +3669,22 @@ pub fn Jedi_SaberBlockGo(
             return evasionType_t::EVASION_NONE;
         }
         //stop taunting
-        crate::g_timer::TIMER_Set(ctx, self_, c"taunting".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"taunting".as_ptr(), 0);
         //stop gripping
-        crate::g_timer::TIMER_Set(ctx, self_, c"gripping".as_ptr(), -(*world).level.time);
+        crate::g_timer::TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"gripping".as_ptr(),
+            -(*world).level.time,
+        );
         crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_GRIP);
         //stop draining
-        crate::g_timer::TIMER_Set(ctx, self_, c"draining".as_ptr(), -(*world).level.time);
+        crate::g_timer::TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"draining".as_ptr(),
+            -(*world).level.time,
+        );
         crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_DRAIN);
 
         if dodgeAnim != -1 {
@@ -3502,7 +3715,7 @@ pub fn Jedi_SaberBlockGo(
                 if (*world).bg_state.rng.Q_irand(0, duckChance) == 0 {
                     crate::g_timer::TIMER_Start(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"duck".as_ptr(),
                         (*world).bg_state.rng.Q_irand(500, 1500),
                     );
@@ -3563,7 +3776,9 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
         let mut tr: trace_t = core::mem::zeroed();
         let evasionType: evasionType_t;
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"parryReCalcTime".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryReCalcTime".as_ptr())
+            == qfalse
+        {
             //can't do our own re-think of which parry to use yet
             return qfalse;
         }
@@ -3623,7 +3838,7 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
                     cstr(&format!("^1enemy saber dist: {:.2}\n", dist)).as_ptr(),
                 );
             }
-            crate::g_timer::TIMER_Set(ctx, npc, c"parryTime".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr(), -1);
             return qfalse;
         }
         if d_jedi {
@@ -3676,7 +3891,7 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
             dist = crate::q_math::VectorNormalize(&mut dir2Me);
             if crate::q_math::_DotProduct(dir, dir2Me) < 0.2f32 {
                 //saber is not swinging in my direction
-                crate::g_timer::TIMER_Set(ctx, npc, c"parryTime".as_ptr(), -1);
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr(), -1);
                 return qfalse;
             }
             let mut hitloc_out: vec3_t = [0.0; 3];
@@ -3717,7 +3932,7 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
             parryReCalcTime = Jedi_ReCalcParryTime(ctx, npc, evasionType);
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"parryReCalcTime".as_ptr(),
                 (*world).bg_state.rng.Q_irand(0, parryReCalcTime),
             );
@@ -3731,11 +3946,13 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
                 );
             }
 
-            if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr())
+                != qfalse
+            {
                 if (*client).NPC_class == CLASS_TAVION {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"parryTime".as_ptr(),
                         (*world)
                             .bg_state
@@ -3743,11 +3960,16 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
                             .Q_irand(parryReCalcTime / 2, (parryReCalcTime as f32 * 1.5) as c_int),
                     );
                 } else if (*npc_info).rank as c_int >= RANK_LT_JG as c_int {
-                    crate::g_timer::TIMER_Set(ctx, npc, c"parryTime".as_ptr(), parryReCalcTime);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"parryTime".as_ptr(),
+                        parryReCalcTime,
+                    );
                 } else {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"parryTime".as_ptr(),
                         (*world).bg_state.rng.Q_irand(1, 2) * parryReCalcTime,
                     );
@@ -3760,8 +3982,13 @@ pub fn Jedi_SaberBlock(ctx: GameContext<'_>, saberNum: c_int, bladeNum: c_int) -
             {
                 dodgeTime -= 200;
             }
-            crate::g_timer::TIMER_Set(ctx, npc, c"parryReCalcTime".as_ptr(), dodgeTime);
-            crate::g_timer::TIMER_Set(ctx, npc, c"parryTime".as_ptr(), dodgeTime);
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"parryReCalcTime".as_ptr(),
+                dodgeTime,
+            );
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr(), dodgeTime);
         }
         let _ = pointDist;
         qtrue
@@ -3817,16 +4044,22 @@ pub fn Jedi_EvasionSaber(
         }
 
         if (*enemy_client).ps.saberInFlight != qfalse
-            && crate::g_timer::TIMER_Done(ctx, npc, c"taunting".as_ptr()) == qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"taunting".as_ptr())
+                == qfalse
         {
             //if he's throwing his saber, stop taunting
-            crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), -(*world).level.time);
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"taunting".as_ptr(),
+                -(*world).level.time,
+            );
             if (*client).ps.saberInFlight == qfalse {
                 crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
             }
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr()) != qfalse {
             if (*client).ps.saberBlocked != BLOCKED_ATK_BOUNCE as c_int
                 && (*client).ps.saberBlocked != BLOCKED_PARRY_BROKEN as c_int
             {
@@ -3980,7 +4213,11 @@ pub fn Jedi_EvasionSaber(
                         //use jedi force push?
                         if ((*npc_info).rank as c_int == RANK_ENSIGN as c_int
                             || (*npc_info).rank as c_int > RANK_LT_JG as c_int)
-                            && crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse
+                            && crate::g_timer::TIMER_Done(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"parryTime".as_ptr(),
+                            ) != qfalse
                         {
                             crate::w_force::ForceThrow(ctx, ctx.entity_id_of(npc).unwrap(), qfalse);
                         }
@@ -4004,7 +4241,7 @@ pub fn Jedi_EvasionSaber(
                                         && (*npc_info).stats.aggression < 4
                                         && crate::g_timer::TIMER_Done(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc),
                                             c"parryTime".as_ptr(),
                                         ) != qfalse)
                                 {
@@ -4030,7 +4267,7 @@ pub fn Jedi_EvasionSaber(
                                         (*client).ps.fd.forceJumpCharge = 480.0;
                                         crate::g_timer::TIMER_Set(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc),
                                             c"jumpChaseDebounce".as_ptr(),
                                             (*world).bg_state.rng.Q_irand(2000, 5000),
                                         );
@@ -4072,7 +4309,7 @@ pub fn Jedi_EvasionSaber(
                                 }
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    npc,
+                                    ctx.entity_id_of(npc),
                                     c"jumpChaseDebounce".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(2000, 5000),
                                 );
@@ -4082,8 +4319,18 @@ pub fn Jedi_EvasionSaber(
                 }
 
                 //turn off slow walking no matter what
-                crate::g_timer::TIMER_Set(ctx, npc, c"walking".as_ptr(), -(*world).level.time);
-                crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), -(*world).level.time);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"walking".as_ptr(),
+                    -(*world).level.time,
+                );
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"taunting".as_ptr(),
+                    -(*world).level.time,
+                );
             }
         }
     }
@@ -4311,7 +4558,8 @@ pub fn Jedi_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) {
         crate::NPC_utils::CalcEntitySpot(ctx, enemy, SPOT_HEAD, &mut enemy_eyes);
 
         if (*client).NPC_class == CLASS_BOBAFETT
-            && crate::g_timer::TIMER_Done(ctx, npc, c"flameTime".as_ptr()) != qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"flameTime".as_ptr())
+                != qfalse
             && (*npc).s.weapon != WP_NONE as c_int
             && (*npc).s.weapon != WP_DISRUPTOR as c_int
             && ((*npc).s.weapon != WP_ROCKET_LAUNCHER as c_int
@@ -4382,8 +4630,10 @@ pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
         let client = (*npc).client as *mut gclient_t;
         //Time-debounce changes in forward/back dir
         if (*world).globals.ucmd.forwardmove > 0 {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"moveback".as_ptr()) == qfalse
-                || crate::g_timer::TIMER_Done(ctx, npc, c"movenone".as_ptr()) == qfalse
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveback".as_ptr())
+                == qfalse
+                || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movenone".as_ptr())
+                    == qfalse
             {
                 (*world).globals.ucmd.forwardmove = 0;
                 if (*world).globals.ucmd.rightmove > 0 {
@@ -4392,26 +4642,40 @@ pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
                     (*world).globals.ucmd.rightmove = -127;
                 }
                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
-                crate::g_timer::TIMER_Set(ctx, npc, c"moveback".as_ptr(), -(*world).level.time);
-                if crate::g_timer::TIMER_Done(ctx, npc, c"movenone".as_ptr()) != qfalse {
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"moveback".as_ptr(),
+                    -(*world).level.time,
+                );
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movenone".as_ptr())
+                    != qfalse
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"movenone".as_ptr(),
                         (*world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
-            } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveforward".as_ptr()) != qfalse {
+            } else if crate::g_timer::TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"moveforward".as_ptr(),
+            ) != qfalse
+            {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"moveforward".as_ptr(),
                     (*world).bg_state.rng.Q_irand(500, 2000),
                 );
             }
         } else if (*world).globals.ucmd.forwardmove < 0 {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"moveforward".as_ptr()) == qfalse
-                || crate::g_timer::TIMER_Done(ctx, npc, c"movenone".as_ptr()) == qfalse
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveforward".as_ptr())
+                == qfalse
+                || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movenone".as_ptr())
+                    == qfalse
             {
                 (*world).globals.ucmd.forwardmove = 0;
                 if (*world).globals.ucmd.rightmove > 0 {
@@ -4420,34 +4684,49 @@ pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
                     (*world).globals.ucmd.rightmove = -127;
                 }
                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
-                crate::g_timer::TIMER_Set(ctx, npc, c"moveforward".as_ptr(), -(*world).level.time);
-                if crate::g_timer::TIMER_Done(ctx, npc, c"movenone".as_ptr()) != qfalse {
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"moveforward".as_ptr(),
+                    -(*world).level.time,
+                );
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movenone".as_ptr())
+                    != qfalse
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"movenone".as_ptr(),
                         (*world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
-            } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveback".as_ptr()) != qfalse {
+            } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveback".as_ptr())
+                != qfalse
+            {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"moveback".as_ptr(),
                     (*world).bg_state.rng.Q_irand(250, 1000),
                 );
             }
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveforward".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveforward".as_ptr())
+            == qfalse
+        {
             (*world).globals.ucmd.forwardmove = 127;
             (*client).ps.moveDir = [0.0, 0.0, 0.0];
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveback".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveback".as_ptr())
+            == qfalse
+        {
             (*world).globals.ucmd.forwardmove = -127;
             (*client).ps.moveDir = [0.0, 0.0, 0.0];
         }
         //Time-debounce changes in right/left dir
         if (*world).globals.ucmd.rightmove > 0 {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"moveleft".as_ptr()) == qfalse
-                || crate::g_timer::TIMER_Done(ctx, npc, c"movecenter".as_ptr()) == qfalse
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveleft".as_ptr())
+                == qfalse
+                || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movecenter".as_ptr())
+                    == qfalse
             {
                 (*world).globals.ucmd.rightmove = 0;
                 if (*world).globals.ucmd.forwardmove > 0 {
@@ -4456,26 +4735,37 @@ pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
                     (*world).globals.ucmd.forwardmove = -127;
                 }
                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
-                crate::g_timer::TIMER_Set(ctx, npc, c"moveleft".as_ptr(), -(*world).level.time);
-                if crate::g_timer::TIMER_Done(ctx, npc, c"movecenter".as_ptr()) != qfalse {
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"moveleft".as_ptr(),
+                    -(*world).level.time,
+                );
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movecenter".as_ptr())
+                    != qfalse
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"movecenter".as_ptr(),
                         (*world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
-            } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveright".as_ptr()) != qfalse {
+            } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveright".as_ptr())
+                != qfalse
+            {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"moveright".as_ptr(),
                     (*world).bg_state.rng.Q_irand(250, 1500),
                 );
             }
         } else if (*world).globals.ucmd.rightmove < 0 {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"moveright".as_ptr()) == qfalse
-                || crate::g_timer::TIMER_Done(ctx, npc, c"movecenter".as_ptr()) == qfalse
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveright".as_ptr())
+                == qfalse
+                || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movecenter".as_ptr())
+                    == qfalse
             {
                 (*world).globals.ucmd.rightmove = 0;
                 if (*world).globals.ucmd.forwardmove > 0 {
@@ -4484,27 +4774,40 @@ pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
                     (*world).globals.ucmd.forwardmove = -127;
                 }
                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
-                crate::g_timer::TIMER_Set(ctx, npc, c"moveright".as_ptr(), -(*world).level.time);
-                if crate::g_timer::TIMER_Done(ctx, npc, c"movecenter".as_ptr()) != qfalse {
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"moveright".as_ptr(),
+                    -(*world).level.time,
+                );
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"movecenter".as_ptr())
+                    != qfalse
+                {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"movecenter".as_ptr(),
                         (*world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
-            } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveleft".as_ptr()) != qfalse {
+            } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveleft".as_ptr())
+                != qfalse
+            {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"moveleft".as_ptr(),
                     (*world).bg_state.rng.Q_irand(250, 1500),
                 );
             }
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveright".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveright".as_ptr())
+            == qfalse
+        {
             (*world).globals.ucmd.rightmove = 127;
             (*client).ps.moveDir = [0.0, 0.0, 0.0];
-        } else if crate::g_timer::TIMER_Done(ctx, npc, c"moveleft".as_ptr()) == qfalse {
+        } else if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"moveleft".as_ptr())
+            == qfalse
+        {
             (*world).globals.ucmd.rightmove = -127;
             (*client).ps.moveDir = [0.0, 0.0, 0.0];
         }
@@ -4523,14 +4826,21 @@ pub fn Jedi_TimersApply(ctx: GameContext<'_>) {
 
         if (*world).globals.ucmd.rightmove == 0 {
             //only if not already strafing
-            if crate::g_timer::TIMER_Done(ctx, npc, c"strafeLeft".as_ptr()) == qfalse {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"strafeLeft".as_ptr())
+                == qfalse
+            {
                 if (*npc_info).desiredYaw > (*client).ps.viewangles[YAW as usize] + 60.0 {
                     //we want to turn left, don't apply the strafing
                 } else {
                     (*world).globals.ucmd.rightmove = -127;
                     (*client).ps.moveDir = [0.0, 0.0, 0.0];
                 }
-            } else if crate::g_timer::TIMER_Done(ctx, npc, c"strafeRight".as_ptr()) == qfalse {
+            } else if crate::g_timer::TIMER_Done(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"strafeRight".as_ptr(),
+            ) == qfalse
+            {
                 if (*npc_info).desiredYaw < (*client).ps.viewangles[YAW as usize] - 60.0 {
                     //we want to turn right, don't apply the strafing
                 } else {
@@ -4544,24 +4854,26 @@ pub fn Jedi_TimersApply(ctx: GameContext<'_>) {
 
         //use careful anim/slower movement if not already moving
         if (*world).globals.ucmd.forwardmove == 0
-            && crate::g_timer::TIMER_Done(ctx, npc, c"walking".as_ptr()) == qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"walking".as_ptr()) == qfalse
         {
             (*world).globals.ucmd.buttons |= BUTTON_WALKING;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"taunting".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"taunting".as_ptr()) == qfalse {
             (*world).globals.ucmd.buttons |= BUTTON_WALKING;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"gripping".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"gripping".as_ptr()) == qfalse {
             (*world).globals.ucmd.buttons |= BUTTON_FORCEGRIP;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"draining".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"draining".as_ptr()) == qfalse {
             (*world).globals.ucmd.buttons |= BUTTON_FORCE_DRAIN;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"holdLightning".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"holdLightning".as_ptr())
+            == qfalse
+        {
             //hold down the lightning key
             (*world).globals.ucmd.buttons |= BUTTON_FORCE_LIGHTNING;
         }
@@ -4589,10 +4901,10 @@ pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
             (*enemy).client as *mut gclient_t
         };
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"roamTime".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"roamTime".as_ptr()) != qfalse {
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"roamTime".as_ptr(),
                 (*world).bg_state.rng.Q_irand(2000, 5000),
             );
@@ -4633,9 +4945,11 @@ pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
             }
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"noStrafe".as_ptr()) != qfalse
-            && crate::g_timer::TIMER_Done(ctx, npc, c"strafeLeft".as_ptr()) != qfalse
-            && crate::g_timer::TIMER_Done(ctx, npc, c"strafeRight".as_ptr()) != qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"noStrafe".as_ptr()) != qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"strafeLeft".as_ptr())
+                != qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"strafeRight".as_ptr())
+                != qfalse
         {
             if (*world).bg_state.rng.Q_irand(0, 4) == 0 {
                 //start a strafe
@@ -4648,7 +4962,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
                 //postpone any strafing for a while
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"noStrafe".as_ptr(),
                     (*world).bg_state.rng.Q_irand(1000, 3000),
                 );
@@ -4660,7 +4974,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: GameContext<'_>, enemy_dist: c_int) {
             let mut newFlags = (*client).ps.saberEventFlags;
             if (*client).ps.saberEventFlags & SEF_PARRIED as c_int != 0 {
                 //parried
-                crate::g_timer::TIMER_Set(ctx, npc, c"parryTime".as_ptr(), -1);
+                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr(), -1);
                 if !enemy.is_null()
                     && crate::bg_panimate::PM_SaberInKnockaway((*enemy_client).ps.saberMove)
                         != qfalse
@@ -4764,7 +5078,7 @@ pub fn Jedi_CombatIdle(ctx: GameContext<'_>, enemy_dist: c_int) {
         let npc_info = (*world).globals.NPCInfo;
         let client = (*npc).client as *mut gclient_t;
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr()) == qfalse {
             return;
         }
         if (*client).ps.saberInFlight != qfalse {
@@ -4782,7 +5096,8 @@ pub fn Jedi_CombatIdle(ctx: GameContext<'_>, enemy_dist: c_int) {
                 chance = 10;
             }
             if (*world).bg_state.rng.Q_irand(2, chance) < (*npc_info).stats.aggression {
-                if crate::g_timer::TIMER_Done(ctx, npc, c"chatter".as_ptr()) != qfalse
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr())
+                    != qfalse
                     && (*client).ps.forceHandExtend == HANDEXTEND_NONE as c_int
                 {
                     if enemy_dist > 200
@@ -4801,16 +5116,21 @@ pub fn Jedi_CombatIdle(ctx: GameContext<'_>, enemy_dist: c_int) {
 
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"chatter".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(5000, 10000),
                             );
-                            crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), 5500);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"taunting".as_ptr(),
+                                5500,
+                            );
                         } else {
                             Jedi_BattleTaunt(ctx);
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"taunting".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(5000, 10000),
                             );
@@ -4875,7 +5195,7 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
                 (*client).ps.saberEventFlags &= !(SEF_LOCK_WON as c_int);
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"noRetreat".as_ptr(),
                     (*world).bg_state.rng.Q_irand(500, 2000),
                 );
@@ -4914,7 +5234,7 @@ pub fn Jedi_AttackDecide(ctx: GameContext<'_>, enemy_dist: c_int) -> qboolean {
             return qfalse;
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr()) == qfalse {
             return qfalse;
         }
 
@@ -5169,7 +5489,9 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
         if ((*npc_info).scriptFlags & SCF_NO_ACROBATICS) != 0 {
             return qfalse;
         }
-        if crate::g_timer::TIMER_Done(ctx, npc, c"jumpChaseDebounce".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"jumpChaseDebounce".as_ptr())
+            != qfalse
+        {
             if (*goal).client.is_null() || (*goal_client).ps.groundEntityNum != ENTITYNUM_NONE {
                 if crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
                     && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
@@ -5292,7 +5614,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
 
                                     crate::g_timer::TIMER_Set(
                                         ctx,
-                                        npc,
+                                        ctx.entity_id_of(npc),
                                         c"forceJumpChasing".as_ptr(),
                                         (*world).bg_state.rng.Q_irand(2000, 3000),
                                     );
@@ -5303,7 +5625,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
                         if debounce != qfalse {
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"jumpChaseDebounce".as_ptr(),
                                 (*world).bg_state.rng.Q_irand(2000, 5000),
                             );
@@ -5311,7 +5633,7 @@ pub fn Jedi_TryJump(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
                             (*client).ps.moveDir = [0.0, 0.0, 0.0];
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc),
                                 c"duck".as_ptr(),
                                 -(*world).level.time,
                             );
@@ -5333,13 +5655,19 @@ pub fn Jedi_Jumping(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let client = (*npc).client as *mut gclient_t;
-        if crate::g_timer::TIMER_Done(ctx, npc, c"forceJumpChasing".as_ptr()) == qfalse
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"forceJumpChasing".as_ptr())
+            == qfalse
             && !goal.is_null()
         {
             //force-jumping at the enemy
             if (*client).ps.groundEntityNum != ENTITYNUM_NONE {
                 //landed
-                crate::g_timer::TIMER_Set(ctx, npc, c"forceJumpChasing".as_ptr(), 0);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"forceJumpChasing".as_ptr(),
+                    0,
+                );
             } else {
                 crate::NPC_utils::NPC_FaceEntity(ctx, goal, qtrue);
                 return qtrue;
@@ -5390,23 +5718,33 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                         (*world).globals.ucmd.upmove = 0;
                         (*client).ps.moveDir = [0.0, 0.0, 0.0];
                         (*client).ps.fd.forceJumpCharge = 0.0;
-                        crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), -1);
-                        crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), -1);
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc),
+                            c"strafeLeft".as_ptr(),
+                            -1,
+                        );
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"strafeRight".as_ptr(),
+                            -1,
+                        );
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(npc),
                             c"noStrafe".as_ptr(),
                             (*world).bg_state.rng.Q_irand(500, 1000),
                         );
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc),
                             c"movenone".as_ptr(),
                             (*world).bg_state.rng.Q_irand(500, 1000),
                         );
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            npc,
+                            ctx.entity_id_of(npc),
                             c"movecenter".as_ptr(),
                             (*world).bg_state.rng.Q_irand(500, 1000),
                         );
@@ -5434,17 +5772,27 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                                 (*world).globals.ucmd.upmove = 0;
                                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
                                 (*client).ps.fd.forceJumpCharge = 0.0;
-                                crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), -1);
-                                crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), -1);
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    npc,
+                                    ctx.entity_id_of(npc),
+                                    c"strafeLeft".as_ptr(),
+                                    -1,
+                                );
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(npc),
+                                    c"strafeRight".as_ptr(),
+                                    -1,
+                                );
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(npc),
                                     c"noStrafe".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(500, 1000),
                                 );
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    npc,
+                                    ctx.entity_id_of(npc),
                                     c"noturn".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(250, 500)
                                         * (3 - (*world).cvars.g_spskill.integer),
@@ -5475,13 +5823,13 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                                 } else {
                                     crate::g_timer::TIMER_Set(
                                         ctx,
-                                        npc,
+                                        ctx.entity_id_of(npc),
                                         c"movenone".as_ptr(),
                                         (*world).bg_state.rng.Q_irand(500, 1000),
                                     );
                                     crate::g_timer::TIMER_Set(
                                         ctx,
-                                        npc,
+                                        ctx.entity_id_of(npc),
                                         c"movecenter".as_ptr(),
                                         (*world).bg_state.rng.Q_irand(500, 1000),
                                     );
@@ -5510,11 +5858,21 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                                 (*world).globals.ucmd.upmove = 0;
                                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
                                 (*client).ps.fd.forceJumpCharge = 0.0;
-                                crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), -1);
-                                crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), -1);
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    npc,
+                                    ctx.entity_id_of(npc),
+                                    c"strafeLeft".as_ptr(),
+                                    -1,
+                                );
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(npc),
+                                    c"strafeRight".as_ptr(),
+                                    -1,
+                                );
+                                crate::g_timer::TIMER_Set(
+                                    ctx,
+                                    ctx.entity_id_of(npc),
                                     c"noStrafe".as_ptr(),
                                     (*world).bg_state.rng.Q_irand(500, 1000),
                                 );
@@ -5545,13 +5903,13 @@ pub fn Jedi_CheckEnemyMovement(ctx: GameContext<'_>, enemy_dist: f32) {
                                 } else {
                                     crate::g_timer::TIMER_Set(
                                         ctx,
-                                        npc,
+                                        ctx.entity_id_of(npc),
                                         c"movenone".as_ptr(),
                                         (*world).bg_state.rng.Q_irand(500, 1000),
                                     );
                                     crate::g_timer::TIMER_Set(
                                         ctx,
-                                        npc,
+                                        ctx.entity_id_of(npc),
                                         c"movecenter".as_ptr(),
                                         (*world).bg_state.rng.Q_irand(500, 1000),
                                     );
@@ -5777,7 +6135,9 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
                 }
 
                 //Check for evasion
-                if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr())
+                    != qfalse
+                {
                     if (*client).ps.saberBlocked != BLOCKED_ATK_BOUNCE as c_int
                         && (*client).ps.saberBlocked != BLOCKED_PARRY_BROKEN as c_int
                     {
@@ -5853,13 +6213,13 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
         }
 
         //Turn to face the enemy
-        if crate::g_timer::TIMER_Done(ctx, npc, c"noturn".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"noturn".as_ptr()) != qfalse {
             Jedi_FaceEnemy(ctx, qtrue);
         }
         crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
 
         //Check for evasion
-        if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) != qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr()) != qfalse {
             if (*client).ps.saberBlocked != BLOCKED_ATK_BOUNCE as c_int
                 && (*client).ps.saberBlocked != BLOCKED_PARRY_BROKEN as c_int
             {
@@ -5883,7 +6243,12 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
                 Jedi_CombatIdle(ctx, enemy_dist as c_int);
             } else {
                 //we are attacking; stop taunting
-                crate::g_timer::TIMER_Set(ctx, npc, c"taunting".as_ptr(), -(*world).level.time);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    ctx.entity_id_of(npc),
+                    c"taunting".as_ptr(),
+                    -(*world).level.time,
+                );
             }
         }
         if (*client).NPC_class == CLASS_BOBAFETT {
@@ -5910,8 +6275,8 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
                 crate::NPC_move::NPC_MoveToGoal(ctx, qfalse);
             }
             //reset the timers.
-            crate::g_timer::TIMER_Set(ctx, npc, c"strafeLeft".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ctx, npc, c"strafeRight".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"strafeLeft".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"strafeRight".as_ptr(), 0);
         }
         let _ = enemy_lost;
     }
@@ -5938,7 +6303,7 @@ pub fn NPC_Jedi_Pain(
 
         if (*other).s.weapon == WP_SABER as c_int {
             //back off
-            crate::g_timer::TIMER_Set(ctx, self_, c"parryTime".as_ptr(), -1);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"parryTime".as_ptr(), -1);
             if (*client).NPC_class == CLASS_DESANN
                 || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*self_).NPC_type) == 0
             {
@@ -6085,7 +6450,7 @@ pub fn Jedi_CheckDanger(ctx: GameContext<'_>) -> qboolean {
             (*npc_info).enemyLastSeenTime = (*world).level.time;
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"attackDelay".as_ptr(),
                 (*world).bg_state.rng.Q_irand(500, 2500),
             );
@@ -6185,7 +6550,7 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
             (*npc_info).enemyLastSeenTime = (*world).level.time;
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"attackDelay".as_ptr(),
                 (*world).bg_state.rng.Q_irand(500, 2500),
             );
@@ -6362,16 +6727,22 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                 (*npc_info).stats.aggression = 3;
                             } else if (*client).NPC_class != CLASS_BOBAFETT {
                                 //the player, toy with him
-                                if crate::g_timer::TIMER_Done(ctx, npc, c"watchTime".as_ptr())
-                                    != qfalse
+                                if crate::g_timer::TIMER_Done(
+                                    ctx,
+                                    ctx.entity_id_of(npc),
+                                    c"watchTime".as_ptr(),
+                                ) != qfalse
                                 {
-                                    if crate::g_timer::TIMER_Get(ctx, npc, c"watchTime".as_ptr())
-                                        == -1
+                                    if crate::g_timer::TIMER_Get(
+                                        ctx,
+                                        ctx.entity_id_of(npc),
+                                        c"watchTime".as_ptr(),
+                                    ) == -1
                                     {
                                         //ignore him for a couple seconds
                                         crate::g_timer::TIMER_Set(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc),
                                             c"watchTime".as_ptr(),
                                             (*world).bg_state.rng.Q_irand(3000, 5000),
                                         );
@@ -6392,7 +6763,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                         (*npc_info).investigateCount += 1;
                                         crate::g_timer::TIMER_Set(
                                             ctx,
-                                            npc,
+                                            ctx.entity_id_of(npc),
                                             c"watchTime".as_ptr(),
                                             (*world).bg_state.rng.Q_irand(4000, 10000),
                                         );
@@ -6416,8 +6787,11 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                     || (*npc_info).investigateCount == 1
                                 {
                                     //stage two: stop and face him every now and then
-                                    if crate::g_timer::TIMER_Done(ctx, npc, c"watchTime".as_ptr())
-                                        != qfalse
+                                    if crate::g_timer::TIMER_Done(
+                                        ctx,
+                                        ctx.entity_id_of(npc),
+                                        c"watchTime".as_ptr(),
+                                    ) != qfalse
                                     {
                                         crate::NPC_utils::NPC_FaceEntity(ctx, best_enemy, qtrue);
                                     }
@@ -6431,8 +6805,11 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                                 }
                                 let _ = best_c;
                             }
-                        } else if crate::g_timer::TIMER_Done(ctx, npc, c"watchTime".as_ptr())
-                            != qfalse
+                        } else if crate::g_timer::TIMER_Done(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"watchTime".as_ptr(),
+                        ) != qfalse
                         {
                             //haven't seen him in a bit, clear the lookTarget
                             crate::NPC_utils::NPC_ClearLookTarget(npc);
@@ -6466,7 +6843,8 @@ pub fn Jedi_CanPullBackSaber(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
         let world = ctx.world;
         let client = (*self_).client as *mut gclient_t;
         if (*client).ps.saberBlocked == BLOCKED_PARRY_BROKEN as c_int
-            && crate::g_timer::TIMER_Done(ctx, self_, c"parryTime".as_ptr()) == qfalse
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"parryTime".as_ptr())
+                == qfalse
         {
             return qfalse;
         }
@@ -6573,7 +6951,12 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
                         ctx.engine,
                         mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(tempGoal),
                     );
-                    crate::g_timer::TIMER_Set(ctx, npc, c"jumpChaseDebounce".as_ptr(), -1);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc),
+                        c"jumpChaseDebounce".as_ptr(),
+                        -1,
+                    );
                     if Jedi_TryJump(ctx, tempGoal) != qfalse {
                         //going to jump to the dest
                         crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
@@ -6704,10 +7087,17 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                     if (*npc_info).walkDebounceTime < (*world).level.time
                         && (*npc_info).walkDebounceTime >= 0
                     {
-                        crate::g_timer::TIMER_Set(ctx, npc, c"gloatTime".as_ptr(), 10000);
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"gloatTime".as_ptr(),
+                            10000,
+                        );
                         (*npc_info).walkDebounceTime = -1;
                     }
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"gloatTime".as_ptr()) == qfalse {
+                    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"gloatTime".as_ptr())
+                        == qfalse
+                    {
                         if crate::q_math::DistanceHorizontalSquared(
                             (*client).renderInfo.eyePoint,
                             (*enemy).r.currentOrigin,
@@ -6718,7 +7108,12 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                             Jedi_Move(ctx, enemy, qfalse);
                             (*world).globals.ucmd.buttons |= BUTTON_WALKING;
                         } else {
-                            crate::g_timer::TIMER_Set(ctx, npc, c"gloatTime".as_ptr(), 0);
+                            crate::g_timer::TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(npc),
+                                c"gloatTime".as_ptr(),
+                                0,
+                            );
                         }
                     } else if (*npc_info).walkDebounceTime == -1 {
                         (*npc_info).walkDebounceTime = -2;
@@ -6740,8 +7135,15 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                     crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
                     return;
                 } else {
-                    if crate::g_timer::TIMER_Done(ctx, npc, c"parryTime".as_ptr()) == qfalse {
-                        crate::g_timer::TIMER_Set(ctx, npc, c"parryTime".as_ptr(), -1);
+                    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr())
+                        == qfalse
+                    {
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"parryTime".as_ptr(),
+                            -1,
+                        );
                         (*client).ps.fd.forcePowerDebounce[FP_SABER_DEFENSE as usize] =
                             (*world).level.time + 500;
                     }
@@ -6767,11 +7169,20 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
                             (*npc_info).desiredPitch = 0.0;
                             (*npc_info).goalEntity = None;
                         }
-                        crate::g_timer::TIMER_Set(ctx, npc, c"gloatTime".as_ptr(), 10000);
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"gloatTime".as_ptr(),
+                            10000,
+                        );
                     }
                     if (*client).ps.saberHolstered == 0
                         || (*client).ps.saberInFlight != qfalse
-                        || crate::g_timer::TIMER_Done(ctx, npc, c"gloatTime".as_ptr()) == qfalse
+                        || crate::g_timer::TIMER_Done(
+                            ctx,
+                            ctx.entity_id_of(npc),
+                            c"gloatTime".as_ptr(),
+                        ) == qfalse
                     {
                         //keep walking
                         if crate::q_math::DistanceHorizontalSquared(
@@ -6868,7 +7279,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
             (*client).ps.moveDir = [0.0, 0.0, 0.0];
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"duck".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"duck".as_ptr()) == qfalse {
             (*world).globals.ucmd.upmove = -127;
         }
 

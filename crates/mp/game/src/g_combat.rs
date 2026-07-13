@@ -1743,7 +1743,7 @@ pub fn G_CheckVictoryScript(ctx: GameContext<'_>, self_: EntityId) {
             (*self_).wait = 1.0;
             TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 c"gloatTime".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(5000, 8000),
             );
@@ -2503,7 +2503,12 @@ pub fn player_die(
                 || meansOfDeath == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
             {
                 // no credit for veh-veh collisions?
-            } else if attacker == self_ || crate::g_team::OnSameTeam(ctx, self_, attacker) != qfalse
+            } else if attacker == self_
+                || crate::g_team::OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(self_),
+                    ctx.entity_id_of(attacker),
+                ) != qfalse
             {
                 // killed self or teammate
                 if meansOfDeath == meansOfDeath_t::MOD_FALLING as c_int
@@ -2685,7 +2690,12 @@ pub fn player_die(
         }
 
         // Add team bonuses
-        crate::g_team::Team_FragBonuses(ctx, self_, inflictor, attacker);
+        crate::g_team::Team_FragBonuses(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+        );
 
         // if I committed suicide, the flag does not fall, it returns.
         if meansOfDeath == meansOfDeath_t::MOD_SUICIDE as c_int {
@@ -2896,7 +2906,7 @@ pub fn player_die(
         }
 
         // Free up any timers we may have on us.
-        crate::g_timer::TIMER_Clear2(ctx, self_);
+        crate::g_timer::TIMER_Clear2(ctx, ctx.entity_id_of(self_));
 
         trap::LinkEntity(
             ctx.engine,
@@ -5217,7 +5227,12 @@ pub fn G_Damage(
         // check for completely getting out of the damage
         if (dflags & DAMAGE_NO_PROTECTION) == 0 {
             if targ != attacker {
-                if crate::g_team::OnSameTeam(ctx, targ, attacker) != qfalse {
+                if crate::g_team::OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(targ),
+                    ctx.entity_id_of(attacker),
+                ) != qfalse
+                {
                     if (*ctx.world).cvars.g_friendlyFire.integer == 0 {
                         return;
                     }
@@ -5236,7 +5251,9 @@ pub fn G_Damage(
                     let act = &mut (*ctx.world).g_entities
                         [(*attacker).activator.unwrap().0 as usize]
                         as *mut gentity_t;
-                    if crate::g_team::OnSameTeam(ctx, targ, act) != qfalse {
+                    if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(act))
+                        != qfalse
+                    {
                         if (*ctx.world).cvars.g_friendlyFire.integer == 0 {
                             return;
                         }
@@ -5285,7 +5302,11 @@ pub fn G_Damage(
                 if !targown.is_null()
                     && (*targown).inuse != qfalse
                     && !(*targown).client.is_null()
-                    && crate::g_team::OnSameTeam(ctx, targown, attacker) != qfalse
+                    && crate::g_team::OnSameTeam(
+                        ctx,
+                        ctx.entity_id_of(targown),
+                        ctx.entity_id_of(attacker),
+                    ) != qfalse
                 {
                     if (*ctx.world).cvars.g_friendlyFire.integer == 0 {
                         return;
@@ -5375,7 +5396,9 @@ pub fn G_Damage(
             && !client.is_null()
         {
             let ac = (*attacker).client as *mut gclient_t;
-            if crate::g_team::OnSameTeam(ctx, targ, attacker) != qfalse {
+            if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(attacker))
+                != qfalse
+            {
                 (*ac).ps.persistant[persEnum_t::PERS_HITS as usize] -= 1;
             } else {
                 (*ac).ps.persistant[persEnum_t::PERS_HITS as usize] += 1;
@@ -5711,7 +5734,11 @@ pub fn G_Damage(
         if (*ctx.world).cvars.g_gametype.integer == GT_CTF
             || (*ctx.world).cvars.g_gametype.integer == GT_CTY
         {
-            crate::g_team::Team_CheckHurtCarrier(ctx, targ, attacker);
+            crate::g_team::Team_CheckHurtCarrier(
+                ctx,
+                ctx.entity_id_of(targ),
+                ctx.entity_id_of(attacker),
+            );
         }
 
         if !(*targ).client.is_null() {

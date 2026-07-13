@@ -105,7 +105,7 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
         let npc_info = (*ctx.world).globals.NPCInfo;
 
         // Syringe
-        if crate::g_timer::TIMER_Done(ctx, npc, c"syringeDelay".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"syringeDelay".as_ptr()) != 0 {
             (*npc).pos1[1] = crate::q_math::AngleNormalize360((*npc).pos1[1]);
 
             if ((*npc).pos1[1] < 60.0) || ((*npc).pos1[1] > 300.0) {
@@ -125,14 +125,14 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
 
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"syringeDelay".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(100, 1000),
             );
         }
 
         // Scalpel
-        if crate::g_timer::TIMER_Done(ctx, npc, c"scalpelDelay".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"scalpelDelay".as_ptr()) != 0 {
             // Change pitch
             if (*npc_info).localState == LSTATE_BLADEDOWN {
                 // Blade is moving down
@@ -149,7 +149,7 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
                     (*npc_info).localState = LSTATE_BLADEDOWN; // Make it move down
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"scalpelDelay".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(100, 1000),
                     );
@@ -447,7 +447,7 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
         let npc_info = (*ctx.world).globals.NPCInfo;
         let base = (*ctx.world).g_entities.as_mut_ptr();
 
-        if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
             let enemy_ptr = match (*npc).enemy {
                 Some(id) => base.add(id.index()),
                 None => core::ptr::null_mut(),
@@ -462,7 +462,7 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
                 {
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc),
                         c"attackDelay".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(500, 3000),
                     );
@@ -509,8 +509,8 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
         Interrogator_MaintainHeight(ctx);
 
         // randomly talk
-        if crate::g_timer::TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"angerNoise".as_ptr()) != 0 {
                 // Raven: `va("sound/chars/probe/misc/talk.wav", Q_irand(1, 3))` — the
                 // format string has no specifier, so the value is discarded, but the
                 // Q_irand still advances the holdrand stream; keep the draw.
@@ -525,7 +525,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"patrolNoise".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(4000, 10000),
                 );

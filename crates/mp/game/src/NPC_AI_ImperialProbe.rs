@@ -410,7 +410,7 @@ pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qb
         let npc = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
 
-        if TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
             let (_delay_min, _delay_max) = if world.cvars.g_spskill.integer == 0 {
                 (500, 3000)
             } else if world.cvars.g_spskill.integer > 1 {
@@ -421,7 +421,7 @@ pub fn ImperialProbe_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qb
 
             TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"attackDelay".as_ptr(),
                 world.bg_state.rng.Q_irand(500, 3000),
             );
@@ -447,8 +447,8 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
         ImperialProbe_MaintainHeight(ctx);
 
         // randomly talk
-        if TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
-            if TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(npc), c"angerNoise".as_ptr()) != 0 {
                 let sound_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
                 G_SoundOnEnt(
@@ -460,7 +460,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 
                 TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"patrolNoise".as_ptr(),
                     world.bg_state.rng.Q_irand(4000, 10000),
                 );
@@ -646,7 +646,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
                 NPC_MoveToGoal(ctx, 1);
             }
             // randomly talk
-            if TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
                 let sound_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
                 G_SoundOnEnt(
@@ -658,7 +658,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
 
                 TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"patrolNoise".as_ptr(),
                     world.bg_state.rng.Q_irand(2000, 4000),
                 );
@@ -673,7 +673,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
             );
             TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"angerNoise".as_ptr(),
                 world.bg_state.rng.Q_irand(2000, 4000),
             );

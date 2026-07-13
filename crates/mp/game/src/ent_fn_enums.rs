@@ -152,10 +152,12 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::SaberUpdateSelf => SaberUpdateSelf(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ShieldGoSolid => ShieldGoSolid(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::ShieldThink => ShieldThink(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::SiegeItemThink => SiegeItemThink(ctx, self_),
+        EntThink::SiegeItemThink => SiegeItemThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::SolidifyOwner => SolidifyOwner(ctx, self_),
         EntThink::SpecialItemThink => SpecialItemThink(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::Team_DroppedFlagThink => Team_DroppedFlagThink(ctx, self_),
+        EntThink::Team_DroppedFlagThink => {
+            Team_DroppedFlagThink(ctx, ctx.entity_id_of(self_).unwrap())
+        }
         EntThink::Think_BeginMoving => Think_BeginMoving(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Think_MatchTeam => Think_MatchTeam(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::Think_SetupTrainTargets => {
@@ -312,7 +314,12 @@ pub fn dispatch_touch(
             ctx.entity_id_of(other),
             trace,
         ),
-        EntTouch::SiegeItemTouch => SiegeItemTouch(ctx, self_, other, trace),
+        EntTouch::SiegeItemTouch => SiegeItemTouch(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            trace,
+        ),
         EntTouch::Touch_Button => Touch_Button(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -443,8 +450,17 @@ pub fn dispatch_use(
         EntUse::NPC_Spawn => NPC_Spawn(ctx, self_, other, activator),
         EntUse::NPC_Use => NPC_Use(ctx, self_, other, activator),
         EntUse::NPC_VehicleSpawnUse => NPC_VehicleSpawnUse(ctx, self_, other, activator),
-        EntUse::SiegeIconUse => SiegeIconUse(self_, other, activator),
-        EntUse::SiegeItemUse => SiegeItemUse(ctx, self_, other, activator),
+        EntUse::SiegeIconUse => SiegeIconUse(
+            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::SiegeItemUse => SiegeItemUse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::SiegePointUse => SiegePointUse(
             ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
             ctx.entity_id_of(other),
@@ -523,7 +539,12 @@ pub fn dispatch_use(
             ammo_generic_power_converter_use(ctx, self_, other, activator)
         }
         EntUse::ammo_power_converter_use => ammo_power_converter_use(ctx, self_, other, activator),
-        EntUse::decompTriggerUse => decompTriggerUse(ctx, self_, other, activator),
+        EntUse::decompTriggerUse => decompTriggerUse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::emplaced_gun_realuse => emplaced_gun_realuse(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -571,8 +592,18 @@ pub fn dispatch_use(
         EntUse::shield_power_converter_use => {
             shield_power_converter_use(ctx, self_, other, activator)
         }
-        EntUse::siegeEndUse => siegeEndUse(ctx, self_, other, activator),
-        EntUse::siegeTriggerUse => siegeTriggerUse(ctx, self_, other, activator),
+        EntUse::siegeEndUse => siegeEndUse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::siegeTriggerUse => siegeTriggerUse(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::target_activate_use => target_activate_use(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -700,7 +731,12 @@ pub fn dispatch_pain(
             ctx.entity_id_of(attacker),
             damage,
         ),
-        EntPain::SiegeItemPain => SiegeItemPain(ctx, self_, attacker, damage),
+        EntPain::SiegeItemPain => SiegeItemPain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::TurretBasePain => TurretBasePain(ctx, self_, attacker, damage),
         EntPain::TurretG2Pain => TurretG2Pain(ctx, self_, attacker, damage),
         EntPain::TurretPain => TurretPain(ctx, self_, attacker, damage),
@@ -778,7 +814,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::SiegeItemDie => SiegeItemDie(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::SiegeItemDie => SiegeItemDie(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::auto_turret_die => auto_turret_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::body_die => body_die(
             ctx,
@@ -1471,11 +1514,17 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::info_null => SP_info_null(ctx, ent),
         EntSpawn::info_notnull => SP_info_notnull(ent),
         EntSpawn::info_camp => SP_info_camp(ent),
-        EntSpawn::info_siege_objective => SP_info_siege_objective(ctx, ent),
-        EntSpawn::info_siege_radaricon => SP_info_siege_radaricon(ctx, ent),
-        EntSpawn::info_siege_decomplete => SP_info_siege_decomplete(ctx, ent),
-        EntSpawn::target_siege_end => SP_target_siege_end(ctx, ent),
-        EntSpawn::misc_siege_item => SP_misc_siege_item(ctx, ent),
+        EntSpawn::info_siege_objective => {
+            SP_info_siege_objective(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_siege_radaricon => {
+            SP_info_siege_radaricon(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::info_siege_decomplete => {
+            SP_info_siege_decomplete(ctx, ctx.entity_id_of(ent).unwrap())
+        }
+        EntSpawn::target_siege_end => SP_target_siege_end(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::misc_siege_item => SP_misc_siege_item(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::func_plat => SP_func_plat(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::func_button => SP_func_button(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::func_door => SP_func_door(ctx, ctx.entity_id_of(ent).unwrap()),
@@ -1650,10 +1699,18 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::point_combat => SP_point_combat(ctx, ent),
         EntSpawn::misc_holocron => SP_misc_holocron(ctx, ent),
         EntSpawn::shooter_blaster => SP_shooter_blaster(ctx, ent),
-        EntSpawn::team_CTF_redplayer => SP_team_CTF_redplayer(ent),
-        EntSpawn::team_CTF_blueplayer => SP_team_CTF_blueplayer(ent),
-        EntSpawn::team_CTF_redspawn => SP_team_CTF_redspawn(ent),
-        EntSpawn::team_CTF_bluespawn => SP_team_CTF_bluespawn(ent),
+        EntSpawn::team_CTF_redplayer => {
+            SP_team_CTF_redplayer(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::team_CTF_blueplayer => {
+            SP_team_CTF_blueplayer(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::team_CTF_redspawn => {
+            SP_team_CTF_redspawn(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
+        EntSpawn::team_CTF_bluespawn => {
+            SP_team_CTF_bluespawn(ctx.entity(ctx.entity_id_of(ent).unwrap()))
+        }
         EntSpawn::item_botroam => SP_item_botroam(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
         EntSpawn::emplaced_gun => SP_emplaced_gun(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::misc_turret => SP_misc_turret(ctx, ent),

@@ -14,6 +14,7 @@ use crate::prelude::*;
 use core::ffi::CStr;
 
 use crate::bg_lib::qsort;
+use crate::ent_id::resolve;
 use crate::entity::flags::{FL_DROPPED_ITEM, FL_FORCE_GESTURE};
 use crate::g_combat::AddScore;
 use crate::g_items::RespawnItem;
@@ -237,7 +238,15 @@ pub fn AddTeamScore(ctx: GameContext<'_>, origin: vec3_t, team: c_int, score: c_
 /// Raven `OnSameTeam`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:187-276`
-pub fn OnSameTeam(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut gentity_t) -> qboolean {
+pub fn OnSameTeam(
+    ctx: GameContext<'_>,
+    ent1: Option<EntityId>,
+    ent2: Option<EntityId>,
+) -> qboolean {
+    // STAGE-1: Option<EntityId> params, raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let ent1: *mut gentity_t = unsafe { resolve(base, ent1) };
+    let ent2: *mut gentity_t = unsafe { resolve(base, ent2) };
     unsafe {
         if (*ent1).client.is_null() || (*ent2).client.is_null() {
             return qfalse;
@@ -391,7 +400,9 @@ pub fn Team_SetFlagStatus(ctx: GameContext<'_>, team: c_int, status: flagStatus_
 /// Raven `Team_CheckDroppedItem`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:320-330`
-pub fn Team_CheckDroppedItem(ctx: GameContext<'_>, dropped: *mut gentity_t) {
+pub fn Team_CheckDroppedItem(ctx: GameContext<'_>, dropped: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let dropped: *mut gentity_t = ctx.entity_mut(dropped);
     unsafe {
         let giTag = (*(*dropped).item).giTag;
         if giTag == PW_REDFLAG {
@@ -434,16 +445,21 @@ pub fn Team_ForceGesture(ctx: GameContext<'_>, team: c_int) {
 /// Source: `oracle/codemp/game/g_team.c:363-534`
 pub fn Team_FragBonuses(
     ctx: GameContext<'_>,
-    targ: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    targ: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
 ) {
+    // STAGE-1: EntityId targ + Option<EntityId> inflictor/attacker; raw body
+    // re-derived verbatim (Stage-2 debt). `inflictor` is an unused param.
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let targ: *mut gentity_t = ctx.entity_mut(targ);
+    let attacker: *mut gentity_t = unsafe { resolve(base, attacker) };
     unsafe {
         // no bonus for fragging yourself or team mates
         if (*targ).client.is_null()
             || (*attacker).client.is_null()
             || targ == attacker
-            || OnSameTeam(ctx, targ, attacker) != 0
+            || OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(attacker)) != 0
         {
             return;
         }
@@ -758,7 +774,15 @@ pub fn Team_FragBonuses(
 /// Raven `Team_CheckHurtCarrier`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:544-565`
-pub fn Team_CheckHurtCarrier(ctx: GameContext<'_>, targ: *mut gentity_t, attacker: *mut gentity_t) {
+pub fn Team_CheckHurtCarrier(
+    ctx: GameContext<'_>,
+    targ: Option<EntityId>,
+    attacker: Option<EntityId>,
+) {
+    // STAGE-1: Option<EntityId> params, raw body re-derived verbatim (Stage-2 debt).
+    let base = ctx.world().g_entities.as_mut_ptr();
+    let targ: *mut gentity_t = unsafe { resolve(base, targ) };
+    let attacker: *mut gentity_t = unsafe { resolve(base, attacker) };
     unsafe {
         if (*targ).client.is_null() || (*attacker).client.is_null() {
             return;
@@ -855,7 +879,9 @@ pub fn Team_ResetFlags(ctx: GameContext<'_>) {
 /// Raven `Team_ReturnFlagSound`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:608-624`
-pub fn Team_ReturnFlagSound(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int) {
+pub fn Team_ReturnFlagSound(ctx: GameContext<'_>, ent: Option<EntityId>, team: c_int) {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     if ent.is_null() {
         // G_Printf(ctx, "Warning:  NULL passed to Team_ReturnFlagSound\n") —
         // logging trap not resolved in this packet's call surface; behavior
@@ -881,7 +907,9 @@ pub fn Team_ReturnFlagSound(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_i
 /// Raven `Team_TakeFlagSound`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:626-662`
-pub fn Team_TakeFlagSound(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int) {
+pub fn Team_TakeFlagSound(ctx: GameContext<'_>, ent: Option<EntityId>, team: c_int) {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             // G_Printf ("Warning:  NULL passed to Team_TakeFlagSound\n");
@@ -929,7 +957,9 @@ pub fn Team_TakeFlagSound(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int
 /// Raven `Team_CaptureFlagSound`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:664-680`
-pub fn Team_CaptureFlagSound(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int) {
+pub fn Team_CaptureFlagSound(ctx: GameContext<'_>, ent: Option<EntityId>, team: c_int) {
+    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world().g_entities.as_mut_ptr(), ent) };
     if ent.is_null() {
         // G_Printf(ctx, "Warning:  NULL passed to Team_CaptureFlagSound\n") —
         // logging trap not resolved in this packet's call surface.
@@ -956,7 +986,7 @@ pub fn Team_CaptureFlagSound(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_
 /// Source: `oracle/codemp/game/g_team.c:682-691`
 pub fn Team_ReturnFlag(ctx: GameContext<'_>, team: c_int) {
     let flag = Team_ResetFlag(ctx, team);
-    Team_ReturnFlagSound(ctx, flag, team);
+    Team_ReturnFlagSound(ctx, ctx.entity_id_of(flag), team);
     if team == TEAM_FREE {
         // PrintMsg(NULL, "The flag has returned!\n") — dead (StringEd-only
         // client-side messaging, g_team.c:685).
@@ -969,7 +999,9 @@ pub fn Team_ReturnFlag(ctx: GameContext<'_>, team: c_int) {
 /// Raven `Team_FreeEntity`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:693-703`
-pub fn Team_FreeEntity(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn Team_FreeEntity(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let giTag = (*(*ent).item).giTag;
         if giTag == PW_REDFLAG {
@@ -989,7 +1021,9 @@ pub fn Team_FreeEntity(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// when they time out. Stored as a fn pointer (`EntThink`) — the fn-ID enum
 /// wiring for the assignment site is separate from this body.
 /// Source: `oracle/codemp/game/g_team.c:714-729`
-pub fn Team_DroppedFlagThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn Team_DroppedFlagThink(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let giTag = (*(*ent).item).giTag;
         let team = if giTag == PW_REDFLAG {
@@ -1002,7 +1036,7 @@ pub fn Team_DroppedFlagThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // Team_ResetFlag will delete this entity.
         let flag = Team_ResetFlag(ctx, team);
-        Team_ReturnFlagSound(ctx, flag, team);
+        Team_ReturnFlagSound(ctx, ctx.entity_id_of(flag), team);
     }
 }
 
@@ -1011,10 +1045,13 @@ pub fn Team_DroppedFlagThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/codemp/game/g_team.c:737-825`
 pub fn Team_TouchOurFlag(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
+    ent: EntityId,
+    other: EntityId,
     team: c_int,
 ) -> c_int {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = ctx.entity_mut(other);
     unsafe {
         let cl = (*other).client as *mut gclient_t;
         let world = &mut *ctx.world;
@@ -1041,7 +1078,7 @@ pub fn Team_TouchOurFlag(
             );
             (*cl).pers.teamState.flagrecovery += 1;
             (*cl).pers.teamState.lastreturnedflag = world.level.time as f32;
-            Team_ReturnFlagSound(ctx, Team_ResetFlag(ctx, team), team);
+            Team_ReturnFlagSound(ctx, ctx.entity_id_of(Team_ResetFlag(ctx, team)), team);
             return 0;
         }
 
@@ -1077,7 +1114,7 @@ pub fn Team_TouchOurFlag(
             CTF_CAPTURE_BONUS,
         );
 
-        Team_CaptureFlagSound(ctx, ent, team);
+        Team_CaptureFlagSound(ctx, ctx.entity_id_of(ent), team);
 
         // Ok, let's do the player loop, hand out the bonuses
         let max_clients = world.cvars.g_maxclients.integer;
@@ -1159,10 +1196,13 @@ pub fn Team_TouchOurFlag(
 /// Source: `oracle/codemp/game/g_team.c:827-846`
 pub fn Team_TouchEnemyFlag(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
+    ent: EntityId,
+    other: EntityId,
     team: c_int,
 ) -> c_int {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = ctx.entity_mut(other);
     unsafe {
         let cl = (*other).client as *mut gclient_t;
 
@@ -1189,7 +1229,7 @@ pub fn Team_TouchEnemyFlag(
             CTF_FLAG_BONUS,
         );
         (*cl).pers.teamState.flagsince = world.level.time as f32;
-        Team_TakeFlagSound(ctx, ent, team);
+        Team_TakeFlagSound(ctx, ctx.entity_id_of(ent), team);
 
         -1 // Do not respawn this automatically, but do delete it if it was FL_DROPPED
     }
@@ -1198,7 +1238,10 @@ pub fn Team_TouchEnemyFlag(
 /// Raven `Pickup_Team`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:848-871`
-pub fn Pickup_Team(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
+pub fn Pickup_Team(ctx: GameContext<'_>, ent: EntityId, other: EntityId) -> c_int {
+    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    let other: *mut gentity_t = ctx.entity_mut(other);
     unsafe {
         let classname = CStr::from_ptr((*ent).classname);
         let team = if classname == c"team_CTF_redflag" {
@@ -1214,9 +1257,19 @@ pub fn Pickup_Team(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentit
 
         let cl = (*other).client as *mut gclient_t;
         if team == (*cl).sess.sessionTeam as c_int {
-            Team_TouchOurFlag(ctx, ent, other, team)
+            Team_TouchOurFlag(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(other).unwrap(),
+                team,
+            )
         } else {
-            Team_TouchEnemyFlag(ctx, ent, other, team)
+            Team_TouchEnemyFlag(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                ctx.entity_id_of(other).unwrap(),
+                team,
+            )
         }
     }
 }
@@ -1224,7 +1277,9 @@ pub fn Pickup_Team(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentit
 /// Raven `Team_GetLocation`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:880-909`
-pub fn Team_GetLocation(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
+pub fn Team_GetLocation(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let world = &*ctx.world;
         let mut best: *mut gentity_t = core::ptr::null_mut();
@@ -1284,12 +1339,14 @@ pub fn Team_GetLocation(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut genti
 /// Source: `oracle/codemp/game/g_team.c:919-938`
 pub fn Team_GetLocationMsg(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     loc: *mut c_char,
     loclen: c_int,
 ) -> qboolean {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let best = Team_GetLocation(ctx, ent);
+        let best = Team_GetLocation(ctx, ctx.entity_id_of(ent).unwrap());
 
         if best.is_null() {
             return qfalse;
@@ -1499,7 +1556,9 @@ pub fn SortClients(a: *const c_void, b: *const c_void) -> c_int {
 /// Raven `TeamplayInfoMessage`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:1103-1159`
-pub fn TeamplayInfoMessage(ctx: GameContext<'_>, ent: *mut gentity_t) {
+pub fn TeamplayInfoMessage(ctx: GameContext<'_>, ent: EntityId) {
+    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+    let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let world = &mut *ctx.world;
 
@@ -1627,7 +1686,7 @@ pub fn CheckTeamStatus(ctx: GameContext<'_>) {
                 && ((*((*ent).client as *mut gclient_t)).sess.sessionTeam as c_int == TEAM_RED
                     || (*((*ent).client as *mut gclient_t)).sess.sessionTeam as c_int == TEAM_BLUE)
             {
-                let loc = Team_GetLocation(ctx, ent);
+                let loc = Team_GetLocation(ctx, EntityId(i as u32));
                 if !loc.is_null() {
                     (*((*ent).client as *mut gclient_t)).pers.teamState.location = (*loc).health;
                 } else {
@@ -1647,7 +1706,7 @@ pub fn CheckTeamStatus(ctx: GameContext<'_>) {
                 && ((*((*ent).client as *mut gclient_t)).sess.sessionTeam as c_int == TEAM_RED
                     || (*((*ent).client as *mut gclient_t)).sess.sessionTeam as c_int == TEAM_BLUE)
             {
-                TeamplayInfoMessage(ctx, ent);
+                TeamplayInfoMessage(ctx, EntityId(i as u32));
             }
         }
     }
@@ -1658,22 +1717,22 @@ pub fn CheckTeamStatus(ctx: GameContext<'_>) {
 /// Raven: empty — spawn markers carry no runtime behavior; classname alone
 /// is read by `SelectRandomTeamSpawnPoint`.
 /// Source: `oracle/codemp/game/g_team.c:1209-1210`
-pub fn SP_team_CTF_redplayer(ent: *mut gentity_t) {}
+pub fn SP_team_CTF_redplayer(ent: &gentity_t) {}
 
 /// Raven `SP_team_CTF_blueplayer`.
 ///
 /// Raven: empty — spawn markers carry no runtime behavior.
 /// Source: `oracle/codemp/game/g_team.c:1216-1217`
-pub fn SP_team_CTF_blueplayer(ent: *mut gentity_t) {}
+pub fn SP_team_CTF_blueplayer(ent: &gentity_t) {}
 
 /// Raven `SP_team_CTF_redspawn`.
 ///
 /// Raven: empty — spawn markers carry no runtime behavior.
 /// Source: `oracle/codemp/game/g_team.c:1224-1225`
-pub fn SP_team_CTF_redspawn(ent: *mut gentity_t) {}
+pub fn SP_team_CTF_redspawn(ent: &gentity_t) {}
 
 /// Raven `SP_team_CTF_bluespawn`.
 ///
 /// Raven: empty — spawn markers carry no runtime behavior.
 /// Source: `oracle/codemp/game/g_team.c:1231-1232`
-pub fn SP_team_CTF_bluespawn(ent: *mut gentity_t) {}
+pub fn SP_team_CTF_bluespawn(ent: &gentity_t) {}

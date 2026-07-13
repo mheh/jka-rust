@@ -583,7 +583,11 @@ pub fn VEH_TurretThink(
                         .add(enemy_id.0 as usize);
                     if (*enemy_ptr).s.number < ENTITYNUM_WORLD {
                         if (*ctx.world).cvars.g_gametype.integer < GT_TEAM
-                            || OnSameTeam(ctx, enemy_ptr, parent) == qfalse
+                            || OnSameTeam(
+                                ctx,
+                                ctx.entity_id_of(enemy_ptr),
+                                ctx.entity_id_of(parent),
+                            ) == qfalse
                         {
                             // either not in a team game or the enemy isn't on the same team
                             turretEnemy = enemy_ptr;

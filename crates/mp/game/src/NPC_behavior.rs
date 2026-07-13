@@ -528,7 +528,12 @@ pub fn NPC_BSFollowLeader(ctx: GameContext<'_>) {
                                 world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
                             (*NPCInfo).enemyLastSeenTime = world.level.time;
                             let s = cstr("attackDelay");
-                            TIMER_Set(ctx, NPC, s.as_ptr(), world.bg_state.rng.Q_irand(500, 1000));
+                            TIMER_Set(
+                                ctx,
+                                ctx.entity_id_of(NPC),
+                                s.as_ptr(),
+                                world.bg_state.rng.Q_irand(500, 1000),
+                            );
                         }
                     }
                 }
@@ -1418,7 +1423,9 @@ pub fn NPC_BSFlee(ctx: GameContext<'_>) {
         let base = world.g_entities.as_ptr();
 
         let flee_s = cstr("flee");
-        if TIMER_Done(ctx, NPC, flee_s.as_ptr()) != 0 && (*NPCInfo).tempBehavior == BS_FLEE {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), flee_s.as_ptr()) != 0
+            && (*NPCInfo).tempBehavior == BS_FLEE
+        {
             (*NPCInfo).tempBehavior = BS_DEFAULT;
             (*NPCInfo).squadState = SQUAD_IDLE;
         }
@@ -1616,26 +1623,31 @@ pub fn NPC_StartFlee(
             }
         }
         let s = cstr("attackDelay");
-        TIMER_Set(ctx, NPC, s.as_ptr(), world.bg_state.rng.Q_irand(500, 2500));
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(NPC),
+            s.as_ptr(),
+            world.bg_state.rng.Q_irand(500, 2500),
+        );
         (*NPCInfo).squadState = SQUAD_RETREAT;
         let s2 = cstr("flee");
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             s2.as_ptr(),
             world.bg_state.rng.Q_irand(fleeTimeMin, fleeTimeMax),
         );
         let s3 = cstr("panic");
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             s3.as_ptr(),
             world.bg_state.rng.Q_irand(1000, 4000),
         );
 
         if (*npc_client).NPC_class != class_t::CLASS_PROTOCOL {
             let s4 = cstr("duck");
-            TIMER_Set(ctx, NPC, s4.as_ptr(), 0);
+            TIMER_Set(ctx, ctx.entity_id_of(NPC), s4.as_ptr(), 0);
         }
     }
 }

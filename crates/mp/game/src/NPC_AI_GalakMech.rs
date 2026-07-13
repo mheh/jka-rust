@@ -134,13 +134,13 @@ pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).r.mins = [-60.0, -60.0, -24.0];
             (*ent).r.maxs = [60.0, 60.0, 80.0];
             (*ent).flags |= FL_NO_KNOCKBACK; // don't get pushed
-            crate::g_timer::TIMER_Set(ctx, ent, c"attackDelay".as_ptr(), 0); // FIXME: Slant for difficulty levels
-            crate::g_timer::TIMER_Set(ctx, ent, c"flee".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ctx, ent, c"smackTime".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ctx, ent, c"beamDelay".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ctx, ent, c"noLob".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ctx, ent, c"noRapid".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ctx, ent, c"talkDebounce".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"attackDelay".as_ptr(), 0); // FIXME: Slant for difficulty levels
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"flee".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"smackTime".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"beamDelay".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noLob".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noRapid".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"talkDebounce".as_ptr(), 0);
 
             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_shield".as_ptr(), TURN_ON);
             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, ent, c"torso_galakface".as_ptr(), TURN_OFF);
@@ -228,7 +228,9 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
             // self->client->ps.powerups[PW_SHOCKED] = level.time + 1000;
             let client = (*self_).client as *mut gclient_t;
             (*client).ps.electrifyTime = level_time + 1000;
-            if crate::g_timer::TIMER_Done(ctx, self_, c"dyingExplosion".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"dyingExplosion".as_ptr())
+                != 0
+            {
                 let mut newBolt: c_int;
                 match (*ctx.world).bg_state.rng.Q_irand(1, 14) {
                     // Find place to generate explosion
@@ -441,7 +443,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_),
                     c"dyingExplosion".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(300, 1100),
                 );
@@ -524,14 +526,16 @@ pub fn NPC_GM_Pain(
             if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int
                 && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0
             {
-                if crate::g_timer::TIMER_Done(ctx, self_, c"noRapid".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"noRapid".as_ptr())
+                    != 0
+                {
                     if !npc.is_null() {
                         (*npc).scriptFlags &= !SCF_ALT_FIRE;
                     }
                     (*self_).alt_fire = 0;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"noLob".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(2000, 6000),
                     );
@@ -539,7 +543,7 @@ pub fn NPC_GM_Pain(
                     // hopefully this will make us fire the laser
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"noLob".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
@@ -547,14 +551,15 @@ pub fn NPC_GM_Pain(
             } else if r#mod == meansOfDeath_t::MOD_REPEATER as c_int
                 && (*ctx.world).bg_state.rng.Q_irand(0, 5) == 0
             {
-                if crate::g_timer::TIMER_Done(ctx, self_, c"noLob".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"noLob".as_ptr()) != 0
+                {
                     if !npc.is_null() {
                         (*npc).scriptFlags |= SCF_ALT_FIRE;
                     }
                     (*self_).alt_fire = 1;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"noRapid".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(2000, 6000),
                     );
@@ -562,7 +567,7 @@ pub fn NPC_GM_Pain(
                     // hopefully this will make us fire the laser
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        self_,
+                        ctx.entity_id_of(self_),
                         c"noRapid".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
@@ -711,7 +716,7 @@ pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
                 // don't attack right away
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(250, 500), // FIXME: Slant for difficulty levels
                 );
@@ -858,8 +863,18 @@ pub fn NPC_GM_StartLaser(ctx: GameContext<'_>) {
             }
             let client = (*npc_ent).client as *mut gclient_t;
             let torso_timer = (*client).ps.torsoTimer;
-            crate::g_timer::TIMER_Set(ctx, npc_ent, c"beamDelay".as_ptr(), torso_timer);
-            crate::g_timer::TIMER_Set(ctx, npc_ent, c"attackDelay".as_ptr(), torso_timer + 3000);
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc_ent),
+                c"beamDelay".as_ptr(),
+                torso_timer,
+            );
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc_ent),
+                c"attackDelay".as_ptr(),
+                torso_timer + 3000,
+            );
             (*npc_ent).lockCount = 1;
             // turn on warmup effect (Raven `vec3_origin` — resolved via the
             // crate prelude, pass-3 symbol backfill).
@@ -953,7 +968,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             (*ctx.world).globals.shoot4 = qfalse;
             if (*npc_ent).lockCount == 1 {
                 // charging up
-                if crate::g_timer::TIMER_Done(ctx, npc_ent, c"beamDelay".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"beamDelay".as_ptr())
+                    != 0
+                {
                     // time to start the beam
                     let laserAnim: c_int = BOTH_ATTACK2 as c_int;
                     crate::npc_c::NPC_SetAnim(
@@ -965,7 +982,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     );
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent),
                         c"attackDelay".as_ptr(),
                         (*client).ps.torsoTimer + (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                     );
@@ -1007,7 +1024,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*npc_ent).s.loopSound = 0;
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent),
                         c"attackDelay".as_ptr(),
                         (*client).ps.torsoTimer,
                     );
@@ -1106,7 +1123,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 && (*enemy_ent).localAnimIndex <= 1
             {
                 // our shield is down, and enemy within 80, if very close, use melee attack to slap away
-                if crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0 {
+                if crate::g_timer::TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc_ent),
+                    c"attackDelay".as_ptr(),
+                ) != 0
+                {
                     // animate me
                     let swingAnim: c_int = BOTH_ATTACK1 as c_int;
                     crate::npc_c::NPC_SetAnim(
@@ -1118,17 +1140,26 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     );
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent),
                         c"attackDelay".as_ptr(),
                         (*client).ps.torsoTimer + (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                     );
                     // delay the hurt until the proper point in the anim
-                    crate::g_timer::TIMER_Set(ctx, npc_ent, c"smackTime".as_ptr(), 600);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(npc_ent),
+                        c"smackTime".as_ptr(),
+                        600,
+                    );
                     (*npc_info).blockedDebounceTime = 0;
                 }
             } else if (*npc_ent).lockCount == 0
                 && (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH
-                && crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0
+                && crate::g_timer::TIMER_Done(
+                    ctx,
+                    ctx.entity_id_of(npc_ent),
+                    c"attackDelay".as_ptr(),
+                ) != 0
                 && InFront(
                     (*enemy_ent).r.currentOrigin,
                     (*npc_ent).r.currentOrigin,
@@ -1142,8 +1173,16 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     == 0
                     && (*ctx.world).globals.enemyDist4 > MIN_LOB_DIST_SQUARED
                     && (*ctx.world).globals.enemyDist4 < MAX_LOB_DIST_SQUARED
-                    || crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) == 0
-                        && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) == 0)
+                    || crate::g_timer::TIMER_Done(
+                        ctx,
+                        ctx.entity_id_of(npc_ent),
+                        c"noLob".as_ptr(),
+                    ) == 0
+                        && crate::g_timer::TIMER_Done(
+                            ctx,
+                            ctx.entity_id_of(npc_ent),
+                            c"noRapid".as_ptr(),
+                        ) == 0)
                 && (*enemy_ent).s.weapon != WP_TURRET as c_int
             {
                 // sometimes use the laser beam attack, but only after he's taken down our generator
@@ -1152,7 +1191,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             } else if (*ctx.world).globals.enemyDist4 < MIN_LOB_DIST_SQUARED
                 && ((*enemy_ent).s.weapon != WP_TURRET as c_int
                     || crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) != 0)
-                && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0
+                && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"noRapid".as_ptr())
+                    != 0
             {
                 // enemy within 256
                 if (*client).ps.weapon == WP_REPEATER as c_int
@@ -1166,7 +1206,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             } else if ((*ctx.world).globals.enemyDist4 > MAX_LOB_DIST_SQUARED
                 || ((*enemy_ent).s.weapon == WP_TURRET as c_int
                     && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) == 0))
-                && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) != 0
+                && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"noLob".as_ptr())
+                    != 0
             {
                 // enemy more than 448 away and we are ready to try lob fire again
                 if (*client).ps.weapon == WP_REPEATER as c_int
@@ -1243,7 +1284,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         {
             // C only declares hit/hitEnt here; the single NPC_ShotEntity call is below,
             // after enemyLastSeenTime is set.
-            if crate::g_timer::TIMER_Done(ctx, npc_ent, c"talkDebounce".as_ptr()) != 0
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"talkDebounce".as_ptr())
+                != 0
                 && (*ctx.world).bg_state.rng.Q_irand(0, 10) == 0
             {
                 if (*npc_info).enemyCheckDebounceTime < 8 {
@@ -1271,7 +1313,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         );
                         crate::g_timer::TIMER_Set(
                             ctx,
-                            npc_ent,
+                            ctx.entity_id_of(npc_ent),
                             c"talkDebounce".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(5000, 7000),
                         );
@@ -1333,7 +1375,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         if (*client).ps.weapon == WP_REPEATER as c_int
             && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int != 0
             && (*ctx.world).globals.shoot4 != 0
-            && crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"attackDelay".as_ptr())
+                != 0
         {
             let mut muzzle: vec3_t = [0.0; 3];
             let mut angles: vec3_t = [0.0; 3];
@@ -1379,7 +1422,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 // no clear lob shot and no lob shot that will hit something breakable
                 if (*ctx.world).globals.enemyLOS4 != 0
                     && (*ctx.world).globals.enemyCS4 != 0
-                    && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0
+                    && crate::g_timer::TIMER_Done(
+                        ctx,
+                        ctx.entity_id_of(npc_ent),
+                        c"noRapid".as_ptr(),
+                    ) != 0
                 {
                     // have a clear straight shot, so switch to primary
                     (*npc_info).scriptFlags &= !(SCF_ALT_FIRE as i32);
@@ -1388,7 +1435,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     // keep this weap for a bit
                     crate::g_timer::TIMER_Set(
                         ctx,
-                        npc_ent,
+                        ctx.entity_id_of(npc_ent),
                         c"noLob".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(500, 1000),
                     );
@@ -1410,7 +1457,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc_ent, c"standTime".as_ptr()) == 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"standTime".as_ptr()) == 0 {
             (*ctx.world).globals.move4 = qfalse;
         }
         if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) == 0 {
@@ -1430,7 +1477,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             }
         }
 
-        if crate::g_timer::TIMER_Done(ctx, npc_ent, c"flee".as_ptr()) == 0 {
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"flee".as_ptr()) == 0 {
             // running away
             (*ctx.world).globals.faceEnemy4 = qfalse;
         }
@@ -1468,7 +1515,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
         if (*ctx.world).globals.shoot4 != 0 {
             // try to shoot if it's time
-            if crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc_ent), c"attackDelay".as_ptr())
+                != 0
+            {
                 if ((*npc_info).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                     // we've already fired, no need to do it again here
                     crate::NPC_combat::WeaponThink(ctx, qtrue);
@@ -1525,13 +1574,13 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 let mut smackDir: vec3_t = [0.0; 3];
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent),
                     c"attackDelay".as_ptr(),
                     (*client).ps.torsoTimer,
                 );
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc_ent,
+                    ctx.entity_id_of(npc_ent),
                     c"standTime".as_ptr(),
                     (*client).ps.legsTimer,
                 );

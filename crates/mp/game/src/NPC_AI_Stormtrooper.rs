@@ -161,21 +161,91 @@ pub fn ST_AggressionAdjust(self_: *mut gentity_t, change: c_int) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:88-104`
 pub fn ST_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    TIMER_Set(ctx, ent, c"chatter".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"duck".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"stand".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"shuffleTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"sleepTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"enemyLastVisible".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"roamTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"hideTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"chatter".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"duck".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"stand".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"shuffleTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"sleepTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"enemyLastVisible".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"roamTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"hideTime".as_ptr() as *const c_char,
+        0,
+    );
     // FIXME: Slant for difficulty levels (Raven comment).
-    TIMER_Set(ctx, ent, c"attackDelay".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"stick".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"scoutTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"flee".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"interrogating".as_ptr() as *const c_char, 0);
-    TIMER_Set(ctx, ent, c"verifyCP".as_ptr() as *const c_char, 0);
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"attackDelay".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"stick".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"scoutTime".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"flee".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"interrogating".as_ptr() as *const c_char,
+        0,
+    );
+    TIMER_Set(
+        ctx,
+        ctx.entity_id_of(ent),
+        c"verifyCP".as_ptr() as *const c_char,
+        0,
+    );
 }
 
 /// Raven `ST_Speech`.
@@ -210,7 +280,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
                     }
                 }
                 */
-            } else if TIMER_Done(ctx, self_, c"chatter".as_ptr()) == 0 {
+            } else if TIMER_Done(ctx, ctx.entity_id_of(self_), c"chatter".as_ptr()) == 0 {
                 // personal timer
                 return;
             } else if world.globals.groupSpeechDebounceTime[(*client).playerTeam as usize]
@@ -232,7 +302,7 @@ pub fn ST_Speech(ctx: GameContext<'_>, self_: *mut gentity_t, speechType: c_int,
         } else {
             TIMER_Set(
                 ctx,
-                self_,
+                ctx.entity_id_of(self_),
                 c"chatter".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
             );
@@ -382,7 +452,7 @@ pub fn ST_MarkToCover(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*npc).localState = LSTATE_UNDERFIRE;
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"attackDelay".as_ptr() as *const c_char,
             (*ctx.world).bg_state.rng.Q_irand(500, 2500),
         );
@@ -440,9 +510,24 @@ pub fn NPC_ST_Pain(
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(ctx, self_, c"duck".as_ptr() as *const c_char, -1);
-        TIMER_Set(ctx, self_, c"hideTime".as_ptr() as *const c_char, -1);
-        TIMER_Set(ctx, self_, c"stand".as_ptr() as *const c_char, 2000);
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"duck".as_ptr() as *const c_char,
+            -1,
+        );
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"hideTime".as_ptr() as *const c_char,
+            -1,
+        );
+        TIMER_Set(
+            ctx,
+            ctx.entity_id_of(self_),
+            c"stand".as_ptr() as *const c_char,
+            2000,
+        );
 
         NPC_Pain(ctx, self_, attacker, damage);
 
@@ -471,12 +556,17 @@ pub fn ST_HoldPosition(ctx: GameContext<'_>) {
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
         if (*NPCInfo).squadState == SQUAD_RETREAT {
-            TIMER_Set(ctx, NPC, c"flee".as_ptr(), -world.level.time);
+            TIMER_Set(
+                ctx,
+                ctx.entity_id_of(NPC),
+                c"flee".as_ptr(),
+                -world.level.time,
+            );
         }
         // don't look for another one for a few seconds
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             c"verifyCP".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
         );
@@ -638,7 +728,7 @@ pub fn NPC_ST_SleepShuffle(ctx: GameContext<'_>) {
         }
 
         // Automate some movement and noise
-        if TIMER_Done(ctx, NPC, c"shuffleTime".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"shuffleTime".as_ptr()) != 0 {
             // TODO: Play sleeping shuffle animation (Raven comment).
             //int soundIndex = (*ctx.world).bg_state.rng.Q_irand( 0, 1 );
             /*
@@ -652,15 +742,15 @@ pub fn NPC_ST_SleepShuffle(ctx: GameContext<'_>) {
                 break;
             }
             */
-            TIMER_Set(ctx, NPC, c"shuffleTime".as_ptr(), 4000);
-            TIMER_Set(ctx, NPC, c"sleepTime".as_ptr(), 2000);
+            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"shuffleTime".as_ptr(), 4000);
+            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"sleepTime".as_ptr(), 2000);
             return;
         }
 
         // They made another noise while we were stirring, see if we can see them
-        if TIMER_Done(ctx, NPC, c"sleepTime".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"sleepTime".as_ptr()) != 0 {
             NPC_CheckPlayerTeamStealth(ctx);
-            TIMER_Set(ctx, NPC, c"sleepTime".as_ptr(), 2000);
+            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"sleepTime".as_ptr(), 2000);
         }
     }
 }
@@ -745,7 +835,7 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
             (*NPCInfo).enemyLastSeenTime = world.level.time;
             TIMER_Set(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC),
                 c"attackDelay".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(500, 2500),
             );
@@ -786,7 +876,7 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                 G_SetEnemy(ctx, NPC, target);
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                 );
@@ -837,7 +927,7 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                 G_SetEnemy(ctx, NPC, target);
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                 );
@@ -925,7 +1015,7 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                 (*NPCInfo).enemyLastSeenTime = world.level.time;
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                 );
@@ -936,15 +1026,20 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
             // seconds unless he moves to cover
             if target_rating > cautious && ((*NPCInfo).scriptFlags & SCF_IGNORE_ALERTS) == 0 {
                 // FIXME: ambushing guys should never talk (Raven comment).
-                if TIMER_Done(ctx, NPC, c"enemyLastVisible".as_ptr()) != 0 {
+                if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"enemyLastVisible".as_ptr()) != 0 {
                     // If we haven't already, start the counter
                     let lookTime = (*ctx.world).bg_state.rng.Q_irand(4500, 8500);
-                    TIMER_Set(ctx, NPC, c"enemyLastVisible".as_ptr(), lookTime);
+                    TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(NPC),
+                        c"enemyLastVisible".as_ptr(),
+                        lookTime,
+                    );
                     // TODO: Play a sound along the lines of, "Huh? What was that?" (Raven comment).
                     ST_Speech(ctx, NPC, SPEECH_SIGHT, 0.0);
                     NPC_TempLookTarget(ctx, NPC, (*target).s.number, lookTime, lookTime);
                     // FIXME: set desired yaw and pitch towards this guy? (Raven comment).
-                } else if TIMER_Get(ctx, NPC, c"enemyLastVisible".as_ptr())
+                } else if TIMER_Get(ctx, ctx.entity_id_of(NPC), c"enemyLastVisible".as_ptr())
                     <= world.level.time + 500
                     && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0
                 {
@@ -952,11 +1047,26 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                     if (*NPCInfo).rank < RANK_LT && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         let interrogateTime = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
                         ST_Speech(ctx, NPC, SPEECH_SUSPICIOUS, 0.0);
-                        TIMER_Set(ctx, NPC, c"interrogating".as_ptr(), interrogateTime);
+                        TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(NPC),
+                            c"interrogating".as_ptr(),
+                            interrogateTime,
+                        );
                         G_SetEnemy(ctx, NPC, target);
                         (*NPCInfo).enemyLastSeenTime = world.level.time;
-                        TIMER_Set(ctx, NPC, c"attackDelay".as_ptr(), interrogateTime);
-                        TIMER_Set(ctx, NPC, c"stand".as_ptr(), interrogateTime);
+                        TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(NPC),
+                            c"attackDelay".as_ptr(),
+                            interrogateTime,
+                        );
+                        TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(NPC),
+                            c"stand".as_ptr(),
+                            interrogateTime,
+                        );
                     } else {
                         G_SetEnemy(ctx, NPC, target);
                         (*NPCInfo).enemyLastSeenTime = world.level.time;
@@ -964,13 +1074,13 @@ pub fn NPC_CheckEnemyStealth(ctx: GameContext<'_>, target: *mut gentity_t) -> qb
                         // shouldn't delay... (Raven comment).
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"attackDelay".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                         );
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"stand".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                         );
@@ -1055,7 +1165,7 @@ pub fn NPC_ST_InvestigateEvent(
                 (*NPCInfo).enemyLastSeenTime = world.level.time;
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                 );
@@ -1063,7 +1173,7 @@ pub fn NPC_ST_InvestigateEvent(
                     // heard him, didn't see him, stick for a bit
                     TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         c"roamTime".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(500, 2500),
                     );
@@ -1460,7 +1570,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
             // if ( !(NPCInfo->scriptFlags&SCF_IGNORE_ALERTS) ) (Raven, commented out).
             if (*client).NPC_class != CLASS_IMPERIAL && (*client).NPC_class != CLASS_IMPWORKER {
                 // imperials do not look around
-                if TIMER_Done(ctx, NPC, c"enemyLastVisible".as_ptr()) != 0 {
+                if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"enemyLastVisible".as_ptr()) != 0 {
                     // nothing suspicious, look around
                     if (*ctx.world).bg_state.rng.Q_irand(0, 30) == 0 {
                         (*NPCInfo).desiredYaw = (*NPC).s.angles[1] as f32
@@ -1554,7 +1664,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
         } else if (*NPCInfo).squadState == SQUAD_SCOUT {
             // See if we're a scout
             // If we're supposed to stay put, then stand there and fire
-            if TIMER_Done(ctx, NPC, c"stick".as_ptr()) == qfalse {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr()) == qfalse {
                 world.globals.r#move = qfalse;
                 return;
             }
@@ -1601,7 +1711,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
             }
         } else if (*NPCInfo).squadState == SQUAD_POINT {
             // see if we're at point, duck and fire
-            if TIMER_Done(ctx, NPC, c"stick".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr()) != 0 {
                 AI_GroupUpdateSquadstates((*NPCInfo).group, NPC, SQUAD_STAND_AND_SHOOT);
                 return;
             }
@@ -1661,24 +1771,29 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
                         let client = (*NPC).client as *mut gclient_t;
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"duck".as_ptr(),
                             ((*client).pers.maxHealth - (*NPC).health) * 100,
                         );
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"hideTime".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(3000, 7000),
                         );
-                        TIMER_Set(ctx, NPC, c"flee".as_ptr(), -world.level.time);
+                        TIMER_Set(
+                            ctx,
+                            ctx.entity_id_of(NPC),
+                            c"flee".as_ptr(),
+                            -world.level.time,
+                        );
                         newSquadState = SQUAD_COVER;
                     }
                     x if x == SQUAD_TRANSITION => {
                         // was heading for a combat point
                         TIMER_Set(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC),
                             c"hideTime".as_ptr(),
                             (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                         );
@@ -1693,14 +1808,14 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
                 // don't attack right away
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"attackDelay".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(250, 500),
                 ); // FIXME: Slant for difficulty levels (Raven comment).
                    // don't do something else just yet
                 TIMER_Set(
                     ctx,
-                    NPC,
+                    ctx.entity_id_of(NPC),
                     c"roamTime".as_ptr(),
                     (*ctx.world).bg_state.rng.Q_irand(1000, 4000),
                 );
@@ -1710,7 +1825,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
             // keep going, hold of roamTimer until we get there
             TIMER_Set(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC),
                 c"roamTime".as_ptr(),
                 (*ctx.world).bg_state.rng.Q_irand(4000, 8000),
             );
@@ -1728,45 +1843,46 @@ pub fn ST_ResolveBlockedShot(ctx: GameContext<'_>, hit: c_int) {
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
         // figure out how long we intend to stand here, max
-        let stuckTime =
-            if TIMER_Get(ctx, NPC, c"roamTime".as_ptr()) > TIMER_Get(ctx, NPC, c"stick".as_ptr()) {
-                TIMER_Get(ctx, NPC, c"roamTime".as_ptr()) - world.level.time
-            } else {
-                TIMER_Get(ctx, NPC, c"stick".as_ptr()) - world.level.time
-            };
+        let stuckTime = if TIMER_Get(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr())
+            > TIMER_Get(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr())
+        {
+            TIMER_Get(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr()) - world.level.time
+        } else {
+            TIMER_Get(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr()) - world.level.time
+        };
 
-        if TIMER_Done(ctx, NPC, c"duck".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) != 0 {
             // we're not ducking
             if AI_GroupContainsEntNum((*NPCInfo).group, hit) != qfalse {
                 let member = &mut world.g_entities[hit as usize] as *mut gentity_t;
-                if TIMER_Done(ctx, member, c"duck".as_ptr()) != 0 {
+                if TIMER_Done(ctx, ctx.entity_id_of(member), c"duck".as_ptr()) != 0 {
                     // they aren't ducking
-                    if TIMER_Done(ctx, member, c"stand".as_ptr()) != 0 {
+                    if TIMER_Done(ctx, ctx.entity_id_of(member), c"stand".as_ptr()) != 0 {
                         // they're not being forced to stand
                         // tell them to duck at least as long as I'm not moving
-                        TIMER_Set(ctx, member, c"duck".as_ptr(), stuckTime);
+                        TIMER_Set(ctx, ctx.entity_id_of(member), c"duck".as_ptr(), stuckTime);
                         return;
                     }
                 }
             }
         } else {
             // maybe we should stand
-            if TIMER_Done(ctx, NPC, c"stand".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"stand".as_ptr()) != 0 {
                 // stand for as long as we'll be here
-                TIMER_Set(ctx, NPC, c"stand".as_ptr(), stuckTime);
+                TIMER_Set(ctx, ctx.entity_id_of(NPC), c"stand".as_ptr(), stuckTime);
                 return;
             }
         }
         // Hmm, can't resolve this by telling them to duck or telling me to stand
         // We need to move!
-        TIMER_Set(ctx, NPC, c"roamTime".as_ptr(), -1);
-        TIMER_Set(ctx, NPC, c"stick".as_ptr(), -1);
-        TIMER_Set(ctx, NPC, c"duck".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
         // Raven typo `"attakDelay"` preserved verbatim (parity: a distinct timer
         // key from "attackDelay", never read elsewhere).
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             c"attakDelay".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
         );
@@ -1932,23 +2048,23 @@ pub fn ST_TrackEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemyPos: vec3
         // clear timers
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"attackDelay".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
         );
         // TIMER_Set( self, "duck", -1 ); (Raven, commented out).
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"stick".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(500, 1500),
         );
-        TIMER_Set(ctx, self_, c"stand".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"stand".as_ptr(), -1);
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"scoutTime".as_ptr(),
-            TIMER_Get(ctx, self_, c"stick".as_ptr()) - world.level.time
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"stick".as_ptr()) - world.level.time
                 + (*ctx.world).bg_state.rng.Q_irand(5000, 10000),
         );
         // leave my combat point
@@ -1967,23 +2083,23 @@ pub fn ST_ApproachEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
         let world = &mut *ctx.world;
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"attackDelay".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(250, 500),
         );
         // TIMER_Set( self, "duck", -1 ); (Raven, commented out).
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"stick".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
         );
-        TIMER_Set(ctx, self_, c"stand".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"stand".as_ptr(), -1);
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"scoutTime".as_ptr(),
-            TIMER_Get(ctx, self_, c"stick".as_ptr()) - world.level.time
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"stick".as_ptr()) - world.level.time
                 + (*ctx.world).bg_state.rng.Q_irand(5000, 10000),
         );
         // leave my combat point
@@ -2008,16 +2124,16 @@ pub fn ST_HuntEnemy(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // TIMER_Set( NPC, "duck", -1 ); (Raven, commented out).
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             c"stick".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(250, 1000),
         );
-        TIMER_Set(ctx, NPC, c"stand".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(NPC), c"stand".as_ptr(), -1);
         TIMER_Set(
             ctx,
-            NPC,
+            ctx.entity_id_of(NPC),
             c"scoutTime".as_ptr(),
-            TIMER_Get(ctx, NPC, c"stick".as_ptr()) - world.level.time
+            TIMER_Get(ctx, ctx.entity_id_of(NPC), c"stick".as_ptr()) - world.level.time
                 + (*ctx.world).bg_state.rng.Q_irand(5000, 10000),
         );
         // leave my combat point
@@ -2038,48 +2154,48 @@ pub fn ST_TransferTimers(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mu
         let world = &mut *ctx.world;
         TIMER_Set(
             ctx,
-            other,
+            ctx.entity_id_of(other),
             c"attackDelay".as_ptr(),
-            TIMER_Get(ctx, self_, c"attackDelay".as_ptr()) - world.level.time,
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"attackDelay".as_ptr()) - world.level.time,
         );
         TIMER_Set(
             ctx,
-            other,
+            ctx.entity_id_of(other),
             c"duck".as_ptr(),
-            TIMER_Get(ctx, self_, c"duck".as_ptr()) - world.level.time,
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"duck".as_ptr()) - world.level.time,
         );
         TIMER_Set(
             ctx,
-            other,
+            ctx.entity_id_of(other),
             c"stick".as_ptr(),
-            TIMER_Get(ctx, self_, c"stick".as_ptr()) - world.level.time,
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"stick".as_ptr()) - world.level.time,
         );
         // Raven reads timer key `"scout"`, not `"scoutTime"` — likely a bug, kept
         // verbatim for parity (S19: preserve the faithful reading).
         TIMER_Set(
             ctx,
-            other,
+            ctx.entity_id_of(other),
             c"scoutTime".as_ptr(),
-            TIMER_Get(ctx, self_, c"scout".as_ptr()) - world.level.time,
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"scout".as_ptr()) - world.level.time,
         );
         TIMER_Set(
             ctx,
-            other,
+            ctx.entity_id_of(other),
             c"roamTime".as_ptr(),
-            TIMER_Get(ctx, self_, c"roamTime".as_ptr()) - world.level.time,
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"roamTime".as_ptr()) - world.level.time,
         );
         TIMER_Set(
             ctx,
-            other,
+            ctx.entity_id_of(other),
             c"stand".as_ptr(),
-            TIMER_Get(ctx, self_, c"stand".as_ptr()) - world.level.time,
+            TIMER_Get(ctx, ctx.entity_id_of(self_), c"stand".as_ptr()) - world.level.time,
         );
-        TIMER_Set(ctx, self_, c"attackDelay".as_ptr(), -1);
-        TIMER_Set(ctx, self_, c"duck".as_ptr(), -1);
-        TIMER_Set(ctx, self_, c"stick".as_ptr(), -1);
-        TIMER_Set(ctx, self_, c"scoutTime".as_ptr(), -1);
-        TIMER_Set(ctx, self_, c"roamTime".as_ptr(), -1);
-        TIMER_Set(ctx, self_, c"stand".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"attackDelay".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"duck".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"stick".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"scoutTime".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"roamTime".as_ptr(), -1);
+        TIMER_Set(ctx, ctx.entity_id_of(self_), c"stand".as_ptr(), -1);
     }
 }
 
@@ -2139,7 +2255,7 @@ pub fn ST_TransferMoveGoal(ctx: GameContext<'_>, self_: *mut gentity_t, other: *
         AI_GroupUpdateSquadstates((*selfNpc).group, self_, SQUAD_STAND_AND_SHOOT);
         TIMER_Set(
             ctx,
-            self_,
+            ctx.entity_id_of(self_),
             c"stand".as_ptr(),
             (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
         );
@@ -2381,7 +2497,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
             let NPC = world.globals.NPC as *mut gentity_t;
             let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
-            if TIMER_Done(ctx, NPC, c"flee".as_ptr()) == 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flee".as_ptr()) == 0 {
                 // running away
                 continue;
             }
@@ -2439,7 +2555,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                     {
                         // not running after a pickup
                         let enemyEnt = ent_resolve_opt(ctx, (*NPC).enemy);
-                        if TIMER_Done(ctx, NPC, c"hideTime".as_ptr()) != 0
+                        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"hideTime".as_ptr()) != 0
                             || (DistanceSquared(
                                 (*(*group).enemy).r.currentOrigin,
                                 (*NPC).r.currentOrigin,
@@ -2460,8 +2576,8 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                     }
                     continue;
                 }
-                if TIMER_Done(ctx, NPC, c"roamTime".as_ptr()) != 0
-                    && TIMER_Done(ctx, NPC, c"hideTime".as_ptr()) != 0
+                if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr()) != 0
+                    && TIMER_Done(ctx, ctx.entity_id_of(NPC), c"hideTime".as_ptr()) != 0
                     && (*NPC).health > 10
                     && trap::InPVS(
                         ctx.engine,
@@ -2532,7 +2648,12 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                         (*NPC).r.currentOrigin,
                                     ) < 65536.0
                                     {
-                                        if TIMER_Done(ctx, NPC, c"hideTime".as_ptr()) != 0 {
+                                        if TIMER_Done(
+                                            ctx,
+                                            ctx.entity_id_of(NPC),
+                                            c"hideTime".as_ptr(),
+                                        ) != 0
+                                        {
                                             if (*NPCInfo).squadState != SQUAD_TRANSITION {
                                                 // not already moving: FIXME: we need
                                                 // to see if where we're going is
@@ -2559,7 +2680,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                         && (*NPCInfo).squadState != SQUAD_RETREAT
                     {
                         // it's not us
-                        if TIMER_Done(ctx, NPC, c"verifyCP".as_ptr()) != 0
+                        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"verifyCP".as_ptr()) != 0
                             && DistanceSquared(
                                 (*NPC).r.currentOrigin,
                                 world.level.combatPoints[(*NPCInfo).combatPoint as usize].origin,
@@ -2573,9 +2694,9 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                             cpFlags |= ST_GetCPFlags(ctx);
                         } else {
                             // cover them — stop ducking
-                            TIMER_Set(ctx, NPC, c"duck".as_ptr(), -1);
+                            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
                             // start shooting
-                            TIMER_Set(ctx, NPC, c"attackDelay".as_ptr(), -1);
+                            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr(), -1);
                             // AI should take care of the rest - fire at enemy
                         }
                     } else {
@@ -2606,7 +2727,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                             && (*NPCInfo).squadState != SQUAD_RETREAT
                         {
                             // but we're not running
-                            if TIMER_Done(ctx, NPC, c"verifyCP".as_ptr()) != 0 {
+                            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"verifyCP".as_ptr()) != 0 {
                                 // 1 - 3 seconds have passed since you chose a CP,
                                 // see if you're there since, for some reason,
                                 // you've stopped running...
@@ -2645,7 +2766,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                         // after me... (Raven comment). ALSO: seem to give up when
                         // behind an area portal? (Raven comment). since no-one
                         // else here has done this, I should be the closest one
-                        if TIMER_Done(ctx, NPC, c"roamTime".as_ptr()) != 0
+                        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr()) != 0
                             && (*ctx.world).bg_state.rng.Q_irand(0, (*group).numGroup) == 0
                         {
                             // only do this if we're ready to move again and we
@@ -2666,7 +2787,9 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                     // we should go for a combat point
                                     cpFlags |= ST_GetCPFlags(ctx);
                                 }
-                            } else if TIMER_Done(ctx, NPC, c"roamTime".as_ptr()) != 0 {
+                            } else if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr())
+                                != 0
+                            {
                                 // we are already on a combat point
                                 if i == 0 {
                                     // we're the closest
@@ -2683,13 +2806,13 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                         // If we're point, then get down
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"roamTime".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
                                         );
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"stick".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
                                         );
@@ -2697,7 +2820,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                         // ducked pos? (Raven comment).
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"duck".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(3000, 4000),
                                         );
@@ -2709,13 +2832,13 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                         // low morale, just hang here
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"roamTime".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
                                         );
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"stick".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(2000, 5000),
                                         );
@@ -2738,13 +2861,13 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                     } else {
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"stick".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                                         );
                                         TIMER_Set(
                                             ctx,
-                                            NPC,
+                                            ctx.entity_id_of(NPC),
                                             c"roamTime".as_ptr(),
                                             (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                                         );
@@ -2761,9 +2884,9 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                             }
                             */
                             // see if we should do other fun stuff — toy with ducking
-                            if TIMER_Done(ctx, NPC, c"duck".as_ptr()) != 0 {
+                            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) != 0 {
                                 // not ducking
-                                if TIMER_Done(ctx, NPC, c"stand".as_ptr()) != 0 {
+                                if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"stand".as_ptr()) != 0 {
                                     // don't have to keep standing
                                     if (*NPCInfo).combatPoint == -1
                                         || (world.level.combatPoints
@@ -2776,7 +2899,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                         if (*ctx.world).bg_state.rng.Q_irand(0, 3) == 0 {
                                             TIMER_Set(
                                                 ctx,
-                                                NPC,
+                                                ctx.entity_id_of(NPC),
                                                 c"duck".as_ptr(),
                                                 (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                                             );
@@ -2889,10 +3012,15 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                     // running
                     runner = qtrue;
                     // don't change course again until we get to where we're going
-                    TIMER_Set(ctx, NPC, c"roamTime".as_ptr(), Q3_INFINITE);
                     TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
+                        c"roamTime".as_ptr(),
+                        Q3_INFINITE,
+                    );
+                    TIMER_Set(
+                        ctx,
+                        ctx.entity_id_of(NPC),
                         c"verifyCP".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
                     );
@@ -3040,7 +3168,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
         // you...? (Raven comment).
 
         // Get our group info
-        if TIMER_Done(ctx, NPC, c"interrogating".as_ptr()) != 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"interrogating".as_ptr()) != 0 {
             AI_GetGroup(ctx, NPC); // , 45, 512, NPC->enemy ); (Raven, commented out).
         } else {
             // FIXME: when done interrogating, I should send out a team alert! (Raven comment).
@@ -3052,7 +3180,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
                 // I'm the first ent in my group, I'll make the command decisions
                 ST_Commander(ctx);
             }
-        } else if TIMER_Done(ctx, NPC, c"flee".as_ptr()) != 0 {
+        } else if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flee".as_ptr()) != 0 {
             let alert = NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, AEL_DANGER as c_int);
             if NPC_CheckForDanger(ctx, alert) != qfalse {
                 // not already fleeing, and going to run
@@ -3236,16 +3364,16 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
         }
 
         if world.globals.r#move == qfalse {
-            if TIMER_Done(ctx, NPC, c"duck".as_ptr()) == 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr()) == 0 {
                 world.globals.ucmd.upmove = -127;
             }
             // FIXME: what about leaning? (Raven comment).
         } else {
             // stop ducking!
-            TIMER_Set(ctx, NPC, c"duck".as_ptr(), -1);
+            TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
         }
 
-        if TIMER_Done(ctx, NPC, c"flee".as_ptr()) == 0 {
+        if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"flee".as_ptr()) == 0 {
             // running away
             world.globals.faceEnemy = qfalse;
         }
@@ -3292,7 +3420,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
                     // delay our next attempt
                     TIMER_Set(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC),
                         c"attackDelay".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(3000, 5000),
                     );
@@ -3300,7 +3428,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
             }
         } else if world.globals.shoot != qfalse {
             // try to shoot if it's time
-            if TIMER_Done(ctx, NPC, c"attackDelay".as_ptr()) != 0 {
+            if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr()) != 0 {
                 if ((*NPCInfo).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                     // we've already fired, no need to do it again here
                     WeaponThink(ctx, qtrue);

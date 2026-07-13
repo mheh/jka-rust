@@ -1369,7 +1369,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: EntityId) {
 
             if !(*ent).client.is_null()
                 && self_ != ent
-                && OnSameTeam(ctx, self_, ent) != 0
+                && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) != 0
                 && (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize]
                     < (*((*ent).client as *mut gclient_t)).ps.stats[STAT_MAX_HEALTH as usize]
                 && (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] > 0
@@ -1489,7 +1489,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: EntityId) {
 
             if !(*ent).client.is_null()
                 && self_ != ent
-                && OnSameTeam(ctx, self_, ent) != 0
+                && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) != 0
                 && (*((*ent).client as *mut gclient_t)).ps.fd.forcePower < 100
                 && ForcePowerUsableOn(
                     ctx,
@@ -1636,8 +1636,8 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: EntityId) {
             && ((*ctx.world).cvars.g_friendlyFire.integer != 0
                 || OnSameTeam(
                     ctx,
-                    self_,
-                    &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
+                    ctx.entity_id_of(self_),
+                    EntityId::from_num(tr.entityNum as c_int),
                 ) == 0)
         //don't grip someone who's still crippled
         {
@@ -2171,7 +2171,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: EntityId) {
                     continue;
                 }
                 if (*ctx.world).cvars.g_friendlyFire.integer == 0
-                    && OnSameTeam(ctx, self_, traceEnt) != 0
+                    && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) != 0
                 {
                     continue;
                 }
@@ -2370,7 +2370,7 @@ pub fn ForceDrainDamage(
         if !traceEnt.is_null() && (*traceEnt).takedamage != 0 {
             let tcl = (*traceEnt).client as *mut gclient_t;
             if !(*traceEnt).client.is_null()
-                && (OnSameTeam(ctx, self_, traceEnt) == 0
+                && (OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) == 0
                     || (*ctx.world).cvars.g_friendlyFire.integer != 0)
                 && (*scl).ps.fd.forceDrainTime < (level_time) as f32
                 && (*tcl).ps.fd.forcePower != 0
@@ -2522,7 +2522,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: EntityId) -> c_int {
                 if (*tcl).ps.fd.forcePower == 0 {
                     continue;
                 }
-                if OnSameTeam(ctx, self_, traceEnt) != 0
+                if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) != 0
                     && (*ctx.world).cvars.g_friendlyFire.integer == 0
                 {
                     continue;
@@ -3291,7 +3291,7 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: EntityId) {
                     ) == 0
                     {
                         entityList[e as usize] = ENTITYNUM_NONE;
-                    } else if OnSameTeam(ctx, self_, ent) != 0 {
+                    } else if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) != 0 {
                         entityList[e as usize] = ENTITYNUM_NONE;
                     }
                 }
@@ -3805,7 +3805,9 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
             if ent == self_ {
                 continue;
             }
-            if !(*ent).client.is_null() && OnSameTeam(ctx, ent, self_) != 0 {
+            if !(*ent).client.is_null()
+                && OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(self_)) != 0
+            {
                 continue;
             }
             if (*ent).inuse == 0 {
@@ -4111,7 +4113,11 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: EntityId, pull: qboolean) {
                                 randfact = 10;
                             }
 
-                            if OnSameTeam(ctx, self_, push_list[x]) == 0
+                            if OnSameTeam(
+                                ctx,
+                                ctx.entity_id_of(self_),
+                                ctx.entity_id_of(push_list[x]),
+                            ) == 0
                                 && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= randfact
                                 && canPullWeapon != 0
                             {
@@ -5371,7 +5377,7 @@ pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: EntityId) {
             if !(*ent).client.is_null()
                 && (*ent).s.number != (*self_).s.number
                 && (*ent).health > 0
-                && OnSameTeam(ctx, self_, ent) == 0
+                && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) == 0
                 && (*((*ent).client as *mut gclient_t)).ps.pm_type != PM_INTERMISSION as c_int
                 && (*((*ent).client as *mut gclient_t)).ps.pm_type != PM_SPECTATOR as c_int
             {
@@ -5524,7 +5530,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: EntityId) {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
             } else if (*en).health < 1 {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
-            } else if OnSameTeam(ctx, self_, en) != 0 {
+            } else if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(en)) != 0 {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
             } else {
                 let ecl = (*en).client as *mut gclient_t;

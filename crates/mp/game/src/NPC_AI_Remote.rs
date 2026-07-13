@@ -71,10 +71,13 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
 
     // If we have an enemy, we should try to hover at or a little below enemy eye level
     if unsafe { (*npc).enemy }.is_some() {
-        if crate::g_timer::TIMER_Done(ctx, npc, c"heightChange".as_ptr()) != 0 {
-            crate::g_timer::TIMER_Set(ctx, npc, c"heightChange".as_ptr(), unsafe {
-                (*ctx.world).bg_state.rng.Q_irand(1000, 3000)
-            });
+        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"heightChange".as_ptr()) != 0 {
+            crate::g_timer::TIMER_Set(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"heightChange".as_ptr(),
+                unsafe { (*ctx.world).bg_state.rng.Q_irand(1000, 3000) },
+            );
 
             // Find the height difference
             let enemy_ent = unsafe {
@@ -380,10 +383,13 @@ pub fn Remote_Ranged(
     let npc = unsafe { (*ctx.world).globals.NPC };
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };
 
-    if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
-        crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), unsafe {
-            (*ctx.world).bg_state.rng.Q_irand(500, 3000)
-        });
+    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
+        crate::g_timer::TIMER_Set(
+            ctx,
+            ctx.entity_id_of(npc),
+            c"attackDelay".as_ptr(),
+            unsafe { (*ctx.world).bg_state.rng.Q_irand(500, 3000) },
+        );
         Remote_Fire(ctx);
     }
 
@@ -405,8 +411,8 @@ pub fn Remote_Attack(ctx: GameContext<'_>) {
     let mut advance: qboolean;
     let mut retreat: qboolean;
 
-    if crate::g_timer::TIMER_Done(ctx, npc, c"spin".as_ptr()) != 0 {
-        crate::g_timer::TIMER_Set(ctx, npc, c"spin".as_ptr(), unsafe {
+    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"spin".as_ptr()) != 0 {
+        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"spin".as_ptr(), unsafe {
             (*ctx.world).bg_state.rng.Q_irand(250, 1500)
         });
         unsafe {

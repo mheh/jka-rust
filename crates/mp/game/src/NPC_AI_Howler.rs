@@ -72,10 +72,10 @@ pub fn Howler_Patrol(ctx: GameContext<'_>) {
             (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         } else {
-            if crate::g_timer::TIMER_Done(ctx, npc, c"patrolTime".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolTime".as_ptr()) != 0 {
                 crate::g_timer::TIMER_Set(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc),
                     c"patrolTime".as_ptr(),
                     ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int,
                 );
@@ -181,11 +181,12 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
 
-        if crate::g_timer::TIMER_Exists(ctx, npc, c"attacking".as_ptr()) == qfalse {
+        if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == qfalse
+        {
             // Going to do ATTACK1
             crate::g_timer::TIMER_Set(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc),
                 c"attacking".as_ptr(),
                 (1700.0 + ((*ctx.world).bg_state.rng.random() as f32 * 200.0)) as c_int,
             );
@@ -197,18 +198,20 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
 
-            crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 200);
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 200);
         }
 
         // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
-        if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg".as_ptr(), qtrue) != 0 {
+        if crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), qtrue)
+            != 0
+        {
             let enemy_ptr =
                 crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
             Howler_TryDamage(ctx, enemy_ptr, 5);
         }
 
         // Just using this to remove the attacking flag at the right time
-        crate::g_timer::TIMER_Done2(ctx, npc, c"attacking".as_ptr(), qtrue);
+        crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr(), qtrue);
     }
 }
 
@@ -246,10 +249,16 @@ pub fn Howler_Combat(ctx: GameContext<'_>) {
         advance = (distance > MIN_DISTANCE_SQR as f32) as qboolean;
 
         if (advance != 0 || (*npc_info).localState == LSTATE_WAITING)
-            && crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0
+            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) != 0
         {
             // waiting monsters can't attack
-            if crate::g_timer::TIMER_Done2(ctx, npc, c"takingPain".as_ptr(), qtrue) != 0 {
+            if crate::g_timer::TIMER_Done2(
+                ctx,
+                ctx.entity_id_of(npc),
+                c"takingPain".as_ptr(),
+                qtrue,
+            ) != 0
+            {
                 (*npc_info).localState = LSTATE_CLEAR;
             } else {
                 Howler_Move(ctx, 1 as qboolean);
@@ -273,8 +282,8 @@ pub fn NPC_Howler_Pain(
 ) {
     unsafe {
         if damage >= 10 {
-            crate::g_timer::TIMER_Remove(ctx, self_, c"attacking".as_ptr());
-            crate::g_timer::TIMER_Set(ctx, self_, c"takingPain".as_ptr(), 2900);
+            crate::g_timer::TIMER_Remove(ctx, ctx.entity_id_of(self_), c"attacking".as_ptr());
+            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr(), 2900);
 
             let npc = (*self_).NPC as *mut gNPC_t;
             if !npc.is_null() {

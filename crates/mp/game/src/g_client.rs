@@ -1505,7 +1505,7 @@ pub fn respawn(ctx: GameContext<'_>, ent: EntityId) {
                     return;
                 }
             }
-            crate::g_saga::SiegeRespawn(ctx, ent);
+            crate::g_saga::SiegeRespawn(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
 
@@ -2165,7 +2165,12 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
                 && ((*ctx.world).globals.gSiegeRoundBegun == qfalse
                     || (*ctx.world).globals.gSiegeRoundEnded != qfalse)
             {
-                SetTeamQuick(ctx, ent, TEAM_SPECTATOR as c_int, qfalse);
+                SetTeamQuick(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    TEAM_SPECTATOR as c_int,
+                    qfalse,
+                );
             }
 
             if (*ent).r.svFlags & SVF_BOT != 0 && (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
@@ -4545,7 +4550,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                     BG_SiegeFindClassIndexByName(className.as_ptr(), &(*ctx.world).bg_state);
             } else {
                 // otherwise, make sure the class we are using is legal.
-                G_ValidateSiegeClassForTeam(ctx, ent, team);
+                G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);
                 write_cstr_field(
                     &mut className,
                     &cstr_to_str((*client).sess.siegeClass.as_ptr()),
