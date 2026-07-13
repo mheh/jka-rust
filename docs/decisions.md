@@ -363,3 +363,28 @@ take/put-back at its `SE_*` wrappers.
 
 Plan + worker spec: `docs/plans/2026-07-11-host-seam-restructure.md`,
 `docs/plans/2026-07-11-host-seam-worker-spec.md`.
+
+## DEC-24 — Safe-state migration: staged, `Option<EntityId>` now, free fns forever (2026-07-12)
+
+The `mp_game` safe-state migration runs as the six-stage plan in
+`docs/plans/2026-07-12-safe-state-migration.md` (the authority; decisions
+§3 there are user-settled). The three rulings most often at risk of
+re-litigation:
+
+- **Gameplay functions stay FREE FUNCTIONS taking `ctx` permanently** ("keep
+  the free function") — no `impl GameContext`/`Game` method-ization of ported
+  Raven gameplay fns, now or in roadmap Stage 2. Accessors on
+  GameWorld/GameContext remain methods.
+- **Entity nullability is `Option<EntityId>` from Stage 1 on** — no sentinel
+  interim. Stored entity fields on `#[repr(C)]` seam structs keep raw layout
+  (§D12); Option applies to params/locals/returns.
+- **`GameContext` final shape** (realized in Stage 2):
+  `{ world: &'a mut GameWorld, engine: &'a Engine }`, threaded as
+  `ctx: &mut GameContext`, not `Copy`.
+
+Rejected: method-ization (user, 2026-07-12); sentinel-first null migration
+(user chose idiomatic-immediately); parallel shard execution for the
+entangled hub files (serial mandatory there — every shard rewrites shared
+dispatch tables and future shards' call sites; 2-wide worktree waves are
+allowed only for the caller-disjoint tail, with serial human-reviewed
+integration and the full referee before each commit).

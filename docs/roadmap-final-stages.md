@@ -43,6 +43,15 @@ of the same source targets our engine later (registers/SSE2/addr-space wins;
 - bg crate split (ruling 19 deferral ends): bg modules move mp_game → mp_bg,
   tier discipline becomes crate-enforced; cgame reuses BgState/BgTraps.
 
+> Status (2026-07-12): EXECUTING — decomposed into sub-stages 0-5 with all
+> design decisions user-settled in
+> `docs/plans/2026-07-12-safe-state-migration.md` (the authority for this
+> stage). Sub-stage 0 (accessor seam) and the Stage-1 hub shards are landed,
+> each commit referee-byte-identical across six scenarios. NOTE: the
+> method-ization sketch in Stage 2 below is superseded on one point — the
+> user ruled gameplay fns STAY free fns ("keep the free function"); see the
+> plan doc §3.
+
 ## Stage 2 — API shape: Raven's vocabulary, Rust's grammar
 
 - `GameContext` grows into `Game<'a>` (world+engine bundle); free fns

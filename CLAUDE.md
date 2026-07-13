@@ -86,10 +86,18 @@ twin asserts; the i686 cross-check and every CI lane are enforced). The §3c
 referee swap is done (2026-07-12): real-map referee scenarios boot the real
 engine island (FS/CM/sv_world) inside the in-repo A/B harness and route the
 spatial syscall arms to the real `SV_GameSystemCalls`; oracle-vs-oracle is
-byte-identical over mp/duel1, and the first oracle-vs-rust run surfaced a
-genuine module finding (spawn-pitch −17 vs −18, `apos.trBase`, syscall
-streams identical — open). Remaining: that finding's fix batch, then the
-safe-state migration.
+byte-identical over mp/duel1. The referee-findings batch is closed
+(2026-07-12): the spawn-pitch and 1-ULP angle findings were **harness-side FP
+semantics**, fixed by patching the oracle build to retail-win32 behavior
+(SnapVector `rint`, promote-to-double libm macros — `tools/referee-oracle/
+build.sh`), plus a genuine mock ABI-width bug (32-bit trap buffer sizes read
+as 64-bit). Six referee scenarios (three mock, three real-map mp/duel1 up to
+2000 frames / 430k syscalls) run byte-identical oracle-vs-rust and gate every
+commit. **The safe-state migration is executing**
+(`docs/plans/2026-07-12-safe-state-migration.md`): Stage 0 (accessor seam) and
+Stage 1's hub shards are landed — entity traffic converts to
+`EntityId`/`Option<EntityId>` at fn boundaries, referee-verified per shard;
+then the Stage-2 world-borrow flip retires `dangerous_implicit_autorefs`.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically
