@@ -21,6 +21,12 @@
 //! `CVAR_SERVERINFO`/`CVAR_ROM`/`CVAR_CHEAT`) have no ported home yet; every
 //! site referencing them carries a `PORT-NOTE(cvar-placement)` /
 //! `PORT-NOTE(missing-const)` /`PORT-NOTE(missing-global)` tag.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`. Bodies re-derive the
+//! raw pointers verbatim at the top (`// STAGE-1:` markers) — Stage-2 debt.
+//! Returns of `*mut gentity_t` stay raw (out of Stage-1 scope). Callers bridge
+//! at the boundary via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::{GetNearestVisibleWP, OrgVisible, OrgVisibleBox};
@@ -46,6 +52,16 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 use std::ffi::CString;
+
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
 
 /// Raven `botGlobalNavWeaponWeights[WP_NUM_WEAPONS]` — per-weapon-index bot
 /// pickup weighting table used by nav item scoring. C's brace initializer is
@@ -789,8 +805,10 @@ pub fn CreateNewWP_InsertUnder(
 /// Raven `TeleportToWP`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:716-758`
-pub fn TeleportToWP(ctx: GameContext<'_>, pl: *mut gentity_t, afterindex: c_int) {
+pub fn TeleportToWP(ctx: GameContext<'_>, pl: Option<EntityId>, afterindex: c_int) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let pl: *mut gentity_t = ent_ptr(ctx, pl);
         let w = ctx.world;
         if pl.is_null() || (*pl).client.is_null() {
             return;
@@ -1814,8 +1832,10 @@ pub fn CalculatePaths(ctx: GameContext<'_>) {
 /// Raven `GetObjectThatTargets`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1715-1732`
-pub fn GetObjectThatTargets(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
+pub fn GetObjectThatTargets(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         if (*ent).targetname.is_null() {
             return core::ptr::null_mut();
         }
@@ -1856,13 +1876,13 @@ pub fn CalculateSiegeGoals(ctx: GameContext<'_>) {
                 && c_str_eq((*ent).classname, b"info_siege_objective")
             {
                 tent = ent;
-                let mut t2ent = GetObjectThatTargets(ctx, tent);
+                let mut t2ent = GetObjectThatTargets(ctx, ctx.entity_id_of(tent).unwrap());
                 let mut looptracker: c_int = 0;
 
                 while !t2ent.is_null() && looptracker < 2048 {
                     // looptracker keeps us from getting stuck in case something is set up weird on this map
                     tent = t2ent;
-                    t2ent = GetObjectThatTargets(ctx, tent);
+                    t2ent = GetObjectThatTargets(ctx, ctx.entity_id_of(tent).unwrap());
                     looptracker += 1;
                 }
 
@@ -3303,8 +3323,10 @@ pub fn LoadPath_ThisLevel(ctx: GameContext<'_>) {
 /// entity range).
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3425-3457`
-pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
+pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: EntityId) -> *mut gentity_t {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let w = ctx.world;
         let mut closest_spawn: *mut gentity_t = core::ptr::null_mut();
         let mut closest_dist: f32 = -1.0;
@@ -3339,8 +3361,10 @@ pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentit
 /// `MAX_CLIENTS` if none follows.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3459-3499`
-pub fn GetNextSpawnInIndex(ctx: GameContext<'_>, currentSpawn: *mut gentity_t) -> *mut gentity_t {
+pub fn GetNextSpawnInIndex(ctx: GameContext<'_>, currentSpawn: EntityId) -> *mut gentity_t {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let currentSpawn: *mut gentity_t = ctx.entity_mut(currentSpawn);
         let w = ctx.world;
         let mut next_spawn: *mut gentity_t = core::ptr::null_mut();
         let mut i: c_int = (*currentSpawn).s.number + 1;
@@ -3382,8 +3406,10 @@ pub fn GetNextSpawnInIndex(ctx: GameContext<'_>, currentSpawn: *mut gentity_t) -
 /// Raven `AcceptBotCommand`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:3501-3813`
-pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity_t) -> c_int {
+pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: Option<EntityId>) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let pl: *mut gentity_t = ent_ptr(ctx, pl);
         let w = ctx.world;
 
         if (*w).globals.gBotEdit == 0.0 {
@@ -3472,26 +3498,26 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
-                TeleportToWP(ctx, pl, optional_argument);
+                TeleportToWP(ctx, ctx.entity_id_of(pl), optional_argument);
             } else {
                 G_Printf(
                     ctx,
                     cstr("^3You didn't specify an index. Assuming last.\n").as_ptr(),
                 );
-                TeleportToWP(ctx, pl, (*w).globals.gWPNum - 1);
+                TeleportToWP(ctx, ctx.entity_id_of(pl), (*w).globals.gWPNum - 1);
             }
             return 1;
         }
 
         if Q_stricmp(cmd, c"bot_wp_spawntele".as_ptr()) == 0 {
-            let mut closest_spawn = GetClosestSpawn(ctx, pl);
+            let mut closest_spawn = GetClosestSpawn(ctx, ctx.entity_id_of(pl).unwrap());
 
             if closest_spawn.is_null() {
                 // There should always be a spawn point..
                 return 1;
             }
 
-            closest_spawn = GetNextSpawnInIndex(ctx, closest_spawn);
+            closest_spawn = GetNextSpawnInIndex(ctx, ctx.entity_id_of(closest_spawn).unwrap());
 
             if !closest_spawn.is_null() {
                 (*((*pl).client as *mut gclient_t)).ps.origin = (*closest_spawn).r.currentOrigin;

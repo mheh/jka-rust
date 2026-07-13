@@ -2634,7 +2634,8 @@ pub fn NPC_FindCombatPoint(
         if (flags & CP_HAS_ROUTE) != 0 || (flags & CP_NEAREST) != 0 {
             //going to be doing macro nav tests
             if (*npc).waypoint == WAYPOINT_NONE {
-                waypoint = NAV_GetNearestNode(ctx, npc, (*npc).lastWaypoint);
+                waypoint =
+                    NAV_GetNearestNode(ctx, ctx.entity_id_of(npc).unwrap(), (*npc).lastWaypoint);
             } else {
                 waypoint = (*npc).waypoint;
             }
@@ -2804,7 +2805,7 @@ pub fn NPC_FindCombatPoint(
                     //can't possibly have a route to any OR can't possibly have a route to this one OR don't have a route to this one
                     if NAV_ClearPathToPoint(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         (*npc).r.mins,
                         (*npc).r.maxs,
                         world.level.combatPoints[i].origin,
@@ -3042,7 +3043,7 @@ pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
                             //can't possibly have a route to any OR can't possibly have a route to this one OR don't have a route to this one
                             if NAV_ClearPathToPoint(
                                 ctx,
-                                npc,
+                                ctx.entity_id_of(npc).unwrap(),
                                 (*npc).r.mins,
                                 (*npc).r.maxs,
                                 (*found).r.currentOrigin,
@@ -3089,12 +3090,12 @@ pub fn NPC_SetPickUpGoal(ctx: GameContext<'_>, foundWeap: Option<EntityId>) {
         org[2] += 24.0 - ((*foundWeap).r.mins[2] * -1.0); //adjust the origin so that I am on the ground
         NPC_SetMoveGoal(
             ctx,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             org,
             ((*foundWeap).r.maxs[0] * 0.75) as c_int,
             qfalse,
             -1,
-            foundWeap,
+            ctx.entity_id_of(foundWeap),
         );
         let tempGoal = ent_ptr(ctx, (*npc_info).tempGoal);
         (*tempGoal).waypoint = (*foundWeap).waypoint;

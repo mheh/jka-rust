@@ -6,6 +6,12 @@
 //! `todo!()`; types resolve against already-ported crates, unresolved
 //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 //! RULES TABLE in fnskel.py.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; `bot_state_t*` /
+//! `gclient_t*` non-entity params stay raw. Bodies re-derive the raw pointers
+//! verbatim at the top (`// STAGE-1:` markers) — Stage-2 debt. Returns of
+//! `*mut gentity_t` stay raw. Callers bridge via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -109,6 +115,16 @@ use mp_bg::public::entity_event::entity_event_t::{
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 // Raven `qboolean` is `c_int`; keep the source `qtrue`/`qfalse` spelling at
 // return sites (house style, mirrors `g_items.rs`).
 
@@ -121,16 +137,14 @@ use mp_qshared::shared::cvar::vmCvar_t;
 /// `squadLeader == ent` identity test is a direct pointer compare.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:128-155`
-pub fn BotStraightTPOrderCheck(
-    base: *const gentity_t,
-    ent: *mut gentity_t,
-    ordernum: c_int,
-    bs: *mut bot_state_t,
-) {
+pub fn BotStraightTPOrderCheck(ent: Option<EntityId>, ordernum: c_int, bs: *mut bot_state_t) {
     unsafe {
+        // STAGE-1: `ent` is an `Option<EntityId>` handle; the arena-base pointer
+        // param and its `ent_id_opt(base, ent)` calls collapse to `ent`. `bs`
+        // (bot_state_t, not an entity) stays raw.
         match ordernum {
             0 => {
-                if (*bs).squadLeader == ent_id_opt(base, ent) {
+                if (*bs).squadLeader == ent {
                     (*bs).teamplayState = 0;
                     (*bs).squadLeader = None;
                 }
@@ -138,13 +152,13 @@ pub fn BotStraightTPOrderCheck(
             x if x == bot_teamplay_state_t::TEAMPLAYSTATE_FOLLOWING as c_int => {
                 (*bs).teamplayState = ordernum;
                 (*bs).isSquadLeader = 0;
-                (*bs).squadLeader = ent_id_opt(base, ent);
+                (*bs).squadLeader = ent;
                 (*bs).wpDestSwitchTime = 0.0;
             }
             x if x == bot_teamplay_state_t::TEAMPLAYSTATE_ASSISTING as c_int => {
                 (*bs).teamplayState = ordernum;
                 (*bs).isSquadLeader = 0;
-                (*bs).squadLeader = ent_id_opt(base, ent);
+                (*bs).squadLeader = ent;
                 (*bs).wpDestSwitchTime = 0.0;
             }
             _ => {
@@ -190,8 +204,10 @@ pub fn BotReportStatus(ctx: GameContext<'_>, bs: *mut bot_state_t) {
 /// Raven `BotOrder`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:184-276`
-pub fn BotOrder(ctx: GameContext<'_>, ent: *mut gentity_t, clientnum: c_int, ordernum: c_int) {
+pub fn BotOrder(ctx: GameContext<'_>, ent: Option<EntityId>, clientnum: c_int, ordernum: c_int) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
         let botstates = &(*world).globals.botstates;
@@ -245,7 +261,7 @@ pub fn BotOrder(ctx: GameContext<'_>, ent: *mut gentity_t, clientnum: c_int, ord
             if ordernum == -1 {
                 BotReportStatus(ctx, bi);
             } else {
-                BotStraightTPOrderCheck(base, ent, ordernum, bi);
+                BotStraightTPOrderCheck(ctx.entity_id_of(ent), ordernum, bi);
                 (*bi).state_Forced = ordernum;
                 (*bi).chatObject = Some(ent_id(base, ent));
                 (*bi).chatAltObject = None;
@@ -265,7 +281,7 @@ pub fn BotOrder(ctx: GameContext<'_>, ent: *mut gentity_t, clientnum: c_int, ord
                     if ordernum == -1 {
                         BotReportStatus(ctx, bi);
                     } else {
-                        BotStraightTPOrderCheck(base, ent, ordernum, bi);
+                        BotStraightTPOrderCheck(ctx.entity_id_of(ent), ordernum, bi);
                         (*bi).state_Forced = ordernum;
                         (*bi).chatObject = Some(ent_id(base, ent));
                         (*bi).chatAltObject = None;
@@ -1115,12 +1131,14 @@ pub fn OrgVisible(ctx: GameContext<'_>, org1: vec3_t, org2: vec3_t, ignore: c_in
 /// Source: `oracle/codemp/game/ai_main.c:997-1026`
 pub fn WPOrgVisible(
     ctx: GameContext<'_>,
-    bot: *mut gentity_t,
+    bot: EntityId,
     org1: vec3_t,
     org2: vec3_t,
     ignore: c_int,
 ) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let bot: *mut gentity_t = ctx.entity_mut(bot);
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
         let mut tr: trace_t = core::mem::zeroed();
@@ -1981,9 +1999,11 @@ pub fn BotTrace_Duck(ctx: GameContext<'_>, bs: *mut bot_state_t, traceto: vec3_t
 pub fn PassStandardEnemyChecks(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
-    en: *mut gentity_t,
+    en: Option<EntityId>,
 ) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let en: *mut gentity_t = ent_ptr(ctx, en);
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
 
@@ -2099,10 +2119,14 @@ pub fn PassStandardEnemyChecks(
 /// Raven `BotDamageNotification`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1861-1941`
-pub fn BotDamageNotification(ctx: GameContext<'_>, bot: *mut gclient_t, attacker: *mut gentity_t) {
+pub fn BotDamageNotification(ctx: GameContext<'_>, bot: EntityId, attacker: Option<EntityId>) {
     // PORT-NOTE(botstates/ENEMY_FORGET_MS): `globals.botstates` is a `()`
     // placeholder (indexed as intended); `ENEMY_FORGET_MS` has no ported home.
     unsafe {
+        // STAGE-1: `bot` is the hurt entity's `EntityId`; re-derive its `gclient_t*`
+        // (Raven's `bot`). `attacker` is an `Option<EntityId>` handle. Body verbatim.
+        let bot: *mut gclient_t = ctx.entity_mut(bot).client as *mut gclient_t;
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
 
@@ -2164,12 +2188,12 @@ pub fn BotDamageNotification(ctx: GameContext<'_>, bot: *mut gclient_t, attacker
             return;
         }
 
-        if PassStandardEnemyChecks(ctx, bs, attacker) == 0 {
+        if PassStandardEnemyChecks(ctx, bs, ctx.entity_id_of(attacker)) == 0 {
             // the person that hurt us is not a valid enemy
             return;
         }
 
-        if PassLovedOneCheck(ctx, bs, attacker) != 0 {
+        if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(attacker)) != 0 {
             // the person that hurt us is the one we love!
             (*bs).currentEnemy = Some(ent_id(base, attacker));
             (*bs).enemySeenTime = ((*world).level.time + ENEMY_FORGET_MS) as f32;
@@ -2183,10 +2207,12 @@ pub fn BotDamageNotification(ctx: GameContext<'_>, bot: *mut gclient_t, attacker
 pub fn BotCanHear(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
-    en: *mut gentity_t,
+    en: Option<EntityId>,
     endist: f32,
 ) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let en: *mut gentity_t = ent_ptr(ctx, en);
         let world = ctx.world;
 
         if en.is_null() || (*en).client.is_null() {
@@ -2308,8 +2334,14 @@ pub fn InFieldOfVision(viewangles: vec3_t, fov: f32, mut angles: vec3_t) -> c_in
 /// Raven `PassLovedOneCheck`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2078-2129`
-pub fn PassLovedOneCheck(ctx: GameContext<'_>, bs: *mut bot_state_t, ent: *mut gentity_t) -> c_int {
+pub fn PassLovedOneCheck(
+    ctx: GameContext<'_>,
+    bs: *mut bot_state_t,
+    ent: Option<EntityId>,
+) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
         let clients = (*world).level.clients;
@@ -2420,13 +2452,13 @@ pub fn ScanForEnemies(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
                     ctx.entity_id_of(base.add((*bs).client as usize)),
                     ctx.entity_id_of(ent),
                 ) == qfalse
-                && PassStandardEnemyChecks(ctx, bs, ent) != 0
+                && PassStandardEnemyChecks(ctx, bs, ctx.entity_id_of(ent)) != 0
                 && BotPVSCheck(
                     ctx,
                     (*((*ent).client as *mut gclient_t)).ps.origin,
                     (*bs).eye,
                 ) != qfalse
-                && PassLovedOneCheck(ctx, bs, ent) != 0
+                && PassLovedOneCheck(ctx, bs, ctx.entity_id_of(ent)) != 0
             {
                 let ent_cl = (*ent).client as *mut gclient_t;
                 crate::q_math::_VectorSubtract((*ent_cl).ps.origin, (*bs).eye, &mut a);
@@ -2441,7 +2473,7 @@ pub fn ScanForEnemies(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
                 if distcheck < closest
                     && ((InFieldOfVision((*bs).viewangles, 90.0, a) != 0
                         && BotMindTricked(ctx, (*bs).client, i) == 0)
-                        || BotCanHear(ctx, bs, ent, distcheck) != 0)
+                        || BotCanHear(ctx, bs, ctx.entity_id_of(ent), distcheck) != 0)
                     && OrgVisible(ctx, (*bs).eye, (*ent_cl).ps.origin, -1) != 0
                 {
                     if BotMindTricked(ctx, (*bs).client, i) != 0 {
@@ -2760,8 +2792,8 @@ pub fn GetNearestBadThing(ctx: GameContext<'_>, bs: *mut bot_state_t) -> *mut ge
 
                 if (*projOwner).inuse != qfalse && !(*projOwner).client.is_null() {
                     if (*bs).currentEnemy.is_none() {
-                        if PassStandardEnemyChecks(ctx, bs, projOwner) != 0 {
-                            if PassLovedOneCheck(ctx, bs, projOwner) != 0 {
+                        if PassStandardEnemyChecks(ctx, bs, ctx.entity_id_of(projOwner)) != 0 {
+                            if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(projOwner)) != 0 {
                                 crate::q_math::_VectorSubtract(
                                     (*bs).origin,
                                     (*ent).r.currentOrigin,
@@ -3039,13 +3071,11 @@ pub fn BotGetFlagHome(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
 /// since it's not in its original position.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2739-2801`
-pub fn GetNewFlagPoint(
-    ctx: GameContext<'_>,
-    wp: *mut wpobject_t,
-    flagEnt: *mut gentity_t,
-    team: c_int,
-) {
+pub fn GetNewFlagPoint(ctx: GameContext<'_>, wp: *mut wpobject_t, flagEnt: EntityId, team: c_int) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        // `wp` (wpobject_t, not an entity) stays raw.
+        let flagEnt: *mut gentity_t = ctx.entity_mut(flagEnt);
         let world = ctx.world;
         let mut i: c_int = 0;
         let mut a: vec3_t = [0.0; 3];
@@ -3215,7 +3245,7 @@ pub fn CTFTakesPriority(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
             GetNewFlagPoint(
                 ctx,
                 (*world).globals.flagRed,
-                (*world).globals.droppedRedFlag,
+                ctx.entity_id_of((*world).globals.droppedRedFlag).unwrap(),
                 TEAM_RED,
             );
         } else {
@@ -3228,7 +3258,7 @@ pub fn CTFTakesPriority(ctx: GameContext<'_>, bs: *mut bot_state_t) -> c_int {
             GetNewFlagPoint(
                 ctx,
                 (*world).globals.flagBlue,
-                (*world).globals.droppedBlueFlag,
+                ctx.entity_id_of((*world).globals.droppedBlueFlag).unwrap(),
                 TEAM_BLUE,
             );
         } else {
@@ -5858,7 +5888,7 @@ pub fn BotLovedOneDied(
             return;
         }
 
-        if PassLovedOneCheck(ctx, bs, loved_lastHurt) == 0 {
+        if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(loved_lastHurt)) == 0 {
             //a loved one killed a loved one.. you cannot hate them
             (*bs).chatObject = (*loved).lastHurt;
             (*bs).chatAltObject = Some(ent_id(base, base.add((*loved).client as usize)));
@@ -6792,18 +6822,18 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
                 && (*lastHurt).s.number != (*bs).client
             {
                 BotDeathNotify(ctx, bs);
-                if PassLovedOneCheck(ctx, bs, lastHurt) != 0 {
+                if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(lastHurt)) != 0 {
                     //CHAT: Died
                     (*bs).chatObject = (*bs).lastHurt;
                     (*bs).chatAltObject = None;
                     let sect = cstr("Died");
                     crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
-                } else if PassLovedOneCheck(ctx, bs, lastHurt) == 0
+                } else if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(lastHurt)) == 0
                     && !(*world).globals.botstates[(*lastHurt).s.number as usize].is_null()
                     && PassLovedOneCheck(
                         ctx,
                         (*world).globals.botstates[(*lastHurt).s.number as usize],
-                        me,
+                        ctx.entity_id_of(me),
                     ) != 0
                 {
                     //killed by a bot that I love, but that does not love me
@@ -7192,7 +7222,7 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
         if (*bs).currentEnemy.is_some() {
             let currentEnemy = resolve((*bs).currentEnemy);
             if (*bs).enemySeenTime < lt as f32
-                || PassStandardEnemyChecks(ctx, bs, currentEnemy) == 0
+                || PassStandardEnemyChecks(ctx, bs, ctx.entity_id_of(currentEnemy)) == 0
             {
                 if (*bs).revengeEnemy == (*bs).currentEnemy
                     && (*currentEnemy).health < 1
@@ -7207,7 +7237,7 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
                     (*bs).revengeEnemy = None;
                     (*bs).revengeHateLevel = 0;
                 } else if (*currentEnemy).health < 1
-                    && PassLovedOneCheck(ctx, bs, currentEnemy) != 0
+                    && PassLovedOneCheck(ctx, bs, ctx.entity_id_of(currentEnemy)) != 0
                     && (*bs).lastAttacked.is_some()
                     && (*bs).lastAttacked == (*bs).currentEnemy
                 {
@@ -7323,7 +7353,7 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
 
             visResult = WPOrgVisible(
                 ctx,
-                me,
+                ctx.entity_id_of(me).unwrap(),
                 (*bs).origin,
                 (*(*bs).wpCurrent).origin,
                 (*bs).client,

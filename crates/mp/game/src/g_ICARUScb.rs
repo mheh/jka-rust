@@ -2015,12 +2015,12 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
             let goalRadius = TAG_GetRadius(ctx, std::ptr::null(), name);
             NPC_SetMoveGoal(
                 ctx,
-                ent,
+                ctx.entity_id_of(ent).unwrap(),
                 goalPos,
                 goalRadius,
                 qtrue,
                 -1,
-                std::ptr::null_mut(),
+                None,
             );
             let goal_id = (*npc).goalEntity.unwrap();
             let goal_ent = &mut (*ctx.world).g_entities[goal_id.0 as usize] as *mut gentity_t;
@@ -2257,7 +2257,11 @@ pub fn Q3_SetBState(ctx: GameContext<'_>, entID: c_int, bs_name: *const c_char) 
                         core::mem::transmute::<c_int, bState_t>(bSID),
                     );
                 } else {
-                    (*ent).waypoint = NAV_FindClosestWaypointForEnt(ctx, ent, WAYPOINT_NONE);
+                    (*ent).waypoint = NAV_FindClosestWaypointForEnt(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        WAYPOINT_NONE,
+                    );
 
                     if (*ent).waypoint != WAYPOINT_NONE {
                         NPC_BSSearchStart(

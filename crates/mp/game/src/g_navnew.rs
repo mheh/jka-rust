@@ -38,6 +38,12 @@
 //! `const-value`); `NAVNEW_MoveToGoal` additionally reaches the ambient
 //! "current NPC" global `NPCInfo` with no `GameContext` channel (topic
 //! `ai-context`, matching `NPC_reactions.rs`/`NPC_utils.rs`).
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::{G_DrawEdge, G_DrawNode, NAV_CheckAhead, NAV_TestBestNode, NAV_TestForBlocked};
@@ -62,14 +68,26 @@ use crate::q_math::VectorNormalize;
 const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
 const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
+/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Raven `NAV_CheckNodeFailedForEnt`.
 ///
 /// Raven: "FIXME: must be a better way to do this". `+1` because 0 is a valid
 /// nodeNum but also the default (unset) slot value.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:15-28`
-pub fn NAV_CheckNodeFailedForEnt(ent: *mut gentity_t, nodeNum: c_int) -> qboolean {
+pub fn NAV_CheckNodeFailedForEnt(ent: &gentity_t, nodeNum: c_int) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *const gentity_t = ent;
         for j in 0..MAX_FAILED_NODES {
             if (*ent).failedWaypoints[j] == nodeNum + 1 {
                 //we failed against this node
@@ -83,8 +101,10 @@ pub fn NAV_CheckNodeFailedForEnt(ent: *mut gentity_t, nodeNum: c_int) -> qboolea
 /// Raven `NPC_ClearBlocked`.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:34-41`
-pub fn NPC_ClearBlocked(self_: *mut gentity_t) {
+pub fn NPC_ClearBlocked(self_: &mut gentity_t) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = self_;
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
             return;
@@ -97,8 +117,11 @@ pub fn NPC_ClearBlocked(self_: *mut gentity_t) {
 /// Raven `NPC_SetBlocked`.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:43-51`
-pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut gentity_t) {
+pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: EntityId, blocker: Option<EntityId>) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
             return;
@@ -165,12 +188,15 @@ pub fn NAVNEW_ClearPathBetweenPoints(
 /// Source: `oracle/codemp/game/g_navnew.c:84-171`
 pub fn NAVNEW_PushBlocker(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
+    self_: EntityId,
+    blocker: Option<EntityId>,
     right: vec3_t,
     setBlockedInfo: qboolean,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         let npc = (*self_).NPC as *mut gNPC_t;
         if (*npc).shoveCount > 30 {
             //don't push for more than 3 seconds;
@@ -285,12 +311,15 @@ pub fn NAVNEW_PushBlocker(
 /// Source: `oracle/codemp/game/g_navnew.c:178-215`
 pub fn NAVNEW_DanceWithBlocker(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
+    self_: Option<EntityId>,
+    blocker: Option<EntityId>,
     movedir: &mut vec3_t,
     right: vec3_t,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        // `self_` is unused by Raven's body (kept for signature fidelity).
+        let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         let client = (*blocker).client as *mut gclient_t;
         if !client.is_null() && (*client).ps.velocity != [0.0f32, 0.0, 0.0] {
             let mut blocker_movedir = (*client).ps.velocity;
@@ -338,14 +367,17 @@ pub fn NAVNEW_DanceWithBlocker(
 /// Source: `oracle/codemp/game/g_navnew.c:222-340`
 pub fn NAVNEW_SidestepBlocker(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
+    self_: EntityId,
+    blocker: Option<EntityId>,
     blocked_dir: vec3_t,
     blocked_dist: f32,
     movedir: &mut vec3_t,
     right: vec3_t,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         let npc = (*self_).NPC as *mut gNPC_t;
         let mut mins = [0.0f32; 3];
         crate::q_math::_VectorCopy((*self_).r.mins, &mut mins);
@@ -521,14 +553,17 @@ pub fn NAVNEW_SidestepBlocker(
 /// Source: `oracle/codemp/game/g_navnew.c:347-377`
 pub fn NAVNEW_Bypass(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
+    self_: EntityId,
+    blocker: Option<EntityId>,
     blocked_dir: vec3_t,
     blocked_dist: f32,
     movedir: vec3_t,
     setBlockedInfo: qboolean,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         //Draw debug info if requested
         if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
             G_DrawEdge(
@@ -546,7 +581,14 @@ pub fn NAVNEW_Bypass(
 
         //Check to see what dir the other guy is moving in (if any) and pick the opposite dir
         let mut movedir_local = movedir;
-        if NAVNEW_DanceWithBlocker(ctx, self_, blocker, &mut movedir_local, right) != qfalse {
+        if NAVNEW_DanceWithBlocker(
+            ctx,
+            ctx.entity_id_of(self_),
+            ctx.entity_id_of(blocker),
+            &mut movedir_local,
+            right,
+        ) != qfalse
+        {
             return qtrue;
         }
 
@@ -554,8 +596,8 @@ pub fn NAVNEW_Bypass(
         let mut movedir_out = movedir;
         if NAVNEW_SidestepBlocker(
             ctx,
-            self_,
-            blocker,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(blocker),
             blocked_dir,
             blocked_dist,
             &mut movedir_out,
@@ -566,7 +608,13 @@ pub fn NAVNEW_Bypass(
         }
 
         //Neither side is clear, tell him to step aside
-        NAVNEW_PushBlocker(ctx, self_, blocker, right, setBlockedInfo);
+        NAVNEW_PushBlocker(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(blocker),
+            right,
+            setBlockedInfo,
+        );
 
         qfalse
     }
@@ -578,11 +626,14 @@ pub fn NAVNEW_Bypass(
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:384-391`
 pub fn NAVNEW_CheckDoubleBlock(
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
+    self_: &gentity_t,
+    blocker: &gentity_t,
     blocked_dir: vec3_t,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *const gentity_t = self_;
+        let blocker: *const gentity_t = blocker;
         let npc = (*blocker).NPC as *mut gNPC_t;
         if !npc.is_null() && (*npc).blockingEntNum == (*self_).s.number {
             return qtrue;
@@ -596,13 +647,16 @@ pub fn NAVNEW_CheckDoubleBlock(
 /// Source: `oracle/codemp/game/g_navnew.c:399-435`
 pub fn NAVNEW_ResolveEntityCollision(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
+    self_: EntityId,
+    blocker: Option<EntityId>,
     movedir: vec3_t,
     pathDir: vec3_t,
     setBlockedInfo: qboolean,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         //Doors are ignored
         if crate::q_shared::Q_stricmp((*blocker).classname, cstr("func_door").as_ptr()) == 0 {
             let mut center = [0.0f32; 3];
@@ -629,8 +683,8 @@ pub fn NAVNEW_ResolveEntityCollision(
         //First, attempt to walk around the blocker or shove him out of the way
         if NAVNEW_Bypass(
             ctx,
-            self_,
-            blocker,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(blocker),
             blocked_dir,
             blocked_dist,
             movedir,
@@ -641,13 +695,17 @@ pub fn NAVNEW_ResolveEntityCollision(
         }
 
         //Can't get around him... see if I'm blocking him too... if so, I need to just keep moving?
-        if NAVNEW_CheckDoubleBlock(self_, blocker, blocked_dir) != qfalse {
+        if NAVNEW_CheckDoubleBlock(&*self_, &*blocker, blocked_dir) != qfalse {
             return qtrue;
         }
 
         if setBlockedInfo != qfalse {
             //Complain about it if we can
-            NPC_SetBlocked(ctx, self_, blocker);
+            NPC_SetBlocked(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(blocker),
+            );
         }
 
         qfalse
@@ -659,13 +717,16 @@ pub fn NAVNEW_ResolveEntityCollision(
 /// Source: `oracle/codemp/game/g_navnew.c:442-518`
 pub fn NAVNEW_AvoidCollision(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    goal: *mut gentity_t,
+    self_: EntityId,
+    goal: Option<EntityId>,
     info: *mut navInfo_t,
     setBlockedInfo: qboolean,
     blockedMovesLimit: c_int,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let goal: *mut gentity_t = ent_ptr(ctx, goal);
         //Cap our distance
         if (*info).distance > MAX_COLL_AVOID_DIST as f32 {
             (*info).distance = MAX_COLL_AVOID_DIST as f32;
@@ -685,7 +746,7 @@ pub fn NAVNEW_AvoidCollision(
         //Now test against entities
         if NAV_CheckAhead(
             ctx,
-            self_,
+            ctx.entity_id_of(self_).unwrap(),
             movepos,
             &mut (*info).trace as *mut trace_t,
             CONTENTS_BODY,
@@ -707,7 +768,11 @@ pub fn NAVNEW_AvoidCollision(
                         //use patch-style navigation
                         (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves += 1;
                     }
-                    NPC_SetBlocked(ctx, self_, (*info).blocker);
+                    NPC_SetBlocked(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        ctx.entity_id_of((*info).blocker),
+                    );
                     return qfalse;
                 }
                 (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves += 1;
@@ -719,9 +784,9 @@ pub fn NAVNEW_AvoidCollision(
             //Test for blocking by standing on goal
             if NAV_TestForBlocked(
                 ctx,
-                self_,
-                goal,
-                (*info).blocker,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(goal),
+                ctx.entity_id_of((*info).blocker),
                 (*info).distance,
                 &mut (*info).flags as *mut c_int,
             ) == qtrue
@@ -738,8 +803,8 @@ pub fn NAVNEW_AvoidCollision(
             //See if we can get that entity to move out of our way
             if NAVNEW_ResolveEntityCollision(
                 ctx,
-                self_,
-                (*info).blocker,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of((*info).blocker),
                 movedir,
                 (*info).pathDirection,
                 setBlockedInfo,
@@ -776,12 +841,14 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
     ctx: GameContext<'_>,
     wp1: c_int,
     wp2: c_int,
-    ignoreEnt: *mut gentity_t,
+    ignoreEnt: Option<EntityId>,
     goalEntNum: c_int,
     checkWorld: qboolean,
     checkEnts: qboolean,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let ignoreEnt: *mut gentity_t = ent_ptr(ctx, ignoreEnt);
         if checkWorld == qfalse && checkEnts == qfalse {
             //duh, nothing to trace against
             return qfalse;
@@ -866,12 +933,10 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
 /// Raven `NAVNEW_MoveToGoal`.
 ///
 /// Source: `oracle/codemp/game/g_navnew.c:578-865`
-pub fn NAVNEW_MoveToGoal(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    info: *mut navInfo_t,
-) -> c_int {
+pub fn NAVNEW_MoveToGoal(ctx: GameContext<'_>, self_: EntityId, info: *mut navInfo_t) -> c_int {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let mut bestNode = WAYPOINT_NONE;
         let mut foundClearPath = qfalse;
         let mut origin = [0.0f32; 3];
@@ -986,7 +1051,13 @@ pub fn NAVNEW_MoveToGoal(
                     //heading to an edge off our confirmed clear waypoint... make sure it's clear
                     //it it's not, bestNode will fall back to our waypoint
                     let oldBestNode = bestNode;
-                    bestNode = NAV_TestBestNode(ctx, self_, (*self_).waypoint, bestNode, qtrue);
+                    bestNode = NAV_TestBestNode(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        (*self_).waypoint,
+                        bestNode,
+                        qtrue,
+                    );
                     if bestNode == (*self_).waypoint {
                         //we fell back to our waypoint, reset the origin
                         (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
@@ -1017,8 +1088,14 @@ pub fn NAVNEW_MoveToGoal(
             //NOTE: One very important thing NAVNEW_AvoidCollision does is
             //		it actually CHANGES the value of "direction" - it changes it to
             //		whatever dir you need to go in to avoid the obstacle...
-            foundClearPath =
-                NAVNEW_AvoidCollision(ctx, self_, goal_ent_ptr, &mut tempInfo, setBlockedInfo, 5);
+            foundClearPath = NAVNEW_AvoidCollision(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(goal_ent_ptr),
+                &mut tempInfo,
+                setBlockedInfo,
+                5,
+            );
 
             if foundClearPath == qfalse {
                 //blocked by an ent
@@ -1033,8 +1110,8 @@ pub fn NAVNEW_MoveToGoal(
                     );
                     foundClearPath = NAVNEW_AvoidCollision(
                         ctx,
-                        self_,
-                        goal_ent_ptr,
+                        ctx.entity_id_of(self_).unwrap(),
+                        ctx.entity_id_of(goal_ent_ptr),
                         &mut tempInfo,
                         setBlockedInfo,
                         5,
@@ -1045,7 +1122,7 @@ pub fn NAVNEW_MoveToGoal(
             if foundClearPath != qfalse {
                 //clear!
                 //If we got set to blocked, clear it
-                NPC_ClearBlocked(self_);
+                NPC_ClearBlocked(&mut *self_);
                 //Take the dir
                 core::ptr::copy_nonoverlapping(
                     &tempInfo as *const navInfo_t,
@@ -1114,7 +1191,7 @@ pub fn NAVNEW_MoveToGoal(
                                ctx.engine,
                                mp_abi::game::syscalls::G_NAV_NODESARENEIGHBORS::GNavNodesareneighborsArgs::new((*self_).waypoint, bestNode),
                            ) == qfalse
-                           || NAVNEW_TestNodeConnectionBlocked(ctx, (*self_).waypoint, bestNode, self_, (if !goal_ent_ptr.is_null() { (*goal_ent_ptr).s.number } else { ENTITYNUM_NONE }), qfalse, qtrue) != qfalse)
+                           || NAVNEW_TestNodeConnectionBlocked(ctx, (*self_).waypoint, bestNode, ctx.entity_id_of(self_), (if !goal_ent_ptr.is_null() { (*goal_ent_ptr).s.number } else { ENTITYNUM_NONE }), qfalse, qtrue) != qfalse)
                         {
                             //the direct path between these 2 nodes is blocked by an ent
                             trap::Nav_AddFailedEdge(

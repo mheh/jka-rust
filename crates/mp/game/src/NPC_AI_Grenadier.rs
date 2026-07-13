@@ -305,12 +305,12 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
                     NPC_SetCombatPoint(ctx, cp);
                     NPC_SetMoveGoal(
                         ctx,
-                        npc_ptr,
+                        ctx.entity_id_of(npc_ptr).unwrap(),
                         world.level.combatPoints[cp as usize].origin,
                         8,
                         qtrue,
                         cp,
-                        core::ptr::null_mut(),
+                        None,
                     );
                     return moved;
                 }
@@ -498,7 +498,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                     .r
                     .currentOrigin,
                 16,
-                FlyingCreature(npc_ptr),
+                FlyingCreature(&*npc_ptr),
             ) != qfalse
                 || ((*npc_info_ptr).squadState == SQUAD_SCOUT
                     && world.globals.enemyLOS3 != qfalse

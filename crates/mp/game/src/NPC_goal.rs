@@ -179,7 +179,7 @@ pub fn ReachedGoal(ctx: GameContext<'_>, goal: Option<EntityId>) -> qboolean {
         }
 
         let npc = (*ctx.world).globals.NPC;
-        let flying = FlyingCreature(npc);
+        let flying = FlyingCreature(&*npc);
 
         NAV_HitNavGoal(
             (*npc).r.currentOrigin,

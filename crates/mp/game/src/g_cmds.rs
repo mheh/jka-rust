@@ -4938,7 +4938,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
 
         // rww - redirect bot commands
         if cmd_s.contains("bot_")
-            && crate::ai_wpnav::AcceptBotCommand(ctx, cmd.as_mut_ptr(), ent) != 0
+            && crate::ai_wpnav::AcceptBotCommand(ctx, cmd.as_mut_ptr(), ctx.entity_id_of(ent)) != 0
         {
             return;
         }

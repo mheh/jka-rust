@@ -306,7 +306,7 @@ impl Dispatch<GameNavClearpathtopoint> for GameContext<'_> {
         let point = unsafe { *(args.point() as *const vec3_t) };
         crate::g_nav::NAV_ClearPathToPoint(
             *self,
-            self_,
+            self.entity_id_of(self_).unwrap(),
             pmins,
             pmaxs,
             point,
@@ -359,7 +359,7 @@ impl Dispatch<GameNavChecknodefailedforent> for GameContext<'_> {
         // SAFETY: seam reborrow of the owned entity arena (STATE-D6).
         let ent =
             unsafe { &mut (*self.world).g_entities[args.entity_num() as usize] as *mut gentity_t };
-        crate::g_navnew::NAV_CheckNodeFailedForEnt(ent, args.node_num())
+        crate::g_navnew::NAV_CheckNodeFailedForEnt(unsafe { &*ent }, args.node_num())
     }
 }
 

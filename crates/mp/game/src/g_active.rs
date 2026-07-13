@@ -1807,8 +1807,8 @@ pub fn G_CheckMovingLoopingSounds(ctx: GameContext<'_>, ent: EntityId, ucmd: *mu
             if (!(*ent).NPC.is_null() && VectorCompare(vec3_origin, (*cl).ps.moveDir) == qfalse) //moving using moveDir
                 || (*ucmd).forwardmove != 0
                 || (*ucmd).rightmove != 0 //moving using ucmds
-                || ((*ucmd).upmove != 0 && FlyingCreature(ent) != 0) //flier using ucmds to move
-                || (FlyingCreature(ent) != 0
+                || ((*ucmd).upmove != 0 && FlyingCreature(&*ent) != 0) //flier using ucmds to move
+                || (FlyingCreature(&*ent) != 0
                     && VectorCompare(vec3_origin, (*cl).ps.velocity) == qfalse
                     && (*ent).health > 0)
             {

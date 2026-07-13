@@ -1308,12 +1308,12 @@ pub fn NPC_ST_InvestigateEvent(
                     (*NPCInfo).investigateGoal = trace.endpos;
                     NPC_SetMoveGoal(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         (*NPCInfo).investigateGoal,
                         16,
                         qtrue,
                         -1,
-                        core::ptr::null_mut(),
+                        None,
                     );
                     (*NPCInfo).localState = LSTATE_INVESTIGATE;
                 }
@@ -1331,12 +1331,12 @@ pub fn NPC_ST_InvestigateEvent(
                 if id != -1 {
                     NPC_SetMoveGoal(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         world.level.combatPoints[id as usize].origin,
                         16,
                         qtrue,
                         id,
-                        core::ptr::null_mut(),
+                        None,
                     );
                     (*NPCInfo).localState = LSTATE_INVESTIGATE;
                 }
@@ -1528,7 +1528,7 @@ pub fn NPC_BSST_Investigate(ctx: GameContext<'_>) {
         if (*NPCInfo).localState == LSTATE_INVESTIGATE && (*NPCInfo).goalEntity != None {
             let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
             // See if we're there
-            let flying = FlyingCreature(NPC);
+            let flying = FlyingCreature(&*NPC);
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
@@ -1786,7 +1786,7 @@ pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
         if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != None) {
             let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
             // Did we make it?
-            let flying = FlyingCreature(NPC);
+            let flying = FlyingCreature(&*NPC);
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
@@ -2115,7 +2115,15 @@ pub fn ST_TrackEnemy(ctx: GameContext<'_>, self_: *mut gentity_t, enemyPos: vec3
         let npc = (*self_).NPC as *mut gNPC_t;
         NPC_FreeCombatPoint(ctx, (*npc).combatPoint, qfalse);
         // go after his last seen pos
-        NPC_SetMoveGoal(ctx, self_, enemyPos, 16, qfalse, -1, core::ptr::null_mut());
+        NPC_SetMoveGoal(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            enemyPos,
+            16,
+            qfalse,
+            -1,
+            None,
+        );
     }
 }
 
@@ -2278,12 +2286,12 @@ pub fn ST_TransferMoveGoal(ctx: GameContext<'_>, self_: *mut gentity_t, other: *
                 };
                 NPC_SetMoveGoal(
                     ctx,
-                    other,
+                    ctx.entity_id_of(other).unwrap(),
                     (*tempGoalEnt).r.currentOrigin,
                     (*selfNpc).goalRadius,
                     isNavGoal,
                     -1,
-                    core::ptr::null_mut(),
+                    None,
                 );
             } else {
                 (*otherNpc).goalEntity = (*selfNpc).goalEntity;
@@ -2409,8 +2417,11 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
         if (*group).lastSeenEnemyTime < world.level.time - 180000 {
             // dissolve the group
             ST_Speech(ctx, NPC, SPEECH_LOST, 0.0);
-            (*(*group).enemy).waypoint =
-                NAV_FindClosestWaypointForEnt(ctx, (*group).enemy, WAYPOINT_NONE);
+            (*(*group).enemy).waypoint = NAV_FindClosestWaypointForEnt(
+                ctx,
+                ctx.entity_id_of((*group).enemy).unwrap(),
+                WAYPOINT_NONE,
+            );
             for i in 0..(*group).numGroup {
                 let member = &mut world.g_entities[(*group).member[i as usize].number as usize]
                     as *mut gentity_t;
@@ -2429,8 +2440,11 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                 }
                 // Lost enemy for three minutes? go into search mode?
                 G_ClearEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
-                (*NPC).waypoint =
-                    NAV_FindClosestWaypointForEnt(ctx, NPC, (*(*group).enemy).waypoint);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    (*(*group).enemy).waypoint,
+                );
                 if (*NPC).waypoint == WAYPOINT_NONE {
                     (*NPCInfo).behaviorState = BS_DEFAULT; // BS_PATROL;
                 } else if (*(*group).enemy).waypoint == WAYPOINT_NONE
@@ -3071,12 +3085,12 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                     NPC_SetCombatPoint(ctx, cp);
                     NPC_SetMoveGoal(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         world.level.combatPoints[cp as usize].origin,
                         8,
                         qtrue,
                         cp,
-                        core::ptr::null_mut(),
+                        None,
                     );
                     // okay, try a move right now to see if we can even get there
                     // if ( ST_Move() ) (Raven, commented out).

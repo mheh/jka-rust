@@ -1811,13 +1811,13 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::NPC_Cultist_Commando => {
             SP_NPC_Cultist_Commando(ctx, ctx.entity_id_of(ent).unwrap())
         }
-        EntSpawn::waypoint => SP_waypoint(ctx, ent),
-        EntSpawn::waypoint_small => SP_waypoint_small(ctx, ent),
-        EntSpawn::waypoint_navgoal => SP_waypoint_navgoal(ctx, ent),
-        EntSpawn::waypoint_navgoal_8 => SP_waypoint_navgoal_8(ctx, ent),
-        EntSpawn::waypoint_navgoal_4 => SP_waypoint_navgoal_4(ctx, ent),
-        EntSpawn::waypoint_navgoal_2 => SP_waypoint_navgoal_2(ctx, ent),
-        EntSpawn::waypoint_navgoal_1 => SP_waypoint_navgoal_1(ctx, ent),
+        EntSpawn::waypoint => SP_waypoint(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::waypoint_small => SP_waypoint_small(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::waypoint_navgoal => SP_waypoint_navgoal(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::waypoint_navgoal_8 => SP_waypoint_navgoal_8(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::waypoint_navgoal_4 => SP_waypoint_navgoal_4(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::waypoint_navgoal_2 => SP_waypoint_navgoal_2(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::waypoint_navgoal_1 => SP_waypoint_navgoal_1(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::CreateSpaceDust => SP_CreateSpaceDust(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::CreateRain => SP_CreateRain(ctx, ctx.entity_id_of(ent).unwrap()),
         EntSpawn::CreateSnow => SP_CreateSnow(ctx, ctx.entity_id_of(ent).unwrap()),

@@ -5734,9 +5734,17 @@ pub fn G_Damage(
             }
 
             if !attacker.is_null() && !(*attacker).client.is_null() {
-                crate::ai_main::BotDamageNotification(ctx, client, attacker);
+                crate::ai_main::BotDamageNotification(
+                    ctx,
+                    ctx.entity_id_of(targ).unwrap(),
+                    ctx.entity_id_of(attacker),
+                );
             } else if !inflictor.is_null() && !(*inflictor).client.is_null() {
-                crate::ai_main::BotDamageNotification(ctx, client, inflictor);
+                crate::ai_main::BotDamageNotification(
+                    ctx,
+                    ctx.entity_id_of(targ).unwrap(),
+                    ctx.entity_id_of(inflictor),
+                );
             }
         }
 

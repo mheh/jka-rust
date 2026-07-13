@@ -46,7 +46,7 @@ pub fn NPC_ClearPathToGoal(ctx: GameContext<'_>, dir: vec3_t, goal: Option<Entit
         // Look ahead and see if we're clear to move to our goal position
         if crate::g_nav::NAV_CheckAhead(
             ctx,
-            npc,
+            ctx.entity_id_of(npc).unwrap(),
             (*goal).r.currentOrigin,
             &mut trace as *mut trace_t,
             ((*npc).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
@@ -55,7 +55,7 @@ pub fn NPC_ClearPathToGoal(ctx: GameContext<'_>, dir: vec3_t, goal: Option<Entit
             return qtrue;
         }
 
-        if FlyingCreature(npc) == qfalse {
+        if FlyingCreature(&*npc) == qfalse {
             // See if we're too far above
             if ((*npc).r.currentOrigin[2] - (*goal).r.currentOrigin[2]).abs() > 48.0 {
                 return qfalse;
@@ -84,7 +84,7 @@ pub fn NPC_ClearPathToGoal(ctx: GameContext<'_>, dir: vec3_t, goal: Option<Entit
                 (*npc).r.maxs,
                 (*goal).r.currentOrigin,
                 npc_info.goalRadius,
-                FlyingCreature(npc),
+                FlyingCreature(&*npc),
             ) == qtrue
             {
                 return qtrue;
@@ -243,7 +243,7 @@ pub fn NPC_GetMoveDirection(
                 // See if we're just stuck
                 if NAV_MoveToGoal(
                     ctx,
-                    npc,
+                    ctx.entity_id_of(npc).unwrap(),
                     &mut world.globals.frameNavInfo.0 as *mut navInfo_t,
                 ) == WAYPOINT_NONE
                 {
@@ -262,13 +262,19 @@ pub fn NPC_GetMoveDirection(
         // Avoid any collisions on the way
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
-            if NAV_AvoidCollision(ctx, npc, goal_ptr, &mut world.globals.frameNavInfo.0) == qfalse {
+            if NAV_AvoidCollision(
+                ctx,
+                ctx.entity_id_of(npc).unwrap(),
+                ctx.entity_id_of(goal_ptr),
+                &mut world.globals.frameNavInfo.0,
+            ) == qfalse
+            {
                 if (world.globals.frameNavInfo.0.flags & NIF_MACRO_NAV) == 0 {
                     // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
                     // See if we're just stuck
                     if NAV_MoveToGoal(
                         ctx,
-                        npc,
+                        ctx.entity_id_of(npc).unwrap(),
                         &mut world.globals.frameNavInfo.0 as *mut navInfo_t,
                     ) == WAYPOINT_NONE
                     {
@@ -349,7 +355,12 @@ pub fn NPC_GetMoveDirectionAltRoute(
                 ) == qfalse
             {
                 // blocked — Can't get straight to goal, use macro nav
-                if NAVNEW_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0) == WAYPOINT_NONE {
+                if NAVNEW_MoveToGoal(
+                    ctx,
+                    ctx.entity_id_of(npc).unwrap(),
+                    &mut world.globals.frameNavInfo.0,
+                ) == WAYPOINT_NONE
+                {
                     // Can't reach goal, just face
                     vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
                     npc_info.desiredYaw = AngleNormalize360(angles[1]);
@@ -365,11 +376,21 @@ pub fn NPC_GetMoveDirectionAltRoute(
                 if (*ctx.world).cvars.d_altRoutes.integer != 0 {
                     // try macro nav
                     let mut temp_info = world.globals.frameNavInfo.0;
-                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut temp_info, qtrue, 5) == qfalse
+                    if NAVNEW_AvoidCollision(
+                        ctx,
+                        ctx.entity_id_of(npc).unwrap(),
+                        ctx.entity_id_of(goal_ptr),
+                        &mut temp_info,
+                        qtrue,
+                        5,
+                    ) == qfalse
                     {
                         // revert to macro nav — Can't get straight to goal, dump tempInfo and use macro nav
-                        if NAVNEW_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0)
-                            == WAYPOINT_NONE
+                        if NAVNEW_MoveToGoal(
+                            ctx,
+                            ctx.entity_id_of(npc).unwrap(),
+                            &mut world.globals.frameNavInfo.0,
+                        ) == WAYPOINT_NONE
                         {
                             // Can't reach goal, just face
                             vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
@@ -388,8 +409,8 @@ pub fn NPC_GetMoveDirectionAltRoute(
                     // OR: just give up
                     if NAVNEW_AvoidCollision(
                         ctx,
-                        npc,
-                        goal_ptr,
+                        ctx.entity_id_of(npc).unwrap(),
+                        ctx.entity_id_of(goal_ptr),
                         &mut world.globals.frameNavInfo.0,
                         qtrue,
                         30,

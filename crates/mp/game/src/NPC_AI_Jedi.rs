@@ -6998,7 +6998,7 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
 
             if crate::g_nav::NAV_CheckAhead(
                 ctx,
-                npc,
+                ctx.entity_id_of(npc).unwrap(),
                 (*goal).r.currentOrigin,
                 &mut trace,
                 ((*npc).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,

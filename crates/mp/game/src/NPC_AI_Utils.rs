@@ -136,7 +136,7 @@ pub fn AI_ClosestGroupEntityNumToPoint(
 
         markerWP = NAV_FindClosestWaypointForPoint(
             ctx,
-            &mut (*ctx.world).g_entities[(*group).member[0].number as usize] as *mut gentity_t,
+            EntityId::from_num((*group).member[0].number as c_int).unwrap(),
             point,
         );
 
@@ -197,7 +197,11 @@ pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupIn
 
         if !(*group).enemy.is_null() {
             // FIXME: just use enemy->waypoint?
-            (*group).enemyWP = NAV_FindClosestWaypointForEnt(ctx, (*group).enemy, WAYPOINT_NONE);
+            (*group).enemyWP = NAV_FindClosestWaypointForEnt(
+                ctx,
+                ctx.entity_id_of((*group).enemy).unwrap(),
+                WAYPOINT_NONE,
+            );
         } else {
             (*group).enemyWP = WAYPOINT_NONE;
         }
@@ -209,8 +213,11 @@ pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupIn
                 (*group).member[i as usize].pathCostToEnemy = Q3_INFINITE;
             } else {
                 // FIXME: just use member->waypoint?
-                (*group).member[i as usize].waypoint =
-                    NAV_FindClosestWaypointForEnt(ctx, (*group).enemy, WAYPOINT_NONE);
+                (*group).member[i as usize].waypoint = NAV_FindClosestWaypointForEnt(
+                    ctx,
+                    ctx.entity_id_of((*group).enemy).unwrap(),
+                    WAYPOINT_NONE,
+                );
                 if (*group).member[i as usize].waypoint != WAYPOINT_NONE {
                     (*group).member[i as usize].pathCostToEnemy = trap::Nav_GetPathCost(
                         ctx.engine,

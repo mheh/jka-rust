@@ -95,12 +95,12 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
             let cap = &mut world.g_entities[captureGoal.index()] as *mut gentity_t;
             NPC_SetMoveGoal(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC).unwrap(),
                 (*cap).r.currentOrigin,
                 16,
                 qtrue,
                 -1,
-                core::ptr::null_mut(),
+                None,
             );
             (*NPCInfo).goalTime = world.level.time + 100000;
         }
@@ -1028,7 +1028,11 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
 
             if VectorLengthSquared(vec) < minGoalReachedDistSquared {
                 // Close enough, just got there.
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    WAYPOINT_NONE,
+                );
 
                 if (*NPCInfo).homeWp == WAYPOINT_NONE || (*NPC).waypoint == WAYPOINT_NONE {
                     if (*NPCInfo).tempBehavior == BS_SEARCH {
@@ -1108,7 +1112,11 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                 }
             } else {
                 // Just finished waiting.
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    WAYPOINT_NONE,
+                );
 
                 if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
                     let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
@@ -1165,7 +1173,8 @@ pub fn NPC_BSSearchStart(ctx: GameContext<'_>, homeWp: c_int, bState: bState_t) 
         let mut homeWp = homeWp;
 
         if homeWp == WAYPOINT_NONE {
-            homeWp = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
+            homeWp =
+                NAV_FindClosestWaypointForEnt(ctx, ctx.entity_id_of(NPC).unwrap(), WAYPOINT_NONE);
             if (*NPC).waypoint == WAYPOINT_NONE {
                 (*NPC).waypoint = homeWp;
             }
@@ -1269,7 +1278,11 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
             }
 
             if VectorLengthSquared(vec) < minGoalReachedDistSquared {
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    WAYPOINT_NONE,
+                );
 
                 if world.bg_state.rng.Q_irand(0, 1) == 0 {
                     NPC_SetAnim(
@@ -1331,7 +1344,11 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                     }
                 }
             } else {
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    WAYPOINT_NONE,
+                );
 
                 if (*NPC).waypoint != WAYPOINT_NONE {
                     let numEdges = trap::Nav_GetNodeNumEdges(
@@ -1516,7 +1533,8 @@ pub fn NPC_BSFlee(ctx: GameContext<'_>) {
             let mut reverseCourse = qtrue;
 
             if (*NPC).waypoint == WAYPOINT_NONE {
-                (*NPC).waypoint = NAV_GetNearestNode(ctx, NPC, (*NPC).lastWaypoint);
+                (*NPC).waypoint =
+                    NAV_GetNearestNode(ctx, ctx.entity_id_of(NPC).unwrap(), (*NPC).lastWaypoint);
             }
             if (*NPC).waypoint != WAYPOINT_NONE {
                 let numEdges = trap::Nav_GetNodeNumEdges(
@@ -1551,7 +1569,15 @@ pub fn NPC_BSFlee(ctx: GameContext<'_>) {
                         if _DotProduct(runDir, dangerDir) > world.bg_state.rng.flrand(0.0, 0.5) {
                             continue;
                         }
-                        NPC_SetMoveGoal(ctx, NPC, branchPos, 0, qtrue, -1, core::ptr::null_mut());
+                        NPC_SetMoveGoal(
+                            ctx,
+                            ctx.entity_id_of(NPC).unwrap(),
+                            branchPos,
+                            0,
+                            qtrue,
+                            -1,
+                            None,
+                        );
                         reverseCourse = qfalse;
                         break;
                     }
@@ -1676,12 +1702,12 @@ pub fn NPC_StartFlee(
             NPC_SetCombatPoint(ctx, cp);
             NPC_SetMoveGoal(
                 ctx,
-                NPC,
+                ctx.entity_id_of(NPC).unwrap(),
                 world.level.combatPoints[cp as usize].origin,
                 8,
                 qtrue,
                 cp,
-                core::ptr::null_mut(),
+                None,
             );
             (*NPCInfo).behaviorState = BS_HUNT_AND_KILL;
             (*NPCInfo).tempBehavior = BS_DEFAULT;
@@ -1690,7 +1716,15 @@ pub fn NPC_StartFlee(
                 return;
             } else {
                 (*NPCInfo).tempBehavior = BS_FLEE;
-                NPC_SetMoveGoal(ctx, NPC, dangerPoint, 0, qtrue, -1, core::ptr::null_mut());
+                NPC_SetMoveGoal(
+                    ctx,
+                    ctx.entity_id_of(NPC).unwrap(),
+                    dangerPoint,
+                    0,
+                    qtrue,
+                    -1,
+                    None,
+                );
                 _VectorCopy(dangerPoint, &mut (*NPCInfo).investigateGoal);
             }
         }

@@ -250,12 +250,12 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
                         NPC_SetCombatPoint(ctx, cp2);
                         NPC_SetMoveGoal(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC).unwrap(),
                             world.level.combatPoints[cp2 as usize].origin,
                             8,
                             qtrue,
                             cp2,
-                            core::ptr::null_mut(),
+                            None,
                         );
                         return moved;
                     }
@@ -264,12 +264,12 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
                     NPC_SetCombatPoint(ctx, cp);
                     NPC_SetMoveGoal(
                         ctx,
-                        NPC,
+                        ctx.entity_id_of(NPC).unwrap(),
                         world.level.combatPoints[cp as usize].origin,
                         8,
                         qtrue,
                         cp,
-                        core::ptr::null_mut(),
+                        None,
                     );
                     return moved;
                 }
@@ -424,7 +424,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
         // See if we're moving towards a goal, not the enemy
         if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != None) {
             // Did we make it?
-            let flying = FlyingCreature(NPC);
+            let flying = FlyingCreature(&*NPC);
             let goal_ent =
                 &mut world.g_entities[(*NPCInfo).goalEntity.unwrap().index()] as *mut gentity_t;
             if NAV_HitNavGoal(
@@ -570,12 +570,12 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                             NPC_SetCombatPoint(ctx, cp2);
                             NPC_SetMoveGoal(
                                 ctx,
-                                NPC,
+                                ctx.entity_id_of(NPC).unwrap(),
                                 world.level.combatPoints[cp2 as usize].origin,
                                 8,
                                 qtrue,
                                 cp2,
-                                core::ptr::null_mut(),
+                                None,
                             );
                             TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
                             TIMER_Set(
@@ -591,12 +591,12 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                         NPC_SetCombatPoint(ctx, cp);
                         NPC_SetMoveGoal(
                             ctx,
-                            NPC,
+                            ctx.entity_id_of(NPC).unwrap(),
                             world.level.combatPoints[cp as usize].origin,
                             8,
                             qtrue,
                             cp,
-                            core::ptr::null_mut(),
+                            None,
                         );
                         TIMER_Set(ctx, ctx.entity_id_of(NPC), c"duck".as_ptr(), -1);
                         TIMER_Set(
