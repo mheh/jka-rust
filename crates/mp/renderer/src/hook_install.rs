@@ -73,7 +73,20 @@ fn r_model_mdxm_hook(view: &mut EngineHostView, model: qhandle_t) -> *mut c_void
 fn r_model_mdxa_hook(view: &mut EngineHostView, model: qhandle_t) -> *mut c_void {
     // SAFETY: view-constructor slot, single-threaded, no other live cast.
     let rm = unsafe { rm_from_view(view) };
-    rm.get_model(model).mdxa as *mut c_void
+    let m = rm.get_model(model);
+    if !m.mdxa.is_null() {
+        return m.mdxa as *mut c_void;
+    }
+    // Raven reads the GLA header off the GLM's anim model —
+    // `R_GetModelByHandle(currentModel->mdxm->animIndex)->mdxa`
+    // (`tr_ghoul2.cpp:2092-2094`); a GLM handle resolves through its
+    // `animIndex` here so every G2SV-D15 header read lands on the GLA block.
+    if m.mdxm.is_null() {
+        return core::ptr::null_mut();
+    }
+    // SAFETY: `mdxm` is the loader's live parsed block for this handle.
+    let anim_index = unsafe { (*m.mdxm).animIndex };
+    rm.get_model(anim_index).mdxa as *mut c_void
 }
 
 /// `EngineHost::skin_surfaces` backing — Raven `R_GetSkinByHandle` flattened
