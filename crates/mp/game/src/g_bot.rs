@@ -1088,7 +1088,7 @@ pub fn G_AddBot(
             }
 
             (*cl).sess.sessionTeam = TEAM_SPECTATOR;
-            SetTeam(ctx, bot, cstr("s").into_raw());
+            SetTeam(ctx, ctx.entity_id_of(bot).unwrap(), cstr("s").into_raw());
         } else {
             if delay == 0 {
                 ClientBegin(ctx, clientNum, qfalse);

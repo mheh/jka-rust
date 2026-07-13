@@ -602,7 +602,11 @@ pub fn AddTournamentPlayer(ctx: GameContext<'_>) {
         let idx = next_in_line.offset_from(clients) as usize;
         let ent = (*ctx.world).g_entities.as_mut_ptr().add(idx);
         let s = CString::new("f").unwrap();
-        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+        SetTeam(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            s.as_ptr() as *mut c_char,
+        );
     }
 }
 
@@ -624,7 +628,11 @@ pub fn RemoveTournamentLoser(ctx: GameContext<'_>) {
         // make them a spectator
         let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
         let s = CString::new("s").unwrap();
-        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+        SetTeam(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            s.as_ptr() as *mut c_char,
+        );
     }
 }
 
@@ -744,7 +752,11 @@ pub fn AddPowerDuelPlayers(ctx: GameContext<'_>) {
         let idx = next_in_line.offset_from(clients) as usize;
         let ent = (*ctx.world).g_entities.as_mut_ptr().add(idx);
         let s = CString::new("f").unwrap();
-        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+        SetTeam(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            s.as_ptr() as *mut c_char,
+        );
 
         // Call recursively until everyone is in
         AddPowerDuelPlayers(ctx);
@@ -791,7 +803,11 @@ pub fn RemovePowerDuelLosers(ctx: GameContext<'_>) {
                 .as_mut_ptr()
                 .add(remClients[j] as usize);
             let s = CString::new("s").unwrap();
-            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            SetTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                s.as_ptr() as *mut c_char,
+            );
             j += 1;
         }
 
@@ -837,12 +853,20 @@ pub fn RemoveDuelDrawLoser(ctx: GameContext<'_>) {
         if cl_failure != 2 {
             let clientNum = (*ctx.world).level.sortedClients[cl_failure as usize];
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
-            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            SetTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                s.as_ptr() as *mut c_char,
+            );
         } else {
             // we could be more elegant about this, but oh well.
             let clientNum = (*ctx.world).level.sortedClients[1];
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
-            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            SetTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                s.as_ptr() as *mut c_char,
+            );
         }
     }
 }
@@ -865,7 +889,11 @@ pub fn RemoveTournamentWinner(ctx: GameContext<'_>) {
         // make them a spectator
         let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
         let s = CString::new("s").unwrap();
-        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+        SetTeam(
+            ctx,
+            ctx.entity_id_of(ent).unwrap(),
+            s.as_ptr() as *mut c_char,
+        );
     }
 }
 
@@ -1430,7 +1458,7 @@ pub fn SendScoreboardMessageToAllClients(ctx: GameContext<'_>) {
         let mut i: c_int = 0;
         while i < maxclients {
             if (*clients.add(i as usize)).pers.connected == CON_CONNECTED {
-                DeathmatchScoreboardMessage(ctx, entities.add(i as usize));
+                DeathmatchScoreboardMessage(ctx, EntityId(i as u32));
             }
             i += 1;
         }
@@ -1448,7 +1476,7 @@ pub fn MoveClientToIntermission(ctx: GameContext<'_>, ent: EntityId) {
 
         // take out of follow mode if needed
         if (*client).sess.spectatorState == SPECTATOR_FOLLOW {
-            StopFollowing(ctx, ent);
+            StopFollowing(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
         // move to the spot
@@ -2564,7 +2592,11 @@ pub fn G_RemoveDuelist(ctx: GameContext<'_>, team: c_int) {
                 && (*cl).sess.duelTeam == team
             {
                 let s = CString::new("s").unwrap();
-                SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+                SetTeam(
+                    ctx,
+                    ctx.entity_id_of(ent).unwrap(),
+                    s.as_ptr() as *mut c_char,
+                );
             }
             i += 1;
         }

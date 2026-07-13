@@ -5863,7 +5863,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
 
             //keep the saber off during this period
             if (*cl).ps.weapon == WP_SABER as c_int && (*cl).ps.saberHolstered == 0 {
-                Cmd_ToggleSaber_f(ctx, self_);
+                Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(self_).unwrap());
             }
         } else {
             (*cl).ps.fd.forceGripCripple = 0;

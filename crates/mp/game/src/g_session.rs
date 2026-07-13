@@ -255,7 +255,11 @@ pub fn G_InitSessionData(
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM as i32 {
             if (*ctx.world).cvars.g_teamAutoJoin.integer != 0 {
                 (*client).sess.sessionTeam = PickTeam(ctx, -1);
-                BroadcastTeamChange(ctx, client, -1);
+                BroadcastTeamChange(
+                    ctx,
+                    EntityId(client.offset_from((*ctx.world).level.clients) as u32),
+                    -1,
+                );
             } else {
                 if isBot == qfalse {
                     (*client).sess.sessionTeam = TEAM_SPECTATOR;
@@ -269,7 +273,11 @@ pub fn G_InitSessionData(
                     } else {
                         (*client).sess.sessionTeam = PickTeam(ctx, -1);
                     }
-                    BroadcastTeamChange(ctx, client, -1);
+                    BroadcastTeamChange(
+                        ctx,
+                        EntityId(client.offset_from((*ctx.world).level.clients) as u32),
+                        -1,
+                    );
                 }
             }
         } else {

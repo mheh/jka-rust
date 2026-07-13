@@ -2554,7 +2554,10 @@ pub fn player_die(
                         && (*attacker).s.number < MAX_CLIENTS as c_int
                         && (*self_).s.number < MAX_CLIENTS as c_int
                     {
-                        crate::g_cmds::G_CheckTKAutoKickBan(ctx, attacker);
+                        crate::g_cmds::G_CheckTKAutoKickBan(
+                            ctx,
+                            ctx.entity_id_of(attacker).unwrap(),
+                        );
                     }
                 }
                 if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER {
@@ -2721,7 +2724,7 @@ pub fn player_die(
                 1,
             );
         } else {
-            crate::g_cmds::Cmd_Score_f(ctx, self_); // show scores
+            crate::g_cmds::Cmd_Score_f(ctx, ctx.entity_id_of(self_).unwrap()); // show scores
         }
 
         // send updated scores to any clients that are following this one
@@ -2734,10 +2737,7 @@ pub fn player_die(
                 continue;
             }
             if (*client).sess.spectatorClient == (*self_).s.number {
-                crate::g_cmds::Cmd_Score_f(
-                    ctx,
-                    &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t,
-                );
+                crate::g_cmds::Cmd_Score_f(ctx, EntityId(i as u32));
             }
         }
 

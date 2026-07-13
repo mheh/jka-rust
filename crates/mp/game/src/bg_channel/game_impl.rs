@@ -754,7 +754,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_cmds::TryGrapple(ctx, ent)
+            crate::g_cmds::TryGrapple(ctx, ctx.entity_id_of(ent).unwrap())
         }
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {

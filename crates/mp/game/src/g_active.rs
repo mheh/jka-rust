@@ -933,12 +933,12 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: EntityId, ucmd: *mut usercmd_t)
         if (*client).tempSpectate < (*ctx.world).level.time {
             // attack button cycles through spectators
             if (*client).buttons & BUTTON_ATTACK != 0 && (*client).oldbuttons & BUTTON_ATTACK == 0 {
-                Cmd_FollowCycle_f(ctx, ent, 1);
+                Cmd_FollowCycle_f(ctx, ctx.entity_id_of(ent).unwrap(), 1);
             }
 
             if (*client).sess.spectatorState == SPECTATOR_FOLLOW && (*ucmd).upmove > 0 {
                 // jump now removes you from follow mode
-                StopFollowing(ctx, ent);
+                StopFollowing(ctx, ctx.entity_id_of(ent).unwrap());
             }
         }
     }
@@ -3507,14 +3507,14 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
 
             let gc = pm.cmd.generic_cmd as c_int;
             if gc == GENCMD_SABERSWITCH as c_int {
-                Cmd_ToggleSaber_f(ctx, ent);
+                Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_ENGAGE_DUEL as c_int {
                 if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
                     || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
                 {
                     // already in a duel, made it a taunt command
                 } else {
-                    Cmd_EngageDuel_f(ctx, ent);
+                    Cmd_EngageDuel_f(ctx, ctx.entity_id_of(ent).unwrap());
                 }
             } else if gc == GENCMD_FORCE_HEAL as c_int {
                 ForceHeal(ctx, ent);
@@ -3678,7 +3678,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: EntityId) {
                     }
                 }
             } else if gc == GENCMD_SABERATTACKCYCLE as c_int {
-                Cmd_SaberAttackCycle_f(ctx, ent);
+                Cmd_SaberAttackCycle_f(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_TAUNT as c_int {
                 G_SetTauntAnim(ctx, ctx.entity_id_of(ent).unwrap(), TAUNT_TAUNT);
             } else if gc == GENCMD_BOW as c_int {
@@ -3961,7 +3961,11 @@ pub fn G_CheckClientTimeouts(ctx: GameContext<'_>, ent: EntityId) {
             > (*ctx.world).cvars.g_timeouttospec.integer * 1000
         {
             let s = cstr("spectator");
-            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            SetTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                s.as_ptr() as *mut c_char,
+            );
         }
     }
 }

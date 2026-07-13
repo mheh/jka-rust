@@ -1931,7 +1931,7 @@ pub fn ClientConnect(
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
-            BroadcastTeamChange(ctx, client, -1);
+            BroadcastTeamChange(ctx, EntityId(clientNum as u32), -1);
         }
 
         // count current clients and rank for scoreboard
@@ -2090,7 +2090,11 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
             && (*client).sess.duelTeam == DUELTEAM_FREE as c_int
         {
-            SetTeam(ctx, ent, c"s".as_ptr() as *mut c_char);
+            SetTeam(
+                ctx,
+                ctx.entity_id_of(ent).unwrap(),
+                c"s".as_ptr() as *mut c_char,
+            );
         } else {
             if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
                 && ((*ctx.world).globals.gSiegeRoundBegun == qfalse
@@ -2119,8 +2123,20 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
                         sab1 = "dual_1";
                         sab2 = "none";
                     }
-                    G_SetSaber(ctx, ent, 0, cstr(sab1).as_ptr() as *mut c_char, qfalse);
-                    G_SetSaber(ctx, ent, 0, cstr(sab2).as_ptr() as *mut c_char, qfalse);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        cstr(sab1).as_ptr() as *mut c_char,
+                        qfalse,
+                    );
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        cstr(sab2).as_ptr() as *mut c_char,
+                        qfalse,
+                    );
                     Info_SetValueForKey(
                         userinfo_buf.as_mut_ptr(),
                         c"saber1".as_ptr(),
@@ -2139,14 +2155,20 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
                         ),
                     );
                 } else {
-                    G_SetSaber(ctx, ent, 0, saber_val, qfalse);
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, saber_val, qfalse);
                 }
 
                 if !saber_val.is_null()
                     && *saber_val != 0
                     && (saber2_val.is_null() || *saber2_val == 0)
                 {
-                    G_SetSaber(ctx, ent, 0, c"none".as_ptr() as *mut c_char, qfalse);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        c"none".as_ptr() as *mut c_char,
+                        qfalse,
+                    );
                     Info_SetValueForKey(
                         userinfo_buf.as_mut_ptr(),
                         c"saber2".as_ptr(),
@@ -2160,7 +2182,7 @@ pub fn ClientBegin(ctx: GameContext<'_>, clientNum: c_int, allowTeamReset: qbool
                         ),
                     );
                 } else {
-                    G_SetSaber(ctx, ent, 0, saber2_val, qfalse);
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, saber2_val, qfalse);
                 }
             }
 
@@ -2582,8 +2604,13 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         || saber.is_empty()
                         || (*client).saber[0].model[0] == 0
                     {
-                        if G_SetSaber(ctx, ent, l, cstr(&value_s).as_ptr() as *mut c_char, qfalse)
-                            != qfalse
+                        if G_SetSaber(
+                            ctx,
+                            ctx.entity_id_of(ent).unwrap(),
+                            l,
+                            cstr(&value_s).as_ptr() as *mut c_char,
+                            qfalse,
+                        ) != qfalse
                         {
                             changed_saber = qtrue;
                         } else if saber.is_empty() || (*client).saber[0].model[0] == 0 {
@@ -2982,7 +3009,11 @@ pub fn ClientSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         && (*client).sess.sessionTeam != force_team
                     {
                         let team_name = TeamName(force_team as c_int);
-                        SetTeam(ctx, ent, team_name as *mut c_char);
+                        SetTeam(
+                            ctx,
+                            ctx.entity_id_of(ent).unwrap(),
+                            team_name as *mut c_char,
+                        );
                         return;
                     }
                 }
@@ -3423,7 +3454,7 @@ pub fn ClientDisconnect(ctx: GameContext<'_>, clientNum: c_int) {
                     == crate::client::spectator_state::spectatorState_t::SPECTATOR_FOLLOW
                 && cl.sess.spectatorClient == clientNum
             {
-                StopFollowing(ctx, (*ctx.world).g_entities.as_mut_ptr().add(i as usize));
+                StopFollowing(ctx, EntityId(i as u32));
             }
             i += 1;
         }
@@ -4452,16 +4483,40 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                 let scl = &(*ctx.world).bg_state.bgSiegeClasses[(*client).siegeClass as usize];
 
                 if scl.saber1[0] as c_int != 0 {
-                    G_SetSaber(ctx, ent, 0, scl.saber1.as_ptr() as *mut c_char, qtrue);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        scl.saber1.as_ptr() as *mut c_char,
+                        qtrue,
+                    );
                 } else {
                     // default I guess
-                    G_SetSaber(ctx, ent, 0, cstr("Kyle").as_ptr() as *mut c_char, qtrue);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        cstr("Kyle").as_ptr() as *mut c_char,
+                        qtrue,
+                    );
                 }
                 if scl.saber2[0] as c_int != 0 {
-                    G_SetSaber(ctx, ent, 1, scl.saber2.as_ptr() as *mut c_char, qtrue);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        1,
+                        scl.saber2.as_ptr() as *mut c_char,
+                        qtrue,
+                    );
                 } else {
                     // no second saber then
-                    G_SetSaber(ctx, ent, 1, cstr("none").as_ptr() as *mut c_char, qtrue);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        1,
+                        cstr("none").as_ptr() as *mut c_char,
+                        qtrue,
+                    );
                 }
 
                 // make sure the saber models are updated

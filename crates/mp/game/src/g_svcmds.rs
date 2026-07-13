@@ -587,7 +587,7 @@ pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
         unsafe { (cl as usize - world.level.clients as usize) / std::mem::size_of::<gclient_t>() };
 
     let ent = unsafe { world.g_entities.as_ptr().add(cl_idx) as *mut gentity_t };
-    crate::g_cmds::SetTeam(ctx, ent, str.as_mut_ptr());
+    crate::g_cmds::SetTeam(ctx, ctx.entity_id_of(ent).unwrap(), str.as_mut_ptr());
 }
 
 /// Raven `ConsoleCommand`.

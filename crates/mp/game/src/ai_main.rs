@@ -7157,13 +7157,13 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
                 if InFieldOfVision((*bs).viewangles, 100.0, e_ang_vec) != 0 {
                     //Our enemy has his saber holstered and has challenged us to a duel, so challenge him back
                     if (*bs).cur_ps.saberHolstered == 0 {
-                        Cmd_ToggleSaber_f(ctx, me);
+                        Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(me).unwrap());
                     } else {
                         if (*ce_cl).ps.duelIndex == (*bs).client
                             && (*ce_cl).ps.duelTime > lt
                             && (*bs).cur_ps.duelInProgress == 0
                         {
-                            Cmd_EngageDuel_f(ctx, me);
+                            Cmd_EngageDuel_f(ctx, ctx.entity_id_of(me).unwrap());
                         }
                     }
 
@@ -7623,17 +7623,17 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
                             && (*bs).saberPower != 0
                         {
                             //h4q them
-                            Cmd_SaberAttackCycle_f(ctx, me);
+                            Cmd_SaberAttackCycle_f(ctx, ctx.entity_id_of(me).unwrap());
                         }
                     } else if (*currentEnemy).health > 40
                         && (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] > 1
                     {
                         if (*cl).ps.fd.saberAnimLevel != saber_styles_t::SS_MEDIUM as c_int {
-                            Cmd_SaberAttackCycle_f(ctx, me);
+                            Cmd_SaberAttackCycle_f(ctx, ctx.entity_id_of(me).unwrap());
                         }
                     } else {
                         if (*cl).ps.fd.saberAnimLevel != saber_styles_t::SS_FAST as c_int {
-                            Cmd_SaberAttackCycle_f(ctx, me);
+                            Cmd_SaberAttackCycle_f(ctx, ctx.entity_id_of(me).unwrap());
                         }
                     }
                 }

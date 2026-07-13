@@ -3996,9 +3996,9 @@ pub fn Q3_SetSaberActive(ctx: GameContext<'_>, entID: c_int, active: qboolean) {
         //fixme: Take into account player being in state where saber won't toggle? For now we simply won't care.
         let client = (*ent).client as *mut gclient_t;
         if (*client).ps.saberHolstered == 0 && active != 0 {
-            Cmd_ToggleSaber_f(ctx, ent);
+            Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(ent).unwrap());
         } else if BG_SabersOff(&mut (*client).ps as *mut playerState_t) != 0 && active == 0 {
-            Cmd_ToggleSaber_f(ctx, ent);
+            Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(ent).unwrap());
         }
     }
 }
