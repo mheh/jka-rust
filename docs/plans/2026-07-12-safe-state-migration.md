@@ -53,12 +53,23 @@ be independently referee-verified is wrong-sized and must be re-cut.
   subsystem, one referee-verified commit per shard. Returns stay raw (later
   pass); deref-saturated bodies may convert at the signature only, re-deriving
   raw pointers at the top with an in-code `// STAGE-1: … (Stage-2 debt)` mark.
-- **Stage 2 — World-borrow flip (F1+F3; the headline).** `(*ctx.world).X` →
-  accessor-based access; `GameContext.world` flips to `&'a mut GameWorld` with
-  `ctx: &mut GameContext` threading; the transitional `world()` accessor and
-  every Stage-1 signature-only body dissolve; **delete
-  `#![allow(dangerous_implicit_autorefs)]`**. The ruling-21 `GameCallbacksImpl`
-  raw reborrow dissolves here.
+- **Stage 2 — World-borrow flip (F1+F3; the headline).** Re-cut into 2a/2b
+  (user ruling 2026-07-12, "do #2 in 2 hours"):
+  - **2a — structural flip (fast, ~2h):** delete
+    `#![allow(dangerous_implicit_autorefs)]` (deny it, fix the ~130 fire
+    sites with explicit `&raw`/`addr_of!` forms, compiler-guided);
+    `GameContext.world` flips to `&'a mut GameWorld` with
+    `ctx: &mut GameContext` threading (implicit reborrow keeps most call
+    sites unchanged; `f(ctx, ctx.m(x))` sites need compiler-guided
+    arg-hoisting); the transitional `world()` accessor dies; `(*ctx.world).X`
+    text stays valid (deref of `&mut`) and its now-unused `unsafe` strips
+    mechanically. The ruling-21 `GameCallbacksImpl` raw reborrow dissolves.
+    Key enablers: raw pointers don't hold borrows, so the Stage-1 re-derive
+    bodies keep compiling unchanged.
+  - **2b — body sweep (rolling):** dissolve the Stage-1 signature-only
+    bodies file-by-file (multi-entity borrow restructuring per the pilot's
+    re-acquire pattern) — the "unsafe retreats to the seam" bulk, landed as
+    independent referee-gated commits after 2a.
 - **Stage 3 — `static mut` scratch → `GameWorld.scratch` sub-struct (F7)**,
   preserving buffer-rotation index semantics (va/vtos rings). The DEC-19
   qshared twin gets the mirrored engine-side home.
@@ -106,12 +117,16 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
   S6 g_combat (G_Damage hub, ~150 sites/33 files) `b7ec40f1` ·
   S7 g_weapon (80 fns) `3b065975` · S8 g_utils+g_main (~858 sites/51 files)
   `41f7c1e5` · S9 g_cmds `0a78e4e7` · S10 g_client `fb74d84e`.
-  Tail (in flight, 2-wide waves): W1 w_force+w_saber+bg_saber ∥
-  g_team+g_saga+g_log+g_timer; W2 g_misc+g_ICARUScb ∥ NPC_combat/utils/senses/
-  goal/move/reactions/behavior; W3 NPC_spawn+npc_c+stats+sounds ∥
-  g_nav+g_navnew+ai_wpnav+ai_main; W4 NPC_AI_Jedi+Stormtrooper ∥
-  turrets+g_vehicles+FighterNPC; W5 small NPC_AI_* + Stage-1-end cleanup
-  (stale STAGING headers, final `fn .*\*mut gentity_t` param sweep).
+  Tail DONE (2-wide waves, every shard referee-byte-identical):
+  W1A w_force+w_saber `dc9070fd` ∥ W1B g_team+g_saga+g_log+g_timer
+  `00759c2e`; W2A g_misc+g_ICARUScb `be5f00ac` ∥ W2B NPC_combat/utils/
+  senses/goal/move/reactions/behavior `5f7b01bc`; W3A NPC_spawn+npc_c+
+  stats+sounds `5810762f` ∥ W3B g_nav+g_navnew+ai_wpnav+ai_main
+  `26e13763`; W4A NPC_AI_Jedi+Stormtrooper `0c9cc20b` ∥ W4B
+  turrets+g_vehicles+FighterNPC `485b24f5`; W5 small NPC_AI_* +
+  Stage-1-end cleanup `36786079` (stale STAGING headers swept, final
+  param sweep: only seam/arena-base/double-pointer raws remain by
+  design). **Stage 1 is complete.**
 - **Stage-1 precedents established** (binding on later shards): returns stay
   raw; signature-only re-derives for saturated bodies with in-code Stage-2
   debt marks; unused handler `other`/`activator` params are `Option<EntityId>`;
