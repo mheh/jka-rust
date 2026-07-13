@@ -5479,7 +5479,7 @@ pub fn G_Damage(
                 }
 
                 (*tv).m_iShields = (*tc).ps.stats[statIndex_t::STAT_ARMOR as usize];
-                crate::g_vehicles::G_VehUpdateShields(targ);
+                crate::g_vehicles::G_VehUpdateShields(&mut *targ);
                 (*tv).m_iArmor -= take;
                 if (*tv).m_iArmor <= 0 {
                     (*targ).s.eFlags |= EF_DEAD;
@@ -5534,11 +5534,16 @@ pub fn G_Damage(
                                         // this area of the ship is now dead
                                         let wasDying = (*tv).m_iRemovedSurfaces != 0;
                                         if crate::g_vehicles::G_FlyVehicleDestroySurface(
-                                            ctx, targ, surface,
+                                            ctx,
+                                            ctx.entity_id_of(targ).unwrap(),
+                                            surface,
                                         ) != qfalse
                                         {
                                             crate::g_vehicles::G_VehicleSetDamageLocFlags(
-                                                ctx, targ, surface, deathPoint,
+                                                ctx,
+                                                ctx.entity_id_of(targ).unwrap(),
+                                                surface,
+                                                deathPoint,
                                             );
                                             if !wasDying {
                                                 (*tc).ps.otherKillerDebounceTime = 0;
@@ -5554,7 +5559,10 @@ pub fn G_Damage(
                                         }
                                     } else {
                                         crate::g_vehicles::G_VehicleSetDamageLocFlags(
-                                            ctx, targ, surface, deathPoint,
+                                            ctx,
+                                            ctx.entity_id_of(targ).unwrap(),
+                                            surface,
+                                            deathPoint,
                                         );
                                     }
                                 }

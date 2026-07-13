@@ -6,6 +6,11 @@
 //! `todo!()`; types resolve against already-ported crates, unported
 //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 //! RULES TABLE in fnskel.py.
+//!
+//! Safe-state migration **Stage 1**: `gentity_t*` params are `EntityId` /
+//! `&gentity_t` handles (§B5). `Vehicle_t*`/`bgEntity_t*`/`playerState_t*`
+//! params are NOT entity handles and stay raw (§D12 seam). The only in-scope
+//! `gentity_t*` here is `FighterIsInSpace`'s ctx-free read receiver.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -265,8 +270,12 @@ pub fn PredictedAngularDecrement(scale: f32, timeMod: f32, originalAngle: f32) -
 /// Raven `FighterIsInSpace`.
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:276-286`
-pub fn FighterIsInSpace(gParent: *mut gentity_t) -> qboolean {
+pub fn FighterIsInSpace(gParent: &gentity_t) -> qboolean {
     unsafe {
+        // STAGE-1: ctx-free leaf takes &gentity_t; raw body re-derived verbatim
+        // (Stage-2 debt). The `gParent.is_null()` guard is now vacuous (a live
+        // borrow is never null) but kept for a verbatim body.
+        let gParent: *const gentity_t = gParent;
         if !gParent.is_null() {
             let ent = &*gParent;
             if !ent.client.is_null() {
@@ -1011,7 +1020,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         // QAGAME gravity/pitch handling (the `#else` one-liner is dead in this build).
         if (*(*pVeh).m_vOrientation.add(0) * 0.1) > 10.0 {
             // pitched downward: increase speed based on tilt
-            if FighterIsInSpace(parent as *mut gentity_t) != qfalse {
+            if FighterIsInSpace(&*(parent as *mut gentity_t)) != qfalse {
                 // in space, do nothing with speed based on pitch
             } else {
                 let mut mult = *(*pVeh).m_vOrientation.add(0) * 0.1;
@@ -1028,7 +1037,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
         if (*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime {
             // going down
-            if FighterIsInSpace(parent as *mut gentity_t) != qfalse {
+            if FighterIsInSpace(&*(parent as *mut gentity_t)) != qfalse {
                 // in a valid trigger_space brush; simulate randomness
                 if (*parent).s.number & 3 == 0 {
                     (*parentPS).gravity = 0;
@@ -1050,7 +1059,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             && (*pVeh).m_ucmd.upmove <= 0
         {
             // slowing down or stopped and not trying to take off
-            if FighterIsInSpace(parent as *mut gentity_t) != qfalse {
+            if FighterIsInSpace(&*(parent as *mut gentity_t)) != qfalse {
                 if FighterOverValidLandingSurface(pVeh) != qfalse {
                     (*parentPS).gravity = ((speedIdle - (*parentPS).speed) / 4.0) as c_int;
                 }
@@ -1286,7 +1295,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         // No one aboard and up in the sky: pitch forward as it tumbles down (QAGAME).
         if crate::veh_dispatch::inhabited(ctx, pVeh) == qfalse
             && (*pVeh).m_LandTrace.fraction >= groundFraction
-            && FighterIsInSpace(parent as *mut gentity_t) == qfalse
+            && FighterIsInSpace(&*(parent as *mut gentity_t)) == qfalse
             && FighterSuspended(pVeh, parentPS) == qfalse
         {
             (*pVeh).m_ucmd.upmove = 0;

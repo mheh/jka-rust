@@ -5,6 +5,11 @@
 //! manifest, then filled by the jampgame mega-pass (pass 2). think/use/
 //! pain/die assignments are wired through the `EntThink`/`EntUse`/
 //! `EntPain`/`EntDie` dispatch enums that `gentity_t` carries.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`. Bodies re-derive the
+//! raw pointers verbatim at the top (`// STAGE-1:` markers) — Stage-2 debt.
+//! Callers bridge at the boundary via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_misc::BG_GiveMeVectorFromMatrix;
@@ -59,19 +64,26 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
     !a.is_null() && *a != 0
 }
 
+/// Resolve a stored `Option<EntityId>` back to a `gentity_t*` (the id->pointer
+/// half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Raven `G2Tur_SetBoneAngles`.
 ///
 /// Raven: special routine for tracking angles between client and server -rww.
 /// `angles` is only ever read (copied into the entity state / handed
 /// to the trap), never written back — kept by-value.
 /// Source: `oracle/codemp/game/g_turret_G2.c:24-123`
-pub fn G2Tur_SetBoneAngles(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    bone: *mut c_char,
-    angles: vec3_t,
-) {
+pub fn G2Tur_SetBoneAngles(ctx: GameContext<'_>, ent: EntityId, bone: *mut c_char, angles: vec3_t) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
 
         // Walk the 4 fixed bone-index/bone-angle slot pairs looking for an
@@ -160,13 +172,15 @@ pub fn G2Tur_SetBoneAngles(
 /// Raven `turretG2_set_models`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:125-207`
-pub fn turretG2_set_models(ctx: GameContext<'_>, self_: *mut gentity_t, dying: qboolean) {
+pub fn turretG2_set_models(ctx: GameContext<'_>, self_: EntityId, dying: qboolean) {
     // Raven `#define name .../name2 .../name3 ...` (`g_turret_G2.c:19-22`).
     const NAME: &core::ffi::CStr = c"models/map_objects/imp_mine/turret_canon.glm";
     const NAME2: &core::ffi::CStr = c"models/map_objects/imp_mine/turret_damage.md3";
     const NAME3: &core::ffi::CStr = c"models/map_objects/wedge/laser_cannon_model.glm";
 
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         if dying != 0 {
             if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
                 (*self_).s.modelindex = G_ModelIndex(NAME2.as_ptr());
@@ -228,7 +242,12 @@ pub fn turretG2_set_models(ctx: GameContext<'_>, self_: *mut gentity_t, dying: q
             // symbol backfill).
             if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 {
                 // different pitch bone and muzzle flash points
-                G2Tur_SetBoneAngles(ctx, self_, c"pitch".as_ptr() as *mut c_char, vec3_origin);
+                G2Tur_SetBoneAngles(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    c"pitch".as_ptr() as *mut c_char,
+                    vec3_origin,
+                );
                 (*self_).genericValue11 = trap::G2API_AddBolt(
                     ctx.engine,
                     mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
@@ -248,7 +267,7 @@ pub fn turretG2_set_models(ctx: GameContext<'_>, self_: *mut gentity_t, dying: q
             } else {
                 G2Tur_SetBoneAngles(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     c"Bone_body".as_ptr() as *mut c_char,
                     vec3_origin,
                 );
@@ -270,11 +289,14 @@ pub fn turretG2_set_models(ctx: GameContext<'_>, self_: *mut gentity_t, dying: q
 /// Source: `oracle/codemp/game/g_turret_G2.c:210-233`
 pub fn TurretG2Pain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         if !(*self_).paintarget.is_null() && VALIDSTRING((*self_).paintarget as *const c_char) {
             if (*self_).genericValue8 < (*ctx.world).level.time {
                 G_UseTargets2(
@@ -313,13 +335,17 @@ pub fn TurretG2Pain(
 /// Source: `oracle/codemp/game/g_turret_G2.c:236-316`
 pub fn turretG2_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     meansOfDeath: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let inflictor: *mut gentity_t = ent_ptr(ctx, inflictor);
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let mut forward: vec3_t = [0.0, 0.0, -1.0];
         let pos: vec3_t;
 
@@ -382,7 +408,7 @@ pub fn turretG2_die(
 
         if (*self_).s.modelindex2 != 0 {
             // switch to damage model if we should
-            turretG2_set_models(ctx, self_, qtrue);
+            turretG2_set_models(ctx, ctx.entity_id_of(self_).unwrap(), qtrue);
 
             (*self_).s.apos.trBase = (*self_).r.currentAngles;
             (*self_).s.apos.trDelta = [0.0, 0.0, 0.0];
@@ -416,11 +442,13 @@ pub fn turretG2_die(
 /// Source: `oracle/codemp/game/g_turret_G2.c:321-340`
 pub fn TurboLaser_SetBoneAnim(
     ctx: GameContext<'_>,
-    eweb: *mut gentity_t,
+    eweb: EntityId,
     startFrame: c_int,
     endFrame: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let eweb: *mut gentity_t = ctx.entity_mut(eweb);
         // set info on the entity so it knows to start the anim on the client next snapshot.
         (*eweb).s.eFlags |= EF_G2ANIMATING;
 
@@ -459,8 +487,10 @@ pub fn TurboLaser_SetBoneAnim(
 /// Raven `turretG2_fire`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:344-412`
-pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, dir: &mut vec3_t) {
+pub fn turretG2_fire(ctx: GameContext<'_>, ent: EntityId, start: vec3_t, dir: &mut vec3_t) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         // Check if start position is inside a wall
         if (trap::PointContents(
             ctx.engine,
@@ -501,9 +531,9 @@ pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, d
             G_PlayEffectID((*ent).genericValue13, org, ang);
             WP_FireTurboLaserMissile(ctx, ctx.entity_id_of(ent).unwrap(), start, *dir);
             if (*ent).alt_fire != 0 {
-                TurboLaser_SetBoneAnim(ctx, ent, 2, 3);
+                TurboLaser_SetBoneAnim(ctx, ctx.entity_id_of(ent).unwrap(), 2, 3);
             } else {
-                TurboLaser_SetBoneAnim(ctx, ent, 0, 1);
+                TurboLaser_SetBoneAnim(ctx, ctx.entity_id_of(ent).unwrap(), 0, 1);
             }
         } else {
             // Regular blaster turret: fire standard missile
@@ -549,8 +579,10 @@ pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, d
 /// Raven `turretG2_respawn`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:414-434`
-pub fn turretG2_respawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turretG2_respawn(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         (*self_).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use).into();
         (*self_).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain).into();
         (*self_).die = Some(crate::ent_fn_enums::EntDie::turretG2_die).into();
@@ -564,7 +596,7 @@ pub fn turretG2_respawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         (*self_).s.weapon = WP_TURRET as c_int; // crosshair code uses this to mark crosshair red
 
-        turretG2_set_models(ctx, self_, qfalse);
+        turretG2_set_models(ctx, ctx.entity_id_of(self_).unwrap(), qfalse);
         (*self_).s.health = (*self_).genericValue6;
         (*self_).health = (*self_).genericValue6;
 
@@ -579,8 +611,10 @@ pub fn turretG2_respawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turretG2_head_think`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:437-482`
-pub fn turretG2_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turretG2_head_think(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         // if it's time to fire and we have an enemy, then gun 'em down!
         // pushDebounce time controls next fire time
         if !(*self_).enemy.is_none()
@@ -638,7 +672,7 @@ pub fn turretG2_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 org[2] + START_DIS * fwd[2],
             ];
 
-            turretG2_fire(ctx, self_, org, &mut fwd);
+            turretG2_fire(ctx, ctx.entity_id_of(self_).unwrap(), org, &mut fwd);
             (*self_).fly_sound_debounce_time = (*ctx.world).level.time; // used as lastShotTime
         }
     }
@@ -647,8 +681,10 @@ pub fn turretG2_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turretG2_aim`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:485-648`
-pub fn turretG2_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turretG2_aim(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let mut enemyDir: vec3_t;
         let mut org: vec3_t;
         let mut org2: vec3_t;
@@ -793,7 +829,12 @@ pub fn turretG2_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 } else {
                     desiredAngles = [0.0, 0.0, (*self_).speed];
                 }
-                G2Tur_SetBoneAngles(ctx, self_, c"pitch".as_ptr() as *mut c_char, desiredAngles);
+                G2Tur_SetBoneAngles(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    c"pitch".as_ptr() as *mut c_char,
+                    desiredAngles,
+                );
             } else {
                 if (*self_).spawnflags & 2 != 0 {
                     desiredAngles = [(*self_).speed, 0.0, 0.0];
@@ -802,7 +843,7 @@ pub fn turretG2_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 }
                 G2Tur_SetBoneAngles(
                     ctx,
-                    self_,
+                    ctx.entity_id_of(self_).unwrap(),
                     c"Bone_body".as_ptr() as *mut c_char,
                     desiredAngles,
                 );
@@ -826,14 +867,16 @@ pub fn turretG2_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turretG2_turnoff`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:651-674`
-pub fn turretG2_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turretG2_turnoff(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         if (*self_).enemy.is_none() {
             // we don't need to turnoff
             return;
         }
         if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 {
-            TurboLaser_SetBoneAnim(ctx, self_, 4, 5);
+            TurboLaser_SetBoneAnim(ctx, ctx.entity_id_of(self_).unwrap(), 4, 5);
         }
         // shut-down sound
         if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
@@ -856,10 +899,12 @@ pub fn turretG2_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turretG2_find_enemies`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:677-826`
-pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
     // `MAX_GENTITIES` resolves via the crate prelude glob
     // (`mp_qshared::shared::limits`); the redundant local alias was removed.
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let mut found = qfalse;
         let mut foundClient = qfalse;
         let mut bestDist = (*self_).radius * (*self_).radius;
@@ -1042,8 +1087,10 @@ pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbo
 /// Raven `turretG2_base_think`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:829-956`
-pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turretG2_base_think(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let mut turnOff = qtrue;
 
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
@@ -1054,14 +1101,14 @@ pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 // can respawn
                 if (*self_).genericValue5 != 0 && (*self_).genericValue5 < (*ctx.world).level.time {
                     // we are dead, see if it's time to respawn
-                    turretG2_respawn(ctx, self_);
+                    turretG2_respawn(ctx, ctx.entity_id_of(self_).unwrap());
                 }
             }
             return;
         } else if (*self_).spawnflags & 1 != 0 {
             // not turned on
-            turretG2_turnoff(ctx, self_);
-            turretG2_aim(ctx, self_);
+            turretG2_turnoff(ctx, ctx.entity_id_of(self_).unwrap());
+            turretG2_aim(ctx, ctx.entity_id_of(self_).unwrap());
 
             // No target
             (*self_).flags |= FL_NOTARGET;
@@ -1080,7 +1127,7 @@ pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if (*self_).last_move_time < (*ctx.world).level.time {
             // MISNOMER: used a enemy recalcing debouncer
-            if turretG2_find_enemies(ctx, self_) != 0 {
+            if turretG2_find_enemies(ctx, ctx.entity_id_of(self_).unwrap()) != 0 {
                 // found one
                 turnOff = qfalse;
                 let enemy =
@@ -1164,7 +1211,7 @@ pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if turnOff != 0 {
             if (*self_).bounceCount < (*ctx.world).level.time {
                 // bounceCount is used to keep the thing from ping-ponging from on to off
-                turretG2_turnoff(ctx, self_);
+                turretG2_turnoff(ctx, ctx.entity_id_of(self_).unwrap());
             }
         } else {
             // keep our enemy for a minimum of 2 seconds from now
@@ -1173,9 +1220,9 @@ pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
         }
 
-        turretG2_aim(ctx, self_);
+        turretG2_aim(ctx, ctx.entity_id_of(self_).unwrap());
         if turnOff == 0 {
-            turretG2_head_think(ctx, self_);
+            turretG2_head_think(ctx, ctx.entity_id_of(self_).unwrap());
         }
     }
 }
@@ -1183,26 +1230,30 @@ pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turretG2_base_use`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:959-973`
-pub fn turretG2_base_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
-    unsafe {
-        // Toggle on and off
-        (*self_).spawnflags ^= 1;
+pub fn turretG2_base_use(
+    self_: &mut gentity_t,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
+) {
+    // Toggle on and off
+    self_.spawnflags ^= 1;
 
-        if (*self_).s.eFlags & EF_SHADER_ANIM != 0 && (*self_).spawnflags & 1 != 0 {
-            // Start_Off
-            (*self_).s.frame = 1; // black
-        } else {
-            (*self_).s.frame = 0; // glow
-        }
+    if self_.s.eFlags & EF_SHADER_ANIM != 0 && self_.spawnflags & 1 != 0 {
+        // Start_Off
+        self_.s.frame = 1; // black
+    } else {
+        self_.s.frame = 0; // glow
     }
 }
 
 /// Raven `SP_misc_turretG2`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:1029-1081`
-pub fn SP_misc_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
+pub fn SP_misc_turretG2(ctx: GameContext<'_>, base: EntityId) {
     unsafe {
-        turretG2_set_models(ctx, base, qfalse);
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let base: *mut gentity_t = ctx.entity_mut(base);
+        turretG2_set_models(ctx, ctx.entity_id_of(base).unwrap(), qfalse);
 
         G_SpawnInt(
             ctx,
@@ -1242,7 +1293,7 @@ pub fn SP_misc_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
             (*base).s.genericenemyindex = G_IconIndex(ctx, s as *const c_char);
         }
 
-        finish_spawning_turretG2(ctx, base);
+        finish_spawning_turretG2(ctx, ctx.entity_id_of(base).unwrap());
 
         if (*base).spawnflags & 1 != 0 {
             // Start_Off
@@ -1263,8 +1314,10 @@ pub fn SP_misc_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
 /// Raven `finish_spawning_turretG2`.
 ///
 /// Source: `oracle/codemp/game/g_turret_G2.c:1084-1297`
-pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
+pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let base: *mut gentity_t = ctx.entity_mut(base);
         let mut fwd: vec3_t = [0.0; 3];
         let mut t: c_int = 0;
 
@@ -1360,7 +1413,7 @@ pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
             }
 
             // start in "off" anim
-            TurboLaser_SetBoneAnim(ctx, base, 4, 5);
+            TurboLaser_SetBoneAnim(ctx, ctx.entity_id_of(base).unwrap(), 4, 5);
 
             if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
                 (*base).s.eFlags2 |= EF2_BRACKET_ENTITY;

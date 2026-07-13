@@ -28,6 +28,13 @@
 //! The `Ghost`/`UnGhost`/`SHIPSURF_*`/`SVF_*`/`EF_*`/`CONTENTS_*` constants are
 //! spelled with their Raven names as bare identifiers (staging convention: the
 //! integrator wires the const, the name preserves intent).
+//!
+//! Safe-state migration **Stage 1**: `gentity_t*` params are `EntityId` /
+//! `Option<EntityId>` handles (§B5); ctx-free leaf helpers take `&mut gentity_t`.
+//! Bodies re-derive the raw pointers verbatim at the top (`// STAGE-1:` markers)
+//! — Stage-2 debt. `Vehicle_t*`/`bgEntity_t*` params and the vehicle fn-pointer
+//! tables are NOT entity handles and stay raw (§D12 seam). Callers bridge at the
+//! boundary via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_channel::GameBgTraps;
@@ -106,18 +113,30 @@ const TURN_OFF: c_int = 0x0000_0100;
 // `PITCH`/`YAW`/`ROLL` resolve via the crate prelude glob (`crate::q_math`);
 // the shadowing local copies were removed by the placeholder-const sweep.
 
+/// Resolve a stored `Option<EntityId>` back to a `gentity_t*` (the id->pointer
+/// half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Raven `Vehicle_SetAnim`.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:91-100`
 pub fn Vehicle_SetAnim(
     ctx: GameContext<'_>,
-    ent: *mut gentity_t,
+    ent: EntityId,
     setAnimParts: c_int,
     anim: c_int,
     setAnimFlags: c_int,
     iBlend: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         // Raven: assert(ent->client);
         debug_assert!(!(*ent).client.is_null());
         let client = (*ent).client as *mut gclient_t;
@@ -174,8 +193,10 @@ pub fn G_VehicleTrace(
 /// Raven `G_IsRidingVehicle`.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:111-120`
-pub fn G_IsRidingVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t) -> *mut Vehicle_t {
+pub fn G_IsRidingVehicle(ctx: GameContext<'_>, pEnt: Option<EntityId>) -> *mut Vehicle_t {
     unsafe {
+        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
+        let pEnt: *mut gentity_t = ent_ptr(ctx, pEnt);
         let ent = pEnt;
         if !ent.is_null() && !(*ent).client.is_null() {
             let client = (*ent).client as *mut gclient_t;
@@ -200,8 +221,10 @@ pub fn G_CanJumpToEnemyVeh(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> f32
 /// Raven `G_VehicleSpawn`.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:186-244`
-pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         (*self_).s.origin = (*self_).r.currentOrigin;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
@@ -244,8 +267,10 @@ pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `G_AttachToVehicle`.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:247-289`
-pub fn G_AttachToVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t, ucmd: *mut *mut usercmd_t) {
+pub fn G_AttachToVehicle(ctx: GameContext<'_>, pEnt: Option<EntityId>, ucmd: *mut *mut usercmd_t) {
     unsafe {
+        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
+        let pEnt: *mut gentity_t = ent_ptr(ctx, pEnt);
         if pEnt.is_null() || ucmd.is_null() {
             return;
         }
@@ -577,12 +602,15 @@ pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) 
 pub fn VEH_TryEject(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
-    parent: *mut gentity_t,
-    ent: *mut gentity_t,
+    parent: EntityId,
+    ent: EntityId,
     ejectDir: c_int,
     vExitPos: &mut vec3_t,
 ) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
+        let parent: *mut gentity_t = ctx.entity_mut(parent);
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
 
         // Make sure that the entity is not 'stuck' inside the vehicle (since their
@@ -852,7 +880,7 @@ pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
             (*pc).ps.stats[STAT_MAX_HEALTH as usize] = hp;
             (*pc).pers.maxHealth = hp;
             (*pVeh).m_iShields = (*vi).shields;
-            G_VehUpdateShields(parent); // MP
+            G_VehUpdateShields(&mut *parent); // MP
             (*pc).ps.stats[STAT_ARMOR as usize] = (*pVeh).m_iShields;
         }
         (*parent).mass = ((*vi).mass) as f32;
@@ -1034,7 +1062,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_
                 (*parentPS).stats[STAT_ARMOR as usize] = (*vi).shields;
             }
             (*pVeh).m_iShields = (*parentPS).stats[STAT_ARMOR as usize];
-            G_VehUpdateShields(parent); // MP
+            G_VehUpdateShields(&mut *parent); // MP
         }
 
         // MP: sometimes owner gets out of whack
@@ -1472,7 +1500,14 @@ pub fn UpdateRider(
                             (*pVeh).m_EjectDir = VEH_EJECT_LEFT;
                         }
                         _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
-                        Vehicle_SetAnim(ctx, rider, SETANIM_BOTH, Anim, iFlags, iBlend);
+                        Vehicle_SetAnim(
+                            ctx,
+                            ctx.entity_id_of(rider).unwrap(),
+                            SETANIM_BOTH,
+                            Anim,
+                            iFlags,
+                            iBlend,
+                        );
                         // just to make sure it's cleared when roll is done
                         (*rc).ps.weaponTime = (*rc).ps.torsoTimer - 200;
                         crate::g_utils::G_AddEvent(&mut *(rider), EV_ROLL as c_int, 0);
@@ -1507,7 +1542,14 @@ pub fn UpdateRider(
                     }
 
                     _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
-                    Vehicle_SetAnim(ctx, rider, SETANIM_BOTH, Anim, iFlags, iBlend);
+                    Vehicle_SetAnim(
+                        ctx,
+                        ctx.entity_id_of(rider).unwrap(),
+                        SETANIM_BOTH,
+                        Anim,
+                        iFlags,
+                        iBlend,
+                    );
                 }
             } else {
                 // Flying, so just fall off.
@@ -1548,7 +1590,7 @@ pub fn UpdateRider(
                     }
                     Vehicle_SetAnim(
                         ctx,
-                        rider,
+                        ctx.entity_id_of(rider).unwrap(),
                         SETANIM_BOTH,
                         animNumber_t::BOTH_JUMP1 as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -1581,7 +1623,7 @@ pub fn UpdateRider(
                         _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
                         Vehicle_SetAnim(
                             ctx,
-                            rider,
+                            ctx.entity_id_of(rider).unwrap(),
                             SETANIM_BOTH,
                             Anim,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS,
@@ -1889,12 +1931,10 @@ pub fn G_VehicleDamageBoxSizing(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// `ctx`, which must be threaded in by the dispatch retrofit (see shape_mismatch).
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2843-2924`
-pub fn G_FlyVehicleImpactDir(
-    ctx: GameContext<'_>,
-    veh: *mut gentity_t,
-    trace: *mut trace_t,
-) -> c_int {
+pub fn G_FlyVehicleImpactDir(ctx: GameContext<'_>, veh: EntityId, trace: *mut trace_t) -> c_int {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let veh: *mut gentity_t = ctx.entity_mut(veh);
         let pVeh = (*veh).m_pVehicle as *mut Vehicle_t;
         if trace.is_null() || pVeh.is_null() || (*veh).client.is_null() {
             return -1;
@@ -2047,11 +2087,13 @@ pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
 /// Source: `oracle/codemp/game/g_vehicles.c:2961-3039`
 pub fn G_SetVehDamageFlags(
     ctx: GameContext<'_>,
-    veh: *mut gentity_t,
+    veh: EntityId,
     shipSurf: c_int,
     damageLevel: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let veh: *mut gentity_t = ctx.entity_mut(veh);
         let vcl = (*veh).client as *mut gclient_t;
         match damageLevel {
             3 => {
@@ -2144,11 +2186,13 @@ pub fn G_SetVehDamageFlags(
 /// Source: `oracle/codemp/game/g_vehicles.c:3041-3100`
 pub fn G_VehicleSetDamageLocFlags(
     ctx: GameContext<'_>,
-    veh: *mut gentity_t,
+    veh: EntityId,
     impactDir: c_int,
     deathPoint: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let veh: *mut gentity_t = ctx.entity_mut(veh);
         if (*veh).client.is_null() {
             return;
         }
@@ -2189,13 +2233,13 @@ pub fn G_VehicleSetDamageLocFlags(
 
         if (*veh).locationDamage[impactDir as usize] >= deathPoint {
             // destroyed
-            G_SetVehDamageFlags(ctx, veh, impactDir, 3);
+            G_SetVehDamageFlags(ctx, ctx.entity_id_of(veh).unwrap(), impactDir, 3);
         } else if (*veh).locationDamage[impactDir as usize] <= lightDamagePoint {
             // light only
-            G_SetVehDamageFlags(ctx, veh, impactDir, 1);
+            G_SetVehDamageFlags(ctx, ctx.entity_id_of(veh).unwrap(), impactDir, 1);
         } else if (*veh).locationDamage[impactDir as usize] <= heavyDamagePoint {
             // heavy only
-            G_SetVehDamageFlags(ctx, veh, impactDir, 2);
+            G_SetVehDamageFlags(ctx, ctx.entity_id_of(veh).unwrap(), impactDir, 2);
         }
     }
 }
@@ -2209,12 +2253,10 @@ pub fn G_VehicleSetDamageLocFlags(
 /// in by the dispatch retrofit (see shape_mismatch).
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3102-3188`
-pub fn G_FlyVehicleDestroySurface(
-    ctx: GameContext<'_>,
-    veh: *mut gentity_t,
-    surface: c_int,
-) -> qboolean {
+pub fn G_FlyVehicleDestroySurface(ctx: GameContext<'_>, veh: EntityId, surface: c_int) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let veh: *mut gentity_t = ctx.entity_mut(veh);
         let mut surfName: [*const c_char; 4] = [core::ptr::null(); 4]; // up to 4 surfs at once
         let mut numSurfs: c_int = 0;
         let mut smashedBits: c_int = 0;
@@ -2319,12 +2361,14 @@ pub fn G_FlyVehicleDestroySurface(
 /// Source: `oracle/codemp/game/g_vehicles.c:3190-3259`
 pub fn G_FlyVehicleSurfaceDestruction(
     ctx: GameContext<'_>,
-    veh: *mut gentity_t,
+    veh: EntityId,
     trace: *mut trace_t,
     magnitude: c_int,
     force: qboolean,
 ) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let veh: *mut gentity_t = ctx.entity_mut(veh);
         if (*veh).ghoul2.is_null() || (*veh).m_pVehicle.is_null() {
             // no g2 instance.. or no vehicle instance
             return;
@@ -2333,7 +2377,7 @@ pub fn G_FlyVehicleSurfaceDestruction(
         let vp = (*veh).m_pVehicle as *mut Vehicle_t;
         let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
 
-        let mut impactDir = G_FlyVehicleImpactDir(ctx, veh, trace);
+        let mut impactDir = G_FlyVehicleImpactDir(ctx, ctx.entity_id_of(veh).unwrap(), trace);
         let mut alreadyRebroken = qfalse;
         // Raven declares `deathPoint = -1` before the `anotherImpact` label; the
         // goto-loop keeps the prior value when a `default` impactDir leaves it
@@ -2367,17 +2411,30 @@ pub fn G_FlyVehicleSurfaceDestruction(
                 }
                 if (*veh).locationDamage[impactDir as usize] >= deathPoint {
                     // do it
-                    if G_FlyVehicleDestroySurface(ctx, veh, impactDir) != qfalse {
+                    if G_FlyVehicleDestroySurface(ctx, ctx.entity_id_of(veh).unwrap(), impactDir)
+                        != qfalse
+                    {
                         // actually took off a surface
-                        G_VehicleSetDamageLocFlags(ctx, veh, impactDir, deathPoint);
+                        G_VehicleSetDamageLocFlags(
+                            ctx,
+                            ctx.entity_id_of(veh).unwrap(),
+                            impactDir,
+                            deathPoint,
+                        );
                     }
                 } else {
-                    G_VehicleSetDamageLocFlags(ctx, veh, impactDir, deathPoint);
+                    G_VehicleSetDamageLocFlags(
+                        ctx,
+                        ctx.entity_id_of(veh).unwrap(),
+                        impactDir,
+                        deathPoint,
+                    );
                 }
             }
 
             if alreadyRebroken == qfalse {
-                let secondImpact = G_FlyVehicleImpactDir(ctx, veh, trace);
+                let secondImpact =
+                    G_FlyVehicleImpactDir(ctx, ctx.entity_id_of(veh).unwrap(), trace);
                 if impactDir != secondImpact {
                     // can break off another piece in this same impact.. but only
                     // break off up to 2 at once
@@ -2394,8 +2451,12 @@ pub fn G_FlyVehicleSurfaceDestruction(
 /// Raven `G_VehUpdateShields`.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3261-3273`
-pub fn G_VehUpdateShields(targ: *mut gentity_t) {
+pub fn G_VehUpdateShields(targ: &mut gentity_t) {
     unsafe {
+        // STAGE-1: ctx-free leaf takes &mut gentity_t; raw body re-derived
+        // verbatim (Stage-2 debt). The `targ.is_null()` guard is now vacuous
+        // (a live borrow is never null) but kept for a verbatim body.
+        let targ: *mut gentity_t = targ;
         if targ.is_null() || (*targ).client.is_null() || (*targ).m_pVehicle.is_null() {
             return;
         }
@@ -2517,7 +2578,14 @@ pub fn Eject(
             }
             let firstEjectDir = (*pVeh).m_EjectDir;
             let mut vExitPos: vec3_t = [0.0; 3];
-            while VEH_TryEject(ctx, pVeh, parent, ent, (*pVeh).m_EjectDir, &mut vExitPos) == qfalse
+            while VEH_TryEject(
+                ctx,
+                pVeh,
+                ctx.entity_id_of(parent).unwrap(),
+                ctx.entity_id_of(ent).unwrap(),
+                (*pVeh).m_EjectDir,
+                &mut vExitPos,
+            ) == qfalse
             {
                 (*pVeh).m_EjectDir += 1;
                 if (*pVeh).m_EjectDir > VEH_EJECT_BOTTOM {

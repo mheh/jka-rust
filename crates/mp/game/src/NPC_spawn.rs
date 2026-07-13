@@ -1790,7 +1790,7 @@ pub fn NPC_VehicleSpawnUse(
             (*self_).think = Some(EntThink::G_VehicleSpawn).into();
             (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
         } else {
-            crate::g_vehicles::G_VehicleSpawn(ctx, self_);
+            crate::g_vehicles::G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap());
         }
     }
 }
@@ -1850,7 +1850,7 @@ pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: EntityId) {
                 (*self_).think = Some(EntThink::G_VehicleSpawn).into();
                 (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
             } else {
-                crate::g_vehicles::G_VehicleSpawn(ctx, self_);
+                crate::g_vehicles::G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap());
             }
         }
     }

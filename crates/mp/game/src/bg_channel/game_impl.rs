@@ -652,14 +652,17 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `G_FlyVehicleSurfaceDestruction` with the bg-supplied impact `trace` and
         // `force` flag. Source: `oracle/codemp/game/g_vehicles.c:3190`;
         // `bg_slidemove.c:472`.
-        unsafe {
-            let ctx = GameContext {
-                world: self.world,
-                engine: self.engine,
-            };
-            let veh = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_vehicles::G_FlyVehicleSurfaceDestruction(ctx, veh, trace, magnitude, force);
-        }
+        let ctx = GameContext {
+            world: self.world,
+            engine: self.engine,
+        };
+        crate::g_vehicles::G_FlyVehicleSurfaceDestruction(
+            ctx,
+            EntityId(entNum as u32),
+            trace,
+            magnitude,
+            force,
+        );
     }
     fn set_anim(
         &mut self,

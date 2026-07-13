@@ -5653,7 +5653,7 @@ pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
 
             crate::g_vehicles::G_SetVehDamageFlags(
                 ctx,
-                &mut (*world).g_entities[(*ent).s.m_iVehicleNum as usize] as *mut gentity_t,
+                EntityId((*ent).s.m_iVehicleNum as u32),
                 shipSurf,
                 damageLevel,
             );

@@ -6,6 +6,12 @@
 //! `todo!()`; types resolve against already-ported crates, unresolved
 //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 //! RULES TABLE in fnskel.py.
+//!
+//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
+//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
+//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
+//! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
@@ -40,16 +46,29 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
     !a.is_null() && *a != 0
 }
 
+/// Resolve a stored `Option<EntityId>` back to a `gentity_t*` (the id->pointer
+/// half of the entity-id seam; `None` -> Raven's NULL).
+#[inline]
+unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
+        None => core::ptr::null_mut(),
+    }
+}
+
 /// Raven `TurretPain`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:11-32`
 pub fn TurretPain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let target = match (*self_).target_ent {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
@@ -86,11 +105,14 @@ pub fn TurretPain(
 /// Source: `oracle/codemp/game/g_turret.c:35-48`
 pub fn TurretBasePain(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    attacker: Option<EntityId>,
     damage: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let target = match (*self_).target_ent {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
@@ -100,7 +122,12 @@ pub fn TurretBasePain(
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(&mut *(target));
             }
-            TurretPain(ctx, target, attacker, damage);
+            TurretPain(
+                ctx,
+                ctx.entity_id_of(target).unwrap(),
+                ctx.entity_id_of(attacker),
+                damage,
+            );
         }
     }
 }
@@ -110,13 +137,17 @@ pub fn TurretBasePain(
 /// Source: `oracle/codemp/game/g_turret.c:51-109`
 pub fn auto_turret_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     meansOfDeath: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let inflictor: *mut gentity_t = ent_ptr(ctx, inflictor);
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let owner_num = (*self_).r.ownerNum as usize;
         if owner_num < (*ctx.world).g_entities.len() {
             let owner = &mut (*ctx.world).g_entities[owner_num];
@@ -201,13 +232,17 @@ pub fn auto_turret_die(
 /// Source: `oracle/codemp/game/g_turret.c:112-124`
 pub fn bottom_die(
     ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
+    self_: EntityId,
+    inflictor: Option<EntityId>,
+    attacker: Option<EntityId>,
     damage: c_int,
     meansOfDeath: c_int,
 ) {
     unsafe {
+        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
+        let inflictor: *mut gentity_t = ent_ptr(ctx, inflictor);
+        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let target = match (*self_).target_ent {
             Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
@@ -217,7 +252,14 @@ pub fn bottom_die(
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(&mut *(target));
             }
-            auto_turret_die(ctx, target, inflictor, attacker, damage, meansOfDeath);
+            auto_turret_die(
+                ctx,
+                ctx.entity_id_of(target).unwrap(),
+                ctx.entity_id_of(inflictor),
+                ctx.entity_id_of(attacker),
+                damage,
+                meansOfDeath,
+            );
         }
     }
 }
@@ -225,8 +267,10 @@ pub fn bottom_die(
 /// Raven `turret_fire`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:129-176`
-pub fn turret_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, dir: vec3_t) {
+pub fn turret_fire(ctx: GameContext<'_>, ent: EntityId, start: vec3_t, dir: vec3_t) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let ent: *mut gentity_t = ctx.entity_mut(ent);
         let contents = trap::PointContents(
             ctx.engine,
             mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
@@ -312,8 +356,10 @@ pub const START_DIS: f32 = 15.0;
 /// Raven `turret_head_think`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:179-225`
-pub fn turret_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turret_head_think(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let top_num = (*self_).r.ownerNum as usize;
         if top_num >= (*ctx.world).g_entities.len() {
             return;
@@ -361,7 +407,7 @@ pub fn turret_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             // Get top entity as raw pointer
             let top_ptr = &mut (*ctx.world).g_entities[top_num] as *mut gentity_t;
-            turret_fire(ctx, top_ptr, org, fwd);
+            turret_fire(ctx, ctx.entity_id_of(top_ptr).unwrap(), org, fwd);
 
             (*self_).fly_sound_debounce_time = (*ctx.world).level.time;
         }
@@ -371,8 +417,10 @@ pub fn turret_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turret_aim`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:228-352`
-pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turret_aim(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let top_num = (*self_).r.ownerNum as usize;
         if top_num >= (*ctx.world).g_entities.len() {
             return;
@@ -529,8 +577,10 @@ pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turret_turnoff`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:355-374`
-pub fn turret_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turret_turnoff(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let top_num = (*self_).r.ownerNum as usize;
         if top_num < (*ctx.world).g_entities.len() {
             let top = &mut (*ctx.world).g_entities[top_num];
@@ -557,8 +607,10 @@ pub fn turret_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turret_sleep`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:377-391`
-pub fn turret_sleep(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turret_sleep(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         if (*self_).enemy.is_none() {
             return;
         }
@@ -571,8 +623,10 @@ pub fn turret_sleep(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `turret_find_enemies`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:394-502`
-pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
+pub fn turret_find_enemies(ctx: GameContext<'_>, self_: EntityId) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let mut found = qfalse;
         let mut bestDist = (*self_).radius * (*self_).radius;
         let mut bestTarget: *mut gentity_t = std::ptr::null_mut();
@@ -715,13 +769,15 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
 /// Raven `turret_base_think`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:505-601`
-pub fn turret_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
+pub fn turret_base_think(ctx: GameContext<'_>, self_: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let mut turnOff = qtrue;
 
         if ((*self_).spawnflags & 1) != 0 {
             // Not turned on
-            turret_turnoff(ctx, self_);
+            turret_turnoff(ctx, ctx.entity_id_of(self_).unwrap());
             (*self_).flags |= FL_NOTARGET;
             (*self_).nextthink = -1;
             return;
@@ -732,7 +788,7 @@ pub fn turret_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         if (*self_).enemy.is_none() {
-            if turret_find_enemies(ctx, self_) != 0 {
+            if turret_find_enemies(ctx, ctx.entity_id_of(self_).unwrap()) != 0 {
                 turnOff = qfalse;
             }
         } else {
@@ -815,13 +871,13 @@ pub fn turret_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 // Oracle calls turret_head_think only in this branch (enemy
                 // existed and is not a spectator), NOT on the frame a fresh
                 // enemy is acquired via turret_find_enemies.
-                turret_head_think(ctx, self_);
+                turret_head_think(ctx, ctx.entity_id_of(self_).unwrap());
             }
         }
 
         if turnOff != 0 {
             if (*self_).bounceCount < (*ctx.world).level.time {
-                turret_sleep(ctx, self_);
+                turret_sleep(ctx, ctx.entity_id_of(self_).unwrap());
             }
         } else {
             (*self_).bounceCount = (*ctx.world).level.time
@@ -829,18 +885,20 @@ pub fn turret_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
         }
 
-        turret_aim(ctx, self_);
+        turret_aim(ctx, ctx.entity_id_of(self_).unwrap());
     }
 }
 
 /// Raven `turret_base_use`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:604-620`
-pub fn turret_base_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
-    unsafe {
-        // Toggle on and off
-        (*self_).spawnflags ^= 1;
-    }
+pub fn turret_base_use(
+    self_: &mut gentity_t,
+    other: Option<EntityId>,
+    activator: Option<EntityId>,
+) {
+    // Toggle on and off
+    self_.spawnflags ^= 1;
     // Raven's commented-out EF_SHADER_ANIM frame toggle (g_turret.c:610-619)
     // is dead code in the oracle source; not ported.
 }
@@ -848,8 +906,10 @@ pub fn turret_base_use(self_: *mut gentity_t, other: *mut gentity_t, activator: 
 /// Raven `SP_misc_turret`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:663-703`
-pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
+pub fn SP_misc_turret(ctx: GameContext<'_>, base: EntityId) {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let base: *mut gentity_t = ctx.entity_mut(base);
         (*base).s.modelindex2 = G_ModelIndex(c"models/map_objects/hoth/turret_bottom.md3".as_ptr());
         (*base).s.modelindex = G_ModelIndex(c"models/map_objects/hoth/turret_base.md3".as_ptr());
 
@@ -883,7 +943,7 @@ pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base),
         );
 
-        if turret_base_spawn_top(ctx, base) == 0 {
+        if turret_base_spawn_top(ctx, ctx.entity_id_of(base).unwrap()) == 0 {
             G_FreeEntity(ctx, ctx.entity_id_of(base));
         }
     }
@@ -892,8 +952,10 @@ pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
 /// Raven `turret_base_spawn_top`.
 ///
 /// Source: `oracle/codemp/game/g_turret.c:706-861`
-pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboolean {
+pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: EntityId) -> qboolean {
     unsafe {
+        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
+        let base: *mut gentity_t = ctx.entity_mut(base);
         let mut org = [0.0; 3];
         let mut t: c_int = 0;
 

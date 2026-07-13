@@ -374,7 +374,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         // Call Vehicle_SetAnim
         crate::g_vehicles::Vehicle_SetAnim(
             ctx,
-            parent as *mut gentity_t,
+            ctx.entity_id_of(parent as *mut gentity_t).unwrap(),
             SETANIM_LEGS,
             anim as c_int,
             i_flags,

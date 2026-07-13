@@ -136,7 +136,7 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::G_FreeEntity => G_FreeEntity(ctx, ctx.entity_id_of(self_)),
         EntThink::G_PortalifyEntities => G_PortalifyEntities(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::G_RunObject => G_RunObject(ctx, ctx.entity_id_of(self_).unwrap()),
-        EntThink::G_VehicleSpawn => G_VehicleSpawn(ctx, self_),
+        EntThink::G_VehicleSpawn => G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::HolocronThink => HolocronThink(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::InitShooter_Finish => InitShooter_Finish(ctx, ctx.entity_id_of(self_).unwrap()),
         EntThink::JMSaberThink => JMSaberThink(ctx, ctx.entity_id_of(self_).unwrap()),
@@ -234,8 +234,8 @@ pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t)
         EntThink::trigger_cleared_fire => {
             trigger_cleared_fire(ctx, ctx.entity_id_of(self_).unwrap())
         }
-        EntThink::turretG2_base_think => turretG2_base_think(ctx, self_),
-        EntThink::turret_base_think => turret_base_think(ctx, self_),
+        EntThink::turretG2_base_think => turretG2_base_think(ctx, ctx.entity_id_of(self_).unwrap()),
+        EntThink::turret_base_think => turret_base_think(ctx, ctx.entity_id_of(self_).unwrap()),
     }
 }
 
@@ -759,8 +759,16 @@ pub fn dispatch_use(
             ctx.entity_id_of(other),
             ctx.entity_id_of(activator),
         ),
-        EntUse::turretG2_base_use => turretG2_base_use(self_, other, activator),
-        EntUse::turret_base_use => turret_base_use(self_, other, activator),
+        EntUse::turretG2_base_use => turretG2_base_use(
+            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
+        EntUse::turret_base_use => turret_base_use(
+            ctx.entity_mut(ctx.entity_id_of(self_).unwrap()),
+            ctx.entity_id_of(other),
+            ctx.entity_id_of(activator),
+        ),
         EntUse::use_wall => use_wall(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -831,9 +839,24 @@ pub fn dispatch_pain(
             ctx.entity_id_of(attacker),
             damage,
         ),
-        EntPain::TurretBasePain => TurretBasePain(ctx, self_, attacker, damage),
-        EntPain::TurretG2Pain => TurretG2Pain(ctx, self_, attacker, damage),
-        EntPain::TurretPain => TurretPain(ctx, self_, attacker, damage),
+        EntPain::TurretBasePain => TurretBasePain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
+        EntPain::TurretG2Pain => TurretG2Pain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
+        EntPain::TurretPain => TurretPain(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(attacker),
+            damage,
+        ),
         EntPain::emplaced_gun_pain => emplaced_gun_pain(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -916,7 +939,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::auto_turret_die => auto_turret_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::auto_turret_die => auto_turret_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::body_die => body_die(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -925,7 +955,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::bottom_die => bottom_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::bottom_die => bottom_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::emplaced_gun_die => emplaced_gun_die(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -974,7 +1011,14 @@ pub fn dispatch_die(
             damage,
             r#mod,
         ),
-        EntDie::turretG2_die => turretG2_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::turretG2_die => turretG2_die(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            ctx.entity_id_of(inflictor),
+            ctx.entity_id_of(attacker),
+            damage,
+            r#mod,
+        ),
         EntDie::turret_die => turret_die(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -1838,7 +1882,7 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         }
         EntSpawn::item_botroam => SP_item_botroam(ctx.entity_mut(ctx.entity_id_of(ent).unwrap())),
         EntSpawn::emplaced_gun => SP_emplaced_gun(ctx, ctx.entity_id_of(ent).unwrap()),
-        EntSpawn::misc_turret => SP_misc_turret(ctx, ent),
-        EntSpawn::misc_turretG2 => SP_misc_turretG2(ctx, ent),
+        EntSpawn::misc_turret => SP_misc_turret(ctx, ctx.entity_id_of(ent).unwrap()),
+        EntSpawn::misc_turretG2 => SP_misc_turretG2(ctx, ctx.entity_id_of(ent).unwrap()),
     }
 }
