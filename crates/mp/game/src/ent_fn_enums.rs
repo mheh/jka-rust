@@ -312,9 +312,9 @@ pub fn dispatch_touch(
             trace,
         ),
         EntTouch::SaberBounceSound => {
-            let __s951 = ctx.entity_id_of(self_).unwrap();
-            let __s952 = ctx.entity_id_of(other);
-            SaberBounceSound(ctx.entity_mut(__s951), __s952, trace)
+            let self_id = ctx.entity_id_of(self_).unwrap();
+            let other_id = ctx.entity_id_of(other);
+            SaberBounceSound(ctx.entity_mut(self_id), other_id, trace)
         }
         EntTouch::SaberGotHit => SaberGotHit(
             ctx,
@@ -490,10 +490,10 @@ pub fn dispatch_use(
             ctx.entity_id_of(activator),
         ),
         EntUse::SiegeIconUse => {
-            let __s953 = ctx.entity_id_of(self_).unwrap();
-            let __s954 = ctx.entity_id_of(other);
-            let __s955 = ctx.entity_id_of(activator);
-            SiegeIconUse(ctx.entity_mut(__s953), __s954, __s955)
+            let self_id_2 = ctx.entity_id_of(self_).unwrap();
+            let other_id_2 = ctx.entity_id_of(other);
+            let activator_id = ctx.entity_id_of(activator);
+            SiegeIconUse(ctx.entity_mut(self_id_2), other_id_2, activator_id)
         }
         EntUse::SiegeItemUse => SiegeItemUse(
             ctx,
@@ -502,10 +502,10 @@ pub fn dispatch_use(
             ctx.entity_id_of(activator),
         ),
         EntUse::SiegePointUse => {
-            let __s956 = ctx.entity_id_of(self_).unwrap();
-            let __s957 = ctx.entity_id_of(other);
-            let __s958 = ctx.entity_id_of(activator);
-            SiegePointUse(ctx.entity_mut(__s956), __s957, __s958)
+            let self_id_3 = ctx.entity_id_of(self_).unwrap();
+            let other_id_3 = ctx.entity_id_of(other);
+            let activator_id_2 = ctx.entity_id_of(activator);
+            SiegePointUse(ctx.entity_mut(self_id_3), other_id_3, activator_id_2)
         }
         EntUse::Use_BinaryMover => Use_BinaryMover(
             ctx,
@@ -766,16 +766,16 @@ pub fn dispatch_use(
             ctx.entity_id_of(activator),
         ),
         EntUse::turretG2_base_use => {
-            let __s959 = ctx.entity_id_of(self_).unwrap();
-            let __s960 = ctx.entity_id_of(other);
-            let __s961 = ctx.entity_id_of(activator);
-            turretG2_base_use(ctx.entity_mut(__s959), __s960, __s961)
+            let self_id_4 = ctx.entity_id_of(self_).unwrap();
+            let other_id_4 = ctx.entity_id_of(other);
+            let activator_id_3 = ctx.entity_id_of(activator);
+            turretG2_base_use(ctx.entity_mut(self_id_4), other_id_4, activator_id_3)
         }
         EntUse::turret_base_use => {
-            let __s962 = ctx.entity_id_of(self_).unwrap();
-            let __s963 = ctx.entity_id_of(other);
-            let __s964 = ctx.entity_id_of(activator);
-            turret_base_use(ctx.entity_mut(__s962), __s963, __s964)
+            let self_id_5 = ctx.entity_id_of(self_).unwrap();
+            let other_id_5 = ctx.entity_id_of(other);
+            let activator_id_4 = ctx.entity_id_of(activator);
+            turret_base_use(ctx.entity_mut(self_id_5), other_id_5, activator_id_4)
         }
         EntUse::use_wall => use_wall(
             ctx,

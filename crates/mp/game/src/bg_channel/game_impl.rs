@@ -486,11 +486,19 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             } else {
                 Some(&mut *(dir as *mut vec3_t))
             };
-            let __h830 = ctx.entity_id_of(targ);
-            let __h831 = ctx.entity_id_of(inflictor);
-            let __h832 = ctx.entity_id_of(attacker);
+            let targ_id = ctx.entity_id_of(targ);
+            let inflictor_id = ctx.entity_id_of(inflictor);
+            let attacker_id = ctx.entity_id_of(attacker);
             crate::g_combat::G_Damage(
-                &mut ctx, __h830, __h831, __h832, dir, *point, damage, dflags, mod_,
+                &mut ctx,
+                targ_id,
+                inflictor_id,
+                attacker_id,
+                dir,
+                *point,
+                damage,
+                dflags,
+                mod_,
             );
         }
     }
@@ -521,11 +529,18 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let pEnt = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
             let pVehEnt = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
             let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
-            let __h833 = ctx.entity_id_of(pEnt);
-            let __h834 = ctx.entity_id_of(pVehEnt);
-            let __h835 = ctx.entity_id_of(attacker);
+            let pEnt_id = ctx.entity_id_of(pEnt);
+            let pVehEnt_id = ctx.entity_id_of(pVehEnt);
+            let attacker_id_2 = ctx.entity_id_of(attacker);
             crate::g_combat::G_DamageFromKiller(
-                &mut ctx, __h833, __h834, __h835, *point, damage, dflags, mod_,
+                &mut ctx,
+                pEnt_id,
+                pVehEnt_id,
+                attacker_id_2,
+                *point,
+                damage,
+                dflags,
+                mod_,
             );
         }
     }
@@ -620,9 +635,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let other = &mut (*self.world).g_entities[impactNum as usize] as *mut gentity_t;
-            let __h836 = ctx.entity_id_of(self_);
-            let __h837 = ctx.entity_id_of(other);
-            crate::g_active::Client_CheckImpactBBrush(&mut ctx, __h836, __h837);
+            let self_id_2 = ctx.entity_id_of(self_);
+            let other_id = ctx.entity_id_of(other);
+            crate::g_active::Client_CheckImpactBBrush(&mut ctx, self_id_2, other_id);
         }
     }
     fn flyveh_surface_destruction(
@@ -668,10 +683,10 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            let __h838 = ctx.entity_id_of(ent).unwrap();
+            let ent_id_2 = ctx.entity_id_of(ent).unwrap();
             crate::g_utils::G_SetAnim(
                 &mut ctx,
-                __h838,
+                ent_id_2,
                 ucmd,
                 setAnimParts,
                 anim,
@@ -689,8 +704,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            let __h839 = ctx.entity_id_of(ent).unwrap();
-            crate::npc_c::NPC_SetAnim(&mut ctx, __h839, type_, anim, priority);
+            let ent_id_3 = ctx.entity_id_of(ent).unwrap();
+            crate::npc_c::NPC_SetAnim(&mut ctx, ent_id_3, type_, anim, priority);
         }
     }
     fn wp_get_vehicle_cam_pos(
@@ -709,9 +724,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let ent = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pilot = &mut (*self.world).g_entities[pilotEntNum as usize] as *mut gentity_t;
-            let __h840 = ctx.entity_id_of(ent).unwrap();
-            let __h841 = ctx.entity_id_of(pilot).unwrap();
-            crate::g_weapon::WP_GetVehicleCamPos(&mut ctx, __h840, __h841, &mut *camPos);
+            let ent_id_4 = ctx.entity_id_of(ent).unwrap();
+            let pilot_id = ctx.entity_id_of(pilot).unwrap();
+            crate::g_weapon::WP_GetVehicleCamPos(&mut ctx, ent_id_4, pilot_id, &mut *camPos);
         }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
