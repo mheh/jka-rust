@@ -4612,7 +4612,11 @@ pub fn CheckSaberDamage(
     rSaberNum: c_int,
     rBladeNum: c_int,
     mut saberStart: vec3_t,
-    mut saberEnd: vec3_t,
+    // C `vec3_t saberEnd` decays to float*: the interpolate retrace loop's
+    // writes propagate to the caller's array (reused for trail.tip and the
+    // mid-point gate). By-value here dropped that write-back — the lockstep
+    // frame-1806 saber-collision divergence (2026-07-14).
+    saberEnd: &mut vec3_t,
     doInterpolate: qboolean,
     mut trMask: c_int,
     extrapolate: qboolean,
@@ -4726,7 +4730,7 @@ pub fn CheckSaberDamage(
                 {
                     //no valid last pos, use current
                     _VectorCopy(saberStart, &mut oldSaberStart);
-                    _VectorCopy(saberEnd, &mut oldSaberEnd);
+                    _VectorCopy(*saberEnd, &mut oldSaberEnd);
                 } else {
                     //trace from last pos
                     _VectorCopy(
@@ -4743,7 +4747,7 @@ pub fn CheckSaberDamage(
                     );
                 }
 
-                _VectorSubtract(saberStart, saberEnd, &mut saberDif);
+                _VectorSubtract(saberStart, *saberEnd, &mut saberDif);
                 _VectorSubtract(oldSaberStart, oldSaberEnd, &mut oldSaberDif);
 
                 VectorNormalize(&mut saberDif);
@@ -4761,7 +4765,7 @@ pub fn CheckSaberDamage(
                     ctx.engine,
                     GTraceArgs::new(
                         &mut tr as *mut trace_t,
-                        &saberEnd as *const vec3_t,
+                        saberEnd as *const vec3_t,
                         &saberTrMins as *const vec3_t,
                         &saberTrMaxs as *const vec3_t,
                         &saberStart as *const vec3_t,
@@ -4770,7 +4774,7 @@ pub fn CheckSaberDamage(
                     ),
                 );
 
-                _VectorCopy(saberEnd, &mut lastValidStart);
+                _VectorCopy(*saberEnd, &mut lastValidStart);
                 _VectorCopy(saberStart, &mut lastValidEnd);
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(
@@ -4811,7 +4815,7 @@ pub fn CheckSaberDamage(
                     {
                         //no valid last pos, use current
                         _VectorCopy(saberStart, &mut oldSaberStart);
-                        _VectorCopy(saberEnd, &mut oldSaberEnd);
+                        _VectorCopy(*saberEnd, &mut oldSaberEnd);
                     } else {
                         //trace from last pos
                         _VectorCopy(
@@ -4828,7 +4832,7 @@ pub fn CheckSaberDamage(
                         );
                     }
 
-                    _VectorSubtract(saberStart, saberEnd, &mut saberDif);
+                    _VectorSubtract(saberStart, *saberEnd, &mut saberDif);
                     _VectorSubtract(oldSaberStart, oldSaberEnd, &mut oldSaberDif);
 
                     VectorNormalize(&mut saberDif);
@@ -4846,7 +4850,7 @@ pub fn CheckSaberDamage(
                         ctx.engine,
                         GTraceArgs::new(
                             &mut tr as *mut trace_t,
-                            &saberEnd as *const vec3_t,
+                            saberEnd as *const vec3_t,
                             &saberTrMins as *const vec3_t,
                             &saberTrMaxs as *const vec3_t,
                             &saberStart as *const vec3_t,
@@ -4855,7 +4859,7 @@ pub fn CheckSaberDamage(
                         ),
                     );
 
-                    _VectorCopy(saberEnd, &mut lastValidStart);
+                    _VectorCopy(*saberEnd, &mut lastValidStart);
                     _VectorCopy(saberStart, &mut lastValidEnd);
                     if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                         G_G2TraceCollide(
@@ -4891,7 +4895,7 @@ pub fn CheckSaberDamage(
                 if extrapolate != 0 {
                     //extrapolate 16
                     let mut diff: vec3_t = [0.0; 3];
-                    _VectorSubtract(saberEnd, saberStart, &mut diff);
+                    _VectorSubtract(*saberEnd, saberStart, &mut diff);
                     VectorNormalize(&mut diff);
                     _VectorMA(
                         saberStart,
@@ -4900,7 +4904,7 @@ pub fn CheckSaberDamage(
                         &mut saberEndExtrapolated,
                     );
                 } else {
-                    _VectorCopy(saberEnd, &mut saberEndExtrapolated);
+                    _VectorCopy(*saberEnd, &mut saberEndExtrapolated);
                 }
                 trap::Trace(
                     ctx.engine,
@@ -5022,7 +5026,7 @@ pub fn CheckSaberDamage(
                 }
                 if fDmg != 0.0 {
                     //the longer the trace, the more damage it does
-                    let traceLength: f32 = Distance(saberEnd, saberStart);
+                    let traceLength: f32 = Distance(*saberEnd, saberStart);
                     if tr.fraction >= 1.0f32 {
                         //allsolid?
                         dmg = (fDmg * traceLength * 0.1f32 * 0.33f32).ceil() as c_int;
@@ -5034,7 +5038,7 @@ pub fn CheckSaberDamage(
                     if ctx.world.cvars.g_saberDebugBox.integer == 3
                         || ctx.world.cvars.g_saberDebugBox.integer == 4
                     {
-                        G_TestLine(ctx, saberStart, saberEnd, 0x0000ff, 50);
+                        G_TestLine(ctx, saberStart, *saberEnd, 0x0000ff, 50);
                     }
                 }
                 if (*sc).ps.torsoAnim == BOTH_A1_SPECIAL as c_int
@@ -5314,7 +5318,7 @@ pub fn CheckSaberDamage(
             crate::g_main::Com_Printf(cstr(&s).as_ptr());
         }
 
-        _VectorSubtract(saberEnd, saberStart, &mut dir);
+        _VectorSubtract(*saberEnd, saberStart, &mut dir);
         VectorNormalize(&mut dir);
 
         if tr.entityNum as c_int == ENTITYNUM_WORLD
@@ -6344,7 +6348,7 @@ pub fn G_SPSaberDamageTraceLerped(
                 saberNum,
                 bladeNum,
                 *baseNew,
-                *endNew,
+                endNew,
                 qfalse,
                 clipmask,
                 qfalse,
@@ -6377,7 +6381,7 @@ pub fn G_SPSaberDamageTraceLerped(
                 saberNum,
                 bladeNum,
                 bladePointOld,
-                bladePointNew,
+                &mut bladePointNew,
                 qfalse,
                 clipmask,
                 qtrue,
@@ -6470,7 +6474,7 @@ pub fn G_SPSaberDamageTraceLerped(
                         saberNum,
                         bladeNum,
                         bladePointOld,
-                        bladePointNew,
+                        &mut bladePointNew,
                         qfalse,
                         clipmask,
                         extrapolate,
@@ -11146,7 +11150,7 @@ pub fn WP_SaberPositionUpdate(
                                     rSaberNum,
                                     rBladeNum,
                                     boltOrigin,
-                                    end,
+                                    &mut end,
                                     qfalse,
                                     MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT,
                                     qfalse,
@@ -11205,7 +11209,7 @@ pub fn WP_SaberPositionUpdate(
                                         rSaberNum,
                                         rBladeNum,
                                         boltOrigin,
-                                        end,
+                                        &mut end,
                                         qfalse,
                                         trMask,
                                         qfalse,
@@ -11217,7 +11221,7 @@ pub fn WP_SaberPositionUpdate(
                                             rSaberNum,
                                             rBladeNum,
                                             boltOrigin,
-                                            end,
+                                            &mut end,
                                             qtrue,
                                             trMask,
                                             qfalse,
@@ -11354,7 +11358,7 @@ pub fn WP_SaberPositionUpdate(
                                                     rSaberNum,
                                                     rBladeNum,
                                                     saberMidPoint,
-                                                    saberMidEnd,
+                                                    &mut saberMidEnd,
                                                     qfalse,
                                                     trMask,
                                                     qfalse,
@@ -11405,7 +11409,7 @@ pub fn WP_SaberPositionUpdate(
                                     rSaberNum,
                                     rBladeNum,
                                     boltOrigin,
-                                    end,
+                                    &mut end,
                                     qfalse,
                                     MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT,
                                     qfalse,
@@ -11417,7 +11421,7 @@ pub fn WP_SaberPositionUpdate(
                                         rSaberNum,
                                         rBladeNum,
                                         boltOrigin,
-                                        end,
+                                        &mut end,
                                         qtrue,
                                         MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT,
                                         qfalse,
@@ -11441,7 +11445,7 @@ pub fn WP_SaberPositionUpdate(
                                 rSaberNum,
                                 rBladeNum,
                                 boltOrigin,
-                                end,
+                                &mut end,
                                 qfalse,
                                 MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT,
                                 qfalse,
