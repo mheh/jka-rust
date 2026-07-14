@@ -154,6 +154,10 @@ impl Engine {
             // installs them.
             addr_of_mut!((*p).common.hooks)
                 .write(mp_engine_qcommon::common::EngineHooks::null_dedicated());
+            // Engine referee (sv_referee.rs) holds a Vec / Option<File> — not
+            // zero-valid — so it is written in place through its Default
+            // (RefMode::Off, empty buffers) before the Box is exposed.
+            addr_of_mut!((*p).sv.referee).write(Default::default());
             Box::from_raw(p)
         }
     }

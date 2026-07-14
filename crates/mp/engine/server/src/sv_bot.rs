@@ -538,6 +538,12 @@ pub fn SV_BotFrame(common: &mut Common, sv: &mut Server, time: c_int) {
     if sv.gvm.is_null() {
         return;
     }
+    // Engine-referee replay deliberately does NOT suppress this call: bot
+    // CREATION (G_CheckMinimumPlayers) lives INSIDE the module's
+    // BotAIStartFrame, so suppressing bot brains also stops bots from ever
+    // spawning. Instead the brains re-run — deterministic under the referee's
+    // pinned seed + forced msec (verified byte-identical) — and only
+    // tape-created human slots are injected (sv_referee.rs).
     VM_Call(
         common,
         sv.gvm,

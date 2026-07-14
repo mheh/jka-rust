@@ -1037,6 +1037,12 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         }
         let frame_msec = 1000 / (*view.common.sv_fps).integer;
 
+        // Engine referee: RECORD appends `F <msec>`; REPLAY forces msec from the
+        // tape so timeResidual (and thus the game-run cadence and sv.svs.time)
+        // evolves identically to the recorded run. On tape end it schedules a
+        // quit and returns the input msec inertly.
+        let msec = crate::sv_referee::ref_frame_begin(view, sv, msec);
+
         sv.sv.timeResidual += msec;
 
         if (*view.common.com_dedicated).integer == 0 {
@@ -1048,8 +1054,12 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
             && (view.common.com_timescale.is_null() || (*view.common.com_timescale).value >= 1.0)
         {
             // NET_Sleep will give the OS time slices until either get a packet
-            // or time enough for a server frame has gone by
-            NET_Sleep(view.common, frame_msec - sv.sv.timeResidual);
+            // or time enough for a server frame has gone by. Referee replay runs
+            // faster than real time — keep the (state-identical) early return but
+            // skip the wall-clock sleep.
+            if !crate::sv_referee::ref_is_replay(sv) {
+                NET_Sleep(view.common, frame_msec - sv.sv.timeResidual);
+            }
             return;
         }
 
@@ -1105,8 +1115,16 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
             SV_BotFrame(view.common, sv, sv.svs.time);
         }
 
+        // Engine-referee replay: inject this frame's recorded events (bot/human
+        // usercmds, commands, connects, drops) in tape order BEFORE the game
+        // frame — the bot thinks that SV_BotFrame no longer produces come from
+        // here. RECORD/OFF: no-op.
+        crate::sv_referee::ref_frame_inject(view, sv);
+
         // run the game simulation in chunks
+        let mut ran_game = false;
         while sv.sv.timeResidual >= frame_msec {
+            ran_game = true;
             sv.sv.timeResidual -= frame_msec;
             sv.svs.time += frame_msec;
 
@@ -1118,6 +1136,11 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
                 &[sv.svs.time as isize],
             );
         }
+
+        // Engine referee: RECORD appends `S <digest>` for a frame that ran the
+        // game; REPLAY compares the digest to the tape and logs/counts diverges.
+        crate::sv_referee::ref_frame_end(view, sv, ran_game);
+
         //rww - RAGDOLL_BEGIN
         let time = sv.svs.time;
         // SAFETY: view-constructor slot, single-threaded, no other live cast

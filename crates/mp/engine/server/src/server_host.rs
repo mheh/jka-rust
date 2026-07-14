@@ -33,6 +33,7 @@ use crate::server::bot_debugpoly_t::bot_debugpoly_t;
 use crate::server::server_static_t::serverStatic_t;
 use crate::server::server_t::server_t;
 use crate::server::world_sector_s::{worldSector_t, AREA_NODES};
+use crate::sv_referee::Referee;
 
 /// Raven `MAX_WPARRAY_SIZE` — bot waypoint pointer-table capacity
 /// (`gWPArray[MAX_WPARRAY_SIZE]`). `usize`-typed dual of the canonical
@@ -200,6 +201,13 @@ pub struct Server {
     ///
     /// Source: `oracle/codemp/server/sv_main.cpp:792`
     pub sv_check_cvars_last_mod: c_int,
+    /// Engine referee (`sv_referee.rs`) — the input tap (record) and synthetic
+    /// replay state. NOT a Raven mirror; engine tooling owned on our own host
+    /// struct. Default is [`Referee`]'s `RefMode::Off`, so an un-armed server
+    /// carries zero referee behavior. Written through `Default` in
+    /// `Engine::new`'s in-place write list (it holds a `Vec`/`Option<File>`,
+    /// not zero-valid).
+    pub referee: Referee,
 }
 
 /// Wrap a live `&mut Server` into qcommon's type-erased command slot for

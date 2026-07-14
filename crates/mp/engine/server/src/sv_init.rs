@@ -748,8 +748,20 @@ pub fn SV_SpawnServer(
     // to load during actual gameplay
     sv.sv.state = serverState_t::SS_LOADING;
 
+    // Engine referee: arm record/replay for this map load. Placed just before
+    // SV_InitGameProgs so the GAME_INIT randomSeed pin lands on its
+    // Com_Milliseconds read.
+    let ref_map = unsafe { core::ffi::CStr::from_ptr(server) }
+        .to_string_lossy()
+        .into_owned();
+    crate::sv_referee::ref_spawn_setup(view, sv, &ref_map);
+
     // load and spawn all other entities
     SV_InitGameProgs(view, sv);
+
+    // Engine referee: now that GAME_INIT has run (and the seed is captured),
+    // append the tape `H` header (record mode only).
+    crate::sv_referee::ref_spawn_write_header(view, sv, &ref_map);
 
     // don't allow a map_restart if game is modified
     unsafe {
@@ -1207,6 +1219,15 @@ pub fn SV_Init(view: &mut EngineHostView) {
         c"".as_ptr(),
         mp_qshared::shared::cvar::CVAR_ROM,
     );
+
+    // Engine referee (sv_referee.rs) cvars: `ref_record <file>` taps the input/
+    // state stream, `ref_replay <file>` drives the engine from a tape, and a
+    // nonzero `ref_seed` pins the GAME_INIT randomSeed so record and replay
+    // agree. Injection strategy is per-slot (tape-created humans inject, bots
+    // regenerate) — not a cvar.
+    Cvar_Get(view, c"ref_record".as_ptr(), c"".as_ptr(), 0);
+    Cvar_Get(view, c"ref_replay".as_ptr(), c"".as_ptr(), 0);
+    Cvar_Get(view, c"ref_seed".as_ptr(), c"0".as_ptr(), 0);
 
     // initialize bot cvars so they are listed and can be set before loading the botlib
     SV_BotInitCvars(view);

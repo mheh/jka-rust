@@ -692,6 +692,23 @@ pub fn Com_Milliseconds(view: &mut EngineHostView) -> c_int {
         }
     }
 
+    // Engine-referee seed pin (sv_referee.rs): when armed (set just before
+    // `SV_InitGameProgs`), the next `Com_Milliseconds` — the GAME_INIT
+    // `randomSeed` read in `SV_InitGameVM` — returns the pinned seed instead of
+    // wall-clock so record and replay drive `srand(randomSeed)` identically. A
+    // `0` pin keeps the natural value; either way the value used is captured for
+    // the tape header. Disarms after the one call; all other callers unaffected.
+    if view.common.ref_seed_arm {
+        view.common.ref_seed_arm = false;
+        let used = if view.common.ref_seed_pin != 0 {
+            view.common.ref_seed_pin
+        } else {
+            ev.evTime
+        };
+        view.common.ref_seed_used = used;
+        return used;
+    }
+
     ev.evTime
 }
 

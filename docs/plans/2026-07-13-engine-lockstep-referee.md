@@ -41,6 +41,15 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
   bot alike) and the driver mirrors them into the secondary, whose clients
   are synthetic replicas (`bot_enable 0` there). The human plays on the
   primary; their inputs mirror like any other client's.
+  **AMENDED (G2 finding, 2026-07-13): only HUMAN input needs mirroring.** Bot
+  AI proved fully deterministic under a pinned GAME_INIT seed + forced frame
+  msec (2724-frame bot-combat replay, 0 digest divergences) — the bot brain is
+  game-module code, so bots re-run natively on the secondary and become
+  COMPARED BEHAVIOR rather than mirrored input. Also discovered: bot creation
+  (`G_CheckMinimumPlayers`) lives inside `BotAIStartFrame`, so bot brains
+  cannot be suppressed without killing bot spawning — the secondary runs
+  `bot_enable 1`, not 0. Injection is per-slot: only tape-created (`C`-event,
+  human) slots inject; taped bot events are verification data.
 - **Engine-side RNG must be pinned.** The game modules' parity-critical LCG
   lives in-world (`bg_state.rng` — deterministic given identical call
   sequences). The ENGINE's own rand services (`flrand`/`irand` host calls)
@@ -85,6 +94,18 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
   attack-button loss was in record/replay FRAMING (parked-plan finding);
   root-cause it so the injection path is sound. DONE WHEN: a single engine
   can replay its own captured session with byte-identical outcomes.
+  **STATUS: DONE 2026-07-13.** `sv_referee.rs`: `ref_record`/`ref_replay`/
+  `ref_seed` cvars, ordered event tape (`H/C/X/T/D/F/S` lines: taps at
+  `SV_ClientThink`, `SV_ExecuteClientCommand`, `SV_DirectConnect`,
+  `SV_DropClient`; per-frame msec + post-frame FNV-1a64 digest over
+  entityStates+playerStates), GAME_INIT seed pinned via an armed
+  `Com_Milliseconds`, replay forces msec from tape and runs faster than
+  real time. Round trip: 60s+ of 4-bot mp/ffa3 combat, `REF REPLAY COMPLETE
+  frames=2724 divergences=0`. See the amended single-source-inputs keystone
+  for the bot-determinism finding that reshaped injection (per-slot, humans
+  only). Open G3 risks: human-slot injection path not yet exercised by a live
+  human; `ref_inject_connect` sets CS_ACTIVE directly (skips CS_PRIMED) and
+  relies on the taped "begin" `X` event for GAME_CLIENT_BEGIN.
 - **G3 — Lockstep driver.** New tool (suggest `tools/lockstep-referee/` or a
   `crates/jampgame/tests/` binary target): boots both engines (primary: our
   module + bots + open player slot; secondary: patched oracle module,

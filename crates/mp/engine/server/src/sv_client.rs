@@ -446,6 +446,9 @@ pub fn SV_ExecuteClientCommand(
     s: *const c_char,
     clientOK: qboolean,
 ) {
+    // RECORD tap: "begin"/userinfo/say (incl. bot chat via the botlib
+    // client-command trap). Recorded before tokenizing so the raw string is kept.
+    crate::sv_referee::ref_tap_execute_command(sv, cl, s, clientOK);
     mp_engine_qcommon::cmd_common::Cmd_TokenizeString(view.common, s);
 
     // see if it is a server level command
@@ -517,6 +520,9 @@ pub fn SV_ClientThink(
     cl: *mut client_t,
     cmd: *mut usercmd_t,
 ) {
+    // RECORD tap: catches human (SV_UserMove) and bot (BOTLIB_USER_COMMAND trap)
+    // usercmds alike, as raw struct bytes.
+    crate::sv_referee::ref_tap_client_think(sv, cl, cmd);
     unsafe {
         (*cl).lastUsercmd = *cmd;
 
@@ -1072,6 +1078,11 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
         );
 
         (*cl_ptr).state = clientState_t::CS_CONNECTED;
+
+        // RECORD tap: human connect (bot connects are re-created by the module
+        // in replay and are deliberately not recorded).
+        crate::sv_referee::ref_tap_direct_connect(sv, client_num, userinfo.as_ptr());
+
         (*cl_ptr).nextSnapshotTime = sv.svs.time;
         (*cl_ptr).lastPacketTime = sv.svs.time;
         (*cl_ptr).lastConnectTime = sv.svs.time;
@@ -1821,6 +1832,9 @@ pub fn SV_DropClient(
         if (*drop).state == clientState_t::CS_ZOMBIE {
             return; // already dropped
         }
+
+        // RECORD tap: an actual drop (past the already-zombie early-out).
+        crate::sv_referee::ref_tap_drop_client(sv, drop_index as c_int);
 
         if (*drop).gentity.is_null() || (*(*drop).gentity).r.svFlags & SVF_BOT == 0 {
             // see if we already have a challenge for this ip

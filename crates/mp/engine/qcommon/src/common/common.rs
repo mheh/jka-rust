@@ -601,6 +601,23 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/null/null_snddma.cpp:7`
     pub gbInsideLoadSound: qboolean,
+
+    // ---- engine referee (sv_referee.rs) seed-pin seam ----
+    // The one narrow qcommon touch the engine referee needs: `SV_InitGameVM`
+    // seeds `GAME_INIT`'s `randomSeed` from `Com_Milliseconds`, which is wall-
+    // clock and so differs between a record run and its replay. When armed,
+    // `Com_Milliseconds` returns the pinned seed exactly once (the GAME_INIT
+    // call) and records the value actually used, so record and replay drive the
+    // module's `srand(randomSeed)` identically. All three are zero-valid
+    // (disarmed / no pin), so the `alloc_zeroed` mass covers them.
+    /// Armed just before `SV_InitGameProgs`; consumed by the next
+    /// `Com_Milliseconds` (the GAME_INIT seed read).
+    pub ref_seed_arm: bool,
+    /// Forced seed value when armed; `0` means "use the natural clock value".
+    pub ref_seed_pin: c_int,
+    /// The seed value the armed call actually returned, captured for the tape `H`
+    /// header.
+    pub ref_seed_used: c_int,
 }
 
 /// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching the FS field sizes).
