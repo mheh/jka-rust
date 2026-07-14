@@ -15,6 +15,7 @@
 use core::ffi::{c_char, c_int};
 
 use crate::prelude::*;
+use crate::q_shared::QSharedScratch;
 
 use super::rng::Rng;
 use crate::bg_panimate::MAX_ANIM_FILES;
@@ -34,6 +35,15 @@ pub struct BgState {
     /// The faithful LCG RNG. The single parity-critical member.
     /// Source: `oracle/codemp/game/q_math.c:1432`
     pub rng: Rng,
+
+    /// `q_shared.c` file-static parse/format scratch (safe-state Stage 3):
+    /// the COM parser session state + token buffer, and the `va`/
+    /// `Info_ValueForKey` rotating return buffers. Lives on `BgState` (not a
+    /// game-only scratch struct) because both tiers parse through it — bg's
+    /// saber/vehicle loaders take `&mut BgState` and never see `GameContext`.
+    /// Buffer-rotation index semantics preserved exactly.
+    /// Source: `oracle/codemp/game/q_shared.c` file statics.
+    pub qs: QSharedScratch,
 
     // --- `bg_panimate.c` animation tables ---
     /// Raven `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` — per-model animation
@@ -171,6 +181,7 @@ impl BgState {
     /// `holdrand = 0x89abcdef`; all tables empty until their loaders run.
     pub fn new() -> Self {
         Self {
+            qs: QSharedScratch::zeroed(),
             rng: Rng::new(),
             // Sized like Raven's fixed `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` /
             // `bgLoadedEvents_t bgAllEvents[MAX_ANIM_FILES]` zeroed statics

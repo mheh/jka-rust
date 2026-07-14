@@ -18,7 +18,42 @@ use crate::prelude::*;
 use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING};
 
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
-// These are module-level statics mimicking Raven's file-static globals in q_shared.c.
+/// Raven's `q_shared.c` file-static parse/format state, moved into
+/// `BgState.qs` (safe-state Stage 3 — no `static mut`, rule B3). Rotation
+/// index semantics (`va`/`Info_ValueForKey` two-slot rings) preserved.
+/// Source: `oracle/codemp/game/q_shared.c` file statics.
+pub struct QSharedScratch {
+    /// Raven `static int com_lines`.
+    pub com_lines: c_int,
+    /// Raven `static char com_parsename[MAX_TOKEN_CHARS]`.
+    pub com_parsename: [c_char; 1024],
+    /// Raven `static char com_token[MAX_TOKEN_CHARS]` — `COM_Parse*` return
+    /// pointers point into this buffer.
+    pub com_token: [c_char; 1024],
+    /// Raven `static char string[2][32000]` (va's rotating pair) + index.
+    pub va_string: Box<[[c_char; 32000]; 2]>,
+    pub va_index: usize,
+    /// Raven `Info_ValueForKey`'s rotating pair + index.
+    pub info_value: Box<[[c_char; 8192]; 2]>,
+    pub info_valueindex: c_int,
+}
+
+impl QSharedScratch {
+    pub fn zeroed() -> Self {
+        Self {
+            com_lines: 0,
+            com_parsename: [0; 1024],
+            com_token: [0; 1024],
+            va_string: Box::new([[0; 32000]; 2]),
+            va_index: 0,
+            info_value: Box::new([[0; 8192]; 2]),
+            info_valueindex: 0,
+        }
+    }
+}
+
+// TRANSITIONAL (Stage 3 in flight): the statics below are the live state until
+// the fn threading lands; QSharedScratch above is their target home.
 static mut COM_LINES: c_int = 0;
 static mut COM_PARSENAME: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS

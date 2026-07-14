@@ -70,9 +70,18 @@ be independently referee-verified is wrong-sized and must be re-cut.
     bodies file-by-file (multi-entity borrow restructuring per the pilot's
     re-acquire pattern) — the "unsafe retreats to the seam" bulk, landed as
     independent referee-gated commits after 2a.
-- **Stage 3 — `static mut` scratch → `GameWorld.scratch` sub-struct (F7)**,
+- **Stage 3 — `static mut` scratch → world-owned scratch (F7)**,
   preserving buffer-rotation index semantics (va/vtos rings). The DEC-19
   qshared twin gets the mirrored engine-side home.
+  EXECUTION AMENDMENT (2026-07-13): the `q_shared.c` statics (COM parse
+  session/token, va + Info_ValueForKey rings) home in `BgState.qs`
+  (`QSharedScratch`) — NOT a game-only struct — because bg's saber/vehicle
+  loaders parse through them with `&mut BgState` and no `GameContext`;
+  `BgState` lives inside `GameWorld`, so the world stays a complete value.
+  Game-only scratch (GalakMech impact pos, w_saber faces, g_utils
+  tv/vtos/shader-config rings) homes in `GameWorld.scratch`. va/tv have
+  ZERO callers (idiomatic format! replaced them at every site) — their
+  fns keep faithful bodies over the new home, no call-site impact.
 - **Stage 4 — Overlay/shared-buffer casts behind typed seam adapters (F5, F6
   unsafe-bearing subset).** One typed adapter per `T_G_ICARUS_*` overlay.
 - **Stage 5 — bg crate split** (ruling-19 deferral ends). NOT a dedup: mp_bg
