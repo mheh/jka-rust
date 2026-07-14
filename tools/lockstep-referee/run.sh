@@ -33,6 +33,7 @@ SECONDARY_BASE=${SECONDARY_BASE:-$HOME/Developer/jka/lockstep-oracle}
 PRIMARY_PORT=${PRIMARY_PORT:-29085}
 SECONDARY_PORT=${SECONDARY_PORT:-29095}
 RCON=${RCON:-jkarust}
+REF_STATE=${REF_STATE:-1} # 1 = verbose V records (field-level attribution)
 OUT=${OUT:-/tmp/lockstep-referee}
 BIN=${BIN:-target/debug/mp_app}
 ORACLE_DYLIB=${ORACLE_DYLIB:-tools/referee-oracle/build/liboraclejampgame.dylib}
@@ -63,7 +64,7 @@ COMMON_ARGS=(+set dedicated 1 +set sv_maxclients "$MAXCLIENTS" +set bot_enable 1
     +set rconpassword "$RCON" +set bot_minplayers "$BOTS")
 
 "./$BIN" "${COMMON_ARGS[@]}" +set fs_basepath "$PRIMARY_BASE" \
-    +set net_port "$PRIMARY_PORT" +set ref_record "$TAPE" \
+    +set net_port "$PRIMARY_PORT" +set ref_record "$TAPE" +set ref_state "$REF_STATE" \
     +map "$MAP" >"$OUT/primary.log" 2>&1 &
 PRIMARY_PID=$!
 echo "primary   pid=$PRIMARY_PID port=$PRIMARY_PORT module=ours log=$OUT/primary.log"

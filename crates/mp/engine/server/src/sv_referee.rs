@@ -69,6 +69,7 @@ use crate::sv_client::{
     SV_ClientEnterWorld, SV_ClientThink, SV_ExecuteClientCommand, SV_UserinfoChanged,
 };
 use crate::sv_game::SV_GentityNum;
+use crate::sv_referee_fields::{describe, ES, PS};
 use crate::Server;
 
 /// FNV-1a 64 offset basis.
@@ -127,13 +128,31 @@ enum Rec {
     Drop { client: c_int },
     /// `F <msec>` — the frame's msec input.
     Frame { msec: c_int },
-    /// `S <total> E<entities> <slot>:<ps> ...` — the post-frame state digest:
-    /// the combined hash, the entity-block aggregate, and one playerState hash
-    /// per connected slot, so a divergence names its component.
+    /// `S <total> E<entities> Y<hash>:<count> <slot>:<ps> ...` — the post-frame
+    /// state digest: the combined hash, the entity-block aggregate, the frame's
+    /// syscall-stream digest (ordered import numbers; `Y` token optional for
+    /// older tapes), and one playerState hash per connected slot, so a
+    /// divergence names its component.
     State { digest: StateDigest },
+    /// `V <num_entities> <hex entity block> <slot>:<hex ps> ...` — the frame's
+    /// verbose state bytes (`ref_state 1`), emitted just before `S` so a
+    /// follower can name the first divergent FIELD, not just the component.
+    Verbose { state: VState },
     /// `E` — clean end of session, written at `SV_Shutdown`. A follower quits
     /// here; its absence at EOF means the writer is merely lagging (or died).
     End,
+}
+
+/// A frame's verbose state (`V` record): the raw digested bytes, so a
+/// divergence maps to an exact entity/slot + field offset.
+#[derive(Clone)]
+pub struct VState {
+    /// `sv.sv.num_entities` at digest time.
+    pub num_entities: c_int,
+    /// Concatenated `entityState_t`-sized prefixes for entities `0..num_entities`.
+    pub ents: Vec<u8>,
+    /// `(slot, playerState_t bytes)` per connected slot, digest order.
+    pub players: Vec<(c_int, Vec<u8>)>,
 }
 
 /// The engine referee state, owned as `Server.referee`. Default is [`RefMode::Off`]
@@ -165,6 +184,15 @@ pub struct Referee {
     pending: Vec<Rec>,
     /// REPLAY: the current frame's expected digest, if the frame runs the game.
     expected: Option<StateDigest>,
+    /// REPLAY: the current frame's tape state bytes (`V` record), if verbose.
+    expected_state: Option<VState>,
+    /// RECORD: emit `V` verbose state records (`ref_state 1`).
+    verbose: bool,
+    /// Rolling syscall-stream digest for the current frame window (both modes):
+    /// ordered import numbers, reset after each `S` boundary.
+    sys_hash: u64,
+    /// Syscalls folded into `sys_hash` this window.
+    sys_count: u32,
     /// REPLAY: set once the tape is exhausted; further frames are inert.
     done: bool,
     /// REPLAY: frames whose digest was compared.
@@ -239,6 +267,9 @@ pub struct StateDigest {
     pub entities: u64,
     /// `(slot, fnv1a64(playerState))` per slot in state `>= CS_CONNECTED`.
     pub players: Vec<(c_int, u64)>,
+    /// The frame window's syscall-stream digest `(hash, count)` — ordered
+    /// import numbers between `S` boundaries. `None` on pre-G4 tapes.
+    pub sys: Option<(u64, u32)>,
 }
 
 /// Digest the frame's snapshot state: for each entity `0..num_entities` the
@@ -283,13 +314,53 @@ pub fn ref_digest(sv: &Server, maxclients: c_int) -> StateDigest {
         total,
         entities,
         players,
+        sys: None,
+    }
+}
+
+/// Capture the frame's verbose state (`V` record): the same bytes `ref_digest`
+/// hashes, kept raw so a follower can byte-diff to a named field.
+pub fn ref_vstate(sv: &Server, maxclients: c_int) -> VState {
+    let es_size = core::mem::size_of::<entityState_t>();
+    let ps_size = core::mem::size_of::<playerState_t>();
+    let num_entities = sv.sv.num_entities.max(0);
+    let mut ents = Vec::with_capacity(num_entities as usize * es_size);
+    if !sv.sv.gentities.is_null() && sv.sv.gentitySize > 0 {
+        let base = sv.sv.gentities as *const u8;
+        let stride = sv.sv.gentitySize as usize;
+        for i in 0..num_entities as usize {
+            let p = unsafe { base.add(i * stride) };
+            ents.extend_from_slice(unsafe { core::slice::from_raw_parts(p, es_size) });
+        }
+    }
+    let mut players = Vec::new();
+    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_null() {
+        let base = sv.sv.gameClients as *const u8;
+        let stride = sv.sv.gameClientSize as usize;
+        for slot in 0..maxclients.max(0) as usize {
+            let cl = unsafe { &*sv.svs.clients.add(slot) };
+            if (cl.state as c_int) >= (clientState_t::CS_CONNECTED as c_int) {
+                let p = unsafe { base.add(slot * stride) };
+                let ps = unsafe { core::slice::from_raw_parts(p, ps_size) };
+                players.push((slot as c_int, ps.to_vec()));
+            }
+        }
+    }
+    VState {
+        num_entities,
+        ents,
+        players,
     }
 }
 
 impl StateDigest {
-    /// The tape `S` line payload: `<total> E<entities> <slot>:<ps> ...`.
+    /// The tape `S` line payload:
+    /// `<total> E<entities> [Y<hash>:<count>] <slot>:<ps> ...`.
     fn to_line(&self) -> String {
         let mut s = format!("{:016x} E{:016x}", self.total, self.entities);
+        if let Some((h, n)) = self.sys {
+            s.push_str(&format!(" Y{h:016x}:{n}"));
+        }
         for (slot, h) in &self.players {
             s.push_str(&format!(" {slot}:{h:016x}"));
         }
@@ -301,6 +372,11 @@ impl StateDigest {
         let mut parts = Vec::new();
         if self.entities != tape.entities {
             parts.push("entities".to_string());
+        }
+        if let (Some(a), Some(b)) = (self.sys, tape.sys) {
+            if a != b {
+                parts.push(format!("syscalls(ours={} tape={})", a.1, b.1));
+            }
         }
         let ours: std::collections::HashMap<c_int, u64> = self.players.iter().copied().collect();
         let theirs: std::collections::HashMap<c_int, u64> = tape.players.iter().copied().collect();
@@ -317,6 +393,56 @@ impl StateDigest {
         }
         parts.join(",")
     }
+}
+
+impl VState {
+    /// The tape `V` line payload: `<num_entities> <hex ents|-> <slot>:<hex ps> ...`.
+    fn to_line(&self) -> String {
+        let ents = if self.ents.is_empty() {
+            "-".to_string()
+        } else {
+            hex_encode(&self.ents)
+        };
+        let mut s = format!("{} {ents}", self.num_entities);
+        for (slot, ps) in &self.players {
+            s.push_str(&format!(" {slot}:{}", hex_encode(ps)));
+        }
+        s
+    }
+}
+
+/// Field-level attribution: byte-diff our state against the tape's `V` record
+/// and name the first divergent entity field plus each divergent playerState
+/// field (only the FIRST divergent entity — under a cascade the first is the
+/// signal, the rest is noise).
+fn ref_attribute(ours: &VState, tape: &VState) -> String {
+    let es_size = core::mem::size_of::<entityState_t>();
+    let mut parts = Vec::new();
+    if ours.num_entities != tape.num_entities {
+        parts.push(format!(
+            "num_entities(ours={} tape={})",
+            ours.num_entities, tape.num_entities
+        ));
+    }
+    let n = ours.ents.len().min(tape.ents.len());
+    if let Some(off) = (0..n).find(|&i| ours.ents[i] != tape.ents[i]) {
+        let slot = off / es_size;
+        parts.push(format!("ent{slot}.{}", describe(&ES, off % es_size)));
+    }
+    let theirs: std::collections::HashMap<c_int, &Vec<u8>> =
+        tape.players.iter().map(|(s, b)| (*s, b)).collect();
+    for (slot, ours_ps) in &ours.players {
+        if let Some(tape_ps) = theirs.get(slot) {
+            let m = ours_ps.len().min(tape_ps.len());
+            if let Some(off) = (0..m).find(|&i| ours_ps[i] != tape_ps[i]) {
+                parts.push(format!("ps{slot}.{}", describe(&PS, off)));
+            }
+        }
+    }
+    if parts.is_empty() {
+        parts.push("state-bytes-equal".to_string());
+    }
+    parts.join(" ")
 }
 
 // ===========================================================================
@@ -428,6 +554,25 @@ pub fn ref_tap_drop_client(sv: &mut Server, client: c_int) {
     sv.referee.emit(&format!("D {client}"));
 }
 
+/// Tap at `SV_GameSystemCalls` entry (record AND replay): fold the ordered
+/// import number into the frame window's syscall digest. Pointer-free — only
+/// the trap number enters the hash, so differing heap layouts cannot perturb
+/// it. Windows run `S` boundary to `S` boundary, covering the packet-loop
+/// module calls (human events) that land between `S` and the next `F`.
+pub fn ref_tap_syscall(sv: &mut Server, trap: isize) {
+    if !sv.referee.active() {
+        return;
+    }
+    sv.referee.sys_hash = fnv1a64(sv.referee.sys_hash, &(trap as i64).to_le_bytes());
+    sv.referee.sys_count = sv.referee.sys_count.wrapping_add(1);
+}
+
+/// Reset the syscall-digest window (after each `S` emit/compare).
+fn ref_sys_reset(sv: &mut Server) {
+    sv.referee.sys_hash = FNV_OFFSET;
+    sv.referee.sys_count = 0;
+}
+
 /// RECORD tap at `SV_Shutdown`: write the tape's `E` end record and flush, so
 /// a follower can tell a clean session end from a lagging writer.
 pub fn ref_tap_shutdown(sv: &mut Server) {
@@ -519,6 +664,7 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
                 }
             }
             sv.referee.expected = None;
+            sv.referee.expected_state = None;
             sv.referee.pending.clear();
             // Buffer any leading events (e.g. human cmds received before this
             // SV_Frame), then take the frame's F.
@@ -531,7 +677,7 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
                 match rec {
                     Rec::Header { .. } => {}
                     Rec::Frame { msec: m } => return Some(m),
-                    Rec::State { .. } => {}
+                    Rec::State { .. } | Rec::Verbose { .. } => {}
                     Rec::End => {
                         ref_replay_finish(view, sv);
                         return None;
@@ -566,6 +712,10 @@ pub fn ref_frame_inject(view: &mut EngineHostView, sv: &mut Server) {
                 sv.referee.cursor += 1;
                 break;
             }
+            Rec::Verbose { state } => {
+                sv.referee.expected_state = Some(state);
+                sv.referee.cursor += 1;
+            }
             Rec::Frame { .. } => break, // next frame; leave the F for ref_frame_begin
             Rec::End => break,          // session end; leave it for ref_frame_begin
             Rec::Header { .. } => {
@@ -597,18 +747,28 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
     match sv.referee.mode {
         RefMode::Record => {
             if ran_game {
-                let digest = ref_digest(sv, maxclients);
+                if sv.referee.verbose {
+                    let v = ref_vstate(sv, maxclients);
+                    sv.referee.emit(&format!("V {}", v.to_line()));
+                }
+                let mut digest = ref_digest(sv, maxclients);
+                digest.sys = Some((sv.referee.sys_hash, sv.referee.sys_count));
                 sv.referee.emit(&format!("S {}", digest.to_line()));
                 // Bound a live follower's lag at one game frame.
                 if let Some(w) = sv.referee.writer.as_mut() {
                     let _ = w.flush();
                 }
+                ref_sys_reset(sv);
             }
         }
         RefMode::Replay => {
             if ran_game {
                 if let Some(expected) = sv.referee.expected.take() {
-                    let ours = ref_digest(sv, maxclients);
+                    let mut ours = ref_digest(sv, maxclients);
+                    // Compare syscall streams only when the tape carries a Y.
+                    if expected.sys.is_some() {
+                        ours.sys = Some((sv.referee.sys_hash, sv.referee.sys_count));
+                    }
                     sv.referee.frames += 1;
                     if sv.referee.follow && sv.referee.frames % 500 == 0 {
                         let n = sv.referee.frames;
@@ -618,18 +778,33 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
                             &format!("REF FOLLOW frames={n} divergences={d}\n"),
                         );
                     }
-                    if ours.total != expected.total {
+                    let sys_diverged = matches!(
+                        (ours.sys, expected.sys),
+                        (Some(a), Some(b)) if a != b
+                    );
+                    if ours.total != expected.total || sys_diverged {
                         sv.referee.divergences += 1;
                         let n = sv.referee.frames;
                         let what = ours.diff_vs(&expected);
+                        // Field-level attribution when the tape carries the
+                        // frame's verbose state bytes (`ref_state 1`).
+                        let first = match sv.referee.expected_state.take() {
+                            Some(tape_v) if ours.total != expected.total => {
+                                let ours_v = ref_vstate(sv, maxclients);
+                                format!(" first={}", ref_attribute(&ours_v, &tape_v))
+                            }
+                            _ => String::new(),
+                        };
                         com_printf(
                             view.common,
                             &format!(
-                                "REF DIVERGE frame={n} components={what} ours={:016x} tape={:016x}\n",
+                                "REF DIVERGE frame={n} components={what}{first} ours={:016x} tape={:016x}\n",
                                 ours.total, expected.total
                             ),
                         );
                     }
+                    sv.referee.expected_state = None;
+                    ref_sys_reset(sv);
                 }
             }
         }
@@ -716,7 +891,11 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             let cl = unsafe { sv.svs.clients.add(client as usize) };
             crate::SV_DropClient(view.common, sv, cl, c"replay drop".as_ptr());
         }
-        Rec::Header { .. } | Rec::Frame { .. } | Rec::State { .. } | Rec::End => {}
+        Rec::Header { .. }
+        | Rec::Frame { .. }
+        | Rec::State { .. }
+        | Rec::Verbose { .. }
+        | Rec::End => {}
     }
 }
 
@@ -968,6 +1147,12 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
         }
     }
 
+    // Verbose state records (`ref_state 1`, record side) and the syscall-digest
+    // window basis (both modes).
+    sv.referee.verbose = sv.referee.mode == RefMode::Record
+        && Cvar_VariableIntegerValue(view.common, c"ref_state".as_ptr()) != 0;
+    ref_sys_reset(sv);
+
     // Arm the GAME_INIT seed pin whenever a mode is active, so the seed used is
     // captured for the header and forced when required.
     if sv.referee.active() {
@@ -1072,10 +1257,18 @@ fn parse_line(line: &str, lineno: usize) -> Result<Option<Rec>, String> {
                 .and_then(|s| u64::from_str_radix(s, 16).ok())
                 .ok_or_else(bad)?;
             let mut entities = 0u64;
+            let mut sys = None;
             let mut players = Vec::new();
             for tok in it.by_ref() {
                 if let Some(e) = tok.strip_prefix('E') {
                     entities = u64::from_str_radix(e, 16).map_err(|_| bad())?;
+                } else if let Some(y) = tok.strip_prefix('Y') {
+                    // Y before the generic slot:hash arm — it also has a ':'.
+                    let (h, n) = y.split_once(':').ok_or_else(bad)?;
+                    sys = Some((
+                        u64::from_str_radix(h, 16).map_err(|_| bad())?,
+                        n.parse().map_err(|_| bad())?,
+                    ));
                 } else if let Some((slot, h)) = tok.split_once(':') {
                     players.push((
                         slot.parse().map_err(|_| bad())?,
@@ -1089,6 +1282,28 @@ fn parse_line(line: &str, lineno: usize) -> Result<Option<Rec>, String> {
                 digest: StateDigest {
                     total,
                     entities,
+                    players,
+                    sys,
+                },
+            }
+        }
+        "V" => {
+            let num_entities = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let ents_tok = it.next().ok_or_else(bad)?;
+            let ents = if ents_tok == "-" {
+                Vec::new()
+            } else {
+                hex_decode(ents_tok)
+            };
+            let mut players = Vec::new();
+            for tok in it.by_ref() {
+                let (slot, ps) = tok.split_once(':').ok_or_else(bad)?;
+                players.push((slot.parse().map_err(|_| bad())?, hex_decode(ps)));
+            }
+            Rec::Verbose {
+                state: VState {
+                    num_entities,
+                    ents,
                     players,
                 },
             }

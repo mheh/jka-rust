@@ -759,6 +759,11 @@ pub fn SV_GameSystemCalls(
     unsafe {
         let trap = *args.offset(0);
 
+        // Engine referee (record/replay): fold the ordered import number into
+        // the frame's syscall digest (no-op when un-armed).
+        // SAFETY: view-constructor slot, single-threaded (per-arm pattern).
+        crate::sv_referee::ref_tap_syscall(&mut *(view.sv.as_raw() as *mut Server), trap);
+
         // rww - alright, DO NOT EVER add a GAME/CGAME/UI generic call without
         // adding a trap to match, and all of these traps must be shared and
         // have cases in sv_game, cl_cgame, and cl_ui. They must also all be

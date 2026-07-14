@@ -1230,6 +1230,9 @@ pub fn SV_Init(view: &mut EngineHostView) {
     // `ref_follow 1` — ref_replay tail-follows a tape still being written
     // (the lockstep secondary's mode; see sv_referee.rs).
     Cvar_Get(view, c"ref_follow".as_ptr(), c"0".as_ptr(), 0);
+    // `ref_state 1` — record verbose per-frame state bytes (V records) so a
+    // follower names the first divergent field.
+    Cvar_Get(view, c"ref_state".as_ptr(), c"0".as_ptr(), 0);
     Cvar_Get(view, c"ref_seed".as_ptr(), c"0".as_ptr(), 0);
     // `ref_snaps <file>` — raw client-bound wire capture (see sv_referee.rs).
     Cvar_Get(view, c"ref_snaps".as_ptr(), c"".as_ptr(), 0);

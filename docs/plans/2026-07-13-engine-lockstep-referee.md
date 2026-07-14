@@ -131,6 +131,23 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
   artificially injected divergence (e.g. a one-off cvar tweak on the
   secondary) is detected on the exact frame it occurs, with field-level
   attribution.
+  **STATUS: DONE 2026-07-14.** Three additions: (a) engine-side syscall
+  digest — `SV_GameSystemCalls` entry folds each ordered import number into a
+  per-frame-window hash (pointer-free; windows run `S`-boundary to
+  `S`-boundary so packet-loop human events land in the same window on both
+  sides), emitted as the `S` line's `Y<hash>:<count>` token and compared by
+  the follower; (b) verbose state records — `ref_state 1` on the primary
+  emits a `V` line (raw digested entityState/playerState bytes) per game
+  frame, and on divergence the follower byte-diffs to name the first
+  divergent field via `sv_referee_fields.rs` (compile-checked `offset_of!`
+  tables shared in vocabulary with the mock referee, nested `fd`/`pos`/`apos`
+  recursion); (c) `REF DIVERGE` now reports components + syscall counts +
+  `first=<entN.field/psN.field>`. Acceptance: our-vs-our lockstep clean for
+  778 frames; rcon `set g_speed 251` on the SECONDARY only → caught on the
+  exact frame 779: `components=entities,syscalls(ours=417 tape=416),
+  ps0..ps3 first=ent0.pos.trBase+0 ps0.origin+0 … ps3.speed+2` (the +1
+  syscall is g_speed's track-change broadcast); 551 divergences =
+  frames 779..1329, zero before.
 - **G5 — Divergence UX.** `ref_haltOnDiverge` cvar (halt→step mode with
   `ref_step`/`ref_diff` console commands; log→resync path per the resync
   keystone). DONE WHEN: both modes demonstrably work mid-session.
