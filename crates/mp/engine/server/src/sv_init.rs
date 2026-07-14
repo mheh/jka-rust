@@ -1233,6 +1233,9 @@ pub fn SV_Init(view: &mut EngineHostView) {
     // `ref_state 1` — record verbose per-frame state bytes (V records) so a
     // follower names the first divergent field.
     Cvar_Get(view, c"ref_state".as_ptr(), c"0".as_ptr(), 0);
+    // `ref_haltOnDiverge 1` — freeze both engines into step mode on a
+    // divergence (0 = log + resync from the tape's V and continue).
+    Cvar_Get(view, c"ref_haltOnDiverge".as_ptr(), c"0".as_ptr(), 0);
     Cvar_Get(view, c"ref_seed".as_ptr(), c"0".as_ptr(), 0);
     // `ref_snaps <file>` — raw client-bound wire capture (see sv_referee.rs).
     Cvar_Get(view, c"ref_snaps".as_ptr(), c"".as_ptr(), 0);

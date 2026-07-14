@@ -44,6 +44,7 @@
 use core::ffi::{c_char, c_int, CStr};
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
+use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -188,6 +189,21 @@ pub struct Referee {
     expected_state: Option<VState>,
     /// RECORD: emit `V` verbose state records (`ref_state 1`).
     verbose: bool,
+    /// Divergence policy (`ref_haltOnDiverge`): true = freeze both engines
+    /// into step mode; false = log, resync from the tape's `V`, continue.
+    halt_on_diverge: bool,
+    /// The halt-file path (`<tape>.halt`) — the freeze back-channel: the
+    /// follower creates it on a halting divergence, the primary polls it and
+    /// freezes while it exists, `ref_resume` (primary) removes it.
+    halt_path: Option<String>,
+    /// FOLLOW: frozen after a halting divergence (halt file written).
+    halted: bool,
+    /// RECORD: let exactly one frame through the freeze (`ref_step`).
+    step_pending: bool,
+    /// FOLLOW: resync from the next compared frame's `V` (set on resume).
+    resync_next: bool,
+    /// FOLLOW: the last divergence's full field-level report (`ref_diff`).
+    last_report: String,
     /// Rolling syscall-stream digest for the current frame window (both modes):
     /// ordered import numbers, reset after each `S` boundary.
     sys_hash: u64,
@@ -445,6 +461,112 @@ fn ref_attribute(ours: &VState, tape: &VState) -> String {
     parts.join(" ")
 }
 
+/// The aligned 4-byte dword containing byte `off`, as hex (for reports).
+fn dword_at(bytes: &[u8], off: usize) -> String {
+    let a = off & !3;
+    let mut s = String::new();
+    for i in a..(a + 4).min(bytes.len()) {
+        s.push_str(&format!("{:02x}", bytes[i]));
+    }
+    s
+}
+
+/// Full field-level report for `ref_diff`: every divergent entity (first
+/// divergent field + the containing dwords both sides, capped) and every
+/// divergent playerState's first field.
+fn ref_report(ours: &VState, tape: &VState) -> String {
+    let es_size = core::mem::size_of::<entityState_t>();
+    let mut lines = Vec::new();
+    let n_ents = (ours.ents.len() / es_size).min(tape.ents.len() / es_size);
+    let mut shown = 0usize;
+    let mut skipped = 0usize;
+    for slot in 0..n_ents {
+        let a = &ours.ents[slot * es_size..(slot + 1) * es_size];
+        let b = &tape.ents[slot * es_size..(slot + 1) * es_size];
+        if let Some(off) = (0..es_size).find(|&i| a[i] != b[i]) {
+            if shown < 20 {
+                lines.push(format!(
+                    "  ent{slot} {} ours={} tape={}",
+                    describe(&ES, off),
+                    dword_at(a, off),
+                    dword_at(b, off)
+                ));
+                shown += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+    }
+    if skipped > 0 {
+        lines.push(format!("  ... (+{skipped} more divergent entities)"));
+    }
+    let theirs: std::collections::HashMap<c_int, &Vec<u8>> =
+        tape.players.iter().map(|(s, b)| (*s, b)).collect();
+    for (slot, a) in &ours.players {
+        if let Some(b) = theirs.get(slot) {
+            let m = a.len().min(b.len());
+            if let Some(off) = (0..m).find(|&i| a[i] != b[i]) {
+                let count = (0..m).filter(|&i| a[i] != b[i]).count();
+                lines.push(format!(
+                    "  ps{slot} {} ours={} tape={} ({count} divergent bytes)",
+                    describe(&PS, off),
+                    dword_at(a, off),
+                    dword_at(b, off)
+                ));
+            }
+        }
+    }
+    lines.join("\n")
+}
+
+/// Overwrite the module's digested state (entityState prefixes + connected
+/// playerStates) with the tape's `V` bytes, written through the
+/// LocateGameData-registered memory — the log-mode resync (plan keystone: one
+/// divergence must not cascade into noise). Module-private state is untouched
+/// (snapshot semantics); genuinely persistent internal drift re-surfaces as a
+/// fresh divergence on a later frame.
+fn ref_resync(sv: &mut Server, tape: &VState, maxclients: c_int) {
+    let es_size = core::mem::size_of::<entityState_t>();
+    let ps_size = core::mem::size_of::<playerState_t>();
+    if !sv.sv.gentities.is_null() && sv.sv.gentitySize > 0 {
+        let base = sv.sv.gentities as *mut u8;
+        let stride = sv.sv.gentitySize as usize;
+        let n = (sv.sv.num_entities.max(0) as usize)
+            .min(tape.num_entities.max(0) as usize)
+            .min(tape.ents.len() / es_size);
+        for i in 0..n {
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    tape.ents.as_ptr().add(i * es_size),
+                    base.add(i * stride),
+                    es_size,
+                );
+            }
+        }
+    }
+    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_null() {
+        let base = sv.sv.gameClients as *mut u8;
+        let stride = sv.sv.gameClientSize as usize;
+        for (slot, bytes) in &tape.players {
+            if *slot < 0 || *slot >= maxclients {
+                continue;
+            }
+            let cl = unsafe { &*sv.svs.clients.add(*slot as usize) };
+            if (cl.state as c_int) < (clientState_t::CS_CONNECTED as c_int) {
+                continue;
+            }
+            let n = bytes.len().min(ps_size);
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    bytes.as_ptr(),
+                    base.add(*slot as usize * stride),
+                    n,
+                );
+            }
+        }
+    }
+}
+
 // ===========================================================================
 // Record taps
 // ===========================================================================
@@ -641,12 +763,39 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
     match sv.referee.mode {
         RefMode::Off => Some(msec),
         RefMode::Record => {
+            // Halt-mode freeze: while the follower's halt file exists, skip
+            // frames entirely (`ref_step` lets exactly one through;
+            // `ref_resume` removes the file). Console/rcon stay live.
+            if sv.referee.halt_on_diverge && ref_halt_file_exists(sv) {
+                if sv.referee.step_pending {
+                    sv.referee.step_pending = false;
+                    // One full game frame per step: force frame_msec so the
+                    // stepped frame reaches its S digest (and tape flush)
+                    // instead of accumulating a few real-time milliseconds.
+                    let fps = unsafe { (*view.common.sv_fps).integer }.max(1);
+                    let m = 1000 / fps;
+                    sv.referee.emit(&format!("F {m}"));
+                    return Some(m);
+                }
+                sleep(Duration::from_millis(2));
+                return None;
+            }
             sv.referee.emit(&format!("F {msec}"));
             Some(msec)
         }
         RefMode::Replay => {
             if sv.referee.done {
                 return Some(msec);
+            }
+            // Halt released (`ref_resume` on the primary removed the file):
+            // resume, resyncing from the next compared frame's V.
+            if sv.referee.halted && !ref_halt_file_exists(sv) {
+                sv.referee.halted = false;
+                sv.referee.resync_next = true;
+                com_printf(
+                    view.common,
+                    "REF RESUME halt cleared — resyncing from the next frame\n",
+                );
             }
             if sv.referee.follow {
                 ref_follow_poll(sv);
@@ -782,18 +931,28 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
                         (ours.sys, expected.sys),
                         (Some(a), Some(b)) if a != b
                     );
-                    if ours.total != expected.total || sys_diverged {
+                    let diverged = ours.total != expected.total || sys_diverged;
+                    let tape_v = sv.referee.expected_state.take();
+                    if diverged {
                         sv.referee.divergences += 1;
                         let n = sv.referee.frames;
                         let what = ours.diff_vs(&expected);
                         // Field-level attribution when the tape carries the
                         // frame's verbose state bytes (`ref_state 1`).
-                        let first = match sv.referee.expected_state.take() {
-                            Some(tape_v) if ours.total != expected.total => {
+                        let first = match &tape_v {
+                            Some(tv) if ours.total != expected.total => {
                                 let ours_v = ref_vstate(sv, maxclients);
-                                format!(" first={}", ref_attribute(&ours_v, &tape_v))
+                                sv.referee.last_report = format!(
+                                    "REF DIFF frame={n} components={what}\n{}\n",
+                                    ref_report(&ours_v, tv)
+                                );
+                                format!(" first={}", ref_attribute(&ours_v, tv))
                             }
-                            _ => String::new(),
+                            _ => {
+                                sv.referee.last_report =
+                                    format!("REF DIFF frame={n} components={what} (no V record — set ref_state 1 on the primary for field detail)\n");
+                                String::new()
+                            }
                         };
                         com_printf(
                             view.common,
@@ -802,8 +961,34 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
                                 ours.total, expected.total
                             ),
                         );
+                        if sv.referee.resync_next {
+                            // Post-resume (halt mode): this divergence is the
+                            // expected residue of the split — resync instead
+                            // of re-halting, then compare cleanly onward.
+                            if let Some(tv) = &tape_v {
+                                ref_resync(sv, tv, maxclients);
+                                sv.referee.resync_next = false;
+                                com_printf(view.common, &format!("REF RESYNC frame={n}\n"));
+                            }
+                        } else if sv.referee.halt_on_diverge {
+                            if !sv.referee.halted {
+                                sv.referee.halted = true;
+                                ref_halt_file_write(sv, n);
+                                com_printf(
+                                    view.common,
+                                    "REF HALT both engines frozen — ref_step (primary) advances one frame, ref_diff (secondary rcon) shows the delta, ref_resume (primary) resyncs and continues\n",
+                                );
+                            }
+                        } else if let Some(tv) = &tape_v {
+                            // Log-and-continue: resync from the primary's
+                            // authoritative snapshot so one divergence does
+                            // not cascade into noise.
+                            ref_resync(sv, tv, maxclients);
+                            com_printf(view.common, &format!("REF RESYNC frame={n}\n"));
+                        }
+                    } else {
+                        sv.referee.resync_next = false;
                     }
-                    sv.referee.expected_state = None;
                     ref_sys_reset(sv);
                 }
             }
@@ -816,6 +1001,66 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
 /// sleep — replay runs faster than real time).
 pub fn ref_is_replay(sv: &Server) -> bool {
     sv.referee.mode == RefMode::Replay
+}
+
+// ===========================================================================
+// Divergence UX (halt/step/resync — plan G5)
+// ===========================================================================
+
+/// Whether the halt back-channel file currently exists.
+fn ref_halt_file_exists(sv: &Server) -> bool {
+    sv.referee
+        .halt_path
+        .as_deref()
+        .is_some_and(|p| Path::new(p).exists())
+}
+
+/// FOLLOW: create the halt file (freezes the polling primary).
+fn ref_halt_file_write(sv: &Server, frame: u64) {
+    if let Some(p) = sv.referee.halt_path.as_deref() {
+        let _ = std::fs::write(p, format!("diverged frame={frame}\n"));
+    }
+}
+
+/// `ref_step` console command — primary (record) only: let exactly one frame
+/// through the halt freeze; the follower steps automatically when the frame's
+/// block lands on the tape.
+pub fn ref_step_cmd(view: &mut EngineHostView, sv: &mut Server) {
+    match sv.referee.mode {
+        RefMode::Record => {
+            sv.referee.step_pending = true;
+            com_printf(view.common, "REF STEP one frame\n");
+        }
+        _ => com_printf(
+            view.common,
+            "ref_step: record-side (primary) only — the follower steps automatically\n",
+        ),
+    }
+}
+
+/// `ref_resume` console command — primary (record) only: remove the halt file;
+/// the frozen follower notices, resyncs from the next frame's V, and continues.
+pub fn ref_resume_cmd(view: &mut EngineHostView, sv: &mut Server) {
+    match sv.referee.mode {
+        RefMode::Record => {
+            if let Some(p) = sv.referee.halt_path.as_deref() {
+                let _ = std::fs::remove_file(p);
+            }
+            com_printf(view.common, "REF RESUME halt file cleared\n");
+        }
+        _ => com_printf(view.common, "ref_resume: record-side (primary) only\n"),
+    }
+}
+
+/// `ref_diff` console command — follower: print the last divergence's full
+/// field-level report (works over rcon; the primary redirects the print).
+pub fn ref_diff_cmd(view: &mut EngineHostView, sv: &mut Server) {
+    if sv.referee.last_report.is_empty() {
+        com_printf(view.common, "ref_diff: no divergence recorded\n");
+    } else {
+        let report = sv.referee.last_report.clone();
+        com_printf(view.common, &report);
+    }
 }
 
 // ===========================================================================
@@ -1152,6 +1397,24 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     sv.referee.verbose = sv.referee.mode == RefMode::Record
         && Cvar_VariableIntegerValue(view.common, c"ref_state".as_ptr()) != 0;
     ref_sys_reset(sv);
+
+    // Divergence policy + the halt back-channel (`<tape>.halt`). The record
+    // side clears any stale halt file so a fresh session never boots frozen.
+    sv.referee.halt_on_diverge =
+        Cvar_VariableIntegerValue(view.common, c"ref_haltOnDiverge".as_ptr()) != 0;
+    let tape_path = if !replay.is_empty() {
+        Some(replay.clone())
+    } else if !record.is_empty() {
+        Some(record.clone())
+    } else {
+        None
+    };
+    sv.referee.halt_path = tape_path.map(|p| format!("{p}.halt"));
+    if sv.referee.mode == RefMode::Record {
+        if let Some(p) = sv.referee.halt_path.as_deref() {
+            let _ = std::fs::remove_file(p);
+        }
+    }
 
     // Arm the GAME_INIT seed pin whenever a mode is active, so the seed used is
     // captured for the header and forced when required.

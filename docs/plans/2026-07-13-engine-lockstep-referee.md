@@ -151,6 +151,23 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
 - **G5 — Divergence UX.** `ref_haltOnDiverge` cvar (halt→step mode with
   `ref_step`/`ref_diff` console commands; log→resync path per the resync
   keystone). DONE WHEN: both modes demonstrably work mid-session.
+  **STATUS: DONE 2026-07-14.** Log→resync (default, `ref_haltOnDiverge 0`):
+  on divergence the follower overwrites its module's digested state
+  (entityState prefixes + connected playerStates, through the
+  LocateGameData-registered memory) from the tape's `V` record — demo: 123
+  divergences bounded exactly to a g_speed-injection window (frames 523-645,
+  resynced each frame, state hashes held identical), ~1,000 clean frames
+  after restore. Halt (`1`): follower writes `<tape>.halt`; the primary
+  polls it and freezes; `ref_step` (primary) advances exactly one full game
+  frame (forced frame_msec) which the follower auto-compares; `ref_diff`
+  (follower rcon) prints the stored full field report (per-entity/per-ps
+  divergent dwords); `ref_resume` (primary) deletes the file — the follower
+  resyncs from the next frame's V (resync takes priority over re-halt for
+  that frame) and continues. Demo: halt at 525 → diff → step (526) →
+  restore+resume → resync 527 → 528 re-halted on the restore's own 2-syscall
+  residue with state hashes IDENTICAL (resync proven). Found+fixed en route:
+  engine-wide empty rcon replies (com_printf cleared the redirect buffer
+  after every no-op flush — see the standalone fix commit).
 - **G6 — First real hunt.** Run bot combat (`mp/ffa3`, 8 bots, skill 4,
   retail cvars) to first divergence; triage it fully (frame, entity, field,
   oracle-vs-rust code path). The bot force-power/saber MOD-histogram skew

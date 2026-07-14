@@ -34,6 +34,7 @@ PRIMARY_PORT=${PRIMARY_PORT:-29085}
 SECONDARY_PORT=${SECONDARY_PORT:-29095}
 RCON=${RCON:-jkarust}
 REF_STATE=${REF_STATE:-1} # 1 = verbose V records (field-level attribution)
+HALT=${HALT:-0}           # 1 = freeze both engines on divergence (step mode)
 OUT=${OUT:-/tmp/lockstep-referee}
 BIN=${BIN:-target/debug/mp_app}
 ORACLE_DYLIB=${ORACLE_DYLIB:-tools/referee-oracle/build/liboraclejampgame.dylib}
@@ -61,7 +62,8 @@ rm -f "$TAPE" "$OUT"/primary.log "$OUT"/secondary.log
 
 COMMON_ARGS=(+set dedicated 1 +set sv_maxclients "$MAXCLIENTS" +set bot_enable 1
     +set g_gametype "$GAMETYPE" +set sv_fps "$FPS" +set ref_seed "$SEED"
-    +set rconpassword "$RCON" +set bot_minplayers "$BOTS")
+    +set rconpassword "$RCON" +set bot_minplayers "$BOTS"
+    +set ref_haltOnDiverge "$HALT")
 
 "./$BIN" "${COMMON_ARGS[@]}" +set fs_basepath "$PRIMARY_BASE" \
     +set net_port "$PRIMARY_PORT" +set ref_record "$TAPE" +set ref_state "$REF_STATE" \

@@ -1118,6 +1118,19 @@ pub fn SV_AddOperatorCommands(view: &mut EngineHostView, _sv: &mut Server) {
         let sv = unsafe { sv_from_view(view) };
         SV_DumpUser_f(view.common, sv)
     });
+    // Engine referee divergence UX (lockstep plan G5; see sv_referee.rs).
+    add(view, c"ref_step".as_ptr(), |view| {
+        let sv = unsafe { sv_from_view(view) };
+        crate::sv_referee::ref_step_cmd(view, sv)
+    });
+    add(view, c"ref_resume".as_ptr(), |view| {
+        let sv = unsafe { sv_from_view(view) };
+        crate::sv_referee::ref_resume_cmd(view, sv)
+    });
+    add(view, c"ref_diff".as_ptr(), |view| {
+        let sv = unsafe { sv_from_view(view) };
+        crate::sv_referee::ref_diff_cmd(view, sv)
+    });
     add(view, c"map_restart".as_ptr(), SV_MapRestart_f_cmd);
     add(view, c"sectorlist".as_ptr(), |view| {
         let sv = unsafe { sv_from_view(view) };
