@@ -141,6 +141,14 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
   split by weight at cut time. Worker pattern: dissolve `world_raw()`/
   `__hN` temps into real borrows per the g_object.rs pilot re-acquire
   pattern; behavior/evaluation order preserved; referee arbitrates.
+- **Stage 2b — DONE** (V1A `0d3d1065` … V6B, 12 shard commits, every one
+  346-tests + six-referee-scenarios byte-identical): 4,680 raw world reaches
+  dissolved to 27 marked irreducibles (bg-seam GameCallbacksImpl raw fields,
+  &mut-world out-params aliasing ctx at their own calls, raw-ABI callees —
+  each a Stage-2-API-shape question, not debt); all ~1,000 hoist temps
+  renamed in place (RNG/syscall order preserved by construction); ~230 dead
+  unsafe blocks retired. Unsafe now genuinely retreats to the seam + the
+  entity/client deref regime (2c/gclient territory, out of scope).
 - **Stage-1 precedents established** (binding on later shards): returns stay
   raw; signature-only re-derives for saturated bodies with in-code Stage-2
   debt marks; unused handler `other`/`activator` params are `Option<EntityId>`;
