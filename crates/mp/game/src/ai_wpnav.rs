@@ -55,7 +55,7 @@ use std::ffi::CString;
 #[inline]
 unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -290,23 +290,21 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
     let ev_scoreplum = mp_bg::public::entity_event::entity_event_t::EV_SCOREPLUM as c_int;
 
     unsafe {
-        let w = ctx.world_raw();
-
-        if (*w).globals.gBotEdit == 0.0 {
+        if ctx.world.globals.gBotEdit == 0.0 {
             return;
         }
 
         let mut bestindex: c_int = 0;
 
         'checkprint: {
-            if (*w).globals.gWPRenderTime <= (*w).level.time as f32 {
-                (*w).globals.gWPRenderTime = (*w).level.time as f32 + 100.0;
+            if ctx.world.globals.gWPRenderTime <= ctx.world.level.time as f32 {
+                ctx.world.globals.gWPRenderTime = ctx.world.level.time as f32 + 100.0;
 
-                let mut i = (*w).globals.gWPRenderedFrame;
-                let inc_checker = (*w).globals.gWPRenderedFrame;
+                let mut i = ctx.world.globals.gWPRenderedFrame;
+                let inc_checker = ctx.world.globals.gWPRenderedFrame;
 
-                while i < (*w).globals.gWPNum {
-                    let p = (*w).globals.gWPArray.0[i as usize];
+                while i < ctx.world.globals.gWPNum {
+                    let p = ctx.world.globals.gWPArray.0[i as usize];
                     if !p.is_null() && (*p).inuse != 0 {
                         let plum = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
                         (*plum).r.svFlags |= SVF_BROADCAST;
@@ -316,17 +314,17 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                         while n < (*p).neighbornum {
                             let nb = (*p).neighbors[n as usize];
                             if nb.forceJumpTo != 0
-                                && !(*w).globals.gWPArray.0[nb.num as usize].is_null()
+                                && !ctx.world.globals.gWPArray.0[nb.num as usize].is_null()
                             {
-                                let dest = (*w).globals.gWPArray.0[nb.num as usize];
+                                let dest = ctx.world.globals.gWPArray.0[nb.num as usize];
                                 G_TestLine(ctx, (*p).origin, (*dest).origin, 0x0000ff, 5000);
                             }
                             n += 1;
                         }
 
-                        (*w).globals.gWPRenderedFrame += 1;
+                        ctx.world.globals.gWPRenderedFrame += 1;
                     } else {
-                        (*w).globals.gWPRenderedFrame = 0;
+                        ctx.world.globals.gWPRenderedFrame = 0;
                         break;
                     }
 
@@ -336,9 +334,9 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                     i += 1;
                 }
 
-                if i >= (*w).globals.gWPNum {
-                    (*w).globals.gWPRenderTime = (*w).level.time as f32 + 1500.0; // wait a bit after we finish doing the whole trail
-                    (*w).globals.gWPRenderedFrame = 0;
+                if i >= ctx.world.globals.gWPNum {
+                    ctx.world.globals.gWPRenderTime = ctx.world.level.time as f32 + 1500.0; // wait a bit after we finish doing the whole trail
+                    ctx.world.globals.gWPRenderedFrame = 0;
                 }
             }
 
@@ -346,11 +344,11 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
             // file-scope `vmCvar_t` with no home in `GameCvars`/`GameGlobals`
             // yet; reached the same way `bot_wp_*` handles are referenced
             // elsewhere in this file (missing_symbols).
-            if (*w).cvars.bot_wp_info.value == 0.0 {
+            if ctx.world.cvars.bot_wp_info.value == 0.0 {
                 return;
             }
 
-            let viewent: *mut gentity_t = &mut (*w).g_entities[0];
+            let viewent: *mut gentity_t = &mut ctx.world.g_entities[0];
 
             if viewent.is_null() || (*viewent).client.is_null() {
                 // client isn't in the game yet?
@@ -361,8 +359,8 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
             let mut gotbestindex = false;
 
             let mut i: c_int = 0;
-            while i < (*w).globals.gWPNum {
-                let p = (*w).globals.gWPArray.0[i as usize];
+            while i < ctx.world.globals.gWPNum {
+                let p = ctx.world.globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
                     let vo = (*((*viewent).client as *mut gclient_t)).ps.origin;
                     let a = [
@@ -381,10 +379,10 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 i += 1;
             }
 
-            if gotbestindex && bestindex != (*w).globals.gLastPrintedIndex {
-                let p = (*w).globals.gWPArray.0[bestindex as usize];
+            if gotbestindex && bestindex != ctx.world.globals.gLastPrintedIndex {
+                let p = ctx.world.globals.gWPArray.0[bestindex as usize];
                 let flagstr = GetFlagStr(ctx, (*p).flags);
-                (*w).globals.gLastPrintedIndex = bestindex;
+                ctx.world.globals.gLastPrintedIndex = bestindex;
                 let flagstr_s = cstr_to_str(flagstr);
                 let s = format!(
                     "^3Waypoint {}\nFlags - {} ({}) (w{})\nOrigin - ({} {} {})\n",
@@ -404,7 +402,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 (*plum).r.svFlags |= SVF_BROADCAST;
                 (*plum).s.time = bestindex; // render it once
             } else if !gotbestindex {
-                (*w).globals.gLastPrintedIndex = -1;
+                ctx.world.globals.gLastPrintedIndex = -1;
             }
         }
     }
@@ -417,21 +415,20 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:349-369`
 pub fn TransferWPData(ctx: &mut GameContext, from: c_int, to: c_int) {
     unsafe {
-        let w = ctx.world_raw();
-        if (*w).globals.gWPArray.0[to as usize].is_null() {
-            (*w).globals.gWPArray.0[to as usize] =
+        if ctx.world.globals.gWPArray.0[to as usize].is_null() {
+            ctx.world.globals.gWPArray.0[to as usize] =
                 B_Alloc(ctx, size_of::<wpobject_t>() as c_int) as *mut wpobject_t;
         }
 
-        if (*w).globals.gWPArray.0[to as usize].is_null() {
+        if ctx.world.globals.gWPArray.0[to as usize].is_null() {
             G_Printf(
                 ctx,
                 c"^1FATAL ERROR: Could not allocated memory for waypoint\n".as_ptr(),
             );
         }
 
-        let from_p = (*w).globals.gWPArray.0[from as usize];
-        let to_p = (*w).globals.gWPArray.0[to as usize];
+        let from_p = ctx.world.globals.gWPArray.0[from as usize];
+        let to_p = ctx.world.globals.gWPArray.0[to as usize];
         (*to_p).flags = (*from_p).flags;
         (*to_p).weight = (*from_p).weight;
         (*to_p).associated_entity = (*from_p).associated_entity;
@@ -451,37 +448,36 @@ pub fn TransferWPData(ctx: &mut GameContext, from: c_int, to: c_int) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:371-401`
 pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
     unsafe {
-        let w = ctx.world_raw();
-        if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
-            if (*w).cvars.g_RMG.integer == 0 {
+        if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
+            if ctx.world.cvars.g_RMG.integer == 0 {
                 G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
             }
             return;
         }
 
-        let n = (*w).globals.gWPNum as usize;
-        if (*w).globals.gWPArray.0[n].is_null() {
-            (*w).globals.gWPArray.0[n] =
+        let n = ctx.world.globals.gWPNum as usize;
+        if ctx.world.globals.gWPArray.0[n].is_null() {
+            ctx.world.globals.gWPArray.0[n] =
                 B_Alloc(ctx, size_of::<wpobject_t>() as c_int) as *mut wpobject_t;
         }
 
-        if (*w).globals.gWPArray.0[n].is_null() {
+        if ctx.world.globals.gWPArray.0[n].is_null() {
             G_Printf(
                 ctx,
                 c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr(),
             );
         }
 
-        let p = (*w).globals.gWPArray.0[n];
+        let p = ctx.world.globals.gWPArray.0[n];
         (*p).flags = flags;
         (*p).weight = 0.0; // calculated elsewhere
         (*p).associated_entity = ENTITYNUM_NONE; // set elsewhere
         (*p).forceJumpTo = 0;
         (*p).disttonext = 0.0; // calculated elsewhere
-        (*p).index = (*w).globals.gWPNum;
+        (*p).index = ctx.world.globals.gWPNum;
         (*p).inuse = 1;
         (*p).origin = origin;
-        (*w).globals.gWPNum += 1;
+        ctx.world.globals.gWPNum += 1;
     }
 }
 
@@ -493,31 +489,30 @@ pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:403-454`
 pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
     unsafe {
-        let w = ctx.world_raw();
-        if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
+        if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
             return;
         }
 
-        let n = (*w).globals.gWPNum as usize;
-        if (*w).globals.gWPArray.0[n].is_null() {
-            (*w).globals.gWPArray.0[n] =
+        let n = ctx.world.globals.gWPNum as usize;
+        if ctx.world.globals.gWPArray.0[n].is_null() {
+            ctx.world.globals.gWPArray.0[n] =
                 B_Alloc(ctx, size_of::<wpobject_t>() as c_int) as *mut wpobject_t;
         }
 
-        if (*w).globals.gWPArray.0[n].is_null() {
+        if ctx.world.globals.gWPArray.0[n].is_null() {
             G_Printf(
                 ctx,
                 c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr(),
             );
         }
 
-        let p = (*w).globals.gWPArray.0[n];
+        let p = ctx.world.globals.gWPArray.0[n];
         (*p).flags = (*wp).flags;
         (*p).weight = (*wp).weight;
         (*p).associated_entity = (*wp).associated_entity;
         (*p).disttonext = (*wp).disttonext;
         (*p).forceJumpTo = (*wp).forceJumpTo;
-        (*p).index = (*w).globals.gWPNum;
+        (*p).index = ctx.world.globals.gWPNum;
         (*p).inuse = 1;
         (*p).origin = (*wp).origin;
         (*p).neighbornum = (*wp).neighbornum;
@@ -530,14 +525,14 @@ pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
         }
 
         if (*p).flags & WPFLAG_RED_FLAG != 0 {
-            (*w).globals.flagRed = p;
-            (*w).globals.oFlagRed = (*w).globals.flagRed;
+            ctx.world.globals.flagRed = p;
+            ctx.world.globals.oFlagRed = ctx.world.globals.flagRed;
         } else if (*p).flags & WPFLAG_BLUE_FLAG != 0 {
-            (*w).globals.flagBlue = p;
-            (*w).globals.oFlagBlue = (*w).globals.flagBlue;
+            ctx.world.globals.flagBlue = p;
+            ctx.world.globals.oFlagBlue = ctx.world.globals.flagBlue;
         }
 
-        (*w).globals.gWPNum += 1;
+        ctx.world.globals.gWPNum += 1;
     }
 }
 
@@ -551,15 +546,14 @@ pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:456-482`
 pub fn RemoveWP(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
-        if (*w).globals.gWPNum <= 0 {
+        if ctx.world.globals.gWPNum <= 0 {
             return;
         }
 
-        (*w).globals.gWPNum -= 1;
-        let n = (*w).globals.gWPNum as usize;
+        ctx.world.globals.gWPNum -= 1;
+        let n = ctx.world.globals.gWPNum as usize;
 
-        let p = (*w).globals.gWPArray.0[n];
+        let p = ctx.world.globals.gWPArray.0[n];
         if p.is_null() || (*p).inuse == 0 {
             return;
         }
@@ -574,10 +568,8 @@ pub fn RemoveWP(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:484-489`
 pub fn RemoveAllWP(ctx: &mut GameContext) {
-    unsafe {
-        while (*ctx.world_raw()).globals.gWPNum != 0 {
-            RemoveWP(ctx);
-        }
+    while ctx.world.globals.gWPNum != 0 {
+        RemoveWP(ctx);
     }
 }
 
@@ -589,19 +581,18 @@ pub fn RemoveAllWP(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:491-557`
 pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
     unsafe {
-        let w = ctx.world_raw();
         let mut foundindex: c_int = 0;
         let mut foundanindex = 0;
         let mut didchange = 0;
         let mut i: c_int = 0;
 
-        if afterindex < 0 || afterindex >= (*w).globals.gWPNum {
+        if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
             G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
             return;
         }
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).index == afterindex {
                 foundindex = i;
                 foundanindex = 1;
@@ -619,8 +610,8 @@ pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
         }
 
         i = 0;
-        while i <= (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i <= ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).index == foundindex {
                 core::ptr::write_bytes(p as *mut u8, 0, size_of::<*mut wpobject_t>());
                 (*p).inuse = 0;
@@ -632,7 +623,7 @@ pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
             }
             i += 1;
         }
-        (*w).globals.gWPNum -= 1;
+        ctx.world.globals.gWPNum -= 1;
     }
 }
 
@@ -649,25 +640,24 @@ pub fn CreateNewWP_InTrail(
     afterindex: c_int,
 ) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
         let mut foundindex: c_int = 0;
         let mut foundanindex = 0;
         let mut i: c_int = 0;
 
-        if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
-            if (*w).cvars.g_RMG.integer == 0 {
+        if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
+            if ctx.world.cvars.g_RMG.integer == 0 {
                 G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
             }
             return 0;
         }
 
-        if afterindex < 0 || afterindex >= (*w).globals.gWPNum {
+        if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
             G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
             return 0;
         }
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).index == afterindex {
                 foundindex = i;
                 foundanindex = 1;
@@ -684,20 +674,20 @@ pub fn CreateNewWP_InTrail(
             return 0;
         }
 
-        i = (*w).globals.gWPNum;
+        i = ctx.world.globals.gWPNum;
         while i >= 0 {
-            let p = (*w).globals.gWPArray.0[i as usize];
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).index != foundindex {
                 TransferWPData(ctx, i, i + 1);
             } else if !p.is_null() && (*p).inuse != 0 && (*p).index == foundindex {
                 i += 1;
 
-                if (*w).globals.gWPArray.0[i as usize].is_null() {
-                    (*w).globals.gWPArray.0[i as usize] =
+                if ctx.world.globals.gWPArray.0[i as usize].is_null() {
+                    ctx.world.globals.gWPArray.0[i as usize] =
                         B_Alloc(ctx, size_of::<wpobject_t>() as c_int) as *mut wpobject_t;
                 }
 
-                let np = (*w).globals.gWPArray.0[i as usize];
+                let np = ctx.world.globals.gWPArray.0[i as usize];
                 (*np).flags = flags;
                 (*np).weight = 0.0;
                 (*np).associated_entity = ENTITYNUM_NONE;
@@ -706,7 +696,7 @@ pub fn CreateNewWP_InTrail(
                 (*np).index = i;
                 (*np).inuse = 1;
                 (*np).origin = origin;
-                (*w).globals.gWPNum += 1;
+                ctx.world.globals.gWPNum += 1;
                 break;
             }
 
@@ -731,25 +721,24 @@ pub fn CreateNewWP_InsertUnder(
     afterindex: c_int,
 ) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
         let mut foundindex: c_int = 0;
         let mut foundanindex = 0;
         let mut i: c_int = 0;
 
-        if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
-            if (*w).cvars.g_RMG.integer == 0 {
+        if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
+            if ctx.world.cvars.g_RMG.integer == 0 {
                 G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
             }
             return 0;
         }
 
-        if afterindex < 0 || afterindex >= (*w).globals.gWPNum {
+        if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
             G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
             return 0;
         }
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).index == afterindex {
                 foundindex = i;
                 foundanindex = 1;
@@ -766,20 +755,20 @@ pub fn CreateNewWP_InsertUnder(
             return 0;
         }
 
-        i = (*w).globals.gWPNum;
+        i = ctx.world.globals.gWPNum;
         while i >= 0 {
-            let p = (*w).globals.gWPArray.0[i as usize];
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).index != foundindex {
                 TransferWPData(ctx, i, i + 1);
             } else if !p.is_null() && (*p).inuse != 0 && (*p).index == foundindex {
                 TransferWPData(ctx, i, i + 1);
 
-                if (*w).globals.gWPArray.0[i as usize].is_null() {
-                    (*w).globals.gWPArray.0[i as usize] =
+                if ctx.world.globals.gWPArray.0[i as usize].is_null() {
+                    ctx.world.globals.gWPArray.0[i as usize] =
                         B_Alloc(ctx, size_of::<wpobject_t>() as c_int) as *mut wpobject_t;
                 }
 
-                let np = (*w).globals.gWPArray.0[i as usize];
+                let np = ctx.world.globals.gWPArray.0[i as usize];
                 (*np).flags = flags;
                 (*np).weight = 0.0;
                 (*np).associated_entity = ENTITYNUM_NONE;
@@ -788,7 +777,7 @@ pub fn CreateNewWP_InsertUnder(
                 (*np).index = i;
                 (*np).inuse = 1;
                 (*np).origin = origin;
-                (*w).globals.gWPNum += 1;
+                ctx.world.globals.gWPNum += 1;
                 break;
             }
 
@@ -806,7 +795,6 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let pl: *mut gentity_t = ent_ptr(ctx, pl);
-        let w = ctx.world_raw();
         if pl.is_null() || (*pl).client.is_null() {
             return;
         }
@@ -815,13 +803,13 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
         let mut foundanindex = 0;
         let mut i: c_int = 0;
 
-        if afterindex < 0 || afterindex >= (*w).globals.gWPNum {
+        if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
             G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
             return;
         }
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).index == afterindex {
                 foundindex = i;
                 foundanindex = 1;
@@ -839,7 +827,7 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
         }
 
         let cl = (*pl).client as *mut gclient_t;
-        (*cl).ps.origin = (*(*w).globals.gWPArray.0[foundindex as usize]).origin;
+        (*cl).ps.origin = (*ctx.world.globals.gWPArray.0[foundindex as usize]).origin;
     }
 }
 
@@ -848,14 +836,13 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
 /// Source: `oracle/codemp/game/ai_wpnav.c:760-769`
 pub fn WPFlagsModify(ctx: &mut GameContext, wpnum: c_int, flags: c_int) {
     unsafe {
-        let w = ctx.world_raw();
-        let p = if wpnum >= 0 && wpnum < (*w).globals.gWPNum {
-            (*w).globals.gWPArray.0[wpnum as usize]
+        let p = if wpnum >= 0 && wpnum < ctx.world.globals.gWPNum {
+            ctx.world.globals.gWPArray.0[wpnum as usize]
         } else {
             core::ptr::null_mut()
         };
 
-        if wpnum < 0 || wpnum >= (*w).globals.gWPNum || p.is_null() || (*p).inuse == 0 {
+        if wpnum < 0 || wpnum >= ctx.world.globals.gWPNum || p.is_null() || (*p).inuse == 0 {
             G_Printf(
                 ctx,
                 c"^3WPFlagsModify: Waypoint %i does not exist\n".as_ptr(),
@@ -889,28 +876,25 @@ pub fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:787-809`
 pub fn NodeHere(ctx: &mut GameContext, spot: vec3_t) -> c_int {
-    unsafe {
-        let w = ctx.world_raw();
-        let sx = spot[0] as c_int;
-        let sy = spot[1] as c_int;
-        let sz = spot[2] as c_int;
-        let mut i: c_int = 0;
+    let sx = spot[0] as c_int;
+    let sy = spot[1] as c_int;
+    let sz = spot[2] as c_int;
+    let mut i: c_int = 0;
 
-        while i < (*w).globals.nodenum {
-            let o = (*w).globals.nodetable.0[i as usize].origin;
-            let nx = o[0] as c_int;
-            let ny = o[1] as c_int;
-            let nz = o[2] as c_int;
-            if nx == sx && ny == sy {
-                if nz == sz || (nz < sz && nz + 5 > sz) || (nz > sz && nz - 5 < sz) {
-                    return 1;
-                }
+    while i < ctx.world.globals.nodenum {
+        let o = ctx.world.globals.nodetable.0[i as usize].origin;
+        let nx = o[0] as c_int;
+        let ny = o[1] as c_int;
+        let nz = o[2] as c_int;
+        if nx == sx && ny == sy {
+            if nz == sz || (nz < sz && nz + 5 > sz) || (nz > sz && nz - 5 < sz) {
+                return 1;
             }
-            i += 1;
         }
-
-        0
+        i += 1;
     }
+
+    0
 }
 
 /// Raven `CanGetToVector`.
@@ -1132,8 +1116,7 @@ pub fn ConnectTrail(
         mins: vec3_t,
         maxs: vec3_t,
     ) -> bool {
-        let w = ctx.world_raw();
-        let mut testspot = (*w).globals.nodetable.0[i as usize].origin;
+        let mut testspot = ctx.world.globals.nodetable.0[i as usize].origin;
         testspot[0] += dx;
         testspot[1] += dy;
 
@@ -1154,32 +1137,32 @@ pub fn ConnectTrail(
 
         testspot[2] = tr.endpos[2] + base_height;
 
-        let src = (*w).globals.nodetable.0[i as usize].origin;
+        let src = ctx.world.globals.nodetable.0[i as usize].origin;
         if NodeHere(ctx, testspot) == 0
             && tr.startsolid == 0
             && tr.allsolid == 0
             && CanGetToVector(ctx, src, testspot, mins, maxs) != 0
         {
-            let nn = (*w).globals.nodenum as usize;
-            (*w).globals.nodetable.0[nn].origin = testspot;
-            (*w).globals.nodetable.0[nn].inuse = 1;
-            (*w).globals.nodetable.0[nn].weight = (*w).globals.nodetable.0[i as usize].weight + 1.0;
-            (*w).globals.nodetable.0[nn].neighbornum = i;
-            if (*w).globals.nodetable.0[i as usize].origin[2]
-                - (*w).globals.nodetable.0[nn].origin[2]
+            let nn = ctx.world.globals.nodenum as usize;
+            ctx.world.globals.nodetable.0[nn].origin = testspot;
+            ctx.world.globals.nodetable.0[nn].inuse = 1;
+            ctx.world.globals.nodetable.0[nn].weight =
+                ctx.world.globals.nodetable.0[i as usize].weight + 1.0;
+            ctx.world.globals.nodetable.0[nn].neighbornum = i;
+            if ctx.world.globals.nodetable.0[i as usize].origin[2]
+                - ctx.world.globals.nodetable.0[nn].origin[2]
                 > 50.0
             {
                 // big drop — can't magically fly back up
-                (*w).globals.nodetable.0[nn].flags = WPFLAG_ONEWAY_FWD;
+                ctx.world.globals.nodetable.0[nn].flags = WPFLAG_ONEWAY_FWD;
             }
-            (*w).globals.nodenum += 1;
+            ctx.world.globals.nodenum += 1;
             return true;
         }
         false
     }
 
     unsafe {
-        let w = ctx.world_raw();
         let mut foundit: c_int = 0;
         let mut cancontinue: c_int;
         let mut i: c_int;
@@ -1195,10 +1178,10 @@ pub fn ConnectTrail(
         let mins: vec3_t = [-15.0, -15.0, 0.0];
         let maxs: vec3_t = [15.0, 15.0, 0.0];
 
-        if (*w).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             // this might be temporary. Or not.
-            let sp = (*w).globals.gWPArray.0[startindex as usize];
-            let ep = (*w).globals.gWPArray.0[endindex as usize];
+            let sp = ctx.world.globals.gWPArray.0[startindex as usize];
+            let ep = ctx.world.globals.gWPArray.0[endindex as usize];
             if (*sp).flags & WPFLAG_NEVERONEWAY == 0 && (*ep).flags & WPFLAG_NEVERONEWAY == 0 {
                 (*sp).flags |= WPFLAG_ONEWAY_FWD;
                 (*ep).flags |= WPFLAG_ONEWAY_BACK;
@@ -1206,24 +1189,24 @@ pub fn ConnectTrail(
             return 0;
         }
 
-        if (*w).cvars.g_RMG.integer == 0 {
+        if ctx.world.cvars.g_RMG.integer == 0 {
             branch_distance = TABLE_BRANCH_DISTANCE;
         } else {
             branch_distance = 512.0; // be less precise on broad terrain
         }
 
-        if (*w).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             max_dist_factor = 700.0;
         }
 
-        (*w).globals.nodenum = 0;
+        ctx.world.globals.nodenum = 0;
         foundit = 0;
         i = 0;
         successnodeindex = 0;
 
         // clear the node table before using it
         while i < MAX_NODETABLE_SIZE {
-            let nt = &mut (*w).globals.nodetable.0[i as usize];
+            let nt = &mut ctx.world.globals.nodetable.0[i as usize];
             nt.flags = 0;
             nt.inuse = 0;
             nt.neighbornum = 0;
@@ -1242,7 +1225,7 @@ pub fn ConnectTrail(
             );
         }
 
-        let startplace = (*(*w).globals.gWPArray.0[startindex as usize]).origin;
+        let startplace = (*ctx.world.globals.gWPArray.0[startindex as usize]).origin;
         let mut starttrace = startplace;
         starttrace[2] -= 4096.0;
 
@@ -1262,20 +1245,20 @@ pub fn ConnectTrail(
         cancontinue = 1;
 
         {
-            let nn = (*w).globals.nodenum as usize;
-            (*w).globals.nodetable.0[nn].origin = startplace;
-            (*w).globals.nodetable.0[nn].weight = 1.0;
-            (*w).globals.nodetable.0[nn].inuse = 1;
-            (*w).globals.nodenum += 1;
+            let nn = ctx.world.globals.nodenum as usize;
+            ctx.world.globals.nodetable.0[nn].origin = startplace;
+            ctx.world.globals.nodetable.0[nn].weight = 1.0;
+            ctx.world.globals.nodetable.0[nn].inuse = 1;
+            ctx.world.globals.nodenum += 1;
         }
 
-        while (*w).globals.nodenum < MAX_NODETABLE_SIZE && foundit == 0 && cancontinue != 0 {
-            if (*w).cvars.g_RMG.integer != 0 {
+        while ctx.world.globals.nodenum < MAX_NODETABLE_SIZE && foundit == 0 && cancontinue != 0 {
+            if ctx.world.cvars.g_RMG.integer != 0 {
                 // adjust branch distance by distance from start/end (RMG only)
-                let last = ((*w).globals.nodenum - 1) as usize;
-                let so = (*(*w).globals.gWPArray.0[startindex as usize]).origin;
-                let eo = (*(*w).globals.gWPArray.0[endindex as usize]).origin;
-                let no = (*w).globals.nodetable.0[last].origin;
+                let last = (ctx.world.globals.nodenum - 1) as usize;
+                let so = (*ctx.world.globals.gWPArray.0[startindex as usize]).origin;
+                let eo = (*ctx.world.globals.gWPArray.0[endindex as usize]).origin;
+                let no = ctx.world.globals.nodetable.0[last].origin;
                 let start_distf = VectorLength([no[0] - so[0], no[1] - so[1], no[2] - so[2]]);
                 let end_distf = VectorLength([no[0] - eo[0], no[1] - eo[1], no[2] - eo[2]]);
                 if start_distf < 64.0 || end_distf < 64.0 {
@@ -1293,12 +1276,12 @@ pub fn ConnectTrail(
 
             cancontinue = 0;
             i = 0;
-            prenodestart = (*w).globals.nodenum;
+            prenodestart = ctx.world.globals.nodenum;
 
             while i < prenodestart {
                 if extendednodes[i as usize] != 1 {
-                    let eo = (*(*w).globals.gWPArray.0[endindex as usize]).origin;
-                    let no = (*w).globals.nodetable.0[i as usize].origin;
+                    let eo = (*ctx.world.globals.gWPArray.0[endindex as usize]).origin;
+                    let no = ctx.world.globals.nodetable.0[i as usize].origin;
                     fvecmeas = VectorLength([eo[0] - no[0], eo[1] - no[1], eo[2] - no[2]]);
 
                     if fvecmeas < 128.0 && CanGetToVector(ctx, eo, no, mins, maxs) != 0 {
@@ -1310,28 +1293,28 @@ pub fn ConnectTrail(
                     if branch_dir(ctx, i, branch_distance, 0.0, baseheight, mins, maxs) {
                         cancontinue = 1;
                     }
-                    if (*w).globals.nodenum >= MAX_NODETABLE_SIZE {
+                    if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                         break;
                     }
 
                     if branch_dir(ctx, i, -branch_distance, 0.0, baseheight, mins, maxs) {
                         cancontinue = 1;
                     }
-                    if (*w).globals.nodenum >= MAX_NODETABLE_SIZE {
+                    if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                         break;
                     }
 
                     if branch_dir(ctx, i, 0.0, branch_distance, baseheight, mins, maxs) {
                         cancontinue = 1;
                     }
-                    if (*w).globals.nodenum >= MAX_NODETABLE_SIZE {
+                    if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                         break;
                     }
 
                     if branch_dir(ctx, i, 0.0, -branch_distance, baseheight, mins, maxs) {
                         cancontinue = 1;
                     }
-                    if (*w).globals.nodenum >= MAX_NODETABLE_SIZE {
+                    if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                         break;
                     }
 
@@ -1350,8 +1333,8 @@ pub fn ConnectTrail(
                     c"^1Could not link %i to %i, unreachable by node branching.\n".as_ptr(),
                 );
             }
-            (*(*w).globals.gWPArray.0[startindex as usize]).flags |= WPFLAG_ONEWAY_FWD;
-            (*(*w).globals.gWPArray.0[endindex as usize]).flags |= WPFLAG_ONEWAY_BACK;
+            (*ctx.world.globals.gWPArray.0[startindex as usize]).flags |= WPFLAG_ONEWAY_FWD;
+            (*ctx.world.globals.gWPArray.0[endindex as usize]).flags |= WPFLAG_ONEWAY_BACK;
             if behindTheScenes == 0 {
                 G_Printf(
                     ctx,
@@ -1368,14 +1351,14 @@ pub fn ConnectTrail(
                 let mut best_dist: f32 = 0.0;
                 let mut test_dist: f32;
 
-                if (*w).globals.nodenum <= 10 {
+                if ctx.world.globals.nodenum <= 10 {
                     return 0; // not enough to bother
                 }
 
                 // find whichever node is closest to the desired end
-                while n_count < (*w).globals.nodenum {
-                    let no = (*w).globals.nodetable.0[n_count as usize].origin;
-                    let eo = (*(*w).globals.gWPArray.0[endindex as usize]).origin;
+                while n_count < ctx.world.globals.nodenum {
+                    let no = ctx.world.globals.nodetable.0[n_count as usize].origin;
+                    let eo = (*ctx.world.globals.gWPArray.0[endindex as usize]).origin;
                     test_dist = VectorLength([no[0] - eo[0], no[1] - eo[1], no[2] - eo[2]]);
                     if ideal_node == -1 {
                         ideal_node = n_count;
@@ -1403,26 +1386,26 @@ pub fn ConnectTrail(
         i = successnodeindex;
         insertindex = startindex;
         failsafe = 0;
-        let mut validspotpos = (*(*w).globals.gWPArray.0[startindex as usize]).origin;
+        let mut validspotpos = (*ctx.world.globals.gWPArray.0[startindex as usize]).origin;
 
         while failsafe < MAX_NODETABLE_SIZE && i < MAX_NODETABLE_SIZE && i >= 0 {
-            let no = (*w).globals.nodetable.0[i as usize].origin;
+            let no = ctx.world.globals.nodetable.0[i as usize].origin;
             let a = [
                 validspotpos[0] - no[0],
                 validspotpos[1] - no[1],
                 validspotpos[2] - no[2],
             ];
-            let neigh = (*w).globals.nodetable.0[i as usize].neighbornum;
-            let eo = (*(*w).globals.gWPArray.0[endindex as usize]).origin;
+            let neigh = ctx.world.globals.nodetable.0[i as usize].neighbornum;
+            let eo = (*ctx.world.globals.gWPArray.0[endindex as usize]).origin;
 
-            if (*w).globals.nodetable.0[neigh as usize].inuse == 0
+            if ctx.world.globals.nodetable.0[neigh as usize].inuse == 0
                 || CanGetToVectorTravel(ctx, validspotpos, no, mins, maxs) == 0
                 || VectorLength(a) > max_dist_factor
                 || (CanGetToVectorTravel(ctx, validspotpos, eo, mins, maxs) == 0
                     && CanGetToVectorTravel(ctx, no, eo, mins, maxs) != 0)
             {
-                (*w).globals.nodetable.0[i as usize].flags |= WPFLAG_CALCULATED;
-                let nf = (*w).globals.nodetable.0[i as usize].flags;
+                ctx.world.globals.nodetable.0[i as usize].flags |= WPFLAG_CALCULATED;
+                let nf = ctx.world.globals.nodetable.0[i as usize].flags;
                 if CreateNewWP_InTrail(ctx, no, nf, insertindex) == 0 {
                     if behindTheScenes == 0 {
                         G_Printf(
@@ -1440,7 +1423,7 @@ pub fn ConnectTrail(
                 break;
             }
 
-            i = (*w).globals.nodetable.0[i as usize].neighbornum;
+            i = ctx.world.globals.nodetable.0[i as usize].neighbornum;
             failsafe += 1;
         }
 
@@ -1457,9 +1440,8 @@ pub fn ConnectTrail(
 /// Source: `oracle/codemp/game/ai_wpnav.c:1402-1416`
 pub fn OpposingEnds(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
-        let sp = (*w).globals.gWPArray.0[start as usize];
-        let ep = (*w).globals.gWPArray.0[end as usize];
+        let sp = ctx.world.globals.gWPArray.0[start as usize];
+        let ep = ctx.world.globals.gWPArray.0[end as usize];
         if sp.is_null() || (*sp).inuse == 0 || ep.is_null() || (*ep).inuse == 0 {
             return 0;
         }
@@ -1480,9 +1462,8 @@ pub fn OpposingEnds(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
 /// Source: `oracle/codemp/game/ai_wpnav.c:1418-1463`
 pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
-        let sp = (*w).globals.gWPArray.0[start as usize];
-        let ep = (*w).globals.gWPArray.0[end as usize];
+        let sp = ctx.world.globals.gWPArray.0[start as usize];
+        let ep = ctx.world.globals.gWPArray.0[end as usize];
         if sp.is_null() || (*sp).inuse == 0 || ep.is_null() || (*ep).inuse == 0 {
             return 0;
         }
@@ -1505,7 +1486,7 @@ pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c
             return 0;
         }
 
-        let cn = (*w).g_entities[tr.entityNum as usize].classname;
+        let cn = ctx.world.g_entities[tr.entityNum as usize].classname;
         // Raven derefs `testdoor->classname` unconditionally; a slot with a
         // null classname would crash there — the one defined behavior here is
         // "no `func_` match" (returns 0). (§19)
@@ -1555,14 +1536,12 @@ unsafe fn c_str_contains(s: *const c_char, needle: &[u8]) -> bool {
 /// Source: `oracle/codemp/game/ai_wpnav.c:1466-1523`
 pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
-
-        if (*w).globals.gWPNum == 0 {
+        if ctx.world.globals.gWPNum == 0 {
             return 0;
         }
 
         let mut max_dist_factor: f32 = 400.0;
-        if (*w).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             max_dist_factor = 800.0; // higher tolerance here.
         }
 
@@ -1573,16 +1552,16 @@ pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
         // `GameCvars` yet (missing_symbols).
         trap::Cvar_Update(
             ctx.engine,
-            GCvarUpdateArgs::new(&mut (*w).cvars.bot_wp_distconnect as *mut vmCvar_t),
+            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_distconnect as *mut vmCvar_t),
         );
         trap::Cvar_Update(
             ctx.engine,
-            GCvarUpdateArgs::new(&mut (*w).cvars.bot_wp_visconnect as *mut vmCvar_t),
+            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_visconnect as *mut vmCvar_t),
         );
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
-            let pn = (*w).globals.gWPArray.0[(i + 1) as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
+            let pn = ctx.world.globals.gWPArray.0[(i + 1) as usize];
 
             if !p.is_null() && (*p).inuse != 0 && !pn.is_null() && (*pn).inuse != 0 {
                 let a = [
@@ -1595,17 +1574,17 @@ pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
                     && (*pn).flags & WPFLAG_JUMP == 0
                     && (*p).flags & WPFLAG_CALCULATED == 0
                     && OpposingEnds(ctx, i, i + 1) == 0
-                    && (((*w).cvars.bot_wp_distconnect.value != 0.0
+                    && ((ctx.world.cvars.bot_wp_distconnect.value != 0.0
                         && VectorLength(a) > max_dist_factor)
                         || (OrgVisible(ctx, (*p).origin, (*pn).origin, ENTITYNUM_NONE) == 0
-                            && (*w).cvars.bot_wp_visconnect.value != 0.0))
+                            && ctx.world.cvars.bot_wp_visconnect.value != 0.0))
                     && DoorBlockingSection(ctx, i, i + 1) == 0
                 {
                     let _ct_ret = ConnectTrail(ctx, i, i + 1, behindTheScenes);
 
-                    if (*w).globals.gWPNum >= MAX_WPARRAY_SIZE {
+                    if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
                         // Bad!
-                        (*w).globals.gWPNum = MAX_WPARRAY_SIZE;
+                        ctx.world.globals.gWPNum = MAX_WPARRAY_SIZE;
                         break;
                     }
 
@@ -1672,12 +1651,11 @@ pub fn CanForceJumpTo(
     distance: f32,
 ) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
         let heightdif: f32;
         let mins: vec3_t = [-15.0, -15.0, -15.0];
         let maxs: vec3_t = [15.0, 15.0, 15.0];
-        let wp_base = (*w).globals.gWPArray.0[baseindex as usize];
-        let wp_test = (*w).globals.gWPArray.0[testingindex as usize];
+        let wp_base = ctx.world.globals.gWPArray.0[baseindex as usize];
+        let wp_test = ctx.world.globals.gWPArray.0[testingindex as usize];
 
         if wp_base.is_null() || (*wp_base).inuse == 0 || wp_test.is_null() || (*wp_test).inuse == 0
         {
@@ -1742,14 +1720,12 @@ pub fn CanForceJumpTo(
 /// Source: `oracle/codemp/game/ai_wpnav.c:1623-1713`
 pub fn CalculatePaths(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
-
-        if (*w).globals.gWPNum == 0 {
+        if ctx.world.globals.gWPNum == 0 {
             return;
         }
 
         let mut max_neighbor_dist: f32 = MAX_NEIGHBOR_LINK_DISTANCE;
-        if (*w).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             max_neighbor_dist = DEFAULT_GRID_SPACING + (DEFAULT_GRID_SPACING * 0.5);
         }
 
@@ -1758,8 +1734,8 @@ pub fn CalculatePaths(ctx: &mut GameContext) {
 
         // clear out all the neighbor data before we recalculate
         let mut i: c_int = 0;
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 && (*p).neighbornum != 0 {
                 while (*p).neighbornum >= 0 {
                     (*p).neighbors[(*p).neighbornum as usize].num = 0;
@@ -1772,12 +1748,12 @@ pub fn CalculatePaths(ctx: &mut GameContext) {
         }
 
         i = 0;
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 {
                 let mut c: c_int = 0;
-                while c < (*w).globals.gWPNum {
-                    let cp = (*w).globals.gWPArray.0[c as usize];
+                while c < ctx.world.globals.gWPNum {
+                    let cp = ctx.world.globals.gWPArray.0[c as usize];
                     if !cp.is_null() && (*cp).inuse != 0 && i != c && NotWithinRange(i, c) != 0 {
                         let a = [
                             (*p).origin[0] - (*cp).origin[0],
@@ -1860,11 +1836,10 @@ pub fn GetObjectThatTargets(ctx: &mut GameContext, ent: EntityId) -> *mut gentit
 /// Source: `oracle/codemp/game/ai_wpnav.c:1734-1794`
 pub fn CalculateSiegeGoals(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
-        while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
 
             let mut tent: *mut gentity_t = core::ptr::null_mut();
 
@@ -1901,7 +1876,7 @@ pub fn CalculateSiegeGoals(ctx: &mut GameContext) {
                 let wpindex = GetNearestVisibleWP(ctx, dif, (*tent).s.number);
 
                 if wpindex != -1 {
-                    let p = (*w).globals.gWPArray.0[wpindex as usize];
+                    let p = ctx.world.globals.gWPArray.0[wpindex as usize];
                     if !p.is_null() && (*p).inuse != 0 {
                         // found the waypoint nearest the center of this objective-related object
                         if (*ent).side == SIEGETEAM_TEAM1 {
@@ -1925,8 +1900,6 @@ pub fn CalculateSiegeGoals(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:1817-1856`
 pub fn GetNearestVisibleWPToItem(ctx: &mut GameContext, org: vec3_t, ignore: c_int) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
-
         let mut bestdist: f32 = 64.0; // has to be less than 64 units to the item or it isn't safe enough
         let mut bestindex: c_int = -1;
 
@@ -1934,8 +1907,8 @@ pub fn GetNearestVisibleWPToItem(ctx: &mut GameContext, org: vec3_t, ignore: c_i
         let maxs: vec3_t = [15.0, 15.0, 0.0];
 
         let mut i: c_int = 0;
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null()
                 && (*p).inuse != 0
                 && (*p).origin[2] - 15.0 < org[2]
@@ -1974,21 +1947,19 @@ pub fn GetNearestVisibleWPToItem(ctx: &mut GameContext, org: vec3_t, ignore: c_i
 pub fn CalculateWeightGoals(ctx: &mut GameContext) {
     // set waypoint weights depending on weapon and item placement
     unsafe {
-        let w = ctx.world_raw();
-
         // PORT-NOTE(cvar-placement): `bot_wp_clearweight` has no home in
         // `GameCvars` yet (missing_symbols).
         trap::Cvar_Update(
             ctx.engine,
-            GCvarUpdateArgs::new(&mut (*w).cvars.bot_wp_clearweight as *mut vmCvar_t),
+            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_clearweight as *mut vmCvar_t),
         );
 
         let mut i: c_int = 0;
 
-        if (*w).cvars.bot_wp_clearweight.integer != 0 {
+        if ctx.world.cvars.bot_wp_clearweight.integer != 0 {
             // if set then flush out all weight/goal values before calculating them again
-            while i < (*w).globals.gWPNum {
-                let p = (*w).globals.gWPArray.0[i as usize];
+            while i < ctx.world.globals.gWPNum {
+                let p = ctx.world.globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
                     (*p).weight = 0.0;
 
@@ -2003,8 +1974,8 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
 
         i = 0;
 
-        while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
 
             let mut weight: f32 = 0.0;
 
@@ -2039,7 +2010,7 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
                 let wpindex = GetNearestVisibleWPToItem(ctx, (*ent).s.pos.trBase, (*ent).s.number);
 
                 if wpindex != -1 {
-                    let p = (*w).globals.gWPArray.0[wpindex as usize];
+                    let p = ctx.world.globals.gWPArray.0[wpindex as usize];
                     if !p.is_null() && (*p).inuse != 0 {
                         // found the waypoint nearest the center of this object
                         (*p).weight = weight;
@@ -2066,13 +2037,12 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:1953-2005`
 pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: c_int = 0;
         let mut nheightdif: f32;
         let mut pheightdif: f32;
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 {
                 if (*p).flags & WPFLAG_JUMP != 0 {
                     nheightdif = 0.0;
@@ -2080,7 +2050,7 @@ pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
                     (*p).forceJumpTo = 0;
 
                     let prev = if i >= 1 {
-                        (*w).globals.gWPArray.0[(i - 1) as usize]
+                        ctx.world.globals.gWPArray.0[(i - 1) as usize]
                     } else {
                         core::ptr::null_mut()
                     };
@@ -2092,7 +2062,7 @@ pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
                     }
 
                     let next = if i + 1 < MAX_WPARRAY_SIZE {
-                        (*w).globals.gWPArray.0[(i + 1) as usize]
+                        ctx.world.globals.gWPArray.0[(i + 1) as usize]
                     } else {
                         core::ptr::null_mut()
                     };
@@ -2134,7 +2104,6 @@ pub fn CalculateJumpRoutes(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:2007-2250`
 pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: isize = 0;
         let mut i_cv: isize;
 
@@ -2188,9 +2157,9 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             read_lflags[i_cv as usize] = 0;
             i += 1;
 
-            (*w).globals.gLevelFlags = atoi(read_lflags.as_ptr());
+            ctx.world.globals.gLevelFlags = atoi(read_lflags.as_ptr());
         } else {
-            (*w).globals.gLevelFlags = 0;
+            ctx.world.globals.gLevelFlags = 0;
         }
 
         while i < len as isize {
@@ -2329,7 +2298,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
         trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
 
-        if (*w).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             CalculateSiegeGoals(ctx);
         }
 
@@ -2353,7 +2322,6 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 /// Source: `oracle/codemp/game/ai_wpnav.c:2252-2369`
 pub fn FlagObjects(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: c_int = 0;
         let mut bestindex: c_int = 0;
         let mut found: c_int = 0;
@@ -2365,8 +2333,8 @@ pub fn FlagObjects(ctx: &mut GameContext) {
         let maxs: vec3_t = [15.0, 15.0, 5.0];
         let mut tr: trace_t = core::mem::zeroed();
 
-        while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
             if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
                 if flag_red.is_null() && c_str_eq((*ent).classname, b"team_CTF_redflag") {
                     flag_red = ent;
@@ -2387,8 +2355,8 @@ pub fn FlagObjects(ctx: &mut GameContext) {
             return;
         }
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 {
                 let rb = (*flag_red).s.pos.trBase;
                 let po = (*p).origin;
@@ -2417,11 +2385,11 @@ pub fn FlagObjects(ctx: &mut GameContext) {
         }
 
         if found != 0 {
-            let p = (*w).globals.gWPArray.0[bestindex as usize];
+            let p = ctx.world.globals.gWPArray.0[bestindex as usize];
             (*p).flags |= WPFLAG_RED_FLAG;
-            (*w).globals.flagRed = p;
-            (*w).globals.oFlagRed = (*w).globals.flagRed;
-            (*w).globals.eFlagRed = flag_red;
+            ctx.world.globals.flagRed = p;
+            ctx.world.globals.oFlagRed = ctx.world.globals.flagRed;
+            ctx.world.globals.eFlagRed = flag_red;
         }
 
         bestdist = 999999.0;
@@ -2429,8 +2397,8 @@ pub fn FlagObjects(ctx: &mut GameContext) {
         found = 0;
         i = 0;
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 {
                 let bb = (*flag_blue).s.pos.trBase;
                 let po = (*p).origin;
@@ -2459,11 +2427,11 @@ pub fn FlagObjects(ctx: &mut GameContext) {
         }
 
         if found != 0 {
-            let p = (*w).globals.gWPArray.0[bestindex as usize];
+            let p = ctx.world.globals.gWPArray.0[bestindex as usize];
             (*p).flags |= WPFLAG_BLUE_FLAG;
-            (*w).globals.flagBlue = p;
-            (*w).globals.oFlagBlue = (*w).globals.flagBlue;
-            (*w).globals.eFlagBlue = flag_blue;
+            ctx.world.globals.flagBlue = p;
+            ctx.world.globals.oFlagBlue = ctx.world.globals.flagBlue;
+            ctx.world.globals.eFlagBlue = flag_blue;
         }
     }
 }
@@ -2481,10 +2449,9 @@ unsafe fn c_str_eq(s: *const c_char, needle: &[u8]) -> bool {
 /// Source: `oracle/codemp/game/ai_wpnav.c:2372-2500`
 pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
-        if (*w).globals.gWPNum == 0 {
+        if ctx.world.globals.gWPNum == 0 {
             return 0;
         }
 
@@ -2520,7 +2487,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
         FlagObjects(ctx); // currently only used for flagging waypoints nearest CTF flags
 
-        let p0 = (*w).globals.gWPArray.0[i as usize];
+        let p0 = ctx.world.globals.gWPArray.0[i as usize];
         let mut file_string = format!(
             "{} {} {} ({} {} {}) {{ ",
             (*p0).index,
@@ -2549,7 +2516,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         }
 
         let p1 = if (i + 1) < MAX_WPARRAY_SIZE {
-            (*w).globals.gWPArray.0[(i + 1) as usize]
+            ctx.world.globals.gWPArray.0[(i + 1) as usize]
         } else {
             core::ptr::null_mut()
         };
@@ -2570,8 +2537,8 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
         i += 1;
 
-        while i < (*w).globals.gWPNum {
-            let p = (*w).globals.gWPArray.0[i as usize];
+        while i < ctx.world.globals.gWPNum {
+            let p = ctx.world.globals.gWPArray.0[i as usize];
             let mut store_string = format!(
                 "{} {} {} ({} {} {}) {{ ",
                 (*p).index,
@@ -2594,7 +2561,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             }
 
             let pn = if (i + 1) < MAX_WPARRAY_SIZE {
-                (*w).globals.gWPArray.0[(i + 1) as usize]
+                ctx.world.globals.gWPArray.0[(i + 1) as usize]
             } else {
                 core::ptr::null_mut()
             };
@@ -2647,48 +2614,42 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2510-2541`
 pub fn G_NearestNodeToPoint(ctx: &mut GameContext, point: vec3_t) -> c_int {
-    unsafe {
-        let w = ctx.world_raw();
-        let mut best_index: c_int = -1;
-        let mut i: c_int = 0;
-        let mut best_dist: f32 = 0.0;
-        let mut test_dist: f32;
+    let mut best_index: c_int = -1;
+    let mut i: c_int = 0;
+    let mut best_dist: f32 = 0.0;
+    let mut test_dist: f32;
 
-        while i < (*w).globals.nodenum {
-            let o = (*w).globals.nodetable.0[i as usize].origin;
-            test_dist = VectorLength([o[0] - point[0], o[1] - point[1], o[2] - point[2]]);
+    while i < ctx.world.globals.nodenum {
+        let o = ctx.world.globals.nodetable.0[i as usize].origin;
+        test_dist = VectorLength([o[0] - point[0], o[1] - point[1], o[2] - point[2]]);
 
-            if best_index == -1 {
-                best_index = i;
-                best_dist = test_dist;
-                i += 1;
-                continue;
-            }
-
-            if test_dist < best_dist {
-                best_index = i;
-                best_dist = test_dist;
-            }
+        if best_index == -1 {
+            best_index = i;
+            best_dist = test_dist;
             i += 1;
+            continue;
         }
 
-        best_index
+        if test_dist < best_dist {
+            best_index = i;
+            best_dist = test_dist;
+        }
+        i += 1;
     }
+
+    best_index
 }
 
 /// Raven `G_NodeClearForNext`.
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2545-2556`
 pub fn G_NodeClearForNext(ctx: &mut GameContext) {
-    unsafe {
-        let w = ctx.world_raw();
-        let mut i: c_int = 0;
-        while i < (*w).globals.nodenum {
-            let nt = &mut (*w).globals.nodetable.0[i as usize];
-            nt.flags = 0;
-            nt.weight = 99999.0;
-            i += 1;
-        }
+    let mut i: c_int = 0;
+    while i < ctx.world.globals.nodenum {
+        let nt = &mut ctx.world.globals.nodetable.0[i as usize];
+        nt.flags = 0;
+        nt.weight = 99999.0;
+        i += 1;
     }
 }
 
@@ -2696,13 +2657,10 @@ pub fn G_NodeClearForNext(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2558-2568`
 pub fn G_NodeClearFlags(ctx: &mut GameContext) {
-    unsafe {
-        let w = ctx.world_raw();
-        let mut i: c_int = 0;
-        while i < (*w).globals.nodenum {
-            (*w).globals.nodetable.0[i as usize].flags = 0;
-            i += 1;
-        }
+    let mut i: c_int = 0;
+    while i < ctx.world.globals.nodenum {
+        ctx.world.globals.nodetable.0[i as usize].flags = 0;
+        i += 1;
     }
 }
 
@@ -2712,18 +2670,15 @@ pub fn G_NodeClearFlags(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2570-2587`
 pub fn G_NodeMatchingXY(ctx: &mut GameContext, x: f32, y: f32) -> c_int {
-    unsafe {
-        let w = ctx.world_raw();
-        let mut i: c_int = 0;
-        while i < (*w).globals.nodenum {
-            let nt = &(*w).globals.nodetable.0[i as usize];
-            if nt.origin[0] == x && nt.origin[1] == y && nt.flags == 0 {
-                return i;
-            }
-            i += 1;
+    let mut i: c_int = 0;
+    while i < ctx.world.globals.nodenum {
+        let nt = &ctx.world.globals.nodetable.0[i as usize];
+        if nt.origin[0] == x && nt.origin[1] == y && nt.flags == 0 {
+            return i;
         }
-        -1
+        i += 1;
     }
+    -1
 }
 
 /// Raven `G_NodeMatchingXY_BA`.
@@ -2733,30 +2688,27 @@ pub fn G_NodeMatchingXY(ctx: &mut GameContext, x: f32, y: f32) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:2589-2614`
 pub fn G_NodeMatchingXY_BA(ctx: &mut GameContext, x: c_int, y: c_int, r#final: c_int) -> c_int {
-    unsafe {
-        let w = ctx.world_raw();
-        let mut i: c_int = 0;
-        let mut bestindex: c_int = -1;
-        let mut best_weight: f32 = 9999.0;
+    let mut i: c_int = 0;
+    let mut bestindex: c_int = -1;
+    let mut best_weight: f32 = 9999.0;
 
-        while i < (*w).globals.nodenum {
-            let nt = &(*w).globals.nodetable.0[i as usize];
-            if nt.origin[0] as c_int == x
-                && nt.origin[1] as c_int == y
-                && nt.flags == 0
-                && (nt.weight < best_weight || i == r#final)
-            {
-                if i == r#final {
-                    return i;
-                }
-                bestindex = i;
-                best_weight = nt.weight;
+    while i < ctx.world.globals.nodenum {
+        let nt = &ctx.world.globals.nodetable.0[i as usize];
+        if nt.origin[0] as c_int == x
+            && nt.origin[1] as c_int == y
+            && nt.flags == 0
+            && (nt.weight < best_weight || i == r#final)
+        {
+            if i == r#final {
+                return i;
             }
-            i += 1;
+            bestindex = i;
+            best_weight = nt.weight;
         }
-
-        bestindex
+        i += 1;
     }
+
+    bestindex
 }
 
 /// Raven `G_RecursiveConnection`.
@@ -2774,7 +2726,6 @@ pub fn G_RecursiveConnection(
     baseHeight: f32,
 ) -> c_int {
     unsafe {
-        let w = ctx.world_raw();
         // 0 == down, 1 == up, 2 == left, 3 == right
         let mut index_directions: [c_int; 4] = [-1; 4];
         let mut recursive_index: c_int = -1;
@@ -2782,9 +2733,9 @@ pub fn G_RecursiveConnection(
         let pass_weight = weight + 1;
         let mut given_xy: [f32; 2];
 
-        (*w).globals.nodetable.0[start as usize].weight = pass_weight as f32;
+        ctx.world.globals.nodetable.0[start as usize].weight = pass_weight as f32;
 
-        let sorg = (*w).globals.nodetable.0[start as usize].origin;
+        let sorg = ctx.world.globals.nodetable.0[start as usize].origin;
 
         given_xy = [sorg[0] - DEFAULT_GRID_SPACING, sorg[1]];
         index_directions[0] = G_NodeMatchingXY(ctx, given_xy[0], given_xy[1]);
@@ -2806,19 +2757,19 @@ pub fn G_RecursiveConnection(
                 return d;
             }
 
-            if d != -1 && (*w).globals.nodetable.0[d as usize].flags != 0 {
+            if d != -1 && ctx.world.globals.nodetable.0[d as usize].flags != 0 {
                 // already used — not valid
                 index_directions[i as usize] = -1;
             } else if d != -1 {
                 // otherwise mark it as used
-                (*w).globals.nodetable.0[d as usize].flags = 1;
+                ctx.world.globals.nodetable.0[d as usize].flags = 1;
             }
 
             let d = index_directions[i as usize];
             if d != -1 && traceCheck != 0 {
                 let mut tr: trace_t = core::mem::zeroed();
-                let a = (*w).globals.nodetable.0[start as usize].origin;
-                let b = (*w).globals.nodetable.0[d as usize].origin;
+                let a = ctx.world.globals.nodetable.0[start as usize].origin;
+                let b = ctx.world.globals.nodetable.0[d as usize].origin;
                 wp_trace(
                     ctx,
                     &mut tr,
@@ -2864,83 +2815,80 @@ pub fn G_BackwardAttachment(
     finalDestination: c_int,
     insertAfter: c_int,
 ) -> qboolean {
-    unsafe {
-        let w = ctx.world_raw();
-        let mut index_directions: [c_int; 4] = [-1; 4];
-        let mut i: c_int = 0;
-        let mut lowest_weight: c_int = 9999;
-        let mut desired_index: c_int = -1;
+    let mut index_directions: [c_int; 4] = [-1; 4];
+    let mut i: c_int = 0;
+    let mut lowest_weight: c_int = 9999;
+    let mut desired_index: c_int = -1;
 
-        let sorg = (*w).globals.nodetable.0[start as usize].origin;
+    let sorg = ctx.world.globals.nodetable.0[start as usize].origin;
 
-        let mut given_xy: [f32; 2] = [sorg[0] - DEFAULT_GRID_SPACING, sorg[1]];
-        index_directions[0] = G_NodeMatchingXY_BA(
-            ctx,
-            given_xy[0] as c_int,
-            given_xy[1] as c_int,
-            finalDestination,
-        );
+    let mut given_xy: [f32; 2] = [sorg[0] - DEFAULT_GRID_SPACING, sorg[1]];
+    index_directions[0] = G_NodeMatchingXY_BA(
+        ctx,
+        given_xy[0] as c_int,
+        given_xy[1] as c_int,
+        finalDestination,
+    );
 
-        given_xy = [sorg[0] + DEFAULT_GRID_SPACING, sorg[1]];
-        index_directions[1] = G_NodeMatchingXY_BA(
-            ctx,
-            given_xy[0] as c_int,
-            given_xy[1] as c_int,
-            finalDestination,
-        );
+    given_xy = [sorg[0] + DEFAULT_GRID_SPACING, sorg[1]];
+    index_directions[1] = G_NodeMatchingXY_BA(
+        ctx,
+        given_xy[0] as c_int,
+        given_xy[1] as c_int,
+        finalDestination,
+    );
 
-        given_xy = [sorg[0], sorg[1] - DEFAULT_GRID_SPACING];
-        index_directions[2] = G_NodeMatchingXY_BA(
-            ctx,
-            given_xy[0] as c_int,
-            given_xy[1] as c_int,
-            finalDestination,
-        );
+    given_xy = [sorg[0], sorg[1] - DEFAULT_GRID_SPACING];
+    index_directions[2] = G_NodeMatchingXY_BA(
+        ctx,
+        given_xy[0] as c_int,
+        given_xy[1] as c_int,
+        finalDestination,
+    );
 
-        given_xy = [sorg[0], sorg[1] + DEFAULT_GRID_SPACING];
-        index_directions[3] = G_NodeMatchingXY_BA(
-            ctx,
-            given_xy[0] as c_int,
-            given_xy[1] as c_int,
-            finalDestination,
-        );
+    given_xy = [sorg[0], sorg[1] + DEFAULT_GRID_SPACING];
+    index_directions[3] = G_NodeMatchingXY_BA(
+        ctx,
+        given_xy[0] as c_int,
+        given_xy[1] as c_int,
+        finalDestination,
+    );
 
-        while i < 4 {
-            let d = index_directions[i as usize];
-            if d != -1 {
-                if d == finalDestination {
-                    // found the original point and linked all the way back
-                    let a = (*w).globals.nodetable.0[start as usize].origin;
-                    CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
-                    let b = (*w).globals.nodetable.0[d as usize].origin;
-                    CreateNewWP_InsertUnder(ctx, b, 0, insertAfter);
-                    return qtrue;
-                }
-
-                let nt = &(*w).globals.nodetable.0[d as usize];
-                if nt.weight < lowest_weight as f32 && nt.weight != 0.0 && nt.flags == 0 {
-                    desired_index = d;
-                    lowest_weight = nt.weight as c_int;
-                }
-            }
-            i += 1;
-        }
-
-        if desired_index != -1 {
-            // create a waypoint here, then recurse for the lowest-weight neighbor
-            if (*w).globals.gWPNum < 3900 {
-                let a = (*w).globals.nodetable.0[start as usize].origin;
+    while i < 4 {
+        let d = index_directions[i as usize];
+        if d != -1 {
+            if d == finalDestination {
+                // found the original point and linked all the way back
+                let a = ctx.world.globals.nodetable.0[start as usize].origin;
                 CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
-            } else {
-                return qfalse;
+                let b = ctx.world.globals.nodetable.0[d as usize].origin;
+                CreateNewWP_InsertUnder(ctx, b, 0, insertAfter);
+                return qtrue;
             }
 
-            (*w).globals.nodetable.0[start as usize].flags = 1;
-            return G_BackwardAttachment(ctx, desired_index, finalDestination, insertAfter);
+            let nt = &ctx.world.globals.nodetable.0[d as usize];
+            if nt.weight < lowest_weight as f32 && nt.weight != 0.0 && nt.flags == 0 {
+                desired_index = d;
+                lowest_weight = nt.weight as c_int;
+            }
+        }
+        i += 1;
+    }
+
+    if desired_index != -1 {
+        // create a waypoint here, then recurse for the lowest-weight neighbor
+        if ctx.world.globals.gWPNum < 3900 {
+            let a = ctx.world.globals.nodetable.0[start as usize].origin;
+            CreateNewWP_InsertUnder(ctx, a, 0, insertAfter);
+        } else {
+            return qfalse;
         }
 
-        qfalse
+        ctx.world.globals.nodetable.0[start as usize].flags = 1;
+        return G_BackwardAttachment(ctx, desired_index, finalDestination, insertAfter);
     }
+
+    qfalse
 }
 
 /// Raven `G_RMGPathing`.
@@ -2960,8 +2908,6 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
     const DEFAULT_MAXS_2: f32 = mp_bg::public::viewheight::DEFAULT_MAXS_2 as f32;
 
     unsafe {
-        let w = ctx.world_raw();
-
         let terrain = G_Find(
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
@@ -2976,9 +2922,9 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
             return;
         }
 
-        (*w).globals.nodenum = 0;
+        ctx.world.globals.nodenum = 0;
         for i in 0..MAX_NODETABLE_SIZE as usize {
-            (*w).globals.nodetable.0[i] = core::mem::zeroed();
+            ctx.world.globals.nodetable.0[i] = core::mem::zeroed();
         }
 
         let tr_mins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
@@ -2992,26 +2938,27 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
         // skim through the entirety of the terrain limits and drop nodes, removing
         // nodes that start in solid or fall too high on the terrain.
         while place_y < (*terrain).r.absmax[1] {
-            if (*w).globals.nodenum >= MAX_NODETABLE_SIZE {
+            if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                 break;
             }
 
             while place_x < (*terrain).r.absmax[0] {
-                if (*w).globals.nodenum >= MAX_NODETABLE_SIZE {
+                if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                     break;
                 }
 
-                let n = (*w).globals.nodenum as usize;
-                (*w).globals.nodetable.0[n].origin = [place_x, place_y, place_z];
+                let n = ctx.world.globals.nodenum as usize;
+                ctx.world.globals.nodetable.0[n].origin = [place_x, place_y, place_z];
 
-                let mut down_vec = (*w).globals.nodetable.0[n].origin;
+                let mut down_vec = ctx.world.globals.nodetable.0[n].origin;
                 down_vec[2] -= 3000.0;
 
+                let node_origin = ctx.world.globals.nodetable.0[n].origin;
                 let mut tr: trace_t = core::mem::zeroed();
                 wp_trace(
                     ctx,
                     &mut tr,
-                    &(*w).globals.nodetable.0[n].origin,
+                    &node_origin,
                     &tr_mins,
                     &tr_maxs,
                     &down_vec,
@@ -3020,14 +2967,14 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                 );
 
                 if (tr.entityNum as c_int >= ENTITYNUM_WORLD
-                    || (*w).g_entities[tr.entityNum as usize].s.eType == et_terrain)
+                    || ctx.world.g_entities[tr.entityNum as usize].s.eType == et_terrain)
                     && tr.endpos[2] < (*terrain).r.absmin[2] + 750.0
                 {
                     // only drop nodes on terrain directly
-                    (*w).globals.nodetable.0[n].origin = tr.endpos;
-                    (*w).globals.nodenum += 1;
+                    ctx.world.globals.nodetable.0[n].origin = tr.endpos;
+                    ctx.world.globals.nodenum += 1;
                 } else {
-                    (*w).globals.nodetable.0[n].origin = [0.0, 0.0, 0.0];
+                    ctx.world.globals.nodetable.0[n].origin = [0.0, 0.0, 0.0];
                 }
 
                 place_x += grid_spacing;
@@ -3041,9 +2988,9 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
 
         // The grid has been placed down, now use it to connect the points in the level.
         let mut i: c_int = 0;
-        while i < (*w).globals.gSpawnPointNum - 1 {
-            let sp0 = (*w).globals.gSpawnPoints.0[i as usize];
-            let sp1 = (*w).globals.gSpawnPoints.0[(i + 1) as usize];
+        while i < ctx.world.globals.gSpawnPointNum - 1 {
+            let sp0 = ctx.world.globals.gSpawnPoints.0[i as usize];
+            let sp1 = ctx.world.globals.gSpawnPoints.0[(i + 1) as usize];
 
             if sp0.is_null() || (*sp0).inuse == 0 || sp1.is_null() || (*sp1).inuse == 0 {
                 i += 1;
@@ -3106,7 +3053,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                 ctx,
                 nearest_index_for_next,
                 nearest_index,
-                (*w).globals.gWPNum - 1,
+                ctx.world.globals.gWPNum - 1,
             ) != 0
             {
                 // successfully connected the trail from nearestIndex to nearestIndexForNext
@@ -3118,7 +3065,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                             ctx,
                             (*sp1).s.origin,
                             WPFLAG_NEVERONEWAY,
-                            (*w).globals.gWPNum - 1,
+                            ctx.world.globals.gWPNum - 1,
                         );
                     }
                 }
@@ -3143,15 +3090,14 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:3254-3342`
 pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
-        (*w).globals.gSpawnPointNum = 0;
+        ctx.world.globals.gSpawnPointNum = 0;
 
         CreateNewWP(ctx, crate::q_math::vec3_origin, 0); // create a dummy waypoint to insert under
 
-        while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
 
             if !ent.is_null()
                 && (*ent).inuse != 0
@@ -3161,9 +3107,9 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
             {
                 if (*ent).s.origin[2] < 1280.0 {
                     // h4x
-                    let n = (*w).globals.gSpawnPointNum as usize;
-                    (*w).globals.gSpawnPoints.0[n] = ent;
-                    (*w).globals.gSpawnPointNum += 1;
+                    let n = ctx.world.globals.gSpawnPointNum as usize;
+                    ctx.world.globals.gSpawnPoints.0[n] = ent;
+                    ctx.world.globals.gSpawnPointNum += 1;
                 }
             } else if !ent.is_null()
                 && (*ent).inuse != 0
@@ -3172,15 +3118,15 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
                 && ((*(*ent).item).giTag == PW_REDFLAG || (*(*ent).item).giTag == PW_BLUEFLAG)
             {
                 // also make it path to flags in CTF.
-                let n = (*w).globals.gSpawnPointNum as usize;
-                (*w).globals.gSpawnPoints.0[n] = ent;
-                (*w).globals.gSpawnPointNum += 1;
+                let n = ctx.world.globals.gSpawnPointNum as usize;
+                ctx.world.globals.gSpawnPoints.0[n] = ent;
+                ctx.world.globals.gSpawnPointNum += 1;
             }
 
             i += 1;
         }
 
-        if (*w).globals.gSpawnPointNum < 1 {
+        if ctx.world.globals.gSpawnPointNum < 1 {
             return;
         }
 
@@ -3190,13 +3136,13 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
         trap::Bot_UpdateWaypoints(
             ctx.engine,
             GBotUpdatewaypointsArgs::new(
-                (*w).globals.gWPNum,
-                (*w).globals.gWPArray.0.as_mut_ptr() as *mut *mut c_void,
+                ctx.world.globals.gWPNum,
+                ctx.world.globals.gWPArray.0.as_mut_ptr() as *mut *mut c_void,
             ),
         );
         trap::Bot_CalculatePaths(
             ctx.engine,
-            GBotCalculatepathsArgs::new((*w).cvars.g_RMG.integer),
+            GBotCalculatepathsArgs::new(ctx.world.cvars.g_RMG.integer),
         );
         // CalculatePaths(); //make everything nice and connected
 
@@ -3204,10 +3150,10 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
 
         i = 0;
 
-        while i < (*w).globals.gWPNum - 1 {
+        while i < ctx.world.globals.gWPNum - 1 {
             // disttonext is normally set on save, and when a file is loaded. For RMG we must do it after calc'ing.
-            let p = (*w).globals.gWPArray.0[i as usize];
-            let pn = (*w).globals.gWPArray.0[(i + 1) as usize];
+            let p = ctx.world.globals.gWPArray.0[i as usize];
+            let pn = ctx.world.globals.gWPArray.0[(i + 1) as usize];
             let v = [
                 (*p).origin[0] - (*pn).origin[0],
                 (*p).origin[1] - (*pn).origin[1],
@@ -3226,7 +3172,6 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:3347-3423`
 pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
     unsafe {
-        let w = ctx.world_raw();
         let mut i: c_int = 0;
 
         let mut mapname: vmCvar_t = vmCvar_t::zeroed();
@@ -3243,7 +3188,7 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
             ),
         );
 
-        if (*w).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             // If RMG, generate the path on-the-fly
             // PORT-NOTE(cvar-placement): `bot_normgpath` is an `ai_wpnav.c`
             // file-scope `vmCvar_t` with no home in `GameCvars` yet
@@ -3252,7 +3197,7 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
             trap::Cvar_Register(
                 ctx.engine,
                 GCvarRegisterArgs::new(
-                    &mut (*w).cvars.bot_normgpath as *mut vmCvar_t,
+                    &mut ctx.world.cvars.bot_normgpath as *mut vmCvar_t,
                     CString::new("bot_normgpath").unwrap(),
                     CString::new("1").unwrap(),
                     CVAR_CHEAT,
@@ -3261,7 +3206,7 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
             // note: This is disabled for now as I'm using standard bot nav
             // on premade terrain levels.
 
-            if (*w).cvars.bot_normgpath.integer == 0 {
+            if ctx.world.cvars.bot_normgpath.integer == 0 {
                 // autopath the random map
                 BeginAutoPathRoutine(ctx);
             } else {
@@ -3269,7 +3214,7 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
                 LoadPathData(ctx, mapname.string.as_ptr());
             }
 
-            (*w).globals.gLevelFlags |= LEVELFLAG_NOPOINTPREDICTION;
+            ctx.world.globals.gLevelFlags |= LEVELFLAG_NOPOINTPREDICTION;
         } else {
             if LoadPathData(ctx, mapname.string.as_ptr()) == 2 {
                 // enter "edit" mode if cheats enabled?
@@ -3280,31 +3225,31 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
         // `GameCvars` yet (missing_symbols).
         trap::Cvar_Update(
             ctx.engine,
-            GCvarUpdateArgs::new(&mut (*w).cvars.bot_wp_edit as *mut vmCvar_t),
+            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_edit as *mut vmCvar_t),
         );
 
-        if (*w).cvars.bot_wp_edit.value != 0.0 {
-            (*w).globals.gBotEdit = 1.0;
+        if ctx.world.cvars.bot_wp_edit.value != 0.0 {
+            ctx.world.globals.gBotEdit = 1.0;
         } else {
-            (*w).globals.gBotEdit = 0.0;
+            ctx.world.globals.gBotEdit = 0.0;
         }
 
         // set the flag entities
-        while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
 
             if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
-                if (*w).globals.eFlagRed.is_null()
+                if ctx.world.globals.eFlagRed.is_null()
                     && c_str_eq((*ent).classname, b"team_CTF_redflag")
                 {
-                    (*w).globals.eFlagRed = ent;
-                } else if (*w).globals.eFlagBlue.is_null()
+                    ctx.world.globals.eFlagRed = ent;
+                } else if ctx.world.globals.eFlagBlue.is_null()
                     && c_str_eq((*ent).classname, b"team_CTF_blueflag")
                 {
-                    (*w).globals.eFlagBlue = ent;
+                    ctx.world.globals.eFlagBlue = ent;
                 }
 
-                if !(*w).globals.eFlagRed.is_null() && !(*w).globals.eFlagBlue.is_null() {
+                if !ctx.world.globals.eFlagRed.is_null() && !ctx.world.globals.eFlagBlue.is_null() {
                     break;
                 }
             }
@@ -3324,13 +3269,12 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let w = ctx.world_raw();
         let mut closest_spawn: *mut gentity_t = core::ptr::null_mut();
         let mut closest_dist: f32 = -1.0;
         let mut i: c_int = MAX_CLIENTS as c_int;
 
-        while i < (*w).level.num_entities {
-            let spawn: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let spawn: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
             if !spawn.is_null()
                 && (*spawn).inuse != 0
                 && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
@@ -3362,12 +3306,11 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let currentSpawn: *mut gentity_t = ctx.entity_mut(currentSpawn);
-        let w = ctx.world_raw();
         let mut next_spawn: *mut gentity_t = core::ptr::null_mut();
         let mut i: c_int = (*currentSpawn).s.number + 1;
 
-        while i < (*w).level.num_entities {
-            let spawn: *mut gentity_t = &mut (*w).g_entities[i as usize];
+        while i < ctx.world.level.num_entities {
+            let spawn: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
             if !spawn.is_null()
                 && (*spawn).inuse != 0
                 && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
@@ -3382,8 +3325,8 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
         if next_spawn.is_null() {
             // loop back around to 0 (client range end)
             i = MAX_CLIENTS as c_int;
-            while i < (*w).level.num_entities {
-                let spawn: *mut gentity_t = &mut (*w).g_entities[i as usize];
+            while i < ctx.world.level.num_entities {
+                let spawn: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
                 if !spawn.is_null()
                     && (*spawn).inuse != 0
                     && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
@@ -3407,9 +3350,8 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let pl: *mut gentity_t = ent_ptr(ctx, pl);
-        let w = ctx.world_raw();
 
-        if (*w).globals.gBotEdit == 0.0 {
+        if ctx.world.globals.gBotEdit == 0.0 {
             return 0;
         }
 
@@ -3448,7 +3390,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         }
 
         if Q_stricmp(cmd, c"bot_wp_add".as_ptr()) == 0 {
-            (*w).globals.gDeactivated = 1.0;
+            ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
             if !optional_s_argument.is_null() {
@@ -3469,7 +3411,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         }
 
         if Q_stricmp(cmd, c"bot_wp_rem".as_ptr()) == 0 {
-            (*w).globals.gDeactivated = 1.0;
+            ctx.world.globals.gDeactivated = 1.0;
 
             optional_s_argument = ConcatArgs(ctx, 1);
 
@@ -3487,7 +3429,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         }
 
         if Q_stricmp(cmd, c"bot_wp_tele".as_ptr()) == 0 {
-            (*w).globals.gDeactivated = 1.0;
+            ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
             if !optional_s_argument.is_null() {
@@ -3501,7 +3443,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
                     ctx,
                     cstr("^3You didn't specify an index. Assuming last.\n").as_ptr(),
                 );
-                TeleportToWP(ctx, ctx.entity_id_of(pl), (*w).globals.gWPNum - 1);
+                TeleportToWP(ctx, ctx.entity_id_of(pl), ctx.world.globals.gWPNum - 1);
             }
             return 1;
         }
@@ -3523,7 +3465,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         }
 
         if Q_stricmp(cmd, c"bot_wp_addflagged".as_ptr()) == 0 {
-            (*w).globals.gDeactivated = 1.0;
+            ctx.world.globals.gDeactivated = 1.0;
 
             required_s_argument = ConcatArgs(ctx, 1);
 
@@ -3583,7 +3525,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         }
 
         if Q_stricmp(cmd, c"bot_wp_switchflags".as_ptr()) == 0 {
-            (*w).globals.gDeactivated = 1.0;
+            ctx.world.globals.gDeactivated = 1.0;
 
             required_s_argument = ConcatArgs(ctx, 1);
 
@@ -3636,8 +3578,8 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         if Q_stricmp(cmd, c"bot_wp_killoneways".as_ptr()) == 0 {
             i = 0;
 
-            while i < (*w).globals.gWPNum {
-                let p = (*w).globals.gWPArray.0[i as usize];
+            while i < ctx.world.globals.gWPNum {
+                let p = ctx.world.globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
                     if (*p).flags & WPFLAG_ONEWAY_FWD != 0 {
                         (*p).flags -= WPFLAG_ONEWAY_FWD;
@@ -3654,7 +3596,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         }
 
         if Q_stricmp(cmd, c"bot_wp_save".as_ptr()) == 0 {
-            (*w).globals.gDeactivated = 0.0;
+            ctx.world.globals.gDeactivated = 0.0;
             let mut mapname: vmCvar_t = vmCvar_t::zeroed();
             // PORT-NOTE(missing-const): `CVAR_SERVERINFO`/`CVAR_ROM` bit
             // constants have no ported home yet (missing_symbols).
