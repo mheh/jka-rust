@@ -1111,15 +1111,17 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         // update ping based on the all received frames
         SV_CalcPings(view.common, sv);
 
+        // Engine-referee replay: inject this frame's recorded human events
+        // (connects, world entries, usercmds, commands, drops) in tape order
+        // BEFORE SV_BotFrame — in the recorded session they arrived via the
+        // packet loop ahead of SV_Frame, so their module calls (and RNG draws)
+        // must land before the bot brains', or the module's RNG stream shifts.
+        // RECORD/OFF: no-op.
+        crate::sv_referee::ref_frame_inject(view, sv);
+
         if (*view.common.com_dedicated).integer != 0 {
             SV_BotFrame(view.common, sv, sv.svs.time);
         }
-
-        // Engine-referee replay: inject this frame's recorded events (bot/human
-        // usercmds, commands, connects, drops) in tape order BEFORE the game
-        // frame — the bot thinks that SV_BotFrame no longer produces come from
-        // here. RECORD/OFF: no-op.
-        crate::sv_referee::ref_frame_inject(view, sv);
 
         // run the game simulation in chunks
         let mut ran_game = false;

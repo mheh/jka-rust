@@ -208,6 +208,10 @@ pub fn SV_SendMessageToClient(
         (*client).frames[idx].messageSent = sv.svs.time;
         (*client).frames[idx].messageAcked = -1;
 
+        // Engine-referee wire tap (`ref_snaps`): capture the logical message
+        // bytes exactly as the client parser will consume them (pre-netchan).
+        crate::sv_referee::ref_tap_client_message(view, sv, client, msg);
+
         // send the datagram
         SV_Netchan_Transmit(view, client, msg);
 

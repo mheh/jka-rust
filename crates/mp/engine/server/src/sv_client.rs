@@ -256,6 +256,9 @@ pub fn SV_ClientEnterWorld(
     client: *mut client_t,
     cmd: *mut usercmd_t,
 ) {
+    // RECORD tap: the engine-driven world entry (GAME_CLIENT_BEGIN) is not a
+    // client text command, so it needs its own tape event.
+    crate::sv_referee::ref_tap_enter_world(sv, client, cmd);
     unsafe {
         mp_engine_qcommon::common::common::com_printf(
             common,

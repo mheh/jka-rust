@@ -1228,6 +1228,8 @@ pub fn SV_Init(view: &mut EngineHostView) {
     Cvar_Get(view, c"ref_record".as_ptr(), c"".as_ptr(), 0);
     Cvar_Get(view, c"ref_replay".as_ptr(), c"".as_ptr(), 0);
     Cvar_Get(view, c"ref_seed".as_ptr(), c"0".as_ptr(), 0);
+    // `ref_snaps <file>` — raw client-bound wire capture (see sv_referee.rs).
+    Cvar_Get(view, c"ref_snaps".as_ptr(), c"".as_ptr(), 0);
 
     // initialize bot cvars so they are listed and can be set before loading the botlib
     SV_BotInitCvars(view);

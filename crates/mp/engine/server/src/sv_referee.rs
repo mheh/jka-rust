@@ -43,6 +43,7 @@ use mp_engine_qcommon::common::error::com_error;
 use mp_engine_qcommon::cvar_fns::{Cvar_VariableIntegerValue, Cvar_VariableString};
 use mp_engine_qcommon::vm::VM_Call;
 use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
+use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
@@ -52,7 +53,9 @@ use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
-use crate::sv_client::{SV_ClientThink, SV_ExecuteClientCommand, SV_UserinfoChanged};
+use crate::sv_client::{
+    SV_ClientEnterWorld, SV_ClientThink, SV_ExecuteClientCommand, SV_UserinfoChanged,
+};
 use crate::sv_game::SV_GentityNum;
 use crate::Server;
 
@@ -96,6 +99,10 @@ enum Rec {
     },
     /// `C <clientNum> <hex userinfo>` — human connect.
     Connect { client: c_int, userinfo: String },
+    /// `B <clientNum> <hex usercmd bytes>` — the engine-driven world entry
+    /// (`SV_ClientEnterWorld`: CS_PRIMED -> CS_ACTIVE + GAME_CLIENT_BEGIN),
+    /// which is not a client text command and so is invisible to the `X` tap.
+    Begin { client: c_int, cmd: Vec<u8> },
     /// `X <clientNum> <clientOK> <hex command>`.
     Command {
         client: c_int,
@@ -108,8 +115,10 @@ enum Rec {
     Drop { client: c_int },
     /// `F <msec>` — the frame's msec input.
     Frame { msec: c_int },
-    /// `S <fnv1a64-hex>` — the post-frame state digest.
-    State { digest: u64 },
+    /// `S <total> E<entities> <slot>:<ps> ...` — the post-frame state digest:
+    /// the combined hash, the entity-block aggregate, and one playerState hash
+    /// per connected slot, so a divergence names its component.
+    State { digest: StateDigest },
 }
 
 /// The engine referee state, owned as `Server.referee`. Default is [`RefMode::Off`]
@@ -119,6 +128,10 @@ pub struct Referee {
     pub mode: RefMode,
     /// RECORD: the append stream.
     writer: Option<BufWriter<File>>,
+    /// Wire tap (`ref_snaps <file>`): raw client-bound message capture, armed
+    /// independently of record/replay. Binary records:
+    /// `u32 len, i32 clientNum, i32 svs_time, i32 outgoingSequence, bytes`.
+    snap_writer: Option<BufWriter<File>>,
     /// REPLAY: the parsed tape and cursor.
     recs: Vec<Rec>,
     cursor: usize,
@@ -132,7 +145,7 @@ pub struct Referee {
     /// REPLAY: events buffered for the current frame's injection.
     pending: Vec<Rec>,
     /// REPLAY: the current frame's expected digest, if the frame runs the game.
-    expected: Option<u64>,
+    expected: Option<StateDigest>,
     /// REPLAY: set once the tape is exhausted; further frames are inert.
     done: bool,
     /// REPLAY: frames whose digest was compared.
@@ -196,13 +209,27 @@ unsafe fn client_index(sv: &Server, cl: *const client_t) -> c_int {
 // State digest
 // ===========================================================================
 
-/// FNV-1a 64 over the frame's snapshot state: for each entity `0..num_entities`
-/// the `entityState_t`-sized prefix of `gentities` (stride `gentitySize`), then
+/// A frame's component-level state digest: the combined hash plus the entity-
+/// block aggregate and one playerState hash per connected slot, so a
+/// divergence names its component rather than just the frame.
+#[derive(Clone, PartialEq, Eq)]
+pub struct StateDigest {
+    /// Combined hash (entities then connected playerStates, fixed order).
+    pub total: u64,
+    /// Aggregate over every entityState prefix.
+    pub entities: u64,
+    /// `(slot, fnv1a64(playerState))` per slot in state `>= CS_CONNECTED`.
+    pub players: Vec<(c_int, u64)>,
+}
+
+/// Digest the frame's snapshot state: for each entity `0..num_entities` the
+/// `entityState_t`-sized prefix of `gentities` (stride `gentitySize`), then
 /// for each client slot `0..maxclients` in state `>= CS_CONNECTED` the
-/// `playerState_t` bytes at `gameClients + slot*gameClientSize`. Digested in a
-/// single running hash so ordering is fixed.
-pub fn ref_digest(sv: &Server, maxclients: c_int) -> u64 {
-    let mut h = FNV_OFFSET;
+/// `playerState_t` bytes at `gameClients + slot*gameClientSize`.
+pub fn ref_digest(sv: &Server, maxclients: c_int) -> StateDigest {
+    let mut total = FNV_OFFSET;
+    let mut entities = FNV_OFFSET;
+    let mut players = Vec::new();
     let es_size = core::mem::size_of::<entityState_t>();
     let ps_size = core::mem::size_of::<playerState_t>();
 
@@ -213,7 +240,8 @@ pub fn ref_digest(sv: &Server, maxclients: c_int) -> u64 {
         for i in 0..sv.sv.num_entities.max(0) as usize {
             let p = unsafe { base.add(i * stride) };
             let es = unsafe { core::slice::from_raw_parts(p, es_size) };
-            h = fnv1a64(h, es);
+            total = fnv1a64(total, es);
+            entities = fnv1a64(entities, es);
         }
     }
 
@@ -226,12 +254,50 @@ pub fn ref_digest(sv: &Server, maxclients: c_int) -> u64 {
             if (cl.state as c_int) >= (clientState_t::CS_CONNECTED as c_int) {
                 let p = unsafe { base.add(slot * stride) };
                 let ps = unsafe { core::slice::from_raw_parts(p, ps_size) };
-                h = fnv1a64(h, ps);
+                total = fnv1a64(total, ps);
+                players.push((slot as c_int, fnv1a64(FNV_OFFSET, ps)));
             }
         }
     }
 
-    h
+    StateDigest {
+        total,
+        entities,
+        players,
+    }
+}
+
+impl StateDigest {
+    /// The tape `S` line payload: `<total> E<entities> <slot>:<ps> ...`.
+    fn to_line(&self) -> String {
+        let mut s = format!("{:016x} E{:016x}", self.total, self.entities);
+        for (slot, h) in &self.players {
+            s.push_str(&format!(" {slot}:{h:016x}"));
+        }
+        s
+    }
+
+    /// Human-readable component delta vs `tape` (which components diverge).
+    fn diff_vs(&self, tape: &StateDigest) -> String {
+        let mut parts = Vec::new();
+        if self.entities != tape.entities {
+            parts.push("entities".to_string());
+        }
+        let ours: std::collections::HashMap<c_int, u64> = self.players.iter().copied().collect();
+        let theirs: std::collections::HashMap<c_int, u64> = tape.players.iter().copied().collect();
+        for slot in 0..64 {
+            match (ours.get(&slot), theirs.get(&slot)) {
+                (Some(a), Some(b)) if a != b => parts.push(format!("ps{slot}")),
+                (Some(_), None) => parts.push(format!("ps{slot}:ours-only")),
+                (None, Some(_)) => parts.push(format!("ps{slot}:tape-only")),
+                _ => {}
+            }
+        }
+        if parts.is_empty() {
+            parts.push("total-only(?)".to_string());
+        }
+        parts.join(",")
+    }
 }
 
 // ===========================================================================
@@ -290,6 +356,51 @@ pub fn ref_tap_direct_connect(sv: &mut Server, client: c_int, userinfo: *const c
     sv.referee.emit(&format!("C {client} {}", hex_encode(&ui)));
 }
 
+/// RECORD tap at `SV_ClientEnterWorld` — the engine-driven CS_PRIMED ->
+/// CS_ACTIVE transition and GAME_CLIENT_BEGIN, with the entering usercmd.
+pub fn ref_tap_enter_world(sv: &mut Server, cl: *const client_t, cmd: *const usercmd_t) {
+    if sv.referee.mode != RefMode::Record {
+        return;
+    }
+    let client = unsafe { client_index(sv, cl) };
+    let bytes = unsafe { usercmd_bytes(cmd) };
+    sv.referee
+        .emit(&format!("B {client} {}", hex_encode(&bytes)));
+}
+
+/// Wire tap at `SV_SendMessageToClient` (`ref_snaps`): append the logical
+/// message bytes for non-bot clients — byte-for-byte what the client's
+/// `CL_ParseServerMessage` consumes after netchan decode (gamestate included,
+/// so an offline decoder has the baselines).
+pub fn ref_tap_client_message(
+    view: &mut EngineHostView,
+    sv: &mut Server,
+    cl: *const client_t,
+    msg: *const msg_t,
+) {
+    if sv.referee.snap_writer.is_none() {
+        return;
+    }
+    unsafe {
+        if (*cl).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
+            return;
+        }
+        let client = client_index(sv, cl);
+        let len = (*msg).cursize.max(0) as u32;
+        let time = sv.svs.time;
+        let seq = (*cl).netchan.outgoingSequence;
+        let _ = view; // header fields only; kept for signature symmetry
+        if let Some(w) = sv.referee.snap_writer.as_mut() {
+            let _ = w.write_all(&len.to_le_bytes());
+            let _ = w.write_all(&client.to_le_bytes());
+            let _ = w.write_all(&time.to_le_bytes());
+            let _ = w.write_all(&seq.to_le_bytes());
+            let _ = w.write_all(core::slice::from_raw_parts((*msg).data, len as usize));
+            let _ = w.flush();
+        }
+    }
+}
+
 /// RECORD tap at `SV_DropClient`.
 pub fn ref_tap_drop_client(sv: &mut Server, client: c_int) {
     if sv.referee.mode != RefMode::Record {
@@ -338,10 +449,14 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
     }
 }
 
-/// Called in `SV_Frame` just before the game-run loop (REPLAY only): read this
-/// frame's trailing events (bot thinks recorded during `SV_BotFrame`) up to the
-/// `S` digest, then inject every buffered event in exact tape order before the
-/// game frame runs.
+/// Called in `SV_Frame` just before `SV_BotFrame` (REPLAY only): read this
+/// frame's remaining events up to the `S` digest, then inject the buffered
+/// tape-created-slot events in exact tape order. The position matters: in the
+/// recorded session human events arrived via the packet loop AHEAD of
+/// `SV_Frame`, so their module calls (and RNG draws) must land before the bot
+/// brains' — injecting after `SV_BotFrame` shifts the module's RNG stream.
+/// (The trailing bot thinks read here were recorded during `SV_BotFrame`;
+/// they are cursor-alignment data, per-slot-skipped at injection.)
 pub fn ref_frame_inject(view: &mut EngineHostView, sv: &mut Server) {
     if sv.referee.mode != RefMode::Replay || sv.referee.done {
         return;
@@ -388,7 +503,7 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
         RefMode::Record => {
             if ran_game {
                 let digest = ref_digest(sv, maxclients);
-                sv.referee.emit(&format!("S {digest:016x}"));
+                sv.referee.emit(&format!("S {}", digest.to_line()));
             }
         }
         RefMode::Replay => {
@@ -396,13 +511,15 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
                 if let Some(expected) = sv.referee.expected.take() {
                     let ours = ref_digest(sv, maxclients);
                     sv.referee.frames += 1;
-                    if ours != expected {
+                    if ours.total != expected.total {
                         sv.referee.divergences += 1;
                         let n = sv.referee.frames;
+                        let what = ours.diff_vs(&expected);
                         com_printf(
                             view.common,
                             &format!(
-                                "REF DIVERGE frame={n} ours={ours:016x} tape={expected:016x}\n"
+                                "REF DIVERGE frame={n} components={what} ours={:016x} tape={:016x}\n",
+                                ours.total, expected.total
                             ),
                         );
                     }
@@ -468,6 +585,22 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             sv.referee.injected_slots |= 1u64 << (client as u32 & 63);
             ref_inject_connect(view, sv, client, userinfo.as_bytes());
         }
+        Rec::Begin { client, cmd } => {
+            if !ref_slot_injected(sv, view, client) {
+                return;
+            }
+            let cl = unsafe { sv.svs.clients.add(client as usize) };
+            let mut ucmd: usercmd_t = unsafe { core::mem::zeroed() };
+            let n = cmd.len().min(core::mem::size_of::<usercmd_t>());
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    cmd.as_ptr(),
+                    &mut ucmd as *mut usercmd_t as *mut u8,
+                    n,
+                );
+            }
+            SV_ClientEnterWorld(view.common, sv, cl, &mut ucmd);
+        }
         Rec::Drop { client } => {
             if !ref_slot_injected(sv, view, client) {
                 return;
@@ -496,19 +629,21 @@ fn ref_slot_injected(sv: &Server, view: &mut EngineHostView, client: c_int) -> b
 /// Materialize a synthetic, netchan-less replica of a recorded human client in
 /// the given slot (the `SV_BotAllocateClient` pattern: NA_BOT remoteAddress so
 /// snapshots skip it), install the recorded userinfo, then run
-/// GAME_CLIENT_CONNECT with firstTime=qtrue, isBot=qfalse. The subsequent
-/// "begin" command (a recorded `X` event) drives GAME_CLIENT_BEGIN.
+/// GAME_CLIENT_CONNECT with firstTime=qtrue, isBot=qfalse. The replica stays
+/// CS_CONNECTED until its taped `B` event drives `SV_ClientEnterWorld`
+/// (CS_ACTIVE + GAME_CLIENT_BEGIN), mirroring the real connect flow.
 fn ref_inject_connect(view: &mut EngineHostView, sv: &mut Server, client: c_int, userinfo: &[u8]) {
     if !ref_client_in_range(view, client) {
         return;
     }
     let cl = unsafe { sv.svs.clients.add(client as usize) };
     unsafe {
+        // Mirror SV_DirectConnect exactly. It does NOT write ent->s.number
+        // (digested memory — the slot keeps its stale value until the module
+        // initializes it at spawn); it links the gentity, installs the
+        // userinfo, runs GAME_CLIENT_CONNECT, THEN SV_UserinfoChanged.
         let ent = SV_GentityNum(sv, client);
         (*cl).gentity = ent;
-        (*(*cl).gentity).s.number = client;
-        (*cl).state = clientState_t::CS_ACTIVE;
-        (*cl).lastPacketTime = sv.svs.time;
         (*cl).netchan.remoteAddress.r#type = netadrtype_t::NA_BOT;
         (*cl).rate = 16384;
 
@@ -519,7 +654,6 @@ fn ref_inject_connect(view: &mut EngineHostView, sv: &mut Server, client: c_int,
             ui.as_ptr() as *const c_char,
             (*cl).userinfo.len() as c_int,
         );
-        SV_UserinfoChanged(view, cl);
     }
     VM_Call(
         view.common,
@@ -527,6 +661,11 @@ fn ref_inject_connect(view: &mut EngineHostView, sv: &mut Server, client: c_int,
         MpGameExport::GAME_CLIENT_CONNECT as c_int,
         &[client as isize, qtrue as isize, qfalse as isize],
     );
+    unsafe {
+        SV_UserinfoChanged(view, cl);
+        (*cl).state = clientState_t::CS_CONNECTED;
+        (*cl).lastPacketTime = sv.svs.time;
+    }
 }
 
 /// End of tape (replay): print the summary and schedule a clean quit. Uses
@@ -665,6 +804,21 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
         );
     }
 
+    // Wire tap, armed independently of record/replay.
+    let snaps = cvar_string(view, c"ref_snaps".as_ptr());
+    if !snaps.is_empty() {
+        match File::create(&snaps) {
+            Ok(f) => {
+                sv.referee.snap_writer = Some(BufWriter::new(f));
+                com_printf(view.common, &format!("REF SNAPS tap -> {snaps}\n"));
+            }
+            Err(e) => com_error(
+                errorParm_t::ERR_DROP,
+                format!("ref_snaps: cannot create {snaps}: {e}"),
+            ),
+        }
+    }
+
     // Arm the GAME_INIT seed pin whenever a mode is active, so the seed used is
     // captured for the header and forced when required.
     if sv.referee.active() {
@@ -741,6 +895,11 @@ fn parse_tape(text: &str) -> Result<Vec<Rec>, String> {
                 let cmd = hex_decode(it.next().unwrap_or(""));
                 out.push(Rec::Think { client, cmd });
             }
+            "B" => {
+                let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+                let cmd = hex_decode(it.next().unwrap_or(""));
+                out.push(Rec::Begin { client, cmd });
+            }
             "D" => {
                 let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
                 out.push(Rec::Drop { client });
@@ -750,11 +909,31 @@ fn parse_tape(text: &str) -> Result<Vec<Rec>, String> {
                 out.push(Rec::Frame { msec });
             }
             "S" => {
-                let digest = it
+                let total = it
                     .next()
                     .and_then(|s| u64::from_str_radix(s, 16).ok())
                     .ok_or_else(bad)?;
-                out.push(Rec::State { digest });
+                let mut entities = 0u64;
+                let mut players = Vec::new();
+                for tok in it.by_ref() {
+                    if let Some(e) = tok.strip_prefix('E') {
+                        entities = u64::from_str_radix(e, 16).map_err(|_| bad())?;
+                    } else if let Some((slot, h)) = tok.split_once(':') {
+                        players.push((
+                            slot.parse().map_err(|_| bad())?,
+                            u64::from_str_radix(h, 16).map_err(|_| bad())?,
+                        ));
+                    } else {
+                        return Err(bad());
+                    }
+                }
+                out.push(Rec::State {
+                    digest: StateDigest {
+                        total,
+                        entities,
+                        players,
+                    },
+                });
             }
             _ => return Err(bad()),
         }
