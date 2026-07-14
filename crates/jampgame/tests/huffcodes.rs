@@ -25,13 +25,21 @@ fn huffcodes() {
         let nbits = m.bit;
         let mut line = format!("{sym:3} {nbits:2} ");
         for b in 0..nbits {
-            line.push(if (buf[(b >> 3) as usize] >> (b & 7)) & 1 != 0 { '1' } else { '0' });
+            line.push(if (buf[(b >> 3) as usize] >> (b & 7)) & 1 != 0 {
+                '1'
+            } else {
+                '0'
+            });
         }
         // decode self-check
         MSG_BeginReading(&mut m);
         let got = MSG_ReadBits(view.common, &mut m, 8);
         let roff = m.bit;
-        line.push_str(if got == sym && roff == nbits { " ok" } else { " DECODE-MISMATCH" });
+        line.push_str(if got == sym && roff == nbits {
+            " ok"
+        } else {
+            " DECODE-MISMATCH"
+        });
         println!("{line}");
     }
 }

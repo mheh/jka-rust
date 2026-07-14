@@ -142,9 +142,20 @@ struct Novelty {
 
 impl Novelty {
     fn new() -> Novelty {
-        Novelty { seen: std::collections::HashSet::new() }
+        Novelty {
+            seen: std::collections::HashSet::new(),
+        }
     }
-    fn check(&mut self, mi: usize, table: u8, tname: &str, fname: &str, fi: usize, bits: i32, v: i32) {
+    fn check(
+        &mut self,
+        mi: usize,
+        table: u8,
+        tname: &str,
+        fname: &str,
+        fi: usize,
+        bits: i32,
+        v: i32,
+    ) {
         let class: u8 = if bits == 0 {
             let f = f32::from_bits(v as u32);
             let trunc = f as i32;
@@ -185,7 +196,10 @@ fn read_records(path: &str) -> Vec<Record> {
         let seq = i32::from_le_bytes(raw[p + 12..p + 16].try_into().unwrap());
         p += 16;
         if p + len > raw.len() {
-            println!("!! truncated final record (len={len}, remaining={})", raw.len() - p);
+            println!(
+                "!! truncated final record (len={len}, remaining={})",
+                raw.len() - p
+            );
             break;
         }
         recs.push(Record {
@@ -224,7 +238,12 @@ fn main_impl() {
     {
         let mut scratch = [0u8; 8];
         let mut m: msg_t = unsafe { core::mem::zeroed() };
-        MSG_Init(&mut view, &mut m, scratch.as_mut_ptr(), scratch.len() as i32);
+        MSG_Init(
+            &mut view,
+            &mut m,
+            scratch.as_mut_ptr(),
+            scratch.len() as i32,
+        );
     }
     let ps_fields: Vec<(String, i32, i32)> = view
         .common
@@ -240,8 +259,12 @@ fn main_impl() {
         .collect();
 
     let mut cl = Cl {
-        baselines: (0..MAX_GENTITIES).map(|_| unsafe { core::mem::zeroed() }).collect(),
-        parse_entities: (0..MAX_PARSE_ENTITIES).map(|_| unsafe { core::mem::zeroed() }).collect(),
+        baselines: (0..MAX_GENTITIES)
+            .map(|_| unsafe { core::mem::zeroed() })
+            .collect(),
+        parse_entities: (0..MAX_PARSE_ENTITIES)
+            .map(|_| unsafe { core::mem::zeroed() })
+            .collect(),
         parse_entities_num: 0,
         snapshots: (0..PACKET_BACKUP).map(|_| Snap::zeroed()).collect(),
         snap: Snap::zeroed(),
@@ -258,7 +281,10 @@ fn main_impl() {
         }
         parse_server_message(&mut view, &mut cl, rec, mi);
     }
-    println!("\ndecode complete: {} messages, no framing errors", recs.len());
+    println!(
+        "\ndecode complete: {} messages, no framing errors",
+        recs.len()
+    );
 }
 
 fn parse_server_message(view: &mut EngineHostView, cl: &mut Cl, rec: &Record, mi: usize) {
@@ -281,7 +307,10 @@ fn parse_server_message(view: &mut EngineHostView, cl: &mut Cl, rec: &Record, mi
         // message ends at its last real op and the boundary is the implicit
         // EOF. Garbage below the boundary is still real corruption.
         if m.readcount >= m.cursize {
-            println!("   implicit EOF at readcount={} / cursize={}", m.readcount, m.cursize);
+            println!(
+                "   implicit EOF at readcount={} / cursize={}",
+                m.readcount, m.cursize
+            );
             break;
         }
         let cmd = MSG_ReadByte(view.common, &mut m);
@@ -291,7 +320,10 @@ fn parse_server_message(view: &mut EngineHostView, cl: &mut Cl, rec: &Record, mi
         }
         match cmd {
             SVC_EOF => {
-                println!("   EOF at readcount={} / cursize={}", m.readcount, m.cursize);
+                println!(
+                    "   EOF at readcount={} / cursize={}",
+                    m.readcount, m.cursize
+                );
                 break;
             }
             SVC_NOP => {}
@@ -398,7 +430,11 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
     let server_time = MSG_ReadLong(view.common, m);
     let message_num = rec.seq;
     let delta_byte = MSG_ReadByte(view.common, m);
-    let delta_num = if delta_byte == 0 { -1 } else { message_num - delta_byte };
+    let delta_num = if delta_byte == 0 {
+        -1
+    } else {
+        message_num - delta_byte
+    };
     let snap_flags = MSG_ReadByte(view.common, m);
 
     let mut new = Snap::zeroed();
@@ -417,7 +453,10 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
         if !o.valid {
             println!("   !! delta from invalid frame");
         } else if o.message_num != delta_num {
-            println!("   !! delta frame too old (slot has {}, want {delta_num})", o.message_num);
+            println!(
+                "   !! delta frame too old (slot has {}, want {delta_num})",
+                o.message_num
+            );
         } else if cl.parse_entities_num - o.parse_entities_num > MAX_PARSE_ENTITIES - 128 {
             println!("   !! delta parseEntitiesNum too old");
         } else {
@@ -461,7 +500,8 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
                 cl.nov.check_array(mi, 0, "stats", i, new.ps.stats[i]);
             }
             if new.ps.persistant[i] != old_copy.ps.persistant[i] {
-                cl.nov.check_array(mi, 1, "persistant", i, new.ps.persistant[i]);
+                cl.nov
+                    .check_array(mi, 1, "persistant", i, new.ps.persistant[i]);
             }
             if new.ps.ammo[i] != old_copy.ps.ammo[i] {
                 cl.nov.check_array(mi, 2, "ammo", i, new.ps.ammo[i]);
@@ -481,14 +521,14 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
     } else if oldindex >= old_copy.num_entities {
         (99999, 0)
     } else {
-        let slot = ((old_copy.parse_entities_num + oldindex as i64)
-            & (MAX_PARSE_ENTITIES - 1)) as usize;
+        let slot =
+            ((old_copy.parse_entities_num + oldindex as i64) & (MAX_PARSE_ENTITIES - 1)) as usize;
         (cl.parse_entities[slot].number, slot)
     };
     let advance_old = |oldindex: &mut i32,
-                           oldnum: &mut i32,
-                           oldstate_slot: &mut usize,
-                           parse_entities: &Vec<entityState_t>| {
+                       oldnum: &mut i32,
+                       oldstate_slot: &mut usize,
+                       parse_entities: &Vec<entityState_t>| {
         *oldindex += 1;
         if *oldindex >= old_copy.num_entities {
             *oldnum = 99999;
@@ -513,13 +553,31 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
         }
         while oldnum < newnum {
             ent_log.push_str(&format!("u{oldnum} "));
-            delta_entity(view, cl, &mut new, m, oldnum, Src::Unchanged(oldstate_slot), mi);
-            advance_old(&mut oldindex, &mut oldnum, &mut oldstate_slot, &cl.parse_entities);
+            delta_entity(
+                view,
+                cl,
+                &mut new,
+                m,
+                oldnum,
+                Src::Unchanged(oldstate_slot),
+                mi,
+            );
+            advance_old(
+                &mut oldindex,
+                &mut oldnum,
+                &mut oldstate_slot,
+                &cl.parse_entities,
+            );
         }
         if oldnum == newnum {
             ent_log.push_str(&format!("d{newnum}@{} ", m.readcount));
             delta_entity(view, cl, &mut new, m, newnum, Src::Old(oldstate_slot), mi);
-            advance_old(&mut oldindex, &mut oldnum, &mut oldstate_slot, &cl.parse_entities);
+            advance_old(
+                &mut oldindex,
+                &mut oldnum,
+                &mut oldstate_slot,
+                &cl.parse_entities,
+            );
             continue;
         }
         // oldnum > newnum: delta from baseline.
@@ -528,8 +586,21 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
     }
     while oldnum != 99999 {
         ent_log.push_str(&format!("u{oldnum} "));
-        delta_entity(view, cl, &mut new, m, oldnum, Src::Unchanged(oldstate_slot), mi);
-        advance_old(&mut oldindex, &mut oldnum, &mut oldstate_slot, &cl.parse_entities);
+        delta_entity(
+            view,
+            cl,
+            &mut new,
+            m,
+            oldnum,
+            Src::Unchanged(oldstate_slot),
+            mi,
+        );
+        advance_old(
+            &mut oldindex,
+            &mut oldnum,
+            &mut oldstate_slot,
+            &cl.parse_entities,
+        );
     }
 
     println!(
@@ -546,7 +617,11 @@ fn parse_snapshot(view: &mut EngineHostView, cl: &mut Cl, m: &mut msg_t, rec: &R
     }
 
     // Wrap-clear + store (CL_ParseSnapshot tail).
-    let mut old_message_num = if cl.have_snap { cl.snap.message_num + 1 } else { new.message_num };
+    let mut old_message_num = if cl.have_snap {
+        cl.snap.message_num + 1
+    } else {
+        new.message_num
+    };
     if new.message_num - old_message_num >= PACKET_BACKUP {
         old_message_num = new.message_num - (PACKET_BACKUP - 1);
     }
@@ -604,12 +679,28 @@ fn delta_entity(
     if let Src::Old(old_slot) = src {
         let fields = std::mem::take(&mut cl.ent_fields);
         let from = unsafe { core::ptr::read(&cl.parse_entities[old_slot]) };
-        diff_fields(&mut cl.nov, mi, 1, "netf", &fields, &from, &cl.parse_entities[slot]);
+        diff_fields(
+            &mut cl.nov,
+            mi,
+            1,
+            "netf",
+            &fields,
+            &from,
+            &cl.parse_entities[slot],
+        );
         cl.ent_fields = fields;
     } else if let Src::Baseline = src {
         let fields = std::mem::take(&mut cl.ent_fields);
         let from = unsafe { core::ptr::read(&cl.baselines[newnum as usize]) };
-        diff_fields(&mut cl.nov, mi, 1, "netf", &fields, &from, &cl.parse_entities[slot]);
+        diff_fields(
+            &mut cl.nov,
+            mi,
+            1,
+            "netf",
+            &fields,
+            &from,
+            &cl.parse_entities[slot],
+        );
         cl.ent_fields = fields;
     }
     if cl.parse_entities[slot].number == MAX_GENTITIES as i32 - 1 {

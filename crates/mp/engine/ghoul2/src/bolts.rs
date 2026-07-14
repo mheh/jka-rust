@@ -514,17 +514,26 @@ mod tests {
         let slist: Vec<surfaceInfo_t> = Vec::new();
 
         // bone-name hit (case-insensitive, Raven `stricmp`)
-        assert_eq!(g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "TESTBONE"), 0);
+        assert_eq!(
+            g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "TESTBONE"),
+            0
+        );
         assert_eq!(bltlist[0].boneNumber, 0);
         assert_eq!(bltlist[0].surfaceNumber, -1);
         assert_eq!(bltlist[0].boltUsed, 1);
 
         // re-add bumps the usage count on the same slot
-        assert_eq!(g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "testbone"), 0);
+        assert_eq!(
+            g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "testbone"),
+            0
+        );
         assert_eq!(bltlist[0].boltUsed, 2);
 
         // unknown name misses
-        assert_eq!(g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "nope"), -1);
+        assert_eq!(
+            g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "nope"),
+            -1
+        );
     }
 
     #[test]
