@@ -3074,7 +3074,7 @@ pub fn SV_GameSystemCalls(
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
-            return g2api_add_bolt(g2, ghoul2, *args.offset(2) as c_int, bone_name) as isize;
+            return g2api_add_bolt(g2, view, ghoul2, *args.offset(2) as c_int, bone_name) as isize;
         } else if trap == G::G_G2_SETBOLTINFO as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live g2 cast.
             let g2 = &mut *(view.g2.as_raw() as *mut Ghoul2System);

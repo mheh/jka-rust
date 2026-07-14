@@ -23,6 +23,8 @@
 //! shipped binary (same house convention as `api_models.rs`'s module doc
 //! comment) — dropped, with a one-line citation at each site.
 
+use mp_host_interface::EngineHost;
+
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::surface_info_t::surfaceInfo_t;
@@ -148,31 +150,136 @@ pub fn g2_add_bolt_surf_num(
 /// (`mdxaSkelOffsets_t` + `mdxaSkel_t->name` `stricmp`, `:175-186`) if no
 /// surface matched; `-1` if neither matches.
 ///
-/// DOC/ORACLE MISMATCH (reported, not improvised around — porting-rules §F17):
-/// this fn is **not** actually host-free. It calls `G2_IsSurfaceLegal`
-/// (`surfaces.rs`, host-consuming: dereferences `mod_m->mdxm`,
-/// `G2_surfaces.cpp:65-83`) and itself directly walks `mod_a->mdxa`
-/// (`G2_bolts.cpp:175-186`, loader model memory) — two `EngineHost::
-/// model_mdxm`/`model_mdxa` reads the doc's "host-free" `bolts.rs`
-/// classification (`## Slice hooks`, which examined only the dead `:194`
-/// `Com_Printf`) misses. Kept host-free here per the doc's pinned
-/// classification (LAW); the discrepancy is called out under `problems`.
-///
-/// Because the frozen signature has no `host: &mut impl EngineHost` (and
-/// `CGhoul2Info::current_model`/`anim_model` are opaque `*const c_void`,
-/// `G2SV-D5` — resolvable only through that missing service), neither the
-/// surface-name check nor the `.gla` bone-name walk is reachable here. Every
-/// real call therefore falls through to the oracle's own "no match anywhere"
-/// path (`:196`), returning `-1`.
+/// `host` added 2026-07-14, closing the doc/oracle mismatch this doc-comment
+/// previously reported (§F17): the doc's "host-free" classification of this
+/// file was wrong — Raven's body calls `G2_IsSurfaceLegal` (a `mod_m->mdxm`
+/// read) and walks `mod_a->mdxa` bone names, so the frozen host-less
+/// signature forced a permanent `-1` stub, which silently killed every
+/// server-side bolt (saber muzzles collapsed to the entity origin; sabers
+/// whiffed). The bone walk reads `ghl_info.a_header` — the cached block
+/// `G2_SetupModelPointers` populates, exactly Raven's `mod_a` usage — so the
+/// caller must run setup first (`g2api_add_bolt` does, as of the same fix).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bolts.cpp:119-233`
 pub fn g2_add_bolt(
-    _ghl_info: &CGhoul2Info,
-    _bltlist: &mut Vec<boltInfo_t>,
-    _slist: &[surfaceInfo_t],
-    _bone_name: &str,
+    host: &mut impl EngineHost,
+    ghl_info: &CGhoul2Info,
+    bltlist: &mut Vec<boltInfo_t>,
+    slist: &[surfaceInfo_t],
+    bone_name: &str,
 ) -> i32 {
-    -1
+    // Raven's `slist` parameter is unread by this function's body — kept for
+    // 1:1 arity fidelity only.
+    let _ = slist;
+
+    // first up, we'll search for that which this bolt names in all the surfaces
+    let surf = crate::surfaces::g2_is_surface_legal(host, ghl_info.model, bone_name);
+
+    // did we find it as a surface?
+    if let Some((surf_num, _flags)) = surf {
+        // look through entire list - see if it's already there first
+        for (i, bolt) in bltlist.iter_mut().enumerate() {
+            // already there??
+            if bolt.surfaceNumber == surf_num {
+                // increment the usage count
+                bolt.boltUsed += 1;
+                return i as i32;
+            }
+        }
+
+        // look through entire list - see if we can re-use one
+        for (i, bolt) in bltlist.iter_mut().enumerate() {
+            // if this surface entry has info in it, bounce over it
+            if bolt.boneNumber == -1 && bolt.surfaceNumber == -1 {
+                // if we found an entry that had a -1 for the bone / surface
+                // number, then we hit a surface / bone slot that was empty
+                bolt.surfaceNumber = surf_num;
+                bolt.boltUsed = 1;
+                bolt.surfaceType = 0;
+                return i as i32;
+            }
+        }
+
+        // ok, we didn't find an existing surface of that name, or an empty
+        // slot. Lets add an entry
+        bltlist.push(boltInfo_t {
+            boneNumber: -1,
+            surfaceNumber: surf_num,
+            surfaceType: 0,
+            boltUsed: 1,
+            // Raven's stack-local `tempBolt.position` is uninitialized C++
+            // memory; zeroed here (§F19, same note as `g2_add_bolt_surf_num`).
+            position: mdxaBone_t {
+                matrix: [[0.0; 4]; 3],
+            },
+        });
+        return bltlist.len() as i32 - 1;
+    }
+
+    // no, check to see if it's a bone then
+    // SAFETY: `a_header` is the `EngineHost::model_mdxa` block
+    // `G2_SetupModelPointers` cached (the oracle's `mod_a->mdxa`, dereferenced
+    // unchecked there too); callers run setup first (`g2api_add_bolt`).
+    let mdxa = ghl_info.a_header;
+    let num_bones = unsafe { crate::render::skeleton::mdxa_num_bones(mdxa) };
+
+    // walk the entire list of bones in the gla file for this model and see if
+    // any match the name of the bone we want to find
+    let mut x = 0;
+    while x < num_bones {
+        let skel = unsafe { crate::render::skeleton::mdxa_skel_ptr(mdxa, x) };
+        // `mdxaSkel_t.name` is the struct's first member; Raven compares with
+        // `stricmp` (case-insensitive).
+        let name = unsafe { core::ffi::CStr::from_ptr(skel as *const core::ffi::c_char) };
+        // if name is the same, we found it
+        if name.to_bytes().eq_ignore_ascii_case(bone_name.as_bytes()) {
+            break;
+        }
+        x += 1;
+    }
+
+    // check to see we did actually make a match with a bone in the model
+    if x == num_bones {
+        // didn't find it? Error
+        return -1;
+    }
+
+    // look through entire list - see if it's already there first
+    for (i, bolt) in bltlist.iter_mut().enumerate() {
+        // already there??
+        if bolt.boneNumber == x {
+            // increment the usage count
+            bolt.boltUsed += 1;
+            return i as i32;
+        }
+    }
+
+    // look through entire list - see if we can re-use it
+    for (i, bolt) in bltlist.iter_mut().enumerate() {
+        // if this bone entry has info in it, bounce over it
+        if bolt.boneNumber == -1 && bolt.surfaceNumber == -1 {
+            // if we found an entry that had a -1 for the bonenumber, then we
+            // hit a bone slot that was empty
+            bolt.boneNumber = x;
+            bolt.boltUsed = 1;
+            bolt.surfaceType = 0;
+            return i as i32;
+        }
+    }
+
+    // ok, we didn't find an existing bone of that name, or an empty slot.
+    // Lets add an entry
+    bltlist.push(boltInfo_t {
+        boneNumber: x,
+        surfaceNumber: -1,
+        surfaceType: 0,
+        boltUsed: 1,
+        // Same §F19 zero-init note as the surface arm above.
+        position: mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        },
+    });
+    bltlist.len() as i32 - 1
 }
 
 /// Raven `G2_Remove_Bolt` — decrement `boltUsed`; on hitting zero, mark the
@@ -378,11 +485,46 @@ mod tests {
     }
 
     #[test]
-    fn add_bolt_is_a_reported_signature_gap_and_always_misses() {
-        let ghl = CGhoul2Info::default();
+    fn add_bolt_resolves_bone_names_and_reuses_slots() {
+        use mp_host_interface::mock::MockHost;
+
+        // Minimal `.glm` header: numSurfaces=0, so the surface-name search
+        // misses and the bone arm runs (layout per `surfaces.rs` MDXM_*).
+        let mut mdxm = vec![0u8; 164];
+        mdxm[152..156].copy_from_slice(&0i32.to_ne_bytes());
+        mdxm[156..160].copy_from_slice(&164i32.to_ne_bytes());
+
+        // Minimal `.gla`: one bone named "testbone" (layout per `skeleton.rs`
+        // MDXA_*: numBones at 84, offsets table after the 100-byte header,
+        // `mdxaSkel_t.name` first in the entry).
+        let mut mdxa = vec![0u8; 100];
+        mdxa[84..88].copy_from_slice(&1i32.to_ne_bytes());
+        mdxa.extend_from_slice(&4i32.to_ne_bytes()); // offsets[0]
+        let mut skel = [0u8; 64 + 8];
+        skel[..8].copy_from_slice(b"testbone");
+        mdxa.extend_from_slice(&skel);
+
+        let mut host = MockHost::new();
+        host.mdxm_blocks.insert(1, mdxm);
+        let mut ghl = CGhoul2Info::default();
+        ghl.model = 1;
+        ghl.a_header = mdxa.as_ptr() as *const core::ffi::c_void;
+
         let mut bltlist: Vec<boltInfo_t> = Vec::new();
         let slist: Vec<surfaceInfo_t> = Vec::new();
-        assert_eq!(g2_add_bolt(&ghl, &mut bltlist, &slist, "bone"), -1);
+
+        // bone-name hit (case-insensitive, Raven `stricmp`)
+        assert_eq!(g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "TESTBONE"), 0);
+        assert_eq!(bltlist[0].boneNumber, 0);
+        assert_eq!(bltlist[0].surfaceNumber, -1);
+        assert_eq!(bltlist[0].boltUsed, 1);
+
+        // re-add bumps the usage count on the same slot
+        assert_eq!(g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "testbone"), 0);
+        assert_eq!(bltlist[0].boltUsed, 2);
+
+        // unknown name misses
+        assert_eq!(g2_add_bolt(&mut host, &ghl, &mut bltlist, &slist, "nope"), -1);
     }
 
     #[test]

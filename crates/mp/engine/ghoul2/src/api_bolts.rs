@@ -34,12 +34,13 @@
 //! via `RE_RegisterModel`/`R_GetModelByHandle` (`G2_API.cpp:2675-2693`) — a
 //! genuinely host-consuming call, matching `misc.rs`'s own already-landed
 //! `g2_setup_model_pointers(host, ghl_info)` signature. Without a `host`
-//! parameter these six cannot re-derive validity, so each uses the
-//! already-cached `CGhoul2Info::valid` flag (single instance) or "at least one
-//! cached-valid instance" (vector overload) as the closest available proxy —
-//! skipping the post-`vid_restart` revalidation only. Divergence, not
-//! invention (porting-rules §19); the real fix is adding `host` to these six
-//! signatures upstream.
+//! parameter these six could not re-derive validity and originally proxied
+//! through the cached `CGhoul2Info::valid` flag. **CLOSED 2026-07-14**: the
+//! proxy was wrong on a dedicated server — a fresh spawn-time instance has
+//! never been validated, so `G2API_AddBolt` returned `-1` for every bolt at
+//! `ClientSpawn` (saber muzzle collapsed to the entity origin; sabers
+//! whiffed). All six now carry `host` and open with the on-demand
+//! `misc::g2_setup_model_pointers[_v]`, matching Raven.
 //!
 //! **Second doc/oracle gap (reported under `problems`).** `G2_NeedsRecalc`
 //! (`tr_ghoul2.cpp:3544-3563`) is called directly by `G2API_GetBoltMatrix`
@@ -122,13 +123,17 @@ const GHOUL2_NEWORIGIN: i32 = 0x008;
 /// Raven `G2API_AddBolt` — add a bolt on `boneName`, returning its index (or
 /// `-1` on failure: bad `modelIndex` or `G2_SetupModelPointers` failure).
 ///
-/// No `host` param (module-doc gap #1): uses `ghl_info.valid` in place of a
-/// `G2_SetupModelPointers` re-derivation.
+/// `host` added 2026-07-14 (closes module-doc gap #1): the original
+/// `ghl_info.valid` proxy fails on a dedicated server's first use — a fresh
+/// spawn-time instance has never been validated, so every bolt add returned
+/// `-1` (saber-whiff hunt). Raven's on-demand `G2_SetupModelPointers` is the
+/// live behavior.
 ///
 /// Frozen verbatim in `docs/subsystems/ghoul2-server.md` `## Seam definition`.
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1633-1645`
 pub fn g2api_add_bolt(
     g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
     ghoul2: &mut CGhoul2Info_v,
     model_index: i32,
     bone_name: &str,
@@ -137,7 +142,7 @@ pub fn g2api_add_bolt(
     // false in Rust (no null references); folded away (§C10).
     if ghoul2.size(g2) > model_index {
         let ghl_info = ghoul2.get_mut(g2, model_index);
-        if ghl_info.valid {
+        if misc::g2_setup_model_pointers(host, ghl_info) {
             // `bolts::g2_add_bolt` wants `&CGhoul2Info` *and* `&mut`/`&` borrows of
             // two of that same instance's own fields at once — impossible to
             // satisfy together in Rust from a single `&mut CGhoul2Info`. Extract
@@ -146,7 +151,7 @@ pub fn g2api_add_bolt(
             // (possibly mutated) bolt list back.
             let mut bltlist = std::mem::take(&mut ghl_info.bltlist);
             let slist = std::mem::take(&mut ghl_info.slist);
-            let idx = bolts::g2_add_bolt(ghl_info, &mut bltlist, &slist, bone_name);
+            let idx = bolts::g2_add_bolt(host, ghl_info, &mut bltlist, &slist, bone_name);
             ghl_info.bltlist = bltlist;
             ghl_info.slist = slist;
             return idx;
@@ -158,16 +163,17 @@ pub fn g2api_add_bolt(
 /// Raven `G2API_AddBoltSurfNum` — add a bolt on a surface index, returning its
 /// bolt index (or `-1` on `G2_SetupModelPointers` failure).
 ///
-/// No `host` param (module-doc gap #1): uses `ghl_info.valid`.
+/// `host` added 2026-07-14 (closes module-doc gap #1; see [`g2api_add_bolt`]).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1648-1653`
 pub fn g2api_add_bolt_surf_num(
     g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
     ghl_info: &mut CGhoul2Info,
     surf_index: i32,
 ) -> i32 {
     let _ = g2;
-    if !ghl_info.valid {
+    if !misc::g2_setup_model_pointers(host, ghl_info) {
         return -1;
     }
     // Same list-extraction technique as `g2api_add_bolt` above.
@@ -182,12 +188,17 @@ pub fn g2api_add_bolt_surf_num(
 /// Raven `G2API_RemoveBolt` — remove a bolt by index; `qfalse` on
 /// `G2_SetupModelPointers` failure, else `G2_Remove_Bolt`'s result.
 ///
-/// No `host` param (module-doc gap #1): uses `ghl_info.valid`.
+/// `host` added 2026-07-14 (closes module-doc gap #1; see [`g2api_add_bolt`]).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1624-1631`
-pub fn g2api_remove_bolt(g2: &mut Ghoul2System, ghl_info: &mut CGhoul2Info, index: i32) -> bool {
+pub fn g2api_remove_bolt(
+    g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
+    ghl_info: &mut CGhoul2Info,
+    index: i32,
+) -> bool {
     let _ = g2;
-    if !ghl_info.valid {
+    if !misc::g2_setup_model_pointers(host, ghl_info) {
         return false;
     }
     bolts::g2_remove_bolt(&mut ghl_info.bltlist, index)
@@ -299,8 +310,30 @@ pub fn g2api_get_bolt_matrix(
                 skeleton::g2_construct_ghoul_skeleton(g2, host, ghoul2, tframe_num, true, scale);
             }
 
-            // G2_GetBoltMatrixLow (module-doc gap #3): identity-arm stopgap only.
-            let mut bolt = IDENTITY_MATRIX;
+            // Raven: `G2_GetBoltMatrixLow(*ghlInfo, boltIndex, scale, bolt);`
+            // (`G2_API.cpp:1839`) — the real bolt resolution (bone /
+            // tag-surface / unattached arms, `skeleton.rs`), wired 2026-07-14
+            // in place of the former identity stopgap (module-doc gap #3,
+            // CLOSED: the stopgap collapsed every server-side bolt to the
+            // entity origin, so saber muzzles sat inside the body and saber
+            // traces whiffed).
+            let mut bolt = {
+                let Ghoul2System {
+                    info_array,
+                    bone_caches,
+                    ..
+                } = &mut *g2;
+                let ghl_info = &info_array.get(ghoul2.mItem)[model_index as usize];
+                skeleton::resolve_bolt_matrix_low(
+                    bone_caches,
+                    host,
+                    ghl_info.bone_cache,
+                    &ghl_info.slist,
+                    &ghl_info.bltlist,
+                    bolt_index,
+                    scale,
+                )
+            };
 
             // scale the bolt position by the scale factor for this model since at
             // this point it's still in model space (`:1841-1852`).
@@ -406,13 +439,14 @@ fn create_matrix_from_angles(angle: vec3_t) -> mdxaBone_t {
 /// `toBoltIndex`, setup-pointer failure on either model, or an out-of-range
 /// `modelFrom`/`toModel`/an unbolted `toBoltIndex`.
 ///
-/// No `host` param (module-doc gap #1): uses "at least one cached-valid
-/// instance in the vector" in place of the vector-overload
-/// `G2_SetupModelPointers` re-derivation.
+/// `host` added 2026-07-14 (closes module-doc gap #1; see [`g2api_add_bolt`]):
+/// the vector-overload `G2_SetupModelPointers` calls, `&&`-short-circuited in
+/// Raven's order.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1658-1682`
 pub fn g2api_attach_g2_model(
     g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
     ghoul2_from: &mut CGhoul2Info_v,
     model_from: i32,
     ghoul2_to: &mut CGhoul2Info_v,
@@ -422,9 +456,9 @@ pub fn g2api_attach_g2_model(
     if to_bolt_index < 0 {
         return false;
     }
-    let from_ok = g2.info_array.get(ghoul2_from.mItem).iter().any(|i| i.valid);
-    let to_ok = g2.info_array.get(ghoul2_to.mItem).iter().any(|i| i.valid);
-    if !(from_ok && to_ok) {
+    if !(misc::g2_setup_model_pointers_v(g2, host, ghoul2_from)
+        && misc::g2_setup_model_pointers_v(g2, host, ghoul2_to))
+    {
         return false;
     }
     if ghoul2_from.size(g2) <= model_from || ghoul2_to.size(g2) <= to_model {
@@ -450,12 +484,16 @@ pub fn g2api_attach_g2_model(
 /// Raven `G2API_DetachG2Model` — reset `mModelBoltLink` to `-1`; `qfalse` on
 /// `G2_SetupModelPointers` failure.
 ///
-/// No `host` param (module-doc gap #1): uses `ghl_info.valid`.
+/// `host` added 2026-07-14 (closes module-doc gap #1; see [`g2api_add_bolt`]).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1695-1703`
-pub fn g2api_detach_g2_model(g2: &mut Ghoul2System, ghl_info: &mut CGhoul2Info) -> bool {
+pub fn g2api_detach_g2_model(
+    g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
+    ghl_info: &mut CGhoul2Info,
+) -> bool {
     let _ = g2;
-    if !ghl_info.valid {
+    if !misc::g2_setup_model_pointers(host, ghl_info) {
         return false;
     }
     ghl_info.model_bolt_link = -1;
@@ -470,20 +508,21 @@ pub fn g2api_detach_g2_model(g2: &mut Ghoul2System, ghl_info: &mut CGhoul2Info) 
 /// is the untouched-output `qfalse` path, `Some(bolt_info)` the written
 /// `qtrue` path — not a write-through `&mut` out-param.
 ///
-/// No `host` param (module-doc gap #1): uses `ghl_info_to.valid`. Bounds guard
-/// (module-doc note): `toBoltIndex` has no upper-bound check in the oracle
-/// under `-DNDEBUG` (UB on out-of-range).
+/// `host` added 2026-07-14 (closes module-doc gap #1; see [`g2api_add_bolt`]).
+/// Bounds guard (module-doc note): `toBoltIndex` has no upper-bound check in
+/// the oracle under `-DNDEBUG` (UB on out-of-range).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:1705-1725`
 pub fn g2api_attach_ent(
     g2: &mut Ghoul2System,
+    host: &mut impl EngineHost,
     ghl_info_to: &mut CGhoul2Info,
     to_bolt_index: i32,
     ent_num: i32,
     to_model_num: i32,
 ) -> Option<i32> {
     let _ = g2;
-    if !ghl_info_to.valid {
+    if !misc::g2_setup_model_pointers(host, ghl_info_to) {
         return None;
     }
     if ghl_info_to.bltlist.is_empty()

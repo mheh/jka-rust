@@ -129,7 +129,7 @@ const SKEL_OFS_BASE_POSE_MAT_INV: usize = SKEL_OFS_BASE_POSE_MAT + 48;
 ///
 /// # Safety
 /// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
+pub(crate) unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
     core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_BONES_OFFSET) as *const i32)
 }
 
@@ -140,7 +140,7 @@ unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
 /// # Safety
 /// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer
 /// and `bone_index` must be `< numBones`.
-unsafe fn mdxa_skel_ptr(header: *const c_void, bone_index: i32) -> *const u8 {
+pub(crate) unsafe fn mdxa_skel_ptr(header: *const c_void, bone_index: i32) -> *const u8 {
     let base = (header as *const u8).add(MDXA_HEADER_SIZE);
     let skel_offset = core::ptr::read_unaligned((base as *const i32).add(bone_index as usize));
     base.offset(skel_offset as isize)
@@ -621,7 +621,9 @@ fn g2_process_surface_bolt2(
 /// override entry in `slist` matching `surfaceNumber`, else the mesh surface by
 /// index (`G2_FindSurface_BC`) — then computes the bolt matrix from its verts
 /// (`g2_process_surface_bolt2`). `host` resolves the surface's `mdxm` block.
-fn resolve_bolt_matrix_low(
+/// `pub(crate)`: `api_bolts::g2api_get_bolt_matrix` needs this same split-
+/// borrow shape (its arena instance is already field-projected out of `g2`).
+pub(crate) fn resolve_bolt_matrix_low(
     bone_caches: &mut BoneCacheArena,
     host: &mut impl EngineHost,
     bone_cache: Option<BoneCacheId>,
