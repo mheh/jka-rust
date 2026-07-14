@@ -43,6 +43,10 @@ DURATION=${DURATION:-}
 
 [ -x "$BIN" ] || { echo "missing $BIN (cargo build --workspace)"; exit 1; }
 
+# Keep the primary's module current: stage our freshly built dylib as the
+# engine-named module (symlink, so rebuilds are picked up automatically).
+ln -sf "$(pwd)/target/debug/libjampgame.dylib" "$PRIMARY_BASE/base/jampgamei386.so"
+
 # Stage the secondary basepath: shared assets, module per SECONDARY_MODULE.
 mkdir -p "$SECONDARY_BASE/base"
 for pk3 in "$PRIMARY_BASE"/base/assets*.pk3; do
@@ -67,6 +71,7 @@ COMMON_ARGS=(+set dedicated 1 +set sv_maxclients "$MAXCLIENTS" +set bot_enable 1
 
 "./$BIN" "${COMMON_ARGS[@]}" +set fs_basepath "$PRIMARY_BASE" \
     +set net_port "$PRIMARY_PORT" +set ref_record "$TAPE" +set ref_state "$REF_STATE" \
+    +set ref_calls "$OUT/calls-primary.txt" \
     +map "$MAP" >"$OUT/primary.log" 2>&1 &
 PRIMARY_PID=$!
 echo "primary   pid=$PRIMARY_PID port=$PRIMARY_PORT module=ours log=$OUT/primary.log"
@@ -83,6 +88,7 @@ for _ in $(seq 1 300); do [ -s "$TAPE" ] && break; sleep 0.2; done
 
 "./$BIN" "${COMMON_ARGS[@]}" +set fs_basepath "$SECONDARY_BASE" \
     +set net_port "$SECONDARY_PORT" +set ref_replay "$TAPE" +set ref_follow 1 \
+    +set ref_calls "$OUT/calls-secondary.txt" \
     +map "$MAP" >"$OUT/secondary.log" 2>&1 &
 SECONDARY_PID=$!
 echo "secondary pid=$SECONDARY_PID port=$SECONDARY_PORT module=$SECONDARY_MODULE log=$OUT/secondary.log"

@@ -209,6 +209,14 @@ pub struct Referee {
     sys_hash: u64,
     /// Syscalls folded into `sys_hash` this window.
     sys_count: u32,
+    /// Syscall-stream dump (`ref_calls <file>`): one line per frame window
+    /// (`F<n> <import numbers>`), for diffing the two engines' exact call
+    /// sequences at a syscall divergence.
+    calls_writer: Option<BufWriter<File>>,
+    /// The current window's ordered imports (only accumulated when dumping).
+    calls_buf: Vec<i32>,
+    /// Frame-window counter for the dump (aligned with the compared frames).
+    calls_frame: u64,
     /// REPLAY: set once the tape is exhausted; further frames are inert.
     done: bool,
     /// REPLAY: frames whose digest was compared.
@@ -687,12 +695,32 @@ pub fn ref_tap_syscall(sv: &mut Server, trap: isize) {
     }
     sv.referee.sys_hash = fnv1a64(sv.referee.sys_hash, &(trap as i64).to_le_bytes());
     sv.referee.sys_count = sv.referee.sys_count.wrapping_add(1);
+    if sv.referee.calls_writer.is_some() {
+        sv.referee.calls_buf.push(trap as i32);
+    }
 }
 
-/// Reset the syscall-digest window (after each `S` emit/compare).
+/// Reset the syscall-digest window (after each `S` emit/compare). When the
+/// call dump is armed, flush the window's ordered imports as one `F<n>` line.
 fn ref_sys_reset(sv: &mut Server) {
     sv.referee.sys_hash = FNV_OFFSET;
     sv.referee.sys_count = 0;
+    if !sv.referee.calls_buf.is_empty() {
+        sv.referee.calls_frame += 1;
+        let n = sv.referee.calls_frame;
+        let line = sv
+            .referee
+            .calls_buf
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        if let Some(w) = sv.referee.calls_writer.as_mut() {
+            let _ = writeln!(w, "F{n} {line}");
+            let _ = w.flush();
+        }
+        sv.referee.calls_buf.clear();
+    }
 }
 
 /// RECORD tap at `SV_Shutdown`: write the tape's `E` end record and flush, so
@@ -1397,6 +1425,21 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     sv.referee.verbose = sv.referee.mode == RefMode::Record
         && Cvar_VariableIntegerValue(view.common, c"ref_state".as_ptr()) != 0;
     ref_sys_reset(sv);
+
+    // Syscall-stream dump (`ref_calls <file>`), armed independently.
+    let calls = cvar_string(view, c"ref_calls".as_ptr());
+    if !calls.is_empty() {
+        match File::create(&calls) {
+            Ok(f) => {
+                sv.referee.calls_writer = Some(BufWriter::new(f));
+                com_printf(view.common, &format!("REF CALLS dump -> {calls}\n"));
+            }
+            Err(e) => com_error(
+                errorParm_t::ERR_DROP,
+                format!("ref_calls: cannot create {calls}: {e}"),
+            ),
+        }
+    }
 
     // Divergence policy + the halt back-channel (`<tape>.halt`). The record
     // side clears any stale halt file so a fresh session never boots frozen.

@@ -1236,6 +1236,9 @@ pub fn SV_Init(view: &mut EngineHostView) {
     // `ref_haltOnDiverge 1` — freeze both engines into step mode on a
     // divergence (0 = log + resync from the tape's V and continue).
     Cvar_Get(view, c"ref_haltOnDiverge".as_ptr(), c"0".as_ptr(), 0);
+    // `ref_calls <file>` — dump each frame window's ordered syscall imports
+    // (for diffing the two engines' exact call sequences).
+    Cvar_Get(view, c"ref_calls".as_ptr(), c"".as_ptr(), 0);
     Cvar_Get(view, c"ref_seed".as_ptr(), c"0".as_ptr(), 0);
     // `ref_snaps <file>` — raw client-bound wire capture (see sv_referee.rs).
     Cvar_Get(view, c"ref_snaps".as_ptr(), c"".as_ptr(), 0);

@@ -176,6 +176,29 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
   eliminated as sole cause only after pinning) is the expected first catch.
   DONE WHEN: first divergence root-caused, fixed, and the fix
   referee-verified.
+  **STATUS: DONE 2026-07-14.** Three module defects root-caused and fixed
+  (hunt tooling: `ref_calls` per-frame syscall-stream dump, diffed offline):
+  (1) frame 164, syscalls-only — 14 game sites called the `G_SNAPVECTOR`
+  trap where Raven's native build uses the local `SnapVector` macro
+  (`bg_pmove.c:11126` is the ONLY native trap site); all 14 converted to
+  `bg_misc::snap_vector`. (2) wrong-variant CRT rand — `Rng::rand/srand`
+  had been transcribed from `bg_lib.c`'s 69069 LCG, but bg_lib.c is
+  `ExcludedFromBuild` in every retail win32 config and its rand is
+  `#ifdef Q3_VM`; retail links the MSVC CRT LCG (holdrand*214013+2531011,
+  >>16, &0x7fff, init 1). Ours rewritten to MSVC semantics (unit-pinned);
+  the oracle build.sh gained the mirrored patch (macOS libc rand matches
+  neither); the bg_lib rand golden section retired. (3) frame 364,
+  entities+ps1 — `chatTime_stored = (strlen(chat)*45)+Q_irand(1300,1500)`
+  is size_t arithmetic in C: an LP64-negative Q_irand roll wraps to ~2^64
+  ("chat never"), while our i32 math went negative ("chat now") — one bot
+  chatted, the other froze waiting; fixed with faithful usize wrapping.
+  Referee-verified: byte-identical 355 → 1,805 frames (2,003-frame bounded
+  run, first divergence now 1806 — a one-shot syscalls-only wiggle in saber
+  per-poly collision with IDENTICAL state hashes, 1-ULP-class module-private
+  float drift; that tail is G7's iterate-until-clean work). The
+  MOD-histogram skew hypothesis gains a mechanism: pre-fix, rust bots
+  chatted immediately/oracle bots never — chat-pending bots stand still,
+  skewing combat behavior.
 - **G7 — Soak to parity.** Iterate G6 until one hour of continuous bot combat
   PLUS a live human play session (the user, frame-mirrored) complete
   byte-identical. This is the Stage-R bar from
