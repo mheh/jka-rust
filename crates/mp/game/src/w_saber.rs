@@ -3018,6 +3018,7 @@ pub fn G_SaberInBackAttack(r#move: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2454-2570`
 pub fn G_BuildSaberFaces(
+    ctx: &mut GameContext,
     base: vec3_t,
     tip: vec3_t,
     radius: f32,
@@ -3028,13 +3029,10 @@ pub fn G_BuildSaberFaces(
 ) {
     unsafe {
         // PORT-NOTE(faces): Raven's `static saberFace_t faces[12]` is a
-        // function-local static returned by pointer; kept as a module-lifetime
-        // `static mut` to preserve that persistent-buffer behavior.
-        static mut FACES: [saberFace_t; 12] = [saberFace_t {
-            v1: [0.0; 3],
-            v2: [0.0; 3],
-            v3: [0.0; 3],
-        }; 12];
+        // function-local static returned by pointer; now owned by
+        // `GameWorld.scratch` (safe-state Stage 3, §B3) to preserve that
+        // persistent-buffer behavior without a `static mut`.
+        let faces = &mut ctx.world.scratch.faces;
         let mut i: usize = 0;
         let mut invFwd: vec3_t = [0.0; 3];
         let mut invRight: vec3_t = [0.0; 3];
@@ -3061,99 +3059,99 @@ pub fn G_BuildSaberFaces(
             };
 
             // first triangle for this surface
-            _VectorMA(base, radius / 2.0f32, d1, &mut FACES[i].v1);
-            let v = FACES[i].v1;
-            _VectorMA(v, radius / 2.0f32, d2, &mut FACES[i].v1);
+            _VectorMA(base, radius / 2.0f32, d1, &mut faces[i].v1);
+            let v = faces[i].v1;
+            _VectorMA(v, radius / 2.0f32, d2, &mut faces[i].v1);
 
-            _VectorMA(tip, radius / 2.0f32, d1, &mut FACES[i].v2);
-            let v = FACES[i].v2;
-            _VectorMA(v, radius / 2.0f32, d2, &mut FACES[i].v2);
+            _VectorMA(tip, radius / 2.0f32, d1, &mut faces[i].v2);
+            let v = faces[i].v2;
+            _VectorMA(v, radius / 2.0f32, d2, &mut faces[i].v2);
 
-            _VectorMA(tip, -radius / 2.0f32, d1, &mut FACES[i].v3);
-            let v = FACES[i].v3;
-            _VectorMA(v, radius / 2.0f32, d2, &mut FACES[i].v3);
+            _VectorMA(tip, -radius / 2.0f32, d1, &mut faces[i].v3);
+            let v = faces[i].v3;
+            _VectorMA(v, radius / 2.0f32, d2, &mut faces[i].v3);
 
             i += 1;
 
             // second triangle for this surface
-            _VectorMA(tip, -radius / 2.0f32, d1, &mut FACES[i].v1);
-            let v = FACES[i].v1;
-            _VectorMA(v, radius / 2.0f32, d2, &mut FACES[i].v1);
+            _VectorMA(tip, -radius / 2.0f32, d1, &mut faces[i].v1);
+            let v = faces[i].v1;
+            _VectorMA(v, radius / 2.0f32, d2, &mut faces[i].v1);
 
-            _VectorMA(base, radius / 2.0f32, d1, &mut FACES[i].v2);
-            let v = FACES[i].v2;
-            _VectorMA(v, radius / 2.0f32, d2, &mut FACES[i].v2);
+            _VectorMA(base, radius / 2.0f32, d1, &mut faces[i].v2);
+            let v = faces[i].v2;
+            _VectorMA(v, radius / 2.0f32, d2, &mut faces[i].v2);
 
-            _VectorMA(base, -radius / 2.0f32, d1, &mut FACES[i].v3);
-            let v = FACES[i].v3;
-            _VectorMA(v, radius / 2.0f32, d2, &mut FACES[i].v3);
+            _VectorMA(base, -radius / 2.0f32, d1, &mut faces[i].v3);
+            let v = faces[i].v3;
+            _VectorMA(v, radius / 2.0f32, d2, &mut faces[i].v3);
 
             i += 1;
         }
 
         // top surface — face 1
-        _VectorMA(tip, radius / 2.0f32, fwd, &mut FACES[i].v1);
-        let v = FACES[i].v1;
-        _VectorMA(v, -radius / 2.0f32, right, &mut FACES[i].v1);
+        _VectorMA(tip, radius / 2.0f32, fwd, &mut faces[i].v1);
+        let v = faces[i].v1;
+        _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v1);
 
-        _VectorMA(tip, radius / 2.0f32, fwd, &mut FACES[i].v2);
-        let v = FACES[i].v2;
-        _VectorMA(v, radius / 2.0f32, right, &mut FACES[i].v2);
+        _VectorMA(tip, radius / 2.0f32, fwd, &mut faces[i].v2);
+        let v = faces[i].v2;
+        _VectorMA(v, radius / 2.0f32, right, &mut faces[i].v2);
 
-        _VectorMA(tip, -radius / 2.0f32, fwd, &mut FACES[i].v3);
-        let v = FACES[i].v3;
-        _VectorMA(v, -radius / 2.0f32, right, &mut FACES[i].v3);
+        _VectorMA(tip, -radius / 2.0f32, fwd, &mut faces[i].v3);
+        let v = faces[i].v3;
+        _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v3);
 
         i += 1;
 
         // face 2
-        _VectorMA(tip, radius / 2.0f32, fwd, &mut FACES[i].v1);
-        let v = FACES[i].v1;
-        _VectorMA(v, radius / 2.0f32, right, &mut FACES[i].v1);
+        _VectorMA(tip, radius / 2.0f32, fwd, &mut faces[i].v1);
+        let v = faces[i].v1;
+        _VectorMA(v, radius / 2.0f32, right, &mut faces[i].v1);
 
-        _VectorMA(tip, -radius / 2.0f32, fwd, &mut FACES[i].v2);
-        let v = FACES[i].v2;
-        _VectorMA(v, -radius / 2.0f32, right, &mut FACES[i].v2);
+        _VectorMA(tip, -radius / 2.0f32, fwd, &mut faces[i].v2);
+        let v = faces[i].v2;
+        _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v2);
 
-        _VectorMA(tip, -radius / 2.0f32, fwd, &mut FACES[i].v3);
-        let v = FACES[i].v3;
-        _VectorMA(v, radius / 2.0f32, right, &mut FACES[i].v3);
+        _VectorMA(tip, -radius / 2.0f32, fwd, &mut faces[i].v3);
+        let v = faces[i].v3;
+        _VectorMA(v, radius / 2.0f32, right, &mut faces[i].v3);
 
         i += 1;
 
         // bottom surface — face 1
-        _VectorMA(base, radius / 2.0f32, fwd, &mut FACES[i].v1);
-        let v = FACES[i].v1;
-        _VectorMA(v, -radius / 2.0f32, right, &mut FACES[i].v1);
+        _VectorMA(base, radius / 2.0f32, fwd, &mut faces[i].v1);
+        let v = faces[i].v1;
+        _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v1);
 
-        _VectorMA(base, radius / 2.0f32, fwd, &mut FACES[i].v2);
-        let v = FACES[i].v2;
-        _VectorMA(v, radius / 2.0f32, right, &mut FACES[i].v2);
+        _VectorMA(base, radius / 2.0f32, fwd, &mut faces[i].v2);
+        let v = faces[i].v2;
+        _VectorMA(v, radius / 2.0f32, right, &mut faces[i].v2);
 
-        _VectorMA(base, -radius / 2.0f32, fwd, &mut FACES[i].v3);
-        let v = FACES[i].v3;
-        _VectorMA(v, -radius / 2.0f32, right, &mut FACES[i].v3);
+        _VectorMA(base, -radius / 2.0f32, fwd, &mut faces[i].v3);
+        let v = faces[i].v3;
+        _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v3);
 
         i += 1;
 
         // face 2
-        _VectorMA(base, radius / 2.0f32, fwd, &mut FACES[i].v1);
-        let v = FACES[i].v1;
-        _VectorMA(v, radius / 2.0f32, right, &mut FACES[i].v1);
+        _VectorMA(base, radius / 2.0f32, fwd, &mut faces[i].v1);
+        let v = faces[i].v1;
+        _VectorMA(v, radius / 2.0f32, right, &mut faces[i].v1);
 
-        _VectorMA(base, -radius / 2.0f32, fwd, &mut FACES[i].v2);
-        let v = FACES[i].v2;
-        _VectorMA(v, -radius / 2.0f32, right, &mut FACES[i].v2);
+        _VectorMA(base, -radius / 2.0f32, fwd, &mut faces[i].v2);
+        let v = faces[i].v2;
+        _VectorMA(v, -radius / 2.0f32, right, &mut faces[i].v2);
 
-        _VectorMA(base, -radius / 2.0f32, fwd, &mut FACES[i].v3);
-        let v = FACES[i].v3;
-        _VectorMA(v, radius / 2.0f32, right, &mut FACES[i].v3);
+        _VectorMA(base, -radius / 2.0f32, fwd, &mut faces[i].v3);
+        let v = faces[i].v3;
+        _VectorMA(v, radius / 2.0f32, right, &mut faces[i].v3);
 
         i += 1;
 
         // yeah.. always going to be 12 I suppose.
         *fNum = i as c_int;
-        *fList = (&raw mut FACES).cast::<saberFace_t>();
+        *fList = faces.as_mut_ptr();
     }
 }
 
@@ -3391,6 +3389,7 @@ pub fn G_SaberCollide(
 
                         //now build collision faces for this blade
                         G_BuildSaberFaces(
+                            ctx,
                             base,
                             tip,
                             (*blade).radius * 3.0f32,

@@ -15,6 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_shared::QSharedScratch;
 
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
@@ -406,9 +407,13 @@ pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
 ///
 /// Raven: "Also used in npc code".
 /// Source: `oracle/codemp/game/bg_saberLoad.c:129-147`
-pub fn BG_ParseLiteral(data: *mut *const c_char, string: *const c_char) -> qboolean {
+pub fn BG_ParseLiteral(
+    qs: &mut QSharedScratch,
+    data: *mut *const c_char,
+    string: *const c_char,
+) -> qboolean {
     unsafe {
-        let token = crate::q_shared::COM_ParseExt(data, qtrue);
+        let token = crate::q_shared::COM_ParseExt(qs, data, qtrue);
         if *token == 0 {
             let msg = std::ffi::CString::new("unexpected EOF\n").unwrap();
             crate::g_main::Com_Printf(msg.as_ptr());
@@ -937,19 +942,19 @@ pub fn WP_SaberParseParms(
 
         // try to parse it out
         let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
-        crate::q_shared::COM_BeginParseSession(c"saberinfo".as_ptr());
+        crate::q_shared::COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
 
         // look for the right saber
         loop {
             if p.is_null() {
                 break;
             }
-            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
+            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 if triedDefault == qfalse {
                     // fall back to default and restart, should always be there
                     p = bg.SaberParms.as_ptr() as *const c_char;
-                    crate::q_shared::COM_BeginParseSession(c"saberinfo".as_ptr());
+                    crate::q_shared::COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
                     c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
                     triedDefault = qtrue;
                 } else {
@@ -961,7 +966,7 @@ pub fn WP_SaberParseParms(
                 break;
             }
 
-            crate::q_shared::SkipBracedSection(&mut p);
+            crate::q_shared::SkipBracedSection(&mut bg.qs, &mut p);
         }
         if p.is_null() {
             // even the default saber isn't found?
@@ -971,13 +976,13 @@ pub fn WP_SaberParseParms(
         // got the name we're using for sure
         c_strcpy((*saber).name.as_mut_ptr(), useSaber.as_ptr());
 
-        if BG_ParseLiteral(&mut p, c"{".as_ptr()) != qfalse {
+        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr()) != qfalse {
             return qfalse;
         }
 
         // parse the saber info block
         loop {
-            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
+            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
@@ -996,7 +1001,7 @@ pub fn WP_SaberParseParms(
             macro_rules! parse_string_field {
                 () => {{
                     let mut value: *const c_char = std::ptr::null();
-                    if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
+                    if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
                         continue;
                     }
                     value
@@ -1004,16 +1009,16 @@ pub fn WP_SaberParseParms(
             }
             macro_rules! parse_int_field {
                 ($n:expr) => {{
-                    if crate::q_shared::COM_ParseInt(&mut p, &mut $n) != qfalse {
-                        crate::q_shared::SkipRestOfLine(&mut p);
+                    if crate::q_shared::COM_ParseInt(&mut bg.qs, &mut p, &mut $n) != qfalse {
+                        crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                         continue;
                     }
                 }};
             }
             macro_rules! parse_float_field {
                 ($f:expr) => {{
-                    if crate::q_shared::COM_ParseFloat(&mut p, &mut $f) != qfalse {
-                        crate::q_shared::SkipRestOfLine(&mut p);
+                    if crate::q_shared::COM_ParseFloat(&mut bg.qs, &mut p, &mut $f) != qfalse {
+                        crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                         continue;
                     }
                 }};
@@ -1770,13 +1775,13 @@ pub fn WP_SaberParseParms(
             // stays on in water
             if qstricmp_eq(tok, c"onInWater") {
                 // ignore in MP
-                crate::q_shared::SkipRestOfLine(&mut p);
+                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
 
             if qstricmp_eq(tok, c"notInMP") {
                 // ignore this
-                crate::q_shared::SkipRestOfLine(&mut p);
+                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
 
@@ -1826,20 +1831,20 @@ pub fn WP_SaberParseParms(
             // `trap_R_RegisterShader` call is CGAME-only dead code here (§20).
             if qstricmp_eq(tok, c"g2MarksShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut p);
+                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut p);
+                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut p);
+                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut p);
+                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"knockbackScale") {
@@ -2017,20 +2022,20 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2MarksShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut p);
+                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut p);
+                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut p);
+                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut p);
+                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"knockbackScale2") {
@@ -2185,7 +2190,7 @@ pub fn WP_SaberParseParms(
                 );
                 crate::g_main::Com_Printf(cstr(&msg).as_ptr());
             }
-            crate::q_shared::SkipRestOfLine(&mut p);
+            crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
         }
 
         // FIXME: precache the saberModel(s)?
@@ -2218,14 +2223,14 @@ pub fn WP_SaberParseParm(
 
         // try to parse it out
         let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
-        crate::q_shared::COM_BeginParseSession(c"saberinfo".as_ptr());
+        crate::q_shared::COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
 
         // look for the right saber
         loop {
             if p.is_null() {
                 return qfalse;
             }
-            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
+            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 return qfalse;
             }
@@ -2234,19 +2239,19 @@ pub fn WP_SaberParseParm(
                 break;
             }
 
-            crate::q_shared::SkipBracedSection(&mut p);
+            crate::q_shared::SkipBracedSection(&mut bg.qs, &mut p);
         }
         if p.is_null() {
             return qfalse;
         }
 
-        if BG_ParseLiteral(&mut p, c"{".as_ptr()) != qfalse {
+        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr()) != qfalse {
             return qfalse;
         }
 
         // parse the saber info block
         loop {
-            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
+            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
@@ -2262,14 +2267,14 @@ pub fn WP_SaberParseParm(
 
             if crate::q_shared::Q_stricmp(token as *const c_char, parmname) == 0 {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut p, &mut value) != qfalse {
+                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
                     continue;
                 }
                 c_strcpy(saberData, value);
                 return qtrue;
             }
 
-            crate::q_shared::SkipRestOfLine(&mut p);
+            crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
         }
 
         qfalse

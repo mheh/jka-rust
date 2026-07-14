@@ -111,7 +111,7 @@ pub fn G_ParseInfos(
         let mut bufp: *const c_char = buf as *const c_char;
 
         loop {
-            let token = COM_Parse(&mut bufp as *mut *const c_char);
+            let token = COM_Parse(&mut ctx.world.bg_state.qs, &mut bufp as *mut *const c_char);
             if *token == 0 {
                 break;
             }
@@ -127,7 +127,11 @@ pub fn G_ParseInfos(
             let mut info: [c_char; MAX_INFO_STRING] = [0; MAX_INFO_STRING];
             info[0] = 0;
             loop {
-                let token = COM_ParseExt(&mut bufp as *mut *const c_char, qtrue);
+                let token = COM_ParseExt(
+                    &mut ctx.world.bg_state.qs,
+                    &mut bufp as *mut *const c_char,
+                    qtrue,
+                );
                 if *token == 0 {
                     Com_Printf(cstr("Unexpected end of info file\n").as_ptr());
                     break;
@@ -138,7 +142,11 @@ pub fn G_ParseInfos(
                 let mut key: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
                 Q_strncpyz(key.as_mut_ptr(), token, key.len() as c_int);
 
-                let token2 = COM_ParseExt(&mut bufp as *mut *const c_char, qfalse);
+                let token2 = COM_ParseExt(
+                    &mut ctx.world.bg_state.qs,
+                    &mut bufp as *mut *const c_char,
+                    qfalse,
+                );
                 let value_ptr = if *token2 == 0 {
                     c"<NULL>".as_ptr()
                 } else {
@@ -289,6 +297,7 @@ pub fn G_DoesMapSupportGametype(
         let mut thisLevel: c_int = -1;
         for n in 0..ctx.world.globals.g_numArenas {
             let r#type = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_arenaInfos[n as usize],
                 cstr("map").as_ptr(),
             );
@@ -303,6 +312,7 @@ pub fn G_DoesMapSupportGametype(
         }
 
         let r#type = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
             ctx.world.globals.g_arenaInfos[thisLevel as usize],
             cstr("type").as_ptr(),
         );
@@ -341,6 +351,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
         let mut thisLevel: c_int = 0;
         for n in 0..ctx.world.globals.g_numArenas {
             let r#type = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_arenaInfos[n as usize],
                 cstr("map").as_ptr(),
             );
@@ -369,6 +380,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
             }
 
             let r#type = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_arenaInfos[n as usize],
                 cstr("type").as_ptr(),
             );
@@ -391,6 +403,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
             );
         } else {
             let r#type = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_arenaInfos[desiredMap as usize],
                 cstr("map").as_ptr(),
             );
@@ -402,6 +415,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
         }
 
         Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
             ctx.world.globals.g_arenaInfos[desiredMap as usize],
             cstr("map").as_ptr(),
         ) as *const c_char
@@ -454,6 +468,7 @@ pub fn G_GetArenaInfoByMap(ctx: &mut GameContext, map: *const c_char) -> *const 
     for n in 0..ctx.world.globals.g_numArenas {
         if Q_stricmp(
             Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_arenaInfos[n as usize],
                 cstr("map").as_ptr(),
             ),
@@ -474,6 +489,7 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
         let mut num: c_int = 0;
         for n in 0..ctx.world.globals.g_numBots {
             let value = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_botInfos[n as usize],
                 cstr("name").as_ptr(),
             );
@@ -511,6 +527,7 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
 
         for n in 0..ctx.world.globals.g_numBots {
             let value = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_botInfos[n as usize],
                 cstr("name").as_ptr(),
             );
@@ -776,15 +793,23 @@ pub fn G_BotConnect(ctx: &mut GameContext, clientNum: c_int, restart: qboolean) 
         write_cstr_field(
             &mut settings.personalityfile,
             &cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 userinfo.as_ptr(),
                 cstr("personality").as_ptr(),
             )),
         );
-        settings.skill =
-            crate::bg_lib::atof(Info_ValueForKey(userinfo.as_ptr(), cstr("skill").as_ptr())) as f32;
+        settings.skill = crate::bg_lib::atof(Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            cstr("skill").as_ptr(),
+        )) as f32;
         write_cstr_field(
             &mut settings.team,
-            &cstr_to_str(Info_ValueForKey(userinfo.as_ptr(), cstr("team").as_ptr())),
+            &cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                cstr("team").as_ptr(),
+            )),
         );
 
         let ok = BotAISetupClient(
@@ -837,9 +862,13 @@ pub fn G_AddBot(
         let mut userinfo: [c_char; MAX_INFO_STRING] = [0; MAX_INFO_STRING];
         userinfo[0] = 0;
 
-        let mut botname = Info_ValueForKey(botinfo, cstr("funname").as_ptr());
+        let mut botname = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            botinfo,
+            cstr("funname").as_ptr(),
+        );
         if *botname == 0 {
-            botname = Info_ValueForKey(botinfo, cstr("name").as_ptr());
+            botname = Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("name").as_ptr());
         }
         // check for an alternative name
         if !altname.is_null() && *altname != 0 {
@@ -882,43 +911,53 @@ pub fn G_AddBot(
             );
         }
 
-        let mut model = Info_ValueForKey(botinfo, cstr("model").as_ptr());
+        let mut model =
+            Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("model").as_ptr());
         if *model == 0 {
             model = cstr("kyle/default").into_raw();
         }
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("model").as_ptr(), model);
 
-        let mut gender = Info_ValueForKey(botinfo, cstr("gender").as_ptr());
+        let mut gender =
+            Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("gender").as_ptr());
         if *gender == 0 {
             gender = cstr("male").into_raw();
         }
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("sex").as_ptr(), gender);
 
-        let mut color1 = Info_ValueForKey(botinfo, cstr("color1").as_ptr());
+        let mut color1 =
+            Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("color1").as_ptr());
         if *color1 == 0 {
             color1 = cstr("4").into_raw();
         }
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("color1").as_ptr(), color1);
 
-        let mut color2 = Info_ValueForKey(botinfo, cstr("color2").as_ptr());
+        let mut color2 =
+            Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("color2").as_ptr());
         if *color2 == 0 {
             color2 = cstr("4").into_raw();
         }
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("color2").as_ptr(), color2);
 
-        let mut saber1 = Info_ValueForKey(botinfo, cstr("saber1").as_ptr());
+        let mut saber1 =
+            Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("saber1").as_ptr());
         if *saber1 == 0 {
             saber1 = cstr("single_1").into_raw();
         }
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("saber1").as_ptr(), saber1);
 
-        let mut saber2 = Info_ValueForKey(botinfo, cstr("saber2").as_ptr());
+        let mut saber2 =
+            Info_ValueForKey(&mut ctx.world.bg_state.qs, botinfo, cstr("saber2").as_ptr());
         if *saber2 == 0 {
             saber2 = cstr("none").into_raw();
         }
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("saber2").as_ptr(), saber2);
 
-        let personality = Info_ValueForKey(botinfo, cstr("personality").as_ptr());
+        let personality = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            botinfo,
+            cstr("personality").as_ptr(),
+        );
         if *personality == 0 {
             Info_SetValueForKey(
                 userinfo.as_mut_ptr(),
@@ -1193,6 +1232,7 @@ pub fn Svcmd_BotList_f(ctx: &mut GameContext) {
 
         for i in 0..ctx.world.globals.g_numBots {
             let mut name = cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_botInfos[i as usize],
                 cstr("name").as_ptr(),
             ));
@@ -1200,6 +1240,7 @@ pub fn Svcmd_BotList_f(ctx: &mut GameContext) {
                 name = "Padawan".to_string();
             }
             let mut funname = cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_botInfos[i as usize],
                 cstr("funname").as_ptr(),
             ));
@@ -1207,6 +1248,7 @@ pub fn Svcmd_BotList_f(ctx: &mut GameContext) {
                 funname = "".to_string();
             }
             let mut model = cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_botInfos[i as usize],
                 cstr("model").as_ptr(),
             ));
@@ -1214,6 +1256,7 @@ pub fn Svcmd_BotList_f(ctx: &mut GameContext) {
                 model = "kyle/default".to_string();
             }
             let mut personality = cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 ctx.world.globals.g_botInfos[i as usize],
                 cstr("personality").as_ptr(),
             ));
@@ -1356,6 +1399,7 @@ pub fn G_GetBotInfoByNumber(ctx: &mut GameContext, num: c_int) -> *mut c_char {
 pub fn G_GetBotInfoByName(ctx: &mut GameContext, name: *const c_char) -> *mut c_char {
     for n in 0..ctx.world.globals.g_numBots {
         let value = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
             ctx.world.globals.g_botInfos[n as usize],
             cstr("name").as_ptr(),
         );

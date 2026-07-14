@@ -1861,6 +1861,7 @@ pub fn ClientConnect(
 
         // check to see if they are on the banned IP list
         let value = cstr_to_str(Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
             cstr(&userinfo).as_ptr(),
             cstr("ip").as_ptr(),
         ));
@@ -1876,6 +1877,7 @@ pub fn ClientConnect(
         {
             // check for a password
             let value = cstr_to_str(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 cstr(&userinfo).as_ptr(),
                 cstr("password").as_ptr(),
             ));
@@ -2132,7 +2134,11 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             ),
         );
         let userinfo = cstr_to_str(userinfo_buf.as_ptr());
-        let modelname = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("model").as_ptr());
+        let modelname = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            cstr(&userinfo).as_ptr(),
+            cstr("model").as_ptr(),
+        );
         SetupGameGhoul2Model(
             ctx,
             ctx.entity_id_of(ent).unwrap(),
@@ -2168,9 +2174,16 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             }
 
             if (*ent).r.svFlags & SVF_BOT != 0 && ctx.world.cvars.g_gametype.integer != GT_SIEGE {
-                let saber_val = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("saber1").as_ptr());
-                let saber2_val =
-                    Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("saber2").as_ptr());
+                let saber_val = Info_ValueForKey(
+                    &mut ctx.world.bg_state.qs,
+                    cstr(&userinfo).as_ptr(),
+                    cstr("saber1").as_ptr(),
+                );
+                let saber2_val = Info_ValueForKey(
+                    &mut ctx.world.bg_state.qs,
+                    cstr(&userinfo).as_ptr(),
+                    cstr("saber2").as_ptr(),
+                );
 
                 if saber_val.is_null() || *saber_val == 0 {
                     // blah, set em up with a random saber
@@ -2665,7 +2678,11 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             };
 
             let key = format!("saber{}", l + 1);
-            let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr(&key).as_ptr());
+            let value = Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                cstr(&userinfo).as_ptr(),
+                cstr(&key).as_ptr(),
+            );
             if let Some(ref saber) = saber {
                 if !value.is_null() {
                     let value_s = cstr_to_str(value);
@@ -2707,7 +2724,11 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     _ => None,
                 };
                 let key = format!("saber{}", l + 1);
-                let value = Info_ValueForKey(userinfo_buf.as_ptr(), cstr(&key).as_ptr());
+                let value = Info_ValueForKey(
+                    &mut ctx.world.bg_state.qs,
+                    userinfo_buf.as_ptr(),
+                    cstr(&key).as_ptr(),
+                );
                 let value_s = if !value.is_null() {
                     cstr_to_str(value)
                 } else {
@@ -2938,11 +2959,23 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).bodyGrabIndex = ENTITYNUM_NONE;
 
         // Get the skin RGB based on his userinfo
-        let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_red").as_ptr());
+        let value = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            cstr(&userinfo).as_ptr(),
+            cstr("char_color_red").as_ptr(),
+        );
         (*client).ps.customRGBA[0] = if !value.is_null() { atoi(value) } else { 255 };
-        let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_green").as_ptr());
+        let value = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            cstr(&userinfo).as_ptr(),
+            cstr("char_color_green").as_ptr(),
+        );
         (*client).ps.customRGBA[1] = if !value.is_null() { atoi(value) } else { 255 };
-        let value = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("char_color_blue").as_ptr());
+        let value = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            cstr(&userinfo).as_ptr(),
+            cstr("char_color_blue").as_ptr(),
+        );
         (*client).ps.customRGBA[2] = if !value.is_null() { atoi(value) } else { 255 };
 
         if ((*client).ps.customRGBA[0] as c_int
@@ -4365,13 +4398,21 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // check for local client
-        s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"ip".as_ptr());
+        s = crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            c"ip".as_ptr(),
+        );
         if crate::q_shared::Q_strcmp(s, c"localhost".as_ptr()) == 0 {
             (*client).pers.localClient = qtrue;
         }
 
         // check the item prediction
-        s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"cg_predictItems".as_ptr());
+        s = crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            c"cg_predictItems".as_ptr(),
+        );
         if atoi(s) == 0 {
             (*client).pers.predictItemPickup = qfalse;
         } else {
@@ -4380,7 +4421,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         // set name
         crate::q_shared::Q_strncpyz(oldname.as_mut_ptr(), (*client).pers.netname.as_ptr(), 1024);
-        s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"name".as_ptr());
+        s = crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            c"name".as_ptr(),
+        );
         ClientCleanName(
             ctx,
             s,
@@ -4453,7 +4498,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         // set model
         crate::q_shared::Q_strncpyz(
             model.as_mut_ptr(),
-            crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"model".as_ptr()),
+            crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                c"model".as_ptr(),
+            ),
             260,
         );
 
@@ -4465,21 +4514,33 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // Get the skin RGB based on his userinfo
-        value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_red".as_ptr());
+        value = crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            c"char_color_red".as_ptr(),
+        );
         if !value.is_null() {
             (*client).ps.customRGBA[0] = atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[0] = 255;
         }
 
-        value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_green".as_ptr());
+        value = crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            c"char_color_green".as_ptr(),
+        );
         if !value.is_null() {
             (*client).ps.customRGBA[1] = atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[1] = 255;
         }
 
-        value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_blue".as_ptr());
+        value = crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            userinfo.as_ptr(),
+            c"char_color_blue".as_ptr(),
+        );
         if !value.is_null() {
             (*client).ps.customRGBA[2] = atoi(value) as c_int;
         } else {
@@ -4499,7 +4560,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         crate::q_shared::Q_strncpyz(
             forcePowers.as_mut_ptr(),
-            crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"forcepowers".as_ptr()),
+            crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                c"forcepowers".as_ptr(),
+            ),
             260,
         );
 
@@ -4507,7 +4572,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM
             && ctx.world.g_entities[clientNum as usize].r.svFlags & SVF_BOT != 0
         {
-            s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"team".as_ptr());
+            s = crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                c"team".as_ptr(),
+            );
             if crate::q_shared::Q_stricmp(s, c"red".as_ptr()) == 0
                 || crate::q_shared::Q_stricmp(s, c"r".as_ptr()) == 0
             {
@@ -4665,7 +4734,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             (*client).pers.teamInfo = qtrue;
         } else {
-            s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"teamoverlay".as_ptr());
+            s = crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                c"teamoverlay".as_ptr(),
+            );
             if *s == 0 || atoi(s) != 0 {
                 (*client).pers.teamInfo = qtrue;
             } else {
@@ -4675,6 +4748,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         // team task (0 = none, 1 = offence, 2 = defence)
         teamTask = atoi(crate::q_shared::Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
             userinfo.as_ptr(),
             c"teamtask".as_ptr(),
         )) as c_int;
@@ -4685,6 +4759,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         write_cstr_field(
             &mut c1,
             &cstr_to_str(crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 userinfo.as_ptr(),
                 c"color1".as_ptr(),
             )),
@@ -4692,6 +4767,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         write_cstr_field(
             &mut c2,
             &cstr_to_str(crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
                 userinfo.as_ptr(),
                 c"color2".as_ptr(),
             )),
@@ -4710,7 +4786,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 (*client).pers.maxHealth,
                 (*client).sess.wins,
                 (*client).sess.losses,
-                cstr_to_str(crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"skill".as_ptr())),
+                cstr_to_str(crate::q_shared::Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo.as_ptr(), c"skill".as_ptr())),
                 teamTask,
                 teamLeader,
                 cstr_to_str(className.as_ptr()),
@@ -4766,8 +4842,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         if modelChanged != qfalse {
             // only going to be true for allowable server-side custom skeleton cases
             // update the server g2 instance if appropriate
-            let modelname_ptr =
-                crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"model".as_ptr());
+            let modelname_ptr = crate::q_shared::Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                c"model".as_ptr(),
+            );
             SetupGameGhoul2Model(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),

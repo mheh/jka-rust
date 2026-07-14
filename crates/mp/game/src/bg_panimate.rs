@@ -2076,7 +2076,7 @@ impl PmoveContext<'_> {
         }
 
         loop {
-            token = COM_Parse(&mut text_p);
+            token = COM_Parse(&mut self.bg.qs, &mut text_p);
 
             if token.is_null() || unsafe { *token as u8 } == 0 {
                 break;
@@ -2087,7 +2087,7 @@ impl PmoveContext<'_> {
                 continue;
             }
 
-            token = COM_Parse(&mut text_p);
+            token = COM_Parse(&mut self.bg.qs, &mut text_p);
             if token.is_null() {
                 break;
             }
@@ -2095,7 +2095,7 @@ impl PmoveContext<'_> {
                 (*animset.offset(animNum as isize)).firstFrame = (atoi(token) as c_int) as u16;
             }
 
-            token = COM_Parse(&mut text_p);
+            token = COM_Parse(&mut self.bg.qs, &mut text_p);
             if token.is_null() {
                 break;
             }
@@ -2103,7 +2103,7 @@ impl PmoveContext<'_> {
                 (*animset.offset(animNum as isize)).numFrames = atoi(token) as u16;
             }
 
-            token = COM_Parse(&mut text_p);
+            token = COM_Parse(&mut self.bg.qs, &mut text_p);
             if token.is_null() {
                 break;
             }
@@ -2111,7 +2111,7 @@ impl PmoveContext<'_> {
                 (*animset.offset(animNum as isize)).loopFrames = atoi(token) as i8;
             }
 
-            token = COM_Parse(&mut text_p);
+            token = COM_Parse(&mut self.bg.qs, &mut text_p);
             if token.is_null() {
                 break;
             }

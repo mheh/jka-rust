@@ -130,13 +130,13 @@ pub fn AddRemap(
 pub fn BuildShaderStateConfig(ctx: &mut GameContext) -> *const c_char {
     unsafe {
         // `MAX_STRING_CHARS` resolves via the crate prelude glob
-        // (`mp_qshared::shared::limits`).
-        #[allow(non_upper_case_globals)] // Raven `static char buff[...]` spelling
-        static mut buff: [c_char; MAX_STRING_CHARS * 4] = [0; MAX_STRING_CHARS * 4];
+        // (`mp_qshared::shared::limits`). Raven's `static char buff[...]` now
+        // lives on `GameWorld.scratch` (safe-state Stage 3).
+        let buff: *mut c_char = (&raw mut *ctx.world.scratch.shader_state_buff).cast::<c_char>();
 
         // Zero out the buffer at the start
         for i in 0..MAX_STRING_CHARS * 4 {
-            buff[i] = 0;
+            *buff.add(i) = 0;
         }
 
         for i in 0..ctx.world.globals.remapCount as usize {
@@ -150,14 +150,10 @@ pub fn BuildShaderStateConfig(ctx: &mut GameContext) -> *const c_char {
 
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
             let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
-            Q_strcat(
-                (&raw mut buff).cast::<c_char>(),
-                (MAX_STRING_CHARS * 4) as c_int,
-                out_cstr.as_ptr(),
-            );
+            Q_strcat(buff, (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
         }
 
-        (&raw const buff).cast::<c_char>()
+        buff as *const c_char
     }
 }
 
@@ -796,16 +792,15 @@ pub fn G_UseTargets(ctx: &mut GameContext, ent: Option<EntityId>, activator: Opt
 /// Raven `tv`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:627-642`
-pub fn tv(x: f32, y: f32, z: f32) -> *mut f32 {
+pub fn tv(ctx: &mut GameContext, x: f32, y: f32, z: f32) -> *mut f32 {
     unsafe {
-        #[allow(non_upper_case_globals)] // Raven `static int index` spelling
-        static mut index: c_int = 0;
-        #[allow(non_upper_case_globals)] // Raven `static vec3_t vecs[8]` spelling
-        static mut vecs: [[f32; 3]; 8] = [[0.0; 3]; 8];
+        // Raven's function-local `static int index` / `static vec3_t vecs[8]`
+        // now live on `GameWorld.scratch` (safe-state Stage 3); the 8-slot ring
+        // rotation is preserved exactly.
+        let idx = ctx.world.scratch.tv_index as usize;
+        ctx.world.scratch.tv_index = (ctx.world.scratch.tv_index + 1) & 7;
 
-        let v = &mut vecs[index as usize];
-        index = (index + 1) & 7;
-
+        let v = &mut ctx.world.scratch.tv_vecs[idx];
         v[0] = x;
         v[1] = y;
         v[2] = z;
@@ -819,13 +814,13 @@ pub fn tv(x: f32, y: f32, z: f32) -> *mut f32 {
 /// Source: `oracle/codemp/game/g_utils.c:653-665`
 pub fn vtos(ctx: &mut GameContext, v: vec3_t) -> *mut c_char {
     unsafe {
-        #[allow(non_upper_case_globals)] // Raven `static int index` spelling
-        static mut index: c_int = 0;
-        #[allow(non_upper_case_globals)] // Raven `static char str[8][32]` spelling
-        static mut str: [[c_char; 32]; 8] = [[0; 32]; 8];
+        // Raven's function-local `static int index` / `static char str[8][32]`
+        // now live on `GameWorld.scratch` (safe-state Stage 3); the 8-slot ring
+        // rotation is preserved exactly.
+        let idx = ctx.world.scratch.vtos_index as usize;
+        ctx.world.scratch.vtos_index = (ctx.world.scratch.vtos_index + 1) & 7;
 
-        let s = &mut str[index as usize];
-        index = (index + 1) & 7;
+        let s = &mut ctx.world.scratch.vtos_str[idx];
 
         let formatted = format!("({} {} {})", v[0] as c_int, v[1] as c_int, v[2] as c_int);
         let bytes = formatted.as_bytes();

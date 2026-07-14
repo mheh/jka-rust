@@ -9,8 +9,6 @@
 
 use core::ffi::{c_char, c_int, c_ulong};
 
-use mp_game::c_format::FmtArg;
-use mp_game::q_shared::va;
 use mp_qshared::common::mp::botlib::action::{
     ACTION_ALT_ATTACK, ACTION_ATTACK, ACTION_CROUCH, ACTION_DELAYEDJUMP, ACTION_FORCEPOWER,
     ACTION_GESTURE, ACTION_JUMP, ACTION_MOVEBACK, ACTION_MOVEDOWN, ACTION_MOVEFORWARD,
@@ -19,6 +17,8 @@ use mp_qshared::common::mp::botlib::action::{
 };
 use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
+use mp_qshared::shared::q_format::FmtArg;
+use mp_qshared::shared::q_string::va;
 use mp_qshared::shared::vec3_t;
 
 use crate::be_ea::ea_consts::{ACTION_JUMPEDLASTFRAME, MAX_USERMOVE};

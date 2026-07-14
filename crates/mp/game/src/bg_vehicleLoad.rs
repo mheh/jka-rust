@@ -162,7 +162,7 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
         // `p` walks the `VehWeaponParms` text buffer via `COM_ParseExt`'s
         // `*const *const c_char` cursor idiom.
         let mut p: *const c_char = bg.VehWeaponParms.as_ptr() as *const c_char;
-        COM_BeginParseSession(cstr("vehWeapons").as_ptr());
+        COM_BeginParseSession(&mut bg.qs, cstr("vehWeapons").as_ptr());
 
         let veh_index = bg.numVehicleWeapons as usize;
         let vehWeapon: *mut vehWeaponInfo_t = &mut bg.g_vehWeaponInfo[veh_index];
@@ -171,20 +171,20 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
             if p.is_null() {
                 return VEH_WEAPON_NONE;
             }
-            let token = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if *token == 0 {
                 return qfalse as c_int;
             }
             if Q_stricmp(token, vehWeaponName) == 0 {
                 break;
             }
-            SkipBracedSection(&mut p as *mut *const c_char);
+            SkipBracedSection(&mut bg.qs, &mut p as *mut *const c_char);
         }
         if p.is_null() {
             return VEH_WEAPON_NONE;
         }
 
-        let token = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+        let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
         if *token == 0 {
             return VEH_WEAPON_NONE;
         }
@@ -193,8 +193,8 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
         }
 
         loop {
-            SkipRestOfLine(&mut p as *mut *const c_char);
-            let token = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+            SkipRestOfLine(&mut bg.qs, &mut p as *mut *const c_char);
+            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if *token == 0 {
                 let name = cstr_to_str(vehWeaponName);
                 Com_Printf(
@@ -212,7 +212,7 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
             }
             let mut parmName: [c_char; 128] = [0; 128];
             Q_strncpyz(parmName.as_mut_ptr(), token, 128);
-            let value = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+            let value = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if value.is_null() || *value == 0 {
                 let pn = cstr_to_str(parmName.as_ptr());
                 Com_Printf(
@@ -499,7 +499,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
         }
 
         let mut p: *const c_char = bg.VehicleParms.as_ptr() as *const c_char;
-        COM_BeginParseSession(cstr("vehicles").as_ptr());
+        COM_BeginParseSession(&mut bg.qs, cstr("vehicles").as_ptr());
 
         let veh_index = bg.numVehicles as usize;
         let vehicle: *mut vehicleInfo_t = &mut bg.g_vehicleInfo[veh_index];
@@ -512,20 +512,20 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
             if p.is_null() {
                 return VEHICLE_NONE;
             }
-            let token = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if *token == 0 {
                 return VEHICLE_NONE;
             }
             if Q_stricmp(token, vehicleName) == 0 {
                 break;
             }
-            SkipBracedSection(&mut p as *mut *const c_char);
+            SkipBracedSection(&mut bg.qs, &mut p as *mut *const c_char);
         }
         if p.is_null() {
             return VEHICLE_NONE;
         }
 
-        let token = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+        let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
         if *token == 0 {
             return VEHICLE_NONE;
         }
@@ -535,8 +535,8 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
 
         BG_VehicleSetDefaults(vehicle);
         loop {
-            SkipRestOfLine(&mut p as *mut *const c_char);
-            let token = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+            SkipRestOfLine(&mut bg.qs, &mut p as *mut *const c_char);
+            let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if *token == 0 {
                 let name = cstr_to_str(vehicleName);
                 Com_Printf(
@@ -554,7 +554,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
             }
             let mut parmName: [c_char; 128] = [0; 128];
             Q_strncpyz(parmName.as_mut_ptr(), token, 128);
-            let value = COM_ParseExt(&mut p as *mut *const c_char, qtrue);
+            let value = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if value.is_null() || *value == 0 {
                 let pn = cstr_to_str(parmName.as_ptr());
                 Com_Printf(

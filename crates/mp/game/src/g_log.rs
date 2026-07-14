@@ -310,8 +310,12 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
         // Write out the level name.
         let mut info: [c_char; 1024] = [0; 1024];
         trap::GetServerinfo(engine, GGetServerinfoArgs::new(info.as_mut_ptr(), 1024));
-        let mapname_full =
-            cstr_to_str(Info_ValueForKey(info.as_ptr(), cstr("mapname").as_ptr())).to_string();
+        let mapname_full = cstr_to_str(Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            info.as_ptr(),
+            cstr("mapname").as_ptr(),
+        ))
+        .to_string();
         // strncpy(mapname, ..., sizeof(mapname)-1) -> 127-byte cap.
         let mapname: String = mapname_full.chars().take(127).collect();
 

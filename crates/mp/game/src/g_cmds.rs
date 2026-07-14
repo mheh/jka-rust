@@ -3098,7 +3098,11 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
 
             let arenaInfo = crate::g_bot::G_GetArenaInfoByMap(ctx, cstr(&arg2_s).as_ptr());
             let mut mapName = if !arenaInfo.is_null() {
-                crate::q_shared::Info_ValueForKey(arenaInfo, cstr("longname").as_ptr())
+                crate::q_shared::Info_ValueForKey(
+                    &mut ctx.world.bg_state.qs,
+                    arenaInfo,
+                    cstr("longname").as_ptr(),
+                )
             } else {
                 std::ptr::null_mut()
             };

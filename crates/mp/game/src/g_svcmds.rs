@@ -441,16 +441,16 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(fh));
 
     let banIPFile = cstr("banip.txt");
-    crate::q_shared::COM_BeginParseSession(banIPFile.as_ptr());
+    crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, banIPFile.as_ptr());
 
     let mut p: *const c_char = ban_ip_buffer.as_ptr();
-    let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
+    let token = crate::q_shared::COM_ParseExt(&mut ctx.world.bg_state.qs, &mut p, qtrue);
 
     if !token.is_null() {
         ctx.world.globals.numIPFilters = atoi(token);
 
         for i in 0..(ctx.world.globals.numIPFilters as usize) {
-            let token = crate::q_shared::COM_ParseExt(&mut p, qtrue);
+            let token = crate::q_shared::COM_ParseExt(&mut ctx.world.bg_state.qs, &mut p, qtrue);
             if !token.is_null() {
                 let token_str = unsafe { std::ffi::CStr::from_ptr(token).to_string_lossy() };
                 if token_str.to_lowercase() == "unused" {

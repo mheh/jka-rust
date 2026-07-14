@@ -3,8 +3,8 @@
 //!
 //! All functions are ported: `GM_Move` reads the canonical `NIF_COLLISION`
 //! bit, `GM_CheckFireState`/`NPC_BSGM_Attack`/`NPC_BSGM_Default` place their
-//! `*4` state in `ctx.world.globals`, and `impactPos4` lives in the file-static
-//! `IMPACT_POS_4` below.
+//! `*4` state in `ctx.world.globals`, and `impactPos4` lives in
+//! `ctx.world.scratch.impact_pos_4` (safe-state Stage 3).
 //!
 //! Safe-state migration **Stage 2b** (body sweep): every world reach is a
 //! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())`
@@ -64,9 +64,10 @@ const FRAMETIME: c_int = 100;
 // `crate::npc::nav_info_s::NIF_COLLISION` through the prelude glob.
 
 // Raven file-static `vec3_t impactPos4` — shared across GM_CheckFireState,
-// NPC_BSGM_Attack, and others for caching impact positions.
+// NPC_BSGM_Attack, and others for caching impact positions. Now owned by
+// `GameWorld.scratch` (safe-state Stage 3, §B3), reached as
+// `ctx.world.scratch.impact_pos_4`.
 // Source: `oracle/codemp/game/NPC_AI_GalakMech.c`
-static mut IMPACT_POS_4: vec3_t = [0.0; 3];
 
 // Vector helpers are the canonical `crate::q_math` forms reached via the
 // prelude glob: `_VectorCopy`/`_VectorSubtract`/`_VectorMA` (out-param) and
@@ -851,7 +852,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
                         SPOT_HEAD,
                         &mut muzzle,
                     );
-                    if VectorCompare(IMPACT_POS_4, vec3_origin) != 0 {
+                    if VectorCompare(ctx.world.scratch.impact_pos_4, vec3_origin) != 0 {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut tr: trace_t = core::mem::zeroed();
                         let mut forward: vec3_t = [0.0; 3];
@@ -870,7 +871,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
                                 MASK_SHOT,
                             ),
                         );
-                        _VectorCopy(tr.endpos, &mut *(&raw mut IMPACT_POS_4));
+                        _VectorCopy(tr.endpos, &mut ctx.world.scratch.impact_pos_4);
                     }
 
                     // see if impact would be too close to me
@@ -881,7 +882,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
                         }
                     }
 
-                    dist = DistanceSquared(IMPACT_POS_4, muzzle);
+                    dist = DistanceSquared(ctx.world.scratch.impact_pos_4, muzzle);
 
                     if dist < distThreshold {
                         // impact would be too close to me
@@ -895,7 +896,10 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
                                 distThreshold = 262144.0; // 512*512
                             }
                         }
-                        dist = DistanceSquared(IMPACT_POS_4, (*npc_info).enemyLastSeenLocation);
+                        dist = DistanceSquared(
+                            ctx.world.scratch.impact_pos_4,
+                            (*npc_info).enemyLastSeenLocation,
+                        );
                         if dist > distThreshold {
                             // impact would be too far from enemy
                             tooFar = qtrue;
@@ -1059,7 +1063,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
         ctx.world.globals.faceEnemy4 = qfalse;
         ctx.world.globals.shoot4 = qfalse;
         ctx.world.globals.hitAlly4 = qfalse;
-        VectorClear(&mut *(&raw mut IMPACT_POS_4));
+        VectorClear(&mut ctx.world.scratch.impact_pos_4);
         ctx.world.globals.enemyDist4 =
             DistanceSquared((*npc_ent).r.currentOrigin, (*enemy_ent).r.currentOrigin);
 
@@ -1341,13 +1345,13 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                     // `impactPos4` is a file static shared with GM_CheckFireState; copy it
                     // out, let NPC_ShotEntity write through the local, then store back so the
                     // later reads see the same value C's file-static vec3_t would hold.
-                    let mut impactPos4 = IMPACT_POS_4;
+                    let mut impactPos4 = ctx.world.scratch.impact_pos_4;
                     let hit = crate::NPC_combat::NPC_ShotEntity(
                         ctx,
                         ctx.entity_id_of(enemy_ent),
                         Some(&mut impactPos4),
                     );
-                    *(&raw mut IMPACT_POS_4) = impactPos4;
+                    ctx.world.scratch.impact_pos_4 = impactPos4;
                     let hit_ent = g_entities_base.add(hit as usize);
                     if hit == (*enemy_ent).s.number as c_int
                         || (!hit_ent.is_null()
@@ -1422,13 +1426,13 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
 
             // `impactPos4` is a file static shared with GM_CheckFireState; copy it out, let
             // NPC_ShotEntity write through the local, then store back (matches C's file-static).
-            let mut impactPos4 = IMPACT_POS_4;
+            let mut impactPos4 = ctx.world.scratch.impact_pos_4;
             let hit = crate::NPC_combat::NPC_ShotEntity(
                 ctx,
                 ctx.entity_id_of(enemy_ent),
                 Some(&mut impactPos4),
             );
-            *(&raw mut IMPACT_POS_4) = impactPos4;
+            ctx.world.scratch.impact_pos_4 = impactPos4;
             let hit_ent = g_entities_base.add(hit as usize);
             if hit == (*enemy_ent).s.number as c_int
                 || (!hit_ent.is_null()

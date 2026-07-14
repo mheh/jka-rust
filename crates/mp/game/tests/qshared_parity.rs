@@ -27,9 +27,9 @@ use mp_game::q_shared::{
     va, COM_BeginParseSession, COM_Compress, COM_DefaultExtension, COM_GetCurrentParseLine,
     COM_ParseExt, COM_StripExtension, Com_Clamp, Com_Clampi, Com_sprintf, Info_NextPair,
     Info_RemoveKey, Info_RemoveKey_Big, Info_SetValueForKey, Info_SetValueForKey_Big,
-    Info_Validate, Info_ValueForKey, Q_CleanStr, Q_PrintStrlen, Q_isalpha, Q_islower, Q_isprint,
-    Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp, Q_strncpyz, Q_strrchr,
-    Q_strupr, SkipBracedSection, SkipRestOfLine,
+    Info_Validate, Info_ValueForKey, QSharedScratch, Q_CleanStr, Q_PrintStrlen, Q_isalpha,
+    Q_islower, Q_isprint, Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp,
+    Q_strncpyz, Q_strrchr, Q_strupr, SkipBracedSection, SkipRestOfLine,
 };
 
 fn oracle_dir() -> PathBuf {
@@ -142,17 +142,23 @@ fn dump_clamp(o: &mut String) {
 fn dump_tokens(o: &mut String) {
     o.push_str("== tokens ==\n");
     let cb = cbuf_b(&read_fixture("tokens.txt"));
+    let mut qs = QSharedScratch::zeroed();
 
     // pass 1: allowLineBreaks = qtrue
     let name = cstr("tokens");
-    COM_BeginParseSession(name.as_ptr());
+    COM_BeginParseSession(&mut qs, name.as_ptr());
     let mut p: *const c_char = cb.as_ptr();
     for _ in 0..200 {
-        let tok = COM_ParseExt(&mut p, qtrue);
+        let tok = COM_ParseExt(&mut qs, &mut p, qtrue);
         let eof = p.is_null();
         let _ = write!(o, "qt ");
         qstr_p(o, tok);
-        let _ = writeln!(o, " line {} nul {}", COM_GetCurrentParseLine(), eof as i32);
+        let _ = writeln!(
+            o,
+            " line {} nul {}",
+            COM_GetCurrentParseLine(&qs),
+            eof as i32
+        );
         let first = unsafe { *tok };
         if first == 0 && eof {
             break;
@@ -160,14 +166,19 @@ fn dump_tokens(o: &mut String) {
     }
 
     // pass 2: allowLineBreaks = qfalse (empty token returned at line breaks)
-    COM_BeginParseSession(name.as_ptr());
+    COM_BeginParseSession(&mut qs, name.as_ptr());
     p = cb.as_ptr();
     for _ in 0..200 {
-        let tok = COM_ParseExt(&mut p, qfalse);
+        let tok = COM_ParseExt(&mut qs, &mut p, qfalse);
         let eof = p.is_null();
         let _ = write!(o, "qf ");
         qstr_p(o, tok);
-        let _ = writeln!(o, " line {} nul {}", COM_GetCurrentParseLine(), eof as i32);
+        let _ = writeln!(
+            o,
+            " line {} nul {}",
+            COM_GetCurrentParseLine(&qs),
+            eof as i32
+        );
         if eof {
             break;
         }
@@ -196,11 +207,12 @@ fn dump_braced(o: &mut String) {
         "noBrace token here",
     ];
     let name = cstr("braced");
+    let mut qs = QSharedScratch::zeroed();
     for (i, input) in cases.iter().enumerate() {
         let cb = cbuf(input);
-        COM_BeginParseSession(name.as_ptr());
+        COM_BeginParseSession(&mut qs, name.as_ptr());
         let mut p: *const c_char = cb.as_ptr();
-        SkipBracedSection(&mut p);
+        SkipBracedSection(&mut qs, &mut p);
         let off: i64 = if p.is_null() {
             -1
         } else {
@@ -209,9 +221,9 @@ fn dump_braced(o: &mut String) {
         let rest: Vec<u8> = if p.is_null() {
             Vec::new()
         } else {
-            read_cstr(COM_ParseExt(&mut p, qtrue))
+            read_cstr(COM_ParseExt(&mut qs, &mut p, qtrue))
         };
-        let line = COM_GetCurrentParseLine();
+        let line = COM_GetCurrentParseLine(&qs);
         let _ = write!(o, "br {i} off {off} line {line} rest ");
         qstr(o, &rest);
         let _ = writeln!(o);
@@ -227,16 +239,17 @@ fn dump_skipline(o: &mut String) {
         "a\nb\nc",
     ];
     let name = cstr("skipline");
+    let mut qs = QSharedScratch::zeroed();
     for (i, input) in cases.iter().enumerate() {
         let cb = cbuf(input);
-        COM_BeginParseSession(name.as_ptr());
+        COM_BeginParseSession(&mut qs, name.as_ptr());
         let mut p: *const c_char = cb.as_ptr();
-        SkipRestOfLine(&mut p);
+        SkipRestOfLine(&mut qs, &mut p);
         // Raven's SkipRestOfLine consumes the terminating NUL when there is no
         // newline, leaving the cursor one past the NUL; dereferencing it is UB.
         // Only the (defined) offset + line counter are dumped (§19).
         let off = unsafe { p.offset_from(cb.as_ptr()) };
-        let line = COM_GetCurrentParseLine();
+        let line = COM_GetCurrentParseLine(&qs);
         let _ = writeln!(o, "sl {i} off {off} line {line}");
     }
 }
@@ -485,10 +498,11 @@ fn dump_strhelpers(o: &mut String) {
 
 fn dump_va(o: &mut String) {
     o.push_str("== va ==\n");
+    let mut qs = QSharedScratch::zeroed();
     let f1 = cstr("first-literal");
-    let p1 = va(f1.as_ptr(), &[]);
+    let p1 = va(&mut qs, f1.as_ptr(), &[]);
     let f2 = cstr("second-literal");
-    let p2 = va(f2.as_ptr(), &[]);
+    let p2 = va(&mut qs, f2.as_ptr(), &[]);
     let _ = write!(o, "va1 ");
     qstr_p(o, p1);
     let _ = writeln!(o);
@@ -496,7 +510,7 @@ fn dump_va(o: &mut String) {
     qstr_p(o, p2);
     let _ = writeln!(o);
     let f3 = cstr("third-literal");
-    let p3 = va(f3.as_ptr(), &[]); // reuses p1's slot (2-slot rotation)
+    let p3 = va(&mut qs, f3.as_ptr(), &[]); // reuses p1's slot (2-slot rotation)
     let _ = write!(o, "va1b ");
     qstr_p(o, p1);
     let _ = writeln!(o);
@@ -541,7 +555,7 @@ const SKV: &[(&str, &str)] = &[
     ("quote", "a\"b"),
 ];
 
-fn dump_info_record(o: &mut String, idx: usize, rec: &[u8]) {
+fn dump_info_record(qs: &mut QSharedScratch, o: &mut String, idx: usize, rec: &[u8]) {
     let cb = cbuf_b(rec);
     let s = cb.as_ptr();
 
@@ -552,7 +566,7 @@ fn dump_info_record(o: &mut String, idx: usize, rec: &[u8]) {
 
     for vk in VKEYS {
         let k = cbuf(vk);
-        let v = Info_ValueForKey(s, k.as_ptr());
+        let v = Info_ValueForKey(qs, s, k.as_ptr());
         let _ = write!(o, "vfk ");
         qstr(o, vk.as_bytes());
         let _ = write!(o, " ");
@@ -639,9 +653,10 @@ fn dump_info_record(o: &mut String, idx: usize, rec: &[u8]) {
 
 fn dump_info(o: &mut String) {
     o.push_str("== info ==\n");
+    let mut qs = QSharedScratch::zeroed();
     let data = read_fixture("infostrings.txt");
     for (idx, rec) in data.split(|&b| b == 0).enumerate() {
-        dump_info_record(o, idx, rec);
+        dump_info_record(&mut qs, o, idx, rec);
     }
 
     // Big infostring in (MAX_INFO_STRING, BIG_INFO_STRING); exercises the
@@ -658,11 +673,11 @@ fn dump_info(o: &mut String) {
     let _ = writeln!(o, "big val {}", Info_Validate(s));
     let k50 = cbuf("k50");
     let _ = write!(o, "big vfk k50 ");
-    qstr_p(o, Info_ValueForKey(s, k50.as_ptr()));
+    qstr_p(o, Info_ValueForKey(&mut qs, s, k50.as_ptr()));
     let _ = writeln!(o);
     let miss = cbuf("missing");
     let _ = write!(o, "big vfk missing ");
-    qstr_p(o, Info_ValueForKey(s, miss.as_ptr()));
+    qstr_p(o, Info_ValueForKey(&mut qs, s, miss.as_ptr()));
     let _ = writeln!(o);
     let mut h: *const c_char = s;
     let mut key = vec![0 as c_char; 1024];

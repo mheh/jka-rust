@@ -269,7 +269,11 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         let userinfo_str = cstr_to_str(userinfo.as_ptr());
         let key = cstr("forcepowers");
-        let val = Info_ValueForKey(cstr(&userinfo_str).as_ptr(), key.as_ptr());
+        let val = Info_ValueForKey(
+            &mut ctx.world.bg_state.qs,
+            cstr(&userinfo_str).as_ptr(),
+            key.as_ptr(),
+        );
         write_cstr_field(&mut forcePowers, &cstr_to_str(val));
 
         // PORT-NOTE(bot-forcepowers): `(*ent).r.svFlags & SVF_BOT` + `botstates`

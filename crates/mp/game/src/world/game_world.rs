@@ -80,6 +80,11 @@ pub struct GameWorld {
     /// Untyped raw bytes, same shape as `memoryPool` above.
     /// Source: `oracle/codemp/game/g_main.c:881`
     pub gSharedBuffer: Box<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>,
+
+    /// Game-tier function-local persistent/rotating scratch (safe-state Stage 3,
+    /// §B3: the `g_*`/`w_*`/`NPC_*` function-local `static` return buffers).
+    /// Source: `crate::world::game_scratch::GameScratch`
+    pub scratch: crate::world::game_scratch::GameScratch,
 }
 
 impl GameWorld {
@@ -159,6 +164,7 @@ impl GameWorld {
             bg_state: crate::bg_channel::BgState::new(),
             refTagOwnerMap,
             gSharedBuffer,
+            scratch: crate::world::game_scratch::GameScratch::zeroed(),
         }
     }
 
@@ -206,6 +212,7 @@ impl GameWorld {
             addr_of_mut!((*p).bg_state).write(crate::bg_channel::BgState::new());
             addr_of_mut!((*p).refTagOwnerMap).write(native_platform::zeroed_box());
             addr_of_mut!((*p).gSharedBuffer).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).scratch).write(crate::world::game_scratch::GameScratch::zeroed());
             boxed.assume_init()
         }
     }

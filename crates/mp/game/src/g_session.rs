@@ -270,7 +270,11 @@ pub fn G_InitSessionData(
                 if isBot == qfalse {
                     (*client).sess.sessionTeam = TEAM_SPECTATOR;
                 } else {
-                    let value = Info_ValueForKey(userinfo, cstr("team").as_ptr());
+                    let value = Info_ValueForKey(
+                        &mut ctx.world.bg_state.qs,
+                        userinfo,
+                        cstr("team").as_ptr(),
+                    );
                     let value_char = if value.is_null() { 0 as c_char } else { *value };
                     let client_id = EntityId(client.offset_from(ctx.world.level.clients) as u32);
                     if value_char == b'r' as c_char || value_char == b'R' as c_char {
@@ -284,7 +288,8 @@ pub fn G_InitSessionData(
                 }
             }
         } else {
-            let value = Info_ValueForKey(userinfo, cstr("team").as_ptr());
+            let value =
+                Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo, cstr("team").as_ptr());
             let value_char = if value.is_null() { 0 as c_char } else { *value };
             if value_char == b's' as c_char {
                 (*client).sess.sessionTeam = TEAM_SPECTATOR;
