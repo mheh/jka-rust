@@ -437,7 +437,6 @@ pub fn Sniper_CheckMoveState(ctx: &mut GameContext) {
             let goal_ent =
                 &mut ctx.world.g_entities[(*NPCInfo).goalEntity.unwrap().index()] as *mut gentity_t;
             let npc_id = ctx.entity_id_of(NPC);
-            let delay = ctx.world.bg_state.rng.Q_irand(4000, 8000);
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
@@ -501,6 +500,7 @@ pub fn Sniper_CheckMoveState(ctx: &mut GameContext) {
             }
 
             // keep going, hold of roamTimer until we get there
+            let delay = ctx.world.bg_state.rng.Q_irand(4000, 8000);
             TIMER_Set(ctx, npc_id, c"roamTime".as_ptr(), delay);
         }
     }
@@ -874,7 +874,6 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
 
         let npc_id = ctx.entity_id_of(NPC);
-        let alert_event = NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, 4);
         // Don't do anything if we're hurt
         if (*NPC).painDebounceTime > ctx.world.level.time {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -888,9 +887,12 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
             return;
         }
 
-        if TIMER_Done(ctx, npc_id, c"flee".as_ptr()) != 0
-            && NPC_CheckForDanger(ctx, alert_event) != 0
-        {
+        // Oracle short-circuit: NPC_CheckAlertEvents (side-effectful) runs only
+        // when the flee timer is done (NPC_AI_Sniper.c:658).
+        if TIMER_Done(ctx, npc_id, c"flee".as_ptr()) != 0 && {
+            let alert_event = NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, 4);
+            NPC_CheckForDanger(ctx, alert_event) != 0
+        } {
             // AEL_DANGER = 4, going to run
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;

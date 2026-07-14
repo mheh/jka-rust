@@ -318,7 +318,6 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
             {
                 let mut newBolt: c_int;
                 let self_id = ctx.entity_id_of(self_);
-                let delay = ctx.world.bg_state.rng.Q_irand(300, 1100);
                 match ctx.world.bg_state.rng.Q_irand(1, 14) {
                     // Find place to generate explosion
                     1 => {
@@ -528,6 +527,7 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
                     _ => {}
                 }
 
+                let delay = ctx.world.bg_state.rng.Q_irand(300, 1100);
                 crate::g_timer::TIMER_Set(ctx, self_id, c"dyingExplosion".as_ptr(), delay);
             }
         } else {

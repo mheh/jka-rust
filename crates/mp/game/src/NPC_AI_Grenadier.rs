@@ -691,14 +691,6 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
         let npc_info_ptr = ctx.world.globals.NPCInfo;
 
         let npc_id = ctx.entity_id_of(npc_ptr);
-        let alert_event = NPC_CheckAlertEvents(
-            ctx,
-            qtrue,
-            qtrue,
-            -1,
-            qfalse,
-            alertEventLevel_e::AEL_DANGER as c_int,
-        );
         if npc_info_ptr.is_null() || npc_ptr.is_null() {
             return;
         }
@@ -716,9 +708,19 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
             return;
         }
 
-        if TIMER_Done(ctx, npc_id, c"flee".as_ptr() as *const c_char) != qfalse
-            && NPC_CheckForDanger(ctx, alert_event) != qfalse
-        {
+        // Oracle short-circuit: NPC_CheckAlertEvents (side-effectful) runs only
+        // when the flee timer is done (NPC_AI_Grenadier.c:461-478).
+        if TIMER_Done(ctx, npc_id, c"flee".as_ptr() as *const c_char) != qfalse && {
+            let alert_event = NPC_CheckAlertEvents(
+                ctx,
+                qtrue,
+                qtrue,
+                -1,
+                qfalse,
+                alertEventLevel_e::AEL_DANGER as c_int,
+            );
+            NPC_CheckForDanger(ctx, alert_event) != qfalse
+        } {
             // going to run
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;

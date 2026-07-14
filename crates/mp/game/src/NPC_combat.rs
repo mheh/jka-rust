@@ -568,11 +568,6 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
                 } else {
                     let mut minErr = 3;
                     let mut maxErr = 12;
-                    let self_id = ctx.entity_id_of(self_).unwrap();
-                    let delay = ctx.world.bg_state.rng.Q_irand(
-                        (*npc).stats.aim - (maxErr * (3 - g_spskill)),
-                        (*npc).stats.aim - (minErr * (3 - g_spskill)),
-                    );
                     if (*client).NPC_class == class_t::CLASS_IMPWORKER {
                         minErr = 15;
                         maxErr = 30;
@@ -583,6 +578,11 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
                         minErr = 5;
                         maxErr = 15;
                     }
+                    let self_id = ctx.entity_id_of(self_).unwrap();
+                    let delay = ctx.world.bg_state.rng.Q_irand(
+                        (*npc).stats.aim - (maxErr * (3 - g_spskill)),
+                        (*npc).stats.aim - (minErr * (3 - g_spskill)),
+                    );
 
                     G_AimSet(ctx, self_id, delay);
                 }
