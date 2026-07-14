@@ -69,6 +69,14 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
   `mp/ffa3` with 8 bots against the PATCHED oracle dylib as its game module
   and runs 10+ minutes without truncation crashes (the exact scenario that
   segfaulted pre-patch).
+  **STATUS: DONE 2026-07-13.** Two fixes: (a) build.sh widens vmMain params +
+  return + the `(int)ClientConnect` denied-string cast to `__INTPTR_TYPE__`;
+  (b) the patched dylib immediately exposed an engine-side twin —
+  `BOTLIB_USER_COMMAND`'s clientNum read full-width in `sv_game.rs`, but a C
+  module's `int` varargs leave the slot's high 32 bits garbage (our Rust
+  module always passes clean full words, masking it). Full dispatch audited:
+  only bad site. Six mock scenarios byte-identical on the patched dylib;
+  11-min 8-bot soak on mp/ffa3 clean.
 - **G2 — Input tap + synthetic-client injection in our engine.** Server-side:
   per-frame capture of every client's `usercmd_t` (+ connect/disconnect/
   userinfo events) to a channel/log; injection path that feeds captured

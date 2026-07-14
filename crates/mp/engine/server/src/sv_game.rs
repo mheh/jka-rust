@@ -1740,10 +1740,12 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::BOTLIB_USER_COMMAND as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
+            // The clientNum trap word is ABI-typed `int`; a C module's variadic
+            // slot leaves the high 32 bits garbage, so read only the low 32.
             crate::sv_client::SV_ClientThink(
                 view.common,
                 sv,
-                sv.svs.clients.offset(*args.offset(1) as isize),
+                sv.svs.clients.offset(*args.offset(1) as c_int as isize),
                 vma(view.common, args, 2) as *mut usercmd_t,
             );
             return 0;

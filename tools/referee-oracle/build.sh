@@ -10,9 +10,11 @@
 # The oracle tree (oracle/**) is NEVER edited. Every game/*.c is compiled
 # straight from a throwaway COPY under build/src/, patched in-place by the
 # python step below: Raven's OWN `#define qboolean int` is activated, SnapVector
-# is retargeted to retail-rounding rint(), and float-arg libm calls (atan2f,
+# is retargeted to retail-rounding rint(), float-arg libm calls (atan2f,
 # sqrtf, ...) are forced back to the double family MSVC's C compile promoted
-# them to, so this C++-compiled oracle matches retail/our f64 parity bar.
+# them to (so this C++-compiled oracle matches retail/our f64 parity bar), and
+# vmMain's arg/return words are widened int -> intptr_t so the dylib survives
+# pointer-carrying engine->game calls on LP64 hosts.
 #
 # Requires a real GCC (Homebrew `gcc`): the unmodified 32-bit-era C++ source needs
 # `-fpermissive` to accept its `FOFS` pointer->int casts on a 64-bit host, which
@@ -124,6 +126,38 @@ new_fmodproto = (
 )
 assert old_fmodproto in s, "q_shared.h fmod() prototype not found — oracle changed?"
 s = s.replace(old_fmodproto, new_fmodproto, 1)
+
+open(p, "w").write(s)
+PY
+
+# vmMain word-width patch (engine lockstep referee, G1): Raven's
+# `int vmMain(int command, int arg0..arg11)` is a 32-bit-era signature. Our
+# engine's VM_Call passes 12 pointer-width words (RawVmMain — see
+# crates/mp/engine/qcommon/src/vm_fns.rs); on LP64 the oracle's `int` params
+# truncate every pointer-carrying word (GAME_NAV_* vec3 args,
+# GAME_ROFF_NOTETRACK_CALLBACK's string — proven segfault hosting bots
+# 2026-07-13), and `(int)ClientConnect(...)` truncates the returned
+# denied-string pointer. Widen the params, the return, and that one return
+# cast to GCC's builtin __INTPTR_TYPE__ (no include needed). All other
+# dispatch arms narrow intptr_t -> int implicitly, which is exactly the
+# 32-bit behavior for the small values they carry.
+python3 - <<'PY'
+p = "build/src/codemp/game/g_main.c"
+s = open(p).read()
+
+old_sig = ("int vmMain( int command, int arg0, int arg1, int arg2, int arg3, "
+           "int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, "
+           "int arg10, int arg11  ) {")
+new_sig = ("__INTPTR_TYPE__ vmMain( int command, "
+           + ", ".join("__INTPTR_TYPE__ arg%d" % i for i in range(12))
+           + " ) { /* referee-oracle: LP64-widened words (G1) */")
+assert old_sig in s, "g_main.c vmMain signature not found — oracle changed?"
+s = s.replace(old_sig, new_sig, 1)
+
+old_cc = "return (int)ClientConnect( arg0, arg1, arg2 );"
+new_cc = "return (__INTPTR_TYPE__)ClientConnect( arg0, arg1, arg2 );"
+assert old_cc in s, "g_main.c ClientConnect return cast not found — oracle changed?"
+s = s.replace(old_cc, new_cc, 1)
 
 open(p, "w").write(s)
 PY
