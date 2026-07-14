@@ -13,6 +13,14 @@
 //! PARKED (see PORT-NOTE markers): 10 functions. Only `NPC_Wampa_Precache`
 //! is ported (accesses no implicit globals, only calls G_SoundIndex with a
 //! string literal).
+//!
+//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
+//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())` raw-deref
+//! regime is retired. Per-body entity/`gNPC_t`/`gclient_t` re-derives stay raw by
+//! design (`// STAGE-1:` markers and their `unsafe` blocks hold the genuine raw
+//! ops); ctx-borrowing call args are hoisted into role-named locals in source
+//! order so RNG/trap ordering is unchanged. This file is referee-blind — parity
+//! rests on the compile + golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_utils::G_SoundIndex;
@@ -26,7 +34,7 @@ use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -132,14 +140,14 @@ pub fn NPC_Wampa_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:66-76`
 pub fn Wampa_Idle(ctx: &mut GameContext) {
     unsafe {
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc_info = ctx.world.globals.NPCInfo;
         if !npc_info.is_null() {
             (*npc_info).localState = LSTATE_CLEAR;
         }
 
         //If we have somewhere to go, then do that
         if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
-            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
+            ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         }
     }
@@ -152,20 +160,19 @@ pub fn Wampa_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let level_time = (*ctx.world_raw()).level.time as f32;
+        let level_time = ctx.world.level.time as f32;
         if (*self_).wait < level_time {
-            (*self_).wait =
-                level_time + (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 20000) as f32;
-            let __h397 = ctx.entity_id_of(self_).unwrap();
-            let __h398 = (*ctx.world_raw()).bg_state.rng.Q_irand(
+            (*self_).wait = level_time + ctx.world.bg_state.rng.Q_irand(5000, 20000) as f32;
+            let self_id = ctx.entity_id_of(self_).unwrap();
+            let anim = ctx.world.bg_state.rng.Q_irand(
                 crate::prelude::BOTH_GESTURE1 as c_int,
                 crate::prelude::BOTH_GESTURE2 as c_int,
             );
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                __h397,
+                self_id,
                 SETANIM_BOTH,
-                __h398,
+                anim,
                 (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD),
             );
             crate::g_timer::TIMER_Set(
@@ -185,8 +192,8 @@ pub fn Wampa_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:94-119`
 pub fn Wampa_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         if !npc_info.is_null() {
             (*npc_info).localState = LSTATE_CLEAR;
@@ -194,13 +201,13 @@ pub fn Wampa_Patrol(ctx: &mut GameContext) {
 
         //If we have somewhere to go, then do that
         if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
-            (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
+            ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         } else {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolTime".as_ptr()) != 0 {
-                let __h399 = ctx.entity_id_of(npc);
-                let __h400 = ((*ctx.world_raw()).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
-                crate::g_timer::TIMER_Set(ctx, __h399, c"patrolTime".as_ptr(), __h400);
+                let npc_id = ctx.entity_id_of(npc);
+                let patrol_time = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+                crate::g_timer::TIMER_Set(ctx, npc_id, c"patrolTime".as_ptr(), patrol_time);
             }
         }
 
@@ -209,9 +216,9 @@ pub fn Wampa_Patrol(ctx: &mut GameContext) {
             return;
         }
         Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap());
-        let __h401 = ctx.entity_id_of(npc);
-        let __h402 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
-        crate::g_timer::TIMER_Set(ctx, __h401, c"lookForNewEnemy".as_ptr(), __h402);
+        let npc_id = ctx.entity_id_of(npc);
+        let look_for_new_enemy = ctx.world.bg_state.rng.Q_irand(5000, 15000);
+        crate::g_timer::TIMER_Set(ctx, npc_id, c"lookForNewEnemy".as_ptr(), look_for_new_enemy);
     }
 }
 
@@ -220,8 +227,8 @@ pub fn Wampa_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:126-169`
 pub fn Wampa_Move(ctx: &mut GameContext, visible: qboolean) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         if !npc_info.is_null() && (*npc_info).localState != LSTATE_WAITING {
             (*npc_info).goalEntity = (*npc).enemy;
@@ -229,7 +236,7 @@ pub fn Wampa_Move(ctx: &mut GameContext, visible: qboolean) {
             if !(*npc).enemy.is_none() {
                 // pick correct movement speed and anim
                 // run by default
-                (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
+                ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
                 if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"runfar".as_ptr()) == 0
                     || crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"runclose".as_ptr())
                         == 0
@@ -239,31 +246,29 @@ pub fn Wampa_Move(ctx: &mut GameContext, visible: qboolean) {
                     == 0
                 {
                     // keep walking for a bit
-                    (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
+                    ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
                 } else if visible != 0
-                    && (*ctx.world_raw()).globals.enemyDist > 384.0
+                    && ctx.world.globals.enemyDist > 384.0
                     && (*npc_info).stats.runSpeed == 180
                 {
                     // fast run, all fours
                     (*npc_info).stats.runSpeed = 300;
-                    let __h403 = ctx.entity_id_of(npc);
-                    let __h404 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
-                    crate::g_timer::TIMER_Set(ctx, __h403, c"runfar".as_ptr(), __h404);
-                } else if (*ctx.world_raw()).globals.enemyDist > 256.0
-                    && (*npc_info).stats.runSpeed == 300
-                {
+                    let npc_id = ctx.entity_id_of(npc);
+                    let runfar = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+                    crate::g_timer::TIMER_Set(ctx, npc_id, c"runfar".as_ptr(), runfar);
+                } else if ctx.world.globals.enemyDist > 256.0 && (*npc_info).stats.runSpeed == 300 {
                     // slow run, upright
                     (*npc_info).stats.runSpeed = 180;
-                    let __h405 = ctx.entity_id_of(npc);
-                    let __h406 = (*ctx.world_raw()).bg_state.rng.Q_irand(3000, 5000);
-                    crate::g_timer::TIMER_Set(ctx, __h405, c"runclose".as_ptr(), __h406);
-                } else if (*ctx.world_raw()).globals.enemyDist < 128.0 {
+                    let npc_id = ctx.entity_id_of(npc);
+                    let runclose = ctx.world.bg_state.rng.Q_irand(3000, 5000);
+                    crate::g_timer::TIMER_Set(ctx, npc_id, c"runclose".as_ptr(), runclose);
+                } else if ctx.world.globals.enemyDist < 128.0 {
                     // walk
                     (*npc_info).stats.runSpeed = 180;
-                    (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
-                    let __h407 = ctx.entity_id_of(npc);
-                    let __h408 = (*ctx.world_raw()).bg_state.rng.Q_irand(4000, 6000);
-                    crate::g_timer::TIMER_Set(ctx, __h407, c"walk".as_ptr(), __h408);
+                    ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
+                    let npc_id = ctx.entity_id_of(npc);
+                    let walk = ctx.world.bg_state.rng.Q_irand(4000, 6000);
+                    crate::g_timer::TIMER_Set(ctx, npc_id, c"walk".as_ptr(), walk);
                 }
             }
 
@@ -289,9 +294,9 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
         let mut boltOrg: [f32; 3] = [0.0; 3];
         // damage is rolled once, before the loop, and applied to every entity hit.
         let damage = if backhand != 0 {
-            (*ctx.world_raw()).bg_state.rng.Q_irand(10, 15)
+            ctx.world.bg_state.rng.Q_irand(10, 15)
         } else {
-            (*ctx.world_raw()).bg_state.rng.Q_irand(20, 30)
+            ctx.world.bg_state.rng.Q_irand(20, 30)
         };
 
         let numEnts = crate::NPC_utils::NPC_GetEntsNearBolt(
@@ -303,15 +308,15 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
         );
 
         for i in 0..(numEnts as usize) {
-            let radiusEnt = (*ctx.world_raw())
-                .g_entities
-                .get_unchecked_mut(radiusEntNums[i] as usize)
-                as *mut gentity_t;
+            let radiusEnt =
+                ctx.world
+                    .g_entities
+                    .get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
             if (*radiusEnt).inuse == 0 {
                 continue;
             }
 
-            let npc = (*ctx.world_raw()).globals.NPC;
+            let npc = ctx.world.globals.NPC;
             if radiusEnt == npc {
                 // Skip the wampa ent
                 continue;
@@ -351,10 +356,9 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                         (*((*npc).client as *mut gclient_t)).ps.viewangles,
                         &mut angs,
                     );
-                    angs[crate::prelude::YAW as usize] +=
-                        (*ctx.world_raw()).bg_state.rng.flrand(25.0, 50.0);
+                    angs[crate::prelude::YAW as usize] += ctx.world.bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] =
-                        (*ctx.world_raw()).bg_state.rng.flrand(-25.0, -15.0);
+                        ctx.world.bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
                     if (*((*radiusEnt).client as *mut gclient_t)).NPC_class
                         != crate::prelude::CLASS_WAMPA
@@ -373,7 +377,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                             &mut (*((*radiusEnt).client as *mut gclient_t)).ps as *mut _,
                         ) != 0
                             && (*radiusEnt).health > 0
-                            && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0
+                            && ctx.world.bg_state.rng.Q_irand(0, 1) != 0
                         {
                             // do pain on enemy
                             (*((*radiusEnt).client as *mut gclient_t))
@@ -382,15 +386,15 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                             (*((*radiusEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
                             (*((*radiusEnt).client as *mut gclient_t))
                                 .ps
-                                .forceHandExtendTime = (*ctx.world_raw()).level.time + 1100;
+                                .forceHandExtendTime = ctx.world.level.time + 1100;
                             (*((*radiusEnt).client as *mut gclient_t)).ps.quickerGetup = qfalse;
                         }
                     }
                 } else if (*radiusEnt).health <= 0 && !(*radiusEnt).client.is_null() {
                     // killed them, chance of dismembering
-                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                    if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                         // bite something off
-                        let hitLoc = (*ctx.world_raw()).bg_state.rng.Q_irand(
+                        let hitLoc = ctx.world.bg_state.rng.Q_irand(
                             crate::prelude::G2_MODELPART_HEAD as c_int,
                             crate::prelude::G2_MODELPART_RLEG as c_int,
                         );
@@ -423,9 +427,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                             qtrue,
                         );
                     }
-                } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) == 0
-                    && (*radiusEnt).health > 0
-                {
+                } else if ctx.world.bg_state.rng.Q_irand(0, 3) == 0 && (*radiusEnt).health > 0 {
                     // one out of every 4 normal hits does a knockdown, too
                     let mut pushDir: [f32; 3] = [0.0; 3];
                     let mut angs: [f32; 3] = [0.0; 3];
@@ -433,10 +435,9 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                         (*((*npc).client as *mut gclient_t)).ps.viewangles,
                         &mut angs,
                     );
-                    angs[crate::prelude::YAW as usize] +=
-                        (*ctx.world_raw()).bg_state.rng.flrand(25.0, 50.0);
+                    angs[crate::prelude::YAW as usize] += ctx.world.bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] =
-                        (*ctx.world_raw()).bg_state.rng.flrand(-25.0, -15.0);
+                        ctx.world.bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
                     crate::g_combat::G_Knockdown(ctx, ctx.entity_id_of(radiusEnt));
                 }
@@ -456,12 +457,12 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:267-341`
 pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc = ctx.world.globals.NPC;
         if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == 0 {
-            let __h409 = ctx.entity_id_of(npc);
-            let __h410 = (*((*npc).client as *mut gclient_t)).ps.legsTimer as c_int
-                + ((*ctx.world_raw()).bg_state.rng.random() * 200.0) as c_int;
-            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) != 0 && doCharge == 0 {
+            let npc_id = ctx.entity_id_of(npc);
+            let attacking = (*((*npc).client as *mut gclient_t)).ps.legsTimer as c_int
+                + (ctx.world.bg_state.rng.random() * 200.0) as c_int;
+            if ctx.world.bg_state.rng.Q_irand(0, 2) != 0 && doCharge == 0 {
                 // double slash
                 crate::npc_c::NPC_SetAnim(
                     ctx,
@@ -474,7 +475,7 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
             } else if doCharge != 0
                 || (distance > 270.0
                     && distance < 430.0
-                    && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0)
+                    && ctx.world.bg_state.rng.Q_irand(0, 1) == 0)
             {
                 // leap
                 let mut fwd: [f32; 3] = [0.0; 3];
@@ -515,7 +516,7 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                 crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 250);
             }
 
-            crate::g_timer::TIMER_Set(ctx, __h409, c"attacking".as_ptr(), __h410);
+            crate::g_timer::TIMER_Set(ctx, npc_id, c"attacking".as_ptr(), attacking);
             // allow us to re-evaluate our running speed/anim
             crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"runfar".as_ptr(), -1);
             crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"runclose".as_ptr(), -1);
@@ -607,7 +608,7 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
             && distance > ((*npc).r.maxs[0] as f32 + MIN_DISTANCE as f32)
         {
             // okay to keep moving
-            (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
+            ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             Wampa_Move(ctx, 1);
         }
     }
@@ -618,18 +619,17 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:344-425`
 pub fn Wampa_Combat(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
         // Raven dereferences `NPC->enemy` unguarded here; this function is only
         // called while actively engaged, so the enemy is assumed live.
-        let enemy_ent =
-            &mut (*ctx.world_raw()).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy_ent = &mut ctx.world.g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
 
         // If we cannot see our target or we have somewhere to go, then do that
         if crate::NPC_utils::NPC_ClearLOS(ctx, (*npc).r.currentOrigin, (*enemy_ent).r.currentOrigin)
             == 0
         {
-            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 10) == 0 {
+            if ctx.world.bg_state.rng.Q_irand(0, 10) == 0 {
                 if Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap()) != 0 {
                     return;
                 }
@@ -650,7 +650,7 @@ pub fn Wampa_Combat(ctx: &mut GameContext) {
         } else {
             let distance =
                 crate::q_math::Distance((*npc).r.currentOrigin, (*enemy_ent).r.currentOrigin);
-            (*ctx.world_raw()).globals.enemyDist = distance;
+            ctx.world.globals.enemyDist = distance;
             let mut advance = if distance > ((*npc).r.maxs[0] as f32 + MIN_DISTANCE as f32) {
                 qtrue
             } else {
@@ -676,7 +676,7 @@ pub fn Wampa_Combat(ctx: &mut GameContext) {
                     && crate::NPC_senses::InFOV3((*enemy_ent).r.currentOrigin, (*npc).r.currentOrigin, yawOnlyAngles, 20, 20) != 0
                 {
                     // enemy generally in front
-                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 9) == 0 {
+                    if ctx.world.bg_state.rng.Q_irand(0, 9) == 0 {
                         // 10% chance of doing charge anim
                         // go for the charge
                         doCharge = qtrue;
@@ -702,13 +702,13 @@ pub fn Wampa_Combat(ctx: &mut GameContext) {
                     Wampa_Move(ctx, 1);
                 }
             } else {
-                if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 20) == 0 {
+                if ctx.world.bg_state.rng.Q_irand(0, 20) == 0 {
                     // FIXME: only do this if we just damaged them or vice-versa?
                     if Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap()) != 0 {
                         return;
                     }
                 }
-                if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                     // FIXME: base on skill
                     Wampa_Attack(ctx, distance, doCharge);
                 }
@@ -739,23 +739,23 @@ pub fn NPC_Wampa_Pain(
         }
         if !attacker.is_null()
             && (*attacker).inuse != 0
-            && ent_id_opt((*ctx.world_raw()).g_entities.as_ptr(), attacker) != (*self_).enemy
+            && ent_id_opt(ctx.world.g_entities.as_ptr(), attacker) != (*self_).enemy
             && ((*attacker).flags & crate::prelude::FL_NOTARGET) == 0
         {
             // Resolved once; only dereferenced downstream after the `is_none()`
             // short-circuit guards it (mirrors Raven's unguarded `self->enemy->x`).
             let enemy_ptr = match (*self_).enemy {
-                Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
                 None => core::ptr::null_mut(),
             };
-            if ((*attacker).s.number == 0 && (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) == 0)
+            if ((*attacker).s.number == 0 && ctx.world.bg_state.rng.Q_irand(0, 3) == 0)
                 || (*self_).enemy.is_none()
                 || (*enemy_ptr).health == 0
                 || (!(*self_).enemy.is_none()
                     && !(*enemy_ptr).client.is_null()
                     && (*((*enemy_ptr).client as *mut gclient_t)).NPC_class
                         == crate::prelude::CLASS_WAMPA)
-                || ((*ctx.world_raw()).bg_state.rng.Q_irand(0, 4) == 0
+                || (ctx.world.bg_state.rng.Q_irand(0, 4) == 0
                     && crate::q_math::DistanceSquared(
                         (*attacker).r.currentOrigin,
                         (*self_).r.currentOrigin,
@@ -771,18 +771,28 @@ pub fn NPC_Wampa_Pain(
                     ctx.entity_id_of(self_).unwrap(),
                     ctx.entity_id_of(attacker),
                 );
-                let __h411 = ctx.entity_id_of(self_);
-                let __h412 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
-                crate::g_timer::TIMER_Set(ctx, __h411, c"lookForNewEnemy".as_ptr(), __h412);
+                let self_id = ctx.entity_id_of(self_);
+                let look_for_new_enemy = ctx.world.bg_state.rng.Q_irand(5000, 15000);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    self_id,
+                    c"lookForNewEnemy".as_ptr(),
+                    look_for_new_enemy,
+                );
                 if hitByWampa != 0 {
-                    let __h413 = ctx.entity_id_of(self_);
-                    let __h414 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 5000);
+                    let self_id = ctx.entity_id_of(self_);
+                    let wampa_infight = ctx.world.bg_state.rng.Q_irand(2000, 5000);
                     // stay mad at this Wampa for 2-5 secs before looking for attacker enemies
-                    crate::g_timer::TIMER_Set(ctx, __h413, c"wampaInfight".as_ptr(), __h414);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        self_id,
+                        c"wampaInfight".as_ptr(),
+                        wampa_infight,
+                    );
                 }
             }
         }
-        if (hitByWampa != 0 || (*ctx.world_raw()).bg_state.rng.Q_irand(0, 100) < damage) // hit by wampa, hit while holding live victim, or took a lot of damage
+        if (hitByWampa != 0 || ctx.world.bg_state.rng.Q_irand(0, 100) < damage) // hit by wampa, hit while holding live victim, or took a lot of damage
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE1) as i32
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr()) != 0
@@ -808,10 +818,10 @@ pub fn NPC_Wampa_Pain(
                             &mut (*self_).s.angles,
                         );
 
-                        let __h415 = ctx.entity_id_of(self_);
-                        let __h416 = (*((*self_).client as *mut gclient_t)).ps.legsTimer
-                            + (*ctx.world_raw()).bg_state.rng.Q_irand(0, 500);
-                        if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+                        let self_id = ctx.entity_id_of(self_);
+                        let taking_pain = (*((*self_).client as *mut gclient_t)).ps.legsTimer
+                            + ctx.world.bg_state.rng.Q_irand(0, 500);
+                        if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
                                 ctx.entity_id_of(self_).unwrap(),
@@ -828,7 +838,12 @@ pub fn NPC_Wampa_Pain(
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                             );
                         }
-                        crate::g_timer::TIMER_Set(ctx, __h415, c"takingPain".as_ptr(), __h416);
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            self_id,
+                            c"takingPain".as_ptr(),
+                            taking_pain,
+                        );
                         // allow us to re-evaluate our running speed/anim
                         crate::g_timer::TIMER_Set(
                             ctx,
@@ -865,8 +880,8 @@ pub fn NPC_Wampa_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:506-654`
 pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         (*((*npc).client as *mut gclient_t)).ps.eFlags2 &=
             !mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
@@ -891,16 +906,16 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
             // Guaranteed `Some` inside this block by the guard above (mirrors
             // Raven's unguarded `NPC->enemy->x` once `NPC->enemy` is known set).
             let enemy_ptr =
-                &mut (*ctx.world_raw()).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
+                &mut ctx.world.g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == 0 {
                 // in middle of attack
                 // face enemy
                 crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
                 // continue attack logic
-                (*ctx.world_raw()).globals.enemyDist =
+                ctx.world.globals.enemyDist =
                     crate::q_math::Distance((*npc).r.currentOrigin, (*enemy_ptr).r.currentOrigin);
-                let __h417 = (*ctx.world_raw()).globals.enemyDist;
-                Wampa_Attack(ctx, __h417, qfalse);
+                let enemy_dist = ctx.world.globals.enemyDist;
+                Wampa_Attack(ctx, enemy_dist, qfalse);
                 return;
             } else {
                 if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"angrynoise".as_ptr())
@@ -908,7 +923,7 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                 {
                     let angrynoise_snd = crate::cstr_util::cstr(&format!(
                         "sound/chars/wampa/misc/anger{}.wav",
-                        (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2)
+                        ctx.world.bg_state.rng.Q_irand(1, 2)
                     ));
                     crate::g_utils::G_Sound(
                         ctx,
@@ -917,9 +932,9 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                         crate::g_utils::G_SoundIndex(angrynoise_snd.as_ptr()),
                     );
 
-                    let __h418 = ctx.entity_id_of(npc);
-                    let __h419 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 10000);
-                    crate::g_timer::TIMER_Set(ctx, __h418, c"angrynoise".as_ptr(), __h419);
+                    let npc_id = ctx.entity_id_of(npc);
+                    let angrynoise = ctx.world.bg_state.rng.Q_irand(5000, 10000);
+                    crate::g_timer::TIMER_Set(ctx, npc_id, c"angrynoise".as_ptr(), angrynoise);
                 }
                 // else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
                 if !(*npc).enemy.is_none()
@@ -938,9 +953,7 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                     }
                 } else {
                     let enemy_for_valid = match (*npc).enemy {
-                        Some(id) => {
-                            &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t
-                        }
+                        Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
                     };
                     if crate::NPC_combat::ValidEnemy(ctx, ctx.entity_id_of(enemy_for_valid))
@@ -952,8 +965,8 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                             c"lookForNewEnemy".as_ptr(),
                         ); // make them look again right now
                         if (*enemy_ptr).inuse == 0
-                            || (*ctx.world_raw()).level.time - (*enemy_ptr).s.time
-                                > (*ctx.world_raw()).bg_state.rng.Q_irand(10000, 15000)
+                            || ctx.world.level.time - (*enemy_ptr).s.time
+                                > ctx.world.bg_state.rng.Q_irand(10000, 15000)
                         {
                             // it's been a while since the enemy died, or enemy is completely gone, get bored with him
                             (*npc).enemy = None;
@@ -989,16 +1002,16 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                         let newEnemy;
                         let sav_enemy = (*npc).enemy; // FIXME: what about NPC->lastEnemy?
                         (*npc).enemy = None;
-                        let __h420 = if (*npc_info).confusionTime < (*ctx.world_raw()).level.time {
+                        let check_all = if (*npc_info).confusionTime < ctx.world.level.time {
                             qtrue
                         } else {
                             qfalse
                         };
-                        newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, __h420, qfalse, qfalse);
+                        newEnemy =
+                            crate::NPC_combat::NPC_CheckEnemy(ctx, check_all, qfalse, qfalse);
                         (*npc).enemy = sav_enemy;
                         if !newEnemy.is_null()
-                            && ent_id_opt((*ctx.world_raw()).g_entities.as_ptr(), newEnemy)
-                                != sav_enemy
+                            && ent_id_opt(ctx.world.g_entities.as_ptr(), newEnemy) != sav_enemy
                         {
                             // picked up a new enemy!
                             (*npc).lastEnemy = (*npc).enemy;
@@ -1007,24 +1020,24 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                                 ctx.entity_id_of(npc).unwrap(),
                                 ctx.entity_id_of(newEnemy),
                             );
-                            let __h421 = ctx.entity_id_of(npc);
-                            let __h422 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
+                            let npc_id = ctx.entity_id_of(npc);
+                            let look_for_new_enemy = ctx.world.bg_state.rng.Q_irand(5000, 15000);
                             // hold this one for at least 5-15 seconds
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                __h421,
+                                npc_id,
                                 c"lookForNewEnemy".as_ptr(),
-                                __h422,
+                                look_for_new_enemy,
                             );
                         } else {
-                            let __h423 = ctx.entity_id_of(npc);
-                            let __h424 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 5000);
+                            let npc_id = ctx.entity_id_of(npc);
+                            let look_for_new_enemy = ctx.world.bg_state.rng.Q_irand(2000, 5000);
                             // look again in 2-5 secs
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                __h423,
+                                npc_id,
                                 c"lookForNewEnemy".as_ptr(),
-                                __h424,
+                                look_for_new_enemy,
                             );
                         }
                     }
@@ -1041,9 +1054,9 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                     crate::g_utils::G_SoundIndex(c"sound/chars/wampa/misc/anger3.wav".as_ptr()),
                 );
 
-                let __h425 = ctx.entity_id_of(npc);
-                let __h426 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
-                crate::g_timer::TIMER_Set(ctx, __h425, c"idlenoise".as_ptr(), __h426);
+                let npc_id = ctx.entity_id_of(npc);
+                let idlenoise = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+                crate::g_timer::TIMER_Set(ctx, npc_id, c"idlenoise".as_ptr(), idlenoise);
             }
             if ((*npc).spawnflags & 2) != 0 {
                 // search around me if I don't have an enemy
@@ -1056,7 +1069,7 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                     );
                     (*npc_info).tempBehavior = crate::prelude::BS_DEFAULT;
                 }
-                (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
+                ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
                 crate::NPC_behavior::NPC_BSSearch(ctx); // this automatically looks for enemies
             } else if ((*npc).spawnflags & 1) != 0 {
                 // wander if I don't have an enemy
@@ -1069,16 +1082,21 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                     );
                     (*npc_info).tempBehavior = crate::prelude::BS_DEFAULT;
                 }
-                (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
+                ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
                 crate::NPC_behavior::NPC_BSWander(ctx);
                 if ((*npc_info).scriptFlags & crate::prelude::SCF_LOOK_FOR_ENEMIES) != 0 {
                     if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue) == qfalse {
                         Wampa_Idle(ctx);
                     } else {
                         Wampa_CheckRoar(ctx, ctx.entity_id_of(npc).unwrap());
-                        let __h427 = ctx.entity_id_of(npc);
-                        let __h428 = (*ctx.world_raw()).bg_state.rng.Q_irand(5000, 15000);
-                        crate::g_timer::TIMER_Set(ctx, __h427, c"lookForNewEnemy".as_ptr(), __h428);
+                        let npc_id = ctx.entity_id_of(npc);
+                        let look_for_new_enemy = ctx.world.bg_state.rng.Q_irand(5000, 15000);
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            npc_id,
+                            c"lookForNewEnemy".as_ptr(),
+                            look_for_new_enemy,
+                        );
                     }
                 }
             } else {

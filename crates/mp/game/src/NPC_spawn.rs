@@ -10,6 +10,13 @@
 //! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
 //! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
 //! via `ctx.entity_id_of(ptr)`.
+//!
+//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
+//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())` raw-deref
+//! regime is retired. One `world_raw()` use survives (irreducible): the raw
+//! `*mut GameWorld` field of `GameCallbacksImpl` fed to `BG_ParseAnimationFile`.
+//! Per-body entity re-derives stay raw by design (`// STAGE-1:` markers). This
+//! file is referee-blind — parity rests on the compile + golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -282,7 +289,7 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
             && (*ent).activator.is_some()
         {
             // teams already set correctly
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*ent).s.NPC_class != CLASS_VEHICLE as c_int
         {
             if (*((*ent).client as *mut gclient_t)).enemyTeam == NPCTEAM_PLAYER {
@@ -541,7 +548,7 @@ pub fn NPC_SetFX_SpawnStates(ctx: &mut GameContext, ent: EntityId) {
         let ent: *mut gentity_t = ctx.entity_mut(ent);
         if (*((*ent).NPC as *mut gNPC_t)).aiFlags & NPCAI_CUSTOM_GRAVITY == 0 {
             (*((*ent).client as *mut gclient_t)).ps.gravity =
-                (*ctx.world_raw()).cvars.g_gravity.value as c_int;
+                ctx.world.cvars.g_gravity.value as c_int;
         }
     }
 }
@@ -568,7 +575,7 @@ pub fn NPC_SpotWouldTelefrag(ctx: &mut GameContext, npc: EntityId) -> qboolean {
             ),
         );
 
-        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
+        let base = ctx.world.g_entities.as_mut_ptr();
         for i in 0..num {
             let hit = base.add(touch[i as usize] as usize);
             if (*hit).inuse != 0
@@ -627,7 +634,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                         (*ent).target3 as *const c_char,
                     );
                     (*ent).think = Some(EntThink::G_FreeEntity).into();
-                    (*ent).nextthink = (*ctx.world_raw()).level.time + 100;
+                    (*ent).nextthink = ctx.world.level.time + 100;
                 } else {
                     let tn = if (*ent).targetname.is_null() {
                         String::new()
@@ -645,8 +652,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                         .as_ptr(),
                     );
                     (*ent).think = Some(EntThink::NPC_Begin).into();
-                    (*ent).nextthink =
-                        (((*ctx.world_raw()).level.time as f32) + (*ent).wait) as i32;
+                    (*ent).nextthink = ((ctx.world.level.time as f32) + (*ent).wait) as i32;
                 }
                 return;
             }
@@ -663,7 +669,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         let client = (*ent).client as *mut gclient_t;
 
         (*client).ps.persistant[PERS_SPAWN_COUNT as usize] += 1;
-        (*client).airOutTime = (*ctx.world_raw()).level.time + 12000;
+        (*client).airOutTime = ctx.world.level.time + 12000;
         (*client).ps.clientNum = (*ent).s.number;
 
         if (*ent).health != 0 {
@@ -676,7 +682,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
             {
                 (*((*ent).NPC as *mut gNPC_t)).stats.health +=
                     (*((*ent).NPC as *mut gNPC_t)).stats.health / 4
-                        * (*ctx.world_raw()).cvars.g_spskill.integer;
+                        * ctx.world.cvars.g_spskill.integer;
             }
             (*client).pers.maxHealth = (*((*ent).NPC as *mut gNPC_t)).stats.health;
             (*client).ps.stats[STAT_MAX_HEALTH as usize] =
@@ -688,15 +694,15 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
 
         let rodian = cstr("rodian");
         if crate::q_shared::Q_stricmp(rodian.as_ptr(), (*ent).NPC_type) == 0 {
-            match (*ctx.world_raw()).cvars.g_spskill.integer {
+            match ctx.world.cvars.g_spskill.integer {
                 0 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (1.0) as i32,
                 1 => {
                     (*((*ent).NPC as *mut gNPC_t)).stats.aim =
-                        ((*ctx.world_raw()).bg_state.rng.Q_irand(2, 3) as f32) as i32
+                        (ctx.world.bg_state.rng.Q_irand(2, 3) as f32) as i32
                 }
                 2 => {
                     (*((*ent).NPC as *mut gNPC_t)).stats.aim =
-                        ((*ctx.world_raw()).bg_state.rng.Q_irand(3, 4) as f32) as i32
+                        (ctx.world.bg_state.rng.Q_irand(3, 4) as f32) as i32
                 }
                 _ => {}
             }
@@ -707,25 +713,25 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                 || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER
                 || crate::q_shared::Q_stricmp(rodian2.as_ptr(), (*ent).NPC_type) == 0
             {
-                match (*ctx.world_raw()).cvars.g_spskill.integer {
+                match ctx.world.cvars.g_spskill.integer {
                     0 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 0.75f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
-                                (*ctx.world_raw()).bg_state.rng.Q_irand(3, 6);
+                                ctx.world.bg_state.rng.Q_irand(3, 6);
                         }
                     }
                     1 => {
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
-                                (*ctx.world_raw()).bg_state.rng.Q_irand(2, 4);
+                                ctx.world.bg_state.rng.Q_irand(2, 4);
                         }
                     }
                     2 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
                             (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
-                                (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2);
+                                ctx.world.bg_state.rng.Q_irand(0, 2);
                         }
                     }
                     _ => {}
@@ -733,7 +739,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
             } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_REBORN
                 || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER
             {
-                match (*ctx.world_raw()).cvars.g_spskill.integer {
+                match ctx.world.cvars.g_spskill.integer {
                     1 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.25f32,
                     2 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32,
                     _ => {}
@@ -802,11 +808,11 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
         (*client).ps.pm_time = 100;
 
-        (*client).respawnTime = (*ctx.world_raw()).level.time;
-        (*client).inactivityTime = (*ctx.world_raw()).level.time
-            + ((*ctx.world_raw()).cvars.g_inactivity.value as c_int) * 1000;
+        (*client).respawnTime = ctx.world.level.time;
+        (*client).inactivityTime =
+            ctx.world.level.time + (ctx.world.cvars.g_inactivity.value as c_int) * 1000;
         (*client).latched_buttons = 0;
-        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
+        let base = ctx.world.g_entities.as_mut_ptr();
         if (*ent).s.m_iVehicleNum != 0 {
             // already have owner set
         } else if (*client).NPC_class == CLASS_SEEKER && (*ent).activator.is_some() {
@@ -839,8 +845,8 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         SetNPCGlobals(ctx, ctx.entity_id_of(ent).unwrap());
 
         (*ent).enemy = None;
-        (*(*ctx.world_raw()).globals.NPCInfo).timeOfDeath = 0;
-        (*(*ctx.world_raw()).globals.NPCInfo).shotTime = 0;
+        (*ctx.world.globals.NPCInfo).timeOfDeath = 0;
+        (*ctx.world.globals.NPCInfo).shotTime = 0;
         crate::NPC_goal::NPC_ClearGoal(ctx);
         NPC_ChangeWeapon((*client).ps.weapon);
 
@@ -853,16 +859,15 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.ping = (*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50;
 
         if (*ent).s.NPC_class != CLASS_VEHICLE as c_int
-            || (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
+            || ctx.world.cvars.g_gametype.integer != GT_SIEGE
         {
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
         (*ent).use_ = Some(EntUse::NPC_Use).into();
         (*ent).think = Some(EntThink::NPC_Think).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time
-            + FRAMETIME
-            + (*ctx.world_raw()).bg_state.rng.Q_irand(0, 100);
+        (*ent).nextthink =
+            ctx.world.level.time + FRAMETIME + ctx.world.bg_state.rng.Q_irand(0, 100);
 
         NPC_SetMiscDefaultData(ctx, ctx.entity_id_of(ent).unwrap());
         if (*ent).health <= 0 {
@@ -943,7 +948,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                             droid_npc_type as *const c_char,
                         ) == 0
                     {
-                        droid_npc_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                        droid_npc_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                             cstr("r2d2").into_raw()
                         } else {
                             cstr("r5d2").into_raw()
@@ -1016,19 +1021,18 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:1278-1297`
 pub fn New_NPC_t(ctx: &mut GameContext, entNum: c_int) -> *mut gNPC_t {
     unsafe {
-        if (&(*ctx.world_raw()).globals.gNPCPtrs)[entNum as usize].is_null() {
+        if (&ctx.world.globals.gNPCPtrs)[entNum as usize].is_null() {
             // `gNPC_t` holds a `*mut AIGroupInfo_t` field (align 8); pad to an
             // 8-byte boundary first (see `BG_AllocPad8`) so every `(*ptr).field`
             // access downstream is safely dereferenceable.
-            crate::bg_misc::BG_AllocPad8(&mut (*ctx.world_raw()).bg_state);
-            (&mut (*ctx.world_raw()).globals.gNPCPtrs)[entNum as usize] = BG_Alloc(
+            crate::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
+            (&mut ctx.world.globals.gNPCPtrs)[entNum as usize] = BG_Alloc(
                 core::mem::size_of::<gNPC_t>() as c_int,
-                &mut (*ctx.world_raw()).bg_state,
-            )
-                as *mut gNPC_t;
+                &mut ctx.world.bg_state,
+            ) as *mut gNPC_t;
         }
 
-        let ptr = (&(*ctx.world_raw()).globals.gNPCPtrs)[entNum as usize];
+        let ptr = (&ctx.world.globals.gNPCPtrs)[entNum as usize];
 
         if !ptr.is_null() {
             // Byte-wise, like C's memset: `ptr` is BG_Alloc pool storage (4-byte
@@ -1135,7 +1139,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         );
 
         (*((*newent).NPC as *mut gNPC_t)).tempGoal = ent_id_opt(
-            (*ctx.world_raw()).g_entities.as_mut_ptr(),
+            ctx.world.g_entities.as_mut_ptr(),
             crate::g_utils::G_Spawn(ctx),
         );
 
@@ -1147,11 +1151,11 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             return core::ptr::null_mut();
         }
         let temp_goal = ent_id::resolve(
-            (*ctx.world_raw()).g_entities.as_mut_ptr(),
+            ctx.world.g_entities.as_mut_ptr(),
             (*((*newent).NPC as *mut gNPC_t)).tempGoal,
         );
         (*temp_goal).classname = c"NPC_goal".as_ptr() as *mut c_char;
-        (*temp_goal).parent = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), newent));
+        (*temp_goal).parent = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), newent));
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
 
         if (*newent).client.is_null() {
@@ -1211,7 +1215,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         {
             let i_veh_index = BG_VehicleGetIndex(
                 (*ent).NPC_type as *const c_char,
-                &mut (*ctx.world_raw()).bg_state,
+                &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
             );
 
@@ -1221,7 +1225,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 return core::ptr::null_mut();
             }
 
-            match (&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize].r#type {
+            match (&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].r#type {
                 VH_ANIMAL => {
                     crate::AnimalNPC::G_CreateAnimalNPC(
                         ctx,
@@ -1276,9 +1280,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
             crate::veh_dispatch::register_assets(ctx, (*newent).m_pVehicle as *mut Vehicle_t);
             (*((*newent).client as *mut gclient_t)).NPC_class = CLASS_VEHICLE;
-            if (&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize].r#type
-                == VH_FIGHTER
-            {
+            if (&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].r#type == VH_FIGHTER {
                 (*newent).flags |= FL_NO_KNOCKBACK | FL_SHIELDED | FL_DMG_BY_HEAVY_WEAP_ONLY;
             }
             (*(*((*newent).m_pVehicle as *mut Vehicle_t))
@@ -1349,7 +1351,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             } else if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, test.as_ptr())
                 == 0
             {
-                let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
+                let base = ctx.world.g_entities.as_mut_ptr();
                 for n in 0..1 {
                     let e = base.add(n as usize);
                     if (*e).s.eType != (ET_NPC) as i32 && !(*e).client.is_null() {
@@ -1432,12 +1434,12 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         }
 
         (*newent).s.pos.trType = TR_INTERPOLATE;
-        (*newent).s.pos.trTime = (*ctx.world_raw()).level.time;
+        (*newent).s.pos.trTime = ctx.world.level.time;
         crate::q_math::_VectorCopy((*newent).r.currentOrigin, &mut (*newent).s.pos.trBase);
         (*newent).s.pos.trDelta = [0.0; 3];
         (*newent).s.pos.trDuration = 0;
         (*newent).s.apos.trType = TR_INTERPOLATE;
-        (*newent).s.apos.trTime = (*ctx.world_raw()).level.time;
+        (*newent).s.apos.trTime = ctx.world.level.time;
         crate::q_math::_VectorCopy((*newent).s.angles, &mut (*newent).s.apos.trBase);
         (*newent).s.apos.trDelta = [0.0; 3];
         (*newent).s.apos.trDuration = 0;
@@ -1448,7 +1450,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         (*newent).s.eFlags |= EF_NODRAW;
 
         (*newent).think = Some(EntThink::NPC_Begin).into();
-        (*newent).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+        (*newent).nextthink = ctx.world.level.time + FRAMETIME;
         NPC_DefaultScriptFlags(&*newent);
 
         (*newent).s.shouldtarget = (*ent).s.shouldtarget;
@@ -1509,10 +1511,10 @@ pub fn NPC_ShySpawn(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
-        (*ent).nextthink = (*ctx.world_raw()).level.time + SHY_THINK_TIME;
+        (*ent).nextthink = ctx.world.level.time + SHY_THINK_TIME;
         (*ent).think = Some(EntThink::NPC_ShySpawn).into();
 
-        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
+        let base = ctx.world.g_entities.as_mut_ptr();
         let player0 = base;
         if crate::q_math::DistanceSquared((*player0).r.currentOrigin, (*ent).r.currentOrigin)
             <= SHY_SPAWN_DISTANCE_SQR as vec_t
@@ -1564,7 +1566,7 @@ pub fn NPC_Spawn(
             } else {
                 (*ent).think = Some(EntThink::NPC_Spawn_Go).into();
             }
-            (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).delay;
+            (*ent).nextthink = ctx.world.level.time + (*ent).delay;
         } else {
             if (*ent).spawnflags & 2048 != 0 {
                 NPC_ShySpawn(ctx, ctx.entity_id_of(ent).unwrap());
@@ -1598,9 +1600,9 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut t: c_int = 0;
 
-        if (*ctx.world_raw()).cvars.g_allowNPC.integer == 0 {
+        if ctx.world.cvars.g_allowNPC.integer == 0 {
             (*self_).think = Some(EntThink::G_FreeEntity).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time;
+            (*self_).nextthink = ctx.world.level.time;
             return;
         }
         if (*self_).fullName.is_null() || *(*self_).fullName == 0 {
@@ -1654,7 +1656,7 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
             (*self_).use_ = Some(EntUse::NPC_Spawn).into();
         } else {
             (*self_).think = Some(EntThink::NPC_Spawn_Go).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + START_TIME_REMOVE_ENTS + 50;
+            (*self_).nextthink = ctx.world.level.time + START_TIME_REMOVE_ENTS + 50;
         }
     }
 }
@@ -1669,7 +1671,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
         let mut droid_npc_type: *const c_char = core::ptr::null();
         let i_veh_index = BG_VehicleGetIndex(
             (*spawner).NPC_type as *const c_char,
-            &mut (*ctx.world_raw()).bg_state,
+            &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
         if i_veh_index == VEHICLE_NONE {
@@ -1684,7 +1686,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             .as_ptr(),
         );
 
-        let p_veh_info = &(&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize];
+        let p_veh_info = &(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize];
         if !p_veh_info.model.is_null() && *p_veh_info.model != 0 {
             let mut temp_g2: *mut c_void = core::ptr::null_mut();
             let mut skin: c_int = 0;
@@ -1735,12 +1737,14 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
                         core::ptr::copy_nonoverlapping(anim_cfg.as_ptr(), slash, n as usize + 1);
 
                         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+                        // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a raw
+                        // `*mut GameWorld` field fed by the `world_raw()` accessor.
                         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                             world: ctx.world_raw(),
                             engine: ctx.engine,
                         };
                         crate::bg_panimate::BG_ParseAnimationFile(
-                            &mut (*ctx.world_raw()).bg_state,
+                            &mut ctx.world.bg_state,
                             &traps,
                             &mut callbacks,
                             gla_name.as_ptr(),
@@ -1760,13 +1764,13 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
 
         if !(*spawner).model2.is_null() && *(*spawner).model2 != 0 {
             droid_npc_type = (*spawner).model2 as *const c_char;
-        } else if !(&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize]
+        } else if !(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize]
             .droidNPC
             .is_null()
-            && *(&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC != 0
+            && *(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC != 0
         {
-            droid_npc_type = (&(*ctx.world_raw()).bg_state.g_vehicleInfo)[i_veh_index as usize]
-                .droidNPC as *const c_char;
+            droid_npc_type =
+                (&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC as *const c_char;
         }
 
         if !droid_npc_type.is_null() {
@@ -1800,7 +1804,7 @@ pub fn NPC_VehicleSpawnUse(
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         if (*self_).delay != 0 {
             (*self_).think = Some(EntThink::G_VehicleSpawn).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + (*self_).delay;
+            (*self_).nextthink = ctx.world.level.time + (*self_).delay;
         } else {
             crate::g_vehicles::G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap());
         }
@@ -1860,7 +1864,7 @@ pub fn SP_NPC_Vehicle(ctx: &mut GameContext, self_: EntityId) {
                     return;
                 }
                 (*self_).think = Some(EntThink::G_VehicleSpawn).into();
-                (*self_).nextthink = (*ctx.world_raw()).level.time + (*self_).delay;
+                (*self_).nextthink = ctx.world.level.time + (*self_).delay;
             } else {
                 crate::g_vehicles::G_VehicleSpawn(ctx, ctx.entity_id_of(self_).unwrap());
             }
@@ -2094,13 +2098,13 @@ pub fn SP_NPC_Cultist(ctx: &mut GameContext, self_: EntityId) {
             if (*self_).spawnflags & 1 != 0 {
                 (*self_).NPC_type = core::ptr::null_mut();
                 (*self_).spawnflags = 0;
-                match (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) {
+                match ctx.world.bg_state.rng.Q_irand(0, 2) {
                     0 => (*self_).spawnflags |= 1,
                     1 => (*self_).spawnflags |= 2,
                     2 => (*self_).spawnflags |= 4,
                     _ => {}
                 }
-                if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                     (*self_).spawnflags |= 8;
                 }
                 SP_NPC_Cultist_Saber(ctx, ctx.entity_id_of(self_).unwrap());
@@ -2221,7 +2225,7 @@ pub fn SP_NPC_Jedi(ctx: &mut GameContext, self_: EntityId) {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
                 (*self_).NPC_type = c"jeditrainer".as_ptr() as *mut c_char;
-            } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+            } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                 (*self_).NPC_type = c"Jedi".as_ptr() as *mut c_char;
             } else {
                 (*self_).NPC_type = c"Jedi2".as_ptr() as *mut c_char;
@@ -2240,7 +2244,7 @@ pub fn SP_NPC_Prisoner(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                 c"Prisoner".as_ptr() as *mut c_char
             } else {
                 c"Prisoner2".as_ptr() as *mut c_char
@@ -2258,7 +2262,7 @@ pub fn SP_NPC_Rebel(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                 c"Rebel".as_ptr() as *mut c_char
             } else {
                 c"Rebel2".as_ptr() as *mut c_char
@@ -2284,7 +2288,7 @@ pub fn SP_NPC_Stormtrooper(ctx: &mut GameContext, self_: EntityId) {
         } else if (*self_).spawnflags & 1 != 0 {
             (*self_).NPC_type = c"stofficer".as_ptr() as *mut c_char;
         } else {
-            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                 c"StormTrooper".as_ptr() as *mut c_char
             } else {
                 c"StormTrooper2".as_ptr() as *mut c_char
@@ -2338,7 +2342,7 @@ pub fn SP_NPC_Ugnaught(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+            (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                 c"Ugnaught".as_ptr() as *mut c_char
             } else {
                 c"Ugnaught2".as_ptr() as *mut c_char
@@ -2379,7 +2383,7 @@ pub fn SP_NPC_Gran(ctx: &mut GameContext, self_: EntityId) {
             } else if (*self_).spawnflags & 2 != 0 {
                 (*self_).NPC_type = c"granboxer".as_ptr() as *mut c_char;
             } else {
-                (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                     c"gran".as_ptr() as *mut c_char
                 } else {
                     c"gran2".as_ptr() as *mut c_char
@@ -2416,7 +2420,7 @@ pub fn SP_NPC_Weequay(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = match (*ctx.world_raw()).bg_state.rng.Q_irand(0, 3) {
+            (*self_).NPC_type = match ctx.world.bg_state.rng.Q_irand(0, 3) {
                 0 => c"Weequay".as_ptr() as *mut c_char,
                 1 => c"Weequay2".as_ptr() as *mut c_char,
                 2 => c"Weequay3".as_ptr() as *mut c_char,
@@ -2519,9 +2523,9 @@ pub fn SP_NPC_ImpWorker(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2) == 0 {
+            if ctx.world.bg_state.rng.Q_irand(0, 2) == 0 {
                 (*self_).NPC_type = c"ImpWorker".as_ptr() as *mut c_char;
-            } else if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+            } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                 (*self_).NPC_type = c"ImpWorker2".as_ptr() as *mut c_char;
             } else {
                 (*self_).NPC_type = c"ImpWorker3".as_ptr() as *mut c_char;
@@ -2539,7 +2543,7 @@ pub fn SP_NPC_BespinCop(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+            (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                 c"BespinCop".as_ptr() as *mut c_char
             } else {
                 c"BespinCop2".as_ptr() as *mut c_char
@@ -2582,7 +2586,7 @@ pub fn SP_NPC_ShadowTrooper(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) == 0 {
+            (*self_).NPC_type = if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                 c"ShadowTrooper".as_ptr() as *mut c_char
             } else {
                 c"ShadowTrooper2".as_ptr() as *mut c_char
@@ -2937,7 +2941,7 @@ pub fn NPC_SpawnType(
 
     unsafe {
         (*npc_spawner).think = Some(EntThink::G_FreeEntity).into();
-        (*npc_spawner).nextthink = (*ctx.world_raw()).level.time + 50; // FRAMETIME
+        (*npc_spawner).nextthink = ctx.world.level.time + 50; // FRAMETIME
     }
 
     if npc_type.is_null() {
@@ -3232,7 +3236,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
     }
 
     for n in 1..ENTITYNUM_MAX_NORMAL {
-        let player = unsafe { (*ctx.world_raw()).g_entities.get_mut(n as usize) };
+        let player = ctx.world.g_entities.get_mut(n as usize);
         if player.is_none() {
             continue;
         }
@@ -3286,7 +3290,10 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                             ))
                             .as_ptr(),
                         );
-                        G_FreeEntity(ctx, ctx.entity_id_of(player));
+                        // STAGE-1: raw pointer cast ends the `player` borrow before
+                        // re-entering `ctx` (Stage-2 debt).
+                        let player_ptr = player as *mut gentity_t;
+                        G_FreeEntity(ctx, ctx.entity_id_of(player_ptr));
                     }
                 }
             }
@@ -3401,13 +3408,11 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
         cmd.as_ptr() as *const c_char,
     ) == 0
     {
-        unsafe {
-            (*ctx.world_raw()).globals.showBBoxes = if (*ctx.world_raw()).globals.showBBoxes != 0 {
-                0
-            } else {
-                1
-            };
-        }
+        ctx.world.globals.showBBoxes = if ctx.world.globals.showBBoxes != 0 {
+            0
+        } else {
+            1
+        };
     } else if Q_stricmp(
         c"score".as_ptr() as *const c_char,
         cmd.as_ptr() as *const c_char,
@@ -3427,8 +3432,8 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
             // Show the score for all NPCs
             Com_Printf(c"SCORE LIST:\n".as_ptr() as *const c_char);
             for i in 0..ENTITYNUM_WORLD as usize {
-                let player = unsafe { (*ctx.world_raw()).g_entities.get(i) };
-                if player.is_none() || unsafe { player.unwrap().client.is_null() } {
+                let player = ctx.world.g_entities.get(i);
+                if player.is_none() || player.unwrap().client.is_null() {
                     continue;
                 }
                 NPC_PrintScore(ctx, ctx.entity_id_of(player.unwrap()).unwrap());
