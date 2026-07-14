@@ -97,21 +97,29 @@ pub fn AddRemap(
     timeOffset: f32,
 ) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        for i in 0..world.globals.remapCount as usize {
-            let existing = world.globals.remappedShaders.0[i].oldShader.as_ptr();
+        for i in 0..ctx.world.globals.remapCount as usize {
+            let existing = ctx.world.globals.remappedShaders.0[i].oldShader.as_ptr();
             if Q_stricmp(oldShader, existing) == 0 {
-                strcpy_buf(&mut world.globals.remappedShaders.0[i].newShader, newShader);
-                world.globals.remappedShaders.0[i].timeOffset = timeOffset;
+                strcpy_buf(
+                    &mut ctx.world.globals.remappedShaders.0[i].newShader,
+                    newShader,
+                );
+                ctx.world.globals.remappedShaders.0[i].timeOffset = timeOffset;
                 return;
             }
         }
-        if (world.globals.remapCount as usize) < MAX_SHADER_REMAPS {
-            let i = world.globals.remapCount as usize;
-            strcpy_buf(&mut world.globals.remappedShaders.0[i].newShader, newShader);
-            strcpy_buf(&mut world.globals.remappedShaders.0[i].oldShader, oldShader);
-            world.globals.remappedShaders.0[i].timeOffset = timeOffset;
-            world.globals.remapCount += 1;
+        if (ctx.world.globals.remapCount as usize) < MAX_SHADER_REMAPS {
+            let i = ctx.world.globals.remapCount as usize;
+            strcpy_buf(
+                &mut ctx.world.globals.remappedShaders.0[i].newShader,
+                newShader,
+            );
+            strcpy_buf(
+                &mut ctx.world.globals.remappedShaders.0[i].oldShader,
+                oldShader,
+            );
+            ctx.world.globals.remappedShaders.0[i].timeOffset = timeOffset;
+            ctx.world.globals.remapCount += 1;
         }
     }
 }
@@ -131,15 +139,14 @@ pub fn BuildShaderStateConfig(ctx: &mut GameContext) -> *const c_char {
             buff[i] = 0;
         }
 
-        let world = &*ctx.world_raw();
-        for i in 0..world.globals.remapCount as usize {
+        for i in 0..ctx.world.globals.remapCount as usize {
             let old_shader_str =
-                CStr::from_ptr(world.globals.remappedShaders.0[i].oldShader.as_ptr())
+                CStr::from_ptr(ctx.world.globals.remappedShaders.0[i].oldShader.as_ptr())
                     .to_string_lossy();
             let new_shader_str =
-                CStr::from_ptr(world.globals.remappedShaders.0[i].newShader.as_ptr())
+                CStr::from_ptr(ctx.world.globals.remappedShaders.0[i].newShader.as_ptr())
                     .to_string_lossy();
-            let time_offset = world.globals.remappedShaders.0[i].timeOffset;
+            let time_offset = ctx.world.globals.remappedShaders.0[i].timeOffset;
 
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
             let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
@@ -295,10 +302,9 @@ pub fn G_TeamCommand(ctx: &mut GameContext, team: team_t, cmd: *mut c_char) {
     use crate::client::client_connected::CON_CONNECTED;
 
     unsafe {
-        let world = &*ctx.world_raw();
         let text = CStr::from_ptr(cmd).to_string_lossy().into_owned();
-        for i in 0..world.level.maxclients {
-            let client = &world.clients[i as usize];
+        for i in 0..ctx.world.level.maxclients {
+            let client = &ctx.world.clients[i as usize];
             if client.pers.connected == CON_CONNECTED && client.sess.sessionTeam == team {
                 trap::SendServerCommand(
                     ctx.engine,
@@ -322,9 +328,8 @@ pub fn G_Find(
     let from: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), from) };
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let base = world.g_entities.as_mut_ptr();
-        let num_entities = world.level.num_entities;
+        let base = ctx.world.g_entities.as_mut_ptr();
+        let num_entities = ctx.world.level.num_entities;
 
         let mut cur = if from.is_null() { base } else { from.add(1) };
 
@@ -378,10 +383,9 @@ pub fn G_RadiusList(
             ),
         );
 
-        let world = &mut *ctx.world_raw();
         let mut ent_count: c_int = 0;
         for e in 0..num_listed_entities {
-            let ent = &mut world.g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
+            let ent = &mut ctx.world.g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
 
             if ent == ignore || (*ent).inuse == qfalse || (*ent).takedamage != takeDamage {
                 continue;
@@ -419,16 +423,14 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let targ: *mut gentity_t = ctx.entity_mut(targ);
     unsafe {
-        let world = &mut *ctx.world_raw();
-
         let mass = if (*targ).physicsBounce > 0.0 {
             (*targ).physicsBounce
         } else {
             200.0
         };
 
-        let g_gravity = world.cvars.g_gravity.value;
-        let g_knockback = world.cvars.g_knockback.value;
+        let g_gravity = ctx.world.cvars.g_gravity.value;
+        let g_knockback = ctx.world.cvars.g_knockback.value;
 
         let mut kvel = [0.0f32; 3];
         if g_gravity > 0.0 {
@@ -458,7 +460,7 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
                 (*targ).s.pos.trDelta[i] += kvel[i];
             }
             (*targ).s.pos.trBase = (*targ).r.currentOrigin;
-            (*targ).s.pos.trTime = world.level.time;
+            (*targ).s.pos.trTime = ctx.world.level.time;
         }
 
         // set the timer so that the other client can't cancel
@@ -493,21 +495,20 @@ pub fn G_FreeFakeClient(cl: *mut *mut gclient_t) {}
 /// Source: `oracle/codemp/game/g_utils.c:388-410`
 pub fn G_AllocateVehicleObject(ctx: &mut GameContext, pVeh: *mut *mut Vehicle_t) {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let mut i: c_int = 0;
 
-        if world.globals.g_vehiclePoolInit == qfalse {
-            world.globals.g_vehiclePoolInit = qtrue;
+        if ctx.world.globals.g_vehiclePoolInit == qfalse {
+            ctx.world.globals.g_vehiclePoolInit = qtrue;
             for j in 0..crate::game_globals::MAX_VEHICLES_AT_A_TIME {
-                world.globals.g_vehiclePoolOccupied.0[j] = qfalse;
+                ctx.world.globals.g_vehiclePoolOccupied.0[j] = qfalse;
             }
         }
 
         while i < crate::game_globals::MAX_VEHICLES_AT_A_TIME as c_int {
             // iterate through and try to find a free one
-            if world.globals.g_vehiclePoolOccupied.0[i as usize] == qfalse {
-                world.globals.g_vehiclePoolOccupied.0[i as usize] = qtrue;
-                let slot = &mut world.globals.g_vehiclePool.0[i as usize] as *mut Vehicle_t;
+            if ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] == qfalse {
+                ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] = qtrue;
+                let slot = &mut ctx.world.globals.g_vehiclePool.0[i as usize] as *mut Vehicle_t;
                 core::ptr::write_bytes(slot, 0, 1);
                 *pVeh = slot;
                 return;
@@ -525,19 +526,16 @@ pub fn G_AllocateVehicleObject(ctx: &mut GameContext, pVeh: *mut *mut Vehicle_t)
 ///
 /// Source: `oracle/codemp/game/g_utils.c:413-426`
 pub fn G_FreeVehicleObject(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        let mut i: c_int = 0;
-        while i < crate::game_globals::MAX_VEHICLES_AT_A_TIME as c_int {
-            if world.globals.g_vehiclePoolOccupied.0[i as usize] == qtrue
-                && core::ptr::eq(&world.globals.g_vehiclePool.0[i as usize], pVeh)
-            {
-                // guess this is it
-                world.globals.g_vehiclePoolOccupied.0[i as usize] = qfalse;
-                break;
-            }
-            i += 1;
+    let mut i: c_int = 0;
+    while i < crate::game_globals::MAX_VEHICLES_AT_A_TIME as c_int {
+        if ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] == qtrue
+            && core::ptr::eq(&ctx.world.globals.g_vehiclePool.0[i as usize], pVeh)
+        {
+            // guess this is it
+            ctx.world.globals.g_vehiclePoolOccupied.0[i as usize] = qfalse;
+            break;
         }
+        i += 1;
     }
 }
 
@@ -550,18 +548,17 @@ pub fn G_FreeVehicleObject(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 /// Source: `oracle/codemp/game/g_utils.c:430-438`
 pub fn G_CreateFakeClient(ctx: &mut GameContext, entNum: c_int, cl: *mut *mut gclient_t) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        if world.globals.gClPtrs.0[entNum as usize].is_null() {
+        if ctx.world.globals.gClPtrs.0[entNum as usize].is_null() {
             // `gclient_t` holds pointer fields (align 8); pad to an 8-byte
             // boundary first (see `BG_AllocPad8`) so every `(*client).field`
             // access downstream is safely dereferenceable.
-            crate::bg_misc::BG_AllocPad8(&mut world.bg_state);
-            world.globals.gClPtrs.0[entNum as usize] = crate::bg_misc::BG_Alloc(
+            crate::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
+            ctx.world.globals.gClPtrs.0[entNum as usize] = crate::bg_misc::BG_Alloc(
                 core::mem::size_of::<gclient_t>() as c_int,
-                &mut world.bg_state,
+                &mut ctx.world.bg_state,
             );
         }
-        *cl = world.globals.gClPtrs.0[entNum as usize] as *mut gclient_t;
+        *cl = ctx.world.globals.gClPtrs.0[entNum as usize] as *mut gclient_t;
     }
 }
 
@@ -570,10 +567,9 @@ pub fn G_CreateFakeClient(ctx: &mut GameContext, entNum: c_int, cl: *mut *mut gc
 /// Source: `oracle/codemp/game/g_utils.c:450-465`
 pub fn G_CleanAllFakeClients(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let mut i = MAX_CLIENTS as usize;
         while i < mp_qshared::shared::MAX_GENTITIES {
-            let ent = &mut world.g_entities[i] as *mut gentity_t;
+            let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
             if (*ent).inuse != qfalse
                 && (*ent).s.eType == ET_NPC as c_int
                 && !(*ent).client.is_null()
@@ -606,18 +602,17 @@ pub fn G_SetAnim(
     // `BG_ParseAnimationFile` game-tier wrapper precedent.
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
-        let anims = (&(*ctx.world_raw()).bg_state.bgAllAnims)[(*ent).localAnimIndex as usize].anims;
+        let anims = (&ctx.world.bg_state.bgAllAnims)[(*ent).localAnimIndex as usize].anims;
         let ps = &mut (*((*ent).client as *mut gclient_t)).ps as *mut playerState_t;
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // field held alongside the `&mut ctx.world.bg_state` borrow below.
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
-        let mut pmc = crate::bg_channel::PmoveContext::new(
-            &mut (*ctx.world_raw()).bg_state,
-            &traps,
-            &mut callbacks,
-        );
+        let mut pmc =
+            crate::bg_channel::PmoveContext::new(&mut ctx.world.bg_state, &traps, &mut callbacks);
         pmc.BG_SetAnim(ps, anims, setAnimParts, anim, setAnimFlags, blendTime);
     }
 }
@@ -666,8 +661,7 @@ pub fn G_PickTarget(ctx: &mut GameContext, targetname: *mut c_char) -> *mut gent
             return core::ptr::null_mut();
         }
 
-        let world = &mut *ctx.world_raw();
-        let idx = (world.bg_state.rng.rand() % num_choices as c_int) as usize;
+        let idx = (ctx.world.bg_state.rng.rand() % num_choices as c_int) as usize;
         choice[idx]
     }
 }
@@ -725,7 +719,7 @@ pub fn G_UseTargets2(
         }
 
         if !(*ent).targetShaderName.is_null() && !(*ent).targetShaderNewName.is_null() {
-            let f = ((*ctx.world_raw()).level.time as f32) * 0.001;
+            let f = (ctx.world.level.time as f32) * 0.001;
             AddRemap(ctx, (*ent).targetShaderName, (*ent).targetShaderNewName, f);
             let config = BuildShaderStateConfig(ctx);
             trap::SetConfigstring(
@@ -873,8 +867,7 @@ pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let e: *mut gentity_t = ctx.entity_mut(e);
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let base = world.g_entities.as_mut_ptr();
+        let base = ctx.world.g_entities.as_mut_ptr();
         (*e).inuse = qtrue;
         (*e).classname = b"noclass\0".as_ptr() as *mut c_char;
         (*e).s.number = e.offset_from(base) as c_int;
@@ -893,7 +886,6 @@ pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
 /// Source: `oracle/codemp/game/g_utils.c:705-787`
 pub fn G_SpewEntList(ctx: &mut GameContext) {
     unsafe {
-        let world = &*ctx.world_raw();
         let mut numNPC = 0;
         let mut numProjectile = 0;
         let mut numTempEnt = 0;
@@ -906,7 +898,7 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
         );
 
         for i in 0..mp_qshared::shared::ENTITYNUM_MAX_NORMAL as usize {
-            let ent = &world.g_entities[i];
+            let ent = &ctx.world.g_entities[i];
             if ent.inuse != qfalse {
                 if ent.s.eType == ET_NPC as c_int {
                     numNPC += 1;
@@ -971,18 +963,17 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/g_utils.c:804-853`
 pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let mut e: *mut gentity_t = core::ptr::null_mut();
         let mut i: c_int = 0;
 
         for force in 0..2 {
-            e = &mut world.g_entities[MAX_CLIENTS as usize] as *mut gentity_t;
+            e = &mut ctx.world.g_entities[MAX_CLIENTS as usize] as *mut gentity_t;
             i = MAX_CLIENTS as c_int;
-            while i < world.level.num_entities {
+            while i < ctx.world.level.num_entities {
                 if (*e).inuse == qfalse {
                     if force == 0
-                        && (*e).freetime > world.level.startTime + 2000
-                        && world.level.time - (*e).freetime < 1000
+                        && (*e).freetime > ctx.world.level.startTime + 2000
+                        && ctx.world.level.time - (*e).freetime < 1000
                     {
                         i += 1;
                         e = e.add(1);
@@ -1009,16 +1000,16 @@ pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
         }
 
         // open up a new slot
-        world.level.num_entities += 1;
+        ctx.world.level.num_entities += 1;
 
         // let the server system know that there are more entities
-        let entities_base = world.g_entities.as_mut_ptr();
-        let clients_base = &mut world.clients[0] as *mut gclient_t as *mut playerState_t;
+        let entities_base = ctx.world.g_entities.as_mut_ptr();
+        let clients_base = &mut ctx.world.clients[0] as *mut gclient_t as *mut playerState_t;
         trap::LocateGameData(
             ctx.engine,
             GLocateGameDataArgs::new(
                 entities_base,
-                world.level.num_entities,
+                ctx.world.level.num_entities,
                 core::mem::size_of::<gentity_t>() as c_int,
                 clients_base,
                 core::mem::size_of::<gclient_t>() as c_int,
@@ -1034,17 +1025,14 @@ pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:860-873`
 pub fn G_EntitiesFree(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let world = &*ctx.world_raw();
-        let mut i = MAX_CLIENTS as c_int;
-        while i < world.level.num_entities {
-            if world.g_entities[i as usize].inuse == qfalse {
-                return qtrue;
-            }
-            i += 1;
+    let mut i = MAX_CLIENTS as c_int;
+    while i < ctx.world.level.num_entities {
+        if ctx.world.g_entities[i as usize].inuse == qfalse {
+            return qtrue;
         }
-        qfalse
+        i += 1;
     }
+    qfalse
 }
 
 /// Raven `G_SendG2KillQueue`. `gG2KillIndex`/`gG2KillNum` reached via
@@ -1052,32 +1040,32 @@ pub fn G_EntitiesFree(ctx: &mut GameContext) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:880-907`
 pub fn G_SendG2KillQueue(ctx: &mut GameContext) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        if world.globals.gG2KillNum == 0 {
-            return;
-        }
+    if ctx.world.globals.gG2KillNum == 0 {
+        return;
+    }
 
-        let mut msg = String::from("kg2");
-        let mut i = 0;
-        while i < world.globals.gG2KillNum && i < 64 {
-            msg.push_str(&format!(" {}", world.globals.gG2KillIndex.0[i as usize]));
-            i += 1;
-        }
+    let mut msg = String::from("kg2");
+    let mut i = 0;
+    while i < ctx.world.globals.gG2KillNum && i < 64 {
+        msg.push_str(&format!(
+            " {}",
+            ctx.world.globals.gG2KillIndex.0[i as usize]
+        ));
+        i += 1;
+    }
 
-        trap::SendServerCommand(
-            ctx.engine,
-            GSendServerCommandArgs::new(-1, CString::new(msg).unwrap()),
-        );
+    trap::SendServerCommand(
+        ctx.engine,
+        GSendServerCommandArgs::new(-1, CString::new(msg).unwrap()),
+    );
 
-        // Clear the count because we just sent off the whole queue
-        world.globals.gG2KillNum -= i;
-        if world.globals.gG2KillNum < 0 {
-            // Raven: "hmm, should be impossible, but I'm paranoid as we're
-            // far past beta." `assert(0)` in a debug build; faithfully clamp.
-            debug_assert!(false, "gG2KillNum went negative");
-            world.globals.gG2KillNum = 0;
-        }
+    // Clear the count because we just sent off the whole queue
+    ctx.world.globals.gG2KillNum -= i;
+    if ctx.world.globals.gG2KillNum < 0 {
+        // Raven: "hmm, should be impossible, but I'm paranoid as we're
+        // far past beta." `assert(0)` in a debug build; faithfully clamp.
+        debug_assert!(false, "gG2KillNum went negative");
+        ctx.world.globals.gG2KillNum = 0;
     }
 }
 
@@ -1085,22 +1073,19 @@ pub fn G_SendG2KillQueue(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_utils.c:909-923`
 pub fn G_KillG2Queue(ctx: &mut GameContext, entNum: c_int) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        if world.globals.gG2KillNum >= crate::game_globals::MAX_G2_KILL_QUEUE as c_int {
-            // This would be considered a Bad Thing. Since we're out of queue
-            // slots, just send it now as a separate command (eats more
-            // bandwidth, but we have no choice).
-            trap::SendServerCommand(
-                ctx.engine,
-                GSendServerCommandArgs::new(-1, CString::new(format!("kg2 {}", entNum)).unwrap()),
-            );
-            return;
-        }
-
-        world.globals.gG2KillIndex.0[world.globals.gG2KillNum as usize] = entNum;
-        world.globals.gG2KillNum += 1;
+    if ctx.world.globals.gG2KillNum >= crate::game_globals::MAX_G2_KILL_QUEUE as c_int {
+        // This would be considered a Bad Thing. Since we're out of queue
+        // slots, just send it now as a separate command (eats more
+        // bandwidth, but we have no choice).
+        trap::SendServerCommand(
+            ctx.engine,
+            GSendServerCommandArgs::new(-1, CString::new(format!("kg2 {}", entNum)).unwrap()),
+        );
+        return;
     }
+
+    ctx.world.globals.gG2KillIndex.0[ctx.world.globals.gG2KillNum as usize] = entNum;
+    ctx.world.globals.gG2KillNum += 1;
 }
 
 /// Raven `G_FreeEntity`. `ed->client` reached via the house
@@ -1156,10 +1141,9 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
                 saberEntNum = (*client).saberStoredIndex;
             }
 
-            let world = &mut *ctx.world_raw();
-            if saberEntNum > 0 && world.g_entities[saberEntNum as usize].inuse != qfalse {
-                world.g_entities[saberEntNum as usize].neverFree = qfalse;
-                let saber_ent = &mut world.g_entities[saberEntNum as usize] as *mut gentity_t;
+            if saberEntNum > 0 && ctx.world.g_entities[saberEntNum as usize].inuse != qfalse {
+                ctx.world.g_entities[saberEntNum as usize].neverFree = qfalse;
+                let saber_ent = &mut ctx.world.g_entities[saberEntNum as usize] as *mut gentity_t;
                 G_FreeEntity(ctx, ctx.entity_id_of(saber_ent));
             }
 
@@ -1186,10 +1170,9 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
         }
 
         if (*ed).s.eFlags & EF_SOUNDTRACKER != 0 {
-            let world = &mut *ctx.world_raw();
             let mut i = 0usize;
             while i < MAX_CLIENTS {
-                let ent = &mut world.g_entities[i] as *mut gentity_t;
+                let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
                 if !ent.is_null() && (*ent).inuse != qfalse && !(*ent).client.is_null() {
                     let client = (*ent).client as *mut gclient_t;
                     let mut ch = (trackchan_t::TRACK_CHANNEL_NONE as c_int - 50) as usize;
@@ -1223,7 +1206,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
         // the FnId<EntXxx> handler fields as None by construction (zero == None,
         // std-guaranteed via Option<NonZeroU8>), matching Raven's NULL fn ptrs.
         (*ed).classname = b"freed\0".as_ptr() as *mut c_char;
-        (*ed).freetime = (*ctx.world_raw()).level.time;
+        (*ed).freetime = ctx.world.level.time;
         (*ed).inuse = qfalse;
     }
 }
@@ -1237,7 +1220,7 @@ pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> *mut
         (*e).s.eType = mp_bg::public::entity_type::entityType_t::ET_EVENTS as c_int + event;
 
         (*e).classname = b"tempEntity\0".as_ptr() as *mut c_char;
-        (*e).eventTime = (*ctx.world_raw()).level.time;
+        (*e).eventTime = ctx.world.level.time;
         (*e).freeAfterEvent = qtrue;
 
         let mut snapped = origin;
@@ -1273,7 +1256,7 @@ pub fn G_SoundTempEntity(
         (*e).inuse = qtrue;
 
         (*e).classname = b"tempEntity\0".as_ptr() as *mut c_char;
-        (*e).eventTime = (*ctx.world_raw()).level.time;
+        (*e).eventTime = ctx.world.level.time;
         (*e).freeAfterEvent = qtrue;
 
         let mut snapped = origin;
@@ -1356,12 +1339,11 @@ pub fn G_KillBox(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
 
-        let world = &mut *ctx.world_raw();
         for i in 0..num {
-            let hit = &mut world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
-            let __h654 = ctx.entity_id_of(hit);
-            let __h655 = ctx.entity_id_of(ent);
-            let __h656 = ctx.entity_id_of(ent);
+            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
+            let targ_id = ctx.entity_id_of(hit);
+            let inflictor_id = ctx.entity_id_of(ent);
+            let attacker_id = ctx.entity_id_of(ent);
             if (*hit).client.is_null() {
                 continue;
             }
@@ -1379,9 +1361,9 @@ pub fn G_KillBox(ctx: &mut GameContext, ent: EntityId) {
             // nail it
             crate::g_combat::G_Damage(
                 ctx,
-                __h654,
-                __h655,
-                __h656,
+                targ_id,
+                inflictor_id,
+                attacker_id,
                 None,
                 [0.0, 0.0, 0.0],
                 100000,
@@ -1543,8 +1525,7 @@ pub fn G_MuteSound(ctx: &mut GameContext, entnum: c_int, channel: c_int) {
         (*te).s.trickedentindex2 = entnum;
         (*te).s.trickedentindex = channel;
 
-        let world = &mut *ctx.world_raw();
-        let e = &mut world.g_entities[entnum as usize] as *mut gentity_t;
+        let e = &mut ctx.world.g_entities[entnum as usize] as *mut gentity_t;
         if (*e).s.eFlags & EF_SOUNDTRACKER != 0 {
             G_FreeEntity(ctx, ctx.entity_id_of(e));
             (*e).s.eFlags = 0;
@@ -1580,17 +1561,17 @@ pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, sou
             // can kill the most recent sound on request
             let client = (*ent).client as *mut gclient_t;
             let idx = (channel - 50) as usize;
-            let world = &mut *ctx.world_raw();
             let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
-            if world.g_entities[killIdx as usize].inuse != qfalse && killIdx > MAX_CLIENTS as c_int
+            if ctx.world.g_entities[killIdx as usize].inuse != qfalse
+                && killIdx > MAX_CLIENTS as c_int
             {
                 G_MuteSound(ctx, killIdx, mp_qshared::shared::sound_channel::CHAN_VOICE);
                 let client = (*ent).client as *mut gclient_t;
                 let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
                 if killIdx > MAX_CLIENTS as c_int
-                    && world.g_entities[killIdx as usize].inuse != qfalse
+                    && ctx.world.g_entities[killIdx as usize].inuse != qfalse
                 {
-                    let e = &mut world.g_entities[killIdx as usize] as *mut gentity_t;
+                    let e = &mut ctx.world.g_entities[killIdx as usize] as *mut gentity_t;
                     G_FreeEntity(ctx, ctx.entity_id_of(e));
                 }
                 (*client).ps.fd.killSoundEntIndex[idx] = 0;
@@ -1689,8 +1670,7 @@ pub fn G_UseDispenserOn(ctx: &mut GameContext, ent: EntityId, dispType: c_int, t
         const STAT_HEALTH: usize = statIndex_t::STAT_HEALTH as usize;
         const STAT_MAX_HEALTH: usize = statIndex_t::STAT_MAX_HEALTH as usize;
 
-        let world = &*ctx.world_raw();
-        let level_time = world.level.time;
+        let level_time = ctx.world.level.time;
 
         if dispType == HI_HEALTHDISP {
             let client = (*target).client as *mut gclient_t;
@@ -1800,14 +1780,12 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
     let target: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), target) };
     unsafe {
-        let world = &*ctx.world_raw();
-
         if ent.is_null() || (*ent).client.is_null() {
             return qfalse;
         }
 
         let client = (*ent).client as *mut gclient_t;
-        if world.cvars.g_gametype.integer != GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer != GT_SIEGE
             || (*client).siegeClass == -1
             || target.is_null()
             || (*target).inuse == qfalse
@@ -1821,18 +1799,18 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
             return qfalse;
         }
 
-        let scl = &world.bg_state.bgSiegeClasses[(*client).siegeClass as usize];
+        let scl = &ctx.world.bg_state.bgSiegeClasses[(*client).siegeClass as usize];
 
         if Q_stricmp(scl.name.as_ptr(), (*target).healingclass) == 0 {
             // this thing can be healed by the class this player is using
-            if (*target).healingDebounce < world.level.time {
+            if (*target).healingDebounce < ctx.world.level.time {
                 // do the actual heal
                 (*target).health += 10;
                 if (*target).health > (*target).maxHealth {
                     // don't go too high
                     (*target).health = (*target).maxHealth;
                 }
-                (*target).healingDebounce = world.level.time + (*target).healingrate;
+                (*target).healingDebounce = ctx.world.level.time + (*target).healingrate;
                 if !(*target).healingsound.is_null() && *(*target).healingsound != 0 {
                     // play it
                     if (*target).s.solid == SOLID_BMODEL {
@@ -1856,7 +1834,7 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
                 // update net health for bar
                 G_ScaleNetHealth(&mut *(target));
                 let target_ent = match (*target).target_ent {
-                    Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
+                    Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
                     None => core::ptr::null_mut(),
                 };
                 if !target_ent.is_null() && (*target_ent).maxHealth != 0 {
@@ -1911,9 +1889,9 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
     let ent: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
-        let world = &mut *ctx.world_raw();
-
-        if world.globals.gSiegeRoundBegun == qfalse && world.cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.globals.gSiegeRoundBegun == qfalse
+            && ctx.world.cvars.g_gametype.integer == GT_SIEGE
+        {
             return;
         }
 
@@ -1941,7 +1919,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
         // Check if in a vehicle
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
             let current_veh =
-                &mut world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
+                &mut ctx.world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*current_veh).inuse != qfalse && !(*current_veh).m_pVehicle.is_null() {
                 let pVeh = (*current_veh).m_pVehicle as *mut Vehicle_t;
                 if (*pVeh).m_iBoarding == 0 {
@@ -1960,9 +1938,9 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         // Check body grab
         if (*client).bodyGrabIndex != ENTITYNUM_NONE {
-            if (*client).bodyGrabTime < world.level.time {
+            if (*client).bodyGrabTime < ctx.world.level.time {
                 let grabbed =
-                    &mut world.g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
+                    &mut ctx.world.g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
                 if (*grabbed).inuse != qfalse {
                     if !(*grabbed).client.is_null() {
                         let grabbed_client = (*grabbed).client as *mut gclient_t;
@@ -1973,7 +1951,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
                 }
             }
             (*client).bodyGrabIndex = ENTITYNUM_NONE;
-            (*client).bodyGrabTime = world.level.time + 1000;
+            (*client).bodyGrabTime = ctx.world.level.time + 1000;
             return;
         }
 
@@ -2008,7 +1986,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
             return;
         }
 
-        let target = &mut world.g_entities[trace.entityNum as usize] as *mut gentity_t;
+        let target = &mut ctx.world.g_entities[trace.entityNum as usize] as *mut gentity_t;
 
         // Check for vehicle target
         if !target.is_null()
@@ -2025,7 +2003,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
                     crate::veh_dispatch::eject(ctx, pVeh, ent as *mut bgEntity_t, qfalse);
                 } else {
                     // Otherwise board this vehicle.
-                    if world.cvars.g_gametype.integer < GT_TEAM
+                    if ctx.world.cvars.g_gametype.integer < GT_TEAM
                         || (*target).alliedTeam == 0
                         || ((*target).alliedTeam == (*client).sess.sessionTeam)
                     {
@@ -2088,10 +2066,10 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         // Check for valid use target
         if ValidUseTarget((target).as_ref()) != qfalse
-            && (world.cvars.g_gametype.integer != GT_SIEGE
+            && (ctx.world.cvars.g_gametype.integer != GT_SIEGE
                 || (*target).alliedTeam == 0
                 || (*target).alliedTeam != (*client).sess.sessionTeam
-                || world.cvars.g_ff_objectives.integer != 0)
+                || ctx.world.cvars.g_ff_objectives.integer != 0)
         {
             if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1
             {
@@ -2142,7 +2120,6 @@ fn goto_tryJetPack(ctx: &mut GameContext, ent: EntityId) {
     // mp_qshared::shared::limits) so the STAT_HOLDABLE_ITEMS bit tests and the
     // ItemUse_UseDisp / EV_USE_ITEM0 dispType all use the real values.
     unsafe {
-        let world = &mut *ctx.world_raw();
         let client = (*ent).client as *mut gclient_t;
 
         // Jetpack check
@@ -2388,16 +2365,14 @@ pub fn DebugLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int
         points[3][i] += 2.0 * cross[i];
     }
 
-    unsafe {
-        trap::DebugPolygonCreate(
-            ctx.engine,
-            mp_abi::game::syscalls::G_DEBUG_POLYGON_CREATE::GDebugPolygonCreateArgs::new(
-                color,
-                4,
-                points.as_mut_ptr() as *mut vec3_t,
-            ),
-        )
-    }
+    trap::DebugPolygonCreate(
+        ctx.engine,
+        mp_abi::game::syscalls::G_DEBUG_POLYGON_CREATE::GDebugPolygonCreateArgs::new(
+            color,
+            4,
+            points.as_mut_ptr() as *mut vec3_t,
+        ),
+    )
 }
 
 /// Raven `G_ROFF_NotetrackCallback`.
