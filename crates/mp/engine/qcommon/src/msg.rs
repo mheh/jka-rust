@@ -497,13 +497,19 @@ fn build_entity_state_fields() -> Vec<netField_t> {
 }
 
 /// Raven `playerStateFields[]` — the normal-client playerstate delta table.
-/// `_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally defined
-/// (`q_shared.h:2154`), so this is the `#ifdef` branch's table (the `#else`
-/// variant at msg.cpp:1827-1989 is dead); `!_XBOX` mod-author tail included.
 /// Order is wire-critical. `fd.forcePowerLevel[FP_LEVITATION/FP_SEE]` and
 /// `fd.forcePowerDebounce[FP_LEVITATION]` index the nested `forcedata_t`.
 ///
-/// Source: `oracle/codemp/qcommon/msg.cpp:1410-1568`
+/// RETAIL-WIRE DIVERGENCE (do NOT regenerate from the oracle source): the
+/// source drop's tables (152 rows, both ifdef variants, msg.cpp:1410-1568)
+/// postdate the shipped 1.01 build. The retail wire is THIS 137-row set,
+/// verified row-identical against a retail-compatible client's compiled
+/// tables (TaystJK arm64 binary dump, 2026-07-14; the 152-row table shifts
+/// every field index past 66 and drops real clients with
+/// `CL_ParsePacketEntities: end of message` when e.g. lookTarget changes).
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1410-1568` (minus the 15
+/// never-shipped vehicle rows)
 fn build_player_state_fields() -> Vec<netField_t> {
     vec![
         nf("commandTime", offset_of!(playerState_t, commandTime), 32),
@@ -702,35 +708,17 @@ fn build_player_state_fields() -> Vec<netField_t> {
             GENTITYNUM_BITS,
         ),
         nf(
-            "vehOrientation[0]",
-            offset_of!(playerState_t, vehOrientation) + 0 * 4,
-            0,
-        ),
-        nf(
             "weaponChargeSubtractTime",
             offset_of!(playerState_t, weaponChargeSubtractTime),
             32,
         ),
         nf(
-            "vehOrientation[1]",
-            offset_of!(playerState_t, vehOrientation) + 1 * 4,
-            0,
-        ),
-        nf("moveDir[1]", offset_of!(playerState_t, moveDir) + 1 * 4, 0),
-        nf("moveDir[0]", offset_of!(playerState_t, moveDir) + 0 * 4, 0),
-        nf(
             "weaponChargeTime",
             offset_of!(playerState_t, weaponChargeTime),
             32,
         ),
-        nf(
-            "vehOrientation[2]",
-            offset_of!(playerState_t, vehOrientation) + 2 * 4,
-            0,
-        ),
         nf("legsFlip", offset_of!(playerState_t, legsFlip), 1),
         nf("damageEvent", offset_of!(playerState_t, damageEvent), 8),
-        nf("moveDir[2]", offset_of!(playerState_t, moveDir) + 2 * 4, 0),
         nf(
             "rocketTargetTime",
             offset_of!(playerState_t, rocketTargetTime),
@@ -781,11 +769,6 @@ fn build_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, m_iVehicleNum),
             GENTITYNUM_BITS,
         ),
-        nf(
-            "vehTurnaroundTime",
-            offset_of!(playerState_t, vehTurnaroundTime),
-            32,
-        ),
         nf("generic1", offset_of!(playerState_t, generic1), 8),
         nf("jumppad_ent", offset_of!(playerState_t, jumppad_ent), 10),
         nf(
@@ -826,19 +809,9 @@ fn build_player_state_fields() -> Vec<netField_t> {
             16,
         ),
         nf(
-            "vehWeaponsLinked",
-            offset_of!(playerState_t, vehWeaponsLinked),
-            1,
-        ),
-        nf(
             "lastHitLoc[2]",
             offset_of!(playerState_t, lastHitLoc) + 2 * 4,
             0,
-        ),
-        nf(
-            "hyperSpaceTime",
-            offset_of!(playerState_t, hyperSpaceTime),
-            32,
         ),
         nf(
             "fd.forceMindtrickTargetIndex3",
@@ -857,16 +830,10 @@ fn build_player_state_fields() -> Vec<netField_t> {
             16,
         ),
         nf(
-            "hyperSpaceAngles[1]",
-            offset_of!(playerState_t, hyperSpaceAngles) + 1 * 4,
-            0,
-        ),
-        nf(
             "lastHitLoc[1]",
             offset_of!(playerState_t, lastHitLoc) + 1 * 4,
             0,
         ),
-        nf("vehBoarding", offset_of!(playerState_t, vehBoarding), 1),
         nf(
             "fd.sentryDeployed",
             offset_of!(playerState_t, fd.sentryDeployed),
@@ -882,12 +849,6 @@ fn build_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, saberLockFrame),
             16,
         ),
-        nf(
-            "vehTurnaroundIndex",
-            offset_of!(playerState_t, vehTurnaroundIndex),
-            GENTITYNUM_BITS,
-        ),
-        nf("vehSurfaces", offset_of!(playerState_t, vehSurfaces), 16),
         nf(
             "fd.forcePowerLevel[FP_SEE]",
             offset_of!(playerState_t, fd.forcePowerLevel) + FP_SEE as usize * 4,
@@ -940,16 +901,6 @@ fn build_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, hackingBaseTime),
             16,
         ),
-        nf(
-            "hyperSpaceAngles[0]",
-            offset_of!(playerState_t, hyperSpaceAngles) + 0 * 4,
-            0,
-        ),
-        nf(
-            "hyperSpaceAngles[2]",
-            offset_of!(playerState_t, hyperSpaceAngles) + 2 * 4,
-            0,
-        ),
         nf("userInt1", offset_of!(playerState_t, userInt1), 1),
         nf("userInt2", offset_of!(playerState_t, userInt2), 1),
         nf("userInt3", offset_of!(playerState_t, userInt3), 1),
@@ -996,7 +947,11 @@ fn build_player_state_fields() -> Vec<netField_t> {
 /// `sizeof(pilotPlayerStateFields)/sizeof([0]) - 82` — but the full 140-entry
 /// table is transcribed faithfully.
 ///
-/// Source: `oracle/codemp/qcommon/msg.cpp:1570-1734`
+/// RETAIL-WIRE DIVERGENCE: 140 rows, not the source drop's 152 — see
+/// [`build_player_state_fields`]; verified against the same client binary.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1570-1734` (minus never-shipped
+/// vehicle rows)
 fn build_pilot_player_state_fields() -> Vec<netField_t> {
     vec![
         nf("commandTime", offset_of!(playerState_t, commandTime), 32),
@@ -1109,6 +1064,7 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
         ),
         nf("generic1", offset_of!(playerState_t, generic1), 8),
         nf("eFlags2", offset_of!(playerState_t, eFlags2), 10),
+        //===THESE SHOULD NOT BE CHANGING OFTEN====================================================================
         nf("legsAnim", offset_of!(playerState_t, legsAnim), 16),
         nf("torsoAnim", offset_of!(playerState_t, torsoAnim), 16),
         nf("torsoTimer", offset_of!(playerState_t, torsoTimer), 16),
@@ -1171,6 +1127,7 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
         ),
         nf("holocronBits", offset_of!(playerState_t, holocronBits), 32),
         nf("fd.forcePower", offset_of!(playerState_t, fd.forcePower), 8),
+        //===THE REST OF THESE SHOULD NOT BE RELEVANT, BUT, FOR SAFETY, INCLUDE THEM ANYWAY, JUST AT THE BOTTOM===============================================================
         nf(
             "velocity[0]",
             offset_of!(playerState_t, velocity) + 0 * 4,
@@ -1391,58 +1348,8 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, hackingBaseTime),
             16,
         ),
-        nf(
-            "vehOrientation[0]",
-            offset_of!(playerState_t, vehOrientation) + 0 * 4,
-            0,
-        ),
-        nf(
-            "vehOrientation[1]",
-            offset_of!(playerState_t, vehOrientation) + 1 * 4,
-            0,
-        ),
-        nf(
-            "vehOrientation[2]",
-            offset_of!(playerState_t, vehOrientation) + 2 * 4,
-            0,
-        ),
-        nf(
-            "vehTurnaroundTime",
-            offset_of!(playerState_t, vehTurnaroundTime),
-            32,
-        ),
-        nf(
-            "vehWeaponsLinked",
-            offset_of!(playerState_t, vehWeaponsLinked),
-            1,
-        ),
-        nf(
-            "hyperSpaceTime",
-            offset_of!(playerState_t, hyperSpaceTime),
-            32,
-        ),
-        nf(
-            "vehTurnaroundIndex",
-            offset_of!(playerState_t, vehTurnaroundIndex),
-            GENTITYNUM_BITS,
-        ),
-        nf("vehSurfaces", offset_of!(playerState_t, vehSurfaces), 16),
-        nf("vehBoarding", offset_of!(playerState_t, vehBoarding), 1),
-        nf(
-            "hyperSpaceAngles[1]",
-            offset_of!(playerState_t, hyperSpaceAngles) + 1 * 4,
-            0,
-        ),
-        nf(
-            "hyperSpaceAngles[0]",
-            offset_of!(playerState_t, hyperSpaceAngles) + 0 * 4,
-            0,
-        ),
-        nf(
-            "hyperSpaceAngles[2]",
-            offset_of!(playerState_t, hyperSpaceAngles) + 2 * 4,
-            0,
-        ),
+        //===NEVER SEND THESE, ONLY USED BY VEHICLES============================
+        // (Raven's veh* entries here are commented out in the oracle.)
         nf("userInt1", offset_of!(playerState_t, userInt1), 1),
         nf("userInt2", offset_of!(playerState_t, userInt2), 1),
         nf("userInt3", offset_of!(playerState_t, userInt3), 1),
@@ -1486,7 +1393,11 @@ fn build_pilot_player_state_fields() -> Vec<netField_t> {
 /// `_OPTIMIZED_VEHICLE_NETWORKING` is unconditionally defined,
 /// `q_shared.h:2154`). Order is wire-critical; all 69 entries are coded.
 ///
-/// Source: `oracle/codemp/qcommon/msg.cpp:1736-1822`
+/// RETAIL-WIRE DIVERGENCE: 69 rows, not the source drop's 80 — see
+/// [`build_player_state_fields`]; verified against the same client binary.
+///
+/// Source: `oracle/codemp/qcommon/msg.cpp:1736-1822` (minus never-shipped
+/// vehicle rows)
 fn build_veh_player_state_fields() -> Vec<netField_t> {
     vec![
         nf("commandTime", offset_of!(playerState_t, commandTime), 32),
@@ -1548,47 +1459,15 @@ fn build_veh_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, rocketLockIndex),
             GENTITYNUM_BITS,
         ),
-        nf(
-            "genericEnemyIndex",
-            offset_of!(playerState_t, genericEnemyIndex),
-            32,
-        ),
         nf("events[0]", offset_of!(playerState_t, events) + 0 * 4, 10),
         nf("events[1]", offset_of!(playerState_t, events) + 1 * 4, 10),
-        nf(
-            "customRGBA[0]",
-            offset_of!(playerState_t, customRGBA) + 0 * 4,
-            8,
-        ),
-        nf("movementDir", offset_of!(playerState_t, movementDir), 4),
-        nf(
-            "customRGBA[3]",
-            offset_of!(playerState_t, customRGBA) + 3 * 4,
-            8,
-        ),
         nf("weaponstate", offset_of!(playerState_t, weaponstate), 4),
-        nf("basespeed", offset_of!(playerState_t, basespeed), -16),
         nf("pm_flags", offset_of!(playerState_t, pm_flags), 16),
         nf("pm_time", offset_of!(playerState_t, pm_time), -16),
-        nf(
-            "customRGBA[1]",
-            offset_of!(playerState_t, customRGBA) + 1 * 4,
-            8,
-        ),
         nf(
             "clientNum",
             offset_of!(playerState_t, clientNum),
             GENTITYNUM_BITS,
-        ),
-        nf(
-            "duelIndex",
-            offset_of!(playerState_t, duelIndex),
-            GENTITYNUM_BITS,
-        ),
-        nf(
-            "customRGBA[2]",
-            offset_of!(playerState_t, customRGBA) + 2 * 4,
-            8,
         ),
         nf("gravity", offset_of!(playerState_t, gravity), 16),
         nf("weapon", offset_of!(playerState_t, weapon), 8),
@@ -1647,19 +1526,9 @@ fn build_veh_player_state_fields() -> Vec<netField_t> {
             32,
         ),
         nf(
-            "activeForcePass",
-            offset_of!(playerState_t, activeForcePass),
-            6,
-        ),
-        nf(
             "electrifyTime",
             offset_of!(playerState_t, electrifyTime),
             32,
-        ),
-        nf(
-            "fd.forceJumpZStart",
-            offset_of!(playerState_t, fd.forceJumpZStart),
-            0,
         ),
         nf("loopSound", offset_of!(playerState_t, loopSound), 16),
         nf(
@@ -1677,7 +1546,6 @@ fn build_veh_player_state_fields() -> Vec<netField_t> {
             offset_of!(playerState_t, vehTurnaroundTime),
             32,
         ),
-        nf("generic1", offset_of!(playerState_t, generic1), 8),
         nf("hackingTime", offset_of!(playerState_t, hackingTime), 32),
         nf("brokenLimbs", offset_of!(playerState_t, brokenLimbs), 8),
         nf(
