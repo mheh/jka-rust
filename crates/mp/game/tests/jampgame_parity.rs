@@ -565,18 +565,10 @@ fn qmath_parity() {
 
 // ============================ bg_lib family ============================
 
-fn dump_rand_bg(o: &mut String) {
-    o.push_str("== rand ==\n");
-    let seeds: [u32; 5] = [0, 1, 12345, 0x7fffffff, 0xdeadbeef];
-    let mut rng = Rng::new();
-    for s in seeds {
-        let _ = writeln!(o, "seed {:08x}", s);
-        rng.srand(s);
-        for _ in 0..64 {
-            let _ = writeln!(o, "r {}", rng.rand());
-        }
-    }
-}
+// bg_lib's rand/srand are QVM-only surface (retail's JK2_game.vcproj excludes
+// bg_lib.c; the native module links the MSVC CRT rand — see
+// bg_channel::rng). Their 69069-LCG dump section was retired 2026-07-14;
+// Rng's CRT rand is pinned by a unit test in rng.rs instead.
 
 fn dump_atox(o: &mut String) {
     let path = oracle_dir().join("fixtures/strings.txt");
@@ -709,7 +701,6 @@ fn dump_memmove(o: &mut String) {
 #[test]
 fn bglib_parity() {
     let mut o = String::new();
-    dump_rand_bg(&mut o);
     dump_atox(&mut o);
     dump_qsort(&mut o);
     dump_memmove(&mut o);

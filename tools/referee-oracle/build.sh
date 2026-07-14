@@ -127,6 +127,54 @@ new_fmodproto = (
 assert old_fmodproto in s, "q_shared.h fmod() prototype not found — oracle changed?"
 s = s.replace(old_fmodproto, new_fmodproto, 1)
 
+# retail links the MSVC CRT rand()/srand() into the native module (bg_lib.c is
+# ExcludedFromBuild in every JK2_game.vcproj win32 config AND its rand/srand
+# sit under #ifdef Q3_VM, bg_lib.c:754 — the 69069 LCG is QVM-only). This
+# host's libc rand() is a different LCG, so bot-AI rolls (chat/aim/camping)
+# diverge from retail (found by the lockstep referee, 2026-07-14: first
+# divergent bot decision at the first chat gate). Route rand/srand to a
+# retail-exact MSVC-semantics clone: 32-bit holdrand (unsigned long is 32-bit
+# on win32/win64 alike), init 1, next = holdrand*214013+2531011, return
+# (holdrand>>16)&0x7fff. State is a single shared variable defined in the
+# q_math.c copy below.
+old_limitsinc = "#include <limits.h>\n"
+new_limitsinc = (
+    "#include <limits.h>\n"
+    "/* referee-oracle: retail-win32 rand()/srand() are the MSVC CRT LCG; this\n"
+    "   host's libc differs. See tools/referee-oracle/build.sh for rationale. */\n"
+    "extern unsigned int jka_msvc_holdrand;\n"
+    "static inline int jka_msvc_rand(void) {\n"
+    "    jka_msvc_holdrand = jka_msvc_holdrand * 214013u + 2531011u;\n"
+    "    return (int)((jka_msvc_holdrand >> 16) & 0x7fff);\n"
+    "}\n"
+    "static inline void jka_msvc_srand(unsigned int seed) { jka_msvc_holdrand = seed; }\n"
+    "#define rand() jka_msvc_rand()\n"
+    "#define srand(s) jka_msvc_srand((unsigned int)(s))\n"
+)
+assert old_limitsinc in s, "q_shared.h '#include <limits.h>' not found — oracle changed?"
+s = s.replace(old_limitsinc, new_limitsinc, 1)
+
+open(p, "w").write(s)
+
+# The MSVC-rand state (one shared definition; declared extern in q_shared.h).
+p = "build/src/codemp/game/q_math.c"
+s = open(p).read()
+s += "\n/* referee-oracle: MSVC CRT rand() state (see q_shared.h patch). */\nunsigned int jka_msvc_holdrand = 1u;\n"
+open(p, "w").write(s)
+
+
+# bg_lib.c defines its own rand/srand OUTSIDE the Q3_VM guard (the #endif at
+# ~761 closes early) — shield those definitions from the macros. They compile
+# as dead C++-mangled symbols either way (retail excludes bg_lib.c entirely);
+# the shield just keeps the definitions parseable.
+p = "build/src/codemp/game/bg_lib.c"
+s = open(p).read()
+old_randseed = "static int randSeed = 0;"
+new_randseed = ("#undef rand /* referee-oracle: shield bg_lib's own defs from the MSVC-rand macros */\n"
+                "#undef srand\n"
+                "static int randSeed = 0;")
+assert old_randseed in s, "bg_lib.c randSeed not found — oracle changed?"
+s = s.replace(old_randseed, new_randseed, 1)
 open(p, "w").write(s)
 PY
 

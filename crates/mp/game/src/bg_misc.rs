@@ -1500,7 +1500,7 @@ pub fn BG_ValidateSkinForTeam(
 ///
 /// Source: `oracle/codemp/game/q_shared.h:1408-1427`
 #[inline]
-fn snap_vector(v: &mut vec3_t) {
+pub(crate) fn snap_vector(v: &mut vec3_t) {
     v[0] = v[0].round_ties_even();
     v[1] = v[1].round_ties_even();
     v[2] = v[2].round_ties_even();

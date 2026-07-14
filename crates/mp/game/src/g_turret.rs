@@ -12,6 +12,7 @@
 //! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_misc::snap_vector;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::ent_fn_enums::{EntDie, EntPain, EntThink, EntUse};
 use crate::entity::flags::FL_NOTARGET;
@@ -333,12 +334,7 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
         (*bolt).s.pos.trDelta[1] = dir[1] * (*ent).mass as f32;
         (*bolt).s.pos.trDelta[2] = dir[2] * (*ent).mass as f32;
 
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-                &mut (*bolt).s.pos.trDelta as *mut vec3_t,
-            ),
-        );
+        snap_vector(&mut (*bolt).s.pos.trDelta);
 
         // VectorCopy(start, currentOrigin)
         (*bolt).r.currentOrigin[0] = start[0];

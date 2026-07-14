@@ -13,6 +13,7 @@ use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 
 // Pass-2: entity fn-pointer dispatch as fn-ID enums and the
 // `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
+use crate::bg_misc::snap_vector;
 use crate::ent_fn_enums::EntThink;
 use crate::entity::hit_location::*;
 use crate::level::damage_flags::{
@@ -2256,12 +2257,7 @@ pub fn rocketThink(ctx: &mut GameContext, ent: EntityId) {
 
             crate::q_math::_VectorScale(newdir, vel * 0.5, &mut (*ent).s.pos.trDelta);
             (*ent).movedir = newdir;
-            trap::SnapVector(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-                    &mut (*ent).s.pos.trDelta,
-                ),
-            ); // save net bandwidth
+            snap_vector(&mut (*ent).s.pos.trDelta); // save net bandwidth
             (*ent).s.pos.trBase = (*ent).r.currentOrigin;
             (*ent).s.pos.trTime = ctx.world.level.time;
         }
@@ -2430,10 +2426,7 @@ pub fn thermalDetonatorExplode(ctx: &mut GameContext, ent: EntityId) {
 
             crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos, ctx.world.level.time, &mut origin);
             origin[2] += 8.0;
-            trap::SnapVector(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut origin),
-            );
+            snap_vector(&mut origin);
             crate::g_utils::G_SetOrigin(&mut *(ent), origin);
 
             (*ent).s.eType = (ET_GENERAL) as i32;
@@ -2582,10 +2575,7 @@ pub fn WP_FireThermalDetonator(
         (*bolt).s.pos.trTime = ctx.world.level.time; // move a bit on the very first frame
         (*bolt).s.pos.trBase = start;
 
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*bolt).s.pos.trDelta),
-        ); // save net bandwidth
+        snap_vector(&mut (*bolt).s.pos.trDelta); // save net bandwidth
         (*bolt).r.currentOrigin = start;
 
         (*bolt).pos2 = start;
@@ -3212,19 +3202,9 @@ pub fn CreateLaserTrap(ctx: &mut GameContext, laserTrap: EntityId, start: vec3_t
 
         (*laserTrap).s.pos.trTime = ctx.world.level.time; // move a bit on the very first frame
         (*laserTrap).s.pos.trBase = start;
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-                &mut (*laserTrap).s.pos.trBase,
-            ),
-        ); // save net bandwidth
+        snap_vector(&mut (*laserTrap).s.pos.trBase); // save net bandwidth
 
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-                &mut (*laserTrap).s.pos.trDelta,
-            ),
-        ); // save net bandwidth
+        snap_vector(&mut (*laserTrap).s.pos.trDelta); // save net bandwidth
         (*laserTrap).r.currentOrigin = start;
 
         (*laserTrap).s.apos.trType = TR_GRAVITY;
@@ -4530,10 +4510,7 @@ pub fn CalcMuzzlePoint(
         }
 
         // snap to integer coordinates for more efficient network bandwidth usage
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(muzzlePoint),
-        );
+        snap_vector(muzzlePoint);
     }
 }
 

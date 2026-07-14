@@ -460,8 +460,15 @@ pub fn BotDoChat(
             bs_ref.doChat = 1;
         }
         // Oracle uses `strlen(bs->currentChat)` — the post-%-substitution length.
-        bs_ref.chatTime_stored = (((c_strlen(currentChat_b as *const u8) as c_int) * 45)
-            + ctx.world.bg_state.rng.Q_irand(1300, 1500)) as f32;
+        // C types: `strlen` is size_t, so the (possibly-negative on LP64)
+        // `Q_irand` roll promotes to unsigned — a negative roll wraps to a
+        // huge value and the float conversion lands on 2^64 (chat scheduled
+        // never). Keep the size_t-width arithmetic; i32 math here made the
+        // bot chat immediately instead (lockstep frame-364 find, 2026-07-14).
+        bs_ref.chatTime_stored = (c_strlen(currentChat_b as *const u8))
+            .wrapping_mul(45)
+            .wrapping_add(ctx.world.bg_state.rng.Q_irand(1300, 1500) as isize as usize)
+            as f32;
         bs_ref.chatTime = (ctx.world.level.time as f32) + bs_ref.chatTime_stored;
 
         B_TempFree(ctx, crate::game_globals::MAX_CHAT_BUFFER_SIZE as c_int);

@@ -65,6 +65,7 @@ use std::ffi::{CStr, CString};
 // `crate::g_public_consts` (`=0x0000_0020`); the earlier local shadow consts
 // (which claimed no canonical existed) are dropped in favor of those.
 // Source: `oracle/codemp/game/bg_public.h:409`, `g_local.h`
+use crate::bg_misc::snap_vector;
 use crate::game_globals::MAX_SHADER_REMAPS;
 
 /// Raven `strcpy(dest, src)` into a fixed-size `[c_char; N]` field — copies
@@ -1219,10 +1220,7 @@ pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> *mut
         (*e).freeAfterEvent = qtrue;
 
         let mut snapped = origin;
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut snapped as *mut vec3_t), // save network bandwidth
-        );
+        snap_vector(&mut snapped); // save network bandwidth
         G_SetOrigin(&mut *(e), snapped);
         // WTF? Why aren't we setting the s.origin? (like below) — cg_events.c
         // code checks origin all over the place!!! Trying to save
@@ -1255,10 +1253,7 @@ pub fn G_SoundTempEntity(
         (*e).freeAfterEvent = qtrue;
 
         let mut snapped = origin;
-        trap::SnapVector(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut snapped as *mut vec3_t), // save network bandwidth
-        );
+        snap_vector(&mut snapped); // save network bandwidth
         G_SetOrigin(&mut *(e), snapped);
 
         // find cluster for PVS

@@ -34,6 +34,7 @@ unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
     ctx.world.g_entities.as_ptr()
 }
 
+use crate::bg_misc::snap_vector;
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
 
@@ -292,10 +293,7 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
 
     let time = ctx.world.level.time;
     crate::bg_misc::BG_EvaluateTrajectory(&ctx.entity(ent).s.pos, time, &mut origin);
-    trap::SnapVector(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut origin),
-    );
+    snap_vector(&mut origin);
     G_SetOrigin(ctx.entity_mut(ent), origin);
 
     ctx.entity_mut(ent).s.eType = ET_GENERAL as c_int;
@@ -465,19 +463,11 @@ pub fn CreateMissile(
     ctx.entity_mut(missile).target_ent = None;
 
     let mut snapped_org = org;
-    trap::SnapVector(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut snapped_org),
-    );
+    snap_vector(&mut snapped_org);
     crate::q_math::_VectorCopy(snapped_org, &mut ctx.entity_mut(missile).s.pos.trBase);
     crate::q_math::_VectorScale(dir, vel, &mut ctx.entity_mut(missile).s.pos.trDelta);
     crate::q_math::_VectorCopy(snapped_org, &mut ctx.entity_mut(missile).r.currentOrigin);
-    trap::SnapVector(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-            &mut ctx.entity_mut(missile).s.pos.trDelta,
-        ),
-    );
+    snap_vector(&mut ctx.entity_mut(missile).s.pos.trDelta);
 
     missile_ptr
 }

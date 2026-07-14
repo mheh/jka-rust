@@ -11,11 +11,11 @@
 
 use core::ffi::{c_int, c_uint, c_ulong};
 
-/// Raven's `holdrand` seed plus the VC-libc `rand()` LCG.
+/// Raven's `holdrand` seed plus the C runtime `rand()` LCG.
 ///
-/// Raven kept two independent generator states — this file-static `holdrand`
-/// (`q_math.c:1432`) and `bg_lib.c`'s file-static `randSeed` (`bg_lib.c:763`)
-/// — that never shared state; both are kept threaded here.
+/// The retail native module carries two independent generator states — the
+/// file-static `holdrand` (`q_math.c:1432`) and the MSVC CRT `rand()`'s own
+/// holdrand — that never share state; both are kept threaded here.
 ///
 /// Source: `oracle/codemp/game/q_math.c:1432`
 pub struct Rng {
@@ -26,11 +26,13 @@ pub struct Rng {
     /// Source: `oracle/codemp/game/q_math.c:1432`
     holdrand: c_ulong,
 
-    /// Raven `bg_lib.c`'s `static int randSeed = 0;` — the independent LCG
-    /// state backing `bg_lib.c`'s `rand`/`srand` and the `q_shared.h`
-    /// `random`/`crandom` macros.
-    /// Source: `oracle/codemp/game/bg_lib.c:763`
-    randSeed: u32,
+    /// The C runtime `rand()` state backing the native module's `rand`/`srand`
+    /// and the `q_shared.h` `random`/`crandom` macros. Retail win32 links the
+    /// MSVC CRT here (`bg_lib.c` is `ExcludedFromBuild` in every
+    /// `JK2_game.vcproj` win32 config AND its `rand` sits under `#ifdef
+    /// Q3_VM`, `bg_lib.c:754` — the bg_lib 69069 LCG is QVM-only). MSVC's
+    /// `holdrand` is a 32-bit `long` on win32/win64 alike, initialized to 1.
+    crt_holdrand: u32,
 }
 
 impl Rng {
@@ -40,11 +42,11 @@ impl Rng {
     const HOLDRAND_INIT: c_ulong = 0x89ab_cdef;
 
     /// Fresh generator seeded with Raven's compile-time `holdrand` value and
-    /// `bg_lib.c`'s compile-time `randSeed = 0`.
+    /// the MSVC CRT's compile-time `holdrand = 1L`.
     pub fn new() -> Self {
         Self {
             holdrand: Self::HOLDRAND_INIT,
-            randSeed: 0,
+            crt_holdrand: 1,
         }
     }
 
@@ -101,18 +103,20 @@ impl Rng {
         self.irand(value1, value2)
     }
 
-    /// Raven `bg_lib.c`'s `srand` — (re)seeds the independent `randSeed` LCG.
-    /// Source: `oracle/codemp/game/bg_lib.c:765-767`
+    /// The native module's `srand` — the MSVC CRT one retail links (called by
+    /// `G_InitGame`'s `srand(randomSeed)`, `g_main.c:929`); reseeds
+    /// `crt_holdrand`.
     pub fn srand(&mut self, seed: c_uint) {
-        self.randSeed = seed as u32;
+        self.crt_holdrand = seed as u32;
     }
 
-    /// Raven `bg_lib.c`'s `rand` — `randSeed = 69069*randSeed + 1; return
-    /// randSeed & 0x7fff;`.
-    /// Source: `oracle/codemp/game/bg_lib.c:769-772`
+    /// The native module's `rand` — the MSVC CRT LCG retail links:
+    /// `holdrand = holdrand * 214013 + 2531011; return (holdrand >> 16) &
+    /// 0x7fff;`. (bg_lib.c's 69069 LCG is QVM-only — see `crt_holdrand`;
+    /// wrong-variant fix found by the lockstep referee, 2026-07-14.)
     pub fn rand(&mut self) -> c_int {
-        self.randSeed = 69069u32.wrapping_mul(self.randSeed).wrapping_add(1);
-        (self.randSeed & 0x7fff) as c_int
+        self.crt_holdrand = self.crt_holdrand.wrapping_mul(214013).wrapping_add(2531011);
+        ((self.crt_holdrand >> 16) & 0x7fff) as c_int
     }
 
     /// Raven `random()` macro — `(rand() & 0x7fff) / ((float)0x7fff)`.
@@ -142,3 +146,27 @@ impl Default for Rng {
 // though the low 32 bits of the stream agree). Goldens for this family are
 // regenerated per host width by `tools/jampgame-oracle/run.sh`.
 // Source: `oracle/codemp/game/q_math.c:1432` (holdrand*214013+2531011 >>17)
+
+#[cfg(test)]
+mod tests {
+    use super::Rng;
+
+    /// The MSVC CRT `rand()` stream — the canonical first draws for the
+    /// default seed (1) and a reseed, verifying retail-win32 semantics
+    /// (32-bit holdrand, *214013+2531011, >>16, &0x7fff).
+    #[test]
+    fn crt_rand_matches_msvc_stream() {
+        let mut rng = Rng::new();
+        let first: Vec<i32> = (0..10).map(|_| rng.rand()).collect();
+        assert_eq!(
+            first,
+            [41, 18467, 6334, 26500, 19169, 15724, 11478, 29358, 26962, 24464]
+        );
+        rng.srand(42);
+        let reseeded: Vec<i32> = (0..4).map(|_| rng.rand()).collect();
+        // 42*214013+2531011 = 11519557 -> >>16 = 175, then the chain follows.
+        assert_eq!(reseeded[0], 175);
+        rng.srand(1);
+        assert_eq!(rng.rand(), 41);
+    }
+}

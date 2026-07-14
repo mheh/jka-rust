@@ -13,16 +13,6 @@ int    raven_atoi(const char *string);
 // atof/qsort/memmove/srand/rand come from bg_lib.c (declared by <stdlib.h>/
 // <string.h> which the shim pulls in; signatures match Raven's).
 
-static void dump_rand(void) {
-	printf("== rand ==\n");
-	static const unsigned seeds[] = { 0, 1, 12345, 0x7fffffff, 0xdeadbeef };
-	for (unsigned s = 0; s < sizeof(seeds)/sizeof(seeds[0]); s++) {
-		printf("seed %08x\n", seeds[s]);
-		srand(seeds[s]);
-		for (int i = 0; i < 64; i++) printf("r %d\n", rand());
-	}
-}
-
 static void dump_atox(const char *dir) {
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/strings.txt", dir);
@@ -112,7 +102,6 @@ static void dump_memmove(void) {
 
 int main(int argc, char **argv) {
 	if (argc != 2) { fprintf(stderr, "usage: %s <fixture-dir>\n", argv[0]); return 2; }
-	dump_rand();
 	dump_atox(argv[1]);
 	dump_qsort(argv[1]);
 	dump_memmove();

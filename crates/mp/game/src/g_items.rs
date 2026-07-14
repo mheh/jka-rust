@@ -122,6 +122,7 @@ use crate::g_public_consts::{SVF_BROADCAST, SVF_NOCLIENT, SVF_SINGLECLIENT};
 // Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`,
 // canonical in `mp_bg::public::entity_flags`.
 // Source: `oracle/codemp/game/bg_public.h:560,601,607`
+use crate::bg_misc::snap_vector;
 use mp_bg::public::entity_flags::{EF_CLIENTSMOOTH, EF_G2ANIMATING, EF_ITEMPLACEHOLDER};
 
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).
@@ -4386,12 +4387,7 @@ pub fn G_BounceItem(ctx: &mut GameContext, ent: EntityId, trace: *mut trace_t) {
         // check for stop
         if (*trace).plane.normal[2] > 0.0 && (*ent).s.pos.trDelta[2] < 40.0 {
             (*trace).endpos[2] += 1.0; // make sure it is off ground
-            trap::SnapVector(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-                    &mut (*trace).endpos as *mut vec3_t,
-                ),
-            );
+            snap_vector(&mut (*trace).endpos);
             G_SetOrigin(&mut *(ent), (*trace).endpos);
             (*ent).s.groundEntityNum = (*trace).entityNum as c_int;
             return;

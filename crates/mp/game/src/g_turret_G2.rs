@@ -12,6 +12,7 @@
 //! Callers bridge at the boundary via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_misc::snap_vector;
 use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::entity::flags::{FL_BBRUSH, FL_NOTARGET};
@@ -563,12 +564,7 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
             (*bolt).s.pos.trTime = ctx.world.level.time;
             crate::q_math::_VectorCopy(start, &mut (*bolt).s.pos.trBase);
             crate::q_math::_VectorScale(*dir, (*ent).mass, &mut (*bolt).s.pos.trDelta);
-            trap::SnapVector(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
-                    &mut (*bolt).s.pos.trDelta as *mut vec3_t,
-                ),
-            );
+            snap_vector(&mut (*bolt).s.pos.trDelta);
             crate::q_math::_VectorCopy(start, &mut (*bolt).r.currentOrigin);
         }
     }
