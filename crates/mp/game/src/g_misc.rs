@@ -477,7 +477,7 @@ pub fn SP_misc_portal_surface(ctx: &mut GameContext, ent: EntityId) {
             crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ent).s.origin2);
         } else {
             (*ent).think = Some(EntThink::locateCamera).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time + 100;
+            (*ent).nextthink = ctx.world.level.time + 100;
         }
     }
 }
@@ -564,15 +564,12 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         ); // SV_SetBrushModel -- sets mins and maxs
         crate::g_utils::G_BSPIndex(ctx, temp.as_ptr());
 
-        (*ctx.world_raw()).level.mNumBSPInstances += 1;
-        write_cstr_field(
-            &mut temp,
-            &format!("{}-", (*ctx.world_raw()).level.mNumBSPInstances),
-        );
-        crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ctx.world_raw()).level.mOriginAdjust);
-        (*ctx.world_raw()).level.mRotationAdjust = (*ent).s.angles[1];
-        (*ctx.world_raw()).level.mTargetAdjust = temp.as_mut_ptr();
-        (*ctx.world_raw()).level.mBSPInstanceDepth += 1;
+        ctx.world.level.mNumBSPInstances += 1;
+        write_cstr_field(&mut temp, &format!("{}-", ctx.world.level.mNumBSPInstances));
+        crate::q_math::_VectorCopy((*ent).s.origin, &mut ctx.world.level.mOriginAdjust);
+        ctx.world.level.mRotationAdjust = (*ent).s.angles[1];
+        ctx.world.level.mTargetAdjust = temp.as_mut_ptr();
+        ctx.world.level.mBSPInstanceDepth += 1;
 
         let mut teamfilter_out: *mut c_char = core::ptr::null_mut();
         G_SpawnString(
@@ -582,7 +579,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
             &mut teamfilter_out,
         );
         write_cstr_field(
-            &mut (*ctx.world_raw()).level.mTeamFilter,
+            &mut ctx.world.level.mTeamFilter,
             &cstr_to_str(teamfilter_out),
         );
 
@@ -599,8 +596,8 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         crate::g_spawn::G_SpawnEntitiesFromString(ctx, qtrue);
         trap::SetActiveSubBSP(ctx.engine, GSetActiveSubbspArgs::new(-1));
 
-        (*ctx.world_raw()).level.mBSPInstanceDepth -= 1;
-        (*ctx.world_raw()).level.mTeamFilter[0] = 0;
+        ctx.world.level.mBSPInstanceDepth -= 1;
+        ctx.world.level.mTeamFilter[0] = 0;
     }
 }
 
@@ -624,7 +621,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // Force it to 1 when there is terrain on the level.
         trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("RMG"), cstr("1")));
-        (*ctx.world_raw()).cvars.g_RMG.integer = 1;
+        ctx.world.cvars.g_RMG.integer = 1;
 
         (*ent).s.angles = [0.0, 0.0, 0.0];
         trap::SetBrushModel(
@@ -637,7 +634,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
 
         let mut seed: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut mission_type: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        if (*ctx.world_raw()).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             trap::Cvar_VariableStringBuffer(
                 ctx.engine,
                 GCvarVariableStringBufferArgs::new(
@@ -806,7 +803,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
         // If running RMG then initialize the terrain and handle team skins
-        if (*ctx.world_raw()).cvars.g_RMG.integer != 0 {
+        if ctx.world.cvars.g_RMG.integer != 0 {
             trap::RMG_Init(ctx.engine, GRmgInitArgs::new(terrain_id));
         }
     }
@@ -826,7 +823,7 @@ pub fn G_PortalifyEntities(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let mut i: usize = 0;
         while i < mp_qshared::shared::MAX_GENTITIES {
-            let scan = &mut (*ctx.world_raw()).g_entities[i] as *mut gentity_t;
+            let scan = &mut ctx.world.g_entities[i] as *mut gentity_t;
             if (*scan).inuse != 0
                 && (*scan).s.number != (*ent).s.number
                 && trap::InPVS(
@@ -865,7 +862,7 @@ pub fn G_PortalifyEntities(ctx: &mut GameContext, ent: EntityId) {
         }
 
         (*ent).think = Some(EntThink::G_FreeEntity).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time;
+        (*ent).nextthink = ctx.world.level.time;
     }
 }
 
@@ -934,7 +931,7 @@ pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
         );
 
         (*ent).think = Some(EntThink::G_PortalifyEntities).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 1050; // give it some time first so that all other entities are spawned.
+        (*ent).nextthink = ctx.world.level.time + 1050; // give it some time first so that all other entities are spawned.
     }
 }
 
@@ -954,21 +951,17 @@ pub fn HolocronPopOut(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
 
     unsafe {
-        if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 10) < 5 {
-            (*self_).s.pos.trDelta[0] =
-                150.0 + (*ctx.world_raw()).bg_state.rng.Q_irand(1, 100) as f32;
+        if ctx.world.bg_state.rng.Q_irand(1, 10) < 5 {
+            (*self_).s.pos.trDelta[0] = 150.0 + ctx.world.bg_state.rng.Q_irand(1, 100) as f32;
         } else {
-            (*self_).s.pos.trDelta[0] =
-                -150.0 - (*ctx.world_raw()).bg_state.rng.Q_irand(1, 100) as f32;
+            (*self_).s.pos.trDelta[0] = -150.0 - ctx.world.bg_state.rng.Q_irand(1, 100) as f32;
         }
-        if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 10) < 5 {
-            (*self_).s.pos.trDelta[1] =
-                150.0 + (*ctx.world_raw()).bg_state.rng.Q_irand(1, 100) as f32;
+        if ctx.world.bg_state.rng.Q_irand(1, 10) < 5 {
+            (*self_).s.pos.trDelta[1] = 150.0 + ctx.world.bg_state.rng.Q_irand(1, 100) as f32;
         } else {
-            (*self_).s.pos.trDelta[1] =
-                -150.0 - (*ctx.world_raw()).bg_state.rng.Q_irand(1, 100) as f32;
+            (*self_).s.pos.trDelta[1] = -150.0 - ctx.world.bg_state.rng.Q_irand(1, 100) as f32;
         }
-        (*self_).s.pos.trDelta[2] = 150.0 + (*ctx.world_raw()).bg_state.rng.Q_irand(1, 100) as f32;
+        (*self_).s.pos.trDelta[2] = 150.0 + ctx.world.bg_state.rng.Q_irand(1, 100) as f32;
     }
 }
 
@@ -1024,7 +1017,7 @@ pub fn HolocronTouch(
             && (*((*other).client as *mut gclient_t))
                 .ps
                 .holocronCantTouchTime
-                > (*ctx.world_raw()).level.time as f32
+                > ctx.world.level.time as f32
         {
             return;
         }
@@ -1075,8 +1068,8 @@ pub fn HolocronTouch(
             }
         }
 
-        if (*ctx.world_raw()).cvars.g_MaxHolocronCarry.integer != 0
-            && othercarrying >= (*ctx.world_raw()).cvars.g_MaxHolocronCarry.integer
+        if ctx.world.cvars.g_MaxHolocronCarry.integer != 0
+            && othercarrying >= ctx.world.cvars.g_MaxHolocronCarry.integer
         {
             // make the oldest holocron carried by the player pop out to make room for this one
             (*((*other).client as *mut gclient_t)).ps.holocronsCarried[index_lowest as usize] = 0.0;
@@ -1091,12 +1084,12 @@ pub fn HolocronTouch(
         );
 
         (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] =
-            (*ctx.world_raw()).level.time as f32;
+            ctx.world.level.time as f32;
         (*self_).s.modelindex = 0;
-        (*self_).enemy = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), other));
+        (*self_).enemy = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), other));
 
         (*self_).pos2[0] = 1.0;
-        (*self_).pos2[1] = ((*ctx.world_raw()).level.time + HOLOCRON_RESPAWN_TIME) as f32;
+        (*self_).pos2[1] = (ctx.world.level.time + HOLOCRON_RESPAWN_TIME) as f32;
 
         if force_reselect != WP_NONE {
             G_AddEvent(
@@ -1121,10 +1114,10 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
     let ent: *mut gentity_t = ctx.entity_mut(ent);
 
     unsafe {
-        let base = (*ctx.world_raw()).g_entities.as_mut_ptr();
+        let base = ctx.world.g_entities.as_mut_ptr();
 
         let justthink = |ent: *mut gentity_t, ctx: &mut GameContext| {
-            (*ent).nextthink = (*ctx.world_raw()).level.time + 50;
+            (*ent).nextthink = ctx.world.level.time + 50;
             if (*ent).s.pos.trDelta[0] != 0.0
                 || (*ent).s.pos.trDelta[1] != 0.0
                 || (*ent).s.pos.trDelta[2] != 0.0
@@ -1174,7 +1167,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                 .enemy
                 .map_or(false, |e| !(*(base.add(e.index()))).client.is_null())
         {
-            (*ent).pos2[1] = ((*ctx.world_raw()).level.time + HOLOCRON_RESPAWN_TIME) as f32;
+            (*ent).pos2[1] = (ctx.world.level.time + HOLOCRON_RESPAWN_TIME) as f32;
         }
 
         if let Some(e) = (*ent).enemy {
@@ -1190,7 +1183,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                         .holocronCantTouch = (*ent).s.number;
                     (*((*enemy_ptr).client as *mut gclient_t))
                         .ps
-                        .holocronCantTouchTime = ((*ctx.world_raw()).level.time + 5000) as f32;
+                        .holocronCantTouchTime = (ctx.world.level.time + 5000) as f32;
 
                     HolocronRespawn(&mut *ent);
                     crate::q_math::_VectorCopy(
@@ -1229,7 +1222,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                     crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).s.origin);
                     crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).r.currentOrigin);
 
-                    (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
+                    (*ent).s.pos.trTime = ctx.world.level.time;
 
                     (*ent).pos2[0] = 0.0;
 
@@ -1241,13 +1234,13 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
             }
         }
 
-        if (*ent).pos2[0] != 0.0 && (*ent).pos2[1] < (*ctx.world_raw()).level.time as f32 {
+        if (*ent).pos2[0] != 0.0 && (*ent).pos2[1] < ctx.world.level.time as f32 {
             // isn't in original place and has been there for (HOLOCRON_RESPAWN_TIME) seconds without being picked up, so respawn
             crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).s.pos.trBase);
             crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).s.origin);
             crate::q_math::_VectorCopy((*ent).s.origin2, &mut (*ent).r.currentOrigin);
 
-            (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
+            (*ent).s.pos.trTime = ctx.world.level.time;
 
             (*ent).pos2[0] = 0.0;
 
@@ -1270,7 +1263,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
         let mut dest: vec3_t;
         let mut tr: trace_t = core::mem::zeroed();
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_HOLOCRON {
+        if ctx.world.cvars.g_gametype.integer != GT_HOLOCRON {
             G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
@@ -1312,11 +1305,11 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            let __h575 = cstr(&format!(
+            let msg = cstr(&format!(
                 "SP_misc_holocron: misc_holocron startsolid at {}\n",
                 cstr_to_str(vtos(ctx, (*ent).s.origin))
             ));
-            G_Printf(ctx, __h575.as_ptr());
+            G_Printf(ctx, msg.as_ptr());
             G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
@@ -1346,7 +1339,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.modelindex = (*ent).count - 128; //G_ModelIndex(holocronTypeModels[ent->count]);
         (*ent).s.eType = entityType_t::ET_HOLOCRON as c_int;
         (*ent).s.pos.trType = TR_GRAVITY;
-        (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
+        (*ent).s.pos.trTime = ctx.world.level.time;
 
         (*ent).r.contents = mp_qshared::shared::surface_flags::CONTENTS_TRIGGER;
         (*ent).clipmask = mp_qshared::shared::surface_flags::MASK_SOLID;
@@ -1370,7 +1363,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
         (*ent).think = Some(EntThink::HolocronThink).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 50;
+        (*ent).nextthink = ctx.world.level.time + 50;
     }
 }
 
@@ -1396,7 +1389,7 @@ pub fn Use_Shooter(
 
         // see if we have a target
         if let Some(e) = (*ent).enemy {
-            let enemy_ptr = (*ctx.world_raw()).g_entities.as_mut_ptr().add(e.index());
+            let enemy_ptr = ctx.world.g_entities.as_mut_ptr().add(e.index());
             let mut d: vec3_t = [0.0, 0.0, 0.0];
             crate::q_math::_VectorSubtract((*enemy_ptr).r.currentOrigin, (*ent).s.origin, &mut d);
             VectorNormalize(&mut d);
@@ -1409,12 +1402,12 @@ pub fn Use_Shooter(
         PerpendicularVector(&mut up, dir);
         CrossProduct(up, dir, &mut right);
 
-        let mut deg = (*ctx.world_raw()).bg_state.rng.crandom() * (*ent).random;
+        let mut deg = ctx.world.bg_state.rng.crandom() * (*ent).random;
         let mut new_dir: vec3_t = [0.0, 0.0, 0.0];
         crate::q_math::_VectorMA(dir, deg, up, &mut new_dir);
         dir = new_dir;
 
-        deg = (*ctx.world_raw()).bg_state.rng.crandom() * (*ent).random;
+        deg = ctx.world.bg_state.rng.crandom() * (*ent).random;
         crate::q_math::_VectorMA(dir, deg, right, &mut new_dir);
         dir = new_dir;
 
@@ -1450,7 +1443,7 @@ pub fn InitShooter_Finish(ctx: &mut GameContext, ent: EntityId) {
 
     unsafe {
         (*ent).enemy = ent_id_opt(
-            (*ctx.world_raw()).g_entities.as_mut_ptr(),
+            ctx.world.g_entities.as_mut_ptr(),
             G_PickTarget(ctx, (*ent).target),
         );
         (*ent).think = FnId::NONE;
@@ -1482,7 +1475,7 @@ pub fn InitShooter(ctx: &mut GameContext, ent: EntityId, weapon: c_int) {
         // target might be a moving object, so we can't set movedir for it
         if !(*ent).target.is_null() {
             (*ent).think = Some(EntThink::InitShooter_Finish).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time + 500;
+            (*ent).nextthink = ctx.world.level.time + 500;
         }
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -1514,7 +1507,7 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
         let activator = match (*ent).activator {
-            Some(id) => &mut (*ctx.world_raw()).g_entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         let activator_cl = if activator.is_null() {
@@ -1522,7 +1515,7 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
         } else {
             (*activator).client as *mut gclient_t
         };
-        if (*ent).fly_sound_debounce_time < (*ctx.world_raw()).level.time
+        if (*ent).fly_sound_debounce_time < ctx.world.level.time
             || activator.is_null()
             || activator_cl.is_null()
             || (*activator_cl).pers.cmd.buttons & BUTTON_USE == 0
@@ -1542,15 +1535,15 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if (*ent).activator.is_none() {
-            if (*ent).genericValue8 < (*ctx.world_raw()).level.time {
+            if (*ent).genericValue8 < ctx.world.level.time {
                 if (*ent).count < (*ent).genericValue4 {
                     (*ent).count += 1;
                 }
-                (*ent).genericValue8 = (*ctx.world_raw()).level.time + (*ent).genericValue5;
+                (*ent).genericValue8 = ctx.world.level.time + (*ent).genericValue5;
             }
         }
         (*ent).s.health = (*ent).count;
-        (*ent).nextthink = (*ctx.world_raw()).level.time;
+        (*ent).nextthink = ctx.world.level.time;
     }
 }
 
@@ -1611,12 +1604,12 @@ pub fn shield_power_converter_use(
             return;
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && !other.is_null()
             && !(*other).client.is_null()
             && (*((*other).client as *mut gclient_t)).siegeClass != 0
         {
-            if (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
+            if (&ctx.world.bg_state.bgSiegeClasses)
                 [(*((*other).client as *mut gclient_t)).siegeClass as usize]
                 .maxarmor
                 == 0
@@ -1632,20 +1625,20 @@ pub fn shield_power_converter_use(
             }
         }
 
-        if (*self_).setTime < (*ctx.world_raw()).level.time {
+        if (*self_).setTime < ctx.world.level.time {
             let max_armor: c_int;
             if (*self_).s.loopSound == 0 {
                 (*self_).s.loopSound = G_SoundIndex(c"sound/interface/shieldcon_run".as_ptr());
                 (*self_).s.loopIsSoundset = qfalse;
             }
-            (*self_).setTime = (*ctx.world_raw()).level.time + 100;
+            (*self_).setTime = ctx.world.level.time + 100;
 
-            if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+            if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                 && !other.is_null()
                 && !(*other).client.is_null()
                 && (*((*other).client as *mut gclient_t)).siegeClass != -1
             {
-                max_armor = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
+                max_armor = (&ctx.world.bg_state.bgSiegeClasses)
                     [(*((*other).client as *mut gclient_t)).siegeClass as usize]
                     .maxarmor;
             } else {
@@ -1675,18 +1668,15 @@ pub fn shield_power_converter_use(
                 }
                 stop = false;
 
-                (*self_).fly_sound_debounce_time = (*ctx.world_raw()).level.time + 500;
-                (*self_).activator = Some(ent_id(
-                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
-                    activator,
-                ));
+                (*self_).fly_sound_debounce_time = ctx.world.level.time + 500;
+                (*self_).activator = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), activator));
 
                 (*((*activator).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize] += add;
             }
         }
 
         if stop || (*self_).count <= 0 {
-            if (*self_).s.loopSound != 0 && (*self_).setTime < (*ctx.world_raw()).level.time {
+            if (*self_).s.loopSound != 0 && (*self_).setTime < ctx.world.level.time {
                 if (*self_).count <= 0 {
                     G_Sound(
                         ctx,
@@ -1705,8 +1695,8 @@ pub fn shield_power_converter_use(
             }
             (*self_).s.loopSound = 0;
             (*self_).s.loopIsSoundset = qfalse;
-            if (*self_).setTime < (*ctx.world_raw()).level.time {
-                (*self_).setTime = (*ctx.world_raw()).level.time + (*self_).genericValue5 + 100;
+            if (*self_).setTime < ctx.world.level.time {
+                (*self_).setTime = ctx.world.level.time + (*self_).genericValue5 + 100;
             }
         }
     }
@@ -1738,7 +1728,7 @@ pub fn ammo_generic_power_converter_use(
             return;
         }
 
-        if (*self_).setTime < (*ctx.world_raw()).level.time {
+        if (*self_).setTime < ctx.world.level.time {
             let mut gave_some = false;
 
             let mut i = AMMO_BLASTER as c_int;
@@ -1746,11 +1736,8 @@ pub fn ammo_generic_power_converter_use(
                 (*self_).s.loopSound = G_SoundIndex(c"sound/interface/ammocon_run".as_ptr());
                 (*self_).s.loopIsSoundset = qfalse;
             }
-            (*self_).fly_sound_debounce_time = (*ctx.world_raw()).level.time + 500;
-            (*self_).activator = Some(ent_id(
-                (*ctx.world_raw()).g_entities.as_mut_ptr(),
-                activator,
-            ));
+            (*self_).fly_sound_debounce_time = ctx.world.level.time + 500;
+            (*self_).activator = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), activator));
             while i < AMMO_MAX as c_int {
                 add = (ammoData[i as usize].max as f32 * 0.05) as c_int;
                 if add < 1 {
@@ -1763,7 +1750,7 @@ pub fn ammo_generic_power_converter_use(
                         < ammoData[i as usize].max
                 {
                     gave_some = true;
-                    if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+                    if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                         && i == AMMO_ROCKETS as c_int
                         && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= 10
                     {
@@ -1771,7 +1758,7 @@ pub fn ammo_generic_power_converter_use(
                         gave_some = false;
                     }
                     (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] += add;
-                    if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+                    if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                         && i == AMMO_ROCKETS as c_int
                         && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= 10
                     {
@@ -1816,7 +1803,7 @@ pub fn ammo_generic_power_converter_use(
         }
 
         if stop || (*self_).count <= 0 {
-            if (*self_).s.loopSound != 0 && (*self_).setTime < (*ctx.world_raw()).level.time {
+            if (*self_).s.loopSound != 0 && (*self_).setTime < ctx.world.level.time {
                 if (*self_).count <= 0 {
                     G_Sound(
                         ctx,
@@ -1835,8 +1822,8 @@ pub fn ammo_generic_power_converter_use(
             }
             (*self_).s.loopSound = 0;
             (*self_).s.loopIsSoundset = qfalse;
-            if (*self_).setTime < (*ctx.world_raw()).level.time {
-                (*self_).setTime = (*ctx.world_raw()).level.time + (*self_).genericValue5 + 100;
+            if (*self_).setTime < ctx.world.level.time {
+                (*self_).setTime = ctx.world.level.time + (*self_).genericValue5 + 100;
             }
         }
     }
@@ -1879,11 +1866,11 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            let __h576 = cstr(&format!(
+            let msg = cstr(&format!(
                 "SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n",
                 cstr_to_str(vtos(ctx, (*ent).s.origin))
             ));
-            G_Printf(ctx, __h576.as_ptr());
+            G_Printf(ctx, msg.as_ptr());
             G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
@@ -1931,7 +1918,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.teamowner = 0;
         (*ent).s.owner = ENTITYNUM_NONE as c_int;
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 200; // + STATION_RECHARGE_TIME
+        (*ent).nextthink = ctx.world.level.time + 200; // + STATION_RECHARGE_TIME
 
         (*ent).use_ = Some(EntUse::ammo_generic_power_converter_use).into();
 
@@ -1942,7 +1929,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).genericValue7 = G_SoundIndex(c"sound/interface/ammocon_done".as_ptr());
         G_SoundIndex(c"sound/interface/ammocon_empty".as_ptr());
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // show on radar from everywhere
             (*ent).r.svFlags |= SVF_BROADCAST;
             (*ent).s.eFlags |= EF_RADAROBJECT;
@@ -1965,9 +1952,9 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         let mut dest: vec3_t;
         let mut tr: trace_t = core::mem::zeroed();
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_CTF
-            && (*ctx.world_raw()).cvars.g_gametype.integer != GT_CTY
-            && (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer != GT_CTF
+            && ctx.world.cvars.g_gametype.integer != GT_CTY
+            && ctx.world.cvars.g_gametype.integer != GT_SIEGE
         {
             G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
@@ -1997,11 +1984,11 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            let __h577 = cstr(&format!(
+            let msg = cstr(&format!(
                 "SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n",
                 cstr_to_str(vtos(ctx, (*ent).s.origin))
             ));
-            G_Printf(ctx, __h577.as_ptr());
+            G_Printf(ctx, msg.as_ptr());
             G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
@@ -2049,7 +2036,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.teamowner = 0;
         (*ent).s.owner = ENTITYNUM_NONE as c_int;
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 200;
+        (*ent).nextthink = ctx.world.level.time + 200;
 
         (*ent).use_ = Some(EntUse::shield_power_converter_use).into();
 
@@ -2060,7 +2047,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).genericValue7 = G_SoundIndex(c"sound/interface/shieldcon_done".as_ptr());
         G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr());
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             (*ent).r.svFlags |= SVF_BROADCAST;
             (*ent).s.eFlags |= EF_RADAROBJECT;
             (*ent).s.genericenemyindex =
@@ -2103,7 +2090,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: &mut GameContext, ent: EntityId
         (*ent).s.teamowner = 0;
         (*ent).s.owner = ENTITYNUM_NONE as c_int;
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 200;
+        (*ent).nextthink = ctx.world.level.time + 200;
 
         (*ent).use_ = Some(EntUse::shield_power_converter_use).into();
 
@@ -2162,12 +2149,12 @@ pub fn ammo_power_converter_use(
             return;
         }
 
-        if (*self_).setTime < (*ctx.world_raw()).level.time {
+        if (*self_).setTime < ctx.world.level.time {
             if (*self_).s.loopSound == 0 {
                 (*self_).s.loopSound = G_SoundIndex(c"sound/player/pickupshield.wav".as_ptr());
             }
 
-            (*self_).setTime = (*ctx.world_raw()).level.time + 100;
+            (*self_).setTime = ctx.world.level.time + 100;
 
             if (*self_).count != 0 {
                 // Has it got any power left?
@@ -2195,11 +2182,8 @@ pub fn ammo_power_converter_use(
                 }
                 stop = false;
 
-                (*self_).fly_sound_debounce_time = (*ctx.world_raw()).level.time + 500;
-                (*self_).activator = Some(ent_id(
-                    (*ctx.world_raw()).g_entities.as_mut_ptr(),
-                    activator,
-                ));
+                (*self_).fly_sound_debounce_time = ctx.world.level.time + 500;
+                (*self_).activator = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), activator));
             }
         }
 
@@ -2254,7 +2238,7 @@ pub fn SP_misc_model_ammo_power_converter(ctx: &mut GameContext, ent: EntityId) 
         (*ent).s.teamowner = 0;
         (*ent).s.owner = ENTITYNUM_NONE as c_int;
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 200;
+        (*ent).nextthink = ctx.world.level.time + 200;
 
         G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
@@ -2309,11 +2293,11 @@ pub fn health_power_converter_use(
             return;
         }
 
-        if (*self_).setTime < (*ctx.world_raw()).level.time {
+        if (*self_).setTime < ctx.world.level.time {
             if (*self_).s.loopSound == 0 {
                 (*self_).s.loopSound = G_SoundIndex(c"sound/player/pickuphealth.wav".as_ptr());
             }
-            (*self_).setTime = (*ctx.world_raw()).level.time + 100;
+            (*self_).setTime = ctx.world.level.time + 100;
 
             let cl = &mut *((*activator).client as *mut gclient_t);
             let dif = cl.ps.stats[STAT_MAX_HEALTH as usize] - (*activator).health;
@@ -2326,9 +2310,8 @@ pub fn health_power_converter_use(
 
                 stop = false;
 
-                (*self_).fly_sound_debounce_time = (*ctx.world_raw()).level.time + 500;
-                (*self_).activator =
-                    ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), activator);
+                (*self_).fly_sound_debounce_time = ctx.world.level.time + 500;
+                (*self_).activator = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), activator);
 
                 (*activator).health += add;
             }
@@ -2377,7 +2360,7 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
         (*ent).s.teamowner = 0;
         (*ent).s.owner = ENTITYNUM_NONE as c_int;
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 200;
+        (*ent).nextthink = ctx.world.level.time + 200;
 
         G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
@@ -2387,7 +2370,7 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
         G_SoundIndex(c"sound/player/pickuphealth.wav".as_ptr());
         (*ent).genericValue7 = G_SoundIndex(c"sound/interface/shieldcon_done".as_ptr());
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // show on radar from everywhere
             (*ent).r.svFlags |= SVF_BROADCAST;
             (*ent).s.eFlags |= EF_RADAROBJECT;
@@ -2407,12 +2390,12 @@ pub fn fx_runner_think(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         crate::bg_misc::BG_EvaluateTrajectory(
             &(*ent).s.pos as *const trajectory_t,
-            (*ctx.world_raw()).level.time,
+            ctx.world.level.time,
             &mut (*ent).r.currentOrigin,
         );
         crate::bg_misc::BG_EvaluateTrajectory(
             &(*ent).s.apos as *const trajectory_t,
-            (*ctx.world_raw()).level.time,
+            ctx.world.level.time,
             &mut (*ent).r.currentAngles,
         );
 
@@ -2429,9 +2412,9 @@ pub fn fx_runner_think(ctx: &mut GameContext, ent: EntityId) {
         crate::q_math::_VectorCopy((*ent).r.currentAngles, &mut (*ent).s.angles);
         crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*ent).s.origin);
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time
+        (*ent).nextthink = ctx.world.level.time
             + (*ent).delay
-            + ((*ctx.world_raw()).bg_state.rng.random() * (*ent).random) as c_int;
+            + (ctx.world.bg_state.rng.random() * (*ent).random) as c_int;
 
         if (*ent).spawnflags & 4 != 0 {
             // damage
@@ -2637,7 +2620,7 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
 
             // Let's get to work right now!
             (*ent).think = Some(EntThink::fx_runner_think).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time + 200; // wait a small bit, then start working
+            (*ent).nextthink = ctx.world.level.time + 200; // wait a small bit, then start working
         }
 
         // make us useable if we can be targeted
@@ -2714,7 +2697,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
 
         // Give us a bit of time to spawn in the other entities, since we may have to target one of 'em
         (*ent).think = Some(EntThink::fx_runner_link).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 400;
+        (*ent).nextthink = ctx.world.level.time + 400;
 
         // Save our position and link us up!
         G_SetOrigin(&mut *(ent), (*ent).s.origin);
@@ -2850,14 +2833,13 @@ pub fn Use_Target_Escapetrig(
     use mp_bg::public::team::TEAM_SPECTATOR;
     unsafe {
         if (*ent).genericValue6 == 0 {
-            (*ctx.world_raw()).globals.gEscaping = qtrue;
-            (*ctx.world_raw()).globals.gEscapeTime =
-                (*ctx.world_raw()).level.time + (*ent).genericValue5;
-        } else if (*ctx.world_raw()).globals.gEscaping != qfalse {
+            ctx.world.globals.gEscaping = qtrue;
+            ctx.world.globals.gEscapeTime = ctx.world.level.time + (*ent).genericValue5;
+        } else if ctx.world.globals.gEscaping != qfalse {
             let mut i: c_int = 0;
-            (*ctx.world_raw()).globals.gEscaping = qfalse;
+            ctx.world.globals.gEscaping = qfalse;
             while i < mp_qshared::shared::MAX_CLIENTS_I32 {
-                let e = &mut (*ctx.world_raw()).g_entities[i as usize] as *mut gentity_t;
+                let e = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
                 if (*e).inuse != 0
                     && !(*e).client.is_null()
                     && (*e).health > 0
@@ -2900,7 +2882,7 @@ pub fn SP_target_escapetrig(ctx: &mut GameContext, ent: EntityId) {
 
     use mp_bg::public::gametype::GT_SINGLE_PLAYER;
     unsafe {
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SINGLE_PLAYER {
+        if ctx.world.cvars.g_gametype.integer != GT_SINGLE_PLAYER {
             G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
@@ -2945,7 +2927,7 @@ pub fn maglock_die(
     use crate::entity::flags::FL_INACTIVE;
     unsafe {
         if let Some(door_id) = (*self_).activator {
-            let door = &mut (*ctx.world_raw()).g_entities[door_id.index()] as *mut gentity_t;
+            let door = &mut ctx.world.g_entities[door_id.index()] as *mut gentity_t;
             (*door).lockCount -= 1;
             if (*door).lockCount == 0 {
                 (*door).flags &= !FL_INACTIVE;
@@ -2976,7 +2958,7 @@ pub fn SP_misc_maglock(ctx: &mut GameContext, self_: EntityId) {
 
         (*self_).think = Some(EntThink::maglock_link).into();
         //FIXME: for some reason, when you re-load a level, these fail to find their doors...?  Random?  Testing an additional 200ms after the START_TIME_FIND_LINKS
-        (*self_).nextthink = (*ctx.world_raw()).level.time + START_TIME_FIND_LINKS + 200;
+        (*self_).nextthink = ctx.world.level.time + START_TIME_FIND_LINKS + 200;
         //because we need to let the doors link up and spawn their triggers first!
     }
 }
@@ -3029,17 +3011,16 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
         }
         if trace.fraction == 1.0 {
             (*self_).think = Some(EntThink::maglock_link).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + 100;
+            (*self_).nextthink = ctx.world.level.time + 100;
             return;
         }
-        let trace_ent =
-            &mut (*ctx.world_raw()).g_entities[trace.entityNum as usize] as *mut gentity_t;
+        let trace_ent = &mut ctx.world.g_entities[trace.entityNum as usize] as *mut gentity_t;
         if trace.entityNum >= (ENTITYNUM_WORLD as c_int) as i16
             || trace_ent.is_null()
             || Q_stricmp(c"func_door".as_ptr(), (*trace_ent).classname) != 0
         {
             (*self_).think = Some(EntThink::maglock_link).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + 100;
+            (*self_).nextthink = ctx.world.level.time + 100;
             return;
         }
 
@@ -3047,17 +3028,12 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
         // find the trigger for the door
         let door_trigger = G_FindDoorTrigger(ctx, ctx.entity_id_of(trace_ent).unwrap());
         (*self_).activator = if !door_trigger.is_null() {
-            Some(ent_id(
-                (*ctx.world_raw()).g_entities.as_mut_ptr(),
-                door_trigger,
-            ))
+            Some(ent_id(ctx.world.g_entities.as_mut_ptr(), door_trigger))
         } else {
-            Some(ent_id(
-                (*ctx.world_raw()).g_entities.as_mut_ptr(),
-                trace_ent,
-            ))
+            Some(ent_id(ctx.world.g_entities.as_mut_ptr(), trace_ent))
         };
-        let activator_ptr = (*ctx.world_raw())
+        let activator_ptr = ctx
+            .world
             .g_entities
             .as_mut_ptr()
             .add((*self_).activator.unwrap().index());
@@ -3101,9 +3077,8 @@ pub fn faller_touch(
 
     use mp_qshared::shared::sound_channel::{CHAN_AUTO, CHAN_VOICE};
     unsafe {
-        if (*self_).epVelocity[2] < -100.0 && (*self_).genericValue7 < (*ctx.world_raw()).level.time
-        {
-            let r = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
+        if (*self_).epVelocity[2] < -100.0 && (*self_).genericValue7 < ctx.world.level.time {
+            let r = ctx.world.bg_state.rng.Q_irand(1, 3);
 
             (*self_).genericValue11 = if r == 1 {
                 G_SoundIndex(c"sound/chars/stofficer1/misc/pain25".as_ptr())
@@ -3126,8 +3101,8 @@ pub fn faller_touch(
                 (*self_).genericValue10,
             );
 
-            (*self_).genericValue6 = (*ctx.world_raw()).level.time + 3000;
-            (*self_).genericValue7 = (*ctx.world_raw()).level.time + 200;
+            (*self_).genericValue6 = ctx.world.level.time + 3000;
+            (*self_).genericValue7 = ctx.world.level.time + 200;
         }
     }
 }
@@ -3147,9 +3122,9 @@ pub fn faller_think(ctx: &mut GameContext, ent: EntityId) {
         let mass: f32 = 0.09;
         let bounce: f32 = 1.1;
 
-        if (*ent).genericValue6 < (*ctx.world_raw()).level.time {
+        if (*ent).genericValue6 < ctx.world.level.time {
             (*ent).think = Some(EntThink::G_FreeEntity).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time;
+            (*ent).nextthink = ctx.world.level.time;
             return;
         }
 
@@ -3182,7 +3157,7 @@ pub fn faller_think(ctx: &mut GameContext, ent: EntityId) {
             (*ent).epVelocity[1] * 10.0,
             (*ent).epVelocity[2] * 10.0,
         ];
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 25;
+        (*ent).nextthink = ctx.world.level.time + 25;
     }
 }
 
@@ -3209,7 +3184,7 @@ pub fn misc_faller_create(
         (*faller).genericValue8 = 0;
         (*faller).genericValue7 = 0;
 
-        (*faller).genericValue6 = (*ctx.world_raw()).level.time + 15000;
+        (*faller).genericValue6 = ctx.world.level.time + 15000;
 
         G_SetOrigin(&mut *(faller), (*ent).s.origin);
 
@@ -3217,9 +3192,9 @@ pub fn misc_faller_create(
         (*faller).s.modelindex = G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
         (*faller).s.g2radius = 100;
 
-        (*faller).s.customRGBA[0] = ((*ctx.world_raw()).bg_state.rng.Q_irand(1, 255) as u8) as i32;
-        (*faller).s.customRGBA[1] = ((*ctx.world_raw()).bg_state.rng.Q_irand(1, 255) as u8) as i32;
-        (*faller).s.customRGBA[2] = ((*ctx.world_raw()).bg_state.rng.Q_irand(1, 255) as u8) as i32;
+        (*faller).s.customRGBA[0] = (ctx.world.bg_state.rng.Q_irand(1, 255) as u8) as i32;
+        (*faller).s.customRGBA[1] = (ctx.world.bg_state.rng.Q_irand(1, 255) as u8) as i32;
+        (*faller).s.customRGBA[2] = (ctx.world.bg_state.rng.Q_irand(1, 255) as u8) as i32;
         (*faller).s.customRGBA[3] = 255;
 
         (*faller).r.mins = [-15.0, -15.0, DEFAULT_MINS_2 as f32];
@@ -3231,12 +3206,12 @@ pub fn misc_faller_create(
         (*faller).s.eFlags = EF_RAG | EF_CLIENTSMOOTH;
 
         (*faller).think = Some(EntThink::faller_think).into();
-        (*faller).nextthink = (*ctx.world_raw()).level.time;
+        (*faller).nextthink = ctx.world.level.time;
 
         (*faller).touch = Some(EntTouch::faller_touch).into();
 
-        (*faller).epVelocity[0] = (*ctx.world_raw()).bg_state.rng.flrand(-256.0, 256.0);
-        (*faller).epVelocity[1] = (*ctx.world_raw()).bg_state.rng.flrand(-256.0, 256.0);
+        (*faller).epVelocity[0] = ctx.world.bg_state.rng.flrand(-256.0, 256.0);
+        (*faller).epVelocity[1] = ctx.world.bg_state.rng.flrand(-256.0, 256.0);
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(faller));
     }
@@ -3257,12 +3232,9 @@ pub fn misc_faller_think(ctx: &mut GameContext, ent: EntityId) {
             ctx.entity_id_of(ent),
             ctx.entity_id_of(ent),
         );
-        (*ent).nextthink = (*ctx.world_raw()).level.time
+        (*ent).nextthink = ctx.world.level.time
             + (*ent).genericValue1
-            + (*ctx.world_raw())
-                .bg_state
-                .rng
-                .Q_irand(0, (*ent).genericValue2);
+            + ctx.world.bg_state.rng.Q_irand(0, (*ent).genericValue2);
     }
 }
 
@@ -3298,12 +3270,9 @@ pub fn SP_misc_faller(ctx: &mut GameContext, ent: EntityId) {
 
         if (*ent).targetname.is_null() || *(*ent).targetname == 0 {
             (*ent).think = Some(EntThink::misc_faller_think).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time
+            (*ent).nextthink = ctx.world.level.time
                 + (*ent).genericValue1
-                + (*ctx.world_raw())
-                    .bg_state
-                    .rng
-                    .Q_irand(0, (*ent).genericValue2);
+                + ctx.world.bg_state.rng.Q_irand(0, (*ent).genericValue2);
         } else {
             (*ent).use_ = Some(EntUse::misc_faller_create).into();
         }
@@ -3314,24 +3283,22 @@ pub fn SP_misc_faller(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2888-2903`
 pub fn FirstFreeTagOwner(ctx: &mut GameContext) -> *mut crate::level::tag_owner::tagOwner_t {
-    unsafe {
-        let mut i: c_int = 0;
-        while i < MAX_TAG_OWNERS as c_int {
-            if (*ctx.world_raw()).refTagOwnerMap[i as usize].inuse == 0 {
-                return &mut (*ctx.world_raw()).refTagOwnerMap[i as usize] as *mut _;
-            }
-            i += 1;
+    let mut i: c_int = 0;
+    while i < MAX_TAG_OWNERS as c_int {
+        if ctx.world.refTagOwnerMap[i as usize].inuse == 0 {
+            return &mut ctx.world.refTagOwnerMap[i as usize] as *mut _;
         }
-
-        crate::g_main::Com_Printf(
-            cstr(&format!(
-                "WARNING: MAX_TAG_OWNERS ({}) REF TAG LIMIT HIT\n",
-                MAX_TAG_OWNERS
-            ))
-            .as_ptr(),
-        );
-        core::ptr::null_mut()
+        i += 1;
     }
+
+    crate::g_main::Com_Printf(
+        cstr(&format!(
+            "WARNING: MAX_TAG_OWNERS ({}) REF TAG LIMIT HIT\n",
+            MAX_TAG_OWNERS
+        ))
+        .as_ptr(),
+    );
+    core::ptr::null_mut()
 }
 
 /// Raven `FirstFreeRefTag`.
@@ -3373,11 +3340,10 @@ pub fn TAG_Init(ctx: &mut GameContext) {
         while i < MAX_TAG_OWNERS as c_int {
             let mut x: c_int = 0;
             while x < MAX_TAGS as c_int {
-                (*ctx.world_raw()).refTagOwnerMap[i as usize].tags[x as usize] =
-                    core::mem::zeroed();
+                ctx.world.refTagOwnerMap[i as usize].tags[x as usize] = core::mem::zeroed();
                 x += 1;
             }
-            (*ctx.world_raw()).refTagOwnerMap[i as usize] = core::mem::zeroed();
+            ctx.world.refTagOwnerMap[i as usize] = core::mem::zeroed();
             i += 1;
         }
     }
@@ -3390,22 +3356,17 @@ pub fn TAG_FindOwner(
     ctx: &mut GameContext,
     owner: *const c_char,
 ) -> *mut crate::level::tag_owner::tagOwner_t {
-    unsafe {
-        let mut i: c_int = 0;
-        while i < MAX_TAG_OWNERS as c_int {
-            if (*ctx.world_raw()).refTagOwnerMap[i as usize].inuse != 0
-                && Q_stricmp(
-                    (*ctx.world_raw()).refTagOwnerMap[i as usize].name.as_ptr(),
-                    owner,
-                ) == 0
-            {
-                return &mut (*ctx.world_raw()).refTagOwnerMap[i as usize] as *mut _;
-            }
-            i += 1;
+    let mut i: c_int = 0;
+    while i < MAX_TAG_OWNERS as c_int {
+        if ctx.world.refTagOwnerMap[i as usize].inuse != 0
+            && Q_stricmp(ctx.world.refTagOwnerMap[i as usize].name.as_ptr(), owner) == 0
+        {
+            return &mut ctx.world.refTagOwnerMap[i as usize] as *mut _;
         }
-
-        core::ptr::null_mut()
+        i += 1;
     }
+
+    core::ptr::null_mut()
 }
 
 /// Raven `TAG_Find`.
@@ -3713,7 +3674,7 @@ pub fn SP_reference_tag(ctx: &mut GameContext, ent: EntityId) {
         if !(*ent).target.is_null() {
             // Init cannot occur until all entities have been spawned
             (*ent).think = Some(EntThink::ref_link).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time + START_TIME_LINK_ENTS;
+            (*ent).nextthink = ctx.world.level.time + START_TIME_LINK_ENTS;
         } else {
             ref_link(ctx, ctx.entity_id_of(ent).unwrap());
         }
@@ -3727,18 +3688,17 @@ pub fn G_ClientForShooter(ctx: &mut GameContext) -> *mut gclient_t {
     unsafe {
         let mut i: c_int = 0;
 
-        if (*ctx.world_raw()).globals.g_shooterClientInit == qfalse {
+        if ctx.world.globals.g_shooterClientInit == qfalse {
             // in theory it should be initialized to 0 on the stack, but just in case.
-            for slot in (*ctx.world_raw()).globals.g_shooterClients.iter_mut() {
+            for slot in ctx.world.globals.g_shooterClients.iter_mut() {
                 *slot = core::mem::zeroed();
             }
-            (*ctx.world_raw()).globals.g_shooterClientInit = qtrue;
+            ctx.world.globals.g_shooterClientInit = qtrue;
         }
 
         while (i as usize) < (MAX_SHOOTERS) as usize {
-            if (*ctx.world_raw()).globals.g_shooterClients[i as usize].inuse == qfalse {
-                return &mut (*ctx.world_raw()).globals.g_shooterClients[i as usize].cl
-                    as *mut gclient_t;
+            if ctx.world.globals.g_shooterClients[i as usize].inuse == qfalse {
+                return &mut ctx.world.globals.g_shooterClients[i as usize].cl as *mut gclient_t;
             }
             i += 1;
         }
@@ -3755,15 +3715,13 @@ pub fn G_ClientForShooter(ctx: &mut GameContext) -> *mut gclient_t {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3377-3389`
 pub fn G_FreeClientForShooter(ctx: &mut GameContext, cl: *mut gclient_t) {
-    unsafe {
-        let mut i: usize = 0;
-        while i < (MAX_SHOOTERS) as usize {
-            if &mut (*ctx.world_raw()).globals.g_shooterClients[i].cl as *mut gclient_t == cl {
-                (*ctx.world_raw()).globals.g_shooterClients[i].inuse = qfalse;
-                return;
-            }
-            i += 1;
+    let mut i: usize = 0;
+    while i < (MAX_SHOOTERS) as usize {
+        if &mut ctx.world.globals.g_shooterClients[i].cl as *mut gclient_t == cl {
+            ctx.world.globals.g_shooterClients[i].inuse = qfalse;
+            return;
         }
+        i += 1;
     }
 }
 
@@ -3785,7 +3743,7 @@ pub fn misc_weapon_shooter_fire(ctx: &mut GameContext, self_: EntityId) {
         );
         if (*self_).spawnflags & 2 != 0 {
             (*self_).think = Some(EntThink::misc_weapon_shooter_fire).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + (*self_).wait as c_int;
+            (*self_).nextthink = ctx.world.level.time + (*self_).wait as c_int;
         }
     }
 }
@@ -3839,7 +3797,7 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
                 (*self_).target,
             );
             if !targ.is_null() {
-                (*self_).enemy = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), targ));
+                (*self_).enemy = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), targ));
                 crate::q_math::_VectorSubtract(
                     (*targ).r.currentOrigin,
                     (*self_).r.currentOrigin,
@@ -3855,7 +3813,7 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
                     (*((*self_).client as *mut gclient_t)).ps.viewangles,
                 );
                 //FIXME: don't keep doing this unless target is a moving target?
-                (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+                (*self_).nextthink = ctx.world.level.time + FRAMETIME;
             } else {
                 (*self_).enemy = None;
             }
@@ -3902,7 +3860,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
         // set up to link
         if !(*self_).target.is_null() {
             (*self_).think = Some(EntThink::misc_weapon_shooter_aim).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + START_TIME_LINK_ENTS;
+            (*self_).nextthink = ctx.world.level.time + START_TIME_LINK_ENTS;
         } else {
             // just set aim angles
             crate::q_math::_VectorCopy(
