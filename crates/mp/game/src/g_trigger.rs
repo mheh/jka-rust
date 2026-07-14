@@ -9,6 +9,12 @@
 //! rather than read from a bare `crandom`/`Q_irand`, and fn-pointer fields
 //! are set via the `EntThink`/`EntTouch`/`EntUse` enums (see
 //! `out/gen/ent_fn_enums.rs`) rather than a bare fn pointer.
+//!
+//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
+//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())`
+//! raw-deref regime is gone. The per-body entity re-derives stay raw by design,
+//! so the `// STAGE-1:` markers and their `unsafe` blocks legitimately hold
+//! genuine raw ops. Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -81,12 +87,12 @@ pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 // and build the id at assignment sites.
 #[inline]
 unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
-    unsafe { (*ctx.world_raw()).g_entities.as_ptr() }
+    ctx.world.g_entities.as_ptr()
 }
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -190,14 +196,14 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
 
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 && (*ent).wait >= 0.0 {
             (*ent).think = Some(EntThink::trigger_cleared_fire).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).speed as c_int;
+            (*ent).nextthink = ctx.world.level.time + (*ent).speed as c_int;
         } else if (*ent).wait > 0.0 {
-            if (*ent).painDebounceTime != (*ctx.world_raw()).level.time {
+            if (*ent).painDebounceTime != ctx.world.level.time {
                 // first ent to touch it this frame
-                (*ent).nextthink = (*ctx.world_raw()).level.time
-                    + ((((*ent).wait + (*ent).random * (*ctx.world_raw()).bg_state.rng.crandom())
-                        * 1000.0) as c_int);
-                (*ent).painDebounceTime = (*ctx.world_raw()).level.time;
+                (*ent).nextthink = ctx.world.level.time
+                    + ((((*ent).wait + (*ent).random * ctx.world.bg_state.rng.crandom()) * 1000.0)
+                        as c_int);
+                (*ent).painDebounceTime = ctx.world.level.time;
             }
         } else if (*ent).wait < 0.0 {
             // we can't just remove (self) here, because this is a touch function
@@ -210,7 +216,7 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
 
         if !activator_ptr.is_null() && !(*activator_ptr).client.is_null() {
             // mark the trigger as being touched by the player
-            (*ent).aimDebounceTime = (*ctx.world_raw()).level.time;
+            (*ent).aimDebounceTime = ctx.world.level.time;
         }
     }
 }
@@ -266,14 +272,13 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             return;
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
-            && (*ctx.world_raw()).globals.gSiegeRoundBegun == 0
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE && ctx.world.globals.gSiegeRoundBegun == 0
         {
             // nothing can be used til the round starts.
             return;
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && !activator.is_null()
             && !(*activator).client.is_null()
             && (*ent).alliedTeam != 0
@@ -283,7 +288,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             return;
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && !(*ent).idealclass.is_null()
             && *(*ent).idealclass != 0
         {
@@ -296,7 +301,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                 return;
             }
 
-            let siege_class_name = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
+            let siege_class_name = (&ctx.world.bg_state.bgSiegeClasses)
                 [(*((*activator).client as *mut gclient_t)).siegeClass as usize]
                 .name
                 .as_ptr();
@@ -306,7 +311,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             }
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE && (*ent).genericValue1 != 0 {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE && (*ent).genericValue1 != 0 {
             halt_trigger = true;
 
             if !activator.is_null()
@@ -315,7 +320,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                 && !(*ent).targetname.is_null()
                 && *(*ent).targetname != 0
             {
-                let obj_item = &mut (*ctx.world_raw()).g_entities
+                let obj_item = &mut ctx.world.g_entities
                     [(*((*activator).client as *mut gclient_t)).holdingObjectiveItem as usize]
                     as *mut gentity_t;
 
@@ -375,7 +380,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             let owning_team = (*ent).genericValue3;
             let mut new_owning_team: c_int = 0;
 
-            if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE {
+            if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
                 return;
             }
 
@@ -405,7 +410,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             while i < num_ents {
                 if entity_list[i as usize] < MAX_CLIENTS as c_int {
                     // only care about clients
-                    let cl = &mut (*ctx.world_raw()).g_entities[entity_list[i as usize] as usize]
+                    let cl = &mut ctx.world.g_entities[entity_list[i as usize] as usize]
                         as *mut gentity_t;
 
                     // the client is valid
@@ -462,12 +467,10 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             return;
         }
 
-        if (*ent).nextthink > (*ctx.world_raw()).level.time {
+        if (*ent).nextthink > ctx.world.level.time {
             if (*ent).spawnflags & 2048 != 0 {
                 // MULTIPLE - allow multiple entities to touch this trigger in a single frame
-                if (*ent).painDebounceTime != 0
-                    && (*ent).painDebounceTime != (*ctx.world_raw()).level.time
-                {
+                if (*ent).painDebounceTime != 0 && (*ent).painDebounceTime != ctx.world.level.time {
                     // this should still allow subsequent ents to fire this trigger in the current frame
                     return; // can't retrigger until the wait is over
                 }
@@ -479,7 +482,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
         // if the player has already activated this trigger this frame
         if !activator.is_null()
             && (*activator).s.number == 0
-            && (*ent).aimDebounceTime == (*ctx.world_raw()).level.time
+            && (*ent).aimDebounceTime == ctx.world.level.time
         {
             return;
         }
@@ -491,13 +494,11 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
 
         (*ent).activator = ent_id_opt(ent_base(ctx), activator);
 
-        if (*ent).delay != 0
-            && (*ent).painDebounceTime < ((*ctx.world_raw()).level.time + (*ent).delay)
-        {
+        if (*ent).delay != 0 && (*ent).painDebounceTime < (ctx.world.level.time + (*ent).delay) {
             // delay before firing trigger
             (*ent).think = Some(EntThink::multi_trigger_run).into();
-            (*ent).nextthink = (*ctx.world_raw()).level.time + (*ent).delay;
-            (*ent).painDebounceTime = (*ctx.world_raw()).level.time;
+            (*ent).nextthink = ctx.world.level.time + (*ent).delay;
+            (*ent).painDebounceTime = ctx.world.level.time;
         } else {
             multi_trigger_run(ctx, ent_id);
         }
@@ -617,7 +618,7 @@ pub fn Touch_Multi(
             if (*self_).genericValue7 != 0 {
                 // we have to be holding the use key in this trigger for x
                 // milliseconds before firing
-                if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+                if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                     && !(*self_).idealclass.is_null()
                     && *(*self_).idealclass != 0
                 {
@@ -630,7 +631,7 @@ pub fn Touch_Multi(
                         return;
                     }
 
-                    let siege_class_name = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
+                    let siege_class_name = (&ctx.world.bg_state.bgSiegeClasses)
                         [(*other_client).siegeClass as usize]
                         .name
                         .as_ptr();
@@ -657,16 +658,15 @@ pub fn Touch_Multi(
                     // start the hack
                     (*other_client).isHacking = (*self_).s.number;
                     (*other_client).hackingAngles = (*other_client).ps.viewangles;
-                    (*other_client).ps.hackingTime =
-                        (*ctx.world_raw()).level.time + (*self_).genericValue7;
+                    (*other_client).ps.hackingTime = ctx.world.level.time + (*self_).genericValue7;
                     (*other_client).ps.hackingBaseTime = (*self_).genericValue7;
                     if (*other_client).ps.hackingBaseTime > 60000 {
                         // don't allow a bit overflow
-                        (*other_client).ps.hackingTime = (*ctx.world_raw()).level.time + 60000;
+                        (*other_client).ps.hackingTime = ctx.world.level.time + 60000;
                         (*other_client).ps.hackingBaseTime = 60000;
                     }
                     return;
-                } else if (*other_client).ps.hackingTime < (*ctx.world_raw()).level.time {
+                } else if (*other_client).ps.hackingTime < ctx.world.level.time {
                     // finished with the hack, reset the hacking values and let
                     // it fall through
                     (*other_client).isHacking = 0; // can't hack a client
@@ -728,7 +728,7 @@ pub fn Touch_Multi(
 
         if (*self_).think.get() == Some(EntThink::trigger_cleared_fire) {
             // We're waiting to fire our target2 first
-            (*self_).nextthink = (*ctx.world_raw()).level.time + (*self_).speed as c_int;
+            (*self_).nextthink = ctx.world.level.time + (*self_).speed as c_int;
             return;
         }
 
@@ -755,9 +755,9 @@ pub fn trigger_cleared_fire(ctx: &mut GameContext, self_: EntityId) {
         // should start the wait timer now, because the trigger's just been
         // cleared, so we must "wait" from this point
         if (*self_).wait > 0.0 {
-            (*self_).nextthink = (*ctx.world_raw()).level.time
-                + (((*self_).wait + (*self_).random * (*ctx.world_raw()).bg_state.rng.crandom())
-                    * 1000.0) as c_int;
+            (*self_).nextthink = ctx.world.level.time
+                + (((*self_).wait + (*self_).random * ctx.world.bg_state.rng.crandom()) * 1000.0)
+                    as c_int;
         }
     }
 }
@@ -907,11 +907,13 @@ pub fn Do_Strike(ctx: &mut GameContext, ent: EntityId) {
 
         // choose a random point to strike within the bounds of the trigger
         let mut strike_point: vec3_t = [0.0; 3];
-        strike_point[0] = (*ctx.world_raw())
+        strike_point[0] = ctx
+            .world
             .bg_state
             .rng
             .flrand((*ent).r.absmin[0], (*ent).r.absmax[0]);
-        strike_point[1] = (*ctx.world_raw())
+        strike_point[1] = ctx
+            .world
             .bg_state
             .rng
             .flrand((*ent).r.absmin[1], (*ent).r.absmax[1]);
@@ -942,7 +944,7 @@ pub fn Do_Strike(ctx: &mut GameContext, ent: EntityId) {
 
         if local_trace.startsolid != 0 || local_trace.allsolid != 0 {
             // got a bad spot, think again next frame to try another strike
-            (*ent).nextthink = (*ctx.world_raw()).level.time;
+            (*ent).nextthink = ctx.world.level.time;
             return;
         }
 
@@ -960,8 +962,8 @@ pub fn Do_Strike(ctx: &mut GameContext, ent: EntityId) {
             );
         } else {
             // only damage individuals
-            let tr_hit = &mut (*ctx.world_raw()).g_entities[local_trace.entityNum as usize]
-                as *mut gentity_t;
+            let tr_hit =
+                &mut ctx.world.g_entities[local_trace.entityNum as usize] as *mut gentity_t;
 
             if (*tr_hit).inuse != 0 && (*tr_hit).takedamage != 0 {
                 // damage it then
@@ -997,12 +999,9 @@ pub fn Think_Strike(ctx: &mut GameContext, ent_id: EntityId) {
             return;
         }
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time
+        (*ent).nextthink = ctx.world.level.time
             + (*ent).wait as c_int
-            + (*ctx.world_raw())
-                .bg_state
-                .rng
-                .Q_irand(0, (*ent).random as c_int);
+            + ctx.world.bg_state.rng.Q_irand(0, (*ent).random as c_int);
         Do_Strike(ctx, ent_id);
     }
 }
@@ -1025,7 +1024,7 @@ pub fn Use_Strike(
 
         if (*ent).genericValue1 == 0 {
             // turn it back on
-            (*ent).nextthink = (*ctx.world_raw()).level.time;
+            (*ent).nextthink = ctx.world.level.time;
         }
     }
 }
@@ -1040,7 +1039,7 @@ pub fn SP_trigger_lightningstrike(ctx: &mut GameContext, ent_id: EntityId) {
         let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
         (*ent).use_ = Some(EntUse::Use_Strike).into();
         (*ent).think = Some(EntThink::Think_Strike).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 500;
+        (*ent).nextthink = ctx.world.level.time + 500;
 
         let mut s: *mut c_char = core::ptr::null_mut();
         G_SpawnString(
@@ -1101,7 +1100,7 @@ pub fn SP_trigger_always(ctx: &mut GameContext, ent: EntityId) {
         // pointer (Stage-2 body debt).
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         // we must have some delay to make sure our use targets are present
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 300;
+        (*ent).nextthink = ctx.world.level.time + 300;
         (*ent).think = Some(EntThink::trigger_always_think).into();
     }
 }
@@ -1140,13 +1139,12 @@ pub fn trigger_push_touch(
         // linear
         // Raven compares in float: `level.time < painDebounceTime + self->wait`, with
         // wait a float, so both sides promote to float rather than truncating wait.
-        if ((*ctx.world_raw()).level.time as f32) < (*self_).painDebounceTime as f32 + (*self_).wait
-        {
+        if (ctx.world.level.time as f32) < (*self_).painDebounceTime as f32 + (*self_).wait {
             // normal 'wait' check
             if (*self_).spawnflags & PUSH_MULTIPLE != 0 {
                 // MULTIPLE - allow multiple entities to touch this trigger in one frame
                 if (*self_).painDebounceTime != 0
-                    && (*ctx.world_raw()).level.time > (*self_).painDebounceTime
+                    && ctx.world.level.time > (*self_).painDebounceTime
                 {
                     // if we haven't reached the next frame continue to let ents touch the trigger
                     return;
@@ -1166,7 +1164,7 @@ pub fn trigger_push_touch(
                 // already moving
                 (*other).s.pos.trBase = (*other).r.currentOrigin;
                 (*other).s.pos.trDelta = (*self_).s.origin2;
-                (*other).s.pos.trTime = (*ctx.world_raw()).level.time;
+                (*other).s.pos.trTime = ctx.world.level.time;
             }
             return;
         }
@@ -1213,7 +1211,7 @@ pub fn trigger_push_touch(
         if (*self_).wait == -1.0 {
             (*self_).touch = FnId::NONE;
         } else if (*self_).wait > 0.0 {
-            (*self_).painDebounceTime = (*ctx.world_raw()).level.time;
+            (*self_).painDebounceTime = ctx.world.level.time;
         }
         // (Raven keeps the `aimDebounceTime` mark commented out — dead code
         // kept commented in the oracle source.)
@@ -1281,7 +1279,7 @@ pub fn AimAtTarget(ctx: &mut GameContext, self_: EntityId) {
         }
 
         let height = (*ent).s.origin[2] - origin[2];
-        let gravity = (*ctx.world_raw()).cvars.g_gravity.value;
+        let gravity = ctx.world.cvars.g_gravity.value;
         // Raven: `sqrt( height / ( .5 * gravity ) )`. `.5` is double, so the divide
         // promotes to double and sqrt is the double libm call; the result narrows to float.
         let time = ((height as f64) / (0.5 * gravity as f64)).sqrt() as f32;
@@ -1341,7 +1339,7 @@ pub fn SP_trigger_push(ctx: &mut GameContext, self_id: EntityId) {
         }
 
         (*self_).think = Some(EntThink::AimAtTarget).into();
-        (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+        (*self_).nextthink = ctx.world.level.time + FRAMETIME;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }
 }
@@ -1374,8 +1372,8 @@ pub fn Use_target_push(
         (*client).ps.velocity = (*self_).s.origin2;
 
         // play fly sound every 1.5 seconds
-        if (*activator).fly_sound_debounce_time < (*ctx.world_raw()).level.time {
-            (*activator).fly_sound_debounce_time = (*ctx.world_raw()).level.time + 1500;
+        if (*activator).fly_sound_debounce_time < ctx.world.level.time {
+            (*activator).fly_sound_debounce_time = ctx.world.level.time + 1500;
             if (*self_).noise_index != 0 {
                 G_Sound(
                     ctx,
@@ -1417,7 +1415,7 @@ pub fn SP_target_push(ctx: &mut GameContext, self_: EntityId) {
             (*self_).r.absmin = (*self_).s.origin;
             (*self_).r.absmax = (*self_).s.origin;
             (*self_).think = Some(EntThink::AimAtTarget).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+            (*self_).nextthink = ctx.world.level.time + FRAMETIME;
         }
         (*self_).use_ = Some(EntUse::Use_target_push).into();
     }
@@ -1517,7 +1515,7 @@ pub fn hurt_use(
         let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let activator = ent_resolve_opt(ctx, activator);
         if !activator.is_null() && (*activator).inuse != 0 && !(*activator).client.is_null() {
-            (*self_).activator = ent_id_opt((*ctx.world_raw()).g_entities.as_mut_ptr(), activator);
+            (*self_).activator = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), activator);
         } else {
             (*self_).activator = None;
         }
@@ -1547,7 +1545,7 @@ pub fn hurt_touch(
         // verbatim via re-derived raw pointers (Stage-2 body debt).
         let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         let other = ent_resolve_opt(ctx, other);
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && !(*self_).team.is_null()
             && *(*self_).team != 0
         {
@@ -1580,7 +1578,7 @@ pub fn hurt_touch(
             return;
         }
 
-        if (*self_).timestamp > (*ctx.world_raw()).level.time {
+        if (*self_).timestamp > ctx.world.level.time {
             return;
         }
 
@@ -1603,9 +1601,9 @@ pub fn hurt_touch(
         }
 
         if (*self_).spawnflags & 16 != 0 {
-            (*self_).timestamp = (*ctx.world_raw()).level.time + 1000;
+            (*self_).timestamp = ctx.world.level.time + 1000;
         } else {
-            (*self_).timestamp = (*ctx.world_raw()).level.time + FRAMETIME;
+            (*self_).timestamp = ctx.world.level.time + FRAMETIME;
         }
 
         // play sound
@@ -1621,16 +1619,16 @@ pub fn hurt_touch(
         if (*self_).damage == -1 && !other.is_null() && !(*other).client.is_null() {
             let other_client = (*other).client as *mut gclient_t;
 
-            if (*other_client).ps.otherKillerTime > (*ctx.world_raw()).level.time {
+            if (*other_client).ps.otherKillerTime > ctx.world.level.time {
                 // we're as good as dead, so if someone pushed us into this
                 // then remember them
-                (*other_client).ps.otherKillerTime = (*ctx.world_raw()).level.time + 20000;
-                (*other_client).ps.otherKillerDebounceTime = (*ctx.world_raw()).level.time + 10000;
+                (*other_client).ps.otherKillerTime = ctx.world.level.time + 20000;
+                (*other_client).ps.otherKillerDebounceTime = ctx.world.level.time + 10000;
                 (*other_client).otherKillerMOD = MOD_FALLING as c_int;
                 (*other_client).otherKillerVehWeapon = 0;
                 (*other_client).otherKillerWeaponType = WP_NONE as c_int;
             }
-            (*other_client).ps.fallingToDeath = (*ctx.world_raw()).level.time;
+            (*other_client).ps.fallingToDeath = ctx.world.level.time;
 
             // rag on the way down, this flag will automatically be cleared for
             // us on respawn
@@ -1714,7 +1712,7 @@ pub fn SP_trigger_hurt(ctx: &mut GameContext, self_id: EntityId) {
         let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
         InitTrigger(ctx, self_id);
 
-        (*ctx.world_raw()).globals.gTrigFallSound = G_SoundIndex(c"*falling1.wav".as_ptr());
+        ctx.world.globals.gTrigFallSound = G_SoundIndex(c"*falling1.wav".as_ptr());
 
         (*self_).noise_index = G_SoundIndex(c"sound/weapons/force/speed.wav".as_ptr());
         (*self_).touch = Some(EntTouch::hurt_touch).into();
@@ -1766,7 +1764,7 @@ pub fn space_touch(
             && (*other_client).ps.m_iVehicleNum >= MAX_CLIENTS as c_int
         {
             // a player client inside a vehicle
-            let veh = &mut (*ctx.world_raw()).g_entities[(*other_client).ps.m_iVehicleNum as usize]
+            let veh = &mut ctx.world.g_entities[(*other_client).ps.m_iVehicleNum as usize]
                 as *mut gentity_t;
 
             if (*veh).inuse != 0 && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
@@ -1794,8 +1792,7 @@ pub fn space_touch(
 
         if (*other_client).inSpaceIndex == 0 || (*other_client).inSpaceIndex == ENTITYNUM_NONE {
             // freshly entering space
-            (*other_client).inSpaceSuffocation =
-                (*ctx.world_raw()).level.time + INITIAL_SUFFOCATION_DELAY;
+            (*other_client).inSpaceSuffocation = ctx.world.level.time + INITIAL_SUFFOCATION_DELAY;
         }
 
         (*other_client).inSpaceIndex = (*self_).s.number;
@@ -1847,7 +1844,7 @@ pub fn shipboundary_touch(
         let other_client = (*other).client as *mut gclient_t;
 
         if (*other_client).ps.hyperSpaceTime != 0
-            && (*ctx.world_raw()).level.time - (*other_client).ps.hyperSpaceTime < HYPERSPACE_TIME
+            && ctx.world.level.time - (*other_client).ps.hyperSpaceTime < HYPERSPACE_TIME
         {
             // don't interfere with hyperspacing ships
             return;
@@ -1890,11 +1887,10 @@ pub fn shipboundary_touch(
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
         (*other_client).ps.vehTurnaroundIndex = (*ent).s.number;
-        (*other_client).ps.vehTurnaroundTime =
-            (*ctx.world_raw()).level.time + (*self_).genericValue1 * 2;
+        (*other_client).ps.vehTurnaroundTime = ctx.world.level.time + (*self_).genericValue1 * 2;
 
         // keep up the detailed checks for another 2 seconds
-        (*self_).genericValue7 = (*ctx.world_raw()).level.time + 2000;
+        (*self_).genericValue7 = ctx.world.level.time + 2000;
     }
 }
 
@@ -1906,9 +1902,9 @@ pub fn shipboundary_think(ctx: &mut GameContext, ent_id: EntityId) {
         // Stage-1: `EntityId` signature; mega-fn body kept verbatim via a
         // re-derived raw pointer (Stage-2 body debt).
         let ent = ctx.entity_mut(ent_id) as *mut gentity_t;
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 100;
+        (*ent).nextthink = ctx.world.level.time + 100;
 
-        if (*ent).genericValue7 < (*ctx.world_raw()).level.time {
+        if (*ent).genericValue7 < ctx.world.level.time {
             // don't need to be doing this check, no one has touched recently
             return;
         }
@@ -1926,8 +1922,8 @@ pub fn shipboundary_think(ctx: &mut GameContext, ent_id: EntityId) {
 
         let mut i = 0;
         while i < num_listed {
-            let listed_ent = &mut (*ctx.world_raw()).g_entities[entity_list[i as usize] as usize]
-                as *mut gentity_t;
+            let listed_ent =
+                &mut ctx.world.g_entities[entity_list[i as usize] as usize] as *mut gentity_t;
             if (*listed_ent).inuse != 0
                 && !(*listed_ent).client.is_null()
                 && (*((*listed_ent).client as *mut gclient_t)).ps.m_iVehicleNum != 0
@@ -1983,7 +1979,7 @@ pub fn SP_trigger_shipboundary(ctx: &mut GameContext, self_id: EntityId) {
         }
 
         (*self_).think = Some(EntThink::shipboundary_think).into();
-        (*self_).nextthink = (*ctx.world_raw()).level.time + 500;
+        (*self_).nextthink = ctx.world.level.time + 500;
         (*self_).touch = Some(EntTouch::shipboundary_touch).into();
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
@@ -2017,13 +2013,12 @@ pub fn hyperspace_touch(
         let other_client = (*other).client as *mut gclient_t;
 
         if (*other_client).ps.hyperSpaceTime != 0
-            && (*ctx.world_raw()).level.time - (*other_client).ps.hyperSpaceTime < HYPERSPACE_TIME
+            && ctx.world.level.time - (*other_client).ps.hyperSpaceTime < HYPERSPACE_TIME
         {
             // already hyperspacing, just keep us moving
             if (*other_client).ps.eFlags2 & EF2_HYPERSPACE != 0 {
                 // they've started the hyperspace but haven't been teleported yet
-                let time_frac = ((*ctx.world_raw()).level.time - (*other_client).ps.hyperSpaceTime)
-                    as f32
+                let time_frac = (ctx.world.level.time - (*other_client).ps.hyperSpaceTime) as f32
                     / HYPERSPACE_TIME as f32;
                 if time_frac >= HYPERSPACE_TELEPORT_FRAC {
                     // half-way, now teleport them!
@@ -2176,7 +2171,7 @@ pub fn hyperspace_touch(
                 return;
             }
             (*other_client).ps.hyperSpaceAngles = (*ent).s.angles;
-            (*other_client).ps.hyperSpaceTime = (*ctx.world_raw()).level.time;
+            (*other_client).ps.hyperSpaceTime = ctx.world.level.time;
         }
     }
 }
@@ -2238,9 +2233,8 @@ pub fn func_timer_think(ctx: &mut GameContext, self_: EntityId) {
             ctx.entity_id_of(activator_ptr),
         );
         // set time before next firing
-        (*self_).nextthink = (*ctx.world_raw()).level.time
-            + (1000.0
-                * ((*self_).wait + (*ctx.world_raw()).bg_state.rng.crandom() * (*self_).random))
+        (*self_).nextthink = ctx.world.level.time
+            + (1000.0 * ((*self_).wait + ctx.world.bg_state.rng.crandom() * (*self_).random))
                 as c_int;
     }
 }
@@ -2307,7 +2301,7 @@ pub fn SP_func_timer(ctx: &mut GameContext, self_: EntityId) {
         }
 
         if (*self_).spawnflags & 1 != 0 {
-            (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+            (*self_).nextthink = ctx.world.level.time + FRAMETIME;
             (*self_).activator = ent_id_opt(ent_base(ctx), self_);
         }
 
@@ -2356,7 +2350,7 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
         }
 
         // FIXME: need a seed
-        let pick = (*ctx.world_raw()).bg_state.rng.Q_irand(1, t_count);
+        let pick = ctx.world.bg_state.rng.Q_irand(1, t_count);
         t_count = 0;
         t = core::ptr::null_mut();
         loop {
@@ -2394,11 +2388,11 @@ pub fn asteroid_count_num_asteroids(ctx: &mut GameContext, self_: EntityId) -> c
         let mut count: c_int = 0;
         let mut i = MAX_CLIENTS as c_int;
         while i < ENTITYNUM_WORLD as c_int {
-            if (*ctx.world_raw()).g_entities[i as usize].inuse == 0 {
+            if ctx.world.g_entities[i as usize].inuse == 0 {
                 i += 1;
                 continue;
             }
-            if (*ctx.world_raw()).g_entities[i as usize].r.ownerNum == (*self_).s.number {
+            if ctx.world.g_entities[i as usize].r.ownerNum == (*self_).s.number {
                 count += 1;
             }
             i += 1;
@@ -2423,18 +2417,19 @@ pub fn asteroid_move_to_start2(
         let ownerTrigger = ent_resolve_opt(ctx, ownerTrigger);
         if !ownerTrigger.is_null() {
             // move it
-            let speed = (*ctx.world_raw())
+            let speed = ctx
+                .world
                 .bg_state
                 .rng
                 .flrand((*self_).speed * 0.25, (*self_).speed * 2.0);
-            let cap_axis = (*ctx.world_raw()).bg_state.rng.Q_irand(0, 2);
+            let cap_axis = ctx.world.bg_state.rng.Q_irand(0, 2);
 
             let mut start_spot: vec3_t = [0.0; 3];
             let mut end_spot: vec3_t = [0.0; 3];
 
             for axis in 0..3usize {
                 if axis as c_int == cap_axis {
-                    if (*ctx.world_raw()).bg_state.rng.Q_irand(0, 1) != 0 {
+                    if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                         start_spot[axis] = (*ownerTrigger).r.mins[axis];
                         end_spot[axis] = (*ownerTrigger).r.maxs[axis];
                     } else {
@@ -2443,10 +2438,10 @@ pub fn asteroid_move_to_start2(
                     }
                 } else {
                     start_spot[axis] = (*ownerTrigger).r.mins[axis]
-                        + ((*ctx.world_raw()).bg_state.rng.flrand(0.0, 1.0)
+                        + (ctx.world.bg_state.rng.flrand(0.0, 1.0)
                             * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
                     end_spot[axis] = (*ownerTrigger).r.mins[axis]
-                        + ((*ctx.world_raw()).bg_state.rng.flrand(0.0, 1.0)
+                        + (ctx.world.bg_state.rng.flrand(0.0, 1.0)
                             * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
                 }
             }
@@ -2460,25 +2455,25 @@ pub fn asteroid_move_to_start2(
 
             // spin it
             let start_angles: vec3_t = [
-                (*ctx.world_raw()).bg_state.rng.flrand(-360.0, 360.0),
-                (*ctx.world_raw()).bg_state.rng.flrand(-360.0, 360.0),
-                (*ctx.world_raw()).bg_state.rng.flrand(-360.0, 360.0),
+                ctx.world.bg_state.rng.flrand(-360.0, 360.0),
+                ctx.world.bg_state.rng.flrand(-360.0, 360.0),
+                ctx.world.bg_state.rng.flrand(-360.0, 360.0),
             ];
             G_SetAngles(&mut *(self_), start_angles);
             (*self_).s.apos.trDelta = [
-                (*ctx.world_raw()).bg_state.rng.flrand(-100.0, 100.0),
-                (*ctx.world_raw()).bg_state.rng.flrand(-100.0, 100.0),
-                (*ctx.world_raw()).bg_state.rng.flrand(-100.0, 100.0),
+                ctx.world.bg_state.rng.flrand(-100.0, 100.0),
+                ctx.world.bg_state.rng.flrand(-100.0, 100.0),
+                ctx.world.bg_state.rng.flrand(-100.0, 100.0),
             ];
-            (*self_).s.apos.trTime = (*ctx.world_raw()).level.time;
+            (*self_).s.apos.trTime = ctx.world.level.time;
             (*self_).s.apos.trType = TR_LINEAR;
             // move it back to a new start when done
             (*self_).think = Some(EntThink::asteroid_move_to_start).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + time;
+            (*self_).nextthink = ctx.world.level.time + time;
         } else {
             // crap, go bye-bye
             (*self_).think = Some(EntThink::G_FreeEntity).into();
-            (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+            (*self_).nextthink = ctx.world.level.time + FRAMETIME;
         }
     }
 }
@@ -2493,7 +2488,7 @@ pub fn asteroid_move_to_start(ctx: &mut GameContext, self_id: EntityId) {
         // pointer (Stage-2 body debt).
         let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
         let owner_trigger =
-            &mut (*ctx.world_raw()).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            &mut ctx.world.g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
         asteroid_move_to_start2(ctx, self_id, ctx.entity_id_of(owner_trigger));
     }
 }
@@ -2508,7 +2503,7 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
         let self_ = ctx.entity_mut(self_id) as *mut gentity_t;
         let num_asteroids = asteroid_count_num_asteroids(ctx, self_id);
 
-        (*self_).nextthink = (*ctx.world_raw()).level.time + 500;
+        (*self_).nextthink = ctx.world.level.time + 500;
 
         if num_asteroids < (*self_).count {
             // need to spawn a new asteroid
@@ -2551,7 +2546,7 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
                     // think again sooner if need even more
                     if num_asteroids + 1 < (*self_).count {
                         // still need at least one more — spawn it in 100ms
-                        (*self_).nextthink = (*ctx.world_raw()).level.time + 100;
+                        (*self_).nextthink = ctx.world.level.time + 100;
                     }
                 }
             }
@@ -2584,7 +2579,7 @@ pub fn SP_trigger_asteroid_field(ctx: &mut GameContext, self_: EntityId) {
         }
 
         (*self_).think = Some(EntThink::asteroid_field_think).into();
-        (*self_).nextthink = (*ctx.world_raw()).level.time + 100;
+        (*self_).nextthink = ctx.world.level.time + 100;
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
     }

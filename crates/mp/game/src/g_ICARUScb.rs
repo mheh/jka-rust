@@ -11,6 +11,12 @@
 //! Filled by the jampgame mega-pass; functions reach file-scope game state
 //! (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
+//!
+//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
+//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())`
+//! raw-deref regime is gone. The per-body entity/`gclient_t` re-derives stay
+//! raw by design, so the `// STAGE-1:` markers and their `unsafe` blocks
+//! legitimately hold genuine raw ops. Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::NAV_FindClosestWaypointForEnt;
@@ -79,7 +85,7 @@ pub fn G_DebugPrint(
     // variadic `...` — C varargs, seam decision pending
 ) {
     unsafe {
-        if (*ctx.world_raw()).cvars.g_developer.integer != 2 {
+        if ctx.world.cvars.g_developer.integer != 2 {
             return;
         }
 
@@ -108,7 +114,7 @@ pub fn G_DebugPrint(
                 ent_num = 0;
             }
 
-            let targ = (*ctx.world_raw()).g_entities[ent_num as usize].script_targetname;
+            let targ = ctx.world.g_entities[ent_num as usize].script_targetname;
             let targ_str = if targ.is_null() {
                 String::new()
             } else {
@@ -234,7 +240,7 @@ pub fn Q3_PlaySound(
     channel: *const c_char,
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let mut final_name = [0 as c_char; MAX_QPATH as usize];
         Q_strncpyz(final_name.as_mut_ptr(), name, MAX_QPATH as c_int);
         Q_strupr(final_name.as_mut_ptr());
@@ -315,7 +321,7 @@ pub fn Q3_Play(
     name: *const c_char,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(r#type, b"PLAY_ROFF\0".as_ptr() as *const c_char) == 0 {
             // Raven passes `name` (already a `char*`) straight to `trap_ROFF_Cache`;
@@ -368,7 +374,7 @@ pub fn anglerCallback(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.apos.trDelta = [0.0, 0.0, 0.0];
         (*ent).s.apos.trDuration = 1;
         (*ent).s.apos.trType = trType_t::TR_STATIONARY;
-        (*ent).s.apos.trTime = (*ctx.world_raw()).level.time;
+        (*ent).s.apos.trTime = ctx.world.level.time;
 
         // Stop thinking.
         (*ent).reached = FnId::NONE;
@@ -404,13 +410,13 @@ pub fn moverCallback(ctx: &mut GameContext, ent: EntityId) {
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_END);
 
         if (*ent).moverState == MOVER_1TO2 {
-            let __h525 = ctx.entity_id_of(ent).unwrap();
-            let __h526 = (*ctx.world_raw()).level.time;
-            MatchTeam(ctx, __h525, MOVER_POS2 as c_int, __h526);
+            let team_leader = ctx.entity_id_of(ent).unwrap();
+            let time = ctx.world.level.time;
+            MatchTeam(ctx, team_leader, MOVER_POS2 as c_int, time);
         } else if (*ent).moverState == MOVER_2TO1 {
-            let __h527 = ctx.entity_id_of(ent).unwrap();
-            let __h528 = (*ctx.world_raw()).level.time;
-            MatchTeam(ctx, __h527, MOVER_POS1 as c_int, __h528);
+            let team_leader = ctx.entity_id_of(ent).unwrap();
+            let time = ctx.world.level.time;
+            MatchTeam(ctx, team_leader, MOVER_POS1 as c_int, time);
         }
 
         if (*ent).blocked.get() == Some(EntBlocked::Blocked_Mover) {
@@ -486,7 +492,7 @@ pub fn moveAndRotateCallback(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:682-721`
 pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration: f32) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp(
@@ -514,7 +520,7 @@ pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duratio
         }
 
         (*ent).s.pos.trDuration = (duration * 10.0) as c_int;
-        (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
+        (*ent).s.pos.trTime = ctx.world.level.time;
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
@@ -532,7 +538,7 @@ pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duratio
 /// Source: `oracle/codemp/game/g_ICARUScb.c:730-769`
 pub fn Q3_Lerp2End(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration: f32) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp(
@@ -560,7 +566,7 @@ pub fn Q3_Lerp2End(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration:
         }
 
         (*ent).s.pos.trDuration = (duration * 10.0) as c_int;
-        (*ent).s.time = (*ctx.world_raw()).level.time;
+        (*ent).s.time = ctx.world.level.time;
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
@@ -585,7 +591,7 @@ pub fn Q3_Lerp2Pos(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp(
@@ -627,9 +633,9 @@ pub fn Q3_Lerp2Pos(
 
         (*ent).s.pos.trDuration = duration as c_int;
 
-        let __h529 = ctx.entity_id_of(ent).unwrap();
-        let __h530 = (*ctx.world_raw()).level.time;
-        MatchTeam(ctx, __h529, moverState as c_int, __h530);
+        let team_leader = ctx.entity_id_of(ent).unwrap();
+        let time = ctx.world.level.time;
+        MatchTeam(ctx, team_leader, moverState as c_int, time);
 
         if let Some(angles) = angles {
             let mut ang = [0.0f32; 3];
@@ -646,7 +652,7 @@ pub fn Q3_Lerp2Pos(
                 trType_t::TR_NONLINEAR_STOP
             };
             (*ent).s.apos.trDuration = duration as c_int;
-            (*ent).s.apos.trTime = (*ctx.world_raw()).level.time;
+            (*ent).s.apos.trTime = ctx.world.level.time;
 
             (*ent).reached = Some(EntReached::moveAndRotateCallback).into();
             trap::ICARUS_TaskIDSet(
@@ -686,7 +692,7 @@ pub fn Q3_Lerp2Angles(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         (*ent).s.apos.trDuration = if duration > 0.0 { duration as c_int } else { 1 };
 
@@ -704,7 +710,7 @@ pub fn Q3_Lerp2Angles(
             trType_t::TR_NONLINEAR_STOP
         };
 
-        (*ent).s.apos.trTime = (*ctx.world_raw()).level.time;
+        (*ent).s.apos.trTime = ctx.world.level.time;
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
@@ -712,7 +718,7 @@ pub fn Q3_Lerp2Angles(
         );
 
         (*ent).think = Some(EntThink::anglerCallback).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time + duration as c_int;
+        (*ent).nextthink = ctx.world.level.time + duration as c_int;
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -741,7 +747,7 @@ pub fn Q3_GetTag(
     info: &mut [f32; 3],
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).inuse == 0 {
             debug_assert!(false);
@@ -764,7 +770,7 @@ pub fn Q3_GetTag(
 /// Source: `oracle/codemp/game/g_ICARUScb.c:981-998`
 pub fn Q3_Use(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if target.is_null() || *target == 0 {
             G_DebugPrint(
@@ -788,14 +794,14 @@ pub fn Q3_Use(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1009-1052`
 pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let mut victim: *mut gentity_t = std::ptr::null_mut();
 
         if Q_stricmp(name, b"self\0".as_ptr() as *const c_char) == 0 {
             victim = ent;
         } else if Q_stricmp(name, b"enemy\0".as_ptr() as *const c_char) == 0 {
             if let Some(enemy_id) = (*ent).enemy {
-                victim = &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+                victim = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
             }
         } else {
             victim = G_Find(
@@ -861,11 +867,11 @@ pub fn Q3_RemoveEnt(ctx: &mut GameContext, victim: EntityId) {
                     // porting-rules §F (idiomatic C++ reimplementation, not yet ported).
                 }
                 (*victim).think = Some(EntThink::G_FreeEntity).into();
-                (*victim).nextthink = (*ctx.world_raw()).level.time + 100;
+                (*victim).nextthink = ctx.world.level.time + 100;
             }
         } else {
             (*victim).think = Some(EntThink::G_FreeEntity).into();
-            (*victim).nextthink = (*ctx.world_raw()).level.time + 100;
+            (*victim).nextthink = ctx.world.level.time + 100;
         }
     }
 }
@@ -875,7 +881,7 @@ pub fn Q3_RemoveEnt(ctx: &mut GameContext, victim: EntityId) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1128-1168`
 pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"self\0".as_ptr() as *const c_char, name) == 0 {
             Q3_RemoveEnt(ctx, ctx.entity_id_of(ent).unwrap());
@@ -889,8 +895,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
                 );
                 return;
             }
-            let victim =
-                &mut (*ctx.world_raw()).g_entities[victim.unwrap().0 as usize] as *mut gentity_t;
+            let victim = &mut ctx.world.g_entities[victim.unwrap().0 as usize] as *mut gentity_t;
             Q3_RemoveEnt(ctx, ctx.entity_id_of(victim).unwrap());
         } else {
             let mut victim = G_Find(
@@ -934,7 +939,7 @@ pub fn Q3_GetFloat(
     value: *mut f32,
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
@@ -1031,7 +1036,7 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_VISRANGE as i32 => return 0,
             _ if toGet == SET_EARSHOT as i32 => return 0,
             _ if toGet == SET_VIGILANCE as i32 => return 0,
-            _ if toGet == SET_GRAVITY as i32 => *value = (*ctx.world_raw()).cvars.g_gravity.value,
+            _ if toGet == SET_GRAVITY as i32 => *value = ctx.world.cvars.g_gravity.value,
             _ if toGet == SET_FACEEYESCLOSED as i32
                 || toGet == SET_FACEEYESOPENED as i32
                 || toGet == SET_FACEAUX as i32
@@ -1237,7 +1242,7 @@ pub fn Q3_GetVector(
     value: &mut [f32; 3],
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
@@ -1307,7 +1312,7 @@ pub fn Q3_GetString(
     value: *mut *mut c_char,
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
@@ -1551,10 +1556,9 @@ pub fn MoveOwner(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
 
     unsafe {
-        let owner =
-            &mut (*ctx.world_raw()).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+        let owner = &mut ctx.world.g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
-        (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+        (*self_).nextthink = ctx.world.level.time + FRAMETIME;
         (*self_).think = Some(EntThink::G_FreeEntity).into();
 
         if owner.is_null() || (*owner).inuse == 0 {
@@ -1584,7 +1588,7 @@ pub fn MoveOwner(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1895-1920`
 pub fn Q3_SetTeleportDest(ctx: &mut GameContext, entID: c_int, org: vec3_t) -> qboolean {
     unsafe {
-        let tele_ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let tele_ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if SpotWouldTelefrag2(ctx, ctx.entity_id_of(tele_ent).unwrap(), org) != 0 {
             let teleporter = G_Spawn(ctx);
@@ -1593,7 +1597,7 @@ pub fn Q3_SetTeleportDest(ctx: &mut GameContext, entID: c_int, org: vec3_t) -> q
             (*teleporter).r.ownerNum = (*tele_ent).s.number;
 
             (*teleporter).think = Some(EntThink::MoveOwner).into();
-            (*teleporter).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+            (*teleporter).nextthink = ctx.world.level.time + FRAMETIME;
 
             qfalse
         } else {
@@ -1611,7 +1615,7 @@ pub fn Q3_SetTeleportDest(ctx: &mut GameContext, entID: c_int, org: vec3_t) -> q
 // (`G_SetOrigin`) branch is faithful, the client branch panics loudly.
 pub fn Q3_SetOrigin(ctx: &mut GameContext, entID: c_int, origin: vec3_t) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
 
@@ -1648,7 +1652,7 @@ pub fn Q3_SetCopyOrigin(ctx: &mut GameContext, entID: c_int, name: *const c_char
 
         if !found.is_null() {
             Q3_SetOrigin(ctx, entID, (*found).r.currentOrigin);
-            let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+            let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
             SetClientViewAngle(&mut *ent, (*found).s.angles);
         } else {
             G_DebugPrint(
@@ -1665,7 +1669,7 @@ pub fn Q3_SetCopyOrigin(ctx: &mut GameContext, entID: c_int, name: *const c_char
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1992-2013`
 pub fn Q3_SetVelocity(ctx: &mut GameContext, entID: c_int, axis: c_int, speed: f32) {
     unsafe {
-        let found = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let found = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*found).client.is_null() {
             G_DebugPrint(
@@ -1691,7 +1695,7 @@ pub fn Q3_SetVelocity(ctx: &mut GameContext, entID: c_int, axis: c_int, speed: f
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2022-2042`
 pub fn Q3_SetAngles(ctx: &mut GameContext, entID: c_int, angles: vec3_t) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             (*ent).s.angles = angles;
@@ -1713,7 +1717,7 @@ pub fn Q3_Lerp2Origin(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp(
@@ -1750,9 +1754,9 @@ pub fn Q3_Lerp2Origin(
 
         (*ent).s.pos.trDuration = duration as c_int;
 
-        let __h531 = ctx.entity_id_of(ent).unwrap();
-        let __h532 = (*ctx.world_raw()).level.time;
-        MatchTeam(ctx, __h531, moverState as c_int, __h532);
+        let team_leader = ctx.entity_id_of(ent).unwrap();
+        let time = ctx.world.level.time;
+        MatchTeam(ctx, team_leader, moverState as c_int, time);
 
         (*ent).reached = Some(EntReached::moverCallback).into();
         if (*ent).damage != 0 {
@@ -1777,7 +1781,7 @@ pub fn Q3_Lerp2Origin(
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2114-2140`
 pub fn Q3_SetOriginOffset(ctx: &mut GameContext, entID: c_int, axis: c_int, offset: f32) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp(
@@ -1817,7 +1821,7 @@ pub fn Q3_SetOriginOffset(ctx: &mut GameContext, entID: c_int, axis: c_int, offs
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2149-2197`
 pub fn Q3_SetEnemy(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
             || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
@@ -1857,7 +1861,7 @@ pub fn Q3_SetEnemy(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2207-2246`
 pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -1890,7 +1894,7 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             } else if (*leader).health <= 0 {
                 return;
             } else {
-                (*client).leader = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), leader));
+                (*client).leader = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), leader));
             }
         }
     }
@@ -1901,7 +1905,7 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2255-2320`
 pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let mut goalPos: vec3_t = [0.0, 0.0, 0.0];
 
         if (*ent).health == 0 {
@@ -1945,8 +1949,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             return qfalse;
         }
         let temp_goal_id = (*npc).tempGoal.unwrap();
-        let temp_goal =
-            &mut (*ctx.world_raw()).g_entities[temp_goal_id.0 as usize] as *mut gentity_t;
+        let temp_goal = &mut ctx.world.g_entities[temp_goal_id.0 as usize] as *mut gentity_t;
         if (*temp_goal).inuse == 0 {
             G_DebugPrint(
                 ctx,
@@ -1991,7 +1994,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
                 );
                 return qfalse;
             }
-            (*npc).goalEntity = Some(ent_id((*ctx.world_raw()).g_entities.as_mut_ptr(), targ));
+            (*npc).goalEntity = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), targ));
             // C's `sqrt` is the double libm function: the float sums promote to
             // f64, are rooted and summed in f64, then truncated to the int
             // `goalRadius`. f32-throughout would diverge at truncation boundaries.
@@ -2012,7 +2015,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
                 None,
             );
             let goal_id = (*npc).goalEntity.unwrap();
-            let goal_ent = &mut (*ctx.world_raw()).g_entities[goal_id.0 as usize] as *mut gentity_t;
+            let goal_ent = &mut ctx.world.g_entities[goal_id.0 as usize] as *mut gentity_t;
             (*goal_ent).lastWaypoint = WAYPOINT_NONE;
             (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
             // Raven's `#ifdef _DEBUG` block (tempGoal->target = G_NewString(name))
@@ -2028,7 +2031,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2330-2347`
 pub fn SetLowerAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -2057,7 +2060,7 @@ pub fn SetLowerAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2358-2375`
 pub fn SetUpperAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -2151,7 +2154,7 @@ pub fn Q3_SetAnimHoldTime(ctx: &mut GameContext, entID: c_int, int_data: c_int, 
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2487-2527`
 pub fn Q3_SetHealth(ctx: &mut GameContext, entID: c_int, data: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let mut data = data;
 
         if data < 0 {
@@ -2197,7 +2200,7 @@ pub fn Q3_SetHealth(ctx: &mut GameContext, entID: c_int, data: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2539-2559`
 pub fn Q3_SetArmor(ctx: &mut GameContext, entID: c_int, data: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             return;
@@ -2220,7 +2223,7 @@ pub fn Q3_SetArmor(ctx: &mut GameContext, entID: c_int, data: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2573-2687`
 pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -2310,7 +2313,7 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2699-2737`
 pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -2341,7 +2344,7 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2749-2771`
 pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -2484,7 +2487,7 @@ pub fn Q3_SetTimeScale(ctx: &mut GameContext, entID: c_int, data: *const c_char)
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2941-2968`
 pub fn Q3_SetInvisible(ctx: &mut GameContext, entID: c_int, invisible: qboolean) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if invisible != 0 {
             (*self_).s.eFlags |= EF_NODRAW;
@@ -2550,7 +2553,7 @@ pub fn Q3_SetWatchTarget(ctx: &mut GameContext, entID: c_int, name: *const c_cha
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3031-3054`
 pub fn Q3_SetLoopSound(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
             || Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
@@ -2640,7 +2643,7 @@ pub fn Q3_SetViewEntity(ctx: &mut GameContext, entID: c_int, name: *const c_char
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3104-3111`
 pub fn Q3_SetWeapon(ctx: &mut GameContext, entID: c_int, wp_name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let wp = GetIDForString(WPTable.as_ptr() as *mut stringID_table_t, wp_name);
 
         (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << wp;
@@ -2665,7 +2668,7 @@ pub fn Q3_SetItem(ctx: &mut GameContext, entID: c_int, item_name: *const c_char)
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3139-3161`
 pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).NPC.is_null() {
             G_DebugPrint(
@@ -2697,7 +2700,7 @@ pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3173-3195`
 pub fn Q3_SetRunSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).NPC.is_null() {
             G_DebugPrint(
@@ -2762,7 +2765,7 @@ pub fn Q3_SetAim(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3255-3273`
 pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).client.is_null() {
             G_DebugPrint(
@@ -2790,7 +2793,7 @@ pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3285-3307`
 pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).client.is_null() {
             G_DebugPrint(
@@ -2819,7 +2822,7 @@ pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3319-3330`
 pub fn Q3_SetWait(ctx: &mut GameContext, entID: c_int, float_data: f32) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         (*self_).wait = float_data;
     }
 }
@@ -2851,7 +2854,7 @@ pub fn Q3_SetFollowDist(ctx: &mut GameContext, entID: c_int, float_data: f32) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3364-3396`
 pub fn Q3_SetScale(ctx: &mut GameContext, entID: c_int, float_data: f32) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*self_).client.is_null() {
             let client = (*self_).client as *mut gclient_t;
@@ -2897,7 +2900,7 @@ pub fn Q3_GameSideCheckStringCounterIncrement(string: *const c_char) -> f32 {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3440-3460`
 pub fn Q3_SetCount(ctx: &mut GameContext, entID: c_int, data: *const c_char) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         let val = Q3_GameSideCheckStringCounterIncrement(data);
         if val != 0.0 {
@@ -2913,7 +2916,7 @@ pub fn Q3_SetCount(ctx: &mut GameContext, entID: c_int, data: *const c_char) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3472-3490`
 pub fn Q3_SetTargetName(ctx: &mut GameContext, entID: c_int, targetname: *const c_char) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, targetname) == 0 {
             (*self_).targetname = std::ptr::null_mut();
@@ -2928,7 +2931,7 @@ pub fn Q3_SetTargetName(ctx: &mut GameContext, entID: c_int, targetname: *const 
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3502-3520`
 pub fn Q3_SetTarget(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, target) == 0 {
             (*self_).target = std::ptr::null_mut();
@@ -2976,7 +2979,7 @@ pub fn Q3_SetPainTarget(ctx: &mut GameContext, entID: c_int, targetname: *const 
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3610-3628`
 pub fn Q3_SetFullName(ctx: &mut GameContext, entID: c_int, fullName: *const c_char) {
     unsafe {
-        let self_ = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, fullName) == 0 {
             (*self_).fullName = std::ptr::null_mut();
@@ -3023,7 +3026,7 @@ pub fn Q3_SetForcePowerLevel(
 // `Q3_Set*` stubs.
 pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if parmNum < 0 || parmNum >= MAX_PARMS as c_int {
             return;
@@ -3116,7 +3119,7 @@ pub fn Q3_SetIgnoreAlerts(ctx: &mut GameContext, entID: c_int, data: qboolean) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3767-3781`
 pub fn Q3_SetNoTarget(ctx: &mut GameContext, entID: c_int, data: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if data != 0 {
             (*ent).flags |= FL_NOTARGET;
@@ -3164,7 +3167,7 @@ pub fn Q3_SetFireWeapon(ctx: &mut GameContext, entID: c_int, add: qboolean) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3830-3848`
 pub fn Q3_SetInactive(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if add != 0 {
             (*ent).flags |= FL_INACTIVE;
@@ -3179,7 +3182,7 @@ pub fn Q3_SetInactive(ctx: &mut GameContext, entID: c_int, add: qboolean) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3857-3880`
 pub fn Q3_SetFuncUsableVisible(ctx: &mut GameContext, entID: c_int, visible: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if visible != 0 {
             (*ent).r.svFlags &= !SVF_NOCLIENT;
@@ -3240,7 +3243,7 @@ pub fn Q3_SetCrouched(ctx: &mut GameContext, entID: c_int, add: qboolean) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3942-3967`
 pub fn Q3_SetWalking(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -3491,7 +3494,7 @@ pub fn Q3_SetForceInvincible(ctx: &mut GameContext, entID: c_int, forceInv: qboo
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4237-4261`
 pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -3523,10 +3526,9 @@ pub fn SolidifyOwner(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
 
     unsafe {
-        let owner =
-            &mut (*ctx.world_raw()).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+        let owner = &mut ctx.world.g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
-        (*self_).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+        (*self_).nextthink = ctx.world.level.time + FRAMETIME;
         (*self_).think = Some(EntThink::G_FreeEntity).into();
 
         if owner.is_null() || (*owner).inuse == 0 {
@@ -3557,7 +3559,7 @@ pub fn SolidifyOwner(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4305-4345`
 pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() || (*ent).inuse == 0 {
             G_DebugPrint(
@@ -3580,7 +3582,7 @@ pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboo
                 (*solidifier).r.ownerNum = (*ent).s.number;
 
                 (*solidifier).think = Some(EntThink::SolidifyOwner).into();
-                (*solidifier).nextthink = (*ctx.world_raw()).level.time + FRAMETIME;
+                (*solidifier).nextthink = ctx.world.level.time + FRAMETIME;
 
                 (*ent).r.contents = oldContents;
                 return qfalse;
@@ -3604,7 +3606,7 @@ pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboo
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4354-4372`
 pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() {
             G_DebugPrint(
@@ -3645,7 +3647,7 @@ pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4381-4399`
 pub fn Q3_SetRightMove(ctx: &mut GameContext, entID: c_int, rmoveVal: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         if (*ent).client.is_null() {
             G_DebugPrint(
                 ctx,
@@ -3669,7 +3671,7 @@ pub fn Q3_SetRightMove(ctx: &mut GameContext, entID: c_int, rmoveVal: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4408-4445`
 pub fn Q3_SetLockAngle(ctx: &mut GameContext, entID: c_int, lockAngle: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         if (*ent).client.is_null() {
             G_DebugPrint(
                 ctx,
@@ -3841,7 +3843,7 @@ pub fn Q3_SetBehaviorSet(
     scriptname: *const c_char,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let mut bSet = bSet_t::BSET_INVALID;
 
         if ent.is_null() {
@@ -3914,7 +3916,7 @@ pub fn Q3_SetDelayScriptTime(ctx: &mut GameContext, entID: c_int, delayTime: c_i
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4734-4752`
 pub fn Q3_SetPlayerUsable(ctx: &mut GameContext, entID: c_int, usable: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() {
             G_DebugPrint(
@@ -4018,7 +4020,7 @@ pub fn Q3_SetShields(ctx: &mut GameContext, entID: c_int, shields: qboolean) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4866-4889`
 pub fn Q3_SetSaberActive(ctx: &mut GameContext, entID: c_int, active: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() || (*ent).inuse == 0 {
             return;
@@ -4047,7 +4049,7 @@ pub fn Q3_SetSaberActive(ctx: &mut GameContext, entID: c_int, active: qboolean) 
 /// Source: `oracle/codemp/game/g_ICARUScb.c:4900-4918`
 pub fn Q3_SetNoKnockback(ctx: &mut GameContext, entID: c_int, noKnockback: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         if noKnockback != 0 {
             (*ent).flags |= FL_NO_KNOCKBACK;
         } else {
@@ -4161,7 +4163,7 @@ pub fn Q3_Set(
     data: *const c_char,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world_raw()).g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let mut float_data: f32;
         let mut int_data: c_int;
         let mut vector_data: vec3_t = [0.0, 0.0, 0.0];
@@ -5127,9 +5129,9 @@ pub fn Q3_Set(
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetInactive(ctx, entID, qfalse);
                 } else if Q_stricmp(b"unlocked\0".as_ptr() as *const c_char, data) == 0 {
-                    UnLockDoors(&mut (*ctx.world_raw()).g_entities[entID as usize]);
+                    UnLockDoors(&mut ctx.world.g_entities[entID as usize]);
                 } else if Q_stricmp(b"locked\0".as_ptr() as *const c_char, data) == 0 {
-                    LockDoors(&mut (*ctx.world_raw()).g_entities[entID as usize]);
+                    LockDoors(&mut ctx.world.g_entities[entID as usize]);
                 }
             }
 
