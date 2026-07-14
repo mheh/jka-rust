@@ -158,6 +158,10 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
   renamed in place (RNG/syscall order preserved by construction); ~230 dead
   unsafe blocks retired. Unsafe now genuinely retreats to the seam + the
   entity/client deref regime (2c/gclient territory, out of scope).
+- **Stage 3 — DONE**: zero `static mut` in mp_game; q_shared parse/format
+  state in `BgState.qs` per the execution amendment, game-only scratch in
+  `GameWorld.scratch`; ~224 call sites threaded across both tiers; botlib's
+  va/FmtArg realigned to the DEC-19 qshared twin. Gates green.
 - **Stage-1 precedents established** (binding on later shards): returns stay
   raw; signature-only re-derives for saturated bodies with in-code Stage-2
   debt marks; unused handler `other`/`activator` params are `Option<EntityId>`;
