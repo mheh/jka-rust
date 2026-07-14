@@ -10,8 +10,8 @@
 //! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`, precedent
 //! `w_force.rs`): logic fns that reach `level`/cvars/`g_entities`/traps thread
 //! the `GameContext<'_>` receiver (`.world: *mut GameWorld`, `.engine`). Globals
-//! are `GameWorld` fields (fork 1): `level` → `(*ctx.world_raw()).level`, cvars →
-//! `(*ctx.world_raw()).cvars`, `g_entities[i]` → `(*ctx.world_raw()).g_entities[i]`. Traps go
+//! are `GameWorld` fields (fork 1): `level` → `ctx.world.level`, cvars →
+//! `ctx.world.cvars`, `g_entities[i]` → `ctx.world.g_entities[i]`. Traps go
 //! through `trap::X(ctx.engine, <Name>Args::new(…))`. Cross-file callees are
 //! invoked with the packet's resolved raw-pointer signatures verbatim (their
 //! own porters thread the spine). Raw `gentity_t*`/`gclient_t*` chains are
@@ -29,7 +29,7 @@
 //! Args constructors not in this packet); `va(fmt, …)` varargs sites (the
 //! resolved `va` drops the C varargs); and the large ghoul2/bg-entangled
 //! `Client*`/body-queue functions. `random()` (`q_shared.h:1591`) is reached
-//! via `(*ctx.world_raw()).bg_state.rng.random()` (ruling 15).
+//! via `ctx.world.bg_state.rng.random()` (ruling 15).
 //!
 //! Safe-state migration **Stage 1**. Entity params crossing this file's ABI
 //! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
@@ -314,7 +314,7 @@ pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut soff: c_int = 0;
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
             // turn into a DM spawn if not in siege game mode
             (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
             SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
@@ -350,7 +350,7 @@ pub fn SP_info_player_siegeteam2(ctx: &mut GameContext, ent: EntityId) {
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut soff: c_int = 0;
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
             // turn into a DM spawn if not in siege game mode
             (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
             SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
@@ -403,18 +403,18 @@ pub fn ThrowSaberToAttacker(ctx: &mut GameContext, self_: EntityId, attacker: Op
     // attacker); raw re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), attacker) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     unsafe {
-        let base = (*ctx.world_raw()).g_entities.as_ptr();
+        let base = ctx.world.g_entities.as_ptr();
         let client = (*self_).client as *mut gclient_t;
-        let mut ent =
-            &mut (*ctx.world_raw()).g_entities[(*client).ps.saberIndex as usize] as *mut gentity_t;
+        let mut ent = &mut ctx.world.g_entities[(*client).ps.saberIndex as usize] as *mut gentity_t;
         let mut altVelocity: c_int = 0;
 
         if ent.is_null() || (*ent).enemy != ent_id_opt(base, self_) {
             // something has gone very wrong (this should never happen)
             // but in case it does.. find the saber manually
-            ent = (*ctx.world_raw())
+            ent = ctx
+                .world
                 .globals
                 .gJMSaberEnt
                 .unwrap_or(core::ptr::null_mut());
@@ -438,9 +438,8 @@ pub fn ThrowSaberToAttacker(ctx: &mut GameContext, self_: EntityId, attacker: Op
         {
             // someone killed us and we had the saber thrown, so actually move this
             // saber to the saber location
-            let flyingsaber = &mut (*ctx.world_raw()).g_entities
-                [(*client).ps.saberEntityNum as usize]
-                as *mut gentity_t;
+            let flyingsaber =
+                &mut ctx.world.g_entities[(*client).ps.saberEntityNum as usize] as *mut gentity_t;
 
             if !flyingsaber.is_null() && (*flyingsaber).inuse != qfalse {
                 (*ent).s.pos.trBase = (*flyingsaber).s.pos.trBase;
@@ -512,10 +511,10 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        (*ctx.world_raw()).globals.gJMSaberEnt = Some(ent);
+        ctx.world.globals.gJMSaberEnt = Some(ent);
 
         if let Some(enemy_id) = (*ent).enemy {
-            let enemy = &mut (*ctx.world_raw()).g_entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).client.is_null() || (*enemy).inuse == qfalse {
                 // disconnected?
                 (*ent).s.pos.trBase = (*enemy).s.pos.trBase;
@@ -533,9 +532,9 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
                 (*ent).pos2[1] = 0.0; // respawn next think
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
             } else {
-                (*ent).pos2[1] = ((*ctx.world_raw()).level.time + JMSABER_RESPAWN_TIME) as f32;
+                (*ent).pos2[1] = (ctx.world.level.time + JMSABER_RESPAWN_TIME) as f32;
             }
-        } else if (*ent).pos2[0] != 0.0 && (*ent).pos2[1] < (*ctx.world_raw()).level.time as f32 {
+        } else if (*ent).pos2[0] != 0.0 && (*ent).pos2[1] < ctx.world.level.time as f32 {
             (*ent).s.pos.trBase = (*ent).s.origin2;
             (*ent).s.origin = (*ent).s.origin2;
             (*ent).r.currentOrigin = (*ent).s.origin2;
@@ -543,7 +542,7 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
         }
 
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 50;
+        (*ent).nextthink = ctx.world.level.time + 50;
         crate::g_object::G_RunObject(ctx, ctx.entity_id_of(ent).unwrap());
     }
 }
@@ -565,7 +564,7 @@ pub fn JMSaberTouch(
     // raw re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), other) };
+        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if other.is_null() || (*other).client.is_null() || (*other).health < 1 {
             return;
@@ -589,7 +588,7 @@ pub fn JMSaberTouch(
             return;
         }
 
-        let base = (*ctx.world_raw()).g_entities.as_ptr();
+        let base = ctx.world.g_entities.as_ptr();
         (*self_).enemy = Some(ent_id(base, other));
         (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << WP_SABER;
         (*((*other).client as *mut gclient_t)).ps.weapon = WP_SABER;
@@ -603,11 +602,10 @@ pub fn JMSaberTouch(
             GSetConfigstringArgs::new(CS_CLIENT_JEDIMASTER, cstr(&cs)),
         );
 
-        if (*ctx.world_raw()).cvars.g_spawnInvulnerability.integer != 0 {
+        if ctx.world.cvars.g_spawnInvulnerability.integer != 0 {
             (*((*other).client as *mut gclient_t)).ps.eFlags |= EF_INVULNERABLE;
             (*((*other).client as *mut gclient_t)).invulnerableTimer =
-                (*ctx.world_raw()).level.time
-                    + (*ctx.world_raw()).cvars.g_spawnInvulnerability.integer;
+                ctx.world.level.time + ctx.world.cvars.g_spawnInvulnerability.integer;
         }
 
         let msg = format!(
@@ -646,7 +644,7 @@ pub fn JMSaberTouch(
         }
 
         (*self_).pos2[0] = 1.0;
-        (*self_).pos2[1] = ((*ctx.world_raw()).level.time + JMSABER_RESPAWN_TIME) as f32;
+        (*self_).pos2[1] = (ctx.world.level.time + JMSABER_RESPAWN_TIME) as f32;
 
         (*self_).s.modelindex = 0;
         (*self_).s.eFlags |= EF_NODRAW;
@@ -669,8 +667,8 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_JEDIMASTER {
-            (*ctx.world_raw()).globals.gJMSaberEnt = None;
+        if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
+            ctx.world.globals.gJMSaberEnt = None;
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
             return;
         }
@@ -687,7 +685,7 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.eType = ET_MISSILE as c_int;
         (*ent).s.weapon = WP_SABER;
         (*ent).s.pos.trType = TR_GRAVITY;
-        (*ent).s.pos.trTime = (*ctx.world_raw()).level.time;
+        (*ent).s.pos.trTime = ctx.world.level.time;
         crate::q_math::VectorSet(&mut (*ent).r.maxs, 3.0, 3.0, 3.0);
         crate::q_math::VectorSet(&mut (*ent).r.mins, -3.0, -3.0, -3.0);
         (*ent).r.contents = CONTENTS_TRIGGER;
@@ -707,7 +705,7 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
         (*ent).think = Some(EntThink::JMSaberThink).into();
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 50;
+        (*ent).nextthink = ctx.world.level.time + 50;
     }
 }
 
@@ -739,8 +737,7 @@ pub fn SpotWouldTelefrag(ctx: &mut GameContext, spot: EntityId) -> qboolean {
 
         let mut i = 0;
         while i < num {
-            let hit =
-                &mut (*ctx.world_raw()).g_entities[touch[i as usize] as usize] as *mut gentity_t;
+            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
             // if ( hit->client && hit->client->ps.stats[STAT_HEALTH] > 0 ) — the
             // health test is commented out in Raven; any client presence telefrags.
             if !(*hit).client.is_null() {
@@ -781,8 +778,7 @@ pub fn SpotWouldTelefrag2(ctx: &mut GameContext, mover: EntityId, dest: vec3_t) 
 
         let mut i = 0;
         while i < num {
-            let hit =
-                &mut (*ctx.world_raw()).g_entities[touch[i as usize] as usize] as *mut gentity_t;
+            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
             if hit == mover {
                 i += 1;
                 continue;
@@ -836,42 +832,39 @@ pub fn SelectNearestDeathmatchSpawnPoint(ctx: &mut GameContext, from: vec3_t) ->
 /// Source: `oracle/codemp/game/g_client.c:622-645`
 pub fn SelectRandomDeathmatchSpawnPoint(ctx: &mut GameContext) -> *mut gentity_t {
     pub const MAX_SPAWN_POINTS: usize = 128;
-    unsafe {
-        let mut count: c_int = 0;
-        let mut spot: *mut gentity_t = core::ptr::null_mut();
-        let mut spots: [*mut gentity_t; MAX_SPAWN_POINTS] =
-            [core::ptr::null_mut(); MAX_SPAWN_POINTS];
+    let mut count: c_int = 0;
+    let mut spot: *mut gentity_t = core::ptr::null_mut();
+    let mut spots: [*mut gentity_t; MAX_SPAWN_POINTS] = [core::ptr::null_mut(); MAX_SPAWN_POINTS];
 
-        loop {
-            spot = crate::g_utils::G_Find(
-                ctx,
-                ctx.entity_id_of(spot),
-                fofs_classname(),
-                b"info_player_deathmatch\0".as_ptr() as *const c_char,
-            );
-            if spot.is_null() {
-                break;
-            }
-            if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
-                continue;
-            }
-            spots[count as usize] = spot;
-            count += 1;
+    loop {
+        spot = crate::g_utils::G_Find(
+            ctx,
+            ctx.entity_id_of(spot),
+            fofs_classname(),
+            b"info_player_deathmatch\0".as_ptr() as *const c_char,
+        );
+        if spot.is_null() {
+            break;
         }
-
-        if count == 0 {
-            // no spots that won't telefrag
-            return crate::g_utils::G_Find(
-                ctx,
-                ctx.entity_id_of(core::ptr::null_mut()),
-                fofs_classname(),
-                b"info_player_deathmatch\0".as_ptr() as *const c_char,
-            );
+        if SpotWouldTelefrag(ctx, ctx.entity_id_of(spot).unwrap()) != 0 {
+            continue;
         }
-
-        let selection = (*ctx.world_raw()).bg_state.rng.rand() % count;
-        spots[selection as usize]
+        spots[count as usize] = spot;
+        count += 1;
     }
+
+    if count == 0 {
+        // no spots that won't telefrag
+        return crate::g_utils::G_Find(
+            ctx,
+            ctx.entity_id_of(core::ptr::null_mut()),
+            fofs_classname(),
+            b"info_player_deathmatch\0".as_ptr() as *const c_char,
+        );
+    }
+
+    let selection = ctx.world.bg_state.rng.rand() % count;
+    spots[selection as usize]
 }
 
 /// Raven `SelectRandomFurthestSpawnPoint` — a start furthest from the avoid
@@ -895,7 +888,7 @@ pub fn SelectRandomFurthestSpawnPoint(
         let mut spot: *mut gentity_t = core::ptr::null_mut();
 
         // in Team DM, look for a team start spot first, if any
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_TEAM
+        if ctx.world.cvars.g_gametype.integer == GT_TEAM
             && team != TEAM_FREE
             && team != TEAM_SPECTATOR
         {
@@ -1021,7 +1014,7 @@ pub fn SelectRandomFurthestSpawnPoint(
         }
 
         // select a random spot from the spawn points furthest away
-        let rnd = ((*ctx.world_raw()).bg_state.rng.random() * ((numSpots / 2) as f32)) as c_int;
+        let rnd = (ctx.world.bg_state.rng.random() * ((numSpots / 2) as f32)) as c_int;
 
         *origin = (*list_spot[rnd as usize]).s.origin;
         origin[2] += 9.0;
@@ -1139,7 +1132,7 @@ pub fn SelectDuelSpawnPoint(
             }
 
             // select a random spot from the spawn points furthest away
-            let rnd = ((*ctx.world_raw()).bg_state.rng.random() * ((numSpots / 2) as f32)) as c_int;
+            let rnd = (ctx.world.bg_state.rng.random() * ((numSpots / 2) as f32)) as c_int;
 
             *origin = (*list_spot[rnd as usize]).s.origin;
             origin[2] += 9.0;
@@ -1217,14 +1210,12 @@ pub fn SelectSpectatorSpawnPoint(
     origin: &mut [f32; 3],
     angles: &mut [f32; 3],
 ) -> *mut gentity_t {
-    unsafe {
-        crate::g_main::FindIntermissionPoint(ctx);
+    crate::g_main::FindIntermissionPoint(ctx);
 
-        *origin = (*ctx.world_raw()).level.intermission_origin;
-        *angles = (*ctx.world_raw()).level.intermission_angle;
+    *origin = ctx.world.level.intermission_origin;
+    *angles = ctx.world.level.intermission_angle;
 
-        core::ptr::null_mut()
-    }
+    core::ptr::null_mut()
 }
 
 /// Raven `InitBodyQue` — allocate the body-queue entities.
@@ -1232,12 +1223,12 @@ pub fn SelectSpectatorSpawnPoint(
 /// Source: `oracle/codemp/game/g_client.c:953-964`
 pub fn InitBodyQue(ctx: &mut GameContext) {
     unsafe {
-        (*ctx.world_raw()).level.bodyQueIndex = 0;
+        ctx.world.level.bodyQueIndex = 0;
         for i in 0..BODY_QUEUE_SIZE {
             let ent = crate::g_utils::G_Spawn(ctx);
             (*ent).classname = b"bodyque\0".as_ptr() as *mut c_char;
             (*ent).neverFree = qtrue;
-            (*ctx.world_raw()).level.bodyQue[i] = ent;
+            ctx.world.level.bodyQue[i] = ent;
         }
     }
 }
@@ -1249,7 +1240,7 @@ pub fn BodySink(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        if (*ctx.world_raw()).level.time - (*ent).timestamp > BODY_SINK_TIME + 2500 {
+        if ctx.world.level.time - (*ent).timestamp > BODY_SINK_TIME + 2500 {
             // the body ques are never actually freed, they are just unlinked
             trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
             (*ent).physicsObject = qfalse;
@@ -1257,7 +1248,7 @@ pub fn BodySink(ctx: &mut GameContext, ent: EntityId) {
         }
 
         crate::g_utils::G_AddEvent(&mut *(ent), entity_event_t::EV_BODYFADE as c_int, 0);
-        (*ent).nextthink = (*ctx.world_raw()).level.time + 18000;
+        (*ent).nextthink = ctx.world.level.time + 18000;
         (*ent).takedamage = qfalse;
     }
 }
@@ -1273,7 +1264,7 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        if (*ctx.world_raw()).level.intermissiontime != 0 {
+        if ctx.world.level.intermissiontime != 0 {
             return qfalse;
         }
 
@@ -1296,9 +1287,9 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         }
 
         // grab a body que and cycle to the next one
-        let body = (*ctx.world_raw()).level.bodyQue[(*ctx.world_raw()).level.bodyQueIndex as usize];
-        (*ctx.world_raw()).level.bodyQueIndex =
-            ((*ctx.world_raw()).level.bodyQueIndex + 1) % (BODY_QUEUE_SIZE) as i32;
+        let body = ctx.world.level.bodyQue[ctx.world.level.bodyQueIndex as usize];
+        ctx.world.level.bodyQueIndex =
+            (ctx.world.level.bodyQueIndex + 1) % (BODY_QUEUE_SIZE) as i32;
 
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(body));
         (*body).s = (*ent).s;
@@ -1328,13 +1319,13 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         (*body).s.powerups = 0; // clear powerups
         (*body).s.loopSound = 0; // clear lava burning
         (*body).s.loopIsSoundset = qfalse;
-        (*body).s.number = ent_id((*ctx.world_raw()).g_entities.as_ptr(), body).index() as c_int;
-        (*body).timestamp = (*ctx.world_raw()).level.time;
+        (*body).s.number = ent_id(ctx.world.g_entities.as_ptr(), body).index() as c_int;
+        (*body).timestamp = ctx.world.level.time;
         (*body).physicsObject = qtrue;
         (*body).physicsBounce = (0) as f32; // don't bounce
         if (*body).s.groundEntityNum == ENTITYNUM_NONE {
             (*body).s.pos.trType = TR_GRAVITY;
-            (*body).s.pos.trTime = (*ctx.world_raw()).level.time;
+            (*body).s.pos.trTime = ctx.world.level.time;
             crate::q_math::_VectorCopy(
                 (*((*ent).client as *mut gclient_t)).ps.velocity,
                 &mut (*body).s.pos.trDelta,
@@ -1388,7 +1379,7 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         (*body).r.contents = CONTENTS_CORPSE;
         (*body).r.ownerNum = (*ent).s.number;
 
-        (*body).nextthink = (*ctx.world_raw()).level.time + BODY_SINK_TIME;
+        (*body).nextthink = ctx.world.level.time + BODY_SINK_TIME;
         (*body).think = Some(EntThink::BodySink).into();
 
         (*body).die = Some(EntDie::body_die).into();
@@ -1420,7 +1411,7 @@ pub fn MaintainBodyQueue(ctx: &mut GameContext, ent: EntityId) {
         let mut do_rcg = qfalse;
 
         assert!(!ent.is_null() && !(*ent).client.is_null());
-        if (*((*ent).client as *mut gclient_t)).tempSpectate > (*ctx.world_raw()).level.time
+        if (*((*ent).client as *mut gclient_t)).tempSpectate > ctx.world.level.time
             || (*((*ent).client as *mut gclient_t)).ps.eFlags2 & EF2_SHIP_DEATH != 0
         {
             (*((*ent).client as *mut gclient_t)).noCorpse = qtrue;
@@ -1458,9 +1449,7 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
 
         let client = (*ent).client as *mut gclient_t;
 
-        if (*ctx.world_raw()).globals.gEscaping != 0
-            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
-        {
+        if ctx.world.globals.gEscaping != 0 || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
             (*client).sess.sessionTeam = TEAM_SPECTATOR;
             (*client).sess.spectatorState =
                 crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
@@ -1468,7 +1457,7 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
 
             (*client).pers.teamState.state =
                 crate::client::player_team_state::playerTeamStateState_t::TEAM_BEGIN;
-            (*client).sess.spectatorTime = (*ctx.world_raw()).level.time;
+            (*client).sess.spectatorTime = ctx.world.level.time;
             ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
             (*client).iAmALoser = qtrue;
             return;
@@ -1476,14 +1465,14 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
 
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
-            if (*ctx.world_raw()).cvars.g_siegeRespawn.integer != 0 {
-                if (*client).tempSpectate <= (*ctx.world_raw()).level.time {
-                    let mut minDel = (*ctx.world_raw()).cvars.g_siegeRespawn.integer * 2000;
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
+            if ctx.world.cvars.g_siegeRespawn.integer != 0 {
+                if (*client).tempSpectate <= ctx.world.level.time {
+                    let mut minDel = ctx.world.cvars.g_siegeRespawn.integer * 2000;
                     if minDel < 20000 {
                         minDel = 20000;
                     }
-                    (*client).tempSpectate = (*ctx.world_raw()).level.time + minDel;
+                    (*client).tempSpectate = ctx.world.level.time + minDel;
                     (*client).ps.stats[STAT_HEALTH as usize] = 1;
                     (*ent).health = 1;
                     (*client).ps.weapon = WP_NONE;
@@ -1500,7 +1489,7 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
                             (*client).ps.origin,
                             entity_event_t::EV_SIEGESPEC as c_int,
                         );
-                        (*te).s.time = (*ctx.world_raw()).globals.g_siegeRespawnCheck;
+                        (*te).s.time = ctx.world.globals.g_siegeRespawnCheck;
                         (*te).s.owner = (*ent).s.number;
                     }
 
@@ -1529,19 +1518,19 @@ pub fn TeamCount(ctx: &mut GameContext, ignoreClientNum: c_int, team: c_int) -> 
     unsafe {
         let mut count: c_int = 0;
         let mut i: c_int = 0;
-        while i < (*ctx.world_raw()).level.maxclients {
+        while i < ctx.world.level.maxclients {
             if i == ignoreClientNum {
                 i += 1;
                 continue;
             }
-            let cl = (*ctx.world_raw()).level.clients.add(i as usize);
+            let cl = ctx.world.level.clients.add(i as usize);
             if (*cl).pers.connected == CON_DISCONNECTED {
                 i += 1;
                 continue;
             }
             if (*cl).sess.sessionTeam == team {
                 count += 1;
-            } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+            } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                 && (*cl).sess.siegeDesiredTeam == team
             {
                 count += 1;
@@ -1558,8 +1547,8 @@ pub fn TeamCount(ctx: &mut GameContext, ignoreClientNum: c_int, team: c_int) -> 
 pub fn TeamLeader(ctx: &mut GameContext, team: c_int) -> c_int {
     unsafe {
         let mut i: c_int = 0;
-        while i < (*ctx.world_raw()).level.maxclients {
-            let cl = (*ctx.world_raw()).level.clients.add(i as usize);
+        while i < ctx.world.level.maxclients {
+            let cl = ctx.world.level.clients.add(i as usize);
             if (*cl).pers.connected == CON_DISCONNECTED {
                 i += 1;
                 continue;
@@ -1579,26 +1568,24 @@ pub fn TeamLeader(ctx: &mut GameContext, team: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_client.c:1291-1308`
 pub fn PickTeam(ctx: &mut GameContext, ignoreClientNum: c_int) -> team_t {
-    unsafe {
-        let mut counts = [0 as c_int; TEAM_NUM_TEAMS as usize];
+    let mut counts = [0 as c_int; TEAM_NUM_TEAMS as usize];
 
-        counts[TEAM_BLUE as usize] = TeamCount(ctx, ignoreClientNum, TEAM_BLUE);
-        counts[TEAM_RED as usize] = TeamCount(ctx, ignoreClientNum, TEAM_RED);
+    counts[TEAM_BLUE as usize] = TeamCount(ctx, ignoreClientNum, TEAM_BLUE);
+    counts[TEAM_RED as usize] = TeamCount(ctx, ignoreClientNum, TEAM_RED);
 
-        if counts[TEAM_BLUE as usize] > counts[TEAM_RED as usize] {
-            return TEAM_RED;
-        }
-        if counts[TEAM_RED as usize] > counts[TEAM_BLUE as usize] {
-            return TEAM_BLUE;
-        }
-        // equal team count, so join the team with the lowest score
-        if (*ctx.world_raw()).level.teamScores[TEAM_BLUE as usize]
-            > (*ctx.world_raw()).level.teamScores[TEAM_RED as usize]
-        {
-            return TEAM_RED;
-        }
-        TEAM_BLUE
+    if counts[TEAM_BLUE as usize] > counts[TEAM_RED as usize] {
+        return TEAM_RED;
     }
+    if counts[TEAM_RED as usize] > counts[TEAM_BLUE as usize] {
+        return TEAM_BLUE;
+    }
+    // equal team count, so join the team with the lowest score
+    if ctx.world.level.teamScores[TEAM_BLUE as usize]
+        > ctx.world.level.teamScores[TEAM_RED as usize]
+    {
+        return TEAM_RED;
+    }
+    TEAM_BLUE
 }
 
 /// Raven `ClientCleanName` — sanitize a player name (colors, spaces, length).
@@ -1859,10 +1846,7 @@ pub fn ClientConnect(
     isBot: qboolean,
 ) -> *mut c_char {
     unsafe {
-        let ent = (*ctx.world_raw())
-            .g_entities
-            .as_mut_ptr()
-            .add(clientNum as usize);
+        let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
 
         let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
         trap::GetUserinfo(
@@ -1888,14 +1872,14 @@ pub fn ClientConnect(
 
         if (*ent).r.svFlags & SVF_BOT == 0
             && isBot == qfalse
-            && (*ctx.world_raw()).cvars.g_needpass.integer != 0
+            && ctx.world.cvars.g_needpass.integer != 0
         {
             // check for a password
             let value = cstr_to_str(Info_ValueForKey(
                 cstr(&userinfo).as_ptr(),
                 cstr("password").as_ptr(),
             ));
-            let g_password = cstr_to_str((*ctx.world_raw()).cvars.g_password.string.as_ptr());
+            let g_password = cstr_to_str(ctx.world.cvars.g_password.string.as_ptr());
             if !g_password.is_empty()
                 && !g_password.eq_ignore_ascii_case("none")
                 && g_password != value
@@ -1912,10 +1896,7 @@ pub fn ClientConnect(
         }
 
         // they can connect
-        (*ent).client = (*ctx.world_raw())
-            .clients
-            .as_mut_ptr()
-            .add(clientNum as usize) as *mut c_void;
+        (*ent).client = ctx.world.clients.as_mut_ptr().add(clientNum as usize) as *mut c_void;
         let client = (*ent).client as *mut gclient_t;
 
         // assign the pointer for bg entity access
@@ -1926,7 +1907,7 @@ pub fn ClientConnect(
         (*client).pers.connected = CON_CONNECTING as _;
 
         // read or initialize the session data
-        if firstTime != qfalse || (*ctx.world_raw()).level.newSession != qfalse {
+        if firstTime != qfalse || ctx.world.level.newSession != qfalse {
             G_InitSessionData(
                 ctx,
                 clientNum as usize,
@@ -1938,23 +1919,23 @@ pub fn ClientConnect(
 
         write_cstr_field(&mut (*client).sess.IPstring, &ip_string);
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
-            && (firstTime != qfalse || (*ctx.world_raw()).level.newSession != qfalse)
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
+            && (firstTime != qfalse || ctx.world.level.newSession != qfalse)
         {
             // if this is the first time then auto-assign a desired siege team and show
             // briefing for that team
             (*client).sess.siegeDesiredTeam = 0;
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
-            if firstTime != qfalse || (*ctx.world_raw()).level.newSession != qfalse {
+            if firstTime != qfalse || ctx.world.level.newSession != qfalse {
                 // start as spec
                 (*client).sess.siegeDesiredTeam = (*client).sess.sessionTeam as c_int;
                 (*client).sess.sessionTeam = TEAM_SPECTATOR;
             }
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+        } else if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
             (*client).sess.sessionTeam = TEAM_SPECTATOR;
@@ -2001,7 +1982,7 @@ pub fn ClientConnect(
             trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cstr(&m)));
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM
+        if ctx.world.cvars.g_gametype.integer >= GT_TEAM
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
             BroadcastTeamChange(ctx, EntityId(clientNum as u32), -1);
@@ -2027,13 +2008,9 @@ pub fn ClientConnect(
 // (parked), reads `gSiegeRound*`/`g_entities`/`g_gametype`/`level`.
 pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboolean) {
     unsafe {
-        let ent = (*ctx.world_raw())
-            .g_entities
-            .as_mut_ptr()
-            .add(clientNum as usize);
+        let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
 
-        if (*ent).r.svFlags & SVF_BOT != 0 && (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM
-        {
+        if (*ent).r.svFlags & SVF_BOT != 0 && ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             if allowTeamReset != qfalse {
                 let mut team_str = "Red";
 
@@ -2084,10 +2061,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             }
         }
 
-        let client = (*ctx.world_raw())
-            .clients
-            .as_mut_ptr()
-            .add(clientNum as usize);
+        let client = ctx.world.clients.as_mut_ptr().add(clientNum as usize);
 
         if (*ent).r.linked != qfalse {
             trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
@@ -2101,7 +2075,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
         (*ent).playerState = &mut (*((*ent).client as *mut gclient_t)).ps;
 
         (*client).pers.connected = CON_CONNECTED as _;
-        (*client).pers.enterTime = (*ctx.world_raw()).level.time;
+        (*client).pers.enterTime = ctx.world.level.time;
         (*client).pers.teamState.state =
             crate::client::player_team_state::playerTeamStateState_t::TEAM_BEGIN;
 
@@ -2171,7 +2145,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             // update the renderinfo bolts next update.
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+        if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
             && (*client).sess.duelTeam == DUELTEAM_FREE as c_int
         {
@@ -2181,9 +2155,9 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                 c"s".as_ptr() as *mut c_char,
             );
         } else {
-            if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
-                && ((*ctx.world_raw()).globals.gSiegeRoundBegun == qfalse
-                    || (*ctx.world_raw()).globals.gSiegeRoundEnded != qfalse)
+            if ctx.world.cvars.g_gametype.integer == GT_SIEGE
+                && (ctx.world.globals.gSiegeRoundBegun == qfalse
+                    || ctx.world.globals.gSiegeRoundEnded != qfalse)
             {
                 SetTeamQuick(
                     ctx,
@@ -2193,16 +2167,14 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                 );
             }
 
-            if (*ent).r.svFlags & SVF_BOT != 0
-                && (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
-            {
+            if (*ent).r.svFlags & SVF_BOT != 0 && ctx.world.cvars.g_gametype.integer != GT_SIEGE {
                 let saber_val = Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("saber1").as_ptr());
                 let saber2_val =
                     Info_ValueForKey(cstr(&userinfo).as_ptr(), cstr("saber2").as_ptr());
 
                 if saber_val.is_null() || *saber_val == 0 {
                     // blah, set em up with a random saber
-                    let r = (*ctx.world_raw()).bg_state.rng.rand() % 50;
+                    let r = ctx.world.bg_state.rng.rand() % 50;
                     let (sab1, sab2);
                     if r <= 17 {
                         sab1 = "Katarn";
@@ -2286,8 +2258,8 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             let tent = G_TempEntity(ctx, (*client).ps.origin, (EV_PLAYER_TELEPORT_IN) as i32);
             (*tent).s.clientNum = (*ent).s.clientNum;
 
-            if (*ctx.world_raw()).cvars.g_gametype.integer != GT_DUEL
-                || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+            if ctx.world.cvars.g_gametype.integer != GT_DUEL
+                || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
             {
                 let m = format!(
                     "print \"{}{} {}\n\"",
@@ -2406,7 +2378,7 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
             G_SoundIndex(cstr("*pain25.wav").as_ptr()),
         );
         // FIXME: A nice bone snapping sound instead if possible
-        let n = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
+        let n = ctx.world.bg_state.rng.Q_irand(1, 3);
         G_Sound(
             ctx,
             ctx.entity_id_of(ent),
@@ -2457,7 +2429,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                     frame + 1,
                     BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
                     animSpeedScale,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                     -1.0,
                     150,
                 ),
@@ -2472,7 +2444,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                     frame + 1,
                     BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
                     animSpeedScale,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                     -1.0,
                     150,
                 ),
@@ -2487,7 +2459,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                     frame + 1,
                     BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
                     animSpeedScale,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                     -1.0,
                     150,
                 ),
@@ -2495,8 +2467,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
             return;
         }
 
-        let all_anims =
-            &(&(*ctx.world_raw()).bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];
+        let all_anims = &(&ctx.world.bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];
 
         let skip_legs = (*self_).localAnimIndex > 1
             && (*all_anims.anims.add(legs_anim as usize)).firstFrame == 0
@@ -2538,7 +2509,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                         last_frame,
                         a_flags,
                         l_anim_speed_scale,
-                        (*ctx.world_raw()).level.time,
+                        ctx.world.level.time,
                         -1.0,
                         150,
                     ),
@@ -2550,8 +2521,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
         }
 
         // tryTorso:
-        let all_anims =
-            &(&(*ctx.world_raw()).bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];
+        let all_anims = &(&ctx.world.bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];
         if (*self_).localAnimIndex > 1
             && (*all_anims.anims.add(torso_anim as usize)).firstFrame == 0
             && (*all_anims.anims.add(torso_anim as usize)).numFrames == 0
@@ -2581,11 +2551,10 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                 f,
                 &mut animSpeedScale as *mut f32,
                 (*((*self_).client as *mut gclient_t)).ps.brokenLimbs,
-                (*ctx.world_raw()).g_entities.as_mut_ptr(),
+                ctx.world.g_entities.as_mut_ptr(),
             );
 
-            let all_anims =
-                &(&(*ctx.world_raw()).bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];
+            let all_anims = &(&ctx.world.bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];
             let anim = &*all_anims.anims.add(f as usize);
             anim_speed = 50.0f32 / anim.frameLerp as f32;
             anim_speed *= animSpeedScale;
@@ -2616,7 +2585,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                     last2,
                     a_flags2,
                     speed2,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                     -1.0,
                     150,
                 ),
@@ -2648,7 +2617,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                     last_frame,
                     a_flags,
                     l_anim_speed_scale,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                     -1.0,
                     150,
                 ),
@@ -2671,7 +2640,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let index = ent_id((*ctx.world_raw()).g_entities.as_ptr(), ent).index() as c_int;
+        let index = ent_id(ctx.world.g_entities.as_ptr(), ent).index() as c_int;
         let client = (*ent).client as *mut gclient_t;
 
         // first we want the userinfo so we can see if we should update this client's saber
@@ -2783,7 +2752,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                 (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
                 (*client).ps.fd.saberDrawAnimLevel = (*client).sess.saberLevel;
 
-                if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
+                if ctx.world.cvars.g_gametype.integer != GT_SIEGE
                     && (*client).ps.fd.saberAnimLevel
                         > (*client).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize]
                 {
@@ -2794,7 +2763,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     (*client).sess.saberLevel = lvl;
                 }
             }
-            if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE {
+            if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
                 // let's just make sure the styles we chose are cool
                 if crate::bg_saberLoad::WP_SaberStyleValidForSaber(
                     &mut (*client).saber[0],
@@ -2835,7 +2804,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
             (*client).ps.fd.saberDrawAnimLevel = (*client).sess.saberLevel;
 
-            if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
+            if ctx.world.cvars.g_gametype.integer != GT_SIEGE
                 && (*client).ps.fd.saberAnimLevel
                     > (*client).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize]
             {
@@ -2853,8 +2822,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         let spawn_point: *mut gentity_t;
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
             spawn_point = SelectSpectatorSpawnPoint(ctx, &mut spawn_origin, &mut spawn_angles);
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_CTF
-            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_CTY
+        } else if ctx.world.cvars.g_gametype.integer == GT_CTF
+            || ctx.world.cvars.g_gametype.integer == GT_CTY
         {
             spawn_point = SelectCTFSpawnPoint(
                 ctx,
@@ -2863,7 +2832,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                 &mut spawn_origin,
                 &mut spawn_angles,
             );
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             spawn_point = SelectSiegeSpawnPoint(
                 ctx,
                 (*client).siegeClass,
@@ -2875,7 +2844,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         } else {
             let mut sp;
             loop {
-                if (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL {
+                if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
                     sp = SelectDuelSpawnPoint(
                         ctx,
                         (*client).sess.duelTeam,
@@ -2883,7 +2852,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                         &mut spawn_origin,
                         &mut spawn_angles,
                     );
-                } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL {
+                } else if ctx.world.cvars.g_gametype.integer == GT_DUEL {
                     sp = SelectDuelSpawnPoint(
                         ctx,
                         DUELTEAM_SINGLE as c_int,
@@ -3020,12 +2989,12 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.persistant[PERS_SPAWN_COUNT as usize] += 1;
         (*client).ps.persistant[PERS_TEAM as usize] = (*client).sess.sessionTeam as c_int;
 
-        (*client).airOutTime = (*ctx.world_raw()).level.time + 12000;
+        (*client).airOutTime = ctx.world.level.time + 12000;
 
         // set max health
         let max_health;
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
-            let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
+            let scl = &(&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
             max_health = if scl.maxhealth != 0 {
                 scl.maxhealth
             } else {
@@ -3043,7 +3012,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).mGameFlags = game_flags;
 
         (*ent).s.groundEntityNum = ENTITYNUM_NONE;
-        (*ent).client = (*ctx.world_raw()).clients.as_mut_ptr().add(index as usize) as *mut c_void;
+        (*ent).client = ctx.world.clients.as_mut_ptr().add(index as usize) as *mut c_void;
         (*ent).playerState = &mut (*((*ent).client as *mut gclient_t)).ps;
         (*ent).takedamage = qtrue;
         (*ent).inuse = qtrue;
@@ -3064,31 +3033,31 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         // give default weapons
         (*client).ps.stats[STAT_WEAPONS as usize] = 1 << WP_NONE;
 
-        let w_disable = if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
-            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+        let w_disable = if ctx.world.cvars.g_gametype.integer == GT_DUEL
+            || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
         {
-            (*ctx.world_raw()).cvars.g_duelWeaponDisable.integer
+            ctx.world.cvars.g_duelWeaponDisable.integer
         } else {
-            (*ctx.world_raw()).cvars.g_weaponDisable.integer
+            ctx.world.cvars.g_weaponDisable.integer
         };
 
         let mut in_siege_with_class = qfalse;
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer != GT_HOLOCRON
-            && (*ctx.world_raw()).cvars.g_gametype.integer != GT_JEDIMASTER
+        if ctx.world.cvars.g_gametype.integer != GT_HOLOCRON
+            && ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER
             && HasSetSaberOnly(ctx) == qfalse
-            && AllForceDisabled((*ctx.world_raw()).cvars.g_forcePowerDisable.integer) == qfalse
-            && (*ctx.world_raw()).cvars.g_trueJedi.integer != 0
+            && AllForceDisabled(ctx.world.cvars.g_forcePowerDisable.integer) == qfalse
+            && ctx.world.cvars.g_trueJedi.integer != 0
         {
-            if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM
+            if ctx.world.cvars.g_gametype.integer >= GT_TEAM
                 && ((*client).sess.sessionTeam == TEAM_BLUE
                     || (*client).sess.sessionTeam == TEAM_RED)
             {
-                if (*ctx.world_raw()).level.numPlayingClients > 0 {
+                if ctx.world.level.numPlayingClients > 0 {
                     let mut force_team = TEAM_SPECTATOR;
                     let mut i = 0;
-                    while i < (*ctx.world_raw()).level.maxclients {
-                        let cl = &(*ctx.world_raw()).clients[i as usize];
+                    while i < ctx.world.level.maxclients {
+                        let cl = &ctx.world.clients[i as usize];
                         if cl.pers.connected == CON_DISCONNECTED as _ {
                             i += 1;
                             continue;
@@ -3150,7 +3119,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     cstr("0"),
                 ),
             );
-            if (*ctx.world_raw()).cvars.g_gametype.integer == GT_HOLOCRON {
+            if ctx.world.cvars.g_gametype.integer == GT_HOLOCRON {
                 (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_SABER;
             } else if (*client).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] != 0 {
                 (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_SABER;
@@ -3158,15 +3127,15 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                 (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_MELEE;
             }
 
-            if (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE {
+            if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
                 if w_disable == 0 || w_disable & (1 << WP_BRYAR_PISTOL) == 0 {
                     (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_BRYAR_PISTOL;
-                } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_JEDIMASTER {
+                } else if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
                     (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_BRYAR_PISTOL;
                 }
             }
 
-            if (*ctx.world_raw()).cvars.g_gametype.integer == GT_JEDIMASTER {
+            if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
                 (*client).ps.stats[STAT_WEAPONS as usize] &= !(1 << WP_SABER);
                 (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_MELEE;
             }
@@ -3180,12 +3149,12 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             }
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
             // well then, we will use a custom weaponset for our class
-            let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
+            let scl = &(&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
             (*client).ps.stats[STAT_WEAPONS as usize] = scl.weapons;
 
             if (*client).ps.stats[STAT_WEAPONS as usize] & (1 << WP_SABER) != 0 {
@@ -3207,10 +3176,9 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
 
                     if m >= WP_BRYAR_PISTOL {
                         // Max his ammo out for all the weapons he has.
-                        let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)
-                            [(*client).siegeClass as usize];
-                        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
-                            && m == WP_ROCKET_LAUNCHER
+                        let scl =
+                            &(&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
+                        if ctx.world.cvars.g_gametype.integer == GT_SIEGE && m == WP_ROCKET_LAUNCHER
                         {
                             // don't give full ammo!
                             if scl.classflags & (1 << CFL_SINGLE_ROCKET as c_int) != 0 {
@@ -3218,7 +3186,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                             } else {
                                 (*client).ps.ammo[weaponData[m as usize].ammoIndex as usize] = 10;
                             }
-                        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+                        } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                             && scl.classflags & (1 << CFL_EXTRA_AMMO as c_int) != 0
                         {
                             // double ammo
@@ -3235,11 +3203,11 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             }
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
-            let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
+            let scl = &(&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
             (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] = scl.invenItems;
             (*client).ps.stats[STAT_HOLDABLE_ITEM as usize] = 0;
         } else {
@@ -3247,13 +3215,12 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             (*client).ps.stats[STAT_HOLDABLE_ITEM as usize] = 0;
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
-            && (&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize].powerups
-                != 0
+            && (&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize].powerups != 0
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
         {
-            let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
+            let scl = &(&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
             let mut i = 0;
             while i < PW_NUM_POWERUPS {
                 if scl.powerups & (1 << i) != 0 {
@@ -3289,29 +3256,26 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         crate::w_force::WP_SpawnInitForcePowers(ctx, ctx.entity_id_of(ent).unwrap());
 
         // health will count down towards max_health
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
-            && (&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize]
-                .starthealth
-                != 0
+            && (&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize].starthealth != 0
         {
-            let h = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize]
-                .starthealth;
+            let h = (&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize].starthealth;
             (*ent).health = h;
             (*client).ps.stats[STAT_HEALTH as usize] = h;
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
-            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+        } else if ctx.world.cvars.g_gametype.integer == GT_DUEL
+            || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
         {
-            if (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+            if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
                 && (*client).sess.duelTeam == DUELTEAM_LONE as c_int
             {
-                if (*ctx.world_raw()).cvars.g_duel_fraglimit.integer != 0 {
-                    let h = ((*ctx.world_raw()).cvars.g_powerDuelStartHealth.integer as f32
-                        - (((*ctx.world_raw()).cvars.g_powerDuelStartHealth.integer
-                            - (*ctx.world_raw()).cvars.g_powerDuelEndHealth.integer)
+                if ctx.world.cvars.g_duel_fraglimit.integer != 0 {
+                    let h = (ctx.world.cvars.g_powerDuelStartHealth.integer as f32
+                        - ((ctx.world.cvars.g_powerDuelStartHealth.integer
+                            - ctx.world.cvars.g_powerDuelEndHealth.integer)
                             as f32
                             * (*client).sess.wins as f32
-                            / (*ctx.world_raw()).cvars.g_duel_fraglimit.integer as f32))
+                            / ctx.world.cvars.g_duel_fraglimit.integer as f32))
                         as c_int;
                     (*ent).health = h;
                     (*client).ps.stats[STAT_HEALTH as usize] = h;
@@ -3340,12 +3304,11 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         }
 
         // Start with a small amount of armor as well.
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
-            (*client).ps.stats[STAT_ARMOR as usize] = (&(*ctx.world_raw()).bg_state.bgSiegeClasses)
-                [(*client).siegeClass as usize]
-                .startarmor;
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
-            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
+            (*client).ps.stats[STAT_ARMOR as usize] =
+                (&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize].startarmor;
+        } else if ctx.world.cvars.g_gametype.integer == GT_DUEL
+            || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
         {
             (*client).ps.stats[STAT_ARMOR as usize] = 0;
         } else {
@@ -3362,7 +3325,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         // Raven `client - level.clients` — pointer difference in gclient_t
         // units (ent_id would divide the byte offset by gentity_t's stride and
         // produce a wrong, potentially out-of-range clientNum).
-        let client_num = (client as usize - (*ctx.world_raw()).clients.as_ptr() as usize)
+        let client_num = (client as usize - ctx.world.clients.as_ptr() as usize)
             / core::mem::size_of::<gclient_t>();
         trap::GetUsercmd(
             ctx.engine,
@@ -3416,12 +3379,12 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
         (*client).ps.pm_time = 100;
 
-        (*client).respawnTime = (*ctx.world_raw()).level.time;
+        (*client).respawnTime = ctx.world.level.time;
         (*client).inactivityTime =
-            (*ctx.world_raw()).level.time + (*ctx.world_raw()).cvars.g_inactivity.integer * 1000;
+            ctx.world.level.time + ctx.world.cvars.g_inactivity.integer * 1000;
         (*client).latched_buttons = 0;
 
-        if (*ctx.world_raw()).level.intermissiontime != 0 {
+        if ctx.world.level.intermissiontime != 0 {
             crate::g_main::MoveClientToIntermission(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             // fire the targets of the spawn point
@@ -3429,7 +3392,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         }
 
         // set teams for NPCs to recognize
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // Imperial (team1) team is allied with "enemy" NPCs in this mode
             if (*client).sess.sessionTeam == SIEGETEAM_TEAM1 {
                 (*client).playerTeam = NPCTEAM_ENEMY;
@@ -3448,8 +3411,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
 
         // run a client frame to drop exactly to the floor, initialize animations and
         // other things
-        (*client).ps.commandTime = (*ctx.world_raw()).level.time - 100;
-        (*((*ent).client as *mut gclient_t)).pers.cmd.serverTime = (*ctx.world_raw()).level.time;
+        (*client).ps.commandTime = ctx.world.level.time - 100;
+        (*((*ent).client as *mut gclient_t)).pers.cmd.serverTime = ctx.world.level.time;
         crate::g_active::ClientThink(ctx, index, core::ptr::null_mut());
 
         // positively link the client, even if the command times are weird
@@ -3462,10 +3425,10 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
         }
 
-        if (*ctx.world_raw()).cvars.g_spawnInvulnerability.integer != 0 {
+        if ctx.world.cvars.g_spawnInvulnerability.integer != 0 {
             (*((*ent).client as *mut gclient_t)).ps.eFlags |= EF_INVULNERABLE;
-            (*((*ent).client as *mut gclient_t)).invulnerableTimer = (*ctx.world_raw()).level.time
-                + (*ctx.world_raw()).cvars.g_spawnInvulnerability.integer;
+            (*((*ent).client as *mut gclient_t)).invulnerableTimer =
+                ctx.world.level.time + ctx.world.cvars.g_spawnInvulnerability.integer;
         }
 
         // run the presend to set anything else
@@ -3500,10 +3463,7 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
         // cleanup if we are kicking a bot that hasn't spawned yet
         G_RemoveQueuedBotBegin(ctx, clientNum);
 
-        let ent = (*ctx.world_raw())
-            .g_entities
-            .as_mut_ptr()
-            .add(clientNum as usize);
+        let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
         if (*ent).client.is_null() {
             return;
         }
@@ -3535,7 +3495,8 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
 
         if (*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum != 0 {
             // tell it I'm getting off
-            let veh = (*ctx.world_raw())
+            let veh = ctx
+                .world
                 .g_entities
                 .as_mut_ptr()
                 .add((*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum as usize);
@@ -3555,8 +3516,8 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
 
         // stop any following clients
         i = 0;
-        while i < (*ctx.world_raw()).level.maxclients {
-            let cl = &(*ctx.world_raw()).clients[i as usize];
+        while i < ctx.world.level.maxclients {
+            let cl = &ctx.world.clients[i as usize];
             if cl.sess.sessionTeam == TEAM_SPECTATOR
                 && cl.sess.spectatorState
                     == crate::client::spectator_state::spectatorState_t::SPECTATOR_FOLLOW
@@ -3599,22 +3560,22 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
 
         // if we are playing in tourney mode, give a win to the other player and clear his
         // frags for this round
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
-            && (*ctx.world_raw()).level.intermissiontime == 0
-            && (*ctx.world_raw()).level.warmupTime == 0
+        if ctx.world.cvars.g_gametype.integer == GT_DUEL
+            && ctx.world.level.intermissiontime == 0
+            && ctx.world.level.warmupTime == 0
         {
-            if (*ctx.world_raw()).level.sortedClients[1] == clientNum {
-                let idx0 = (*ctx.world_raw()).level.sortedClients[0] as usize;
-                (*ctx.world_raw()).clients[idx0].ps.persistant[PERS_SCORE as usize] = 0;
-                (*ctx.world_raw()).clients[idx0].sess.wins += 1;
-                let __s951 = (*ctx.world_raw()).level.sortedClients[0];
-                ClientUserinfoChanged(ctx, __s951);
-            } else if (*ctx.world_raw()).level.sortedClients[0] == clientNum {
-                let idx1 = (*ctx.world_raw()).level.sortedClients[1] as usize;
-                (*ctx.world_raw()).clients[idx1].ps.persistant[PERS_SCORE as usize] = 0;
-                (*ctx.world_raw()).clients[idx1].sess.wins += 1;
-                let __s952 = (*ctx.world_raw()).level.sortedClients[1];
-                ClientUserinfoChanged(ctx, __s952);
+            if ctx.world.level.sortedClients[1] == clientNum {
+                let idx0 = ctx.world.level.sortedClients[0] as usize;
+                ctx.world.clients[idx0].ps.persistant[PERS_SCORE as usize] = 0;
+                ctx.world.clients[idx0].sess.wins += 1;
+                let sorted_client_0 = ctx.world.level.sortedClients[0];
+                ClientUserinfoChanged(ctx, sorted_client_0);
+            } else if ctx.world.level.sortedClients[0] == clientNum {
+                let idx1 = ctx.world.level.sortedClients[1] as usize;
+                ctx.world.clients[idx1].ps.persistant[PERS_SCORE as usize] = 0;
+                ctx.world.clients[idx1].sess.wins += 1;
+                let sorted_client_1 = ctx.world.level.sortedClients[1];
+                ClientUserinfoChanged(ctx, sorted_client_1);
             }
         }
 
@@ -3727,14 +3688,14 @@ pub fn SetupGameGhoul2Model(
         }
 
         // rww - just load the "standard" model for the server
-        if (*ctx.world_raw()).globals.precachedKyle.is_null() {
+        if ctx.world.globals.precachedKyle.is_null() {
             let mut defSkin: c_int = 0;
 
             write_cstr_field(&mut afilename, "models/players/kyle/model.glm");
             handle = trap::G2API_InitGhoul2Model(
                 ctx.engine,
                 GG2InitghoulModelArgs::new(
-                    &mut (*ctx.world_raw()).globals.precachedKyle as *mut *mut c_void,
+                    &mut ctx.world.globals.precachedKyle as *mut *mut c_void,
                     cstr(&cstr_to_str(afilename.as_ptr())),
                     0,
                     0,
@@ -3756,22 +3717,17 @@ pub fn SetupGameGhoul2Model(
             );
             trap::G2API_SetSkin(
                 ctx.engine,
-                GG2SetSkinArgs::new(
-                    (*ctx.world_raw()).globals.precachedKyle,
-                    0,
-                    defSkin,
-                    defSkin,
-                ),
+                GG2SetSkinArgs::new(ctx.world.globals.precachedKyle, 0, defSkin, defSkin),
             );
         }
 
-        if !(*ctx.world_raw()).globals.precachedKyle.is_null()
+        if !ctx.world.globals.precachedKyle.is_null()
             && trap::G2_HaveWeGhoul2Models(
                 ctx.engine,
-                GG2Haveweghoul2ModelsArgs::new((*ctx.world_raw()).globals.precachedKyle),
+                GG2Haveweghoul2ModelsArgs::new(ctx.world.globals.precachedKyle),
             ) != qfalse
         {
-            if (*ctx.world_raw()).cvars.d_perPlayerGhoul2.integer != 0
+            if ctx.world.cvars.d_perPlayerGhoul2.integer != 0
                 || (*ent).s.number >= (MAX_CLIENTS) as i32
                 || G_PlayerHasCustomSkeleton(&*(ent)) != qfalse
             {
@@ -3793,7 +3749,7 @@ pub fn SetupGameGhoul2Model(
                     write_cstr_field(&mut vehicleName, &cstr_to_str(modelname));
                     BG_GetVehicleModelName(
                         modelname,
-                        &mut (*ctx.world_raw()).bg_state,
+                        &mut ctx.world.bg_state,
                         &crate::bg_channel::GameBgTraps::new(ctx.engine),
                     );
                     write_cstr_field(&mut truncModelName, &cstr_to_str(modelname));
@@ -3862,22 +3818,22 @@ pub fn SetupGameGhoul2Model(
                             write_cstr_field(&mut skin, "default");
                         }
 
-                        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM
-                            && (*ctx.world_raw()).cvars.g_gametype.integer != GT_SIEGE
-                            && (*ctx.world_raw()).cvars.g_trueJedi.integer == 0
+                        if ctx.world.cvars.g_gametype.integer >= GT_TEAM
+                            && ctx.world.cvars.g_gametype.integer != GT_SIEGE
+                            && ctx.world.cvars.g_trueJedi.integer == 0
                         {
                             BG_ValidateSkinForTeam(
                                 truncModelName.as_ptr(),
                                 skin.as_mut_ptr(),
                                 (*((*ent).client as *mut gclient_t)).sess.sessionTeam,
                                 core::ptr::null_mut(),
-                                &(*ctx.world_raw()).bg_state,
+                                &ctx.world.bg_state,
                                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
                             );
-                        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+                        } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                             // force skin for class if appropriate
                             if (*((*ent).client as *mut gclient_t)).siegeClass != -1 {
-                                let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)
+                                let scl = &(&ctx.world.bg_state.bgSiegeClasses)
                                     [(*((*ent).client as *mut gclient_t)).siegeClass as usize];
                                 if scl.forcedSkin[0] as c_int != 0 {
                                     write_cstr_field(
@@ -3954,7 +3910,7 @@ pub fn SetupGameGhoul2Model(
                     trap::G2API_DuplicateGhoul2Instance(
                         ctx.engine,
                         GG2DuplicateGhoul2InstanceArgs::new(
-                            (*ctx.world_raw()).globals.precachedKyle,
+                            ctx.world.globals.precachedKyle,
                             &mut (*ent).ghoul2 as *mut *mut c_void,
                         ),
                     );
@@ -3988,7 +3944,7 @@ pub fn SetupGameGhoul2Model(
                         trap::G2API_DuplicateGhoul2Instance(
                             ctx.engine,
                             GG2DuplicateGhoul2InstanceArgs::new(
-                                (*ctx.world_raw()).globals.precachedKyle,
+                                ctx.world.globals.precachedKyle,
                                 &mut (*ent).ghoul2 as *mut *mut c_void,
                             ),
                         );
@@ -4021,7 +3977,7 @@ pub fn SetupGameGhoul2Model(
                 trap::G2API_DuplicateGhoul2Instance(
                     ctx.engine,
                     GG2DuplicateGhoul2InstanceArgs::new(
-                        (*ctx.world_raw()).globals.precachedKyle,
+                        ctx.world.globals.precachedKyle,
                         &mut (*ent).ghoul2 as *mut *mut c_void,
                     ),
                 );
@@ -4040,12 +3996,12 @@ pub fn SetupGameGhoul2Model(
         // The model is now loaded.
         GLAName[0] = 0;
 
-        if (*ctx.world_raw()).bg_state.BGPAFtextLoaded == qfalse {
-            let humanoid_anims = (*ctx.world_raw())
-                .bg_state
-                .bgHumanoidAnimations
-                .as_mut_ptr();
+        if ctx.world.bg_state.BGPAFtextLoaded == qfalse {
+            let humanoid_anims = ctx.world.bg_state.bgHumanoidAnimations.as_mut_ptr();
             if crate::bg_panimate::BG_ParseAnimationFile(
+                // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
+                // adapter holds a raw `*mut GameWorld`, so `bg_state` is read raw
+                // to coexist with the `world:` field it fills in the same call.
                 &mut (*ctx.world_raw()).bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
                 &mut crate::bg_channel::GameCallbacksImpl {
@@ -4093,6 +4049,9 @@ pub fn SetupGameGhoul2Model(
                     }
 
                     (*ent).localAnimIndex = crate::bg_panimate::BG_ParseAnimationFile(
+                        // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
+                        // adapter holds a raw `*mut GameWorld`, so `bg_state` is read raw
+                        // to coexist with the `world:` field it fills in the same call.
                         &mut (*ctx.world_raw()).bg_state,
                         &crate::bg_channel::GameBgTraps::new(ctx.engine),
                         &mut crate::bg_channel::GameCallbacksImpl {
@@ -4266,7 +4225,7 @@ pub fn SetupGameGhoul2Model(
                     12,
                     BONE_ANIM_OVERRIDE_LOOP,
                     1.0f32,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                     -1.0,
                     -1,
                 ),
@@ -4284,7 +4243,7 @@ pub fn SetupGameGhoul2Model(
                     NEGATIVE_Z as c_int,
                     core::ptr::null_mut(),
                     0,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                 ),
             );
             trap::G2API_SetBoneAngles(
@@ -4300,15 +4259,15 @@ pub fn SetupGameGhoul2Model(
                     POSITIVE_X as c_int,
                     core::ptr::null_mut(),
                     0,
-                    (*ctx.world_raw()).level.time,
+                    ctx.world.level.time,
                 ),
             );
 
-            if (*ctx.world_raw()).globals.g2SaberInstance.is_null() {
+            if ctx.world.globals.g2SaberInstance.is_null() {
                 trap::G2API_InitGhoul2Model(
                     ctx.engine,
                     GG2InitghoulModelArgs::new(
-                        &mut (*ctx.world_raw()).globals.g2SaberInstance as *mut *mut c_void,
+                        &mut ctx.world.globals.g2SaberInstance as *mut *mut c_void,
                         cstr("models/weapons2/saber/saber_w.glm"),
                         0,
                         0,
@@ -4318,31 +4277,27 @@ pub fn SetupGameGhoul2Model(
                     ),
                 );
 
-                if !(*ctx.world_raw()).globals.g2SaberInstance.is_null() {
+                if !ctx.world.globals.g2SaberInstance.is_null() {
                     // indicate we will be bolted to model 0 (ie the player) on bolt 0
                     // (always the right hand) when we get copied
                     trap::G2API_SetBoltInfo(
                         ctx.engine,
-                        GG2SetBoltInfoArgs::new((*ctx.world_raw()).globals.g2SaberInstance, 0, 0),
+                        GG2SetBoltInfoArgs::new(ctx.world.globals.g2SaberInstance, 0, 0),
                     );
                     // now set up the gun bolt on it
                     trap::G2API_AddBolt(
                         ctx.engine,
-                        GG2AddBoltArgs::new(
-                            (*ctx.world_raw()).globals.g2SaberInstance,
-                            0,
-                            cstr("*blade1"),
-                        ),
+                        GG2AddBoltArgs::new(ctx.world.globals.g2SaberInstance, 0, cstr("*blade1")),
                     );
                 }
             }
 
             if G_SaberModelSetup(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse {
-                if !(*ctx.world_raw()).globals.g2SaberInstance.is_null() {
+                if !ctx.world.globals.g2SaberInstance.is_null() {
                     trap::G2API_CopySpecificGhoul2Model(
                         ctx.engine,
                         GG2CopySpecificGhoul2ModelArgs::new(
-                            (*ctx.world_raw()).globals.g2SaberInstance,
+                            ctx.world.globals.g2SaberInstance,
                             0,
                             (*ent).ghoul2,
                             1,
@@ -4371,10 +4326,7 @@ pub fn SetupGameGhoul2Model(
 /// Source: `oracle/codemp/game/g_client.c:1888-2235`
 pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
     unsafe {
-        let ent: *mut gentity_t = (*ctx.world_raw())
-            .g_entities
-            .as_mut_ptr()
-            .add(clientNum as usize);
+        let ent: *mut gentity_t = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
         let client: *mut gclient_t = (*ent).client as *mut gclient_t;
 
         let mut teamTask: c_int = 0;
@@ -4450,7 +4402,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         if (*client).pers.connected == CON_CONNECTED {
             if crate::q_shared::Q_strcmp(oldname.as_ptr(), (*client).pers.netname.as_ptr()) != 0 {
-                if (*client).pers.netnameTime > (*ctx.world_raw()).level.time {
+                if (*client).pers.netnameTime > ctx.world.level.time {
                     let msg = format!(
                         "print \"{}\n\"",
                         cstr_to_str(G_GetStringEdString(
@@ -4493,7 +4445,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                         ctx.engine,
                         GSendServerCommandArgs::new(-1, cstr(&msg)),
                     );
-                    (*client).pers.netnameTime = (*ctx.world_raw()).level.time + 5000;
+                    (*client).pers.netnameTime = ctx.world.level.time + 5000;
                 }
             }
         }
@@ -4505,7 +4457,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
             260,
         );
 
-        if (*ctx.world_raw()).cvars.d_perPlayerGhoul2.integer != 0 {
+        if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
             if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr()) != 0 {
                 write_cstr_field(&mut (*client).modelname, &cstr_to_str(model.as_ptr()));
                 modelChanged = qtrue;
@@ -4552,8 +4504,8 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         );
 
         // bots set their team a few frames later
-        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM
-            && (*ctx.world_raw()).g_entities[clientNum as usize].r.svFlags & SVF_BOT != 0
+        if ctx.world.cvars.g_gametype.integer >= GT_TEAM
+            && ctx.world.g_entities[clientNum as usize].r.svFlags & SVF_BOT != 0
         {
             s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"team".as_ptr());
             if crate::q_shared::Q_stricmp(s, c"red".as_ptr()) == 0
@@ -4573,7 +4525,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // Set the siege class
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             write_cstr_field(
                 &mut className,
                 &cstr_to_str((*client).sess.siegeClass.as_ptr()),
@@ -4583,20 +4535,16 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
             // If not className will be filled in with the first legal class for this team.
             // Now that the team is legal for sure, we'll go ahead and get an index for it.
             (*client).siegeClass =
-                BG_SiegeFindClassIndexByName(className.as_ptr(), &(*ctx.world_raw()).bg_state);
+                BG_SiegeFindClassIndexByName(className.as_ptr(), &ctx.world.bg_state);
             if (*client).siegeClass == -1 {
                 // ok, get the first valid class for the team you're on then, I guess.
-                BG_SiegeCheckClassLegality(
-                    team,
-                    className.as_mut_ptr(),
-                    &(*ctx.world_raw()).bg_state,
-                );
+                BG_SiegeCheckClassLegality(team, className.as_mut_ptr(), &ctx.world.bg_state);
                 write_cstr_field(
                     &mut (*client).sess.siegeClass,
                     &cstr_to_str(className.as_ptr()),
                 );
                 (*client).siegeClass =
-                    BG_SiegeFindClassIndexByName(className.as_ptr(), &(*ctx.world_raw()).bg_state);
+                    BG_SiegeFindClassIndexByName(className.as_ptr(), &ctx.world.bg_state);
             } else {
                 // otherwise, make sure the class we are using is legal.
                 G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);
@@ -4608,6 +4556,9 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
             // Set the sabers if the class dictates
             if (*client).siegeClass != -1 {
+                // STAGE-2b: irreducible — `scl` is a raw view into world state held
+                // live across the G_SetSaber/G_SaberModelSetup calls that take `&mut
+                // ctx`, so it stays raw-derived rather than a tracked borrow.
                 let scl =
                     &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
 
@@ -4654,7 +4605,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 if scl.forcedModel[0] as c_int != 0 {
                     // be sure to override the model we actually use
                     write_cstr_field(&mut model, &cstr_to_str(scl.forcedModel.as_ptr()));
-                    if (*ctx.world_raw()).cvars.d_perPlayerGhoul2.integer != 0 {
+                    if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
                         if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr())
                             != 0
                         {
@@ -4692,8 +4643,8 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         );
 
         // set max health
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
-            let scl = &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
+            let scl = &(&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
             maxHealth = 100;
 
             if scl.maxhealth != 0 {
@@ -4711,7 +4662,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
         (*client).ps.stats[STAT_MAX_HEALTH as usize] = (*client).pers.maxHealth;
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM {
+        if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             (*client).pers.teamInfo = qtrue;
         } else {
             s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"teamoverlay".as_ptr());
@@ -4768,7 +4719,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 (*client).sess.duelTeam,
                 (*client).sess.siegeDesiredTeam
             )
-        } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // more crap to send
             format!(
                 "n\\{}\\t\\{}\\model\\{}\\c1\\{}\\c2\\{}\\hc\\{}\\w\\{}\\l\\{}\\tt\\{}\\tl\\{}\\siegeclass\\{}\\st\\{}\\st2\\{}\\dt\\{}\\sdt\\{}",
@@ -4835,7 +4786,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
             (*client).legsLastFlip = qfalse;
         }
 
-        if (*ctx.world_raw()).cvars.g_logClientInfo.integer != 0 {
+        if ctx.world.cvars.g_logClientInfo.integer != 0 {
             G_LogPrintf(
                 ctx,
                 cstr(&format!(
