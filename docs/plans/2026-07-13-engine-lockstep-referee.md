@@ -113,6 +113,18 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
   engine RNG seeds and launch cvars. DONE WHEN: both engines step 1000+
   frames in lockstep on `mp/ffa3` with bots, inputs mirrored, without
   protocol stalls.
+  **STATUS: DONE 2026-07-14.** Architecture (user ruling): the STREAMING TAPE
+  is the lockstep transport — the primary records live (`ref_record`, flushed
+  per game frame, sealed with a new `E` end record at `SV_Shutdown`); the
+  secondary runs the new FOLLOW mode (`ref_follow 1` + `ref_replay <tape>`),
+  tail-following the growing tape and stepping each frame as its complete
+  block lands (starved → skip the `SV_Frame` call, re-poll ~2ms). The driver
+  is `tools/lockstep-referee/run.sh` (stages the oracle secondary basepath,
+  launches both, kills by PID, reports). Acceptance: our-vs-our sanity 1,804
+  frames / 0 divergences live-followed; oracle-vs-ours 2,404 frames stepped
+  with zero protocol stalls, byte-identical through frame 355, first
+  divergence frame 356 (`components=entities,ps1`) cascading thereafter
+  (no resync until G5) — that frame is G6's first hunt target.
 - **G4 — Per-frame comparison.** Wire the referee's existing diff machinery
   (entityState/playerState byte-diff + first-divergent-field naming + ordered
   syscall digest) into the driver's per-frame loop. DONE WHEN: an

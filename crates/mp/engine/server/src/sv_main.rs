@@ -1040,8 +1040,12 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         // Engine referee: RECORD appends `F <msec>`; REPLAY forces msec from the
         // tape so timeResidual (and thus the game-run cadence and sv.svs.time)
         // evolves identically to the recorded run. On tape end it schedules a
-        // quit and returns the input msec inertly.
-        let msec = crate::sv_referee::ref_frame_begin(view, sv, msec);
+        // quit and returns the input msec inertly. FOLLOW returns None while
+        // the live tape's next frame block is incomplete (or after its `E`
+        // end record) — skip this SV_Frame call entirely; data-paced retry.
+        let Some(msec) = crate::sv_referee::ref_frame_begin(view, sv, msec) else {
+            return;
+        };
 
         sv.sv.timeResidual += msec;
 

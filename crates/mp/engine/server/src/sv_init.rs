@@ -1227,6 +1227,9 @@ pub fn SV_Init(view: &mut EngineHostView) {
     // regenerate) — not a cvar.
     Cvar_Get(view, c"ref_record".as_ptr(), c"".as_ptr(), 0);
     Cvar_Get(view, c"ref_replay".as_ptr(), c"".as_ptr(), 0);
+    // `ref_follow 1` — ref_replay tail-follows a tape still being written
+    // (the lockstep secondary's mode; see sv_referee.rs).
+    Cvar_Get(view, c"ref_follow".as_ptr(), c"0".as_ptr(), 0);
     Cvar_Get(view, c"ref_seed".as_ptr(), c"0".as_ptr(), 0);
     // `ref_snaps <file>` — raw client-bound wire capture (see sv_referee.rs).
     Cvar_Get(view, c"ref_snaps".as_ptr(), c"".as_ptr(), 0);
@@ -1284,6 +1287,9 @@ pub fn SV_Shutdown(view: &mut EngineHostView, finalmsg: &str) {
     {
         return;
     }
+
+    // RECORD tap: seal the tape with its `E` end record before teardown.
+    crate::sv_referee::ref_tap_shutdown(sv);
 
     if !sv.svs.clients.is_null() && !view.common.error.entered {
         SV_FinalMessage(view, sv, finalmsg);

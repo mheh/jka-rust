@@ -15,6 +15,16 @@
 //! referee gate (see `ref_seed_*` on `Common`), and the per-frame msec is
 //! forced from the tape.
 //!
+//! FOLLOW mode (`ref_follow 1` alongside `ref_replay <file>`) is the lockstep
+//! driver's transport: replay tail-follows a tape another engine is STILL
+//! WRITING. The follower steps a frame only once its complete block
+//! (`[events] F [events] S`) has landed; when starved it skips the `SV_Frame`
+//! call and re-polls ~2ms later, so it paces itself purely by data
+//! availability — a fraction of a second behind the live primary. The record
+//! side flushes after every `S` (bounding follower lag at one game frame) and
+//! emits a final `E` record at `SV_Shutdown` so a clean end of session is
+//! distinguishable from a laggy write.
+//!
 //! Injection is PER-SLOT, not a global mode. Bot brains always RE-RUN
 //! (`SV_BotFrame` untouched): under the pinned seed + forced msec the module
 //! deterministically recreates and re-thinks the identical bot session
@@ -33,7 +43,9 @@
 
 use core::ffi::{c_char, c_int, CStr};
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Read, Write};
+use std::thread::sleep;
+use std::time::Duration;
 
 use mp_abi::game::exports::MpGameExport;
 use mp_engine_qcommon::cmd_common::Cbuf_AddText;
@@ -119,6 +131,9 @@ enum Rec {
     /// the combined hash, the entity-block aggregate, and one playerState hash
     /// per connected slot, so a divergence names its component.
     State { digest: StateDigest },
+    /// `E` — clean end of session, written at `SV_Shutdown`. A follower quits
+    /// here; its absence at EOF means the writer is merely lagging (or died).
+    End,
 }
 
 /// The engine referee state, owned as `Server.referee`. Default is [`RefMode::Off`]
@@ -135,6 +150,10 @@ pub struct Referee {
     /// REPLAY: the parsed tape and cursor.
     recs: Vec<Rec>,
     cursor: usize,
+    /// FOLLOW: replay is tail-following a tape still being written.
+    follow: bool,
+    /// FOLLOW: the incremental tape reader (drained into `recs` per frame).
+    tail: Option<TailReader>,
     /// REPLAY: header seed to pin GAME_INIT with (mirrored to `Common`).
     header_seed: c_int,
     /// REPLAY: bitmask of client slots the TAPE created (`C` events — humans by
@@ -409,24 +428,95 @@ pub fn ref_tap_drop_client(sv: &mut Server, client: c_int) {
     sv.referee.emit(&format!("D {client}"));
 }
 
+/// RECORD tap at `SV_Shutdown`: write the tape's `E` end record and flush, so
+/// a follower can tell a clean session end from a lagging writer.
+pub fn ref_tap_shutdown(sv: &mut Server) {
+    if sv.referee.mode != RefMode::Record {
+        return;
+    }
+    sv.referee.emit("E");
+    if let Some(w) = sv.referee.writer.as_mut() {
+        let _ = w.flush();
+    }
+}
+
 // ===========================================================================
 // Per-frame integration (SV_Frame)
 // ===========================================================================
+
+/// Follow-mode availability of the next frame block at `cursor`: `Ready` once
+/// the block's terminator (its `S`, the next `F`, or the tape `E`) has landed.
+enum FollowScan {
+    Ready,
+    Starved,
+    Ended,
+}
+
+/// Scan `recs[cursor..]` for a complete next frame block.
+fn follow_scan(recs: &[Rec], cursor: usize) -> FollowScan {
+    let mut seen_f = false;
+    for rec in &recs[cursor..] {
+        match rec {
+            Rec::End => {
+                return if seen_f {
+                    FollowScan::Ready
+                } else {
+                    FollowScan::Ended
+                }
+            }
+            Rec::Frame { .. } if seen_f => return FollowScan::Ready,
+            Rec::Frame { .. } => seen_f = true,
+            Rec::State { .. } if seen_f => return FollowScan::Ready,
+            _ => {}
+        }
+    }
+    FollowScan::Starved
+}
+
+/// FOLLOW: drain the tail reader into `recs` (Com_Error on a malformed line —
+/// a complete-but-unparsable line is tape corruption, not lag).
+fn ref_follow_poll(sv: &mut Server) {
+    let Some(tail) = sv.referee.tail.as_mut() else {
+        return;
+    };
+    match tail.poll() {
+        Ok(recs) => sv.referee.recs.extend(recs),
+        Err(e) => com_error(errorParm_t::ERR_DROP, e),
+    }
+}
 
 /// Called at `SV_Frame` entry. RECORD: append `F <msec>` and return `msec`
 /// unchanged. REPLAY: consume the next `F` (buffering any leading events),
 /// return the tape's msec so timeResidual evolves identically; on tape end,
 /// print the summary, schedule a quit, and return the input msec inertly.
-pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) -> c_int {
+/// FOLLOW: additionally poll the growing tape first and return `None` —
+/// meaning skip this `SV_Frame` call entirely — while the next frame's block
+/// is incomplete (starved) or once the tape's `E` end record is reached.
+pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) -> Option<c_int> {
     match sv.referee.mode {
-        RefMode::Off => msec,
+        RefMode::Off => Some(msec),
         RefMode::Record => {
             sv.referee.emit(&format!("F {msec}"));
-            msec
+            Some(msec)
         }
         RefMode::Replay => {
             if sv.referee.done {
-                return msec;
+                return Some(msec);
+            }
+            if sv.referee.follow {
+                ref_follow_poll(sv);
+                match follow_scan(&sv.referee.recs, sv.referee.cursor) {
+                    FollowScan::Ready => {}
+                    FollowScan::Ended => {
+                        ref_replay_finish(view, sv);
+                        return None;
+                    }
+                    FollowScan::Starved => {
+                        // Data-paced: yield briefly and let Com_Frame call again.
+                        sleep(Duration::from_millis(2));
+                        return None;
+                    }
+                }
             }
             sv.referee.expected = None;
             sv.referee.pending.clear();
@@ -435,13 +525,17 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
             loop {
                 let Some(rec) = sv.referee.recs.get(sv.referee.cursor).cloned() else {
                     ref_replay_finish(view, sv);
-                    return msec;
+                    return Some(msec);
                 };
                 sv.referee.cursor += 1;
                 match rec {
                     Rec::Header { .. } => {}
-                    Rec::Frame { msec: m } => return m,
+                    Rec::Frame { msec: m } => return Some(m),
                     Rec::State { .. } => {}
+                    Rec::End => {
+                        ref_replay_finish(view, sv);
+                        return None;
+                    }
                     other => sv.referee.pending.push(other),
                 }
             }
@@ -473,6 +567,7 @@ pub fn ref_frame_inject(view: &mut EngineHostView, sv: &mut Server) {
                 break;
             }
             Rec::Frame { .. } => break, // next frame; leave the F for ref_frame_begin
+            Rec::End => break,          // session end; leave it for ref_frame_begin
             Rec::Header { .. } => {
                 sv.referee.cursor += 1;
             }
@@ -504,6 +599,10 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
             if ran_game {
                 let digest = ref_digest(sv, maxclients);
                 sv.referee.emit(&format!("S {}", digest.to_line()));
+                // Bound a live follower's lag at one game frame.
+                if let Some(w) = sv.referee.writer.as_mut() {
+                    let _ = w.flush();
+                }
             }
         }
         RefMode::Replay => {
@@ -511,6 +610,14 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
                 if let Some(expected) = sv.referee.expected.take() {
                     let ours = ref_digest(sv, maxclients);
                     sv.referee.frames += 1;
+                    if sv.referee.follow && sv.referee.frames % 500 == 0 {
+                        let n = sv.referee.frames;
+                        let d = sv.referee.divergences;
+                        com_printf(
+                            view.common,
+                            &format!("REF FOLLOW frames={n} divergences={d}\n"),
+                        );
+                    }
                     if ours.total != expected.total {
                         sv.referee.divergences += 1;
                         let n = sv.referee.frames;
@@ -609,7 +716,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             let cl = unsafe { sv.svs.clients.add(client as usize) };
             crate::SV_DropClient(view.common, sv, cl, c"replay drop".as_ptr());
         }
-        Rec::Header { .. } | Rec::Frame { .. } | Rec::State { .. } => {}
+        Rec::Header { .. } | Rec::Frame { .. } | Rec::State { .. } | Rec::End => {}
     }
 }
 
@@ -706,13 +813,9 @@ pub fn ref_open_record(sv: &mut Server, path: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Parse the replay tape, switching the referee into REPLAY mode, and return the
-/// tape header for launch-cvar validation.
-pub fn ref_open_replay(sv: &mut Server, path: &str) -> Result<RefHeader, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("ref_replay: cannot read {path}: {e}"))?;
-    let recs = parse_tape(&text)?;
-    let header = recs.iter().find_map(|r| match r {
+/// The first `H` header among `recs`, if parsed yet.
+fn header_of(recs: &[Rec]) -> Option<RefHeader> {
+    recs.iter().find_map(|r| match r {
         Rec::Header {
             map,
             fps,
@@ -725,13 +828,52 @@ pub fn ref_open_replay(sv: &mut Server, path: &str) -> Result<RefHeader, String>
             seed: *seed,
         }),
         _ => None,
-    });
-    let header = header.ok_or_else(|| "ref_replay: tape has no H header".to_string())?;
+    })
+}
+
+/// Parse the replay tape, switching the referee into REPLAY mode, and return the
+/// tape header for launch-cvar validation.
+pub fn ref_open_replay(sv: &mut Server, path: &str) -> Result<RefHeader, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| format!("ref_replay: cannot read {path}: {e}"))?;
+    let recs = parse_tape(&text)?;
+    let header = header_of(&recs).ok_or_else(|| "ref_replay: tape has no H header".to_string())?;
     sv.referee.header_seed = header.seed;
     sv.referee.recs = recs;
     sv.referee.cursor = 0;
     sv.referee.mode = RefMode::Replay;
     Ok(header)
+}
+
+/// FOLLOW: attach to a tape another engine is still writing, switching the
+/// referee into REPLAY+follow. Bounded-waits (60s) for the primary to create
+/// the file and land its `H` header, since the follower typically boots
+/// moments after the primary.
+pub fn ref_open_follow(sv: &mut Server, path: &str) -> Result<RefHeader, String> {
+    let mut tail: Option<TailReader> = None;
+    for _ in 0..600 {
+        if tail.is_none() {
+            if let Ok(f) = File::open(path) {
+                tail = Some(TailReader::new(f));
+            }
+        }
+        if let Some(t) = tail.as_mut() {
+            let recs = t.poll()?;
+            sv.referee.recs.extend(recs);
+            if let Some(header) = header_of(&sv.referee.recs) {
+                sv.referee.header_seed = header.seed;
+                sv.referee.cursor = 0;
+                sv.referee.mode = RefMode::Replay;
+                sv.referee.follow = true;
+                sv.referee.tail = tail;
+                return Ok(header);
+            }
+        }
+        sleep(Duration::from_millis(100));
+    }
+    Err(format!(
+        "ref_follow: no tape header at {path} after 60s (is the primary running?)"
+    ))
 }
 
 // ===========================================================================
@@ -756,12 +898,18 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
 
     let record = cvar_string(view, c"ref_record".as_ptr());
     let replay = cvar_string(view, c"ref_replay".as_ptr());
+    let follow = Cvar_VariableIntegerValue(view.common, c"ref_follow".as_ptr()) != 0;
     let ref_seed = Cvar_VariableIntegerValue(view.common, c"ref_seed".as_ptr());
     let fps = Cvar_VariableIntegerValue(view.common, c"sv_fps".as_ptr());
     let maxclients = unsafe { (*view.common.sv_maxclients).integer };
 
     if !replay.is_empty() {
-        match ref_open_replay(sv, &replay) {
+        let opened = if follow {
+            ref_open_follow(sv, &replay)
+        } else {
+            ref_open_replay(sv, &replay)
+        };
+        match opened {
             Ok(header) => {
                 if header.map != map {
                     com_error(
@@ -787,9 +935,10 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
                         ),
                     );
                 }
+                let mode = if follow { "FOLLOW" } else { "REPLAY" };
                 com_printf(
                     view.common,
-                    &format!("REF REPLAY start map={map} fps={fps} maxclients={maxclients}\n"),
+                    &format!("REF {mode} start map={map} fps={fps} maxclients={maxclients}\n"),
                 );
             }
             Err(e) => com_error(errorParm_t::ERR_DROP, e),
@@ -858,85 +1007,135 @@ fn cvar_string(view: &mut EngineHostView, name: *const c_char) -> String {
 fn parse_tape(text: &str) -> Result<Vec<Rec>, String> {
     let mut out = Vec::new();
     for (lineno, line) in text.lines().enumerate() {
-        let line = line.trim_end();
-        if line.is_empty() {
-            continue;
-        }
-        let mut it = line.split(' ');
-        let tag = it.next().unwrap_or("");
-        let bad = || format!("ref tape: malformed line {}: {line:?}", lineno + 1);
-        match tag {
-            "H" => {
-                let map = it.next().ok_or_else(bad)?.to_string();
-                let fps = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let maxclients = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let seed = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                out.push(Rec::Header {
-                    map,
-                    fps,
-                    maxclients,
-                    seed,
-                });
-            }
-            "C" => {
-                let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let userinfo =
-                    String::from_utf8_lossy(&hex_decode(it.next().unwrap_or(""))).into_owned();
-                out.push(Rec::Connect { client, userinfo });
-            }
-            "X" => {
-                let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let ok = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let cmd = hex_decode(it.next().unwrap_or(""));
-                out.push(Rec::Command { client, ok, cmd });
-            }
-            "T" => {
-                let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let cmd = hex_decode(it.next().unwrap_or(""));
-                out.push(Rec::Think { client, cmd });
-            }
-            "B" => {
-                let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                let cmd = hex_decode(it.next().unwrap_or(""));
-                out.push(Rec::Begin { client, cmd });
-            }
-            "D" => {
-                let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                out.push(Rec::Drop { client });
-            }
-            "F" => {
-                let msec = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
-                out.push(Rec::Frame { msec });
-            }
-            "S" => {
-                let total = it
-                    .next()
-                    .and_then(|s| u64::from_str_radix(s, 16).ok())
-                    .ok_or_else(bad)?;
-                let mut entities = 0u64;
-                let mut players = Vec::new();
-                for tok in it.by_ref() {
-                    if let Some(e) = tok.strip_prefix('E') {
-                        entities = u64::from_str_radix(e, 16).map_err(|_| bad())?;
-                    } else if let Some((slot, h)) = tok.split_once(':') {
-                        players.push((
-                            slot.parse().map_err(|_| bad())?,
-                            u64::from_str_radix(h, 16).map_err(|_| bad())?,
-                        ));
-                    } else {
-                        return Err(bad());
-                    }
-                }
-                out.push(Rec::State {
-                    digest: StateDigest {
-                        total,
-                        entities,
-                        players,
-                    },
-                });
-            }
-            _ => return Err(bad()),
+        if let Some(rec) = parse_line(line, lineno + 1)? {
+            out.push(rec);
         }
     }
     Ok(out)
+}
+
+/// Parse one tape line into a record (`None` for a blank line).
+fn parse_line(line: &str, lineno: usize) -> Result<Option<Rec>, String> {
+    let line = line.trim_end();
+    if line.is_empty() {
+        return Ok(None);
+    }
+    let mut it = line.split(' ');
+    let tag = it.next().unwrap_or("");
+    let bad = || format!("ref tape: malformed line {lineno}: {line:?}");
+    let rec = match tag {
+        "H" => {
+            let map = it.next().ok_or_else(bad)?.to_string();
+            let fps = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let maxclients = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let seed = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            Rec::Header {
+                map,
+                fps,
+                maxclients,
+                seed,
+            }
+        }
+        "C" => {
+            let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let userinfo =
+                String::from_utf8_lossy(&hex_decode(it.next().unwrap_or(""))).into_owned();
+            Rec::Connect { client, userinfo }
+        }
+        "X" => {
+            let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let ok = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let cmd = hex_decode(it.next().unwrap_or(""));
+            Rec::Command { client, ok, cmd }
+        }
+        "T" => {
+            let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let cmd = hex_decode(it.next().unwrap_or(""));
+            Rec::Think { client, cmd }
+        }
+        "B" => {
+            let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let cmd = hex_decode(it.next().unwrap_or(""));
+            Rec::Begin { client, cmd }
+        }
+        "D" => {
+            let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            Rec::Drop { client }
+        }
+        "F" => {
+            let msec = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            Rec::Frame { msec }
+        }
+        "S" => {
+            let total = it
+                .next()
+                .and_then(|s| u64::from_str_radix(s, 16).ok())
+                .ok_or_else(bad)?;
+            let mut entities = 0u64;
+            let mut players = Vec::new();
+            for tok in it.by_ref() {
+                if let Some(e) = tok.strip_prefix('E') {
+                    entities = u64::from_str_radix(e, 16).map_err(|_| bad())?;
+                } else if let Some((slot, h)) = tok.split_once(':') {
+                    players.push((
+                        slot.parse().map_err(|_| bad())?,
+                        u64::from_str_radix(h, 16).map_err(|_| bad())?,
+                    ));
+                } else {
+                    return Err(bad());
+                }
+            }
+            Rec::State {
+                digest: StateDigest {
+                    total,
+                    entities,
+                    players,
+                },
+            }
+        }
+        "E" => Rec::End,
+        _ => return Err(bad()),
+    };
+    Ok(Some(rec))
+}
+
+/// Incremental tape reader for FOLLOW mode: drains newly appended bytes each
+/// poll, holding any trailing partial line until its newline arrives.
+struct TailReader {
+    file: File,
+    /// Bytes after the last complete line (no `\n` seen yet).
+    partial: Vec<u8>,
+    /// Lines fully consumed so far (for parse-error messages).
+    lineno: usize,
+}
+
+impl TailReader {
+    fn new(file: File) -> Self {
+        TailReader {
+            file,
+            partial: Vec::new(),
+            lineno: 0,
+        }
+    }
+
+    /// Read to the current EOF and parse every newly completed line.
+    fn poll(&mut self) -> Result<Vec<Rec>, String> {
+        let mut buf = Vec::new();
+        self.file
+            .read_to_end(&mut buf)
+            .map_err(|e| format!("ref_follow: tape read error: {e}"))?;
+        if !buf.is_empty() {
+            self.partial.extend_from_slice(&buf);
+        }
+        let mut out = Vec::new();
+        while let Some(pos) = self.partial.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = self.partial.drain(..=pos).collect();
+            self.lineno += 1;
+            let line = String::from_utf8_lossy(&line[..line.len() - 1]).into_owned();
+            if let Some(rec) = parse_line(&line, self.lineno)? {
+                out.push(rec);
+            }
+        }
+        Ok(out)
+    }
 }
