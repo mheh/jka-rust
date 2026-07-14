@@ -18,7 +18,7 @@ use crate::prelude::*;
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -74,8 +74,8 @@ pub fn NPC_Remote_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:44-128`
 pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
     let mut dif: f32;
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npc_info = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
 
     // Update our angles regardless
     crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -90,20 +90,21 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
 
     // If we have an enemy, we should try to hover at or a little below enemy eye level
     if unsafe { (*npc).enemy }.is_some() {
-        let __s901 = ctx.entity_id_of(npc);
-        if crate::g_timer::TIMER_Done(ctx, __s901, c"heightChange".as_ptr()) != 0 {
-            let __s902 = ctx.entity_id_of(npc);
-            let __s903 = unsafe { (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 3000) };
-            crate::g_timer::TIMER_Set(ctx, __s902, c"heightChange".as_ptr(), __s903);
+        let npc_id = ctx.entity_id_of(npc);
+        if crate::g_timer::TIMER_Done(ctx, npc_id, c"heightChange".as_ptr()) != 0 {
+            let npc_id = ctx.entity_id_of(npc);
+            let delay = ctx.world.bg_state.rng.Q_irand(1000, 3000);
+            crate::g_timer::TIMER_Set(ctx, npc_id, c"heightChange".as_ptr(), delay);
 
             // Find the height difference
             let enemy_ent = unsafe {
                 let enemy_id = (*npc).enemy.unwrap();
-                &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t
+                &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t
             };
             dif = unsafe {
                 ((*enemy_ent).r.currentOrigin[2]
-                    + (*ctx.world_raw())
+                    + ctx
+                        .world
                         .bg_state
                         .rng
                         .Q_irand(0, (*enemy_ent).r.maxs[2] as c_int + 8)
@@ -135,12 +136,12 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
         if unsafe { (*npc_info).goalEntity }.is_some() {
             goal = unsafe {
                 let goal_id = (*npc_info).goalEntity.unwrap();
-                &mut (*ctx.world_raw()).g_entities[goal_id.0 as usize] as *mut gentity_t
+                &mut ctx.world.g_entities[goal_id.0 as usize] as *mut gentity_t
             };
         } else if unsafe { (*npc_info).lastGoalEntity }.is_some() {
             goal = unsafe {
                 let goal_id = (*npc_info).lastGoalEntity.unwrap();
-                &mut (*ctx.world_raw()).g_entities[goal_id.0 as usize] as *mut gentity_t
+                &mut ctx.world.g_entities[goal_id.0 as usize] as *mut gentity_t
             };
         }
 
@@ -181,8 +182,8 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
 pub fn Remote_Strafe(ctx: &mut GameContext) {
     use crate::trap;
 
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npc_info = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
 
     let mut dir: c_int;
     let mut end: vec3_t = [0.0; 3];
@@ -197,7 +198,7 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
     );
 
     // Pick a random strafe direction, then check to see if doing a strafe would be reasonable valid
-    dir = if unsafe { (*ctx.world_raw()).bg_state.rng.rand() } & 1 != 0 {
+    dir = if ctx.world.bg_state.rng.rand() & 1 != 0 {
         -1
     } else {
         1
@@ -244,9 +245,8 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
             client_ref.ps.velocity[2] += REMOTE_UPWARD_PUSH;
 
             // Set the strafe start time so we can do a controlled roll
-            (*npc_info).standTime = (*ctx.world_raw()).level.time
-                + 3000
-                + ((*ctx.world_raw()).bg_state.rng.random() * 500.0) as c_int;
+            (*npc_info).standTime =
+                ctx.world.level.time + 3000 + (ctx.world.bg_state.rng.random() * 500.0) as c_int;
         }
     }
 }
@@ -255,15 +255,15 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:178-221`
 pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, retreat: qboolean) {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npc_info = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
 
     let mut distance: f32 = 0.0;
     let mut speed: f32;
     let mut forward: vec3_t = [0.0; 3];
 
     // If we're not supposed to stand still, pursue the player
-    if unsafe { (*npc_info).standTime < (*ctx.world_raw()).level.time } {
+    if unsafe { (*npc_info).standTime < ctx.world.level.time } {
         // Only strafe when we can see the player
         if visible != 0 {
             Remote_Strafe(ctx);
@@ -292,8 +292,7 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
     } else {
         unsafe {
             if let Some(enemy_id) = (*npc).enemy {
-                let enemy_ent =
-                    &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+                let enemy_ent = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
                 crate::q_math::_VectorSubtract(
                     (*enemy_ent).r.currentOrigin,
                     (*npc).r.currentOrigin,
@@ -305,7 +304,7 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
     }
 
     speed = REMOTE_FORWARD_BASE_SPEED
-        + REMOTE_FORWARD_MULTIPLIER * unsafe { (*ctx.world_raw()).cvars.g_spskill.integer } as f32;
+        + REMOTE_FORWARD_MULTIPLIER * ctx.world.cvars.g_spskill.integer as f32;
     if retreat != 0 {
         speed *= -1.0;
     }
@@ -325,7 +324,7 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:229-257`
 pub fn Remote_Fire(ctx: &mut GameContext) {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
+    let npc = ctx.world.globals.NPC;
 
     let mut delta1: vec3_t = [0.0; 3];
     let mut enemy_org1: vec3_t = [0.0; 3];
@@ -344,9 +343,7 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
     // an unconditional call passing a null pointer when there is no enemy.
     unsafe {
         let enemy_ent: *const gentity_t = match (*npc).enemy {
-            Some(enemy_id) => {
-                &(*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *const gentity_t
-            }
+            Some(enemy_id) => &ctx.world.g_entities[enemy_id.0 as usize] as *const gentity_t,
             None => core::ptr::null(),
         };
         crate::NPC_utils::CalcEntitySpot(
@@ -405,14 +402,14 @@ pub fn Remote_Ranged(
     advance: qboolean,
     retreat: qboolean,
 ) {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npc_info = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
 
-    let __s901 = ctx.entity_id_of(npc);
-    if crate::g_timer::TIMER_Done(ctx, __s901, c"attackDelay".as_ptr()) != 0 {
-        let __s902 = ctx.entity_id_of(npc);
-        let __s903 = unsafe { (*ctx.world_raw()).bg_state.rng.Q_irand(500, 3000) };
-        crate::g_timer::TIMER_Set(ctx, __s902, c"attackDelay".as_ptr(), __s903);
+    let npc_id = ctx.entity_id_of(npc);
+    if crate::g_timer::TIMER_Done(ctx, npc_id, c"attackDelay".as_ptr()) != 0 {
+        let npc_id = ctx.entity_id_of(npc);
+        let delay = ctx.world.bg_state.rng.Q_irand(500, 3000);
+        crate::g_timer::TIMER_Set(ctx, npc_id, c"attackDelay".as_ptr(), delay);
         Remote_Fire(ctx);
     }
 
@@ -425,8 +422,8 @@ pub fn Remote_Ranged(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:290-332`
 pub fn Remote_Attack(ctx: &mut GameContext) {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npc_info = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
 
     let mut distance: f32;
     let mut visible: qboolean;
@@ -434,13 +431,13 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
     let mut advance: qboolean;
     let mut retreat: qboolean;
 
-    let __s904 = ctx.entity_id_of(npc);
-    if crate::g_timer::TIMER_Done(ctx, __s904, c"spin".as_ptr()) != 0 {
-        let __s905 = ctx.entity_id_of(npc);
-        let __s906 = unsafe { (*ctx.world_raw()).bg_state.rng.Q_irand(250, 1500) };
-        crate::g_timer::TIMER_Set(ctx, __s905, c"spin".as_ptr(), __s906);
+    let npc_id = ctx.entity_id_of(npc);
+    if crate::g_timer::TIMER_Done(ctx, npc_id, c"spin".as_ptr()) != 0 {
+        let npc_id = ctx.entity_id_of(npc);
+        let delay = ctx.world.bg_state.rng.Q_irand(250, 1500);
+        crate::g_timer::TIMER_Set(ctx, npc_id, c"spin".as_ptr(), delay);
         unsafe {
-            (*npc_info).desiredYaw += (*ctx.world_raw()).bg_state.rng.Q_irand(-200, 200) as f32;
+            (*npc_info).desiredYaw += ctx.world.bg_state.rng.Q_irand(-200, 200) as f32;
         }
     }
 
@@ -456,8 +453,7 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
     // Rate our distance to the target, and our visibility
     unsafe {
         if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ent =
-                &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+            let enemy_ent = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
             distance = crate::q_math::DistanceHorizontalSquared(
                 (*npc).r.currentOrigin,
                 (*enemy_ent).r.currentOrigin,
@@ -473,8 +469,7 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
         }
     }
 
-    idealDist = MIN_DISTANCE_SQR
-        + (MIN_DISTANCE_SQR * unsafe { (*ctx.world_raw()).bg_state.rng.flrand(0.0, 1.0) });
+    idealDist = MIN_DISTANCE_SQR + (MIN_DISTANCE_SQR * ctx.world.bg_state.rng.flrand(0.0, 1.0));
     advance = if distance > idealDist * 1.25 {
         qtrue
     } else {
@@ -509,7 +504,7 @@ pub fn Remote_Idle(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:351-367`
 pub fn Remote_Patrol(ctx: &mut GameContext) {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
+    let npc = ctx.world.globals.NPC;
 
     Remote_MaintainHeight(ctx);
 
@@ -518,9 +513,7 @@ pub fn Remote_Patrol(ctx: &mut GameContext) {
         let goal = crate::NPC_goal::UpdateGoal(ctx);
         if !goal.is_null() {
             // start loop sound once we move
-            unsafe {
-                (*ctx.world_raw()).globals.ucmd.buttons |= BUTTON_WALKING;
-            }
+            ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         }
     }
@@ -532,8 +525,8 @@ pub fn Remote_Patrol(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Remote.c:375-389`
 pub fn NPC_BSRemote_Default(ctx: &mut GameContext) {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npc_info = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
 
     if unsafe { (*npc).enemy }.is_some() {
         Remote_Attack(ctx);

@@ -28,7 +28,7 @@ use std::ffi::CStr;
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -54,9 +54,9 @@ const TURN_OFF: c_int = 0x00000100;
 /// Raven: Front 'eye' lense animation.
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:24-46`
 pub fn R2D2_PartsMove(ctx: &mut GameContext) {
-    // PORT-NOTE(globals-access): NPC accessed as (*ctx.world_raw()).globals.NPC per threading digest
+    // PORT-NOTE(globals-access): NPC accessed as ctx.world.globals.NPC per threading digest
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc = ctx.world.globals.NPC;
         if npc.is_null() {
             return;
         }
@@ -69,9 +69,9 @@ pub fn R2D2_PartsMove(ctx: &mut GameContext) {
         {
             (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
 
-            (*npc).pos1[0] += (*ctx.world_raw()).bg_state.rng.Q_irand(-20, 20) as f32;
-            (*npc).pos1[1] = (*ctx.world_raw()).bg_state.rng.Q_irand(-20, 20) as f32;
-            (*npc).pos1[2] = (*ctx.world_raw()).bg_state.rng.Q_irand(-20, 20) as f32;
+            (*npc).pos1[0] += ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
+            (*npc).pos1[1] = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
+            (*npc).pos1[2] = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
 
             NPC_SetBoneAngles(
                 ctx,
@@ -80,9 +80,9 @@ pub fn R2D2_PartsMove(ctx: &mut GameContext) {
                 (*npc).pos1,
             );
 
-            let __h14 = ctx.entity_id_of(npc);
-            let __h15 = (*ctx.world_raw()).bg_state.rng.Q_irand(100, 1000);
-            TIMER_Set(ctx, __h14, b"eyeDelay\0".as_ptr() as *const c_char, __h15);
+            let npc_id = ctx.entity_id_of(npc);
+            let delay = ctx.world.bg_state.rng.Q_irand(100, 1000);
+            TIMER_Set(ctx, npc_id, b"eyeDelay\0".as_ptr() as *const c_char, delay);
         }
     }
 }
@@ -99,8 +99,8 @@ pub fn Droid_Idle() {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:65-95`
 pub fn R2D2_TurnAnims(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
         if npc.is_null() || npc_info.is_null() {
             return;
         }
@@ -152,9 +152,8 @@ pub fn R2D2_TurnAnims(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:102-168`
 pub fn Droid_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
-        let ucmd = &mut (*ctx.world_raw()).globals.ucmd;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
         if npc.is_null() || npc_info.is_null() {
             return;
         }
@@ -173,7 +172,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
         }
 
         if !UpdateGoal(ctx).is_null() {
-            ucmd.buttons |= 1; // BUTTON_WALKING
+            ctx.world.globals.ucmd.buttons |= 1; // BUTTON_WALKING
             NPC_MoveToGoal(ctx, 1 as qboolean); // qtrue
 
             if !(*npc).client.is_null()
@@ -183,7 +182,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                 // `.5` is a double literal and `sin` is the double libm: the whole
                 // term is evaluated in f64 and narrowed only on store to the float.
                 (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
-                    + ((*ctx.world_raw()).level.time as f64 * 0.5).sin() * 25.0)
+                    + (ctx.world.level.time as f64 * 0.5).sin() * 25.0)
                     as f32;
 
                 if TIMER_Done(
@@ -192,18 +191,18 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                     b"patrolNoise\0".as_ptr() as *const c_char,
                 ) != 0
                 {
-                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
+                    let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
-                    let __h15 = ctx.entity_id_of(npc).unwrap();
-                    G_SoundOnEnt(ctx, __h15, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
-                    let __h16 = ctx.entity_id_of(npc);
-                    let __h17 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+                    let npc_id = ctx.entity_id_of(npc).unwrap();
+                    G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
+                    let npc_timer_id = ctx.entity_id_of(npc);
+                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
 
                     TIMER_Set(
                         ctx,
-                        __h16,
+                        npc_timer_id,
                         b"patrolNoise\0".as_ptr() as *const c_char,
-                        __h17,
+                        delay,
                     );
                 }
             } else if !(*npc).client.is_null()
@@ -216,7 +215,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                     b"patrolNoise\0".as_ptr() as *const c_char,
                 ) != 0
                 {
-                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 3);
+                    let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
                     G_SoundOnEnt(
                         ctx,
@@ -225,13 +224,13 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                         cstr(&sound_path).as_ptr(),
                     );
 
-                    let __h18 = ctx.entity_id_of(npc);
-                    let __h19 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+                    let npc_id = ctx.entity_id_of(npc);
+                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
                     TIMER_Set(
                         ctx,
-                        __h18,
+                        npc_id,
                         b"patrolNoise\0".as_ptr() as *const c_char,
-                        __h19,
+                        delay,
                     );
                 }
             } else if !(*npc).client.is_null()
@@ -244,7 +243,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                     b"patrolNoise\0".as_ptr() as *const c_char,
                 ) != 0
                 {
-                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
+                    let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
                     let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
                     G_SoundOnEnt(
                         ctx,
@@ -253,13 +252,13 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                         cstr(&sound_path).as_ptr(),
                     );
 
-                    let __h20 = ctx.entity_id_of(npc);
-                    let __h21 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+                    let npc_id = ctx.entity_id_of(npc);
+                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
                     TIMER_Set(
                         ctx,
-                        __h20,
+                        npc_id,
                         b"patrolNoise\0".as_ptr() as *const c_char,
-                        __h21,
+                        delay,
                     );
                 }
             }
@@ -273,7 +272,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                     b"patrolNoise\0".as_ptr() as *const c_char,
                 ) != 0
                 {
-                    let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 2);
+                    let idx = ctx.world.bg_state.rng.Q_irand(1, 2);
                     let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
                     G_SoundOnEnt(
                         ctx,
@@ -282,13 +281,13 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
                         cstr(&sound_path).as_ptr(),
                     );
 
-                    let __h22 = ctx.entity_id_of(npc);
-                    let __h23 = (*ctx.world_raw()).bg_state.rng.Q_irand(2000, 4000);
+                    let npc_id = ctx.entity_id_of(npc);
+                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
                     TIMER_Set(
                         ctx,
-                        __h22,
+                        npc_id,
                         b"patrolNoise\0".as_ptr() as *const c_char,
-                        __h23,
+                        delay,
                     );
                 }
             }
@@ -303,9 +302,8 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:175-200`
 pub fn Droid_Run(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
-        let ucmd = &mut (*ctx.world_raw()).globals.ucmd;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
         if npc.is_null() || npc_info.is_null() {
             return;
         }
@@ -313,19 +311,19 @@ pub fn Droid_Run(ctx: &mut GameContext) {
         R2D2_PartsMove(ctx);
 
         if (*npc_info).localState == LSTATE_BACKINGUP {
-            ucmd.forwardmove = -127;
+            ctx.world.globals.ucmd.forwardmove = -127;
             (*npc_info).desiredYaw += 5.0;
 
             (*npc_info).localState = LSTATE_NONE;
         } else {
-            ucmd.forwardmove = 64;
+            ctx.world.globals.ucmd.forwardmove = 64;
             if !UpdateGoal(ctx).is_null() {
                 if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 {
                     // qfalse
                     // `.5` is a double literal and `sin` is the double libm: the whole
                     // term is evaluated in f64 and narrowed only on store to the float.
                     (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
-                        + ((*ctx.world_raw()).level.time as f64 * 0.5).sin() * 5.0)
+                        + (ctx.world.level.time as f64 * 0.5).sin() * 5.0)
                         as f32;
                 }
             }
@@ -340,9 +338,8 @@ pub fn Droid_Run(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:207-266`
 pub fn Droid_Spin(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
-        let ucmd = &mut (*ctx.world_raw()).globals.ucmd;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
         if npc.is_null() || npc_info.is_null() {
             return;
         }
@@ -370,19 +367,19 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
                 }
 
                 if TIMER_Done(ctx, ctx.entity_id_of(npc), b"droidspark\0".as_ptr() as *const c_char) != 0 {
-                    let __h24 = ctx.entity_id_of(npc);
-                    let __h25 = (*ctx.world_raw()).bg_state.rng.Q_irand(100, 500);
-                    TIMER_Set(ctx, __h24, b"droidspark\0".as_ptr() as *const c_char, __h25);
+                    let npc_id = ctx.entity_id_of(npc);
+                    let delay = ctx.world.bg_state.rng.Q_irand(100, 500);
+                    TIMER_Set(ctx, npc_id, b"droidspark\0".as_ptr() as *const c_char, delay);
                     G_PlayEffectID(G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
                 }
 
-                ucmd.forwardmove = (*ctx.world_raw()).bg_state.rng.Q_irand(-64, 64) as c_int as i8;
+                ctx.world.globals.ucmd.forwardmove = ctx.world.bg_state.rng.Q_irand(-64, 64) as c_int as i8;
 
                 if TIMER_Done(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char) != 0 {
-                    let __h26 = ctx.entity_id_of(npc);
-                    let __h27 = (*ctx.world_raw()).bg_state.rng.Q_irand(250, 1000);
-                    TIMER_Set(ctx, __h26, b"roam\0".as_ptr() as *const c_char, __h27);
-                    (*npc_info).desiredYaw = (*ctx.world_raw()).bg_state.rng.Q_irand(0, 360) as f32;
+                    let npc_id = ctx.entity_id_of(npc);
+                    let delay = ctx.world.bg_state.rng.Q_irand(250, 1000);
+                    TIMER_Set(ctx, npc_id, b"roam\0".as_ptr() as *const c_char, delay);
+                    (*npc_info).desiredYaw = ctx.world.bg_state.rng.Q_irand(0, 360) as f32;
                 }
             } else {
                 if TIMER_Done(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char) != 0 {
@@ -421,7 +418,7 @@ pub fn NPC_Droid_Pain(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
-        let mod_: c_int = (*ctx.world_raw()).globals.gPainMOD;
+        let mod_: c_int = ctx.world.globals.gPainMOD;
         let mut pain_chance: f32;
 
         // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
@@ -436,7 +433,7 @@ pub fn NPC_Droid_Pain(
 
             if mod_ == MOD_DEMP2 as c_int
                 || mod_ == MOD_DEMP2_ALT as c_int
-                || (*ctx.world_raw()).bg_state.rng.random() < pain_chance
+                || ctx.world.bg_state.rng.random() < pain_chance
             {
                 if (*self_).s.m_iVehicleNum == 0
                     && ((*self_).health < 30
@@ -464,7 +461,7 @@ pub fn NPC_Droid_Pain(
                                 G_PlayEffectID(G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
                             }
 
-                            (*((*self_).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world_raw()).level.time + 3000;
+                            (*((*self_).client as *mut gclient_t)).ps.electrifyTime = ctx.world.level.time + 3000;
 
                             TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
                             TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
@@ -493,9 +490,9 @@ pub fn NPC_Droid_Pain(
                     }
 
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
-                    let __h28 = ctx.entity_id_of(self_);
-                    let __h29 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 2000);
-                    TIMER_Set(ctx, __h28, b"roam\0".as_ptr() as *const c_char, __h29);
+                    let self_id = ctx.entity_id_of(self_);
+                    let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
+                    TIMER_Set(ctx, self_id, b"roam\0".as_ptr() as *const c_char, delay);
                 }
             }
         } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_MOUSE {
@@ -503,7 +500,7 @@ pub fn NPC_Droid_Pain(
             if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                 (*((*self_).client as *mut gclient_t)).ps.electrifyTime =
-                    (*ctx.world_raw()).level.time + 3000;
+                    ctx.world.level.time + 3000;
             } else {
                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_BACKINGUP;
             }
@@ -515,7 +512,7 @@ pub fn NPC_Droid_Pain(
 
             if mod_ == MOD_DEMP2 as c_int
                 || mod_ == MOD_DEMP2_ALT as c_int
-                || (*ctx.world_raw()).bg_state.rng.random() < pain_chance
+                || ctx.world.bg_state.rng.random() < pain_chance
             {
                 if (*self_).s.m_iVehicleNum == 0
                     && ((*self_).health < 30
@@ -543,7 +540,7 @@ pub fn NPC_Droid_Pain(
                                 G_PlayEffectID(G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
                             }
 
-                            (*((*self_).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world_raw()).level.time + 3000;
+                            (*((*self_).client as *mut gclient_t)).ps.electrifyTime = ctx.world.level.time + 3000;
 
                             TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
                             TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
@@ -572,9 +569,9 @@ pub fn NPC_Droid_Pain(
                     }
 
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
-                    let __h30 = ctx.entity_id_of(self_);
-                    let __h31 = (*ctx.world_raw()).bg_state.rng.Q_irand(1000, 2000);
-                    TIMER_Set(ctx, __h30, b"roam\0".as_ptr() as *const c_char, __h31);
+                    let self_id = ctx.entity_id_of(self_);
+                    let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
+                    TIMER_Set(ctx, self_id, b"roam\0".as_ptr() as *const c_char, delay);
                 }
             }
         } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_INTERROGATOR
@@ -613,8 +610,8 @@ pub fn NPC_Droid_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:442-448`
 pub fn Droid_Pain(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
         if npc.is_null() || npc_info.is_null() {
             return;
         }
@@ -634,84 +631,74 @@ pub fn Droid_Pain(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:455-467`
 pub fn NPC_Mouse_Precache(ctx: &mut GameContext) {
-    unsafe {
-        for i in 1..4 {
-            let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", i);
-            G_SoundIndex(cstr(&sound_path).as_ptr());
-        }
-
-        G_EffectIndex(b"env/small_explode\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/mouse/misc/death1\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/mouse/misc/mouse_lp\0".as_ptr() as *const c_char);
+    for i in 1..4 {
+        let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", i);
+        G_SoundIndex(cstr(&sound_path).as_ptr());
     }
+
+    G_EffectIndex(b"env/small_explode\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/mouse/misc/death1\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/mouse/misc/mouse_lp\0".as_ptr() as *const c_char);
 }
 
 /// Raven `NPC_R5D2_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:474-490`
 pub fn NPC_R5D2_Precache(ctx: &mut GameContext) {
-    unsafe {
-        for i in 1..5 {
-            let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", i);
-            G_SoundIndex(cstr(&sound_path).as_ptr());
-        }
-
-        G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp2.wav\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char);
+    for i in 1..5 {
+        let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", i);
+        G_SoundIndex(cstr(&sound_path).as_ptr());
     }
+
+    G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp2.wav\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char);
 }
 
 /// Raven `NPC_R2D2_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:497-513`
 pub fn NPC_R2D2_Precache(ctx: &mut GameContext) {
-    unsafe {
-        for i in 1..4 {
-            let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", i);
-            G_SoundIndex(cstr(&sound_path).as_ptr());
-        }
-
-        G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp.wav\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char);
+    for i in 1..4 {
+        let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", i);
+        G_SoundIndex(cstr(&sound_path).as_ptr());
     }
+
+    G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp.wav\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char);
 }
 
 /// Raven `NPC_Gonk_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:520-530`
 pub fn NPC_Gonk_Precache(ctx: &mut GameContext) {
-    unsafe {
-        // SAFETY: string literals valid.
-        G_SoundIndex(b"sound/chars/gonk/misc/gonktalk1.wav\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/gonk/misc/gonktalk2.wav\0".as_ptr() as *const c_char);
+    // SAFETY: string literals valid.
+    G_SoundIndex(b"sound/chars/gonk/misc/gonktalk1.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/gonk/misc/gonktalk2.wav\0".as_ptr() as *const c_char);
 
-        G_SoundIndex(b"sound/chars/gonk/misc/death1.wav\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/gonk/misc/death2.wav\0".as_ptr() as *const c_char);
-        G_SoundIndex(b"sound/chars/gonk/misc/death3.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/gonk/misc/death1.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/gonk/misc/death2.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex(b"sound/chars/gonk/misc/death3.wav\0".as_ptr() as *const c_char);
 
-        G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
-    }
+    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
 }
 
 /// Raven `NPC_Protocol_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:537-541`
 pub fn NPC_Protocol_Precache(ctx: &mut GameContext) {
-    unsafe {
-        // SAFETY: string literals valid.
-        G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
-        G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
-    }
+    // SAFETY: string literals valid.
+    G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
+    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
 }
 
 /// Raven `NPC_BSDroid_Default`.
@@ -719,7 +706,7 @@ pub fn NPC_Protocol_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:597-621`
 pub fn NPC_BSDroid_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc_info = ctx.world.globals.NPCInfo;
         if npc_info.is_null() {
             return;
         }
@@ -730,8 +717,8 @@ pub fn NPC_BSDroid_Default(ctx: &mut GameContext) {
             Droid_Pain(ctx);
         } else if (*npc_info).localState == LSTATE_DROP {
             NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
-            (*ctx.world_raw()).globals.ucmd.upmove =
-                ((*ctx.world_raw()).bg_state.rng.crandom() * 64.0) as c_int as i8;
+            ctx.world.globals.ucmd.upmove =
+                (ctx.world.bg_state.rng.crandom() * 64.0) as c_int as i8;
         } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
             Droid_Patrol(ctx);
         } else {
