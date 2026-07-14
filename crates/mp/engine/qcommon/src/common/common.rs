@@ -658,8 +658,12 @@ pub fn com_printf(common: &mut Common, msg: &str) {
                 msg_c.as_ptr(),
                 common.rd_buffersize - l1,
             );
-            (*common.rd_flush)(common.rd_buffer);
-            *common.rd_buffer = 0;
+            // Deviation: Raven flushes (`rd_flush`) + clears after EVERY print
+            // — its callback is the real stateful `SV_FlushRedirect`. The
+            // migrated slot is a documented no-op (`sv_redirect_flush_noop`),
+            // so prints ACCUMULATE here and `SVC_RemoteCommand` flushes once
+            // after `Com_EndRedirect`; per-print flush+clear would discard all
+            // rcon output (bug found 2026-07-14).
             return;
         }
     }
