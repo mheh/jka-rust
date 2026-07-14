@@ -147,19 +147,19 @@ pub fn Use_Target_Delay(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let world: *mut GameWorld = ctx.world_raw();
-    let __h828: *mut gentity_t = ctx.entity_mut(ent);
-    let __h826 = ctx.entity_id_of(__h828);
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    let ent_id = ctx.entity_id_of(ent_ptr);
     {
         let e = ctx.entity(ent);
-        if e.nextthink > unsafe { (*world).level.time } && (e.spawnflags & 1) != 0 {
+        if e.nextthink > ctx.world.level.time && (e.spawnflags & 1) != 0 {
             return;
         }
     }
-    G_ActivateBehavior(ctx, __h826, bSet_t::BSET_USE as c_int);
-    let crand = unsafe { (*world).bg_state.rng.crandom() };
+    G_ActivateBehavior(ctx, ent_id, bSet_t::BSET_USE as c_int);
+    let crand = ctx.world.bg_state.rng.crandom();
+    let level_time = ctx.world.level.time;
     let e = ctx.entity_mut(ent);
-    e.nextthink = unsafe { (*world).level.time } + ((e.wait + e.random * crand) * 1000.0) as c_int;
+    e.nextthink = level_time + ((e.wait + e.random * crand) * 1000.0) as c_int;
     e.think = Some(EntThink::Think_Target_Delay).into();
     // C stored the raw `activator` pointer (NULL stays NULL and
     // Think_Target_Delay's G_UseTargets tolerates a NULL activator); the
@@ -171,21 +171,21 @@ pub fn Use_Target_Delay(
 ///
 /// Source: `oracle/codemp/game/g_target.c:93-103`
 pub fn SP_target_delay(ctx: &mut GameContext, ent: EntityId) {
-    let __h621: *mut f32 = &mut ctx.entity_mut(ent).wait;
+    let delay_ptr: *mut f32 = &mut ctx.entity_mut(ent).wait;
     // check delay for backwards compatibility
     if G_SpawnFloat(
         ctx,
         b"delay\0".as_ptr() as *const c_char,
         b"0\0".as_ptr() as *const c_char,
-        __h621,
+        delay_ptr,
     ) == 0
     {
-        let __h622: *mut f32 = &mut ctx.entity_mut(ent).wait;
+        let wait_ptr: *mut f32 = &mut ctx.entity_mut(ent).wait;
         G_SpawnFloat(
             ctx,
             b"wait\0".as_ptr() as *const c_char,
             b"1\0".as_ptr() as *const c_char,
-            __h622,
+            wait_ptr,
         );
     }
 
@@ -238,27 +238,26 @@ pub fn Use_Target_Print(
         return;
     }
 
-    let world: *mut GameWorld = ctx.world_raw();
+    let level_time = ctx.world.level.time;
     let wait = ctx.entity(ent).wait;
     if wait != 0.0 {
-        if ctx.entity(ent).genericValue14 >= unsafe { (*world).level.time } {
+        if ctx.entity(ent).genericValue14 >= level_time {
             return;
         }
-        ctx.entity_mut(ent).genericValue14 =
-            (unsafe { (*world).level.time } as f32 + wait) as c_int;
+        ctx.entity_mut(ent).genericValue14 = (level_time as f32 + wait) as c_int;
     }
 
     // Debug-only checks (FINAL_BUILD mode skips these)
-    if ctx.entity(ent).genericValue15 > unsafe { (*world).level.time } {
+    if ctx.entity(ent).genericValue15 > level_time {
         // Com_Printf("TARGET PRINT ERRORS:\n");
         // ... logging code ...
         // Com_Error(ERR_DROP, "target_print used in quick succession, fix it! See the console for details.");
     }
-    ctx.entity_mut(ent).genericValue15 = unsafe { (*world).level.time } + 5000;
+    ctx.entity_mut(ent).genericValue15 = level_time + 5000;
 
-    let __h829: *mut gentity_t = ctx.entity_mut(ent);
-    let __h827 = ctx.entity_id_of(__h829);
-    G_ActivateBehavior(ctx, __h827, bSet_t::BSET_USE as c_int);
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    let ent_id = ctx.entity_id_of(ent_ptr);
+    G_ActivateBehavior(ctx, ent_id, bSet_t::BSET_USE as c_int);
 
     let message = ctx.entity(ent).message;
     let spawnflags = ctx.entity(ent).spawnflags;
@@ -371,9 +370,9 @@ pub fn Use_Target_Speaker(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let __h810: *mut gentity_t = ctx.entity_mut(ent);
-    let __h623 = ctx.entity_id_of(__h810);
-    G_ActivateBehavior(ctx, __h623, bSet_t::BSET_USE as c_int);
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    let ent_id = ctx.entity_id_of(ent_ptr);
+    G_ActivateBehavior(ctx, ent_id, bSet_t::BSET_USE as c_int);
 
     let spawnflags = ctx.entity(ent).spawnflags;
     if spawnflags & 3 != 0 {
@@ -421,19 +420,19 @@ pub fn Use_Target_Speaker(
 pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
     let mut s: *mut c_char = core::ptr::null_mut();
 
-    let __h624: *mut f32 = &mut ctx.entity_mut(ent).wait;
+    let wait_ptr: *mut f32 = &mut ctx.entity_mut(ent).wait;
     G_SpawnFloat(
         ctx,
         b"wait\0".as_ptr() as *const c_char,
         b"0\0".as_ptr() as *const c_char,
-        __h624,
+        wait_ptr,
     );
-    let __h625: *mut f32 = &mut ctx.entity_mut(ent).random;
+    let random_ptr: *mut f32 = &mut ctx.entity_mut(ent).random;
     G_SpawnFloat(
         ctx,
         b"random\0".as_ptr() as *const c_char,
         b"0\0".as_ptr() as *const c_char,
-        __h625,
+        random_ptr,
     );
 
     if G_SpawnString(
@@ -678,13 +677,13 @@ pub fn target_teleporter_use(
 ) {
     // Raven derefs `activator->client` unconditionally.
     let activator = activator.expect("target_teleporter_use: null activator");
-    let __h811: *mut gentity_t = ctx.entity_mut(self_);
-    let __h628 = ctx.entity_id_of(__h811);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
     if ctx.entity(activator).client.is_null() {
         return;
     }
 
-    G_ActivateBehavior(ctx, __h628, bSet_t::BSET_USE as c_int);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
 
     let target = ctx.entity(self_).target;
     let dest = G_PickTarget(ctx, target);
@@ -746,9 +745,9 @@ pub fn target_relay_use(
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
 
-    let __h812: *mut gentity_t = ctx.entity_mut(self_);
-    let __h629 = ctx.entity_id_of(__h812);
-    let ranscript = G_ActivateBehavior(ctx, __h629, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    let ranscript = G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
     if ctx.entity(self_).wait == -1.0 {
         // never use again
         if ranscript != 0 {
@@ -797,9 +796,9 @@ pub fn target_kill_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let __h813: *mut gentity_t = ctx.entity_mut(self_);
-    let __h630 = ctx.entity_id_of(__h813);
-    G_ActivateBehavior(ctx, __h630, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
     G_Damage(
@@ -858,7 +857,7 @@ pub fn target_location_linkup(ctx: &mut GameContext, ent: EntityId) {
         let id = EntityId(i as u32);
         let classname = ctx.entity(id).classname;
         if !classname.is_null()
-            && unsafe { Q_stricmp(classname, b"target_location\0".as_ptr() as *const c_char) } == 0
+            && Q_stricmp(classname, b"target_location\0".as_ptr() as *const c_char) == 0
         {
             // lets overload some variables!
             ctx.entity_mut(id).health = n; // use for location marking
@@ -920,8 +919,8 @@ pub fn target_counter_use(
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
 
-    let __h814: *mut gentity_t = ctx.entity_mut(self_);
-    let __h631 = ctx.entity_id_of(__h814);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
     if ctx.entity(self_).count != 0 {
         let target2 = ctx.entity(self_).target2;
         if !target2.is_null() {
@@ -935,7 +934,7 @@ pub fn target_counter_use(
         return;
     }
 
-    G_ActivateBehavior(ctx, __h631, bSet_t::BSET_USE as c_int);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
 
     if ctx.entity(self_).spawnflags & 128 != 0 {
         ctx.entity_mut(self_).flags |= FL_INACTIVE;
@@ -982,9 +981,9 @@ pub fn target_random_use(
     let mut t_count = 0;
     let mut t: *mut gentity_t = core::ptr::null_mut();
 
-    let __h815: *mut gentity_t = ctx.entity_mut(self_);
-    let __h632 = ctx.entity_id_of(__h815);
-    G_ActivateBehavior(ctx, __h632, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
 
     if ctx.entity(self_).spawnflags & 1 != 0 {
         ctx.entity_mut(self_).use_ = FnId::NONE;
@@ -1137,12 +1136,12 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
                 GIcarusRunscriptArgs::new(activator_ent, cstr(&script_path).as_ptr()),
             );
         } else {
-            let __h816: *mut gentity_t = ctx.entity_mut(self_);
-            let __h633 = ctx.entity_id_of(__h816);
+            let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+            let self_id = ctx.entity_id_of(self_ptr);
             if ctx.world.cvars.g_developer.integer != 0 && ctx.entity(self_).activator.is_some() {
                 // Informational debug message
             }
-            G_ActivateBehavior(ctx, __h633, bSet_t::BSET_USE as c_int);
+            G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
         }
     }
 
@@ -1237,9 +1236,9 @@ pub fn target_activate_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let __h817: *mut gentity_t = ctx.entity_mut(self_);
-    let __h634 = ctx.entity_id_of(__h817);
-    G_ActivateBehavior(ctx, __h634, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
     let target = ctx.entity(self_).target;
     G_SetActiveState(ctx, target, qtrue);
 }
@@ -1253,9 +1252,9 @@ pub fn target_deactivate_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let __h818: *mut gentity_t = ctx.entity_mut(self_);
-    let __h635 = ctx.entity_id_of(__h818);
-    G_ActivateBehavior(ctx, __h635, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
     let target = ctx.entity(self_).target;
     G_SetActiveState(ctx, target, qfalse);
 }
@@ -1287,9 +1286,9 @@ pub fn target_level_change_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let __h819: *mut gentity_t = ctx.entity_mut(self_);
-    let __h636 = ctx.entity_id_of(__h819);
-    G_ActivateBehavior(ctx, __h636, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
     let message = ctx.entity(self_).message;
     trap::SendConsoleCommand(
         ctx.engine,
@@ -1335,9 +1334,9 @@ pub fn target_play_music_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let __h820: *mut gentity_t = ctx.entity_mut(self_);
-    let __h637 = ctx.entity_id_of(__h820);
-    G_ActivateBehavior(ctx, __h637, bSet_t::BSET_USE as c_int);
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    let self_id = ctx.entity_id_of(self_ptr);
+    G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
     let message = ctx.entity(self_).message;
     trap::SetConfigstring(
         ctx.engine,

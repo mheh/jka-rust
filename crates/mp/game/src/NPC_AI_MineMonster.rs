@@ -36,7 +36,7 @@ use mp_bg::public::entity_event::entity_event_t;
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -61,13 +61,11 @@ const LSTATE_WAITING: i32 = 1;
 /// Precaches the MineMonster's sound effects.
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
 pub fn NPC_MineMonster_Precache(ctx: &mut GameContext) {
-    unsafe {
-        for i in 0..4 {
-            let bite_sound = cstr(&format!("sound/chars/mine/misc/bite{}.wav", i + 1));
-            G_SoundIndex(bite_sound.as_ptr());
-            let miss_sound = cstr(&format!("sound/chars/mine/misc/miss{}.wav", i + 1));
-            G_SoundIndex(miss_sound.as_ptr());
-        }
+    for i in 0..4 {
+        let bite_sound = cstr(&format!("sound/chars/mine/misc/bite{}.wav", i + 1));
+        G_SoundIndex(bite_sound.as_ptr());
+        let miss_sound = cstr(&format!("sound/chars/mine/misc/miss{}.wav", i + 1));
+        G_SoundIndex(miss_sound.as_ptr());
     }
 }
 
@@ -75,11 +73,9 @@ pub fn NPC_MineMonster_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:35-42`
 pub fn MineMonster_Idle(ctx: &mut GameContext) {
-    unsafe {
-        if !UpdateGoal(ctx).is_null() {
-            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
-            NPC_MoveToGoal(ctx, qtrue);
-        }
+    if !UpdateGoal(ctx).is_null() {
+        ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
+        NPC_MoveToGoal(ctx, qtrue);
     }
 }
 
@@ -89,24 +85,24 @@ pub fn MineMonster_Idle(ctx: &mut GameContext) {
 pub fn MineMonster_Patrol(ctx: &mut GameContext) {
     unsafe {
         let mut dif: vec3_t = [0.0; 3];
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         (*npc_info).localState = LSTATE_CLEAR;
 
         if !UpdateGoal(ctx).is_null() {
-            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
+            ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
             NPC_MoveToGoal(ctx, qtrue);
         } else {
             let patrol_timer_id = cstr("patrolTime");
             if TIMER_Done(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr()) != 0 {
-                let dur = ((*ctx.world_raw()).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+                let dur = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
                 TIMER_Set(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr(), dur);
             }
         }
 
         _VectorSubtract(
-            (*ctx.world_raw()).g_entities[0].r.currentOrigin,
+            ctx.world.g_entities[0].r.currentOrigin,
             (*npc).r.currentOrigin,
             &mut dif,
         );
@@ -127,8 +123,8 @@ pub fn MineMonster_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:90-98`
 pub fn MineMonster_Move(ctx: &mut GameContext, visible: qboolean) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         if (*npc_info).localState != LSTATE_WAITING {
             (*npc_info).goalEntity = (*npc).enemy;
@@ -151,8 +147,8 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
 
         let mut end: vec3_t = [0.0; 3];
         let mut dir: vec3_t = [0.0; 3];
-        let mut tr: trace_t = unsafe { core::mem::zeroed() };
-        let npc = (*ctx.world_raw()).globals.NPC;
+        let mut tr: trace_t = core::mem::zeroed();
+        let npc = ctx.world.globals.NPC;
         let origin = vec3_origin;
         let start = (*npc).r.currentOrigin;
 
@@ -178,8 +174,7 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
         );
 
         if tr.entityNum >= 0 && (tr.entityNum as c_uint) < ENTITYNUM_NONE as c_uint {
-            let damage_entity =
-                &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
+            let damage_entity = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
             let mut dir_copy = dir;
             G_Damage(
                 ctx,
@@ -192,12 +187,12 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
                 DAMAGE_NO_KNOCKBACK,
                 MOD_MELEE as c_int,
             );
-            let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
+            let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
             let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
             let sound_idx = G_EffectIndex(bite_str.as_ptr());
             G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
         } else {
-            let idx = (*ctx.world_raw()).bg_state.rng.Q_irand(1, 4);
+            let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
             let miss_str = cstr(&format!("sound/chars/mine/misc/miss{}.wav", idx));
             let sound_idx = G_EffectIndex(miss_str.as_ptr());
             G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
@@ -210,17 +205,14 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
 pub fn MineMonster_Attack(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc = ctx.world.globals.NPC;
         let attacking_id = cstr("attacking");
 
         if TIMER_Exists(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr()) == 0 {
-            let rng = &mut (*ctx.world_raw()).bg_state.rng;
+            let rng = &mut ctx.world.bg_state.rng;
 
             let enemy_height_diff = if let Some(eid) = (*npc).enemy {
-                (*ctx.world_raw()).g_entities[eid.0 as usize]
-                    .r
-                    .currentOrigin[2]
-                    - (*npc).r.currentOrigin[2]
+                ctx.world.g_entities[eid.0 as usize].r.currentOrigin[2] - (*npc).r.currentOrigin[2]
             } else {
                 0.0
             };
@@ -331,12 +323,11 @@ pub fn MineMonster_Attack(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
 pub fn MineMonster_Combat(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         let can_see = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr =
-                &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+            let enemy_ptr = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
             NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) != 0
         } else {
             false
@@ -353,8 +344,7 @@ pub fn MineMonster_Combat(ctx: &mut GameContext) {
         NPC_FaceEnemy(ctx, qtrue);
 
         let distance = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr =
-                &mut (*ctx.world_raw()).g_entities[enemy_id.0 as usize] as *mut gentity_t;
+            let enemy_ptr = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
             DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy_ptr).r.currentOrigin)
         } else {
             0.0
@@ -446,8 +436,8 @@ pub fn NPC_MineMonster_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
 pub fn NPC_BSMineMonster_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         if (*npc).enemy.is_some() {
             MineMonster_Combat(ctx);

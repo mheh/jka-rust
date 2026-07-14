@@ -25,14 +25,14 @@ use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
 ///
 /// Source: `oracle/codemp/game/ai_util.c:14-17`
 pub fn B_TempAlloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
-    unsafe { crate::bg_misc::BG_TempAlloc(size, &mut (*ctx.world_raw()).bg_state) }
+    crate::bg_misc::BG_TempAlloc(size, &mut ctx.world.bg_state)
 }
 
 /// Raven `B_TempFree`.
 ///
 /// Source: `oracle/codemp/game/ai_util.c:19-22`
 pub fn B_TempFree(ctx: &mut GameContext, size: c_int) {
-    unsafe { crate::bg_misc::BG_TempFree(size, &mut (*ctx.world_raw()).bg_state) }
+    crate::bg_misc::BG_TempFree(size, &mut ctx.world.bg_state)
 }
 
 /// Raven `B_Alloc`.
@@ -41,7 +41,7 @@ pub fn B_TempFree(ctx: &mut GameContext, size: c_int) {
 /// `return BG_Alloc(size);` branch (`ai_util.c:77`) is live.
 /// Source: `oracle/codemp/game/ai_util.c:25-80`
 pub fn B_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
-    unsafe { crate::bg_misc::BG_Alloc(size, &mut (*ctx.world_raw()).bg_state) }
+    crate::bg_misc::BG_Alloc(size, &mut ctx.world.bg_state)
 }
 
 /// Raven `B_Free`.
@@ -59,11 +59,8 @@ pub fn B_Free(ptr: *mut c_void) {}
 ///
 /// Source: `oracle/codemp/game/ai_util.c:133-140`
 pub fn B_InitAlloc(ctx: &mut GameContext) {
-    unsafe {
-        // SAFETY: world is valid; globals.gWPArray is an owned field.
-        let world = &mut *ctx.world_raw();
-        world.globals.gWPArray = crate::game_globals::WpArray::default();
-    }
+    // SAFETY: world is valid; globals.gWPArray is an owned field.
+    ctx.world.globals.gWPArray = crate::game_globals::WpArray::default();
 }
 
 /// Raven `B_CleanupAlloc`.
@@ -297,7 +294,7 @@ pub fn BotDoChat(
         }
 
         // Frequency roll: skip chat unless always==true or lucky roll
-        if (*ctx.world_raw()).bg_state.rng.Q_irand(1, 10) > bs_ref.chatFrequency && always == 0 {
+        if ctx.world.bg_state.rng.Q_irand(1, 10) > bs_ref.chatFrequency && always == 0 {
             return 0;
         }
 
@@ -313,8 +310,7 @@ pub fn BotDoChat(
         // panic rather than read OOB, so this guard is a defensive divergence
         // (never taken) applied consistently at every `gBotChatBuffer[client]`
         // site in this file.
-        let world = &mut *ctx.world_raw();
-        let gBotChatBuffer_base = &world.globals.gBotChatBuffer.0;
+        let gBotChatBuffer_base = &ctx.world.globals.gBotChatBuffer.0;
         let client_idx = bs_ref.client as usize;
 
         let rVal = if client_idx < mp_qshared::shared::MAX_CLIENTS {
@@ -366,7 +362,7 @@ pub fn BotDoChat(
         }
 
         // Pick a random line
-        let mut getthisline = (*ctx.world_raw()).bg_state.rng.Q_irand(0, lines + 1);
+        let mut getthisline = ctx.world.bg_state.rng.Q_irand(0, lines + 1);
         if getthisline < 1 {
             getthisline = 1;
         }
@@ -424,18 +420,17 @@ pub fn BotDoChat(
 
                 let mut cobject: *mut gentity_t = core::ptr::null_mut();
 
-                let world = &mut *ctx.world_raw();
                 if *chatgroup_b.offset(inc_1) == b's' as u8 && !bs_ref.chatObject.is_none() {
                     cobject = bs_ref
                         .chatObject
-                        .map(|id| &mut world.g_entities[id.0 as usize] as *mut gentity_t)
+                        .map(|id| &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t)
                         .unwrap_or(core::ptr::null_mut());
                 } else if *chatgroup_b.offset(inc_1) == b'a' as u8
                     && !bs_ref.chatAltObject.is_none()
                 {
                     cobject = bs_ref
                         .chatAltObject
-                        .map(|id| &mut world.g_entities[id.0 as usize] as *mut gentity_t)
+                        .map(|id| &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t)
                         .unwrap_or(core::ptr::null_mut());
                 }
 
@@ -466,9 +461,8 @@ pub fn BotDoChat(
         }
         // Oracle uses `strlen(bs->currentChat)` — the post-%-substitution length.
         bs_ref.chatTime_stored = (((c_strlen(currentChat_b as *const u8) as c_int) * 45)
-            + (*ctx.world_raw()).bg_state.rng.Q_irand(1300, 1500))
-            as f32;
-        bs_ref.chatTime = (world.level.time as f32) + bs_ref.chatTime_stored;
+            + ctx.world.bg_state.rng.Q_irand(1300, 1500)) as f32;
+        bs_ref.chatTime = (ctx.world.level.time as f32) + bs_ref.chatTime_stored;
 
         B_TempFree(ctx, crate::game_globals::MAX_CHAT_BUFFER_SIZE as c_int);
 
@@ -613,7 +607,6 @@ pub fn ReadChatGroups(ctx: &mut GameContext, bs: *mut bot_state_t, buf: *mut c_c
         }
 
         // Copy to gBotChatBuffer[bs->client]
-        let world = &mut *ctx.world_raw();
         let client_idx = bs_ref.client as usize;
 
         if client_idx >= mp_qshared::shared::MAX_CLIENTS {
@@ -622,13 +615,13 @@ pub fn ReadChatGroups(ctx: &mut GameContext, bs: *mut bot_state_t, buf: *mut c_c
 
         let mut i = 0usize;
         while *buf_b.offset(cgbplace) != 0 && i < crate::game_globals::MAX_CHAT_BUFFER_SIZE {
-            world.globals.gBotChatBuffer.0[client_idx][i] = *buf_b.offset(cgbplace) as c_char;
+            ctx.world.globals.gBotChatBuffer.0[client_idx][i] = *buf_b.offset(cgbplace) as c_char;
             i += 1;
             cgbplace += 1;
         }
 
         if i < crate::game_globals::MAX_CHAT_BUFFER_SIZE {
-            world.globals.gBotChatBuffer.0[client_idx][i] = 0;
+            ctx.world.globals.gBotChatBuffer.0[client_idx][i] = 0;
         }
 
         1
@@ -852,8 +845,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if client_idx < mp_qshared::shared::MAX_CLIENTS {
             let mut i = 0usize;
             while i < crate::game_globals::MAX_CHAT_BUFFER_SIZE {
-                let world = &mut *ctx.world_raw();
-                world.globals.gBotChatBuffer.0[client_idx][i] = 0;
+                ctx.world.globals.gBotChatBuffer.0[client_idx][i] = 0;
                 i += 1;
             }
         }

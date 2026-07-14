@@ -124,7 +124,7 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             * (*pVeh).m_fTimeModifier;
 
         // QAGAME MP branch: `curTime = level.time`, reachable through `ctx`.
-        curTime = (*ctx.world_raw()).level.time;
+        curTime = ctx.world.level.time;
 
         // Handle turbo/acceleration
         if !(*pVeh).m_pPilot.is_null()
@@ -394,29 +394,29 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             // channel into this dispatch chain, so BG_AnimLength is reachable
             // (game-tier free-function form off `bg_state`).
             iAnimLen = (crate::bg_panimate::BG_AnimLength(
-                &(*ctx.world_raw()).bg_state,
+                &ctx.world.bg_state,
                 (*(*pVeh).m_pPilot).localAnimIndex,
                 Anim as c_int,
             ) as f32
                 * 0.4f32) as c_int;
             // MP `BG_GetTime()` is `level.time`, reachable through `ctx`.
-            (*pVeh).m_iBoarding = (*ctx.world_raw()).level.time + iAnimLen;
+            (*pVeh).m_iBoarding = ctx.world.level.time + iAnimLen;
 
             // Set the animation which won't be interrupted until completed. `BG_SetAnim`
             // is a `PmoveContext` method (`bgAllAnims` off `BgState`); build a pm-null
             // per-call context from `ctx` (the `BG_ParseAnimationFile` game-tier
             // wrapper precedent; `BG_SetAnimFinal` null-guards the missing `pm`).
             let ps = (*(*pVeh).m_pPilot).playerState;
-            let anims = (&(*ctx.world_raw()).bg_state.bgAllAnims)
-                [(*(*pVeh).m_pPilot).localAnimIndex as usize]
-                .anims;
+            let anims =
+                (&ctx.world.bg_state.bgAllAnims)[(*(*pVeh).m_pPilot).localAnimIndex as usize].anims;
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
             let mut pmc = crate::bg_channel::PmoveContext::new(
-                &mut (*ctx.world_raw()).bg_state,
+                &mut ctx.world.bg_state,
                 &traps,
                 &mut callbacks,
             );
@@ -453,11 +453,10 @@ pub fn G_CreateSpeederNPC(
         // Set the vehicle info pointer based on vehicle type name.
         let vehicleIndex: c_int = BG_VehicleGetIndex(
             strType,
-            &mut (*ctx.world_raw()).bg_state,
+            &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
-        (*(*pVeh)).m_pVehicleInfo = &(&(*ctx.world_raw()).bg_state.g_vehicleInfo)
-            [vehicleIndex as usize] as *const _
-            as *mut vehicleInfo_t;
+        (*(*pVeh)).m_pVehicleInfo = &(&ctx.world.bg_state.g_vehicleInfo)[vehicleIndex as usize]
+            as *const _ as *mut vehicleInfo_t;
     }
 }

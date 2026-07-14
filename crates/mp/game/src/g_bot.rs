@@ -82,7 +82,7 @@ pub fn trap_Cvar_VariableValue(ctx: &mut GameContext, var_name: *const c_char) -
 // MISSING-SYMBOL: `g_arenaInfos`/`g_botInfos` (Raven `static char *g_arenaInfos[MAX_ARENAS]`/
 // `g_botInfos[MAX_BOTS]`, g_bot.c:9/13) have no `GameGlobals` field yet — only
 // `g_numArenas`/`g_numBots` (the counters) were promoted. Every reference below
-// is written as `(*ctx.world_raw()).globals.g_arenaInfos`/`g_botInfos` exactly as
+// is written as `ctx.world.globals.g_arenaInfos`/`g_botInfos` exactly as
 // Raven names them; a fixer must add
 // `pub g_arenaInfos: [*mut c_char; MAX_ARENAS as usize]` /
 // `pub g_botInfos: [*mut c_char; MAX_BOTS as usize]` to `GameGlobals`.
@@ -95,7 +95,7 @@ pub fn trap_Cvar_VariableValue(ctx: &mut GameContext, var_name: *const c_char) -
 // MISSING-SYMBOL: `bot_minplayers` (Raven file-static `vmCvar_t bot_minplayers`,
 // g_bot.c:1226) and `checkminimumplayers_time` (Raven fn-static `int`,
 // g_bot.c:572) have no `GameGlobals` home yet; referenced below as
-// `(*ctx.world_raw()).globals.bot_minplayers` / `.checkminimumplayers_time`.
+// `ctx.world.globals.bot_minplayers` / `.checkminimumplayers_time`.
 
 /// Raven `G_ParseInfos`.
 ///
@@ -214,11 +214,11 @@ pub fn G_LoadArenasFromFile(ctx: &mut GameContext, filename: *mut c_char) {
         buf[len as usize] = 0;
         trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
 
-        let g_numArenas = (*ctx.world_raw()).globals.g_numArenas;
-        let __h535 = &mut (&mut (*ctx.world_raw()).globals.g_arenaInfos)[g_numArenas as usize]
-            as *mut *mut c_char;
-        let added = G_ParseInfos(ctx, buf.as_mut_ptr(), MAX_ARENAS - g_numArenas, __h535);
-        (*ctx.world_raw()).globals.g_numArenas += added;
+        let g_numArenas = ctx.world.globals.g_numArenas;
+        let arena_slot =
+            &mut (&mut ctx.world.globals.g_arenaInfos)[g_numArenas as usize] as *mut *mut c_char;
+        let added = G_ParseInfos(ctx, buf.as_mut_ptr(), MAX_ARENAS - g_numArenas, arena_slot);
+        ctx.world.globals.g_numArenas += added;
     }
 }
 
@@ -279,8 +279,7 @@ pub fn G_DoesMapSupportGametype(
     gametype: c_int,
 ) -> qboolean {
     unsafe {
-        let world = &*ctx.world_raw();
-        if world.globals.g_arenaInfos[0].is_null() {
+        if ctx.world.globals.g_arenaInfos[0].is_null() {
             return qfalse;
         }
         if mapname.is_null() || *mapname == 0 {
@@ -288,9 +287,11 @@ pub fn G_DoesMapSupportGametype(
         }
 
         let mut thisLevel: c_int = -1;
-        for n in 0..world.globals.g_numArenas {
-            let r#type =
-                Info_ValueForKey(world.globals.g_arenaInfos[n as usize], cstr("map").as_ptr());
+        for n in 0..ctx.world.globals.g_numArenas {
+            let r#type = Info_ValueForKey(
+                ctx.world.globals.g_arenaInfos[n as usize],
+                cstr("map").as_ptr(),
+            );
             if Q_stricmp(mapname, r#type) == 0 {
                 thisLevel = n;
                 break;
@@ -302,7 +303,7 @@ pub fn G_DoesMapSupportGametype(
         }
 
         let r#type = Info_ValueForKey(
-            world.globals.g_arenaInfos[thisLevel as usize],
+            ctx.world.globals.g_arenaInfos[thisLevel as usize],
             cstr("type").as_ptr(),
         );
         let typeBits = G_GetMapTypeBits(r#type);
@@ -319,11 +320,10 @@ pub fn G_DoesMapSupportGametype(
 /// Source: `oracle/codemp/game/g_bot.c:216-288`
 pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean) -> *const c_char {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        if world.cvars.g_autoMapCycle.integer == 0 && forced == 0 {
+        if ctx.world.cvars.g_autoMapCycle.integer == 0 && forced == 0 {
             return core::ptr::null();
         }
-        if world.globals.g_arenaInfos[0].is_null() {
+        if ctx.world.globals.g_arenaInfos[0].is_null() {
             return core::ptr::null();
         }
 
@@ -339,9 +339,11 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
         );
 
         let mut thisLevel: c_int = 0;
-        for n in 0..world.globals.g_numArenas {
-            let r#type =
-                Info_ValueForKey(world.globals.g_arenaInfos[n as usize], cstr("map").as_ptr());
+        for n in 0..ctx.world.globals.g_numArenas {
+            let r#type = Info_ValueForKey(
+                ctx.world.globals.g_arenaInfos[n as usize],
+                cstr("map").as_ptr(),
+            );
             if Q_stricmp(mapname.string.as_ptr(), r#type) == 0 {
                 thisLevel = n;
                 break;
@@ -356,8 +358,8 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
             // storage) when n reaches MAX_ARENAS on entry; we choose the defined behavior
             // of treating out-of-range n as null/wrap immediately (porting-rules §19).
             if n >= MAX_ARENAS
-                || world.globals.g_arenaInfos[n as usize].is_null()
-                || n >= world.globals.g_numArenas
+                || ctx.world.globals.g_arenaInfos[n as usize].is_null()
+                || n >= ctx.world.globals.g_numArenas
             {
                 if loopingUp != 0 {
                     break;
@@ -367,7 +369,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
             }
 
             let r#type = Info_ValueForKey(
-                world.globals.g_arenaInfos[n as usize],
+                ctx.world.globals.g_arenaInfos[n as usize],
                 cstr("type").as_ptr(),
             );
             let typeBits = G_GetMapTypeBits(r#type);
@@ -389,7 +391,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
             );
         } else {
             let r#type = Info_ValueForKey(
-                world.globals.g_arenaInfos[desiredMap as usize],
+                ctx.world.globals.g_arenaInfos[desiredMap as usize],
                 cstr("map").as_ptr(),
             );
             let cmd = format!("map {}", cstr_to_str(r#type));
@@ -400,7 +402,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
         }
 
         Info_ValueForKey(
-            world.globals.g_arenaInfos[desiredMap as usize],
+            ctx.world.globals.g_arenaInfos[desiredMap as usize],
             cstr("map").as_ptr(),
         ) as *const c_char
     }
@@ -411,7 +413,7 @@ pub fn G_RefreshNextMap(ctx: &mut GameContext, gametype: c_int, forced: qboolean
 /// Source: `oracle/codemp/game/g_bot.c:295-321`
 pub fn G_LoadArenas(ctx: &mut GameContext) {
     unsafe {
-        (*ctx.world_raw()).globals.g_numArenas = 0;
+        ctx.world.globals.g_numArenas = 0;
 
         let mut dirlist: [c_char; 1024] = [0; 1024];
         let numdirs = trap::FS_GetFileList(
@@ -424,7 +426,7 @@ pub fn G_LoadArenas(ctx: &mut GameContext) {
             ),
         );
         let mut dirptr = dirlist.as_ptr();
-        let __h536 = (*ctx.world_raw()).cvars.g_gametype.integer;
+        let gametype = ctx.world.cvars.g_gametype.integer;
         for _ in 0..numdirs {
             let dirlen = CStr::from_ptr(dirptr).to_bytes().len();
             let mut filename: [c_char; 128] = [0; 128];
@@ -433,15 +435,15 @@ pub fn G_LoadArenas(ctx: &mut GameContext) {
             dirptr = dirptr.add(dirlen + 1);
         }
 
-        for n in 0..(*ctx.world_raw()).globals.g_numArenas {
+        for n in 0..ctx.world.globals.g_numArenas {
             Info_SetValueForKey(
-                (&(*ctx.world_raw()).globals.g_arenaInfos)[n as usize],
+                (&ctx.world.globals.g_arenaInfos)[n as usize],
                 cstr("num").as_ptr(),
                 cstr(&format!("{}", n)).as_ptr(),
             );
         }
 
-        G_RefreshNextMap(ctx, __h536, qfalse);
+        G_RefreshNextMap(ctx, gametype, qfalse);
     }
 }
 
@@ -449,19 +451,19 @@ pub fn G_LoadArenas(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_bot.c:329-339`
 pub fn G_GetArenaInfoByMap(ctx: &mut GameContext, map: *const c_char) -> *const c_char {
-    unsafe {
-        let world = &*ctx.world_raw();
-        for n in 0..world.globals.g_numArenas {
-            if Q_stricmp(
-                Info_ValueForKey(world.globals.g_arenaInfos[n as usize], cstr("map").as_ptr()),
-                map,
-            ) == 0
-            {
-                return world.globals.g_arenaInfos[n as usize] as *const c_char;
-            }
+    for n in 0..ctx.world.globals.g_numArenas {
+        if Q_stricmp(
+            Info_ValueForKey(
+                ctx.world.globals.g_arenaInfos[n as usize],
+                cstr("map").as_ptr(),
+            ),
+            map,
+        ) == 0
+        {
+            return ctx.world.globals.g_arenaInfos[n as usize] as *const c_char;
         }
-        core::ptr::null()
     }
+    core::ptr::null()
 }
 
 /// Raven `G_AddRandomBot`.
@@ -469,23 +471,24 @@ pub fn G_GetArenaInfoByMap(ctx: &mut GameContext, map: *const c_char) -> *const 
 /// Source: `oracle/codemp/game/g_bot.c:373-454`
 pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let mut num: c_int = 0;
-        for n in 0..world.globals.g_numBots {
-            let value =
-                Info_ValueForKey(world.globals.g_botInfos[n as usize], cstr("name").as_ptr());
+        for n in 0..ctx.world.globals.g_numBots {
+            let value = Info_ValueForKey(
+                ctx.world.globals.g_botInfos[n as usize],
+                cstr("name").as_ptr(),
+            );
             let mut i: c_int = 0;
-            while i < world.cvars.g_maxclients.integer {
-                let cl = &world.clients[i as usize];
+            while i < ctx.world.cvars.g_maxclients.integer {
+                let cl = &ctx.world.clients[i as usize];
                 if cl.pers.connected != CON_CONNECTED {
                     i += 1;
                     continue;
                 }
-                if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+                if ctx.world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                     i += 1;
                     continue;
                 }
-                if world.cvars.g_gametype.integer == GT_SIEGE {
+                if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                     if team >= 0 && cl.sess.siegeDesiredTeam != team {
                         i += 1;
                         continue;
@@ -499,28 +502,30 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
                 }
                 i += 1;
             }
-            if i >= world.cvars.g_maxclients.integer {
+            if i >= ctx.world.cvars.g_maxclients.integer {
                 num += 1;
             }
         }
 
-        num = (world.bg_state.rng.random() * num as f32) as c_int;
+        num = (ctx.world.bg_state.rng.random() * num as f32) as c_int;
 
-        for n in 0..world.globals.g_numBots {
-            let value =
-                Info_ValueForKey(world.globals.g_botInfos[n as usize], cstr("name").as_ptr());
+        for n in 0..ctx.world.globals.g_numBots {
+            let value = Info_ValueForKey(
+                ctx.world.globals.g_botInfos[n as usize],
+                cstr("name").as_ptr(),
+            );
             let mut i: c_int = 0;
-            while i < world.cvars.g_maxclients.integer {
-                let cl = &world.clients[i as usize];
+            while i < ctx.world.cvars.g_maxclients.integer {
+                let cl = &ctx.world.clients[i as usize];
                 if cl.pers.connected != CON_CONNECTED {
                     i += 1;
                     continue;
                 }
-                if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+                if ctx.world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                     i += 1;
                     continue;
                 }
-                if world.cvars.g_gametype.integer == GT_SIEGE {
+                if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                     if team >= 0 && cl.sess.siegeDesiredTeam != team {
                         i += 1;
                         continue;
@@ -534,7 +539,7 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
                 }
                 i += 1;
             }
-            if i >= world.cvars.g_maxclients.integer {
+            if i >= ctx.world.cvars.g_maxclients.integer {
                 num -= 1;
                 if num <= 0 {
                     let skill = trap_Cvar_VariableValue(ctx, cstr("g_spSkill").as_ptr());
@@ -571,16 +576,15 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
 /// Source: `oracle/codemp/game/g_bot.c:461-492`
 pub fn G_RemoveRandomBot(ctx: &mut GameContext, team: c_int) -> c_int {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        for i in 0..world.cvars.g_maxclients.integer {
-            let cl = &world.clients[i as usize];
+        for i in 0..ctx.world.cvars.g_maxclients.integer {
+            let cl = &ctx.world.clients[i as usize];
             if cl.pers.connected != CON_CONNECTED {
                 continue;
             }
-            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+            if ctx.world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                 continue;
             }
-            if world.cvars.g_gametype.integer == GT_SIEGE {
+            if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                 if team >= 0 && cl.sess.siegeDesiredTeam != team {
                     continue;
                 }
@@ -606,61 +610,55 @@ pub fn G_RemoveRandomBot(ctx: &mut GameContext, team: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_bot.c:499-518`
 pub fn G_CountHumanPlayers(ctx: &mut GameContext, team: c_int) -> c_int {
-    unsafe {
-        let world = &*ctx.world_raw();
-        let mut num: c_int = 0;
-        for i in 0..world.cvars.g_maxclients.integer {
-            let cl = &world.clients[i as usize];
-            if cl.pers.connected != CON_CONNECTED {
-                continue;
-            }
-            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT != 0 {
-                continue;
-            }
-            if team >= 0 && cl.sess.sessionTeam as c_int != team {
-                continue;
-            }
-            num += 1;
+    let mut num: c_int = 0;
+    for i in 0..ctx.world.cvars.g_maxclients.integer {
+        let cl = &ctx.world.clients[i as usize];
+        if cl.pers.connected != CON_CONNECTED {
+            continue;
         }
-        num
+        if ctx.world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT != 0 {
+            continue;
+        }
+        if team >= 0 && cl.sess.sessionTeam as c_int != team {
+            continue;
+        }
+        num += 1;
     }
+    num
 }
 
 /// Raven `G_CountBotPlayers`.
 ///
 /// Source: `oracle/codemp/game/g_bot.c:525-562`
 pub fn G_CountBotPlayers(ctx: &mut GameContext, team: c_int) -> c_int {
-    unsafe {
-        let world = &*ctx.world_raw();
-        let mut num: c_int = 0;
-        for i in 0..world.cvars.g_maxclients.integer {
-            let cl = &world.clients[i as usize];
-            if cl.pers.connected != CON_CONNECTED {
-                continue;
-            }
-            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
-                continue;
-            }
-            if world.cvars.g_gametype.integer == GT_SIEGE {
-                if team >= 0 && cl.sess.siegeDesiredTeam != team {
-                    continue;
-                }
-            } else if team >= 0 && cl.sess.sessionTeam != team {
-                continue;
-            }
-            num += 1;
+    let mut num: c_int = 0;
+    for i in 0..ctx.world.cvars.g_maxclients.integer {
+        let cl = &ctx.world.clients[i as usize];
+        if cl.pers.connected != CON_CONNECTED {
+            continue;
         }
-        for n in 0..BOT_SPAWN_QUEUE_DEPTH {
-            if world.globals.botSpawnQueue[n].spawnTime == 0 {
-                continue;
-            }
-            if world.globals.botSpawnQueue[n].spawnTime > world.level.time {
-                continue;
-            }
-            num += 1;
+        if ctx.world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+            continue;
         }
-        num
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
+            if team >= 0 && cl.sess.siegeDesiredTeam != team {
+                continue;
+            }
+        } else if team >= 0 && cl.sess.sessionTeam != team {
+            continue;
+        }
+        num += 1;
     }
+    for n in 0..BOT_SPAWN_QUEUE_DEPTH {
+        if ctx.world.globals.botSpawnQueue[n].spawnTime == 0 {
+            continue;
+        }
+        if ctx.world.globals.botSpawnQueue[n].spawnTime > ctx.world.level.time {
+            continue;
+        }
+        num += 1;
+    }
+    num
 }
 
 /// Raven `G_CheckMinimumPlayers`.
@@ -671,42 +669,39 @@ pub fn G_CountBotPlayers(ctx: &mut GameContext, team: c_int) -> c_int {
 /// code (never compiled); not transcribed, matching the active-code-only
 /// faithful-port convention.
 pub fn G_CheckMinimumPlayers(ctx: &mut GameContext) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        if world.cvars.g_gametype.integer == GT_SIEGE {
-            return;
-        }
-        if world.level.intermissiontime != 0 {
-            return;
-        }
-        // only check once each 10 seconds
-        if world.globals.checkminimumplayers_time > world.level.time - 10000 {
-            return;
-        }
-        world.globals.checkminimumplayers_time = world.level.time;
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut world.globals.bot_minplayers as *mut vmCvar_t),
-        );
-        let mut minplayers = world.globals.bot_minplayers.integer;
-        if minplayers <= 0 {
-            return;
-        }
-        if minplayers > world.cvars.g_maxclients.integer {
-            minplayers = world.cvars.g_maxclients.integer;
-        }
+    if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
+        return;
+    }
+    if ctx.world.level.intermissiontime != 0 {
+        return;
+    }
+    // only check once each 10 seconds
+    if ctx.world.globals.checkminimumplayers_time > ctx.world.level.time - 10000 {
+        return;
+    }
+    ctx.world.globals.checkminimumplayers_time = ctx.world.level.time;
+    trap::Cvar_Update(
+        ctx.engine,
+        GCvarUpdateArgs::new(&mut ctx.world.globals.bot_minplayers as *mut vmCvar_t),
+    );
+    let mut minplayers = ctx.world.globals.bot_minplayers.integer;
+    if minplayers <= 0 {
+        return;
+    }
+    if minplayers > ctx.world.cvars.g_maxclients.integer {
+        minplayers = ctx.world.cvars.g_maxclients.integer;
+    }
 
-        let humanplayers = G_CountHumanPlayers(ctx, -1);
-        let botplayers = G_CountBotPlayers(ctx, -1);
+    let humanplayers = G_CountHumanPlayers(ctx, -1);
+    let botplayers = G_CountBotPlayers(ctx, -1);
 
-        if humanplayers + botplayers < minplayers {
-            G_AddRandomBot(ctx, -1);
-        } else if humanplayers + botplayers > minplayers && botplayers != 0 {
-            // try to remove spectators first
-            if G_RemoveRandomBot(ctx, TEAM_SPECTATOR) == 0 {
-                // just remove the bot that is playing
-                G_RemoveRandomBot(ctx, -1);
-            }
+    if humanplayers + botplayers < minplayers {
+        G_AddRandomBot(ctx, -1);
+    } else if humanplayers + botplayers > minplayers && botplayers != 0 {
+        // try to remove spectators first
+        if G_RemoveRandomBot(ctx, TEAM_SPECTATOR) == 0 {
+            // just remove the bot that is playing
+            G_RemoveRandomBot(ctx, -1);
         }
     }
 }
@@ -715,21 +710,18 @@ pub fn G_CheckMinimumPlayers(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_bot.c:697-719`
 pub fn G_CheckBotSpawn(ctx: &mut GameContext) {
-    unsafe {
-        G_CheckMinimumPlayers(ctx);
+    G_CheckMinimumPlayers(ctx);
 
-        let world = &mut *ctx.world_raw();
-        for n in 0..BOT_SPAWN_QUEUE_DEPTH {
-            if world.globals.botSpawnQueue[n].spawnTime == 0 {
-                continue;
-            }
-            if world.globals.botSpawnQueue[n].spawnTime > world.level.time {
-                continue;
-            }
-            let clientNum = world.globals.botSpawnQueue[n].clientNum;
-            ClientBegin(ctx, clientNum, qfalse);
-            world.globals.botSpawnQueue[n].spawnTime = 0;
+    for n in 0..BOT_SPAWN_QUEUE_DEPTH {
+        if ctx.world.globals.botSpawnQueue[n].spawnTime == 0 {
+            continue;
         }
+        if ctx.world.globals.botSpawnQueue[n].spawnTime > ctx.world.level.time {
+            continue;
+        }
+        let clientNum = ctx.world.globals.botSpawnQueue[n].clientNum;
+        ClientBegin(ctx, clientNum, qfalse);
+        ctx.world.globals.botSpawnQueue[n].spawnTime = 0;
     }
 }
 
@@ -737,39 +729,33 @@ pub fn G_CheckBotSpawn(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_bot.c:727-740`
 pub fn AddBotToSpawnQueue(ctx: &mut GameContext, clientNum: c_int, delay: c_int) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        for n in 0..BOT_SPAWN_QUEUE_DEPTH {
-            if world.globals.botSpawnQueue[n].spawnTime == 0 {
-                world.globals.botSpawnQueue[n].spawnTime = world.level.time + delay;
-                world.globals.botSpawnQueue[n].clientNum = clientNum;
-                return;
-            }
+    for n in 0..BOT_SPAWN_QUEUE_DEPTH {
+        if ctx.world.globals.botSpawnQueue[n].spawnTime == 0 {
+            ctx.world.globals.botSpawnQueue[n].spawnTime = ctx.world.level.time + delay;
+            ctx.world.globals.botSpawnQueue[n].clientNum = clientNum;
+            return;
         }
-
-        G_Printf(
-            ctx,
-            cstr(&format!(
-                "{}Unable to delay spawn\n",
-                S_COLOR_YELLOW.to_string_lossy()
-            ))
-            .as_ptr(),
-        );
-        ClientBegin(ctx, clientNum, qfalse);
     }
+
+    G_Printf(
+        ctx,
+        cstr(&format!(
+            "{}Unable to delay spawn\n",
+            S_COLOR_YELLOW.to_string_lossy()
+        ))
+        .as_ptr(),
+    );
+    ClientBegin(ctx, clientNum, qfalse);
 }
 
 /// Raven `G_RemoveQueuedBotBegin`.
 ///
 /// Source: `oracle/codemp/game/g_bot.c:751-760`
 pub fn G_RemoveQueuedBotBegin(ctx: &mut GameContext, clientNum: c_int) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        for n in 0..BOT_SPAWN_QUEUE_DEPTH {
-            if world.globals.botSpawnQueue[n].clientNum == clientNum {
-                world.globals.botSpawnQueue[n].spawnTime = 0;
-                return;
-            }
+    for n in 0..BOT_SPAWN_QUEUE_DEPTH {
+        if ctx.world.globals.botSpawnQueue[n].clientNum == clientNum {
+            ctx.world.globals.botSpawnQueue[n].spawnTime = 0;
+            return;
         }
     }
 }
@@ -963,7 +949,7 @@ pub fn G_AddBot(
         // initialize the bot settings
         let mut team_owned: String;
         if team.is_null() || *team == 0 {
-            if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM {
+            if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
                 if PickTeam(ctx, clientNum) == TEAM_RED {
                     team_owned = "red".to_string();
                 } else {
@@ -986,7 +972,7 @@ pub fn G_AddBot(
             cstr(&team_owned).as_ptr(),
         );
 
-        let bot = &mut (*ctx.world_raw()).g_entities[clientNum as usize] as *mut gentity_t;
+        let bot = &mut ctx.world.g_entities[clientNum as usize] as *mut gentity_t;
         (*bot).r.svFlags |= SVF_BOT;
         (*bot).inuse = qtrue;
 
@@ -999,7 +985,7 @@ pub fn G_AddBot(
             ),
         );
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer >= GT_TEAM {
+        if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             let cl = (*bot).client as *mut gclient_t;
             if Q_stricmp(cstr(&team_owned).as_ptr(), cstr("red").as_ptr()) == 0 {
                 (*cl).sess.sessionTeam = TEAM_RED;
@@ -1010,7 +996,7 @@ pub fn G_AddBot(
             }
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             let cl = (*bot).client as *mut gclient_t;
             (*cl).sess.siegeDesiredTeam = (*cl).sess.sessionTeam;
             (*cl).sess.sessionTeam = TEAM_SPECTATOR;
@@ -1036,7 +1022,7 @@ pub fn G_AddBot(
 
             let team_final = if (*cl).sess.sessionTeam == TEAM_RED {
                 "Red".to_string()
-            } else if (*ctx.world_raw()).cvars.g_gametype.integer == GT_SIEGE {
+            } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                 if (*cl).sess.sessionTeam == TEAM_BLUE {
                     "Blue".to_string()
                 } else {
@@ -1065,8 +1051,8 @@ pub fn G_AddBot(
             ClientUserinfoChanged(ctx, clientNum);
         }
 
-        if (*ctx.world_raw()).cvars.g_gametype.integer == GT_DUEL
-            || (*ctx.world_raw()).cvars.g_gametype.integer == GT_POWERDUEL
+        if ctx.world.cvars.g_gametype.integer == GT_DUEL
+            || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
         {
             let mut loners: c_int = 0;
             let mut doubles: c_int = 0;
@@ -1102,95 +1088,91 @@ pub fn G_AddBot(
 ///
 /// Source: `oracle/codemp/game/g_bot.c:1041-1093`
 pub fn Svcmd_AddBot_f(ctx: &mut GameContext) {
-    unsafe {
-        // are bots enabled?
-        if trap::Cvar_VariableIntegerValue(
-            ctx.engine,
-            GCvarVariableIntegerValueArgs::new(CString::new("bot_enable").unwrap()),
-        ) == 0
-        {
-            return;
-        }
+    // are bots enabled?
+    if trap::Cvar_VariableIntegerValue(
+        ctx.engine,
+        GCvarVariableIntegerValueArgs::new(CString::new("bot_enable").unwrap()),
+    ) == 0
+    {
+        return;
+    }
 
-        // name
-        let mut name: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
-        trap::Argv(
+    // name
+    let mut name: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
+    trap::Argv(
+        ctx.engine,
+        GArgvArgs::new(1, name.as_mut_ptr(), name.len() as c_int),
+    );
+    if name[0] == 0 {
+        trap::Printf(
             ctx.engine,
-            GArgvArgs::new(1, name.as_mut_ptr(), name.len() as c_int),
-        );
-        if name[0] == 0 {
-            trap::Printf(
-                ctx.engine,
-                GPrintArgs::new(
-                    CString::new(
-                        "Usage: Addbot <botname> [skill 1-5] [team] [msec delay] [altname]\n",
-                    )
+            GPrintArgs::new(
+                CString::new("Usage: Addbot <botname> [skill 1-5] [team] [msec delay] [altname]\n")
                     .unwrap(),
-                ),
-            );
-            return;
-        }
+            ),
+        );
+        return;
+    }
 
-        // skill
-        let mut string: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
-        trap::Argv(
+    // skill
+    let mut string: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
+    trap::Argv(
+        ctx.engine,
+        GArgvArgs::new(2, string.as_mut_ptr(), string.len() as c_int),
+    );
+    let skill: f32 = if string[0] == 0 {
+        4.0
+    } else {
+        crate::bg_lib::atof(string.as_ptr()) as f32
+    };
+
+    // team
+    let mut team: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
+    trap::Argv(
+        ctx.engine,
+        GArgvArgs::new(3, team.as_mut_ptr(), team.len() as c_int),
+    );
+
+    // delay
+    trap::Argv(
+        ctx.engine,
+        GArgvArgs::new(4, string.as_mut_ptr(), string.len() as c_int),
+    );
+    let delay: c_int = if string[0] == 0 {
+        0
+    } else {
+        atoi(string.as_ptr())
+    };
+
+    // alternative name
+    let mut altname: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
+    trap::Argv(
+        ctx.engine,
+        GArgvArgs::new(5, altname.as_mut_ptr(), altname.len() as c_int),
+    );
+
+    G_AddBot(
+        ctx,
+        name.as_ptr(),
+        skill,
+        team.as_ptr(),
+        delay,
+        altname.as_mut_ptr(),
+    );
+
+    // if this was issued during gameplay and we are playing locally,
+    // go ahead and load the bot's media immediately
+    if ctx.world.level.time - ctx.world.level.startTime > 1000
+        && trap::Cvar_VariableIntegerValue(
             ctx.engine,
-            GArgvArgs::new(2, string.as_mut_ptr(), string.len() as c_int),
-        );
-        let skill: f32 = if string[0] == 0 {
-            4.0
-        } else {
-            crate::bg_lib::atof(string.as_ptr()) as f32
-        };
-
-        // team
-        let mut team: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
-        trap::Argv(
+            GCvarVariableIntegerValueArgs::new(CString::new("cl_running").unwrap()),
+        ) != 0
+    {
+        // FIXME: spelled wrong, but not changing for demo
+        trap::SendServerCommand(
             ctx.engine,
-            GArgvArgs::new(3, team.as_mut_ptr(), team.len() as c_int),
+            GSendServerCommandArgs::new(-1, CString::new("loaddefered\n").unwrap()),
         );
-
-        // delay
-        trap::Argv(
-            ctx.engine,
-            GArgvArgs::new(4, string.as_mut_ptr(), string.len() as c_int),
-        );
-        let delay: c_int = if string[0] == 0 {
-            0
-        } else {
-            atoi(string.as_ptr())
-        };
-
-        // alternative name
-        let mut altname: [c_char; MAX_TOKEN_CHARS] = [0; MAX_TOKEN_CHARS];
-        trap::Argv(
-            ctx.engine,
-            GArgvArgs::new(5, altname.as_mut_ptr(), altname.len() as c_int),
-        );
-
-        G_AddBot(
-            ctx,
-            name.as_ptr(),
-            skill,
-            team.as_ptr(),
-            delay,
-            altname.as_mut_ptr(),
-        );
-
-        // if this was issued during gameplay and we are playing locally,
-        // go ahead and load the bot's media immediately
-        if (*ctx.world_raw()).level.time - (*ctx.world_raw()).level.startTime > 1000
-            && trap::Cvar_VariableIntegerValue(
-                ctx.engine,
-                GCvarVariableIntegerValueArgs::new(CString::new("cl_running").unwrap()),
-            ) != 0
-        {
-            // FIXME: spelled wrong, but not changing for demo
-            trap::SendServerCommand(
-                ctx.engine,
-                GSendServerCommandArgs::new(-1, CString::new("loaddefered\n").unwrap()),
-            );
-        }
     }
 }
 
@@ -1209,31 +1191,30 @@ pub fn Svcmd_BotList_f(ctx: &mut GameContext) {
             ),
         );
 
-        let world = &*ctx.world_raw();
-        for i in 0..world.globals.g_numBots {
+        for i in 0..ctx.world.globals.g_numBots {
             let mut name = cstr_to_str(Info_ValueForKey(
-                world.globals.g_botInfos[i as usize],
+                ctx.world.globals.g_botInfos[i as usize],
                 cstr("name").as_ptr(),
             ));
             if name.is_empty() {
                 name = "Padawan".to_string();
             }
             let mut funname = cstr_to_str(Info_ValueForKey(
-                world.globals.g_botInfos[i as usize],
+                ctx.world.globals.g_botInfos[i as usize],
                 cstr("funname").as_ptr(),
             ));
             if funname.is_empty() {
                 funname = "".to_string();
             }
             let mut model = cstr_to_str(Info_ValueForKey(
-                world.globals.g_botInfos[i as usize],
+                ctx.world.globals.g_botInfos[i as usize],
                 cstr("model").as_ptr(),
             ));
             if model.is_empty() {
                 model = "kyle/default".to_string();
             }
             let mut personality = cstr_to_str(Info_ValueForKey(
-                world.globals.g_botInfos[i as usize],
+                ctx.world.globals.g_botInfos[i as usize],
                 cstr("personality").as_ptr(),
             ));
             if personality.is_empty() {
@@ -1289,11 +1270,11 @@ pub fn G_LoadBotsFromFile(ctx: &mut GameContext, filename: *mut c_char) {
         buf[len as usize] = 0;
         trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
 
-        let g_numBots = (*ctx.world_raw()).globals.g_numBots;
-        let __h537 = &mut (&mut (*ctx.world_raw()).globals.g_botInfos)[g_numBots as usize]
-            as *mut *mut c_char;
-        let added = G_ParseInfos(ctx, buf.as_mut_ptr(), MAX_BOTS - g_numBots, __h537);
-        (*ctx.world_raw()).globals.g_numBots += added;
+        let g_numBots = ctx.world.globals.g_numBots;
+        let bot_slot =
+            &mut (&mut ctx.world.globals.g_botInfos)[g_numBots as usize] as *mut *mut c_char;
+        let added = G_ParseInfos(ctx, buf.as_mut_ptr(), MAX_BOTS - g_numBots, bot_slot);
+        ctx.world.globals.g_numBots += added;
     }
 }
 
@@ -1310,7 +1291,7 @@ pub fn G_LoadBots(ctx: &mut GameContext) {
             return;
         }
 
-        (*ctx.world_raw()).globals.g_numBots = 0;
+        ctx.world.globals.g_numBots = 0;
 
         let mut botsFile = vmCvar_t::zeroed();
         trap::Cvar_Register(
@@ -1357,58 +1338,52 @@ pub fn G_LoadBots(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_bot.c:1265-1271`
 pub fn G_GetBotInfoByNumber(ctx: &mut GameContext, num: c_int) -> *mut c_char {
-    unsafe {
-        let world = &*ctx.world_raw();
-        if num < 0 || num >= world.globals.g_numBots {
-            let s = format!(
-                "{}Invalid bot number: {}\n",
-                S_COLOR_RED.to_string_lossy(),
-                num
-            );
-            trap::Printf(ctx.engine, GPrintArgs::new(CString::new(s).unwrap()));
-            return core::ptr::null_mut();
-        }
-        world.globals.g_botInfos[num as usize]
+    if num < 0 || num >= ctx.world.globals.g_numBots {
+        let s = format!(
+            "{}Invalid bot number: {}\n",
+            S_COLOR_RED.to_string_lossy(),
+            num
+        );
+        trap::Printf(ctx.engine, GPrintArgs::new(CString::new(s).unwrap()));
+        return core::ptr::null_mut();
     }
+    ctx.world.globals.g_botInfos[num as usize]
 }
 
 /// Raven `G_GetBotInfoByName`.
 ///
 /// Source: `oracle/codemp/game/g_bot.c:1279-1291`
 pub fn G_GetBotInfoByName(ctx: &mut GameContext, name: *const c_char) -> *mut c_char {
-    unsafe {
-        let world = &*ctx.world_raw();
-        for n in 0..world.globals.g_numBots {
-            let value =
-                Info_ValueForKey(world.globals.g_botInfos[n as usize], cstr("name").as_ptr());
-            if Q_stricmp(value, name) == 0 {
-                return world.globals.g_botInfos[n as usize];
-            }
+    for n in 0..ctx.world.globals.g_numBots {
+        let value = Info_ValueForKey(
+            ctx.world.globals.g_botInfos[n as usize],
+            cstr("name").as_ptr(),
+        );
+        if Q_stricmp(value, name) == 0 {
+            return ctx.world.globals.g_botInfos[n as usize];
         }
-        core::ptr::null_mut()
     }
+    core::ptr::null_mut()
 }
 
 /// Raven `G_InitBots`.
 ///
 /// Source: `oracle/codemp/game/g_bot.c:1302-1311`
 pub fn G_InitBots(ctx: &mut GameContext, restart: qboolean) {
-    unsafe {
-        G_LoadBots(ctx);
-        G_LoadArenas(ctx);
+    G_LoadBots(ctx);
+    G_LoadArenas(ctx);
 
-        trap::Cvar_Register(
-            ctx.engine,
-            GCvarRegisterArgs::new(
-                &mut (*ctx.world_raw()).globals.bot_minplayers as *mut vmCvar_t,
-                CString::new("bot_minplayers").unwrap(),
-                CString::new("0").unwrap(),
-                CVAR_SERVERINFO,
-            ),
-        );
+    trap::Cvar_Register(
+        ctx.engine,
+        GCvarRegisterArgs::new(
+            &mut ctx.world.globals.bot_minplayers as *mut vmCvar_t,
+            CString::new("bot_minplayers").unwrap(),
+            CString::new("0").unwrap(),
+            CVAR_SERVERINFO,
+        ),
+    );
 
-        //rww - new bot route stuff
-        LoadPath_ThisLevel(ctx);
-        //end rww
-    }
+    //rww - new bot route stuff
+    LoadPath_ThisLevel(ctx);
+    //end rww
 }

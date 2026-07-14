@@ -10,7 +10,7 @@
 //! helpers borrow `&gentity_t`/`&mut gentity_t`.
 //!
 //! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` field access — the transitional `(*ctx.world_raw())`
+//! checked `ctx.world.…` field access — the transitional `ctx.world`
 //! raw-deref regime (F1) is gone (one irreducible `&mut vec3_t` out-param site
 //! into `G_Damage` excepted, marked in-code). The per-body entity/client
 //! pointers stay raw by design: this file is gclient-saturated (`(*ent).client
@@ -9293,7 +9293,7 @@ pub fn G_KickTrace(
 
         let mut traceOrg: vec3_t = [0.0; 3];
         let mut traceEnd: vec3_t = [0.0; 3];
-        let mut trace: trace_t = unsafe { core::mem::zeroed() };
+        let mut trace: trace_t = core::mem::zeroed();
         let mut hitEnt: *mut gentity_t = core::ptr::null_mut();
 
         // VectorSet(kickMins, -2, -2, -2); VectorSet(kickMaxs, 2, 2, 2);

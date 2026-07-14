@@ -28,7 +28,7 @@ use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -71,27 +71,27 @@ pub fn Howler_Idle() {
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:38-71`
 pub fn Howler_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         (*npc_info).localState = LSTATE_CLEAR;
 
         // If we have somewhere to go, then do that
         if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
-            (*ctx.world_raw()).globals.ucmd.buttons &= !BUTTON_WALKING;
+            ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         } else {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolTime".as_ptr()) != 0 {
-                let __h91 = ctx.entity_id_of(npc);
-                let __h92 = ((*ctx.world_raw()).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
-                crate::g_timer::TIMER_Set(ctx, __h91, c"patrolTime".as_ptr(), __h92);
+                let npc_id = ctx.entity_id_of(npc);
+                let delay = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+                crate::g_timer::TIMER_Set(ctx, npc_id, c"patrolTime".as_ptr(), delay);
             }
         }
 
         // rwwFIXMEFIXME: Care about all clients, not just client 0
         let mut dif: vec3_t = [0.0; 3];
         crate::q_math::_VectorSubtract(
-            (*ctx.world_raw()).g_entities[0].r.currentOrigin,
+            ctx.world.g_entities[0].r.currentOrigin,
             (*npc).r.currentOrigin,
             &mut dif,
         );
@@ -116,8 +116,8 @@ pub fn Howler_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:78-86`
 pub fn Howler_Move(ctx: &mut GameContext, visible: qboolean) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         if (*npc_info).localState != LSTATE_WAITING {
             (*npc_info).goalEntity = (*npc).enemy;
@@ -134,7 +134,7 @@ pub fn Howler_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: 
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let enemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, enemy) };
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc = ctx.world.globals.NPC;
 
         if enemy.is_null() {
             return;
@@ -187,15 +187,14 @@ pub fn Howler_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: 
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:112-131`
 pub fn Howler_Attack(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
+        let npc = ctx.world.globals.NPC;
 
         if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == qfalse
         {
-            let __h93 = ctx.entity_id_of(npc);
-            let __h94 =
-                (1700.0 + ((*ctx.world_raw()).bg_state.rng.random() as f32 * 200.0)) as c_int;
+            let npc_id = ctx.entity_id_of(npc);
+            let delay = (1700.0 + (ctx.world.bg_state.rng.random() as f32 * 200.0)) as c_int;
             // Going to do ATTACK1
-            crate::g_timer::TIMER_Set(ctx, __h93, c"attacking".as_ptr(), __h94);
+            crate::g_timer::TIMER_Set(ctx, npc_id, c"attacking".as_ptr(), delay);
             crate::npc_c::NPC_SetAnim(
                 ctx,
                 ctx.entity_id_of(npc).unwrap(),
@@ -224,15 +223,14 @@ pub fn Howler_Attack(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:134-171`
 pub fn Howler_Combat(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         let distance: f32;
         let advance: qboolean;
 
         // If we cannot see our target or we have somewhere to go, then do that
-        let enemy_ptr =
-            crate::ent_id::resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), (*npc).enemy);
+        let enemy_ptr = crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*npc).enemy);
         if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) == qfalse
             || !crate::NPC_goal::UpdateGoal(ctx).is_null()
         {
@@ -321,8 +319,8 @@ pub fn NPC_Howler_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:202-218`
 pub fn NPC_BSHowler_Default(ctx: &mut GameContext) {
     unsafe {
-        let npc = (*ctx.world_raw()).globals.NPC;
-        let npc_info = (*ctx.world_raw()).globals.NPCInfo;
+        let npc = ctx.world.globals.NPC;
+        let npc_info = ctx.world.globals.NPCInfo;
 
         if (*npc).enemy.is_some() {
             Howler_Combat(ctx);

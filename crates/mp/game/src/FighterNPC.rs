@@ -65,7 +65,7 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
         }
 
         // Set the board wait time (they won't be able to do anything, including getting off, for this amount of time).
-        (*pVeh).m_iBoarding = (*ctx.world_raw()).level.time + 1500;
+        (*pVeh).m_iBoarding = ctx.world.level.time + 1500;
 
         qtrue
     }
@@ -80,13 +80,11 @@ pub fn Eject(
     pEnt: *mut bgEntity_t,
     forceEject: qboolean,
 ) -> qboolean {
-    unsafe {
-        // `g_vehicleInfo[VEHICLE_BASE].Eject` is the generic base body.
-        if crate::g_vehicles::Eject(ctx, pVeh, pEnt, forceEject) != qfalse {
-            qtrue
-        } else {
-            qfalse
-        }
+    // `g_vehicleInfo[VEHICLE_BASE].Eject` is the generic base body.
+    if crate::g_vehicles::Eject(ctx, pVeh, pEnt, forceEject) != qfalse {
+        qtrue
+    } else {
+        qfalse
     }
 }
 
@@ -207,14 +205,14 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         debug_assert!(!parent.is_null());
 
-        let __s951 = (*ctx.world_raw()).cvars.g_gravity.value;
+        let gravity = ctx.world.cvars.g_gravity.value;
         if BG_FighterUpdate(
             ctx,
             pVeh,
             pUcmd,
             (*parent).r.mins,
             (*parent).r.maxs,
-            __s951,
+            gravity,
             G_VehicleTrace,
         ) == qfalse
         {
@@ -473,18 +471,14 @@ pub fn FighterDamageRoutine(
                 if num % 3 == 0 {
                     // NOT everyone should do this
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
-                        == qfalse
-                    {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 2 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
-                        == qfalse
-                    {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) > -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
@@ -513,18 +507,14 @@ pub fn FighterDamageRoutine(
 
                 if num % 3 != 0 {
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
-                        == qfalse
-                    {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 4 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
-                        == qfalse
-                    {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
@@ -684,7 +674,7 @@ pub fn FighterPitchClamp(
     curTime: c_int,
 ) {
     unsafe {
-        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse {
+        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
             // Cap pitch reasonably
             if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
                 if vi.pitchLimit != -1.0
@@ -1098,7 +1088,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         // Resolve the rider (QAGAME `PM_BGEntForNum` == `&g_entities[owner]`).
         let mut rider: *mut bgEntity_t = core::ptr::null_mut();
         if (*parent).s.owner != ENTITYNUM_NONE {
-            rider = &mut (*ctx.world_raw()).g_entities[(*parent).s.owner as usize] as *mut gentity_t
+            rider = &mut ctx.world.g_entities[(*parent).s.owner as usize] as *mut gentity_t
                 as *mut bgEntity_t;
         }
         if rider.is_null() {
@@ -1156,7 +1146,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             return;
         }
 
-        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse {
+        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
             *(*pVeh).m_vOrientation.add(2) =
                 PredictedAngularDecrement(0.95, angleTimeMod * 2.0, *(*pVeh).m_vOrientation.add(2));
         }
@@ -1235,7 +1225,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             && (*(*pVeh).m_pPilot).s.number < MAX_CLIENTS as c_int
             && (*parentPS).speed > 0.0
         {
-            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) != qfalse {
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) != qfalse {
                 *(*pVeh).m_vOrientation.add(0) = (*riderPS).viewangles[0];
                 *(*pVeh).m_vOrientation.add(1) = (*riderPS).viewangles[1];
                 *(*pVeh).m_vOrientation.add(2) = (*riderPS).viewangles[2];
@@ -1307,7 +1297,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         {
             (*pVeh).m_ucmd.upmove = 0;
             *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse
                 && *(*pVeh).m_vOrientation.add(0) > 60.0
             {
                 *(*pVeh).m_vOrientation.add(0) = 60.0;
@@ -1323,9 +1313,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                     && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
                 {
                     // spiralling out of control: leave YAW alone
-                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state)
-                    == qfalse
-                {
+                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
                     *(*pVeh).m_vOrientation.add(1) -=
                         (*(*pVeh).m_vOrientation.add(2) * 0.05) * (*pVeh).m_fTimeModifier;
                 }
@@ -1335,7 +1323,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             let strafeRoll = ((*parentPS).hackingTime as f32 / MAX_STRAFE_TIME) * (*vi).rollLimit;
             let strafeDif = AngleSubtract(strafeRoll, *(*pVeh).m_vOrientation.add(2));
             *(*pVeh).m_vOrientation.add(2) += (strafeDif * 0.1) * (*pVeh).m_fTimeModifier;
-            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world_raw()).bg_state) == qfalse
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse
                 && (*vi).rollLimit != -1.0
                 && (*pVeh).m_iRemovedSurfaces == 0
                 && (*parentPS).electrifyTime < curTime
@@ -1374,7 +1362,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut Anim: c_int = -1;
         let parentPS: *mut playerState_t = (*(*pVeh).m_pParentEntity).playerState;
-        let curTime: c_int = (*ctx.world_raw()).level.time;
+        let curTime: c_int = ctx.world.level.time;
         let vi = (*pVeh).m_pVehicleInfo;
 
         if (*parentPS).hyperSpaceTime != 0 && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
@@ -1466,11 +1454,10 @@ pub fn G_CreateFighterNPC(
         // Set the vehicle info pointer based on vehicle type name.
         let veh_index = BG_VehicleGetIndex(
             strType,
-            &mut (*ctx.world_raw()).bg_state,
+            &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
-        (*(*pVeh)).m_pVehicleInfo = &(&(*ctx.world_raw()).bg_state.g_vehicleInfo)
-            [veh_index as usize] as *const _
-            as *mut vehicleInfo_t;
+        (*(*pVeh)).m_pVehicleInfo = &(&ctx.world.bg_state.g_vehicleInfo)[veh_index as usize]
+            as *const _ as *mut vehicleInfo_t;
     }
 }

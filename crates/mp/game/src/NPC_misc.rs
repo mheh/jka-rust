@@ -50,7 +50,7 @@ pub fn Debug_Printf(
             _ => "^1",                   // Default to S_COLOR_RED
         };
 
-        let time = (*ctx.world_raw()).level.time;
+        let time = ctx.world.level.time;
         let msg: String = cstr_to_str(fmt);
 
         let output = format!("{}{:5}:{}", color, time, msg);
@@ -96,7 +96,7 @@ pub fn Debug_NPCPrintf(
             _ => '1',                   // Default to COLOR_RED
         };
 
-        let time = (*ctx.world_raw()).level.time;
+        let time = ctx.world.level.time;
         let msg: String = cstr_to_str(fmt);
         let npc_targetname: String = cstr_to_str((*printNPC).targetname);
 

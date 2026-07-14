@@ -35,7 +35,7 @@ use mp_qshared::shared::surface_flags::MASK_SHOT;
 #[inline]
 unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -66,7 +66,7 @@ pub fn VEH_TurretCheckFire(
             return;
         }
 
-        if (*pVeh).m_iMuzzleWait[curMuzzle as usize] >= (*ctx.world_raw()).level.time {
+        if (*pVeh).m_iMuzzleWait[curMuzzle as usize] >= ctx.world.level.time {
             // can't fire yet
             return;
         }
@@ -117,7 +117,7 @@ pub fn VEH_TurretCheckFire(
         }
         // add delay to the next muzzle so it doesn't fire right away on the next frame
         (*pVeh).m_iMuzzleWait[(*pVeh).turretStatus[turretNum as usize].nextMuzzle as usize] =
-            (*ctx.world_raw()).level.time + (*turretStats).iDelay;
+            ctx.world.level.time + (*turretStats).iDelay;
     }
 }
 
@@ -494,9 +494,8 @@ pub fn VEH_TurretObeyPassengerControl(
 
         if !passenger.is_null() && !(*passenger).client.is_null() && (*passenger).health > 0 {
             // a valid, living passenger client
-            let vehWeapon: *mut vehWeaponInfo_t = &mut (&mut (*ctx.world_raw())
-                .bg_state
-                .g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
+            let vehWeapon: *mut vehWeaponInfo_t =
+                &mut (&mut ctx.world.bg_state.g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
             let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
             let mut aimAngles = [0f32; 3];
             _VectorCopy(
@@ -577,13 +576,13 @@ pub fn VEH_TurretThink(
             return;
         }
 
-        vehWeapon = &mut (&mut (*ctx.world_raw()).bg_state.g_vehWeaponInfo)
-            [(*turretStats).iWeapon as usize];
+        vehWeapon = &mut (&mut ctx.world.bg_state.g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
         rangeSq = (*turretStats).fAIRange * (*turretStats).fAIRange;
         curMuzzle = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
 
         if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < ENTITYNUM_WORLD {
-            turretEnemy = &mut (*(*ctx.world_raw())
+            turretEnemy = &mut (*ctx
+                .world
                 .g_entities
                 .as_mut_ptr()
                 .add((*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize));
@@ -602,7 +601,7 @@ pub fn VEH_TurretThink(
             }
         }
 
-        if (*pVeh).turretStatus[turretNum as usize].enemyHoldTime < (*ctx.world_raw()).level.time {
+        if (*pVeh).turretStatus[turretNum as usize].enemyHoldTime < ctx.world.level.time {
             if VEH_TurretFindEnemies(
                 ctx,
                 pVeh,
@@ -612,19 +611,17 @@ pub fn VEH_TurretThink(
                 curMuzzle,
             ) != qfalse
             {
-                turretEnemy = &mut (*(*ctx.world_raw())
+                turretEnemy = &mut (*ctx
+                    .world
                     .g_entities
                     .as_mut_ptr()
                     .add((*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize));
                 doAim = qtrue;
             } else if !(*parent).enemy.is_none() {
                 if let Some(enemy_id) = (*parent).enemy {
-                    let enemy_ptr = (*ctx.world_raw())
-                        .g_entities
-                        .as_mut_ptr()
-                        .add(enemy_id.0 as usize);
+                    let enemy_ptr = ctx.world.g_entities.as_mut_ptr().add(enemy_id.0 as usize);
                     if (*enemy_ptr).s.number < ENTITYNUM_WORLD {
-                        if (*ctx.world_raw()).cvars.g_gametype.integer < GT_TEAM
+                        if ctx.world.cvars.g_gametype.integer < GT_TEAM
                             || OnSameTeam(
                                 ctx,
                                 ctx.entity_id_of(enemy_ptr),
@@ -643,11 +640,11 @@ pub fn VEH_TurretThink(
                 if !(*turretEnemy).client.is_null() {
                     // hold on to clients for a min of 3 seconds
                     (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
-                        (*ctx.world_raw()).level.time + 3000;
+                        ctx.world.level.time + 3000;
                 } else {
                     // hold less
                     (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
-                        (*ctx.world_raw()).level.time + 500;
+                        ctx.world.level.time + 500;
                 }
             }
         }

@@ -65,7 +65,7 @@ use mp_qshared::shared::MASK_SHOT;
 #[inline]
 unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -85,23 +85,22 @@ pub const APEX_HEIGHT: f32 = 200.0;
 /// Source: `oracle/codemp/game/NPC_behavior.c:29-183`
 pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
-        let base = world.g_entities.as_ptr();
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let base = ctx.world.g_entities.as_ptr();
 
         // Make sure we're still headed where we want to capture.
         if let Some(captureGoal) = (*NPCInfo).captureGoal {
-            let cap = &mut world.g_entities[captureGoal.index()] as *mut gentity_t;
-            let __h429 = ctx.entity_id_of(NPC).unwrap();
-            NPC_SetMoveGoal(ctx, __h429, (*cap).r.currentOrigin, 16, qtrue, -1, None);
-            (*NPCInfo).goalTime = world.level.time + 100000;
+            let cap = &mut ctx.world.g_entities[captureGoal.index()] as *mut gentity_t;
+            let npc_id = ctx.entity_id_of(NPC).unwrap();
+            NPC_SetMoveGoal(ctx, npc_id, (*cap).r.currentOrigin, 16, qtrue, -1, None);
+            (*NPCInfo).goalTime = ctx.world.level.time + 100000;
         }
 
         NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
 
         if let Some(enemy_id) = (*NPC).enemy {
-            let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             let mut delta = [0.0f32; 3];
             let mut forward = [0.0f32; 3];
             let mut angleToEnemy = [0.0f32; 3];
@@ -117,8 +116,8 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
             let max_aim_off: f32 = 64.0;
 
             _VectorMA((*enemy).r.absmin, 0.5, (*enemy).r.maxs, &mut enemy_org);
-            let __h430 = ctx.entity_id_of(NPC);
-            CalcEntitySpot(ctx, __h430, spot_t::SPOT_WEAPON, &mut muzzle);
+            let muzzle_ent_id = ctx.entity_id_of(NPC);
+            CalcEntitySpot(ctx, muzzle_ent_id, spot_t::SPOT_WEAPON, &mut muzzle);
 
             _VectorSubtract(enemy_org, muzzle, &mut delta);
             vectoangles(delta, &mut angleToEnemy);
@@ -137,18 +136,18 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
             if attack_ok != qfalse {
                 NPC_UpdateShootAngles(ctx, angleToEnemy, qfalse, qtrue);
 
-                (*NPCInfo).enemyLastVisibility = world.globals.enemyVisibility;
-                let __h431 = ctx.entity_id_of(enemy);
-                let vis = NPC_CheckVisibility(ctx, __h431, CHECK_FOV);
-                world.globals.enemyVisibility = vis;
+                (*NPCInfo).enemyLastVisibility = ctx.world.globals.enemyVisibility;
+                let enemy_vis_id = ctx.entity_id_of(enemy);
+                let vis = NPC_CheckVisibility(ctx, enemy_vis_id, CHECK_FOV);
+                ctx.world.globals.enemyVisibility = vis;
 
                 if vis == visibility_t::VIS_FOV {
                     attack_ok = qtrue;
-                    let __h432 = ctx.entity_id_of(enemy);
-                    CalcEntitySpot(ctx, __h432, spot_t::SPOT_HEAD, &mut enemy_head);
+                    let enemy_head_id = ctx.entity_id_of(enemy);
+                    CalcEntitySpot(ctx, enemy_head_id, spot_t::SPOT_HEAD, &mut enemy_head);
 
                     if attack_ok != qfalse {
-                        let mut tr: trace_t = unsafe { core::mem::zeroed() };
+                        let mut tr: trace_t = core::mem::zeroed();
                         trap::Trace(
                             ctx.engine,
                             GTraceArgs::new(
@@ -162,7 +161,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                             ),
                         );
                         let mut traceEnt =
-                            &mut world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+                            &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
                         let npc_client = (*NPC).client as *mut gclient_t;
                         let enemy_client_id = ent_id_opt(base, traceEnt);
                         let trace_is_enemy = enemy_client_id == Some(enemy_id);
@@ -188,7 +187,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                                 ),
                             );
                             traceEnt =
-                                &mut world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+                                &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
                         }
 
                         _VectorCopy(tr.endpos, &mut hitspot);
@@ -233,11 +232,11 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                                 let mut aim_off = VectorLength(diff);
                                 // Oracle uses the `random()` macro (randSeed stream), not flrand.
                                 // Source: `oracle/codemp/game/NPC_behavior.c:140,146`
-                                if aim_off > world.bg_state.rng.random() * max_aim_off {
+                                if aim_off > ctx.world.bg_state.rng.random() * max_aim_off {
                                     attack_scale *= 0.75;
                                     _VectorSubtract(hitspot, enemy_head, &mut diff);
                                     aim_off = VectorLength(diff);
-                                    if aim_off > world.bg_state.rng.random() * max_aim_off {
+                                    if aim_off > ctx.world.bg_state.rng.random() * max_aim_off {
                                         attack_ok = qfalse;
                                     }
                                 }
@@ -250,7 +249,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
 
             if attack_ok != qfalse {
                 if NPC_CheckAttack(ctx, attack_scale) != qfalse {
-                    world.globals.enemyVisibility = visibility_t::VIS_SHOOT;
+                    ctx.world.globals.enemyVisibility = visibility_t::VIS_SHOOT;
                     WeaponThink(ctx, qtrue);
                 } else {
                     attack_ok = qfalse;
@@ -261,7 +260,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
             NPC_UpdateShootAngles(ctx, (*client).ps.viewangles, qtrue, qtrue);
         }
 
-        if world.globals.ucmd.forwardmove == 0 && world.globals.ucmd.rightmove == 0 {
+        if ctx.world.globals.ucmd.forwardmove == 0 && ctx.world.globals.ucmd.rightmove == 0 {
             // We reached our captureGoal.
             if trap::ICARUS_IsInitialized(
                 ctx.engine,
@@ -298,9 +297,8 @@ pub fn BeamOut(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let world = &mut *ctx.world_raw();
         // fixme: doesn't actually go away!
-        (*self_).nextthink = world.level.time + 1500;
+        (*self_).nextthink = ctx.world.level.time + 1500;
         // fn-ptr field -> fn-ID enum (shape_mismatch: gentity_t.think's
         // declared type is still the raw `unsafe extern "C" fn` pointer in this
         // worktree, not `Option<EntThink>` — writing the enum assignment anyway
@@ -319,9 +317,8 @@ pub fn BeamOut(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:213-244`
 pub fn NPC_BSCinematic(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
 
         if (*NPCInfo).scriptFlags & SCF_FIRE_WEAPON != 0 {
             WeaponThink(ctx, qtrue);
@@ -334,7 +331,7 @@ pub fn NPC_BSCinematic(ctx: &mut GameContext) {
 
         if let Some(watch_id) = (*NPCInfo).watchTarget {
             // Have an entity which we want to keep facing.
-            let watch = &mut world.g_entities[watch_id.index()] as *mut gentity_t;
+            let watch = &mut ctx.world.g_entities[watch_id.index()] as *mut gentity_t;
             let mut eyes = [0.0f32; 3];
             let mut viewSpot = [0.0f32; 3];
             let mut viewvec = [0.0f32; 3];
@@ -388,19 +385,18 @@ pub fn NPC_BSInvestigate() {
 /// Source: `oracle/codemp/game/NPC_behavior.c:409-494`
 pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboolean {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
-        let base = world.g_entities.as_ptr();
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let base = ctx.world.g_entities.as_ptr();
 
-        let owner = world.level.alertEvents[alertEventNum as usize].owner;
-        let invAdd = world.level.alertEvents[alertEventNum as usize].level as c_int;
-        let soundRad = world.level.alertEvents[alertEventNum as usize].radius;
+        let owner = ctx.world.level.alertEvents[alertEventNum as usize].owner;
+        let invAdd = ctx.world.level.alertEvents[alertEventNum as usize].level as c_int;
+        let soundRad = ctx.world.level.alertEvents[alertEventNum as usize].radius;
         let earshot = (*NPCInfo).stats.earshot;
 
         let mut soundPos = [0.0f32; 3];
         _VectorCopy(
-            world.level.alertEvents[alertEventNum as usize].position,
+            ctx.world.level.alertEvents[alertEventNum as usize].position,
             &mut soundPos,
         );
 
@@ -445,7 +441,7 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
             && (*npc_client).playerTeam != 0
             && (*owner_client).playerTeam != (*npc_client).playerTeam
         {
-            let __h433 = ctx.entity_id_of(NPC);
+            let npc_id = ctx.entity_id_of(NPC);
             if (*NPCInfo).investigateCount as f32 >= ((*NPCInfo).stats.vigilance * 200.0) {
                 // If investigateCount == 10, just take it as enemy and go.
                 if ValidEnemy(ctx, ctx.entity_id_of(owner)) != qfalse {
@@ -459,15 +455,15 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
                 (*NPCInfo).investigateCount += invAdd;
             }
             // Run awakescript.
-            G_ActivateBehavior(ctx, __h433, BSET_AWAKE as c_int);
+            G_ActivateBehavior(ctx, npc_id, BSET_AWAKE as c_int);
 
             (*NPCInfo).eventOwner = owner_id;
             _VectorCopy(soundPos, &mut (*NPCInfo).investigateGoal);
             if (*NPCInfo).investigateCount > 20 {
-                (*NPCInfo).investigateDebounceTime = world.level.time + 10000;
+                (*NPCInfo).investigateDebounceTime = ctx.world.level.time + 10000;
             } else {
                 (*NPCInfo).investigateDebounceTime =
-                    world.level.time + (*NPCInfo).investigateCount * 500;
+                    ctx.world.level.time + (*NPCInfo).investigateCount * 500;
             }
             (*NPCInfo).tempBehavior = BS_INVESTIGATE;
             return qtrue;
@@ -481,17 +477,14 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
 ///
 /// Source: `oracle/codemp/game/NPC_behavior.c:500-521`
 pub fn NPC_BSSleep(ctx: &mut GameContext) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
+    let NPC = ctx.world.globals.NPC as *mut gentity_t;
 
-        let alertEvent = NPC_CheckAlertEvents(ctx, qtrue, qfalse, -1, qfalse, AEL_MINOR as c_int);
+    let alertEvent = NPC_CheckAlertEvents(ctx, qtrue, qfalse, -1, qfalse, AEL_MINOR as c_int);
 
-        // There is an event to look at.
-        if alertEvent >= 0 {
-            G_ActivateBehavior(ctx, ctx.entity_id_of(NPC), BSET_AWAKE as c_int);
-            return;
-        }
+    // There is an event to look at.
+    if alertEvent >= 0 {
+        G_ActivateBehavior(ctx, ctx.entity_id_of(NPC), BSET_AWAKE as c_int);
+        return;
     }
 }
 
@@ -500,10 +493,9 @@ pub fn NPC_BSSleep(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:524-729`
 pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
-        let base = world.g_entities.as_ptr();
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let base = ctx.world.g_entities.as_ptr();
         let npc_client = (*NPC).client as *mut gclient_t;
 
         let leader_id = (*npc_client).leader;
@@ -517,15 +509,15 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
             }
             return;
         }
-        let leader = &mut world.g_entities[leader_id.unwrap().index()] as *mut gentity_t;
+        let leader = &mut ctx.world.g_entities[leader_id.unwrap().index()] as *mut gentity_t;
 
-        let __h445 = ctx.entity_id_of(leader);
-        let __h786 = ctx.entity_id_of(leader);
+        let leader_ent_id = ctx.entity_id_of(leader);
+        let leader_vis_id = ctx.entity_id_of(leader);
         if (*NPC).enemy.is_none() {
             // No enemy, find one.
             NPC_CheckEnemy(
                 ctx,
-                if (*NPCInfo).confusionTime < world.level.time {
+                if (*NPCInfo).confusionTime < ctx.world.level.time {
                     qtrue
                 } else {
                     qfalse
@@ -535,17 +527,17 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
             );
             if (*NPC).enemy.is_some() {
                 (*NPCInfo).enemyCheckDebounceTime =
-                    world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
+                    ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
             } else {
                 if (*NPCInfo).scriptFlags & SCF_IGNORE_ALERTS == 0 {
                     let eventID =
                         NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, AEL_MINOR as c_int);
-                    if world.level.alertEvents[eventID as usize].level as c_int
+                    if ctx.world.level.alertEvents[eventID as usize].level as c_int
                         >= AEL_SUSPICIOUS as c_int
                         && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0
                     {
-                        (*NPCInfo).lastAlertID = world.level.alertEvents[eventID as usize].ID;
-                        let ev_owner = world.level.alertEvents[eventID as usize].owner;
+                        (*NPCInfo).lastAlertID = ctx.world.level.alertEvents[eventID as usize].ID;
+                        let ev_owner = ctx.world.level.alertEvents[eventID as usize].owner;
                         let ev_owner_client = if ev_owner.is_null() {
                             core::ptr::null_mut()
                         } else {
@@ -558,20 +550,16 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                         {
                             // Not an enemy.
                         } else {
-                            let __h434 = ctx.entity_id_of(NPC).unwrap();
-                            let __h435 = ctx.entity_id_of(ev_owner);
-                            G_SetEnemy(ctx, __h434, __h435);
+                            let npc_id = ctx.entity_id_of(NPC).unwrap();
+                            let ev_owner_id = ctx.entity_id_of(ev_owner);
+                            G_SetEnemy(ctx, npc_id, ev_owner_id);
                             (*NPCInfo).enemyCheckDebounceTime =
-                                world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
-                            (*NPCInfo).enemyLastSeenTime = world.level.time;
+                                ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
+                            (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
                             let s = cstr("attackDelay");
-                            let __h436 = ctx.entity_id_of(NPC);
-                            TIMER_Set(
-                                ctx,
-                                __h436,
-                                s.as_ptr(),
-                                world.bg_state.rng.Q_irand(500, 1000),
-                            );
+                            let atk_timer_id = ctx.entity_id_of(NPC);
+                            let atk_delay = ctx.world.bg_state.rng.Q_irand(500, 1000);
+                            TIMER_Set(ctx, atk_timer_id, s.as_ptr(), atk_delay);
                         }
                     }
                 }
@@ -583,36 +571,36 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                     && (*leader).enemy != ent_id_opt(base, NPC)
                 {
                     let l_enemy_id = (*leader).enemy.unwrap();
-                    let l_enemy = &mut world.g_entities[l_enemy_id.index()] as *mut gentity_t;
+                    let l_enemy = &mut ctx.world.g_entities[l_enemy_id.index()] as *mut gentity_t;
                     let l_enemy_client = (*l_enemy).client as *mut gclient_t;
                     let allied_ok = !l_enemy_client.is_null()
                         && (*l_enemy_client).playerTeam == (*npc_client).enemyTeam;
                     if allied_ok && (*l_enemy).health > 0 {
-                        let __h437 = ctx.entity_id_of(NPC).unwrap();
-                        let __h438 = ctx.entity_id_of(l_enemy);
-                        G_SetEnemy(ctx, __h437, __h438);
+                        let ally_self_id = ctx.entity_id_of(NPC).unwrap();
+                        let ally_enemy_id = ctx.entity_id_of(l_enemy);
+                        G_SetEnemy(ctx, ally_self_id, ally_enemy_id);
                         (*NPCInfo).enemyCheckDebounceTime =
-                            world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
-                        (*NPCInfo).enemyLastSeenTime = world.level.time;
+                            ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
+                        (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
                     }
                 }
             }
         } else {
             let enemy_id = (*NPC).enemy.unwrap();
-            let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).health <= 0 || ((*enemy).flags & FL_NOTARGET) != 0 {
-                let __h439 = ctx.entity_id_of(NPC).unwrap();
-                G_ClearEnemy(ctx, __h439);
-                if (*NPCInfo).enemyCheckDebounceTime > world.level.time + 1000 {
+                let npc_clear_id = ctx.entity_id_of(NPC).unwrap();
+                G_ClearEnemy(ctx, npc_clear_id);
+                if (*NPCInfo).enemyCheckDebounceTime > ctx.world.level.time + 1000 {
                     (*NPCInfo).enemyCheckDebounceTime =
-                        world.level.time + world.bg_state.rng.Q_irand(1000, 2000);
+                        ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(1000, 2000);
                 }
             } else if (*npc_client).ps.weapon != 0
-                && (*NPCInfo).enemyCheckDebounceTime < world.level.time
+                && (*NPCInfo).enemyCheckDebounceTime < ctx.world.level.time
             {
                 NPC_CheckEnemy(
                     ctx,
-                    if (*NPCInfo).confusionTime < world.level.time
+                    if (*NPCInfo).confusionTime < ctx.world.level.time
                         || (*NPCInfo).tempBehavior != BS_FOLLOW_LEADER
                     {
                         qtrue
@@ -628,8 +616,8 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
         if (*NPC).enemy.is_some() && (*npc_client).ps.weapon != 0 {
             // If have an enemy, face him and fire.
             let enemy_id = (*NPC).enemy.unwrap();
-            let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
-            let __h440 = ctx.entity_id_of(enemy);
+            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
+            let enemy_vis_id = ctx.entity_id_of(enemy);
             if (*npc_client).ps.weapon == WP_SABER as c_int {
                 if (*NPCInfo).tempBehavior != BS_FOLLOW_LEADER {
                     (*NPCInfo).tempBehavior = BS_HUNT_AND_KILL;
@@ -638,8 +626,8 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                 }
             }
 
-            let vis = NPC_CheckVisibility(ctx, __h440, CHECK_FOV | CHECK_SHOOT);
-            world.globals.enemyVisibility = vis;
+            let vis = NPC_CheckVisibility(ctx, enemy_vis_id, CHECK_FOV | CHECK_SHOOT);
+            ctx.world.globals.enemyVisibility = vis;
             if (vis as c_int) > (visibility_t::VIS_PVS as c_int) {
                 // Face.
                 let mut enemy_org = [0.0f32; 3];
@@ -647,12 +635,12 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                 let mut delta = [0.0f32; 3];
                 let mut angleToEnemy = [0.0f32; 3];
 
-                let __h441 = ctx.entity_id_of(enemy);
-                CalcEntitySpot(ctx, __h441, spot_t::SPOT_HEAD, &mut enemy_org);
+                let enemy_org_id = ctx.entity_id_of(enemy);
+                CalcEntitySpot(ctx, enemy_org_id, spot_t::SPOT_HEAD, &mut enemy_org);
                 NPC_AimWiggle(ctx, &mut enemy_org);
 
-                let __h442 = ctx.entity_id_of(NPC);
-                CalcEntitySpot(ctx, __h442, spot_t::SPOT_WEAPON, &mut muzzle);
+                let npc_muzzle_id = ctx.entity_id_of(NPC);
+                CalcEntitySpot(ctx, npc_muzzle_id, spot_t::SPOT_WEAPON, &mut muzzle);
 
                 _VectorSubtract(enemy_org, muzzle, &mut delta);
                 vectoangles(delta, &mut angleToEnemy);
@@ -691,10 +679,10 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
             let mut delta = [0.0f32; 3];
             let mut angleToLeader = [0.0f32; 3];
 
-            let __h443 = ctx.entity_id_of(leader);
-            CalcEntitySpot(ctx, __h443, spot_t::SPOT_HEAD, &mut leaderHead);
-            let __h444 = ctx.entity_id_of(NPC);
-            CalcEntitySpot(ctx, __h444, spot_t::SPOT_HEAD, &mut head);
+            let leader_head_id = ctx.entity_id_of(leader);
+            CalcEntitySpot(ctx, leader_head_id, spot_t::SPOT_HEAD, &mut leaderHead);
+            let npc_head_id = ctx.entity_id_of(NPC);
+            CalcEntitySpot(ctx, npc_head_id, spot_t::SPOT_HEAD, &mut head);
             _VectorSubtract(leaderHead, head, &mut delta);
             vectoangles(delta, &mut angleToLeader);
             VectorNormalize(&mut delta);
@@ -705,7 +693,8 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
         }
 
         // Leader visible?
-        let leaderVis = NPC_CheckVisibility(ctx, __h786, CHECK_PVS | CHECK_360 | CHECK_SHOOT);
+        let leaderVis =
+            NPC_CheckVisibility(ctx, leader_vis_id, CHECK_PVS | CHECK_360 | CHECK_SHOOT);
 
         let curAnim = (*npc_client).ps.legsAnim;
         if curAnim != BOTH_ATTACK1 as c_int
@@ -739,28 +728,28 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                 if (leaderVis as c_int) == (visibility_t::VIS_SHOOT as c_int)
                     && leaderDist < minrundist
                 {
-                    world.globals.ucmd.buttons |= BUTTON_WALKING as c_int;
+                    ctx.world.globals.ucmd.buttons |= BUTTON_WALKING as c_int;
                 }
             } else if leaderDist < backupdist {
                 (*NPCInfo).goalEntity = ent_id_opt(base, leader);
                 NPC_SlideMoveToGoal(ctx);
 
-                world.globals.ucmd.forwardmove = -world.globals.ucmd.forwardmove;
-                world.globals.ucmd.rightmove = -world.globals.ucmd.rightmove;
+                ctx.world.globals.ucmd.forwardmove = -ctx.world.globals.ucmd.forwardmove;
+                ctx.world.globals.ucmd.rightmove = -ctx.world.globals.ucmd.rightmove;
                 _VectorScale(
                     (*npc_client).ps.moveDir,
                     -1.0,
                     &mut (*npc_client).ps.moveDir,
                 );
             }
-            if world.globals.ucmd.forwardmove != 0
-                || world.globals.ucmd.rightmove != 0
+            if ctx.world.globals.ucmd.forwardmove != 0
+                || ctx.world.globals.ucmd.rightmove != 0
                 || VectorCompare(vec3_origin, (*npc_client).ps.moveDir) != 0
             {
                 crate::NPC_AI_Jedi::NPC_MoveDirClear(
                     ctx,
-                    world.globals.ucmd.forwardmove as c_int,
-                    world.globals.ucmd.rightmove as c_int,
+                    ctx.world.globals.ucmd.forwardmove as c_int,
+                    ctx.world.globals.ucmd.rightmove as c_int,
                     qtrue,
                 );
             }
@@ -773,16 +762,15 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:733-919`
 pub fn NPC_BSJump(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
-        let base = world.g_entities.as_ptr();
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let base = ctx.world.g_entities.as_ptr();
         let npc_client = (*NPC).client as *mut gclient_t;
 
         let Some(goal_id) = (*NPCInfo).goalEntity else {
             return;
         };
-        let goal = &mut world.g_entities[goal_id.index()] as *mut gentity_t;
+        let goal = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
 
         if (*NPCInfo).jumpState != JS_JUMPING && (*NPCInfo).jumpState != JS_LANDING {
             // Face navgoal.
@@ -881,7 +869,7 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
                 (*NPCInfo).jumpState = JS_JUMPING;
             }
             jumpState_t::JS_JUMPING => {
-                if world.globals.showBBoxes != 0 {
+                if ctx.world.globals.showBBoxes != 0 {
                     let mut p1 = [0.0f32; 3];
                     let mut p2 = [0.0f32; 3];
                     _VectorAdd((*NPC).r.mins, (*NPC).pos1, &mut p1);
@@ -919,9 +907,9 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
                     (*NPCInfo).jumpState = JS_WAITING;
 
                     NPC_ClearGoal(ctx);
-                    (*NPCInfo).goalTime = world.level.time;
+                    (*NPCInfo).goalTime = ctx.world.level.time;
                     (*NPCInfo).aiFlags &= !NPCAI_MOVING;
-                    world.globals.ucmd.forwardmove = 0;
+                    ctx.world.globals.ucmd.forwardmove = 0;
                     (*NPC).flags &= !FL_NO_KNOCKBACK;
                     trap::ICARUS_TaskIDComplete(
                         ctx.engine,
@@ -941,22 +929,21 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:921-937`
 pub fn NPC_BSRemove(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
 
         NPC_UpdateAngles(ctx, qtrue, qtrue);
         if trap::InPVS(
             ctx.engine,
             GInPvsArgs::new(
                 &(*NPC).r.currentOrigin as *const _,
-                &world.g_entities[0].r.currentOrigin as *const _,
+                &ctx.world.g_entities[0].r.currentOrigin as *const _,
             ),
         ) == 0
         {
             let target3 = (*NPC).target3;
-            let __h446 = ctx.entity_id_of(NPC);
-            let __h447 = ctx.entity_id_of(NPC);
-            G_UseTargets2(ctx, __h446, __h447, target3);
+            let self_id = ctx.entity_id_of(NPC);
+            let activator_id = ctx.entity_id_of(NPC);
+            G_UseTargets2(ctx, self_id, activator_id, target3);
             (*NPC).s.eFlags |= EF_NODRAW;
             (*NPC).s.eType = entityType_t::ET_INVISIBLE as c_int;
             (*NPC).r.contents = 0;
@@ -966,7 +953,7 @@ pub fn NPC_BSRemove(ctx: &mut GameContext) {
             // Disappear in half a second.
             // (shape mismatch, see BeamOut note above.)
             (*NPC).think = Some(EntThink::G_FreeEntity).into();
-            (*NPC).nextthink = world.level.time + FRAMETIME;
+            (*NPC).nextthink = ctx.world.level.time + FRAMETIME;
         }
     }
 }
@@ -976,10 +963,9 @@ pub fn NPC_BSRemove(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:939-1124`
 pub fn NPC_BSSearch(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
-        let base = world.g_entities.as_ptr();
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let base = ctx.world.g_entities.as_ptr();
 
         NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
         if (*NPC).enemy.is_some() {
@@ -997,7 +983,7 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
             let Some(tempGoal_id) = (*NPCInfo).tempGoal else {
                 return;
             };
-            let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+            let tempGoal = &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
 
             (*NPCInfo).goalEntity = (*NPCInfo).tempGoal;
 
@@ -1012,9 +998,9 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
             }
 
             if VectorLengthSquared(vec) < minGoalReachedDistSquared {
-                let __h448 = ctx.entity_id_of(NPC).unwrap();
+                let npc_id = ctx.entity_id_of(NPC).unwrap();
                 // Close enough, just got there.
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, __h448, WAYPOINT_NONE);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, npc_id, WAYPOINT_NONE);
 
                 if (*NPCInfo).homeWp == WAYPOINT_NONE || (*NPC).waypoint == WAYPOINT_NONE {
                     if (*NPCInfo).tempBehavior == BS_SEARCH {
@@ -1029,47 +1015,47 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
                 if (*NPC).waypoint == (*NPCInfo).homeWp {
                     if (*NPCInfo).aiFlags & NPCAI_ENROUTE_TO_HOMEWP != 0 {
                         (*NPCInfo).aiFlags &= !NPCAI_ENROUTE_TO_HOMEWP;
-                        let __h449 = ctx.entity_id_of(NPC);
-                        G_ActivateBehavior(ctx, __h449, BSET_LOSTENEMY as c_int);
+                        let activate_id = ctx.entity_id_of(NPC);
+                        G_ActivateBehavior(ctx, activate_id, BSET_LOSTENEMY as c_int);
                     }
                 }
 
-                if world.bg_state.rng.Q_irand(0, 1) == 0 {
-                    let __h450 = ctx.entity_id_of(NPC).unwrap();
+                if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
+                    let lookaround_anim_id = ctx.entity_id_of(NPC).unwrap();
                     NPC_SetAnim(
                         ctx,
-                        __h450,
+                        lookaround_anim_id,
                         SETANIM_BOTH,
                         BOTH_GUARD_LOOKAROUND1 as c_int,
                         SETANIM_FLAG_NORMAL,
                     );
                 } else {
-                    let __h451 = ctx.entity_id_of(NPC).unwrap();
+                    let idle_anim_id = ctx.entity_id_of(NPC).unwrap();
                     NPC_SetAnim(
                         ctx,
-                        __h451,
+                        idle_anim_id,
                         SETANIM_BOTH,
                         BOTH_GUARD_IDLE1 as c_int,
                         SETANIM_FLAG_NORMAL,
                     );
                 }
                 (*NPCInfo).investigateDebounceTime =
-                    world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
+                    ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
             } else {
                 NPC_MoveToGoal(ctx, qtrue);
             }
         } else {
-            if (*NPCInfo).investigateDebounceTime > world.level.time {
+            if (*NPCInfo).investigateDebounceTime > ctx.world.level.time {
                 if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
-                    let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+                    let tempGoal = &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                     if (*tempGoal).waypoint != WAYPOINT_NONE {
-                        if world.bg_state.rng.Q_irand(0, 30) == 0 {
+                        if ctx.world.bg_state.rng.Q_irand(0, 30) == 0 {
                             let numEdges = trap::Nav_GetNodeNumEdges(
                                 ctx.engine,
                                 GNavGetnodenumedgesArgs::new((*tempGoal).waypoint),
                             );
                             if numEdges != WAYPOINT_NONE {
-                                let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
+                                let branchNum = ctx.world.bg_state.rng.Q_irand(0, numEdges - 1);
                                 let mut branchPos = [0.0f32; 3];
                                 let mut lookDir = [0.0f32; 3];
                                 let nextWp = trap::Nav_GetNodeEdge(
@@ -1089,26 +1075,26 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
                                     &mut lookDir,
                                 );
                                 (*NPCInfo).desiredYaw = AngleNormalize360(
-                                    vectoyaw(lookDir) + world.bg_state.rng.flrand(-45.0, 45.0),
+                                    vectoyaw(lookDir) + ctx.world.bg_state.rng.flrand(-45.0, 45.0),
                                 );
                             }
                         }
                     }
                 }
             } else {
-                let __h452 = ctx.entity_id_of(NPC).unwrap();
+                let npc_wp_id = ctx.entity_id_of(NPC).unwrap();
                 // Just finished waiting.
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, __h452, WAYPOINT_NONE);
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, npc_wp_id, WAYPOINT_NONE);
 
                 if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
-                    let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+                    let tempGoal = &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                     if (*NPC).waypoint == (*NPCInfo).homeWp {
                         let numEdges = trap::Nav_GetNodeNumEdges(
                             ctx.engine,
                             GNavGetnodenumedgesArgs::new((*tempGoal).waypoint),
                         );
                         if numEdges != WAYPOINT_NONE {
-                            let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
+                            let branchNum = ctx.world.bg_state.rng.Q_irand(0, numEdges - 1);
                             let nextWp = trap::Nav_GetNodeEdge(
                                 ctx.engine,
                                 GNavGetnodeedgeArgs::new((*NPCInfo).homeWp, branchNum),
@@ -1149,14 +1135,13 @@ pub fn NPC_BSSearch(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:1132-1150`
 pub fn NPC_BSSearchStart(ctx: &mut GameContext, homeWp: c_int, bState: bState_t) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
         let mut homeWp = homeWp;
 
         if homeWp == WAYPOINT_NONE {
-            let __h453 = ctx.entity_id_of(NPC).unwrap();
-            homeWp = NAV_FindClosestWaypointForEnt(ctx, __h453, WAYPOINT_NONE);
+            let npc_id = ctx.entity_id_of(NPC).unwrap();
+            homeWp = NAV_FindClosestWaypointForEnt(ctx, npc_id, WAYPOINT_NONE);
             if (*NPC).waypoint == WAYPOINT_NONE {
                 (*NPC).waypoint = homeWp;
             }
@@ -1166,7 +1151,7 @@ pub fn NPC_BSSearchStart(ctx: &mut GameContext, homeWp: c_int, bState: bState_t)
         (*NPCInfo).aiFlags |= NPCAI_ENROUTE_TO_HOMEWP;
         (*NPCInfo).investigateDebounceTime = 0;
         if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
-            let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+            let tempGoal = &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
             trap::Nav_GetNodePosition(
                 ctx.engine,
                 GNavGetnodepositionArgs::new(
@@ -1184,16 +1169,15 @@ pub fn NPC_BSSearchStart(ctx: &mut GameContext, homeWp: c_int, bState: bState_t)
 /// Source: `oracle/codemp/game/NPC_behavior.c:1160-1191`
 pub fn NPC_BSNoClip(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
 
         if !UpdateGoal(ctx).is_null() {
             // PORT-NOTE(goal-invariant): Raven's `if (UpdateGoal())` implies
             // `NPCInfo->goalEntity` is non-NULL on this branch; `NPC_UpdateAngles`
             // still runs at the tail either way, matching Raven's fall-through.
             let goal_id = (*NPCInfo).goalEntity.expect("UpdateGoal() set goalEntity");
-            let goal = &mut world.g_entities[goal_id.index()] as *mut gentity_t;
+            let goal = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
             let mut dir = [0.0f32; 3];
             let mut forward = [0.0f32; 3];
             let mut right = [0.0f32; 3];
@@ -1218,9 +1202,9 @@ pub fn NPC_BSNoClip(ctx: &mut GameContext) {
             let rDot = _DotProduct(right, dir) * 127.0;
             let uDot = _DotProduct(up, dir) * 127.0;
 
-            world.globals.ucmd.forwardmove = fDot.floor() as i8;
-            world.globals.ucmd.rightmove = rDot.floor() as i8;
-            world.globals.ucmd.upmove = uDot.floor() as i8;
+            ctx.world.globals.ucmd.forwardmove = fDot.floor() as i8;
+            ctx.world.globals.ucmd.rightmove = rDot.floor() as i8;
+            ctx.world.globals.ucmd.upmove = uDot.floor() as i8;
         } else {
             let npc_client = (*NPC).client as *mut gclient_t;
             (*npc_client).ps.velocity = [0.0; 3];
@@ -1235,16 +1219,15 @@ pub fn NPC_BSNoClip(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:1193-1286`
 pub fn NPC_BSWander(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
 
         if (*NPCInfo).investigateDebounceTime == 0 {
             let mut minGoalReachedDistSquared: f32 = 64.0;
             let Some(tempGoal_id) = (*NPCInfo).tempGoal else {
                 return;
             };
-            let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+            let tempGoal = &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
 
             (*NPCInfo).goalEntity = (*NPCInfo).tempGoal;
 
@@ -1260,45 +1243,45 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
             }
 
             if VectorLengthSquared(vec) < minGoalReachedDistSquared {
-                let __h454 = ctx.entity_id_of(NPC).unwrap();
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, __h454, WAYPOINT_NONE);
+                let npc_id = ctx.entity_id_of(NPC).unwrap();
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, npc_id, WAYPOINT_NONE);
 
-                if world.bg_state.rng.Q_irand(0, 1) == 0 {
-                    let __h455 = ctx.entity_id_of(NPC).unwrap();
+                if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
+                    let lookaround_anim_id = ctx.entity_id_of(NPC).unwrap();
                     NPC_SetAnim(
                         ctx,
-                        __h455,
+                        lookaround_anim_id,
                         SETANIM_BOTH,
                         BOTH_GUARD_LOOKAROUND1 as c_int,
                         SETANIM_FLAG_NORMAL,
                     );
                 } else {
-                    let __h456 = ctx.entity_id_of(NPC).unwrap();
+                    let idle_anim_id = ctx.entity_id_of(NPC).unwrap();
                     NPC_SetAnim(
                         ctx,
-                        __h456,
+                        idle_anim_id,
                         SETANIM_BOTH,
                         BOTH_GUARD_IDLE1 as c_int,
                         SETANIM_FLAG_NORMAL,
                     );
                 }
                 (*NPCInfo).investigateDebounceTime =
-                    world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
+                    ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
             } else {
                 NPC_MoveToGoal(ctx, qtrue);
             }
         } else {
-            if (*NPCInfo).investigateDebounceTime > world.level.time {
+            if (*NPCInfo).investigateDebounceTime > ctx.world.level.time {
                 if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
-                    let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+                    let tempGoal = &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                     if (*tempGoal).waypoint != WAYPOINT_NONE {
-                        if world.bg_state.rng.Q_irand(0, 30) == 0 {
+                        if ctx.world.bg_state.rng.Q_irand(0, 30) == 0 {
                             let numEdges = trap::Nav_GetNodeNumEdges(
                                 ctx.engine,
                                 GNavGetnodenumedgesArgs::new((*tempGoal).waypoint),
                             );
                             if numEdges != WAYPOINT_NONE {
-                                let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
+                                let branchNum = ctx.world.bg_state.rng.Q_irand(0, numEdges - 1);
                                 let mut branchPos = [0.0f32; 3];
                                 let mut lookDir = [0.0f32; 3];
                                 let nextWp = trap::Nav_GetNodeEdge(
@@ -1318,15 +1301,15 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
                                     &mut lookDir,
                                 );
                                 (*NPCInfo).desiredYaw = AngleNormalize360(
-                                    vectoyaw(lookDir) + world.bg_state.rng.flrand(-45.0, 45.0),
+                                    vectoyaw(lookDir) + ctx.world.bg_state.rng.flrand(-45.0, 45.0),
                                 );
                             }
                         }
                     }
                 }
             } else {
-                let __h457 = ctx.entity_id_of(NPC).unwrap();
-                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, __h457, WAYPOINT_NONE);
+                let npc_wp_id = ctx.entity_id_of(NPC).unwrap();
+                (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, npc_wp_id, WAYPOINT_NONE);
 
                 if (*NPC).waypoint != WAYPOINT_NONE {
                     let numEdges = trap::Nav_GetNodeNumEdges(
@@ -1336,8 +1319,8 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
                     if numEdges != WAYPOINT_NONE {
                         if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
                             let tempGoal =
-                                &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
-                            let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
+                                &mut ctx.world.g_entities[tempGoal_id.index()] as *mut gentity_t;
+                            let branchNum = ctx.world.bg_state.rng.Q_irand(0, numEdges - 1);
                             let nextWp = trap::Nav_GetNodeEdge(
                                 ctx.engine,
                                 GNavGetnodeedgeArgs::new((*NPC).waypoint, branchNum),
@@ -1369,9 +1352,8 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:1317-1339`
 pub fn NPC_Surrender(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
         let npc_client = (*NPC).client as *mut gclient_t;
 
         if (*npc_client).ps.weaponTime != 0 || PM_InKnockDown(&mut (*npc_client).ps) != 0 {
@@ -1383,20 +1365,17 @@ pub fn NPC_Surrender(ctx: &mut GameContext) {
         {
             //WP_DropWeapon( NPC, NULL ); //rwwFIXMEFIXME
         }
-        if (*NPCInfo).surrenderTime < world.level.time - 5000 {
+        if (*NPCInfo).surrenderTime < ctx.world.level.time - 5000 {
             (*NPCInfo).blockedSpeechDebounceTime = 0;
-            let __h458 = ctx.entity_id_of(NPC).unwrap();
-            G_AddVoiceEvent(
-                ctx,
-                __h458,
-                world
-                    .bg_state
-                    .rng
-                    .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
-                3000,
-            );
+            let npc_id = ctx.entity_id_of(NPC).unwrap();
+            let voice_event = ctx
+                .world
+                .bg_state
+                .rng
+                .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int);
+            G_AddVoiceEvent(ctx, npc_id, voice_event, 3000);
         }
-        (*NPCInfo).surrenderTime = world.level.time + 1000;
+        (*NPCInfo).surrenderTime = ctx.world.level.time + 1000;
     }
 }
 
@@ -1405,14 +1384,13 @@ pub fn NPC_Surrender(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_behavior.c:1341-1442`
 pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let npc_client = (*NPC).client as *mut gclient_t;
 
         let Some(enemy_id) = (*NPC).enemy else {
             return qfalse;
         };
-        let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
+        let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
         let enemy_client = (*enemy).client as *mut gclient_t;
 
         if trap::ICARUS_TaskIDPending(
@@ -1423,13 +1401,13 @@ pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
             && (*npc_client).ps.weaponTime == 0
             && PM_InKnockDown(&mut (*npc_client).ps) == 0
             && !enemy_client.is_null()
-            && (*enemy).enemy == ent_id_opt(world.g_entities.as_ptr(), NPC)
+            && (*enemy).enemy == ent_id_opt(ctx.world.g_entities.as_ptr(), NPC)
             && (*enemy).s.weapon != WP_NONE as c_int
             && (*enemy).s.weapon != WP_STUN_BATON as c_int
             && (*enemy).health > 20
-            && (*enemy).painDebounceTime < world.level.time - 3000
+            && (*enemy).painDebounceTime < ctx.world.level.time - 3000
             && (*enemy_client).ps.fd.forcePowerDebounce[FP_SABER_DEFENSE as usize]
-                < world.level.time - 1000
+                < ctx.world.level.time - 1000
         {
             if (*NPC).s.weapon != WP_ROCKET_LAUNCHER as c_int
                 && (*NPC).s.weapon != WP_REPEATER as c_int
@@ -1441,7 +1419,7 @@ pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
                         return qfalse;
                     }
                     if NPC_SomeoneLookingAtMe(ctx, ctx.entity_id_of(NPC).unwrap()) != qfalse
-                        && (*NPC).painDebounceTime > world.level.time
+                        && (*NPC).painDebounceTime > ctx.world.level.time
                     {
                         // Fall through.
                     } else {
@@ -1483,14 +1461,13 @@ pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_behavior.c:1444-1558`
 pub fn NPC_BSFlee(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
-        let base = world.g_entities.as_ptr();
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let base = ctx.world.g_entities.as_ptr();
 
         let flee_s = cstr("flee");
-        let __h459 = ctx.entity_id_of(NPC);
-        if TIMER_Done(ctx, __h459, flee_s.as_ptr()) != 0 && (*NPCInfo).tempBehavior == BS_FLEE {
+        let npc_id = ctx.entity_id_of(NPC);
+        if TIMER_Done(ctx, npc_id, flee_s.as_ptr()) != 0 && (*NPCInfo).tempBehavior == BS_FLEE {
             (*NPCInfo).tempBehavior = BS_DEFAULT;
             (*NPCInfo).squadState = SQUAD_IDLE;
         }
@@ -1506,13 +1483,13 @@ pub fn NPC_BSFlee(ctx: &mut GameContext) {
         }
 
         if let Some(goal_id) = goal_id {
-            let goal = &mut world.g_entities[goal_id.index()] as *mut gentity_t;
+            let goal = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
             let mut moved;
             let mut reverseCourse = qtrue;
 
             if (*NPC).waypoint == WAYPOINT_NONE {
-                let __h460 = ctx.entity_id_of(NPC).unwrap();
-                (*NPC).waypoint = NAV_GetNearestNode(ctx, __h460, (*NPC).lastWaypoint);
+                let nav_npc_id = ctx.entity_id_of(NPC).unwrap();
+                (*NPC).waypoint = NAV_GetNearestNode(ctx, nav_npc_id, (*NPC).lastWaypoint);
             }
             if (*NPC).waypoint != WAYPOINT_NONE {
                 let numEdges = trap::Nav_GetNodeNumEdges(
@@ -1544,11 +1521,12 @@ pub fn NPC_BSFlee(ctx: &mut GameContext) {
 
                         _VectorSubtract(branchPos, (*NPC).r.currentOrigin, &mut runDir);
                         VectorNormalize(&mut runDir);
-                        let __h461 = ctx.entity_id_of(NPC).unwrap();
-                        if _DotProduct(runDir, dangerDir) > world.bg_state.rng.flrand(0.0, 0.5) {
+                        let move_goal_id = ctx.entity_id_of(NPC).unwrap();
+                        if _DotProduct(runDir, dangerDir) > ctx.world.bg_state.rng.flrand(0.0, 0.5)
+                        {
                             continue;
                         }
-                        NPC_SetMoveGoal(ctx, __h461, branchPos, 0, qtrue, -1, None);
+                        NPC_SetMoveGoal(ctx, move_goal_id, branchPos, 0, qtrue, -1, None);
                         reverseCourse = qfalse;
                         break;
                     }
@@ -1573,11 +1551,11 @@ pub fn NPC_BSFlee(ctx: &mut GameContext) {
                 (*NPCInfo).distToGoal = dist;
                 (*NPCInfo).desiredYaw = vectoyaw(dir);
                 (*NPCInfo).desiredPitch = 0.0;
-                world.globals.ucmd.forwardmove = 127;
+                ctx.world.globals.ucmd.forwardmove = 127;
             } else if reverseCourse != qfalse {
                 (*NPCInfo).desiredYaw *= -1.0;
             }
-            world.globals.ucmd.buttons &= !(BUTTON_WALKING as c_int);
+            ctx.world.globals.ucmd.buttons &= !(BUTTON_WALKING as c_int);
         }
         NPC_UpdateAngles(ctx, qtrue, qtrue);
 
@@ -1599,13 +1577,12 @@ pub fn NPC_StartFlee(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let enemy: *mut gentity_t = unsafe { ent_ptr(ctx, enemy) };
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
         let npc_client = (*NPC).client as *mut gclient_t;
         let mut cp: c_int = -1;
 
-        let __h462 = ctx.entity_id_of(NPC);
+        let npc_id = ctx.entity_id_of(NPC);
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
             GIcarusTaskidpendingArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int),
@@ -1614,13 +1591,13 @@ pub fn NPC_StartFlee(
             return;
         }
 
-        if G_ActivateBehavior(ctx, __h462, BSET_FLEE as c_int) != 0 {
+        if G_ActivateBehavior(ctx, npc_id, BSET_FLEE as c_int) != 0 {
             return;
         }
         if !enemy.is_null() {
-            let __h463 = ctx.entity_id_of(NPC).unwrap();
-            let __h464 = ctx.entity_id_of(enemy);
-            G_SetEnemy(ctx, __h463, __h464);
+            let self_id = ctx.entity_id_of(NPC).unwrap();
+            let enemy_id = ctx.entity_id_of(enemy);
+            G_SetEnemy(ctx, self_id, enemy_id);
         }
 
         if dangerLevel > AEL_DANGER as c_int
@@ -1674,11 +1651,11 @@ pub fn NPC_StartFlee(
 
         if cp != -1 {
             NPC_SetCombatPoint(ctx, cp);
-            let __h465 = ctx.entity_id_of(NPC).unwrap();
+            let move_goal_id = ctx.entity_id_of(NPC).unwrap();
             NPC_SetMoveGoal(
                 ctx,
-                __h465,
-                world.level.combatPoints[cp as usize].origin,
+                move_goal_id,
+                ctx.world.level.combatPoints[cp as usize].origin,
                 8,
                 qtrue,
                 cp,
@@ -1691,36 +1668,24 @@ pub fn NPC_StartFlee(
                 return;
             } else {
                 (*NPCInfo).tempBehavior = BS_FLEE;
-                let __h466 = ctx.entity_id_of(NPC).unwrap();
-                NPC_SetMoveGoal(ctx, __h466, dangerPoint, 0, qtrue, -1, None);
+                let flee_goal_id = ctx.entity_id_of(NPC).unwrap();
+                NPC_SetMoveGoal(ctx, flee_goal_id, dangerPoint, 0, qtrue, -1, None);
                 _VectorCopy(dangerPoint, &mut (*NPCInfo).investigateGoal);
             }
         }
         let s = cstr("attackDelay");
-        let __h467 = ctx.entity_id_of(NPC);
-        TIMER_Set(
-            ctx,
-            __h467,
-            s.as_ptr(),
-            world.bg_state.rng.Q_irand(500, 2500),
-        );
+        let atk_timer_id = ctx.entity_id_of(NPC);
+        let atk_delay = ctx.world.bg_state.rng.Q_irand(500, 2500);
+        TIMER_Set(ctx, atk_timer_id, s.as_ptr(), atk_delay);
         (*NPCInfo).squadState = SQUAD_RETREAT;
         let s2 = cstr("flee");
-        let __h468 = ctx.entity_id_of(NPC);
-        TIMER_Set(
-            ctx,
-            __h468,
-            s2.as_ptr(),
-            world.bg_state.rng.Q_irand(fleeTimeMin, fleeTimeMax),
-        );
+        let flee_timer_id = ctx.entity_id_of(NPC);
+        let flee_delay = ctx.world.bg_state.rng.Q_irand(fleeTimeMin, fleeTimeMax);
+        TIMER_Set(ctx, flee_timer_id, s2.as_ptr(), flee_delay);
         let s3 = cstr("panic");
-        let __h469 = ctx.entity_id_of(NPC);
-        TIMER_Set(
-            ctx,
-            __h469,
-            s3.as_ptr(),
-            world.bg_state.rng.Q_irand(1000, 4000),
-        );
+        let panic_timer_id = ctx.entity_id_of(NPC);
+        let panic_delay = ctx.world.bg_state.rng.Q_irand(1000, 4000);
+        TIMER_Set(ctx, panic_timer_id, s3.as_ptr(), panic_delay);
 
         if (*npc_client).NPC_class != class_t::CLASS_PROTOCOL {
             let s4 = cstr("duck");
@@ -1770,9 +1735,8 @@ pub fn G_StartFlee(
 /// Source: `oracle/codemp/game/NPC_behavior.c:1650-1748`
 pub fn NPC_BSEmplaced(ctx: &mut GameContext) {
     unsafe {
-        let world = &mut *ctx.world_raw();
-        let NPC = world.globals.NPC as *mut gentity_t;
-        let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
 
         let mut enemyLOS = qfalse;
         let mut enemyCS = qfalse;
@@ -1780,7 +1744,7 @@ pub fn NPC_BSEmplaced(ctx: &mut GameContext) {
         let mut shoot = qfalse;
         let mut impactPos = [0.0f32; 3];
 
-        if (*NPC).painDebounceTime > world.level.time {
+        if (*NPC).painDebounceTime > ctx.world.level.time {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
@@ -1790,25 +1754,25 @@ pub fn NPC_BSEmplaced(ctx: &mut GameContext) {
         }
 
         if NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
-            if world.bg_state.rng.Q_irand(0, 30) == 0 {
+            if ctx.world.bg_state.rng.Q_irand(0, 30) == 0 {
                 (*NPCInfo).desiredYaw =
-                    (*NPC).s.angles[1] as f32 + world.bg_state.rng.Q_irand(-90, 90) as f32;
+                    (*NPC).s.angles[1] as f32 + ctx.world.bg_state.rng.Q_irand(-90, 90) as f32;
             }
-            if world.bg_state.rng.Q_irand(0, 30) == 0 {
-                (*NPCInfo).desiredPitch = world.bg_state.rng.Q_irand(-20, 20) as f32;
+            if ctx.world.bg_state.rng.Q_irand(0, 30) == 0 {
+                (*NPCInfo).desiredPitch = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
             }
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
 
         if let Some(enemy_id) = (*NPC).enemy {
-            let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             if NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
                 enemyLOS = qtrue;
 
-                let __h470 = ctx.entity_id_of(enemy);
-                let hit = NPC_ShotEntity(ctx, __h470, Some(&mut impactPos));
-                let hitEnt = &mut world.g_entities[hit as usize] as *mut gentity_t;
+                let enemy_shot_id = ctx.entity_id_of(enemy);
+                let hit = NPC_ShotEntity(ctx, enemy_shot_id, Some(&mut impactPos));
+                let hitEnt = &mut ctx.world.g_entities[hit as usize] as *mut gentity_t;
 
                 if hit == (*enemy).s.number || (!hitEnt.is_null() && (*hitEnt).takedamage != 0) {
                     enemyCS = qtrue;
@@ -1839,7 +1803,8 @@ pub fn NPC_BSEmplaced(ctx: &mut GameContext) {
 
             if (*enemy).enemy.is_some() {
                 let enemy_enemy_id = (*enemy).enemy.unwrap();
-                let enemy_enemy = &mut world.g_entities[enemy_enemy_id.index()] as *mut gentity_t;
+                let enemy_enemy =
+                    &mut ctx.world.g_entities[enemy_enemy_id.index()] as *mut gentity_t;
                 if (*enemy).s.weapon == WP_SABER as c_int
                     && (*enemy_enemy).s.weapon == WP_SABER as c_int
                 {

@@ -97,9 +97,9 @@ pub fn G_RunExPhys(
                 );
                 if tr.startsolid != 0 || tr.allsolid != 0 {
                     if let Some(touch_fn) = (*ent).touch.get() {
-                        let __h542 = &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize]
-                            as *mut gentity_t;
-                        crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, __h542, &mut tr);
+                        let other_ent =
+                            &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+                        crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, other_ent, &mut tr);
                     }
                 }
             }
@@ -156,7 +156,7 @@ pub fn G_RunExPhys(
                         &mut matrix as *mut mdxaBone_t,
                         &gbmAngles as *const vec3_t,
                         &(*ent).r.currentOrigin as *const vec3_t,
-                        (*ctx.world_raw()).level.time,
+                        ctx.world.level.time,
                         core::ptr::null_mut(),
                         &(*ent).modelScale as *const vec3_t,
                     ),
@@ -233,7 +233,7 @@ pub fn G_RunExPhys(
         if tr.startsolid != 0 || tr.allsolid != 0 {
             if autoKill != qfalse {
                 (*ent).think = Some(EntThink::G_FreeEntity).into();
-                (*ent).nextthink = (*ctx.world_raw()).level.time;
+                (*ent).nextthink = ctx.world.level.time;
             }
             return;
         }
@@ -259,9 +259,9 @@ pub fn G_RunExPhys(
 
             if tr.entityNum as c_int != ENTITYNUM_NONE && (*ent).touch.is_some() {
                 if let Some(touch_fn) = (*ent).touch.get() {
-                    let __h543 =
-                        &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t;
-                    crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, __h543, &mut tr);
+                    let other_ent =
+                        &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+                    crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, other_ent, &mut tr);
                 }
             }
 

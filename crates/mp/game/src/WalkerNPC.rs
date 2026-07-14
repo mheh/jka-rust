@@ -221,7 +221,8 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         if (*parent).s.owner != ENTITYNUM_NONE {
             // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
             // `ctx` now threads the world, so index the game arena directly.
-            rider = (*ctx.world_raw())
+            rider = ctx
+                .world
                 .g_entities
                 .as_mut_ptr()
                 .add((*parent).s.owner as usize) as *mut bgEntity_t;
@@ -399,7 +400,7 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
         }
 
         // Set the board wait time (they won't be able to do anything, including getting off, for this amount of time).
-        (*pVeh).m_iBoarding = (*ctx.world_raw()).level.time + 1500;
+        (*pVeh).m_iBoarding = ctx.world.level.time + 1500;
 
         true
     }
@@ -425,11 +426,11 @@ pub fn G_CreateWalkerNPC(
             // Set the vehicle info pointer to the appropriate vehicle type
             let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
                 strAnimalType,
-                &mut (*ctx.world_raw()).bg_state,
+                &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
             );
             (**pVeh).m_pVehicleInfo =
-                &mut (&mut (*ctx.world_raw()).bg_state.g_vehicleInfo)[veh_index as usize];
+                &mut (&mut ctx.world.bg_state.g_vehicleInfo)[veh_index as usize];
         }
     }
 }

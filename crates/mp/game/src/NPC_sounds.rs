@@ -41,9 +41,7 @@ pub fn G_AddVoiceEvent(
             return;
         }
 
-        if (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime
-            > (*ctx.world_raw()).level.time
-        {
+        if (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime > ctx.world.level.time {
             return;
         }
 
@@ -73,7 +71,7 @@ pub fn G_AddVoiceEvent(
 
         G_SpeechEvent(ctx, ctx.entity_id_of(self_).unwrap(), event);
 
-        let new_time = (*ctx.world_raw()).level.time
+        let new_time = ctx.world.level.time
             + if speakDebounceTime == 0 {
                 5000
             } else {
@@ -100,16 +98,17 @@ pub fn NPC_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
                 || (*((*self_).client as *mut gclient_t)).renderInfo.lookTarget == 0
             {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
-                let __h521 = ctx.entity_id_of(self_).unwrap();
-                let __h522 = (*ctx.world_raw())
+                let self_id = ctx.entity_id_of(self_).unwrap();
+                let event = ctx
+                    .world
                     .bg_state
                     .rng
                     .Q_irand(EV_CONFUSE2 as c_int, EV_CONFUSE3 as c_int);
-                G_AddVoiceEvent(ctx, __h521, __h522, 2000);
+                G_AddVoiceEvent(ctx, self_id, event, 2000);
             } else if !(*self_).NPC.is_null()
                 && (*((*self_).NPC as *mut gNPC_t)).investigateDebounceTime
                     + (*((*self_).NPC as *mut gNPC_t)).pauseTime
-                    > (*ctx.world_raw()).level.time
+                    > ctx.world.level.time
             {
                 (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
                 G_AddVoiceEvent(

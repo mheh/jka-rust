@@ -66,8 +66,6 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
     crate::g_strap::init_strap_world(ctx.world);
 
     unsafe {
-        let world = &mut *ctx.world_raw();
-
         // Raven: `#ifdef _XBOX` guards `BG_ClearVehicleParseParms()` +
         // `RemoveAllWP()` here (`g_main.c:902-907`) — dead branch on this
         // (non-Xbox) build, dropped per the `_XBOX`-branch-drop precedent
@@ -75,7 +73,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         // Init RMG to 0, it will be autoset to 1 if there is terrain on the level.
         trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("RMG"), cstr("0")));
-        world.cvars.g_RMG.integer = 0;
+        ctx.world.cvars.g_RMG.integer = 0;
 
         // Clean up any client-server ghoul2 instance attachments that may
         // still exist exe-side.
@@ -88,10 +86,11 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // BG_InitAnimsets(); //clear it out
         {
             let mut callbacks = GameCallbacksImpl {
+                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
-            let mut pmc = PmoveContext::new(&mut world.bg_state, &bg_traps, &mut callbacks);
+            let mut pmc = PmoveContext::new(&mut ctx.world.bg_state, &bg_traps, &mut callbacks);
             pmc.BG_InitAnimsets();
         }
 
@@ -99,11 +98,11 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         trap::SV_RegisterSharedMemory(
             ctx.engine,
-            GSetSharedBufferArgs::new(world.gSharedBuffer.as_mut_ptr() as *mut c_char),
+            GSetSharedBufferArgs::new(ctx.world.gSharedBuffer.as_mut_ptr() as *mut c_char),
         );
 
         // Load external vehicle data
-        BG_VehicleLoadParms(&mut world.bg_state, &bg_traps);
+        BG_VehicleLoadParms(&mut ctx.world.bg_state, &bg_traps);
 
         G_Printf(ctx, c"------- Game Initialization -------\n".as_ptr());
         G_Printf(ctx, c"gamename: basejka\n".as_ptr());
@@ -124,7 +123,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // (ai_main.c bot aim jitter, g_client.c/g_items.c/g_team.c/g_utils.c
         // spawn-choice picks). That LCG is `BgState::rng`'s `randSeed` field
         // (`bg_channel/rng.rs`); reseed it here.
-        world.bg_state.rng.srand(args.random_seed() as c_uint);
+        ctx.world.bg_state.rng.srand(args.random_seed() as c_uint);
 
         G_RegisterCvars(ctx);
 
@@ -134,41 +133,41 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         G_InitMemory(ctx);
 
         // set some level globals
-        world.level = *native_platform::zeroed_box::<level_locals_t>();
-        world.level.time = args.level_time();
-        world.level.startTime = args.level_time();
+        ctx.world.level = *native_platform::zeroed_box::<level_locals_t>();
+        ctx.world.level.time = args.level_time();
+        ctx.world.level.startTime = args.level_time();
 
-        world.level.snd_fry = G_SoundIndex(c"sound/player/fry.wav".as_ptr()); // FIXME standing in lava / slime
+        ctx.world.level.snd_fry = G_SoundIndex(c"sound/player/fry.wav".as_ptr()); // FIXME standing in lava / slime
 
-        world.level.snd_hack = G_SoundIndex(c"sound/player/hacking.wav".as_ptr());
-        world.level.snd_medHealed = G_SoundIndex(c"sound/player/supp_healed.wav".as_ptr());
-        world.level.snd_medSupplied = G_SoundIndex(c"sound/player/supp_supplied.wav".as_ptr());
+        ctx.world.level.snd_hack = G_SoundIndex(c"sound/player/hacking.wav".as_ptr());
+        ctx.world.level.snd_medHealed = G_SoundIndex(c"sound/player/supp_healed.wav".as_ptr());
+        ctx.world.level.snd_medSupplied = G_SoundIndex(c"sound/player/supp_supplied.wav".as_ptr());
 
         // Raven: `//trap_SP_RegisterServer("mp_svgame");` — already commented
         // out in the oracle.
 
         // Raven guards this block with `#ifndef _XBOX` — live on this build.
-        if world.cvars.g_log.string[0] != 0 {
-            let mode = if world.cvars.g_logSync.integer != 0 {
+        if ctx.world.cvars.g_log.string[0] != 0 {
+            let mode = if ctx.world.cvars.g_logSync.integer != 0 {
                 FS_APPEND_SYNC
             } else {
                 FS_APPEND
             };
-            let log_path = CStr::from_ptr(world.cvars.g_log.string.as_ptr()).to_owned();
+            let log_path = CStr::from_ptr(ctx.world.cvars.g_log.string.as_ptr()).to_owned();
             let _ = trap::FS_FOpenFile(
                 ctx.engine,
                 GFsFopenFileArgs::new(
                     log_path,
-                    &mut world.level.logFile as *mut fileHandle_t,
+                    &mut ctx.world.level.logFile as *mut fileHandle_t,
                     mode,
                 ),
             );
-            if world.level.logFile == 0 {
+            if ctx.world.level.logFile == 0 {
                 G_Printf(
                     ctx,
                     cstr(&format!(
                         "WARNING: Couldn't open logfile: {}\n",
-                        cstr_to_str(world.cvars.g_log.string.as_ptr())
+                        cstr_to_str(ctx.world.cvars.g_log.string.as_ptr())
                     ))
                     .as_ptr(),
                 );
@@ -197,35 +196,35 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         G_InitWorldSession(ctx);
 
         // initialize all entities for this game
-        core::ptr::write_bytes(world.g_entities.as_mut_ptr(), 0, MAX_GENTITIES);
+        core::ptr::write_bytes(ctx.world.g_entities.as_mut_ptr(), 0, MAX_GENTITIES);
         // The byte-wise zero above (Raven `memset(g_entities, 0, ...)`, g_main.c)
         // leaves every entity's FnId<EntXxx> handler fields as None by
         // construction (zero == None, std-guaranteed via Option<NonZeroU8>).
-        world.level.gentities = world.g_entities.as_mut_ptr();
+        ctx.world.level.gentities = ctx.world.g_entities.as_mut_ptr();
 
         // initialize all clients for this game
-        world.level.maxclients = world.cvars.g_maxclients.integer;
-        core::ptr::write_bytes(world.clients.as_mut_ptr(), 0, MAX_CLIENTS);
-        world.level.clients = world.clients.as_mut_ptr();
+        ctx.world.level.maxclients = ctx.world.cvars.g_maxclients.integer;
+        core::ptr::write_bytes(ctx.world.clients.as_mut_ptr(), 0, MAX_CLIENTS);
+        ctx.world.level.clients = ctx.world.clients.as_mut_ptr();
 
         // set client fields on player ents
-        for i in 0..(world.level.maxclients as usize) {
-            world.g_entities[i].client = world.clients.as_mut_ptr().add(i) as *mut c_void;
+        for i in 0..(ctx.world.level.maxclients as usize) {
+            ctx.world.g_entities[i].client = ctx.world.clients.as_mut_ptr().add(i) as *mut c_void;
         }
 
         // always leave room for the max number of clients,
         // even if they aren't all used, so numbers inside that
         // range are NEVER anything but clients
-        world.level.num_entities = MAX_CLIENTS as c_int;
+        ctx.world.level.num_entities = MAX_CLIENTS as c_int;
 
         // let the server system know where the entites are
-        let entities_base = world.g_entities.as_mut_ptr();
-        let clients_base = &mut world.clients[0] as *mut gclient_t as *mut playerState_t;
+        let entities_base = ctx.world.g_entities.as_mut_ptr();
+        let clients_base = &mut ctx.world.clients[0] as *mut gclient_t as *mut playerState_t;
         trap::LocateGameData(
             ctx.engine,
             GLocateGameDataArgs::new(
                 entities_base,
-                world.level.num_entities,
+                ctx.world.level.num_entities,
                 core::mem::size_of::<gentity_t>() as c_int,
                 clients_base,
                 core::mem::size_of::<gclient_t>() as c_int,
@@ -233,7 +232,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         );
 
         // Load sabers.cfg data
-        WP_SaberLoadParms(&mut world.bg_state, &bg_traps);
+        WP_SaberLoadParms(&mut ctx.world.bg_state, &bg_traps);
 
         NPC_InitGame(ctx);
 
@@ -278,7 +277,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         let mapname_cstr = CStr::from_ptr(mapname.string.as_ptr()).to_owned();
         let nav_loaded =
             trap::Nav_Load(ctx.engine, GNavLoadArgs::new(mapname_cstr, ck_sum.integer));
-        world.globals.navCalculatePaths = if nav_loaded == qfalse { qtrue } else { qfalse };
+        ctx.world.globals.navCalculatePaths = if nav_loaded == qfalse { qtrue } else { qfalse };
 
         // parse the key/value pairs and spawn gentities
         G_SpawnEntitiesFromString(ctx, qfalse);
@@ -287,16 +286,16 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         G_FindTeams(ctx);
 
         // make sure we have flags for CTF, etc
-        if world.cvars.g_gametype.integer >= GT_TEAM {
+        if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             G_CheckTeamItems(ctx);
-        } else if world.cvars.g_gametype.integer == GT_JEDIMASTER {
+        } else if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
             trap::SetConfigstring(
                 ctx.engine,
                 GSetConfigstringArgs::new(CS_CLIENT_JEDIMASTER, cstr("-1")),
             );
         }
 
-        if world.cvars.g_gametype.integer == GT_POWERDUEL {
+        if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
             trap::SetConfigstring(
                 ctx.engine,
                 GSetConfigstringArgs::new(CS_CLIENT_DUELISTS, cstr("-1|-1|-1")),
@@ -322,7 +321,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // Raven: `//G_Printf ("-----------------------------------\n");` —
         // already commented out in the oracle.
 
-        if world.cvars.g_gametype.integer == GT_SINGLE_PLAYER
+        if ctx.world.cvars.g_gametype.integer == GT_SINGLE_PLAYER
             || trap::Cvar_VariableIntegerValue(
                 ctx.engine,
                 GCvarVariableIntegerValueArgs::new(cstr("com_buildScript")),
@@ -345,34 +344,34 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         G_RemapTeamShaders();
 
-        if world.cvars.g_gametype.integer == GT_DUEL
-            || world.cvars.g_gametype.integer == GT_POWERDUEL
+        if ctx.world.cvars.g_gametype.integer == GT_DUEL
+            || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
         {
             G_LogPrintf(
                 ctx,
                 cstr(&format!(
                     "Duel Tournament Begun: kill limit {}, win limit: {}\n",
-                    world.cvars.g_fraglimit.integer, world.cvars.g_duel_fraglimit.integer
+                    ctx.world.cvars.g_fraglimit.integer, ctx.world.cvars.g_duel_fraglimit.integer
                 ))
                 .as_ptr(),
             );
         }
 
-        if world.globals.navCalculatePaths != qfalse {
+        if ctx.world.globals.navCalculatePaths != qfalse {
             //not loaded - need to calc paths
-            world.globals.navCalcPathTime = world.level.time + START_TIME_NAV_CALC;
+            ctx.world.globals.navCalcPathTime = ctx.world.level.time + START_TIME_NAV_CALC;
         //make sure all ents are in and linked
         } else {
             //loaded
             trap::Nav_SetPathsCalculated(ctx.engine, GNavSetpathscalculatedArgs::new(qtrue));
             //need to do this, because combatpoint waypoints aren't saved out...?
             CP_FindCombatPointWaypoints(ctx);
-            world.globals.navCalcPathTime = 0;
+            ctx.world.globals.navCalcPathTime = 0;
             // Raven's commented-out `eSavedGameJustLoaded` failed-edge clear
             // is SP-only ("No loading games in MP.").
         }
 
-        if world.cvars.g_gametype.integer == GT_SIEGE {
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             //just get these configstrings registered now...
             let names = &mp_bg::local::bg_customSiegeSoundNames;
             let mut i: usize = 0;

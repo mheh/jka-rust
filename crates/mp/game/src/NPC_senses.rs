@@ -42,7 +42,7 @@ use mp_qshared::shared::{
 #[inline]
 unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world_raw()).g_entities[i.index()] as *mut gentity_t },
+        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
         None => core::ptr::null_mut(),
     }
 }
@@ -82,8 +82,7 @@ pub fn G_ClearLineOfSight(
         return 1;
     }
 
-    let hit =
-        unsafe { &mut (*ctx.world_raw()).g_entities[tr.entityNum as usize] as *mut gentity_t };
+    let hit = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
 
     if EntIsGlass(ctx.entity(ctx.entity_id_of(hit).unwrap())) != 0 {
         let mut newpoint1 = tr.endpos;
@@ -121,7 +120,7 @@ pub fn CanSee(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
 
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
+    let npc = ctx.world.globals.NPC;
     CalcEntitySpot(
         ctx,
         ctx.entity_id_of(npc),
@@ -383,8 +382,8 @@ pub fn InVisrange(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     let mut spot = [0.0; 3];
     let mut deltaVector = [0.0; 3];
 
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npcinfo = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npcinfo = ctx.world.globals.NPCInfo;
 
     CalcEntitySpot(
         ctx,
@@ -420,8 +419,8 @@ pub fn NPC_CheckVisibility(
         return visibility_t::VIS_NOT;
     }
 
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npcinfo = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npcinfo = ctx.world.globals.NPCInfo;
 
     // check PVS
     if (flags & CHECK_PVS) != 0 {
@@ -509,27 +508,25 @@ pub fn G_CheckSoundEvents(
     let mut bestTime = -1;
     let max_hear_dist_squared = maxHearDist * maxHearDist;
 
-    let world = unsafe { &*ctx.world_raw() };
-
-    for i in 0..world.level.numAlertEvents as usize {
+    for i in 0..ctx.world.level.numAlertEvents as usize {
         // are we purposely ignoring this alert?
         if i as c_int == ignoreAlert {
             continue;
         }
         // We're only concerned about sounds
-        if world.level.alertEvents[i].r#type != alertEventType_e::AET_SOUND {
+        if ctx.world.level.alertEvents[i].r#type != alertEventType_e::AET_SOUND {
             continue;
         }
         // must be at least this noticeable
-        if (world.level.alertEvents[i].level as i32) < minAlertLevel {
+        if (ctx.world.level.alertEvents[i].level as i32) < minAlertLevel {
             continue;
         }
         // must have an owner?
-        if mustHaveOwner != 0 && world.level.alertEvents[i].owner.is_null() {
+        if mustHaveOwner != 0 && ctx.world.level.alertEvents[i].owner.is_null() {
             continue;
         }
         // Must be within range
-        let dist = DistanceSquared(world.level.alertEvents[i].position, unsafe {
+        let dist = DistanceSquared(ctx.world.level.alertEvents[i].position, unsafe {
             (*self_).r.currentOrigin
         });
 
@@ -538,17 +535,17 @@ pub fn G_CheckSoundEvents(
             continue;
         }
 
-        let radius = world.level.alertEvents[i].radius * world.level.alertEvents[i].radius;
+        let radius = ctx.world.level.alertEvents[i].radius * ctx.world.level.alertEvents[i].radius;
         if dist > radius {
             continue;
         }
 
-        if world.level.alertEvents[i].addLight != 0.0 {
+        if ctx.world.level.alertEvents[i].addLight != 0.0 {
             // a quiet sound, must have LOS to hear it
             if G_ClearLOS5(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
-                world.level.alertEvents[i].position,
+                ctx.world.level.alertEvents[i].position,
             ) == 0
             {
                 // no LOS, didn't hear it
@@ -557,13 +554,13 @@ pub fn G_CheckSoundEvents(
         }
 
         // See if this one takes precedence over the previous one
-        if world.level.alertEvents[i].level as i32 >= bestAlert
-            || (world.level.alertEvents[i].level as i32 == bestAlert
-                && world.level.alertEvents[i].timestamp >= bestTime)
+        if ctx.world.level.alertEvents[i].level as i32 >= bestAlert
+            || (ctx.world.level.alertEvents[i].level as i32 == bestAlert
+                && ctx.world.level.alertEvents[i].timestamp >= bestTime)
         {
             bestEvent = i as c_int;
-            bestAlert = world.level.alertEvents[i].level as i32;
-            bestTime = world.level.alertEvents[i].timestamp;
+            bestAlert = ctx.world.level.alertEvents[i].level as i32;
+            bestTime = ctx.world.level.alertEvents[i].timestamp;
         }
     }
 
@@ -604,28 +601,26 @@ pub fn G_CheckSightEvents(
     let mut bestTime = -1;
     let max_see_dist_squared = maxSeeDist * maxSeeDist;
 
-    let world = unsafe { &*ctx.world_raw() };
-
-    for i in 0..world.level.numAlertEvents as usize {
+    for i in 0..ctx.world.level.numAlertEvents as usize {
         // are we purposely ignoring this alert?
         if i as c_int == ignoreAlert {
             continue;
         }
         // We're only concerned with sight events
-        if world.level.alertEvents[i].r#type != alertEventType_e::AET_SIGHT {
+        if ctx.world.level.alertEvents[i].r#type != alertEventType_e::AET_SIGHT {
             continue;
         }
         // must be at least this noticeable
-        if (world.level.alertEvents[i].level as i32) < minAlertLevel {
+        if (ctx.world.level.alertEvents[i].level as i32) < minAlertLevel {
             continue;
         }
         // must have an owner?
-        if mustHaveOwner != 0 && world.level.alertEvents[i].owner.is_null() {
+        if mustHaveOwner != 0 && ctx.world.level.alertEvents[i].owner.is_null() {
             continue;
         }
 
         // Must be within range
-        let dist = DistanceSquared(world.level.alertEvents[i].position, unsafe {
+        let dist = DistanceSquared(ctx.world.level.alertEvents[i].position, unsafe {
             (*self_).r.currentOrigin
         });
 
@@ -634,7 +629,7 @@ pub fn G_CheckSightEvents(
             continue;
         }
 
-        let radius = world.level.alertEvents[i].radius * world.level.alertEvents[i].radius;
+        let radius = ctx.world.level.alertEvents[i].radius * ctx.world.level.alertEvents[i].radius;
         if dist > radius {
             continue;
         }
@@ -642,7 +637,7 @@ pub fn G_CheckSightEvents(
         // Must be visible
         if InFOV2(
             ctx,
-            world.level.alertEvents[i].position,
+            ctx.world.level.alertEvents[i].position,
             ctx.entity_id_of(self_).unwrap(),
             hFOV,
             vFOV,
@@ -654,20 +649,20 @@ pub fn G_CheckSightEvents(
         if G_ClearLOS5(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
-            world.level.alertEvents[i].position,
+            ctx.world.level.alertEvents[i].position,
         ) == 0
         {
             continue;
         }
 
         // See if this one takes precedence over the previous one
-        if world.level.alertEvents[i].level as i32 >= bestAlert
-            || (world.level.alertEvents[i].level as i32 == bestAlert
-                && world.level.alertEvents[i].timestamp >= bestTime)
+        if ctx.world.level.alertEvents[i].level as i32 >= bestAlert
+            || (ctx.world.level.alertEvents[i].level as i32 == bestAlert
+                && ctx.world.level.alertEvents[i].timestamp >= bestTime)
         {
             bestEvent = i as c_int;
-            bestAlert = world.level.alertEvents[i].level as i32;
-            bestTime = world.level.alertEvents[i].timestamp;
+            bestAlert = ctx.world.level.alertEvents[i].level as i32;
+            bestTime = ctx.world.level.alertEvents[i].timestamp;
         }
     }
 
@@ -697,10 +692,8 @@ pub fn G_CheckAlertEvents(
     let mut bestSoundAlert = -1;
     let mut bestSightAlert = -1;
 
-    let world = unsafe { &mut *ctx.world_raw() };
-
-    let __h513 = ctx.entity_id_of(self_).unwrap();
-    if world.g_entities[0].health <= 0 {
+    let self_id = ctx.entity_id_of(self_).unwrap();
+    if ctx.world.g_entities[0].health <= 0 {
         // player is dead
         return -1;
     }
@@ -708,7 +701,7 @@ pub fn G_CheckAlertEvents(
     // get sound event
     bestSoundEvent = G_CheckSoundEvents(
         ctx,
-        __h513,
+        self_id,
         maxHearDist,
         ignoreAlert,
         mustHaveOwner,
@@ -716,15 +709,15 @@ pub fn G_CheckAlertEvents(
     );
     // get sound event alert level
     if bestSoundEvent >= 0 {
-        bestSoundAlert = world.level.alertEvents[bestSoundEvent as usize].level as i32;
+        bestSoundAlert = ctx.world.level.alertEvents[bestSoundEvent as usize].level as i32;
     }
 
     // get sight event
     if unsafe { !(*self_).NPC.is_null() } {
-        let __h514 = ctx.entity_id_of(self_).unwrap();
+        let self_id2 = ctx.entity_id_of(self_).unwrap();
         bestSightEvent = G_CheckSightEvents(
             ctx,
-            __h514,
+            self_id2,
             unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.hfov },
             unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.vfov },
             maxSeeDist,
@@ -733,10 +726,10 @@ pub fn G_CheckAlertEvents(
             minAlertLevel,
         );
     } else {
-        let __h515 = ctx.entity_id_of(self_).unwrap();
+        let self_id3 = ctx.entity_id_of(self_).unwrap();
         bestSightEvent = G_CheckSightEvents(
             ctx,
-            __h515,
+            self_id3,
             80,
             80,
             maxSeeDist,
@@ -747,7 +740,7 @@ pub fn G_CheckAlertEvents(
     }
     // get sight event alert level
     if bestSightEvent >= 0 {
-        bestSightAlert = world.level.alertEvents[bestSightEvent as usize].level as i32;
+        bestSightAlert = ctx.world.level.alertEvents[bestSightEvent as usize].level as i32;
     }
 
     // return the one that has a higher alert (or sound if equal)
@@ -756,18 +749,18 @@ pub fn G_CheckAlertEvents(
         // get the light level of the alert event for this checker
         let mut eyePoint = [0.0; 3];
         let mut sightDir = [0.0; 3];
-        let __h516 = ctx.entity_id_of(self_);
+        let self_id4 = ctx.entity_id_of(self_);
         // get eye point
-        CalcEntitySpot(ctx, __h516, spot_t::SPOT_HEAD_LEAN, &mut eyePoint);
+        CalcEntitySpot(ctx, self_id4, spot_t::SPOT_HEAD_LEAN, &mut eyePoint);
         _VectorSubtract(
-            world.level.alertEvents[bestSightEvent as usize].position,
+            ctx.world.level.alertEvents[bestSightEvent as usize].position,
             eyePoint,
             &mut sightDir,
         );
-        world.level.alertEvents[bestSightEvent as usize].light =
-            world.level.alertEvents[bestSightEvent as usize].addLight
+        ctx.world.level.alertEvents[bestSightEvent as usize].light =
+            ctx.world.level.alertEvents[bestSightEvent as usize].addLight
                 + G_GetLightLevel(
-                    world.level.alertEvents[bestSightEvent as usize].position,
+                    ctx.world.level.alertEvents[bestSightEvent as usize].position,
                     sightDir,
                 );
         // return the sight event
@@ -788,8 +781,8 @@ pub fn NPC_CheckAlertEvents(
     mustHaveOwner: qboolean,
     minAlertLevel: c_int,
 ) -> c_int {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
-    let npcinfo = unsafe { (*ctx.world_raw()).globals.NPCInfo };
+    let npc = ctx.world.globals.NPC;
+    let npcinfo = ctx.world.globals.NPCInfo;
 
     G_CheckAlertEvents(
         ctx,
@@ -815,11 +808,9 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
         return 0;
     }
 
-    let world = unsafe { &*ctx.world_raw() };
-
-    if (world.level.alertEvents[alertEvent as usize].level as i32) >= AEL_DANGER as i32 {
+    if (ctx.world.level.alertEvents[alertEvent as usize].level as i32) >= AEL_DANGER as i32 {
         // run away!
-        let owner = world.level.alertEvents[alertEvent as usize].owner;
+        let owner = ctx.world.level.alertEvents[alertEvent as usize].owner;
         let owner_team = if !owner.is_null() && !unsafe { (*owner).client.is_null() } {
             Some(unsafe { (*((*owner).client as *mut gclient_t)).playerTeam })
         } else {
@@ -843,13 +834,13 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
                     // can't flee
                     return 0;
                 } else {
-                    let __h517 =
-                        ctx.entity_id_of(world.level.alertEvents[alertEvent as usize].owner);
+                    let owner_id =
+                        ctx.entity_id_of(ctx.world.level.alertEvents[alertEvent as usize].owner);
                     NPC_StartFlee(
                         ctx,
-                        __h517,
-                        world.level.alertEvents[alertEvent as usize].position,
-                        world.level.alertEvents[alertEvent as usize].level as c_int,
+                        owner_id,
+                        ctx.world.level.alertEvents[alertEvent as usize].position,
+                        ctx.world.level.alertEvents[alertEvent as usize].level as c_int,
                         3000,
                         6000,
                     );
@@ -868,7 +859,7 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
 /// Raven: FIXME: more bStates need to call this?
 /// Source: `oracle/codemp/game/NPC_senses.c:568-571`
 pub fn NPC_CheckForDanger(ctx: &mut GameContext, alertEvent: c_int) -> qboolean {
-    let npc = unsafe { (*ctx.world_raw()).globals.NPC };
+    let npc = ctx.world.globals.NPC;
     G_CheckForDanger(ctx, ctx.entity_id_of(npc).unwrap(), alertEvent)
 }
 
@@ -885,10 +876,9 @@ pub fn AddSoundEvent(
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let owner: *mut gentity_t = unsafe { ent_ptr(ctx, owner) };
-    let world = unsafe { &mut *ctx.world_raw() };
 
     // FIXME: Handle this in another manner?
-    if world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
+    if ctx.world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
         if RemoveOldestAlert(ctx) == 0 {
             // how could that fail?
             return;
@@ -902,25 +892,27 @@ pub fn AddSoundEvent(
 
     _VectorCopy(
         position,
-        &mut world.level.alertEvents[world.level.numAlertEvents as usize].position,
+        &mut ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].position,
     );
 
-    world.level.alertEvents[world.level.numAlertEvents as usize].radius = radius;
-    world.level.alertEvents[world.level.numAlertEvents as usize].level = alertLevel;
-    world.level.alertEvents[world.level.numAlertEvents as usize].r#type =
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].radius = radius;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].level = alertLevel;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].r#type =
         alertEventType_e::AET_SOUND;
-    world.level.alertEvents[world.level.numAlertEvents as usize].owner = owner;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].owner = owner;
     if needLOS != 0 {
         // a very low-level sound, when check this sound event, check for LOS
-        world.level.alertEvents[world.level.numAlertEvents as usize].addLight = 1.0;
+        ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].addLight = 1.0;
     } else {
-        world.level.alertEvents[world.level.numAlertEvents as usize].addLight = 0.0;
+        ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].addLight = 0.0;
     }
-    world.level.alertEvents[world.level.numAlertEvents as usize].ID = world.level.curAlertID;
-    world.level.curAlertID += 1;
-    world.level.alertEvents[world.level.numAlertEvents as usize].timestamp = world.level.time;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].ID =
+        ctx.world.level.curAlertID;
+    ctx.world.level.curAlertID += 1;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].timestamp =
+        ctx.world.level.time;
 
-    world.level.numAlertEvents += 1;
+    ctx.world.level.numAlertEvents += 1;
 }
 
 /// Raven `AddSightEvent`.
@@ -936,10 +928,9 @@ pub fn AddSightEvent(
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let owner: *mut gentity_t = unsafe { ent_ptr(ctx, owner) };
-    let world = unsafe { &mut *ctx.world_raw() };
 
     // FIXME: Handle this in another manner?
-    if world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
+    if ctx.world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
         if RemoveOldestAlert(ctx) == 0 {
             // how could that fail?
             return;
@@ -953,20 +944,22 @@ pub fn AddSightEvent(
 
     _VectorCopy(
         position,
-        &mut world.level.alertEvents[world.level.numAlertEvents as usize].position,
+        &mut ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].position,
     );
 
-    world.level.alertEvents[world.level.numAlertEvents as usize].radius = radius;
-    world.level.alertEvents[world.level.numAlertEvents as usize].level = alertLevel;
-    world.level.alertEvents[world.level.numAlertEvents as usize].r#type =
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].radius = radius;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].level = alertLevel;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].r#type =
         alertEventType_e::AET_SIGHT;
-    world.level.alertEvents[world.level.numAlertEvents as usize].owner = owner;
-    world.level.alertEvents[world.level.numAlertEvents as usize].addLight = addLight;
-    world.level.alertEvents[world.level.numAlertEvents as usize].ID = world.level.curAlertID;
-    world.level.curAlertID += 1;
-    world.level.alertEvents[world.level.numAlertEvents as usize].timestamp = world.level.time;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].owner = owner;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].addLight = addLight;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].ID =
+        ctx.world.level.curAlertID;
+    ctx.world.level.curAlertID += 1;
+    ctx.world.level.alertEvents[ctx.world.level.numAlertEvents as usize].timestamp =
+        ctx.world.level.time;
 
-    world.level.numAlertEvents += 1;
+    ctx.world.level.numAlertEvents += 1;
 }
 
 /// Raven `ClearPlayerAlertEvents`.
@@ -978,41 +971,41 @@ pub fn ClearPlayerAlertEvents(ctx: &mut GameContext) {
     // Source: `oracle/codemp/game/b_local.h:164`
     pub const ALERT_CLEAR_TIME: c_int = 200;
 
-    let world = unsafe { &mut *ctx.world_raw() };
-    let cur_num_alerts = world.level.numAlertEvents;
+    let cur_num_alerts = ctx.world.level.numAlertEvents;
     let mut i = 0;
     // loop through them all (max 32)
     while i < cur_num_alerts {
         // see if the event is old enough to delete
-        if world.level.alertEvents[i as usize].timestamp != 0
-            && world.level.alertEvents[i as usize].timestamp + ALERT_CLEAR_TIME < world.level.time
+        if ctx.world.level.alertEvents[i as usize].timestamp != 0
+            && ctx.world.level.alertEvents[i as usize].timestamp + ALERT_CLEAR_TIME
+                < ctx.world.level.time
         {
             // this event has timed out
             // drop the count
-            world.level.numAlertEvents -= 1;
+            ctx.world.level.numAlertEvents -= 1;
             // shift the rest down
-            if world.level.numAlertEvents > 0 {
+            if ctx.world.level.numAlertEvents > 0 {
                 // still have more in the array
                 if (i + 1) < MAX_ALERT_EVENTS as c_int {
                     // memmove shifts [i+1..MAX) down into [i..MAX-1); the final
                     // slot MAX-1 is left untouched (stale), not zeroed.
                     for j in i as usize..(MAX_ALERT_EVENTS - 1) {
-                        world.level.alertEvents[j] = world.level.alertEvents[j + 1];
+                        ctx.world.level.alertEvents[j] = ctx.world.level.alertEvents[j + 1];
                     }
                 }
             } else {
                 // just clear this one... or should we clear the whole array?
-                world.level.alertEvents[i as usize] = alertEvent_t::default();
+                ctx.world.level.alertEvents[i as usize] = alertEvent_t::default();
             }
         }
         i += 1;
     }
     // make sure this never drops below zero... if it does, something very very bad happened
-    assert!(world.level.numAlertEvents >= 0);
+    assert!(ctx.world.level.numAlertEvents >= 0);
 
-    if world.globals.eventClearTime < world.level.time {
+    if ctx.world.globals.eventClearTime < ctx.world.level.time {
         // this is just a 200ms debouncer so things that generate constant alerts (like corpses and missiles) add an alert every 200 ms
-        world.globals.eventClearTime = world.level.time + ALERT_CLEAR_TIME;
+        ctx.world.globals.eventClearTime = ctx.world.level.time + ALERT_CLEAR_TIME;
     }
 }
 
@@ -1020,44 +1013,42 @@ pub fn ClearPlayerAlertEvents(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_senses.c:695-730`
 pub fn RemoveOldestAlert(ctx: &mut GameContext) -> qboolean {
-    let world = unsafe { &mut *ctx.world_raw() };
-
     let mut oldest_event = -1;
     let mut oldest_time = 16777216; // Q3_INFINITE
     let mut i;
 
     // loop through them all (max 32)
     i = 0;
-    while i < world.level.numAlertEvents {
+    while i < ctx.world.level.numAlertEvents {
         // see if the event is old enough to delete
-        if world.level.alertEvents[i as usize].timestamp < oldest_time {
+        if ctx.world.level.alertEvents[i as usize].timestamp < oldest_time {
             oldest_event = i;
-            oldest_time = world.level.alertEvents[i as usize].timestamp;
+            oldest_time = ctx.world.level.alertEvents[i as usize].timestamp;
         }
         i += 1;
     }
     if oldest_event != -1 {
         // drop the count
-        world.level.numAlertEvents -= 1;
+        ctx.world.level.numAlertEvents -= 1;
         // shift the rest down
-        if world.level.numAlertEvents > 0 {
+        if ctx.world.level.numAlertEvents > 0 {
             // still have more in the array
             if (oldest_event + 1) < MAX_ALERT_EVENTS as c_int {
                 // memmove shifts [oldest+1..MAX) down into [oldest..MAX-1); the
                 // final slot MAX-1 is left untouched (stale), not zeroed.
                 for j in (oldest_event as usize)..(MAX_ALERT_EVENTS - 1) {
-                    world.level.alertEvents[j] = world.level.alertEvents[j + 1];
+                    ctx.world.level.alertEvents[j] = ctx.world.level.alertEvents[j + 1];
                 }
             }
         } else {
             // just clear this one... or should we clear the whole array?
-            world.level.alertEvents[oldest_event as usize] = alertEvent_t::default();
+            ctx.world.level.alertEvents[oldest_event as usize] = alertEvent_t::default();
         }
     }
     // make sure this never drops below zero... if it does, something very very bad happened
-    assert!(world.level.numAlertEvents >= 0);
+    assert!(ctx.world.level.numAlertEvents >= 0);
     // return true if have room for one now
-    if world.level.numAlertEvents < MAX_ALERT_EVENTS as c_int {
+    if ctx.world.level.numAlertEvents < MAX_ALERT_EVENTS as c_int {
         1
     } else {
         0
@@ -1090,9 +1081,9 @@ pub fn G_ClearLOS(ctx: &mut GameContext, self_: EntityId, start: vec3_t, end: ve
     while tr.fraction < 1.0 && trace_count < 3 {
         // can see through 3 panes of glass
         if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
-            let world = unsafe { &*ctx.world_raw() };
             if tr.entityNum < (MAX_GENTITIES as u32) as i16 {
-                if world.g_entities[tr.entityNum as usize].r.svFlags & (SVF_GLASS_BRUSH as c_int)
+                if ctx.world.g_entities[tr.entityNum as usize].r.svFlags
+                    & (SVF_GLASS_BRUSH as c_int)
                     != 0
                 {
                     // can see through glass, trace again, ignoring me
@@ -1284,21 +1275,23 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
     let mut eyes = [0.0; 3];
     let mut diff_vec = [0.0; 3];
 
-    let world = unsafe { &mut *ctx.world_raw() };
-
-    let __h518 = ctx.entity_id_of(self_);
-    CalcEntitySpot(ctx, __h518, spot_t::SPOT_HEAD_LEAN, &mut eyes);
-    for i in 0..world.level.numInterestPoints as usize {
+    let self_id = ctx.entity_id_of(self_);
+    CalcEntitySpot(ctx, self_id, spot_t::SPOT_HEAD_LEAN, &mut eyes);
+    for i in 0..ctx.world.level.numInterestPoints as usize {
         // Don't ignore portals?  If through a portal, need to look at portal!
         if trap::InPVS(
             ctx.engine,
             GInPvsArgs::new(
-                &world.level.interestPoints[i].origin as *const vec3_t,
+                &ctx.world.level.interestPoints[i].origin as *const vec3_t,
                 &eyes as *const vec3_t,
             ),
         ) != 0
         {
-            _VectorSubtract(world.level.interestPoints[i].origin, eyes, &mut diff_vec);
+            _VectorSubtract(
+                ctx.world.level.interestPoints[i].origin,
+                eyes,
+                &mut diff_vec,
+            );
             // C's `fabs` is the double libm function: the magnitude sum and the
             // `/2` divide evaluate in f64, so the two boundary comparisons are
             // f64. f32-throughout would diverge at the `< 48` / up-down cutoff.
@@ -1316,7 +1309,7 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
                 if G_ClearLineOfSight(
                     ctx,
                     eyes,
-                    world.level.interestPoints[i].origin,
+                    ctx.world.level.interestPoints[i].origin,
                     unsafe { (*self_).s.number },
                     MASK_OPAQUE,
                 ) != 0
@@ -1328,17 +1321,17 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
         }
     }
     if best_point != ENTITYNUM_NONE
-        && !world.level.interestPoints[best_point as usize]
+        && !ctx.world.level.interestPoints[best_point as usize]
             .target
             .is_null()
     {
-        let __h519 = ctx.entity_id_of(self_);
-        let __h520 = ctx.entity_id_of(self_);
+        let self_id2 = ctx.entity_id_of(self_);
+        let self_id3 = ctx.entity_id_of(self_);
         G_UseTargets2(
             ctx,
-            __h519,
-            __h520,
-            world.level.interestPoints[best_point as usize].target,
+            self_id2,
+            self_id3,
+            ctx.world.level.interestPoints[best_point as usize].target,
         );
     }
     best_point
@@ -1353,9 +1346,8 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
 pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let world = unsafe { &mut *ctx.world_raw() };
 
-    if world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
+    if ctx.world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
         // ERROR: Too many interest points, limit is MAX_INTEREST_POINTS
         Com_Printf(
             cstr(&format!(
@@ -1370,15 +1362,15 @@ pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
 
     _VectorCopy(
         unsafe { (*self_).r.currentOrigin },
-        &mut world.level.interestPoints[world.level.numInterestPoints as usize].origin,
+        &mut ctx.world.level.interestPoints[ctx.world.level.numInterestPoints as usize].origin,
     );
 
     if !unsafe { (*self_).target.is_null() } && unsafe { *(*self_).target } != 0 {
-        world.level.interestPoints[world.level.numInterestPoints as usize].target =
+        ctx.world.level.interestPoints[ctx.world.level.numInterestPoints as usize].target =
             G_NewString(ctx, unsafe { (*self_).target });
     }
 
-    world.level.numInterestPoints += 1;
+    ctx.world.level.numInterestPoints += 1;
 
     G_FreeEntity(ctx, ctx.entity_id_of(self_));
 }

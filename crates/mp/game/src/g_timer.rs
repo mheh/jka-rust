@@ -46,24 +46,20 @@ pub const MAX_GTIMERS: usize = 16384;
 ///
 /// Source: `oracle/codemp/game/g_timer.c:27-41`
 pub fn TIMER_Clear(ctx: &mut GameContext) {
-    unsafe {
-        let world = &mut *ctx.world_raw();
-
-        // Clear all timers for each entity
-        for i in 0..MAX_GENTITIES {
-            world.globals.g_timers.0[i as usize] = core::ptr::null_mut();
-        }
-
-        // Initialize the free list: each timer points to the next one
-        for i in 0..MAX_GTIMERS - 1 {
-            let next = &mut world.globals.g_timerPool.0[i + 1] as *mut gtimer_t;
-            world.globals.g_timerPool.0[i].next = next;
-        }
-        // Last timer in pool has no next
-        world.globals.g_timerPool.0[MAX_GTIMERS - 1].next = core::ptr::null_mut();
-        // Free list starts at first timer in pool
-        world.globals.g_timerFreeList = &mut world.globals.g_timerPool.0[0];
+    // Clear all timers for each entity
+    for i in 0..MAX_GENTITIES {
+        ctx.world.globals.g_timers.0[i as usize] = core::ptr::null_mut();
     }
+
+    // Initialize the free list: each timer points to the next one
+    for i in 0..MAX_GTIMERS - 1 {
+        let next = &mut ctx.world.globals.g_timerPool.0[i + 1] as *mut gtimer_t;
+        ctx.world.globals.g_timerPool.0[i].next = next;
+    }
+    // Last timer in pool has no next
+    ctx.world.globals.g_timerPool.0[MAX_GTIMERS - 1].next = core::ptr::null_mut();
+    // Free list starts at first timer in pool
+    ctx.world.globals.g_timerFreeList = &mut ctx.world.globals.g_timerPool.0[0];
 }
 
 /// Raven `TIMER_Clear2`.
@@ -71,10 +67,8 @@ pub fn TIMER_Clear(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/g_timer.c:49-74`
 pub fn TIMER_Clear2(ctx: &mut GameContext, ent: Option<EntityId>) {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
-        let world = &mut *ctx.world_raw();
-
         // Rudimentary safety checks
         if ent.is_null() {
             return;
@@ -86,7 +80,7 @@ pub fn TIMER_Clear2(ctx: &mut GameContext, ent: Option<EntityId>) {
             return;
         }
 
-        let mut p = world.globals.g_timers.0[entity_num];
+        let mut p = ctx.world.globals.g_timers.0[entity_num];
 
         // No timers at all -> do nothing
         if p.is_null() {
@@ -99,9 +93,9 @@ pub fn TIMER_Clear2(ctx: &mut GameContext, ent: Option<EntityId>) {
         }
 
         // Splice the lists: attach entity's timer list to free list
-        (*p).next = world.globals.g_timerFreeList;
-        world.globals.g_timerFreeList = world.globals.g_timers.0[entity_num];
-        world.globals.g_timers.0[entity_num] = core::ptr::null_mut();
+        (*p).next = ctx.world.globals.g_timerFreeList;
+        ctx.world.globals.g_timerFreeList = ctx.world.globals.g_timers.0[entity_num];
+        ctx.world.globals.g_timers.0[entity_num] = core::ptr::null_mut();
     }
 }
 
@@ -110,9 +104,8 @@ pub fn TIMER_Clear2(ctx: &mut GameContext, ent: Option<EntityId>) {
 /// Source: `oracle/codemp/game/g_timer.c:79-103`
 pub fn TIMER_GetNew(ctx: &mut GameContext, num: c_int, identifier: *const c_char) -> *mut c_void {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let num_usize = num as usize;
-        let mut p = world.globals.g_timers.0[num_usize];
+        let mut p = ctx.world.globals.g_timers.0[num_usize];
 
         // Search for an existing timer with this name
         while !p.is_null() {
@@ -125,14 +118,14 @@ pub fn TIMER_GetNew(ctx: &mut GameContext, num: c_int, identifier: *const c_char
         }
 
         // No existing timer with this name was found, so grab one from the free list
-        if world.globals.g_timerFreeList.is_null() {
+        if ctx.world.globals.g_timerFreeList.is_null() {
             return core::ptr::null_mut();
         }
 
-        p = world.globals.g_timerFreeList;
-        world.globals.g_timerFreeList = (*world.globals.g_timerFreeList).next;
-        (*p).next = world.globals.g_timers.0[num_usize];
-        world.globals.g_timers.0[num_usize] = p;
+        p = ctx.world.globals.g_timerFreeList;
+        ctx.world.globals.g_timerFreeList = (*ctx.world.globals.g_timerFreeList).next;
+        (*p).next = ctx.world.globals.g_timers.0[num_usize];
+        ctx.world.globals.g_timers.0[num_usize] = p;
         p as *mut c_void
     }
 }
@@ -146,9 +139,8 @@ pub fn TIMER_GetExisting(
     identifier: *const c_char,
 ) -> *mut c_void {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let num_usize = num as usize;
-        let mut p = world.globals.g_timers.0[num_usize];
+        let mut p = ctx.world.globals.g_timers.0[num_usize];
 
         while !p.is_null() {
             if Q_stricmp((*p).name, identifier) == 0 {
@@ -173,7 +165,7 @@ pub fn TIMER_Set(
     duration: c_int,
 ) {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return;
@@ -186,7 +178,7 @@ pub fn TIMER_Set(
         }
 
         (*timer).name = identifier;
-        (*timer).time = (*ctx.world_raw()).level.time + duration;
+        (*timer).time = ctx.world.level.time + duration;
     }
 }
 
@@ -195,7 +187,7 @@ pub fn TIMER_Set(
 /// Source: `oracle/codemp/game/g_timer.c:147-157`
 pub fn TIMER_Get(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *const c_char) -> c_int {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return -1;
@@ -220,7 +212,7 @@ pub fn TIMER_Done(
     identifier: *const c_char,
 ) -> qboolean {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return qtrue;
@@ -232,7 +224,7 @@ pub fn TIMER_Done(
             return qtrue;
         }
 
-        if (*timer).time < (*ctx.world_raw()).level.time {
+        if (*timer).time < ctx.world.level.time {
             qtrue
         } else {
             qfalse
@@ -248,17 +240,17 @@ pub fn TIMER_Done(
 /// Source: `oracle/codemp/game/g_timer.c:187-211`
 pub fn TIMER_RemoveHelper(ctx: &mut GameContext, num: c_int, timer: *mut c_void) {
     unsafe {
-        let world = &mut *ctx.world_raw();
         let num_usize = num as usize;
         let timer = timer as *mut gtimer_t;
 
-        let mut p = world.globals.g_timers.0[num_usize];
+        let mut p = ctx.world.globals.g_timers.0[num_usize];
 
         // Special case: first timer in list
         if p == timer {
-            world.globals.g_timers.0[num_usize] = (*world.globals.g_timers.0[num_usize]).next;
-            (*timer).next = world.globals.g_timerFreeList;
-            world.globals.g_timerFreeList = timer;
+            ctx.world.globals.g_timers.0[num_usize] =
+                (*ctx.world.globals.g_timers.0[num_usize]).next;
+            (*timer).next = ctx.world.globals.g_timerFreeList;
+            ctx.world.globals.g_timerFreeList = timer;
             return;
         }
 
@@ -275,8 +267,8 @@ pub fn TIMER_RemoveHelper(ctx: &mut GameContext, num: c_int, timer: *mut c_void)
 
         // Rewire
         (*p).next = (*timer).next;
-        (*timer).next = world.globals.g_timerFreeList;
-        world.globals.g_timerFreeList = timer;
+        (*timer).next = ctx.world.globals.g_timerFreeList;
+        ctx.world.globals.g_timerFreeList = timer;
     }
 }
 
@@ -293,7 +285,7 @@ pub fn TIMER_Done2(
     remove: qboolean,
 ) -> qboolean {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return qfalse;
@@ -305,7 +297,7 @@ pub fn TIMER_Done2(
             return qfalse;
         }
 
-        let res = (*timer).time < (*ctx.world_raw()).level.time;
+        let res = (*timer).time < ctx.world.level.time;
 
         if res && remove == qtrue {
             // Put it back on the free list
@@ -329,7 +321,7 @@ pub fn TIMER_Exists(
     identifier: *const c_char,
 ) -> qboolean {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return qfalse;
@@ -352,7 +344,7 @@ pub fn TIMER_Exists(
 /// Source: `oracle/codemp/game/g_timer.c:267-278`
 pub fn TIMER_Remove(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *const c_char) {
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve((*ctx.world_raw()).g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() {
             return;

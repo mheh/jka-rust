@@ -24,21 +24,19 @@ pub fn G_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
     const POOLSIZE: c_int = 262144; // 256 * 1024
 
     unsafe {
-        let world = &mut *ctx.world_raw();
-
-        if world.cvars.g_debugAlloc.integer != 0 {
+        if ctx.world.cvars.g_debugAlloc.integer != 0 {
             G_Printf(
                 ctx,
                 cstr(&format!(
                     "G_Alloc of {} bytes ({} left)\n",
                     size,
-                    POOLSIZE - world.allocPoint - ((size + 31) & !31)
+                    POOLSIZE - ctx.world.allocPoint - ((size + 31) & !31)
                 ))
                 .as_ptr(),
             );
         }
 
-        if world.allocPoint + size > POOLSIZE {
+        if ctx.world.allocPoint + size > POOLSIZE {
             G_Error(
                 ctx,
                 cstr(&format!("G_Alloc: failed on allocation of {size} bytes\n")).as_ptr(),
@@ -46,8 +44,12 @@ pub fn G_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
             return core::ptr::null_mut();
         }
 
-        let p = world.memoryPool.as_mut_ptr().add(world.allocPoint as usize) as *mut c_void;
-        world.allocPoint += (size + 31) & !31;
+        let p = ctx
+            .world
+            .memoryPool
+            .as_mut_ptr()
+            .add(ctx.world.allocPoint as usize) as *mut c_void;
+        ctx.world.allocPoint += (size + 31) & !31;
         p
     }
 }
@@ -57,9 +59,7 @@ pub fn G_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
 /// Source: `oracle/codemp/game/g_mem.c:35-37`
 pub fn G_InitMemory(ctx: &mut GameContext) {
     // Raven: allocPoint = 0;
-    unsafe {
-        (*ctx.world_raw()).allocPoint = 0;
-    }
+    ctx.world.allocPoint = 0;
 }
 
 /// Raven `Svcmd_GameMem_f`.
@@ -71,8 +71,7 @@ pub fn Svcmd_GameMem_f(ctx: &mut GameContext) {
     let poolsize: c_int = 262144; // POOLSIZE = 256 * 1024
     let msg = format!(
         "Game memory status: {} out of {} bytes allocated\n",
-        unsafe { (*ctx.world_raw()).allocPoint },
-        poolsize
+        ctx.world.allocPoint, poolsize
     );
     let msg_cstr = cstr(&msg);
     G_Printf(ctx, msg_cstr.as_ptr());

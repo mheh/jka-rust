@@ -40,10 +40,8 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 ///
 /// Source: `oracle/codemp/game/AnimalNPC.c:151-154`
 pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
-    unsafe {
-        // Animal `Update` delegates to the generic base body.
-        crate::g_vehicles::Update(ctx, pVeh, pUcmd)
-    }
+    // Animal `Update` delegates to the generic base body.
+    crate::g_vehicles::Update(ctx, pVeh, pUcmd)
 }
 
 /// `ProcessMoveCommands` the Vehicle.
@@ -159,7 +157,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let rider = if (*parent).s.owner != ENTITYNUM_NONE {
             // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
             // `ctx` now threads the world, so index the game arena directly.
-            (*ctx.world_raw())
+            ctx.world
                 .g_entities
                 .as_mut_ptr()
                 .add((*parent).s.owner as usize) as *mut bgEntity_t
@@ -288,7 +286,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 }
 
                 iAnimLen = (crate::bg_panimate::BG_AnimLength(
-                    &(*ctx.world_raw()).bg_state,
+                    &ctx.world.bg_state,
                     (*parent).localAnimIndex,
                     anim as c_int,
                 ) as f32
@@ -472,7 +470,8 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                         // `pilot->enemy` is an `EntityId` arena index (Raven's
                         // `gentity_t*`); `ctx` now threads the world, so index the
                         // game arena directly.
-                        let enemy_ent = (*ctx.world_raw())
+                        let enemy_ent = ctx
+                            .world
                             .g_entities
                             .as_mut_ptr()
                             .add((*pilot).enemy.unwrap().0 as usize);
@@ -590,10 +589,9 @@ pub fn G_CreateAnimalNPC(
         core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
         let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
             strAnimalType,
-            &mut (*ctx.world_raw()).bg_state,
+            &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         ) as usize;
-        (*(*pVeh)).m_pVehicleInfo =
-            &mut (&mut (*ctx.world_raw()).bg_state.g_vehicleInfo)[veh_index];
+        (*(*pVeh)).m_pVehicleInfo = &mut (&mut ctx.world.bg_state.g_vehicleInfo)[veh_index];
     }
 }
