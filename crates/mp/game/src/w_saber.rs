@@ -6696,7 +6696,7 @@ pub fn WP_SaberStartMissileBlockCheck(
         if BG_SabersOff(&mut (*sc).ps as *mut playerState_t) != 0
             && (*sc).NPC_class != CLASS_BOBAFETT
         {
-            if (*self_).s.eType != ET_PLAYER as c_int {
+            if (*self_).s.eType != ET_NPC as c_int {
                 //player doesn't auto-activate
                 doFullRoutine = qfalse;
             }

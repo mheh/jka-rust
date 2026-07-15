@@ -62,3 +62,46 @@ for 3 of 5); none in the non-vehicle live-combat hot path:
 | 4 | `bg_pmove.rs:2790` PM_CheckJump | `bg_pmove.c:1988` | `fabs(dotR) > fabs(dotF)*1.5` double product vs f32 — flip-anim axis tie-break | latent (anim, crosses wire) |
 | 5 | `bg_pmove.rs:4225` PM_CrashLandEffect | `bg_pmove.c:3691` | `fabs(v)/10` double divide vs f32 at the `>= 30.0` dust-effect gate | latent/cosmetic |
 | — | `bg_pmove.rs:9907-9955` PM_VehicleViewAngles | `bg_pmove.c:9646-9709` | oracle reads clampMin/Max uninitialized (UB); zero-init pick needs its §19 site note | doc-only |
+
+### g_combat.rs + g_client.rs — CLEAN (damage/death spine and client lifecycle byte-faithful)
+
+No live-combat or rare-branch bugs. Prior fixes (four point-null guards)
+re-verified. One systemic observation promoted to a sweep item (below);
+one stale PORT-NOTE (G_DamageFromKiller claims a zero-vector dir, code
+correctly passes None) — doc-drift fix rides the next batch. g_client:
+zero findings across ~45 fns (field-copy completeness, IPstring
+truncation, spawn-sort loops, all NULL-guard polarities verified).
+
+### w_saber.rs — 1 LIVE-COMBAT bug (fixed same-day) + 2 latents; 82 fns otherwise faithful
+
+| # | Site | Oracle | Finding | Severity |
+|---|---|---|---|---|
+| 1 | `w_saber.rs:6699` WP_SaberStartMissileBlockCheck | `w_saber.c:5561` | **One-token enumerator flip**: oracle gates on `!= ET_NPC` ("player doesn't auto-activate"); port wrote `!= ET_PLAYER` — inverted holstered-saber missile-block behavior between players and NPCs. Behind `BG_SabersOff && !CLASS_BOBAFETT`, which is why duel1 scenarios never hit it. FIXED same-day (referee suite green incl. real-map combat). | live-combat |
+| 2 | `w_saber.rs:11661-11675` WP_SaberBlockNonRandom | `w_saber.c:9150-9173` | `rightdot > 0.3/0.1` double compares in f32 — F3 class, measure-zero. | latent (→ F3 sweep) |
+| 3 | `w_saber.rs:658-664` SetSaberBoxSize | `w_saber.c:450-461` | The one `g_saberDebugPrint` diagnostic (of 15) dropped marker-less. Diagnostic-only; needs a marker or the print. | latent (doc) |
+
+Prior fixes re-verified (saberEnd write-back, lastHeadAngles, ghoul2 bolt
+consumption); CheckSaberDamage's full double-vs-float literal set verified;
+RNG-consuming short-circuit chains verified operand-by-operand.
+
+### bg_saber.rs + g_cmds.rs — bg_saber CLEAN in full; g_cmds priority paths clean
+
+One cross-cutting latent: say/tell/vote paths round-trip netnames/chat
+through lossy UTF-8 (`cstr_to_str`) — non-ASCII bytes (0x80-0xFF, common in
+player names) become U+FFFD, diverging wire bytes/logs and team-vote name
+matching vs C's raw-byte copies. Referee-blind (bots are ASCII). Fix shape:
+raw-byte handling through the say/tell/vote formatting. Also: g_cmds has an
+explicitly-listed NOT-audited tail (~38 lower-priority fns — team/duel/
+follow/give handlers) for a wave-3 pass. bg_saber: every fn faithful, incl.
+preserved saber1/saber2 copy-paste oracle bug and the vote `msg[1]` typo.
+
+### NEW SWEEP ITEM — F3: unsuffixed-double THRESHOLD COMPARES in f32
+
+`float dot; if (dot > 0.3)` promotes to double in C (`0.3` is a double
+literal); the port compares in f32 wherever libm/multiplication didn't
+force f64. Sites: G_GetHitQuad (0.3×4), G_GetHitLocation (0.1/.800/.400/
+.333/.666/0.4), and port-wide instances of the same convention.
+Measure-zero boundary flips (dismember quadrant, hit-location modifier),
+but `435f7d57` already ruled this class a bug when it promoted
+G_BounceMissile's `> 0.7`. Method: grep oracle for unsuffixed FP literals
+in comparisons against float lvalues, promote per `(x as f64) > lit`.
