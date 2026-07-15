@@ -55,23 +55,23 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 
 ## Open
 
-- **Bot lethality gap — MEASURED 2026-07-15 (task #11 tail).** A/B on
-  mp/ffa3, four skill-4 bots: OpenJK reference lane 1.70 kills/min
-  (11 MOD_SABER — real engagements); our lane 0.08 kills/min (one falling
-  death in 12 min), botlib fixes included. Every historical soak ran at
-  our-lane rates; there was never a baseline to notice. Lockstep is blind
-  by construction (our engine feeds both modules identical inputs).
-  **Lane 3 ran (2026-07-15): our engine + ORACLE module = 0.10 kills/min —
-  as passive as our module. ENGINE-SIDE confirmed.** Threads since ruled
-  out: waypoint reception (NAV_RECV/NAV_LINKS probes never fire — correct:
-  the oracle's only trap_Bot_UpdateWaypoints call is RMG-only; retail .wnt
-  files carry the neighbor links); InPVS (PVS_RATIO probe: 12.7% hit rate
-  over 4k calls — vision alive); navigation (bots roam and pick up items).
-  Calibration: ls-live session bot-vs-bot = 0.43/min (4-5× today's lanes,
-  still 4× under OpenJK; human presence stirs encounters). Remaining
-  suspects: engagement-decision inputs (trace results in OrgVisibility,
-  aggression/chat gates' timing inputs, addbot-vs-minplayers skill
-  plumbing). Next: probe module-side BotScanForEnemies accept/reject
-  reasons under REF_PROBES (module probes fire identically for both
-  modules — the inputs are what differ vs OpenJK). Logs: scratchpad
-  `ab-test2/`, `ab-test3/`, `nav-probe/`.
+- **Bot lethality "gap" — RESOLVED 2026-07-15: instrument artifact.**
+  The alarming numbers (ours 0.08 kills/min, oracle-module-on-our-engine
+  0.10, vs OpenJK 1.70) came from lanes populated by an rcon `addbot`
+  burst at 0.4 s spacing — and Raven's `SVC_RemoteCommand` carries a
+  **faithful 500 ms rcon rate limiter** (`sv_main.cpp`, `lasttime + 500`),
+  so every lane after the first command was silently dropped: those lanes
+  ran ONE bot each. One bot alone on mp/ffa3 produces exactly a stray
+  falling death per 10 minutes. OpenJK relaxed the limiter (all four
+  addbots joined there) and its lane also had fill bots — hence the
+  apparent 20×. Rcon replies (which carry the evidence) are redirected to
+  the sender, not the log, so the drops were invisible until the reply
+  was actually read. Properly populated fill lanes (4 bots each):
+  **ours 0.73 kills/min vs OpenJK 1.26** — same order, single 9.5-min
+  samples, different random rosters; a real residual is UNPROVEN.
+  Kept from the detour: NAV_RECV/NAV_LINKS + PVS_RATIO probes
+  (`2fa112d2`; PVS 12.7% alive, .wnt files carry neighbor links — the
+  update trap is RMG-only in the oracle too). Remaining tail, low
+  priority: repeated fixed-roster fill-lane sampling (rcon spaced
+  > 500 ms) to bound any residual, plus a human feel comparison.
+  Logs: scratchpad `ab-test2/`–`ab-test6/`, `nav-probe/`.
