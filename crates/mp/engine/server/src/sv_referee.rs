@@ -127,6 +127,11 @@ enum Rec {
     Think { client: c_int, cmd: Vec<u8> },
     /// `D <clientNum>`.
     Drop { client: c_int },
+    /// `P <clientNum> <ping>` — the engine-computed ping `SV_CalcPings` writes
+    /// straight into the module's `ps.ping` (digested memory). Network reality
+    /// is invisible to a replica, so the value is taped as an input; recorded
+    /// on change only, for non-bot clients.
+    Ping { client: c_int, ping: c_int },
     /// `F <msec>` — the frame's msec input.
     Frame { msec: c_int },
     /// `S <total> E<entities> Y<hash>:<count> <slot>:<ps> ...` — the post-frame
@@ -183,6 +188,11 @@ pub struct Referee {
     injected_slots: u64,
     /// REPLAY: events buffered for the current frame's injection.
     pending: Vec<Rec>,
+    /// RECORD: last `P`-recorded ping per slot (change-dedupe); reset on `C`.
+    last_ping: Vec<c_int>,
+    /// REPLAY: latest taped ping per injected slot (-1 = none yet); applied by
+    /// `SV_CalcPings` in place of the locally-computed value. Reset on `C`.
+    replica_ping: Vec<c_int>,
     /// REPLAY: the current frame's expected digest, if the frame runs the game.
     expected: Option<StateDigest>,
     /// REPLAY: the current frame's tape state bytes (`V` record), if verbose.
@@ -628,6 +638,11 @@ pub fn ref_tap_direct_connect(sv: &mut Server, client: c_int, userinfo: *const c
         return;
     }
     let ui = unsafe { CStr::from_ptr(userinfo) }.to_bytes().to_vec();
+    let slot = client as usize;
+    if sv.referee.last_ping.len() <= slot {
+        sv.referee.last_ping.resize(slot + 1, c_int::MIN);
+    }
+    sv.referee.last_ping[slot] = c_int::MIN; // new client: force the next P
     sv.referee.emit(&format!("C {client} {}", hex_encode(&ui)));
 }
 
@@ -641,6 +656,40 @@ pub fn ref_tap_enter_world(sv: &mut Server, cl: *const client_t, cmd: *const use
     let bytes = unsafe { usercmd_bytes(cmd) };
     sv.referee
         .emit(&format!("B {client} {}", hex_encode(&bytes)));
+}
+
+/// RECORD tap at `SV_CalcPings` — the engine writes its network-computed ping
+/// into the module's `ps.ping` (digested memory), so the value is a tape
+/// input. Emitted on change only.
+pub fn ref_tap_ping(sv: &mut Server, client: c_int, ping: c_int) {
+    if sv.referee.mode != RefMode::Record {
+        return;
+    }
+    let slot = client as usize;
+    if sv.referee.last_ping.len() <= slot {
+        sv.referee.last_ping.resize(slot + 1, c_int::MIN);
+    }
+    if sv.referee.last_ping[slot] == ping {
+        return;
+    }
+    sv.referee.last_ping[slot] = ping;
+    sv.referee.emit(&format!("P {client} {ping}"));
+}
+
+/// REPLAY: the taped ping for an injected slot, if any — `SV_CalcPings`
+/// applies it in place of the locally-computed value (a replica has no
+/// netchan, so its own computation lands on 999).
+pub fn ref_replica_ping(sv: &Server, client: c_int) -> Option<c_int> {
+    if sv.referee.mode != RefMode::Replay {
+        return None;
+    }
+    if sv.referee.injected_slots & (1u64 << (client as u32 & 63)) == 0 {
+        return None;
+    }
+    match sv.referee.replica_ping.get(client as usize) {
+        Some(&p) if p >= 0 => Some(p),
+        _ => None,
+    }
 }
 
 /// Wire tap at `SV_SendMessageToClient` (`ref_snaps`): append the logical
@@ -1119,6 +1168,10 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
                     &mut ucmd as *mut usercmd_t as *mut u8,
                     n,
                 );
+                // A replica receives no real packets; the taped event IS the
+                // packet — refresh the clock or SV_CheckTimeouts drops it
+                // after sv_timeout (live-session finding: phantom drop ~200s in).
+                (*cl).lastPacketTime = sv.svs.time;
             }
             SV_ClientThink(view.common, sv, cl, &mut ucmd);
         }
@@ -1127,6 +1180,9 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
                 return;
             }
             let cl = unsafe { sv.svs.clients.add(client as usize) };
+            unsafe {
+                (*cl).lastPacketTime = sv.svs.time; // see Rec::Think
+            }
             let mut cstr = cmd.clone();
             cstr.push(0);
             SV_ExecuteClientCommand(
@@ -1142,7 +1198,22 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
                 return;
             }
             sv.referee.injected_slots |= 1u64 << (client as u32 & 63);
+            let slot = client as usize;
+            if sv.referee.replica_ping.len() <= slot {
+                sv.referee.replica_ping.resize(slot + 1, -1);
+            }
+            sv.referee.replica_ping[slot] = -1; // new client: no taped ping yet
             ref_inject_connect(view, sv, client, userinfo.as_bytes());
+        }
+        Rec::Ping { client, ping } => {
+            if !ref_slot_injected(sv, view, client) {
+                return;
+            }
+            let slot = client as usize;
+            if sv.referee.replica_ping.len() <= slot {
+                sv.referee.replica_ping.resize(slot + 1, -1);
+            }
+            sv.referee.replica_ping[slot] = ping;
         }
         Rec::Begin { client, cmd } => {
             if !ref_slot_injected(sv, view, client) {
@@ -1556,6 +1627,11 @@ fn parse_line(line: &str, lineno: usize) -> Result<Option<Rec>, String> {
         "D" => {
             let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
             Rec::Drop { client }
+        }
+        "P" => {
+            let client = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            let ping = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;
+            Rec::Ping { client, ping }
         }
         "F" => {
             let msec = it.next().and_then(|s| s.parse().ok()).ok_or_else(bad)?;

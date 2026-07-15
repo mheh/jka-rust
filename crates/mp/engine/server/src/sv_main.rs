@@ -904,6 +904,15 @@ pub fn SV_CalcPings(common: &mut Common, sv: &mut Server) {
                 continue;
             }
 
+            // REPLAY: a tape-created replica has no netchan — its ping is a
+            // recorded input (`P` records), not a local computation.
+            if let Some(taped) = crate::sv_referee::ref_replica_ping(sv, i) {
+                (*cl).ping = taped;
+                let ps = SV_GameClientNum(sv, i);
+                (*ps).ping = taped;
+                continue;
+            }
+
             let mut total = 0;
             let mut count = 0;
             for j in 0..PACKET_BACKUP {
@@ -926,6 +935,9 @@ pub fn SV_CalcPings(common: &mut Common, sv: &mut Server) {
             // let the game dll know about the ping
             let ps = SV_GameClientNum(sv, i);
             (*ps).ping = (*cl).ping;
+            // RECORD tap: ps.ping is digested module memory fed by network
+            // reality — tape it as an input (change-dedupe inside).
+            crate::sv_referee::ref_tap_ping(sv, i, (*ps).ping);
         }
     }
 }
