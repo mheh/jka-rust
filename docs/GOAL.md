@@ -1,162 +1,103 @@
 # Goal
 
-Build a Rust implementation of the Jedi Academy MP game module that can speak
-the same engine/module ABI as Raven's original `jampgamex86.dll`.
+Build Rust implementations of Jedi Academy's modules and engine that speak
+the same engine/module ABI as Raven's shipped binaries — drop-in
+replacements, verified against the oracle.
 
-The current MP ABI work gives the Rust code the same import/export
-vocabulary as the Raven MP game module: `MpGameImport` models module-to-engine
-syscall numbers, and `MpGameExport` models engine-to-module `vmMain` command
-numbers. Those integer values must match the original Raven values exactly.
+## MP game module (`jampgame`): ABI target ACHIEVED, parity campaign closing
 
-Matching those enum values is necessary, but it is not the whole drop-in DLL ABI.
-A Rust replacement must work through this checklist before it can hot-swap for
-Raven's `jampgamex86.dll`:
+The original checklist (ABI vocabulary, `dllEntry`/`vmMain` contract,
+`PASSFLOAT`, layout asserts, engine-named artifacts, smoke + golden differential
+suites, per-file oracle audit) is complete — history in git (this file,
+pre-2026-07-14) and `docs/audits/`. The three items that were open at the last
+revision are now also done:
 
-- [x] Scope the MP game ABI separately from MP cgame, MP UI, and SP surfaces.
-- [x] Preserve the original MP game import/export integer vocabulary:
-  `MpGameImport` for module-to-engine syscalls and `MpGameExport` for
-  engine-to-module `vmMain` commands.
-- [x] Generate or verify every MP game import/export value directly against
-  Raven `codemp/game/g_public.h`, including explicit reset points like `100`,
-  `200`, `250`, `300`, `400`, and `500`.
-- [x] Port or explicitly classify every generated ABI arg/output TODO for the
-  current MP/SP game, cgame, and UI surfaces.
-- [x] Clear the ABI type inventory audit so there are no active
-  `FIXME: create type` markers or unresolved referenced Rust type names.
-- [x] Document enum-only/unused ABI tokens instead of leaving them as port TODOs
-  when Raven exposes no wrapper, callsite, or transport behavior.
-- [x] Expose exported C symbols with the original names: `dllEntry` and
-  `vmMain` (`crates/jampgame`, the thin cdylib shell).
-- [x] Match Raven's calling convention and `vmMain` argument/return word
-  behavior. (The 12-word signature and `-1` fall-through are live; all
-  command arms are wired to `mp_game` entrypoints.)
-- [x] Store and call the engine syscall callback handed in through `dllEntry`
-  (`ENGINE: OnceLock<CEngine>`, called by every `trap::*` wrapper).
-- [x] Match argument packing for ints, pointers, and floats, including the
-  original `PASSFLOAT` convention (`abi_transport::pass_float`).
-- [x] Source or define ABI-correct layouts for every crossed type, including
-  entities, player state, traces, cvars, commands, botlib data, ICARUS data, nav
-  data, and Ghoul2 data (type port complete — Waves 0–7).
-- [x] Verify struct sizes, alignments, and field offsets against Raven headers
-  for all ABI-visible types (`size_of`/`offset_of!` static-asserts, badge-verified
-  against clang ground truth).
-- [ ] Model shared memory and global expectations visible to the engine.
-- [ ] Implement engine-observable side effects for `GAME_INIT`,
-  `GAME_RUN_FRAME`, `GAME_SHUTDOWN`, client lifecycle calls, botlib, ICARUS, nav,
-  Ghoul2, and related systems.
-- [x] Build the Rust game module as a native dynamic library with the filename
-  and platform conventions expected by the engine (CI packages engine-named
-  modules — `jampgamex86_64.dll`/`.so` — on every master push; the 32-bit
-  `jampgamex86.dll`/`jampgamei386.so` lanes await the ILP32 assert pass).
-- [x] Add an ABI smoke test that loads the Rust module through the same
-  `dllEntry`/`vmMain` contract as the engine
-  (`crates/jampgame/tests/abi_smoke.rs`: loads the built cdylib via the ported
-  `native_platform` loader + real inbound syscall trampoline, drives
-  `GAME_INIT` → 10 `GAME_RUN_FRAME`s → `GAME_SHUTDOWN` against a mock engine,
-  asserting survival and structural side effects).
-- [x] Add differential tests against Raven/oracle behavior for representative
-  imports, exports, and frame/client flows (9 committed-golden parity suites —
-  pmove, pmove-saber, qmath, bglib, saberload, qshared, bgmisc, gcombat,
-  wsaber — via the `tools/jampgame-oracle/` harness, plus the ABI smoke test's
-  client lifecycle drive. Representative, not exhaustive: exhaustive coverage
-  is the per-file audit and referee replay below).
-- [x] Audit every ported game-tier file against its oracle TU (the per-file
-  oracle review): all 107 files compared line-level against
-  `oracle/codemp/game/*.c` (waves 1-2, 2026-07-06; ~160 findings,
-  ~102 confirmed fixed, follow-up ports resolved). Ledger + findings log:
-  `docs/audits/per-file-oracle-audit.md`. Honestly-skimmed functions listed
-  there remain an optional second-pass tail, not a gate.
-- [ ] Prove hot-swap behavior by replacing `jampgamex86.dll`/the platform
-  equivalent with the Rust build and running the MP engine through init, map
-  load, frame loop, client connect, and shutdown.
-- [ ] Referee replay gate (Stage R, `docs/roadmap-final-stages.md`): recorded
-  usercmd streams replayed through oracle DLL and Rust DLL under the same
-  harness, byte-diffing every playerState/entityState per frame. The in-repo
-  mock-engine referee (`crates/jampgame/tests/referee.rs`) is live locally;
-  what remains is the external real-engine variant (parked plan,
-  `docs/plans/2026-07-07-rust-referee.md`).
+- **Shared memory / globals modeled**: `LocateGameData` seam live
+  (engine island DEC-23; boots and hosts live players since 2026-07-12).
+- **Hot-swap proven**: the module runs under OpenJK and our own `jampded`
+  equivalent through init → map load → frame loop → client connect →
+  shutdown (live bot + human sessions, 2026-07-07 → 2026-07-14).
+- **Referee replay gate**: superseded by the stronger **lockstep referee**
+  (`docs/plans/2026-07-13-engine-lockstep-referee.md`): Raven's compiled
+  module and ours run side by side on live servers, comparing entity/player
+  state + the syscall stream per frame, byte for byte. Soak record:
+  11,985 frames / 0 divergences; a 23-minute live human session re-judged
+  offline to zero module state divergences.
 
-So the ABI target is:
+## Active campaign — referee close-out, then the unsafe finish
 
-> The MP Rust game module should become ABI-compatible with Raven's MP game
-> module, such that the engine can load it through the same `dllEntry`/`vmMain`
-> contract and observe equivalent behavior.
+The centralized step list (task list mirrors this; keep both current).
+Ordered; F-items float unordered.
 
-The present state is not yet a drop-in `jampgamex86.dll` replacement, but it is
-no longer just the scaffold: the full jampgame logic port is transcribed and
-integrated (`mp_game` compiles green, merged 2026-07-05; `todo!()` stubs and
-open `TODO: Port` markers both at zero, all `vmMain` arms wired, CI publishing
-engine-named modules), without losing the original ABI numbers or mixing MP
-game, MP cgame, MP UI, and SP surfaces into one global enum. Representative
-oracle differential suites are green (including the first game-tier slices)
-and the ABI smoke test drives the full client lifecycle. What remains before
-hot-swap is the per-file oracle audit, the live-engine run, and ultimately the
-referee replay gate — compiling green is not verified parity.
+1. **Kill the last known module divergence — item-toss velocity.**
+   `ent115.pos.trDelta+8` at live-session frame 14282: a death-dropped item
+   (`ET_ITEM`, `TR_GRAVITY`) spawned with a different toss-velocity z.
+   Suspects: the `LaunchItem`/`TossClientItems` path (`oracle/codemp/game/
+   g_items.c`, `g_combat.c` player_die drops) — RNG draws or velocity math;
+   plausibly another instance of an F-item class bug. Method: probe inputs +
+   `holdrand` both sides (see `tools/referee-oracle/build.sh` G6DBG blocks +
+   in-tree Rust taps), soak or short play session via
+   `tools/lockstep-referee/run.sh`, diff dump streams.
+2. **Explain the replica-connect syscall blip.** Three live-session frames
+   (737 / 5883 / 5964) diverged on syscall COUNT only, state digests equal —
+   the follower's synthetic human-connect (`ref_inject_connect`,
+   `crates/mp/engine/server/src/sv_referee.rs`) makes extra syscalls vs the
+   real network connect path. Either align it call-for-call or teach the
+   follower to expect it at injected connects.
+3. **Probe formalization.** Keep the referee diagnostics permanently (user
+   ruling 2026-07-14). Rename env `G6DBG` → `REF_PROBES`; tags become
+   descriptive (`SAB_TRACE`/`SAB_CD`/`MUZZLE`/`LOOK_*`/`BONE_OVR`/
+   `DEATH_ANIM`/…) — our tags and the oracle build.sh tags must stay
+   byte-identical pairs. One `probe!` macro, env flag cached in a
+   `LazyLock<bool>`. Commit the currently-uncommitted Rust-side taps
+   (`w_saber.rs`, `bg_pmove.rs`, `g_combat.rs`, `g_weapon.rs`,
+   `sv_game.rs`, `rng.rs` accessor); update the build.sh tag strings to
+   match.
+4. **G8 land.** Plan-doc statuses (lockstep plan G7/G8), refresh the stale
+   README Status block (dated 2026-07-11), lift the push hold
+   (29+ held commits).
+5. **Safe-state Stage 4** — overlay/shared-buffer casts behind typed seam
+   adapters (findings F5/F6) + the unsafe-retiring slice of porting-rules
+   §C7. Referee-gated shards. Plan:
+   `docs/plans/2026-07-12-safe-state-migration.md` (Stages 0–3 DONE).
+6. **Safe-state Stage 5** — bg crate split (ends the ruling-19 deferral;
+   mp_bg holds no fn bodies today — a split, not a dedup).
+7. **Ratify the seam split, then dissolve the tail.** The design sketch is
+   in `docs/roadmap-final-stages.md` Stage 2 (2026-07-14): `gentity_t`/
+   `gclient_t` → `#[repr(C)] EntitySeam {s, r}`/`ps` registered arrays +
+   parallel idiomatic arenas; module-chosen `LocateGameData` stride keeps
+   2003/OpenJK drop-in compat. Interactive sit-down to ratify, then shards
+   retire the 27 marked Stage-2b irreducibles and the entity/gclient deref
+   regime ("2c territory").
 
-## Related ABI Track: SP `GetGameAPI`
+Floating (unordered, run when convenient — each instance found prevents a
+future referee interruption):
 
-Before continuing deeper into the MP `dllEntry` / `vmMain` work, model Raven's
-other game-module boundary: the SP `GetGameAPI` function-table ABI.
+- **F1 — Class-bug sweep: unsuffixed C double literals flattened to f32.**
+  Two confirmed kills: `f51f89e9` (BG_G2ClientNeckAngles 0.4/0.6/0.1),
+  `435f7d57` (G_BounceMissile VectorScale 0.65). Method: grep oracle
+  `game/*.c` for unsuffixed FP literals inside float expressions, map to
+  Rust sites, fix as `(x as f64 * lit) as f32`. Reference idiom:
+  `crates/mp/game/src/bg_misc.rs` trajectory code (already correct).
+- **F2 — Class-bug sweep: dropped nullable-vec3 guards.** One batch ruling
+  ("by-value vec3_t can never be null") erased real NULL semantics; four
+  restored in `956101f7` (zero-vector sentinel). Method: grep
+  `PORT-NOTE(point-null)` / `PORT-NOTE(dir/point-null)` and audit every
+  other nullable-pointer-param PORT-NOTE crate-wide against the oracle's
+  `if (!param)` sites.
 
-This is related to the syscall/vmMain work because it is another engine/module
-ABI surface, but it is not the same transport:
+Key context for all of the above: memory file `lockstep-referee-2026-07-14`
+(hunt method, V-record decode offsets, import-number decode, stale-module
+trap: build `-p jampgame`/`-p mp_app`, never `-p mp_game` alone).
 
-- MP game, MP cgame, MP UI, SP cgame, and SP UI use the QVM-style shape:
-  `dllEntry(syscall_callback)`, `vmMain(command, arg0..arg11)`, and typed
-  syscall/vmMain wrappers over raw integer words.
-- SP game uses `GetGameAPI(game_import_t *import) -> game_export_t *`, where
-  the engine passes a `game_import_t` function-pointer table into the module and
-  the module returns a `game_export_t` function-pointer table back to the engine.
+## Related ABI track: SP `GetGameAPI` (future)
 
-The SP table ABI should be modeled beside the MP `vmMain` ABI, not forced into
-the same enum transport.
-
-- [x] Create a generic function-table ABI vocabulary alongside the existing
-  syscall/vmMain vocabulary.
-- [x] Port Raven SP `game_import_t` as a `#[repr(C)]` Rust import table with
-  Raven comments and source line references
-  (`crates/sp/abi/src/game/public/game_import_t.rs`; a handful of member
-  types remain opaque behind `TODO: Port` markers — CGhoul2Info,
-  IGhoul2InfoArray, CRagDollUpdateParams, the variadic `Printf`/`Error`/
-  `SendServerCommand` args — see the marker inventory).
-  - [ ] Create the SP game ABI type foundation for table fields:
-    `qboolean`, `fileHandle_t`, `fsMode_t`, `cvar_t`, `gentity_t`,
-    `usercmd_t`, `trace_t`, `vec3_t`, `qhandle_t`, `memtag_t`,
-    `SavedGameJustLoaded_e`, and related crossed types.
-  - [ ] Define the opaque-type policy for Raven C++ classes, pointers, and
-    references used by `game_import_t`, including Ghoul2, ragdoll, gore,
-    collision, and weather types.
-  - [ ] Define the function-pointer convention for table fields, including how
-    nullable callbacks and variadic callbacks like `Printf`, `Error`, and
-    `SendServerCommand` are represented.
-  - [ ] Preserve Raven field names and order for ABI traceability, even when
-    names do not match Rust style.
-  - [ ] Create a field manifest for every `game_import_t` entry with field name,
-    C signature, Raven source line, Rust type translation, and notes.
-  - [ ] Record the default-argument rule: C++ default arguments are not ABI
-    fields, so Rust signatures model the full parameter list only.
-  - [ ] Add a layout verification plan for `game_import_t`, including size and
-    representative field offsets against Raven headers.
-- [x] Port Raven SP `game_export_t` as a `#[repr(C)]` Rust export table with
-  Raven comments and source line references
-  (`crates/sp/abi/src/game/public/game_export_t.rs`).
-  - [ ] Reuse the SP game ABI type foundation for export callbacks and shared
-    variables such as `gentity_t`, `usercmd_t`, `qboolean`, and
-    `SavedGameJustLoaded_e`.
-  - [ ] Define the function-pointer convention for exported game callbacks and
-    decide where unported callback behavior is stubbed.
-  - [ ] Preserve Raven field names and order for ABI traceability, including
-    global shared fields such as `gentities`, `gentitySize`, and
-    `num_entities`.
-  - [ ] Create a field manifest for every `game_export_t` entry with field name,
-    C signature, Raven source line, Rust type translation, and notes.
-  - [ ] Add a layout verification plan for `game_export_t`, including size and
-    representative field offsets against Raven headers.
-- [x] Add the SP `GetGameAPI` exported symbol only after the import/export
-  tables exist (`crates/jagame`; `GI_Init` wiring still marked).
-- [ ] Store or expose the imported SP engine table in a way that SP game code
-  can call without every callsite handling raw unsafe pointers directly.
-- [ ] Stub exported SP game table functions where behavior is not ported yet,
-  while keeping ABI signatures and source references exact.
-- [ ] Keep SP `GetGameAPI` separate from the MP `dllEntry` / `vmMain` hot-swap
-  path, but reuse shared ABI primitives where the representation truly overlaps.
+SP game uses a different transport: `GetGameAPI(game_import_t*) ->
+game_export_t*` function tables, not `dllEntry`/`vmMain`. The tables are
+ported as `#[repr(C)]` twins (`crates/sp/abi/src/game/public/`), the
+`jagame` shell exports the symbol, and the remaining work (type foundation
+for table fields, opaque-type policy for Raven C++ classes, function-pointer
+conventions, field manifests, layout verification) is inventoried in git
+history of this file and the marker inventory. SP inherits the MP patterns
+as a diff once the MP campaign closes; keep the table ABI separate from the
+`vmMain` enum transport.
