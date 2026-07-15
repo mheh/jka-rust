@@ -221,15 +221,21 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
         crate::q_math::_VectorScale(trdelta, 0.25, &mut ctx.entity_mut(ent).s.pos.trDelta);
         ctx.entity_mut(ent).s.pos.trType = TR_GRAVITY;
 
-        // Check for stop
-        if tr.plane.normal[2] > 0.7 && ctx.entity(ent).s.pos.trDelta[2] < 40.0 {
+        // Check for stop. C promotes `normal[2]` to double against the
+        // unsuffixed `0.7`.
+        if (tr.plane.normal[2] as f64) > 0.7 && ctx.entity(ent).s.pos.trDelta[2] < 40.0 {
             G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
             ctx.entity_mut(ent).nextthink = ctx.world.level.time + 100;
             return;
         }
     } else if (ctx.entity(ent).flags & FL_BOUNCE_HALF) != 0 {
+        // Raven: `VectorScale(..., 0.65, ...)` — the unsuffixed `0.65` makes the
+        // macro multiply each component in double, narrowed on store.
         let trdelta = ctx.entity(ent).s.pos.trDelta;
-        crate::q_math::_VectorScale(trdelta, 0.65, &mut ctx.entity_mut(ent).s.pos.trDelta);
+        let out = &mut ctx.entity_mut(ent).s.pos.trDelta;
+        out[0] = (trdelta[0] as f64 * 0.65) as f32;
+        out[1] = (trdelta[1] as f64 * 0.65) as f32;
+        out[2] = (trdelta[2] as f64 * 0.65) as f32;
         // Check for stop.
         // `normal[2]` (float) and `VectorLength` (float) promote to double
         // against the unsuffixed `0.2`/`40` in C; the f32-nearest 0.2 exceeds
