@@ -18,6 +18,7 @@ use mp_engine_qcommon::vm::VM_Call;
 use mp_engine_qcommon::vm_fns::BotVMShift;
 use mp_engine_qcommon::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::common::mp::botlib::botlib_misc::BOTLIB_API_VERSION;
+use mp_qshared::probe;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
@@ -362,6 +363,8 @@ pub fn SV_OrgVisibleBox(
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:63-75`
 pub fn SV_BotWaypointReception(sv: &mut Server, wpnum: c_int, wps: *mut *mut wpobject_t) {
+    // Referee probe: waypoint count the module delivered to the engine cache.
+    probe!("NAV_RECV", "wpnum={}", wpnum);
     sv.bot.gWPNum = wpnum;
 
     let mut i: c_int = 0;
@@ -473,6 +476,18 @@ pub fn SV_BotCalculatePaths(view: &mut EngineHostView, sv: &mut Server, rmg: c_i
             }
             i += 1;
         }
+
+        // Referee probe: total neighbor links built (bot routing dies if ~0).
+        let mut total_links: c_int = 0;
+        let mut k: c_int = 0;
+        while k < sv.bot.gWPNum {
+            let wp = sv.bot.gWPArray[k as usize];
+            if !wp.is_null() && (*wp).inuse != qfalse {
+                total_links += (*wp).neighbornum;
+            }
+            k += 1;
+        }
+        probe!("NAV_LINKS", "wps={} links={}", sv.bot.gWPNum, total_links);
     }
 }
 

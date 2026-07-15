@@ -61,8 +61,17 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
   death in 12 min), botlib fixes included. Every historical soak ran at
   our-lane rates; there was never a baseline to notice. Lockstep is blind
   by construction (our engine feeds both modules identical inputs).
-  Next discriminator: lane 3 = our engine + the ORACLE module dylib —
-  passive lane 3 pins it on engine-side inputs (FS/waypoint loads, traces,
-  PVS) starving both modules' AI; a fighting lane 3 points module-adjacent.
-  Then probe enemy-acquisition gates both sides. Logs:
-  session scratchpad `ab-test2/`.
+  **Lane 3 ran (2026-07-15): our engine + ORACLE module = 0.10 kills/min —
+  as passive as our module. ENGINE-SIDE confirmed.** Threads since ruled
+  out: waypoint reception (NAV_RECV/NAV_LINKS probes never fire — correct:
+  the oracle's only trap_Bot_UpdateWaypoints call is RMG-only; retail .wnt
+  files carry the neighbor links); InPVS (PVS_RATIO probe: 12.7% hit rate
+  over 4k calls — vision alive); navigation (bots roam and pick up items).
+  Calibration: ls-live session bot-vs-bot = 0.43/min (4-5× today's lanes,
+  still 4× under OpenJK; human presence stirs encounters). Remaining
+  suspects: engagement-decision inputs (trace results in OrgVisibility,
+  aggression/chat gates' timing inputs, addbot-vs-minplayers skill
+  plumbing). Next: probe module-side BotScanForEnemies accept/reject
+  reasons under REF_PROBES (module probes fire identically for both
+  modules — the inputs are what differ vs OpenJK). Logs: scratchpad
+  `ab-test2/`, `ab-test3/`, `nav-probe/`.

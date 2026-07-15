@@ -9,6 +9,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_ulong, c_void};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::probe;
@@ -1089,11 +1090,24 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_IN_PVS as isize {
-            return SV_inPVS(
+            let r = SV_inPVS(
                 view.cm,
                 *(vma(view.common, args, 1) as *const vec3_t),
                 *(vma(view.common, args, 2) as *const vec3_t),
-            ) as isize;
+            );
+            // Referee probe: aggregate InPVS hit ratio (bot vision dies if ~0).
+            {
+                static PVS_CALLS: AtomicU64 = AtomicU64::new(0);
+                static PVS_TRUE: AtomicU64 = AtomicU64::new(0);
+                let n = PVS_CALLS.fetch_add(1, Ordering::Relaxed) + 1;
+                if r != 0 {
+                    PVS_TRUE.fetch_add(1, Ordering::Relaxed);
+                }
+                if n % 4096 == 0 {
+                    probe!("PVS_RATIO", "calls={} true={}", n, PVS_TRUE.load(Ordering::Relaxed));
+                }
+            }
+            return r as isize;
         } else if trap == G::G_IN_PVS_IGNORE_PORTALS as isize {
             return SV_inPVSIgnorePortals(
                 view.cm,
