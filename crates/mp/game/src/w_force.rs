@@ -6199,22 +6199,9 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                     );
                     (*cl).ps.fd.forceJumpCharge = 0.0;
                 }
-            } else if (*ucmd).upmove > 10
-                && (*cl).ps.pm_flags & PMF_JUMP_HELD != 0
-                && (*cl).ps.groundTime != 0
-                && (level_time - (*cl).ps.groundTime) > 150
-                && BG_HasYsalamiri(gametype, &mut (*cl).ps) == 0
-                && BG_CanUseFPNow(gametype, &mut (*cl).ps, level_time, FP_LEVITATION) != 0
-            {
-                //just charging up
-                ForceJumpCharge(ctx, ctx.entity_id_of(self_).unwrap(), ucmd);
-                usingForce = qtrue;
-            } else if (*ucmd).upmove < 10
-                && (*cl).ps.groundEntityNum == ENTITYNUM_NONE
-                && (*cl).ps.fd.forceJumpCharge != 0.0
-            {
-                (*cl).ps.pm_flags &= !PMF_JUMP_HELD;
             }
+            // The two `else if` charge-jump arms at w_force.c:5444-5454 are
+            // `#ifndef METROID_JUMP` — dead in retail (defined at :7), not ported.
 
             if (*cl).ps.pm_flags & PMF_JUMP_HELD == 0 && (*cl).ps.fd.forceJumpCharge != 0.0 {
                 if (*ucmd).buttons & BUTTON_FORCEPOWER == 0

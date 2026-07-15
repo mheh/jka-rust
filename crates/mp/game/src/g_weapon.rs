@@ -3399,12 +3399,22 @@ pub fn charge_stick(
             let mut vNor: vec3_t = (*trace).plane.normal;
             crate::q_math::VectorNormalize(&mut vNor);
             let tN = VectorNPos((*self_).s.pos.trDelta, [0.0; 3]);
-            (*self_).s.pos.trDelta[0] +=
-                vNor[0] * (tN[0] * (ctx.world.bg_state.rng.Q_irand(1, 10) as f32 * 0.1));
-            (*self_).s.pos.trDelta[1] +=
-                vNor[1] * (tN[1] * (ctx.world.bg_state.rng.Q_irand(1, 10) as f32 * 0.1));
-            (*self_).s.pos.trDelta[2] +=
-                vNor[1] * (tN[2] * (ctx.world.bg_state.rng.Q_irand(1, 10) as f32 * 0.1));
+            // C: `vNor[i]*(tN[i]*(((float)Q_irand(1,10))*0.1))` — the bare `0.1`
+            // (double) runs the whole product chain in f64, narrowed once at the
+            // `+=` store. The `vNor[1]` on the [2] component is a faithful oracle bug.
+            // Source: `oracle/codemp/game/g_weapon.c:2671-2673`
+            (*self_).s.pos.trDelta[0] = ((*self_).s.pos.trDelta[0] as f64
+                + vNor[0] as f64
+                    * (tN[0] as f64 * (ctx.world.bg_state.rng.Q_irand(1, 10) as f64 * 0.1)))
+                as f32;
+            (*self_).s.pos.trDelta[1] = ((*self_).s.pos.trDelta[1] as f64
+                + vNor[1] as f64
+                    * (tN[1] as f64 * (ctx.world.bg_state.rng.Q_irand(1, 10) as f64 * 0.1)))
+                as f32;
+            (*self_).s.pos.trDelta[2] = ((*self_).s.pos.trDelta[2] as f64
+                + vNor[1] as f64
+                    * (tN[2] as f64 * (ctx.world.bg_state.rng.Q_irand(1, 10) as f64 * 0.1)))
+                as f32;
 
             crate::q_math::vectoangles(vNor, &mut (*self_).s.angles);
             let mut apos_base: vec3_t = [0.0; 3];
@@ -3706,9 +3716,12 @@ pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
                 if (*found).parent == Some(ent_id(ctx.world.g_entities.as_mut_ptr(), ent)) {
                     (*found).s.origin = (*found).r.currentOrigin;
                     (*found).think = Some(EntThink::DetPackBlow).into();
-                    (*found).nextthink = ctx.world.level.time
-                        + 100
-                        + (ctx.world.bg_state.rng.random() * 200.0) as c_int;
+                    // C: `level.time + 100 + random()*200` — the int sum promotes
+                    // to f32 against `random()*200`, truncating once at the store.
+                    // Source: `oracle/codemp/game/g_weapon.c:2863`
+                    (*found).nextthink = ((ctx.world.level.time + 100) as f32
+                        + ctx.world.bg_state.rng.random() * 200.0)
+                        as c_int;
                     crate::g_utils::G_Sound(
                         ctx,
                         ctx.entity_id_of(found),
@@ -4584,12 +4597,9 @@ pub fn CalcMuzzlePointOrigin(
         muzzlePoint[1] += 14.0 * forward[1];
         muzzlePoint[2] += 14.0 * forward[2];
         // Snap to integer coordinates for more efficient network bandwidth
-        // usage. Raven's inline `SnapVector` (q_shared.h:1408-1427) truncates
-        // via x87 `fistp` (round-to-nearest); `.round()` is the closest safe
-        // Rust equivalent.
-        for i in 0..3 {
-            muzzlePoint[i] = muzzlePoint[i].round();
-        }
+        // usage. Raven's `SnapVector` rounds via x87 `fistp` (round-to-nearest,
+        // ties-even); `snap_vector` is the codebase's rint idiom.
+        snap_vector(&mut muzzlePoint);
         muzzlePoint
     }
 }
@@ -5151,10 +5161,14 @@ pub fn WP_GetVehicleCamPos(
             thirdPersonHorzOffset += ((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32
                 / MAX_STRAFE_TIME)
                 * -80.0;
-            thirdPersonRange += ((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32
-                / MAX_STRAFE_TIME)
-                .abs()
-                * 100.0;
+            // C: `fabs(((float)hackingTime)/MAX_STRAFE_TIME)*100.0f` — libm `fabs`
+            // promotes to double, the double product rounds once at the f32 `+=`.
+            // Source: `oracle/codemp/game/g_weapon.c:3971`
+            thirdPersonRange = (thirdPersonRange as f64
+                + (((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32
+                    / MAX_STRAFE_TIME) as f64)
+                    .abs()
+                    * 100.0) as f32;
         }
 
         if (*vehInfo).cameraPitchDependantVertOffset != qfalse {

@@ -653,10 +653,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
         let bs_ref = &mut *bs;
 
-        // Allocate temporary buffers
         let buf = B_TempAlloc(ctx, 131072) as *mut c_char;
-        let readbuf = B_TempAlloc(ctx, 1024) as *mut c_char;
-        let group = B_TempAlloc(ctx, 65536) as *mut c_char;
 
         // Open the personality file
         let mut f: fileHandle_t = 0;
@@ -709,6 +706,9 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         }
 
         rlen = len;
+
+        let readbuf = B_TempAlloc(ctx, 1024) as *mut c_char;
+        let group = B_TempAlloc(ctx, 65536) as *mut c_char;
 
         // Parse GeneralBotInfo group
         if GetValueGroup(buf, "GeneralBotInfo\0".as_ptr() as *mut c_char, group) == 0 {

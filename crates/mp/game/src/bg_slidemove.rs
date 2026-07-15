@@ -136,7 +136,7 @@ impl PmoveContext<'_> {
             {
                 // hit a func_rotating that is supposed to destroy anything it touches!
                 forceSurfDestruction = qtrue;
-            } else if (Q_fabs((*ps).velocity[0]) + Q_fabs((*ps).velocity[1])) < 100.0
+            } else if (((*ps).velocity[0] as f64).abs() + ((*ps).velocity[1] as f64).abs()) < 100.0
                 && (*ps).velocity[2] > -100.0
             {
                 // we're landing, we're cool
@@ -968,9 +968,9 @@ impl PmoveContext<'_> {
             // never step up when you still have up velocity
             if (*ps).velocity[2] > 0.0
                 && (trace.fraction == 1.0
-                    || (trace.plane.normal[0] * up_test[0]
+                    || ((trace.plane.normal[0] * up_test[0]
                         + trace.plane.normal[1] * up_test[1]
-                        + trace.plane.normal[2] * up_test[2])
+                        + trace.plane.normal[2] * up_test[2]) as f64)
                         < 0.7)
             {
                 return;

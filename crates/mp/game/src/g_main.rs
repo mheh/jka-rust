@@ -4041,6 +4041,8 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
             let mut i: c_int = 0;
             while (i as usize) < MAX_GENTITIES {
                 let classname = ctx.world.g_entities[i as usize].classname;
+                // §19: oracle passes a possibly-NULL classname to %s (UB); we
+                // print "" for unused slots.
                 let name = if classname.is_null() {
                     String::new()
                 } else {

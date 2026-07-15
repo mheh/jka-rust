@@ -1997,9 +1997,6 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
                 } else if c_str_eq((*ent).classname, b"item_ysalimari") {
                     weight = 2.0;
                 } else if c_str_contains((*ent).classname, b"weapon_") && !(*ent).item.is_null() {
-                    // PORT-NOTE(missing-global): `botGlobalNavWeaponWeights`
-                    // (`ai_wpnav.c:1796`) has no ported home yet
-                    // (missing_symbols).
                     weight = botGlobalNavWeaponWeights[(*(*ent).item).giTag as usize];
                 } else if !(*ent).item.is_null() && (*(*ent).item).giType == IT_AMMO {
                     weight = 3.0;

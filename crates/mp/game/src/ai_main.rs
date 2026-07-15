@@ -2104,8 +2104,8 @@ pub fn PassStandardEnemyChecks(
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1861-1941`
 pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Option<EntityId>) {
-    // PORT-NOTE(botstates/ENEMY_FORGET_MS): `globals.botstates` is a `()`
-    // placeholder (indexed as intended); `ENEMY_FORGET_MS` has no ported home.
+    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder
+    // (indexed as intended).
     unsafe {
         // STAGE-1: `bot` is the hurt entity's `EntityId`; re-derive its `gclient_t*`
         // (Raven's `bot`). `attacker` is an `Option<EntityId>` handle. Body verbatim.
@@ -2554,8 +2554,6 @@ pub fn BotGetWeaponRange(bs: *mut bot_state_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2301-2391`
 pub fn BotIsAChickenWuss(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
-    // PORT-NOTE(MAX_CHICKENWUSS_TIME/BOT_RUN_HEALTH): these consts have no
-    // ported home yet; referenced as cited and reported as missing.
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
         let lt = ctx.world.level.time;
@@ -2666,8 +2664,6 @@ pub fn BotIsAChickenWuss(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2395-2504`
 pub fn GetNearestBadThing(ctx: &mut GameContext, bs: *mut bot_state_t) -> *mut gentity_t {
-    // PORT-NOTE(ENEMY_FORGET_MS): the `ENEMY_FORGET_MS` const has no ported
-    // home yet; referenced as cited and reported as missing.
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
         let mut i: c_int = 0;
@@ -2804,8 +2800,6 @@ pub fn GetNearestBadThing(ctx: &mut GameContext, bs: *mut bot_state_t) -> *mut g
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2507-2538`
 pub fn BotDefendFlag(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
-    // PORT-NOTE(BASE_GUARD_DISTANCE): the const has no ported home yet;
-    // referenced as cited and reported as missing.
     unsafe {
         let clients = ctx.world.level.clients;
         let flagPoint: *mut wpobject_t;
@@ -2838,8 +2832,6 @@ pub fn BotDefendFlag(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_main.c:2541-2572`
 pub fn BotGetEnemyFlag(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
-    // PORT-NOTE(BASE_GETENEMYFLAG_DISTANCE): the const has no ported home yet;
-    // referenced as cited and reported as missing.
     unsafe {
         let clients = ctx.world.level.clients;
         let flagPoint: *mut wpobject_t;
