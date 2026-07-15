@@ -3862,9 +3862,8 @@ pub fn G_GetHitQuad(ctx: &mut GameContext, self_: EntityId, hitloc: vec3_t) -> c
 
 /// Raven `G_GetHitLocFromSurfName`.
 ///
-/// PORT-NOTE(point-null): Raven's `if (!point) return qfalse;` guards a nullable
-/// `vec3_t*`; the LAW by-value `vec3_t` can never be null, so the branch is
-/// dropped (point always present).
+/// Callers encode Raven's NULL `vec3_t point` as the zero vector, so the
+/// `if (!point)` guard becomes a zero test (lockstep-caught 2026-07-14).
 /// Source: `oracle/codemp/game/g_combat.c:3757-4216`
 pub fn G_GetHitLocFromSurfName(
     ctx: &mut GameContext,
@@ -3897,7 +3896,10 @@ pub fn G_GetHitLocFromSurfName(
         if client.is_null() {
             return qfalse;
         }
-        // PORT-NOTE(point-null): Raven `if (!point) return qfalse;` — see doc.
+        // Raven `if (!point) return qfalse;` — zero vector is the NULL sentinel.
+        if point == [0.0, 0.0, 0.0] {
+            return qfalse;
+        }
 
         if !(*ent).client.is_null()
             && ((*client).NPC_class == class_t::CLASS_R2D2
@@ -4544,8 +4546,10 @@ pub fn G_LocationBasedDamageModifier(
             // don't bother for idle damage
             return;
         }
-        // PORT-NOTE(point-null): Raven `if (!point) return;` — by-value vec3_t is
-        // never null, so the branch is dropped.
+        // Raven `if (!point) return;` — zero vector is the NULL sentinel.
+        if point == [0.0, 0.0, 0.0] {
+            return;
+        }
 
         if !(*ent).client.is_null() && (*client).NPC_class == class_t::CLASS_VEHICLE {
             // no location-based damage on vehicles
@@ -5988,8 +5992,17 @@ pub fn G_Damage(
                 if !client.is_null() {
                     (*targ).flags |= FL_NO_KNOCKBACK;
 
-                    // PORT-NOTE(dir/point-null): point is a non-null value; copy it.
-                    crate::q_math::_VectorCopy(point, &mut (*targ).pos1);
+                    // Raven `if (point) ... else VectorCopy(ps.origin, pos1)` —
+                    // zero vector is the NULL sentinel (no-point deaths, e.g.
+                    // falling, record the victim's origin for the death anim).
+                    if point != [0.0, 0.0, 0.0] {
+                        crate::q_math::_VectorCopy(point, &mut (*targ).pos1);
+                    } else {
+                        crate::q_math::_VectorCopy(
+                            (*((*targ).client as *mut gclient_t)).ps.origin,
+                            &mut (*targ).pos1,
+                        );
+                    }
                 } else if (*targ).s.eType == entityType_t::ET_NPC as c_int {
                     // g2animent
                     crate::q_math::_VectorCopy(point, &mut (*targ).pos1);
@@ -6058,8 +6071,16 @@ pub fn G_Damage(
                     {
                         // don't even notify NPCs of pain if it's just idle saber damage
                         ctx.world.globals.gPainMOD = r#mod;
-                        // PORT-NOTE(point-null): point is a non-null value; copy it.
-                        crate::q_math::_VectorCopy(point, &mut ctx.world.globals.gPainPoint);
+                        // Raven `if (point) ... else VectorCopy(r.currentOrigin,
+                        // gPainPoint)` — zero vector is the NULL sentinel.
+                        if point != [0.0, 0.0, 0.0] {
+                            crate::q_math::_VectorCopy(point, &mut ctx.world.globals.gPainPoint);
+                        } else {
+                            crate::q_math::_VectorCopy(
+                                (*targ).r.currentOrigin,
+                                &mut ctx.world.globals.gPainPoint,
+                            );
+                        }
                         if let Some(pain_fn) = (*targ).pain.get() {
                             crate::ent_fn_enums::dispatch_pain(ctx, pain_fn, targ, attacker, take);
                         }
