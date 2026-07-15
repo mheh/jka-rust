@@ -23,6 +23,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 MAP=${MAP:-mp/ffa3}
+MAPCMD=${MAPCMD:-map}     # devmap = same map with cheats (must match on both engines)
 BOTS=${BOTS:-4}
 SEED=${SEED:-777777}
 FPS=${FPS:-20}
@@ -72,7 +73,7 @@ COMMON_ARGS=(+set dedicated 1 +set sv_maxclients "$MAXCLIENTS" +set bot_enable 1
 "./$BIN" "${COMMON_ARGS[@]}" +set fs_basepath "$PRIMARY_BASE" \
     +set net_port "$PRIMARY_PORT" +set ref_record "$TAPE" +set ref_state "$REF_STATE" \
     +set ref_calls "$OUT/calls-primary.txt" \
-    +map "$MAP" >"$OUT/primary.log" 2>&1 &
+    "+$MAPCMD" "$MAP" >"$OUT/primary.log" 2>&1 &
 PRIMARY_PID=$!
 echo "primary   pid=$PRIMARY_PID port=$PRIMARY_PORT module=ours log=$OUT/primary.log"
 
@@ -89,7 +90,7 @@ for _ in $(seq 1 300); do [ -s "$TAPE" ] && break; sleep 0.2; done
 "./$BIN" "${COMMON_ARGS[@]}" +set fs_basepath "$SECONDARY_BASE" \
     +set net_port "$SECONDARY_PORT" +set ref_replay "$TAPE" +set ref_follow 1 \
     +set ref_calls "$OUT/calls-secondary.txt" \
-    +map "$MAP" >"$OUT/secondary.log" 2>&1 &
+    "+$MAPCMD" "$MAP" >"$OUT/secondary.log" 2>&1 &
 SECONDARY_PID=$!
 echo "secondary pid=$SECONDARY_PID port=$SECONDARY_PORT module=$SECONDARY_MODULE log=$OUT/secondary.log"
 
