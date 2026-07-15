@@ -70,6 +70,22 @@ of the same source targets our engine later (registers/SSE2/addr-space wins;
   covers prefix-to-receiver moves (G_FreeEntity → ent.free()).
 - §C7 completion: qboolean fields → bool where non-ABI, out-params → returns,
   char[N] → String/&str at non-seam boundaries.
+- **The seam split** (design sketch 2026-07-14 — ratify before Stage-2
+  execution): `gentity_t`/`gclient_t` cease to exist as single types. The
+  LocateGameData contract is module-chosen stride + engine reads only the
+  `sharedEntity_t` prefix (`s`+`r`) per entity slot and `playerState_t` at
+  client slot offset 0 — so only `EntitySeam { s, r }` and `ps` stay
+  `#[repr(C)]` in the registered arrays; every private field moves to
+  parallel idiomatic arenas (`Vec<Entity>`, `Vec<Client>`): pointers →
+  `EntityId`/`Option`, char* → String/enum, ghoul2 stays an opaque handle.
+  No wire marshaling exists or is needed — the seam array IS the live
+  storage the engine snapshots in place, in both directions (module writes
+  `s`, engine writes `r.absmin`/`s.number`/`ps.ping`). Slot recycling keeps
+  Raven's `inuse` semantics — NO generational indices; deliberate
+  stale-slot reads are oracle-verified behavior. Drop-in compat (retail
+  2003 jampded ILP32, OpenJK x86-64) is preserved by construction; the
+  referee's digests cover exactly the seam memory, which is exactly the
+  memory that never changes shape.
 
 ## Stage 3 — The single-writer platform (mailbox + snapshots)
 

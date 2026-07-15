@@ -63,6 +63,66 @@ is ported.
   (`tools/closure-prototype/out/engine/engine-port-order.tsv`); older audits
   live under [`docs/audits/`](docs/audits/).
 
+## Where this is going
+
+Parity is the floor, not the ceiling. Once the lockstep referee locks
+behavior byte-for-byte against Raven's module, the codebase stops being a
+transcription and becomes a redesign — with the oracle still refereeing
+every commit. The endgame data model looks nothing like 2003:
+
+```c
+/* Raven, 2003: one ~900-byte struct, every relationship a raw
+   mutable pointer into every other struct. */
+gentity_t *self = &g_entities[i];
+self->enemy = other;              /* may dangle; nobody checks */
+self->think = SaberUpdateSelf;    /* bare function pointer */
+self->classname = "lightsaber";
+```
+
+```rust
+// The plan: `gentity_t` no longer exists. The bytes the engine actually
+// reads live in ONE #[repr(C)] seam array; everything else is plain Rust.
+#[repr(C)]
+pub struct EntitySeam { pub s: entityState_t, pub r: entityShared_t }
+
+pub struct Entity {               // module-private — no pointers, anywhere
+    pub enemy: Option<EntityId>,  // was *mut gentity_t
+    pub think: Think,             // enum dispatch, was a function pointer
+    pub classname: Classname,     // was char*
+    // ...
+}
+
+// Borrow-checked views rejoin the halves at the call site:
+let mut ent = world.ent_mut(id);      // EntityMut<'_>
+ent.s.pos.trDelta[2] = 237.3;         // seam — the engine sees this byte
+ent.p.enemy = Some(other);            // private — the engine never will
+
+#[doc(alias = "G_Damage")]            // 20 years of muscle memory still greps
+pub fn damage(game: &mut Game, targ: EntityId, /* … */) { /* … */ }
+```
+
+The trick that makes this legal: `LocateGameData` hands the engine a base
+pointer and a **module-chosen stride**, and the engine only ever
+dereferences the `sharedEntity_t` prefix (`s`+`r`) and each client's
+`playerState_t`. Everything Raven packed after that prefix was private all
+along — so it can become `Option`s, enums, and `String`s while **a 2003
+`jampded` binary loads the module and cannot tell the difference**. There
+is no marshaling layer: the seam array is the live storage the engine
+snapshots in place.
+
+Downstream of that (see
+[`docs/roadmap-final-stages.md`](docs/roadmap-final-stages.md)): the world
+becomes a single-writer owned value with a command mailbox and a snapshot
+stream — which turns a 2003 game server into a platform:
+
+- **Time travel**: input logs + sparse keyframes → instant replay,
+  kill-cams, server rewind, replayable crash dumps.
+- **Headless simulation**: thousands of frames/sec, no clock, no renderer —
+  balance testing, fuzzing, soak farms (the lockstep referee is customer #1).
+- **Sidecars**: a Discord bot and an MCP server driving the live world
+  through a whitelisted command mailbox — every mutation a serialized,
+  auditable command.
+
 ## Ship targets
 
 - **MP** (`jamp` engine): 3 loadable modules — `jampgame`, `cgame`, `ui`.
