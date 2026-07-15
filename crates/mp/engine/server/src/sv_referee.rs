@@ -715,6 +715,18 @@ pub fn ref_is_replica(sv: &Server, slot: c_int) -> bool {
         && matches!(sv.referee.replica.get(slot as usize), Some(true))
 }
 
+/// Clear a slot's replica marking at reallocation (bot allocate / real
+/// connect). The flag survives the drop's CS_ZOMBIE teardown, but a reused
+/// slot belongs to its new occupant — leaving it set starves a successor
+/// bot's reliable queue via the replica auto-ack (frame-6400-family catch).
+pub fn ref_clear_replica(sv: &mut Server, slot: c_int) {
+    if slot >= 0 {
+        if let Some(r) = sv.referee.replica.get_mut(slot as usize) {
+            *r = false;
+        }
+    }
+}
+
 /// Wire tap at `SV_SendMessageToClient` (`ref_snaps`): append the logical
 /// message bytes for non-bot clients — byte-for-byte what the client's
 /// `CL_ParseServerMessage` consumes after netchan decode (gamestate included,

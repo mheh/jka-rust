@@ -1005,6 +1005,9 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
         *cl_ptr = newcl;
         let client_num = ((cl_ptr as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
+        // The slot may have last held a replay replica; it belongs to this
+        // client now.
+        crate::sv_referee::ref_clear_replica(sv, client_num);
         let ent = crate::sv_game::SV_GentityNum(sv, client_num);
         (*cl_ptr).gentity = ent;
 

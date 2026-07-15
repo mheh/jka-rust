@@ -89,7 +89,17 @@ pub fn SV_SendClientMessages(view: &mut EngineHostView, sv: &mut Server) {
             }
 
             // A replay replica has no socket; skip its outbound send entirely.
+            // While it is a live client, auto-ack its reliable queue (the
+            // recorded human acked every command within a round trip; the
+            // backlog otherwise drains as extra BOTLIB_GET_CONSOLE_MESSAGE
+            // calls when a bot reuses the slot — frame-5964 referee catch).
+            // Not during CS_ZOMBIE: drop-time broadcasts can never be acked
+            // by the leaving client, and the primary's successor bot drains
+            // exactly those.
             if crate::sv_referee::ref_is_replica(sv, i) {
+                if (*c).state as c_int >= clientState_t::CS_CONNECTED as c_int {
+                    (*c).reliableAcknowledge = (*c).reliableSequence;
+                }
                 continue;
             }
 

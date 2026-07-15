@@ -496,6 +496,10 @@ pub fn SV_BotAllocateClient(common: &mut Common, sv: &mut Server) -> c_int {
             return -1;
         }
 
+        // The slot may have last held a replay replica; it belongs to this
+        // bot now.
+        crate::sv_referee::ref_clear_replica(sv, i);
+
         (*cl).gentity = SV_GentityNum(sv, i);
         (*(*cl).gentity).s.number = i;
         (*cl).state = clientState_t::CS_ACTIVE;
