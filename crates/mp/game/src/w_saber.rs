@@ -659,6 +659,10 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                 // no sabers/blades to FORCE on, so turn off blocking altogether
                 (*saberent).r.mins = [0.0; 3];
                 (*saberent).r.maxs = [0.0; 3];
+                if ctx.world.cvars.g_saberDebugPrint.integer > 1 {
+                    let s = format!("Client {} in broken parry, saber box 0\n", (*owner).s.number);
+                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                }
                 return;
             }
         }
@@ -11658,9 +11662,9 @@ pub fn WP_SaberBlockNonRandom(self_: &gentity_t, hitloc: vec3_t, missileBlock: q
         let zdiff = hitloc[2] - clEye[2];
 
         if zdiff > 0.0 {
-            if rightdot > 0.3 {
+            if (rightdot as f64) > 0.3 {
                 (*client).ps.saberBlocked = BLOCKED_UPPER_RIGHT;
-            } else if rightdot < -0.3 {
+            } else if (rightdot as f64) < -0.3 {
                 (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
             } else {
                 (*client).ps.saberBlocked = BLOCKED_TOP;
@@ -11670,9 +11674,9 @@ pub fn WP_SaberBlockNonRandom(self_: &gentity_t, hitloc: vec3_t, missileBlock: q
                 // hmm, pretty low, but not low enough to use the low block, so
                 // we need to duck
             }
-            if rightdot > 0.1 {
+            if (rightdot as f64) > 0.1 {
                 (*client).ps.saberBlocked = BLOCKED_UPPER_RIGHT;
-            } else if rightdot < -0.1 {
+            } else if (rightdot as f64) < -0.1 {
                 (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
             } else {
                 (*client).ps.saberBlocked = BLOCKED_TOP;

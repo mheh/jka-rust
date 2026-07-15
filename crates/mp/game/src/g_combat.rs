@@ -243,13 +243,13 @@ pub fn G_GetHitLocation(ctx: &mut GameContext, target: EntityId, ppoint: vec3_t)
 
         // Get bottom to top (vertical) position index.
         let udot = dot(&up, &point_dir);
-        let vertical = if udot > 0.800 {
+        let vertical = if (udot as f64) > 0.800 {
             4
-        } else if udot > 0.400 {
+        } else if (udot as f64) > 0.400 {
             3
-        } else if udot > -0.333 {
+        } else if (udot as f64) > -0.333 {
             2
-        } else if udot > -0.666 {
+        } else if (udot as f64) > -0.666 {
             1
         } else {
             0
@@ -257,13 +257,13 @@ pub fn G_GetHitLocation(ctx: &mut GameContext, target: EntityId, ppoint: vec3_t)
 
         // Get back to front (forward) position index.
         let fdot = dot(&forward, &point_dir);
-        let forward_idx = if fdot > 0.666 {
+        let forward_idx = if (fdot as f64) > 0.666 {
             4
-        } else if fdot > 0.333 {
+        } else if (fdot as f64) > 0.333 {
             3
-        } else if fdot > -0.333 {
+        } else if (fdot as f64) > -0.333 {
             2
-        } else if fdot > -0.666 {
+        } else if (fdot as f64) > -0.666 {
             1
         } else {
             0
@@ -271,13 +271,13 @@ pub fn G_GetHitLocation(ctx: &mut GameContext, target: EntityId, ppoint: vec3_t)
 
         // Get left to right (lateral) position index.
         let rdot = dot(&right, &point_dir);
-        let lateral = if rdot > 0.666 {
+        let lateral = if (rdot as f64) > 0.666 {
             4
-        } else if rdot > 0.333 {
+        } else if (rdot as f64) > 0.333 {
             3
-        } else if rdot > -0.333 {
+        } else if (rdot as f64) > -0.333 {
             2
-        } else if rdot > -0.666 {
+        } else if (rdot as f64) > -0.666 {
             1
         } else {
             0
@@ -331,21 +331,21 @@ pub fn G_GetHitLocation(ctx: &mut GameContext, target: EntityId, ppoint: vec3_t)
         {
             // Head.
             HL_HEAD
-        } else if udot < 0.3 {
+        } else if (udot as f64) < 0.3 {
             HL_WAIST
         } else if fdot < 0.0 {
-            if rdot > 0.4 {
+            if (rdot as f64) > 0.4 {
                 HL_BACK_RT
-            } else if rdot < -0.4 {
+            } else if (rdot as f64) < -0.4 {
                 HL_BACK_LT
             } else if fdot < 0.0 {
                 HL_BACK
             } else {
                 HL_NONE
             }
-        } else if rdot > 0.3 {
+        } else if (rdot as f64) > 0.3 {
             HL_CHEST_RT
-        } else if rdot < -0.3 {
+        } else if (rdot as f64) < -0.3 {
             HL_CHEST_LT
         } else if fdot < 0.0 {
             HL_CHEST
@@ -3853,17 +3853,17 @@ pub fn G_GetHitQuad(ctx: &mut GameContext, self_: EntityId, hitloc: vec3_t) -> c
         let zdiff = hitloc[2] - clEye[2];
 
         if zdiff > 0.0 {
-            if rightdot > 0.3 {
+            if (rightdot as f64) > 0.3 {
                 hitLoc = G2_MODELPART_RARM as c_int;
-            } else if rightdot < -0.3 {
+            } else if (rightdot as f64) < -0.3 {
                 hitLoc = G2_MODELPART_LARM as c_int;
             } else {
                 hitLoc = G2_MODELPART_HEAD as c_int;
             }
         } else if zdiff > -20.0 {
-            if rightdot > 0.1 {
+            if (rightdot as f64) > 0.1 {
                 hitLoc = G2_MODELPART_RARM as c_int;
-            } else if rightdot < -0.1 {
+            } else if (rightdot as f64) < -0.1 {
                 hitLoc = G2_MODELPART_LARM as c_int;
             } else {
                 hitLoc = G2_MODELPART_HEAD as c_int;
@@ -6113,9 +6113,8 @@ pub fn G_Damage(
 
 /// Raven `G_DamageFromKiller`.
 ///
-/// PORT-NOTE(ctx-and-dir): threaded `ctx` (needed to reach `G_Damage`);
-/// Raven passes NULL `dir` to `G_Damage` — a non-null `&mut` zero vector is used
-/// instead (see G_Damage dir-null note). See shape_mismatches.
+/// PORT-NOTE(ctx-and-dir): threaded `ctx` (needed to reach `G_Damage`); Raven
+/// passes NULL `dir` to `G_Damage`, which the port carries as `None`.
 /// Source: `oracle/codemp/game/g_combat.c:5717-5758`
 pub fn G_DamageFromKiller(
     ctx: &mut GameContext,

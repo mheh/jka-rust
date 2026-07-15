@@ -381,8 +381,9 @@ impl PmoveContext<'_> {
             VectorClear(&mut vAngles);
             if (*self.pm).waterlevel > 0 {
                 //in water
-                vAngles[PITCH] += ((*(*self.pm).ps).viewangles[PITCH] - vAngles[PITCH]) * 0.75
-                    + (pitchBias as f64 * 0.5) as f32;
+                vAngles[PITCH] = (vAngles[PITCH] as f64
+                    + ((((*(*self.pm).ps).viewangles[PITCH] - vAngles[PITCH]) * 0.75) as f64
+                        + pitchBias as f64 * 0.5)) as f32;
             } else if let Some(normal) = normal {
                 //have a valid surface below me
                 self.PM_pitch_roll_for_slope(pEnt, normal, &mut vAngles);
@@ -412,7 +413,8 @@ impl PmoveContext<'_> {
                     let mut tempVAngles: vec3_t = [0.0; 3];
 
                     // modulate the speed by a sine wave
-                    speed *= ((150.0 + self.pml.frametime) as f64 * 0.003).sin() as f32;
+                    speed = (speed as f64 * ((150.0 + self.pml.frametime) as f64 * 0.003).sin())
+                        as f32;
 
                     if speed > 60.0 {
                         speed = 60.0;
@@ -546,7 +548,8 @@ impl PmoveContext<'_> {
                 }
                 if (*self.pm).waterlevel <= 1 {
                     //part of us is sticking out of water
-                    if Q_fabs((*(*self.pm).ps).velocity[0]) + Q_fabs((*(*self.pm).ps).velocity[1])
+                    if ((*(*self.pm).ps).velocity[0] as f64).abs()
+                        + ((*(*self.pm).ps).velocity[1] as f64).abs()
                         > 100.0
                     {
                         //moving at a decent speed
@@ -637,8 +640,8 @@ impl PmoveContext<'_> {
                             != 0
                         {
                             //hovering on water, make a spash if moving
-                            if Q_fabs((*(*self.pm).ps).velocity[0])
-                                + Q_fabs((*(*self.pm).ps).velocity[1])
+                            if ((*(*self.pm).ps).velocity[0] as f64).abs()
+                                + ((*(*self.pm).ps).velocity[1] as f64).abs()
                                 > 100.0
                             {
                                 //moving at a decent speed
@@ -2787,7 +2790,7 @@ impl PmoveContext<'_> {
                                             + facingFwd[1] * (*ps).velocity[1]
                                             + facingFwd[2] * (*ps).velocity[2];
 
-                                        if Q_fabs(dotR) > Q_fabs(dotF) * 1.5 {
+                                        if (dotR as f64).abs() > (dotF as f64).abs() * 1.5 {
                                             if dotR > 150.0 {
                                                 anim = BOTH_FORCEJUMPRIGHT1 as c_int;
                                             } else if dotR < -150.0 {
@@ -4222,7 +4225,7 @@ impl PmoveContext<'_> {
             if (*pm).waterlevel != 0 {
                 return;
             }
-            let delta = Q_fabs(self.pml.previous_velocity[2]) / 10.0;
+            let delta = ((self.pml.previous_velocity[2] as f64).abs() / 10.0) as f32;
             if delta >= 30.0 {
                 let mut bottom: vec3_t = [0.0; 3];
                 let mut effectID = -1;
@@ -9904,6 +9907,8 @@ pub fn PM_VehicleViewAngles(
     unsafe {
         let pVeh: *mut Vehicle_t = ((*veh).m_pVehicle as *mut Vehicle_t);
         let mut setAngles: qboolean = qtrue;
+        // §19: oracle reads clampMin/clampMax uninitialized for a non-pilot,
+        // non-turret passenger (UB); zero-init picks the "no allowance" clamp arm.
         let mut clampMin: vec3_t = [0.0; 3];
         let mut clampMax: vec3_t = [0.0; 3];
 
