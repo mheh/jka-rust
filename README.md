@@ -63,25 +63,89 @@ is ported.
   (`tools/closure-prototype/out/engine/engine-port-order.tsv`); older audits
   live under [`docs/audits/`](docs/audits/).
 
-## Where this is going
+## If you've spent twenty years in `g_*.c`
 
-Parity is the floor, not the ceiling. Once the lockstep referee locks
-behavior byte-for-byte against Raven's module, the codebase stops being a
-transcription and becomes a redesign — with the oracle still refereeing
-every commit. The endgame data model looks nothing like 2003:
+You already know this codebase. Files mirror Raven's subsystems, functions
+keep Raven's names, fields keep Raven's names, Raven's comments ride along.
+`grep -rn "G_RadiusDamage"` lands where you expect, and where the later
+reshaping renames anything, `#[doc(alias = "G_Damage")]` keeps grep, rustdoc
+search, and IDE lookup working. The port tries to stay as faithful as
+possible so that anyone who knows the original can read it, work on it, and
+build on it.
+
+The same loop, three snapshots — 2003, today, and where this lands:
 
 ```c
-/* Raven, 2003: one ~900-byte struct, every relationship a raw
-   mutable pointer into every other struct. */
-gentity_t *self = &g_entities[i];
-self->enemy = other;              /* may dangle; nobody checks */
-self->think = SaberUpdateSelf;    /* bare function pointer */
-self->classname = "lightsaber";
+/* 2003 — oracle/codemp/game/g_combat.c, G_RadiusDamage */
+numListedEntities = trap_EntitiesInBox( mins, maxs, entityList, MAX_GENTITIES );
+for ( e = 0 ; e < numListedEntities ; e++ ) {
+    ent = &g_entities[entityList[ e ]];
+    if (ent == ignore)
+        continue;
+    if (!ent->takedamage)
+        continue;
+    /* ... */
+    G_Damage( ent, NULL, attacker, dir, origin, (int)points, DAMAGE_RADIUS, mod );
+}
 ```
 
 ```rust
-// The plan: `gentity_t` no longer exists. The bytes the engine actually
-// reads live in ONE #[repr(C)] seam array; everything else is plain Rust.
+// Today — crates/mp/game/src/g_combat.rs, mid-migration. Honest snapshot:
+// noisier than the C. Ids at the boundaries, pointers still in the bodies —
+// scaffolding, kept while every commit byte-verifies against the oracle.
+let numListedEntities = trap::EntitiesInBox(ctx.engine, /* seam args */);
+for e in 0..numListedEntities {
+    let ent = &mut ctx.world.g_entities[entityList[e as usize] as usize] as *mut gentity_t;
+    if ent == ignore { continue; }
+    if (*ent).takedamage == qfalse { continue; }
+    // ...
+    G_Damage(ctx, ctx.entity_id_of(ent), None, ctx.entity_id_of(attacker),
+        Some(&mut dir), origin, points as c_int, DAMAGE_RADIUS, r#mod);
+}
+```
+
+```rust
+// The endgame — the same architecture, stated precisely. No pointer can
+// dangle, no NULL goes unchecked, and the compiler verifies it at compile
+// time with no runtime cost.
+for id in game.entities_in_box(mins, maxs) {
+    if ignore == Some(id) || !game.ent(id).takedamage { continue; }
+    // ...
+    damage(game, id, None, attacker, Some(dir), origin, points as i32,
+           DamageFlags::RADIUS, mod);
+}
+```
+
+(`qboolean` doesn't survive to the third snapshot. It had a good run.)
+
+### Why the middle state exists — and why machines did the typing
+
+Hand-translating a codebase this size invites silent drift: small
+"improvements" made mid-translation that nobody can audit afterward. This
+port avoids that by construction. The transcription was executed by LLM
+agents that were given no creative latitude: tooling parses the oracle with
+libclang and emits self-contained work orders, agents transcribe them
+blind, and mechanical checks judge the output — clang-derived layout
+asserts on every ABI-crossing struct, committed golden fixtures for the C++
+subsystems, and a lockstep referee that runs Raven's compiled `jampgame`
+and ours side by side on a live server, comparing entity/player state and
+the syscall stream every frame, byte for byte. Judgment calls are human
+rulings, recorded in [`docs/decisions.md`](docs/decisions.md).
+
+Examples of what the referee has caught: a one-ULP head-angle divergence
+traced to C's unsuffixed double literals (`0.4` promotes to a double
+multiply; `0.4f` does not); retail never shipping `bg_lib.c`'s `rand()` —
+the native DLL links MSVC's CRT LCG, so faithful bot behavior means
+reproducing `holdrand * 214013 + 2531011`; and a `vec3_t` parameter's
+array-decay write-back that a by-value port silently dropped. The pointers
+you see in today's snapshot are scaffolding kept for exactly this reason:
+reshaping happens only behind a green referee, one verified step at a time.
+
+### Where it lands
+
+```rust
+// `gentity_t` no longer exists. The bytes the engine actually reads live in
+// ONE #[repr(C)] seam array; everything else is plain Rust.
 #[repr(C)]
 pub struct EntitySeam { pub s: entityState_t, pub r: entityShared_t }
 
@@ -92,36 +156,31 @@ pub struct Entity {               // module-private — no pointers, anywhere
     // ...
 }
 
-// Borrow-checked views rejoin the halves at the call site:
-let mut ent = world.ent_mut(id);      // EntityMut<'_>
+let mut ent = world.ent_mut(id);      // EntityMut<'_> — both halves, one borrow
 ent.s.pos.trDelta[2] = 237.3;         // seam — the engine sees this byte
 ent.p.enemy = Some(other);            // private — the engine never will
-
-#[doc(alias = "G_Damage")]            // 20 years of muscle memory still greps
-pub fn damage(game: &mut Game, targ: EntityId, /* … */) { /* … */ }
 ```
 
-The trick that makes this legal: `LocateGameData` hands the engine a base
-pointer and a **module-chosen stride**, and the engine only ever
-dereferences the `sharedEntity_t` prefix (`s`+`r`) and each client's
-`playerState_t`. Everything Raven packed after that prefix was private all
-along — so it can become `Option`s, enums, and `String`s while **a 2003
-`jampded` binary loads the module and cannot tell the difference**. There
-is no marshaling layer: the seam array is the live storage the engine
-snapshots in place.
+What makes this compatible: `LocateGameData` hands the engine a base pointer
+and a module-chosen stride, and the engine only ever dereferences the
+`sharedEntity_t` prefix (`s`+`r`) and each client's `playerState_t`.
+Everything Raven packed after that prefix was module-private all along — so
+it can become `Option`s, enums, and `String`s while a 2003 `jampded` binary
+loads the module unchanged. There is no marshaling layer: the seam array is
+the live storage the engine snapshots in place.
 
-Downstream of that (see
-[`docs/roadmap-final-stages.md`](docs/roadmap-final-stages.md)): the world
-becomes a single-writer owned value with a command mailbox and a snapshot
-stream — which turns a 2003 game server into a platform:
-
-- **Time travel**: input logs + sparse keyframes → instant replay,
-  kill-cams, server rewind, replayable crash dumps.
-- **Headless simulation**: thousands of frames/sec, no clock, no renderer —
-  balance testing, fuzzing, soak farms (the lockstep referee is customer #1).
-- **Sidecars**: a Discord bot and an MCP server driving the live world
-  through a whitelisted command mailbox — every mutation a serialized,
-  auditable command.
+After parity, the reshaping (see
+[`docs/roadmap-final-stages.md`](docs/roadmap-final-stages.md)) makes the
+world one owned, copyable value, with a single input queue in the
+`Cbuf_AddText` tradition — typed, whitelisted commands instead of text —
+and every input logged. Because the simulation is deterministic, an input
+log plus occasional world keyframes is a complete recording: like a demo,
+but of the world rather than the wire, so it can be re-simulated, rewound,
+and inspected rather than only rewatched. The same property gives headless
+runs — no clock, no renderer, thousands of frames per second — for balance
+testing, fuzzing, and soak farms (the lockstep referee is the first
+consumer), and lets external tools such as a Discord bot or an MCP server
+drive a live server through the same audited command queue rcon uses.
 
 ## Ship targets
 
