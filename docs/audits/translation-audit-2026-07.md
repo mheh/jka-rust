@@ -42,9 +42,23 @@ site notes per porting-rules §19:
 - `g_missile.rs:984-987` G_MissileImpact: `think` null guard (oracle
   g_missile.c:677 calls unconditionally).
 
-## Wave 2 queue
+Wave-1 fix batch landed: `b0bee6e4` (findings 1-5 fixed + the two §19
+markers; #6 TryUse stays documented-parked).
 
-bg_pmove.rs and w_saber.rs (solo agents — the giants), g_combat.rs,
-g_client.rs, bg_saber.rs, g_cmds.rs, then remaining g_*/bg_*/w_*;
-NPC_*/ai_* last. Fix batch for wave-1 findings (#1-#5 + the two §19
-markers) can ride any wave's referee-gated landing.
+## Wave 2 (2026-07-15) — bg_pmove, w_saber, g_combat+g_client, bg_saber+g_cmds
+
+### bg_pmove.rs — 5 findings (all f32-vs-double threshold class), core path CLEAN
+
+Full-coverage walk (lines 127-10377, no gaps); prior fixes (lastHeadAngles,
+neck-angle f64s) re-verified intact. Every finding is a libm-double or
+bare-double-literal C expression evaluated in f32 (Q_fabs-for-fabs accounts
+for 3 of 5); none in the non-vehicle live-combat hot path:
+
+| # | Site | Oracle | Finding | Severity |
+|---|---|---|---|---|
+| 1 | `bg_pmove.rs:384-385` PM_SetVehicleAngles | `bg_pmove.c:526` | bare-double `0.5` keeps the pitch adds in f64; sibling branch's `0.5f` asymmetry is real in the oracle | latent (vehicle-in-water) |
+| 2 | `bg_pmove.rs:415` PM_SetVehicleAngles | `bg_pmove.c:563` | `speed *= sin(...)` product is double in C; port narrows sin first | latent (vehicle banking) |
+| 3 | `bg_pmove.rs:549-550,640-642` PM_HoverTrace | `bg_pmove.c:757,835` | `fabs+fabs > 100` sums in double; f32 sum can flip at the boundary — gated arm calls Q_irand → **RNG-stream desync** | latent, PRIORITY (RNG-coupled) |
+| 4 | `bg_pmove.rs:2790` PM_CheckJump | `bg_pmove.c:1988` | `fabs(dotR) > fabs(dotF)*1.5` double product vs f32 — flip-anim axis tie-break | latent (anim, crosses wire) |
+| 5 | `bg_pmove.rs:4225` PM_CrashLandEffect | `bg_pmove.c:3691` | `fabs(v)/10` double divide vs f32 at the `>= 30.0` dust-effect gate | latent/cosmetic |
+| — | `bg_pmove.rs:9907-9955` PM_VehicleViewAngles | `bg_pmove.c:9646-9709` | oracle reads clampMin/Max uninitialized (UB); zero-init pick needs its §19 site note | doc-only |
