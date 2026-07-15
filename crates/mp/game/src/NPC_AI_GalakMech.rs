@@ -1499,12 +1499,20 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
 
             _VectorCopy((*enemy_ent).r.currentOrigin, &mut target);
 
-            target[0] += ctx.world.bg_state.rng.flrand(-5.0, 5.0)
-                + (ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f32 * 2.0);
-            target[1] += ctx.world.bg_state.rng.flrand(-5.0, 5.0)
-                + (ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f32 * 2.0);
-            target[2] += ctx.world.bg_state.rng.flrand(-5.0, 5.0)
-                + (ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f32 * 2.0);
+            // C: `flrand(-5,5) + (crandom()*(6-currentAim)*2)` runs in `double`
+            // (`crandom()` is `double`, `flrand`'s `float` widens); narrows to float.
+            target[0] = (target[0] as f64
+                + (ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
+                    + ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f64 * 2.0))
+                as f32;
+            target[1] = (target[1] as f64
+                + (ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
+                    + ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f64 * 2.0))
+                as f32;
+            target[2] = (target[2] as f64
+                + (ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
+                    + ctx.world.bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f64 * 2.0))
+                as f32;
 
             // Find the desired angles
             let clearshot = crate::g_weapon::WP_LobFire(

@@ -333,7 +333,9 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
             // then add a very small bit of random in front of/behind the player action
             // Inline VectorMA: end += crandom * 25 * dir
             for i in 0..3 {
-                end[i] += ctx.world.bg_state.rng.crandom() * 25.0f32 * dir[i];
+                // C VectorMA scale `crandom() * 25` is `double`; narrows to float.
+                end[i] =
+                    (end[i] as f64 + ctx.world.bg_state.rng.crandom() * 25.0 * dir[i] as f64) as f32;
             }
 
             crate::trap::Trace(

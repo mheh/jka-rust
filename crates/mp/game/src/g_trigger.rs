@@ -200,9 +200,12 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
         } else if (*ent).wait > 0.0 {
             if (*ent).painDebounceTime != ctx.world.level.time {
                 // first ent to touch it this frame
-                (*ent).nextthink = ctx.world.level.time
-                    + ((((*ent).wait + (*ent).random * ctx.world.bg_state.rng.crandom()) * 1000.0)
-                        as c_int);
+                // C evaluates the whole RHS in `double` (`crandom()` is `double`)
+                // and truncates once into the `int` nextthink.
+                (*ent).nextthink = (ctx.world.level.time as f64
+                    + ((*ent).wait as f64
+                        + (*ent).random as f64 * ctx.world.bg_state.rng.crandom())
+                        * 1000.0) as c_int;
                 (*ent).painDebounceTime = ctx.world.level.time;
             }
         } else if (*ent).wait < 0.0 {
@@ -755,9 +758,10 @@ pub fn trigger_cleared_fire(ctx: &mut GameContext, self_: EntityId) {
         // should start the wait timer now, because the trigger's just been
         // cleared, so we must "wait" from this point
         if (*self_).wait > 0.0 {
-            (*self_).nextthink = ctx.world.level.time
-                + (((*self_).wait + (*self_).random * ctx.world.bg_state.rng.crandom()) * 1000.0)
-                    as c_int;
+            (*self_).nextthink = (ctx.world.level.time as f64
+                + ((*self_).wait as f64
+                    + (*self_).random as f64 * ctx.world.bg_state.rng.crandom())
+                    * 1000.0) as c_int;
         }
     }
 }
@@ -2233,9 +2237,10 @@ pub fn func_timer_think(ctx: &mut GameContext, self_: EntityId) {
             ctx.entity_id_of(activator_ptr),
         );
         // set time before next firing
-        (*self_).nextthink = ctx.world.level.time
-            + (1000.0 * ((*self_).wait + ctx.world.bg_state.rng.crandom() * (*self_).random))
-                as c_int;
+        (*self_).nextthink = (ctx.world.level.time as f64
+            + 1000.0
+                * ((*self_).wait as f64
+                    + ctx.world.bg_state.rng.crandom() * (*self_).random as f64)) as c_int;
     }
 }
 

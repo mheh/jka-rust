@@ -1402,12 +1402,14 @@ pub fn Use_Shooter(
         PerpendicularVector(&mut up, dir);
         CrossProduct(up, dir, &mut right);
 
-        let mut deg = ctx.world.bg_state.rng.crandom() * (*ent).random;
+        // C `float deg = crandom() * ent->random`: the `double` product narrows
+        // to `float deg`, then feeds `VectorMA` as the scale.
+        let mut deg = (ctx.world.bg_state.rng.crandom() * (*ent).random as f64) as f32;
         let mut new_dir: vec3_t = [0.0, 0.0, 0.0];
         crate::q_math::_VectorMA(dir, deg, up, &mut new_dir);
         dir = new_dir;
 
-        deg = ctx.world.bg_state.rng.crandom() * (*ent).random;
+        deg = (ctx.world.bg_state.rng.crandom() * (*ent).random as f64) as f32;
         crate::q_math::_VectorMA(dir, deg, right, &mut new_dir);
         dir = new_dir;
 

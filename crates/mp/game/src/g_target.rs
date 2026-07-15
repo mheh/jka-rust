@@ -159,7 +159,10 @@ pub fn Use_Target_Delay(
     let crand = ctx.world.bg_state.rng.crandom();
     let level_time = ctx.world.level.time;
     let e = ctx.entity_mut(ent);
-    e.nextthink = level_time + ((e.wait + e.random * crand) * 1000.0) as c_int;
+    // C computes the whole RHS in `double` (`crand` is `double`) and truncates
+    // once into the `int` nextthink.
+    e.nextthink =
+        (level_time as f64 + (e.wait as f64 + e.random as f64 * crand) * 1000.0) as c_int;
     e.think = Some(EntThink::Think_Target_Delay).into();
     // C stored the raw `activator` pointer (NULL stays NULL and
     // Think_Target_Delay's G_UseTargets tolerates a NULL activator); the

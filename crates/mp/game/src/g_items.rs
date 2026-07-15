@@ -3809,10 +3809,11 @@ pub fn Touch_Item(
 
         // random can be used to vary the respawn time
         if (*ent).random != 0.0 {
-            // C `respawn += crandom() * ent->random` truncates the f32 sum once:
-            // `respawn = (int)((float)respawn + delta)`.
-            respawn =
-                ((respawn as f32) + ctx.world.bg_state.rng.crandom() * (*ent).random) as c_int;
+            // C `respawn += crandom() * ent->random`: `crandom()` is `double`, so
+            // the sum is computed in `double` and truncated once into `int respawn`.
+            respawn = (respawn as f64
+                + ctx.world.bg_state.rng.crandom() * (*ent).random as f64)
+                as c_int;
             if respawn < 1 {
                 respawn = 1;
             }
@@ -3976,7 +3977,10 @@ pub fn Drop_Item(
         velocity[0] *= 150.0;
         velocity[1] *= 150.0;
         velocity[2] *= 150.0;
-        velocity[2] += 200.0 + ctx.world.bg_state.rng.crandom() * 50.0;
+        // C: `200 + crandom() * 50` is `double`; the sum widens `velocity[2]`,
+        // then narrows back to the `float` component.
+        velocity[2] =
+            (velocity[2] as f64 + (200.0 + ctx.world.bg_state.rng.crandom() * 50.0)) as f32;
 
         LaunchItem(ctx, item, (*ent).s.pos.trBase, velocity)
     }

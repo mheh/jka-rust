@@ -130,10 +130,14 @@ impl Rng {
         ((self.rand() & 0x7fff) as f32) / (0x7fff as f32)
     }
 
-    /// Raven `crandom()` macro — `2.0 * (random() - 0.5)`.
+    /// Raven `crandom()` macro — `2.0 * (random() - 0.5)`. The `2.0`/`0.5`
+    /// literals are doubles, so the macro's C type is `double`; the `f32`
+    /// `random()` widens exactly to `f64` before the subtract, and every
+    /// expression touching a call stays `double` in C until it narrows to a
+    /// float lvalue/parameter.
     /// Source: `oracle/codemp/game/q_shared.h:1592`
-    pub fn crandom(&mut self) -> f32 {
-        2.0 * (self.random() - 0.5)
+    pub fn crandom(&mut self) -> f64 {
+        2.0 * (self.random() as f64 - 0.5)
     }
 }
 

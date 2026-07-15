@@ -570,8 +570,14 @@ pub fn WP_FireBlaster(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
 
         if altFire != qfalse {
             // add some slop to the alt-fire direction
-            angs[PITCH] += ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD;
-            angs[YAW] += ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD;
+            // C: `crandom()` is `double`, so each `+=` runs in `double` and
+            // narrows back to the `float` angle component.
+            angs[PITCH] =
+                (angs[PITCH] as f64 + ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD as f64)
+                    as f32;
+            angs[YAW] =
+                (angs[YAW] as f64 + ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD as f64)
+                    as f32;
         }
 
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
@@ -1282,12 +1288,19 @@ pub fn WP_BowcasterMainFire(ctx: &mut GameContext, ent: EntityId) {
         }
 
         for i in 0..count {
-            vel = BOWCASTER_VELOCITY as f32
-                * (ctx.world.bg_state.rng.crandom() * BOWCASTER_VEL_RANGE + 1.0);
+            // C: `BOWCASTER_VELOCITY * (crandom()*RANGE + 1.0f)` runs in `double`
+            // (`crandom()` is `double`) and narrows once to the `float vel`.
+            vel = (BOWCASTER_VELOCITY as f64
+                * (ctx.world.bg_state.rng.crandom() * BOWCASTER_VEL_RANGE as f64 + 1.0))
+                as f32;
 
             crate::q_math::vectoangles(ctx.world.globals.forward, &mut angs);
 
-            angs[PITCH] += ctx.world.bg_state.rng.crandom() * BOWCASTER_ALT_SPREAD * 0.2;
+            // C: `crandom()*BOWCASTER_ALT_SPREAD*0.2f` runs in `double`; `0.2f`
+            // promotes as `(double)0.2f`, not the `double` `0.2` literal.
+            angs[PITCH] = (angs[PITCH] as f64
+                + ctx.world.bg_state.rng.crandom() * BOWCASTER_ALT_SPREAD as f64 * 0.2f32 as f64)
+                as f32;
             angs[YAW] +=
                 (i as f32 + 0.5) * BOWCASTER_ALT_SPREAD - count as f32 * 0.5 * BOWCASTER_ALT_SPREAD;
 
@@ -1439,8 +1452,13 @@ pub fn WP_FireRepeater(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) 
             WP_RepeaterAltFire(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             // add some slop to the alt-fire direction
-            angs[PITCH] += ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD;
-            angs[YAW] += ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD;
+            // C: `crandom()` is `double`; each `+=` runs in `double`, narrows to float.
+            angs[PITCH] =
+                (angs[PITCH] as f64 + ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD as f64)
+                    as f32;
+            angs[YAW] =
+                (angs[YAW] as f64 + ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD as f64)
+                    as f32;
 
             crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
@@ -1809,8 +1827,13 @@ pub fn WP_FlechetteMainFire(ctx: &mut GameContext, ent: EntityId) {
 
             if i != 0 {
                 // do nothing on the first shot, it will hit the crosshairs
-                angs[PITCH] += ctx.world.bg_state.rng.crandom() * FLECHETTE_SPREAD;
-                angs[YAW] += ctx.world.bg_state.rng.crandom() * FLECHETTE_SPREAD;
+                // C: `crandom()` is `double`; each `+=` runs in `double`, narrows to float.
+                angs[PITCH] = (angs[PITCH] as f64
+                    + ctx.world.bg_state.rng.crandom() * FLECHETTE_SPREAD as f64)
+                    as f32;
+                angs[YAW] = (angs[YAW] as f64
+                    + ctx.world.bg_state.rng.crandom() * FLECHETTE_SPREAD as f64)
+                    as f32;
             }
 
             crate::q_math::AngleVectors(angs, Some(&mut fwd), None, None);
@@ -2080,7 +2103,8 @@ pub fn WP_FlechetteAltFire(ctx: &mut GameContext, self_: EntityId) {
             dir = angs;
 
             dir[PITCH] -= ctx.world.bg_state.rng.random() * 4.0 + 8.0; // make it fly upwards
-            dir[YAW] += ctx.world.bg_state.rng.crandom() * 2.0;
+            // C: `crandom() * 2` is `double`; narrows back to the `float` component.
+            dir[YAW] = (dir[YAW] as f64 + ctx.world.bg_state.rng.crandom() * 2.0) as f32;
             crate::q_math::AngleVectors(dir, Some(&mut fwd), None, None);
 
             WP_CreateFlechetteBouncyThing(ctx, start, fwd, ctx.entity_id_of(self_).unwrap());
@@ -2234,7 +2258,10 @@ pub fn rocketThink(ctx: &mut GameContext, ent: EntityId) {
 
             // add crazy drunkenness
             for i in 0..3 {
-                newdir[i] += ctx.world.bg_state.rng.crandom() * (*ent).random * 0.25;
+                // C: `crandom() * ent->random * 0.25f` is `double`; narrows to float.
+                newdir[i] = (newdir[i] as f64
+                    + ctx.world.bg_state.rng.crandom() * (*ent).random as f64 * 0.25)
+                    as f32;
             }
 
             // decay the randomness
