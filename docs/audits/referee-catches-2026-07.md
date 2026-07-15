@@ -22,7 +22,7 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 | `0b41dc4e` | `holdrand` | `c_ulong` is platform-width, not `u32` (t2_wedge NPC-type pick). Predates the CRT-rand finding above. |
 | `dfcfa240` | MD4 | Raven's `UINT4` truncates to 32 bits; wider arithmetic broke sv_pure checksums. |
 | `855b73ef` / `4138f7d0` | NPC class ids / `G_LogWeaponPowerup` | Raven UB sites (§19): out-of-range enum reads and a mis-sized stats array — pick one defined behavior, note it at the site. |
-| `d6ef7674` | `Rng::crandom` → `Drop_Item` toss velocity | Translation bug, **class F1**: the `crandom()` macro (`q_shared.h:1592`, no `#ifdef` variants) is `2.0 * (random() - 0.5)` — double arithmetic, double result — and `velocity[2] += 200 + crandom() * 50` stays double until the f32 store. The port translated `crandom` as an all-f32 fn. Brute force over all 32,768 `rand()` draws: 7.1% narrow to a different f32 (1 ULP) — rare enough that 12k-frame soaks stayed clean; the 27k-frame human session hit one (ent115 `weapon_thermal` toss, frame 14282). Diagnosed from the tape alone, no live repro. |
+| `d6ef7674` | `Rng::crandom` → `Drop_Item` toss velocity | Translation bug, **class F1**: the `crandom()` macro (`q_shared.h:1592`, no `#ifdef` variants) is `2.0 * (random() - 0.5)` — double arithmetic, double result — and `velocity[2] += 200 + crandom() * 50` stays double until the f32 store. The port translated `crandom` as an all-f32 fn. Brute force over all 32,768 `rand()` draws: 7.1% narrow to a different f32 (1 ULP) — rare enough that 12k-frame soaks stayed clean; the 27k-frame human session hit one (ent115 `weapon_thermal` toss, frame 14282). Diagnosed from the tape alone, no live repro; verified by tape replay — at frame 14282 the fixed module's digest equals the oracle's (`7c536199b9e3a203`), zero other divergences over 27,316 frames. |
 
 ## Width/ABI catches (engine + harness plumbing)
 
@@ -44,10 +44,9 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 | `4ac85cf8` | Three stacked ghoul2 bolt defects, incl. a **silent, marker-less always-fail `G2_Add_Bolt` stub** — sabers whiffed. Lesson: sweep for unmarked always-fail stubs. |
 | `2158aba6` | Follower wiped human packet-loop events buffered between server ticks (SV_Frame runs ~3×/game frame) — ClientBegin and ~half the usercmds never reached the mirror. Bot-only runs can't expose it. |
 | `d6902d8b` | Ping is an *input*: `SV_CalcPings` writes network-computed ping into digested `ps.ping` → taped as `P` records. Replicas also phantom-timed-out at `sv_timeout` (no packets refresh their clock) — injected events now count as packets. |
+| `23d7748a` | Replicas were mislabeled `NA_BOT` (a wire-capture-skip shortcut): 8 engine sites branched to the bot path for a mirrored human — `SV_DropClient` ran `SV_BotFreeClient` where the primary ran the human drop (the frame-5883 syscall delta, which vanished once fixed). Replicas now carry NA_LOOPBACK + a dedicated flag; transmit primitives gate on it. Injected C/B/D transition windows suppress the syscall-count compare (digests stay authoritative). |
+| `93f88b0b` | Reliable-command acks are mirror state: the socketless replica never acked, pooling a session of broadcasts that the slot's successor bot drained in one 74-call `BOTLIB_GET_CONSOLE_MESSAGE` burst (frame 5964). Raven hands a reused slot's unacked tail to the new occupant — on the primary, exactly the two drop-time broadcasts the leaving human could never ack. Replicas now auto-ack while live, never during CS_ZOMBIE; the flag clears at slot reallocation. F5964 matches call-for-call (967 == 967). |
 
 ## Open
 
-- `ent115.pos.trDelta+8` (live frame 14282): **root cause found 2026-07-14**
-  — the `Rng::crandom` translation bug above; fix + tape-replay verification
-  in flight. Task #1.
-- Replica-connect syscall-count blips (equal digests). Task #2.
+*(none — all known catches resolved as of 2026-07-15)*
