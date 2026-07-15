@@ -842,9 +842,13 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
             }
             sv.referee.expected = None;
             sv.referee.expected_state = None;
-            sv.referee.pending.clear();
             // Buffer any leading events (e.g. human cmds received before this
-            // SV_Frame), then take the frame's F.
+            // SV_Frame), then take the frame's F. `pending` must NOT be cleared
+            // here: SV_Frame ticks several times per game frame (one F record
+            // each), and leading events buffered under an F whose call ran no
+            // game step must survive until ref_frame_inject drains them —
+            // clearing here ate human C/X/B/T events recorded between ticks
+            // (live-session finding, 2026-07-14).
             loop {
                 let Some(rec) = sv.referee.recs.get(sv.referee.cursor).cloned() else {
                     ref_replay_finish(view, sv);
