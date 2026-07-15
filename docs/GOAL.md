@@ -29,7 +29,10 @@ revision are now also done:
 The centralized step list (task list mirrors this; keep both current).
 Ordered; F-items float unordered.
 
-1. **Kill the last known module divergence — item-toss velocity.**
+1. **DONE 2026-07-15 (`d6ef7674`) — item-toss velocity.** `crandom()` is
+   double-typed C; retyped f64, 27 sites audited. Replay-verified: digest at
+   frame 14282 equals the oracle's; zero other divergences over 27,316 frames.
+   Original brief:
    `ent115.pos.trDelta+8` at live-session frame 14282: a death-dropped item
    (`ET_ITEM`, `TR_GRAVITY`) spawned with a different toss-velocity z.
    Suspects: the `LaunchItem`/`TossClientItems` path (`oracle/codemp/game/
@@ -38,13 +41,17 @@ Ordered; F-items float unordered.
    `holdrand` both sides (see `tools/referee-oracle/build.sh` G6DBG blocks +
    in-tree Rust taps), soak or short play session via
    `tools/lockstep-referee/run.sh`, diff dump streams.
-2. **Explain the replica-connect syscall blip.** Three live-session frames
+2. **DONE 2026-07-15 (`23d7748a`, `93f88b0b`) — replica-connect blip.**
+   NA_BOT overload replaced with a replica flag; injected-transition windows
+   suppress the count compare; replicas mirror the human's reliable acks
+   (never in CS_ZOMBIE). All three frames explained; F5964 matches 967==967.
+   Original brief: Three live-session frames
    (737 / 5883 / 5964) diverged on syscall COUNT only, state digests equal —
    the follower's synthetic human-connect (`ref_inject_connect`,
    `crates/mp/engine/server/src/sv_referee.rs`) makes extra syscalls vs the
    real network connect path. Either align it call-for-call or teach the
    follower to expect it at injected connects.
-3. **Probe formalization.** Keep the referee diagnostics permanently (user
+3. **DONE 2026-07-15 (`ddbd6ddf`) — probe formalization.** Original brief: Keep the referee diagnostics permanently (user
    ruling 2026-07-14). Rename env `G6DBG` → `REF_PROBES`; tags become
    descriptive (`SAB_TRACE`/`SAB_CD`/`MUZZLE`/`LOOK_*`/`BONE_OVR`/
    `DEATH_ANIM`/…) — our tags and the oracle build.sh tags must stay
@@ -53,7 +60,8 @@ Ordered; F-items float unordered.
    (`w_saber.rs`, `bg_pmove.rs`, `g_combat.rs`, `g_weapon.rs`,
    `sv_game.rs`, `rng.rs` accessor); update the build.sh tag strings to
    match.
-4. **G8 land.** Plan-doc statuses (lockstep plan G7/G8), refresh the stale
+4. **DONE 2026-07-15 (`d285ac9c` + README refresh) — G8 land.** Push policy
+   is now batch-on-request (CI cost, user 2026-07-14). Original brief: Plan-doc statuses (lockstep plan G7/G8), refresh the stale
    README Status block (dated 2026-07-11), lift the push hold
    (29+ held commits).
 5. **Translation-bug audit — file-by-file oracle comparison of `mp_game`**
@@ -84,6 +92,14 @@ Ordered; F-items float unordered.
    2003/OpenJK drop-in compat. Interactive sit-down to ratify, then shards
    retire the 27 marked Stage-2b irreducibles and the entity/gclient deref
    regime ("2c territory").
+
+4b. **DONE 2026-07-15 (`fddd3eca`) — botlib audit + fix batch (task #11).**
+   Botlib is referee-blind (bot usercmds are taped inputs); a full-crate
+   audit found 25 vec3_t out-params ported by-value (silent no-ops) plus
+   the FuzzyWeight `EVALUATERECURSIVELY` arm — all fixed, adversarially
+   validated. Live-session syscall histogram: JKA MP bots call only the EA
+   layer (audited clean) — findings were latent for FFA. OPEN TAIL:
+   behavioral A/B vs OpenJK jampded for the bot-feel verdict.
 
 Floating (now folded into item 5's checklist as lenses 1–2; kept here as
 class descriptions):
