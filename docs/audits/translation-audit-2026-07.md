@@ -95,6 +95,67 @@ explicitly-listed NOT-audited tail (~38 lower-priority fns — team/duel/
 follow/give handlers) for a wave-3 pass. bg_saber: every fn faithful, incl.
 preserved saber1/saber2 copy-paste oracle bug and the vote `msg[1]` typo.
 
+Wave-2 fix batch landed: `70d706ea` (bg_pmove 1-5 + §19 note, w_saber 2-3,
+G_GetHitQuad/G_GetHitLocation F3 sites, G_DamageFromKiller doc-drift;
+adversarially validated, full referee suite green incl. real-map duel1).
+
+## Wave 3 (2026-07-15) — g_weapon+w_force, bg_slidemove+bg_misc+g_main, ai_main+ai_util+ai_wpnav
+
+### w_force.rs — 1 LIVE-COMBAT bug + 1 rare-branch
+
+| # | Site | Oracle | Finding | Severity |
+|---|---|---|---|---|
+| 1 | `w_force.rs:6202-6217` WP_ForcePowersUpdate | `w_force.c:5444-5454`, `:7` | **Preprocessor-polarity error**: the two `else if` charge-jump arms live inside `#ifndef METROID_JUMP`, and `#define METROID_JUMP 1` is unconditional — dead in every retail/referee build. The port transcribed them live, re-enabling the cut "charge jump" mechanic for any grounded force-capable player holding jump ≥150ms (built forceJumpCharge, played jumpbuild.wav, suppressed force regen, fired a charged jump retail never fires). Invisible to duel1 tapes only because bots don't produce that input pattern. Arms dropped with site note. | live-combat |
+| 2 | `w_force.rs:4321-4328` ForceThrow func_door arm | `w_force.c:3735-3737` | Oracle recomputes into the fn-local `forward` (persists into later same-loop `G_ReflectMissile`); port writes a fresh local. ~1-ULP, needs spawnflags-2 func_door ordered before a pushable missile in one throw. | rare-branch (parked) |
+
+### g_weapon.rs — 3 latents + 2 doc-only (all fixed/aligned in batch)
+
+charge_stick f64 chain + accumulator (c:2671-2673, `vNor[1]`-on-[2] oracle
+bug preserved); BlowDetpacks single-truncation (c:2863); WP_GetVehicleCamPos
+fabs product (c:3971); CalcMuzzlePointOrigin (dead fn) aligned to
+snap_vector; flechette arg-order verified matching g++-16 eval order.
+
+### bg_slidemove.rs — 2 findings (fixed)
+
+PM_StepSlideMove `DotProduct < 0.7` f32-vs-double compare (c:902 — movement
+clip spine, same class as 435f7d57); PM_VehicleImpact `fabs+fabs < 100.0f`
+f32 sum (c:102, vehicle-only). bg_misc.rs CLEAN (trajectory arms, PS→ES
+copies all verified; NOTE: bg_itemlist table lives in
+`crates/mp/bg/src/public/bg_itemlist.rs` — table lens still to run there).
+g_main.rs: G_RunThink int-vs-float think compare (documented divergence,
+>4.6h uptime — parity decision parked); g_listEntity §19 note added.
+
+### ai_main.rs + ai_util.rs + ai_wpnav.rs — combat spine CLEAN
+
+Substantive negative result for the bot-lethality residual: aim, fire
+gating, reaction timers, weapon weights, chase/range, saber handling,
+enemy acquisition all byte-faithful (incl. RNG-consuming short-circuits,
+accVal/reflex float-division checks, CON_CONNECTED==CA_AUTHORIZING quirk).
+One fix: BotUtilizePersonality allocated readbuf/group before the
+personality-load early returns while freeing only buf — two failed loads
+exhausted the 3-slot BG_TempAlloc table (oracle allocates after the
+returns; reordered to match). Five stale "no ported home" PORT-NOTEs
+removed. Unaudited tails: CTF/Siege team handlers, BotDoChat/chat parsers,
+ai_wpnav nav infrastructure (stub-swept clean, not line-diffed).
+
+Wave-3 fix batch landed: `2a9b171e` (adversarially validated; full referee
+suite green). Sharp F3 criterion from this wave, for the port-wide sweep:
+with SSE f32 operands, a double-vs-f32 threshold compare diverges ONLY at
+`x == f32(lit)` and only when the operator direction matches the literal's
+f32 rounding direction — `>`/`>=` diverge for round-UP literals (0.1, 0.2,
+0.3, 0.4, 0.6, 0.8…), `<`/`<=` for round-DOWN literals (0.7, 0.9…).
+
+### Wave-4 queue
+
+- bg_itemlist table check (`crates/mp/bg/src/public/bg_itemlist.rs`).
+- g_cmds ~38-fn unaudited tail; g_main scoring/vote helpers (spot-checked
+  only); ai_wpnav + CTF/Siege/chat tails above.
+- Remaining unaudited g_* files: g_mover, g_trigger, g_target, g_team,
+  g_bot, g_session, g_spawn, g_svcmds, g_object, g_misc, g_exphysics,
+  g_vehicles + turrets, w_saber follow-ups; then NPC_*.
+- Port-wide F3 sweep using the sharp criterion (only round-direction-
+  matching literals can diverge — much smaller site set than the naive grep).
+
 ### NEW SWEEP ITEM — F3: unsuffixed-double THRESHOLD COMPARES in f32
 
 `float dot; if (dot > 0.3)` promotes to double in C (`0.3` is a double
