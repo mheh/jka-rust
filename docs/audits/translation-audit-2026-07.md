@@ -26,6 +26,25 @@ LaunchItem FL_BOUNCE_HALF clobber (faithful Raven bug); G_KillBox zero-vector
 NULL convention (residual world-origin edge lives in g_combat, astronomically
 rare). Full clean-lists in the wave-1 agent reports (session task outputs).
 
-### g_active.rs + g_missile.rs
+### g_active.rs + g_missile.rs — CLEAN (0 behavioral divergences)
 
-Report pending (agent in flight at wave-1 close); findings to be appended.
+Systematic top-to-bottom walk; every float-flattening candidate numerically
+swept and cleared (P_DamageFeedback pitch-byte math, DoImpact `>= 0.2`
+inclusive compare, fall-damage `delta*0.16` — all byte-identical to f64;
+contrast the strict-`>` bounce compare that WAS a real bug, 435f7d57).
+Eval-order, loop-increment, switch-completeness, NULL-sentinel, and
+dead-quirk preservation all verified. Two §19 UB-hardening guards diverge
+from Raven only where Raven would crash, both **unmarked** — add the ≤2-line
+site notes per porting-rules §19:
+
+- `g_missile.rs:353-359` G_ExplodeMissile: null-client guard on
+  `accuracy_hits++` (oracle g_missile.c:245-252 derefs unconditionally).
+- `g_missile.rs:984-987` G_MissileImpact: `think` null guard (oracle
+  g_missile.c:677 calls unconditionally).
+
+## Wave 2 queue
+
+bg_pmove.rs and w_saber.rs (solo agents — the giants), g_combat.rs,
+g_client.rs, bg_saber.rs, g_cmds.rs, then remaining g_*/bg_*/w_*;
+NPC_*/ai_* last. Fix batch for wave-1 findings (#1-#5 + the two §19
+markers) can ride any wave's referee-gated landing.
