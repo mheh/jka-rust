@@ -51,6 +51,7 @@ use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_bg::public::entity_event::{entity_event_t, entity_event_t::*};
+use mp_qshared::common::mp::game::Q3_INFINITE;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::trajectory::trType_t;
 use std::ffi::{CStr, CString};
@@ -437,7 +438,12 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
             for i in 0..3 {
                 kvel[i] = (newDir[i] as f64 * ((g_knockback * push / mass) as f64 * 0.8)) as f32;
             }
-            kvel[2] = (newDir[2] as f64 * ((g_knockback * push / mass) as f64 * 1.5)) as f32;
+            // Unlike VectorScale's `newDir[i] * scale`, C folds newDir[2] into the
+            // f32 product `newDir[2]*gk*push/mass` (left-assoc, all f32); only the
+            // trailing `* 1.5` promotes to f64, narrowing once at the store.
+            // Source: `oracle/codemp/game/g_utils.c:333`
+            let chain = newDir[2] * g_knockback * push / mass;
+            kvel[2] = (chain as f64 * 1.5) as f32;
         } else {
             for i in 0..3 {
                 kvel[i] = newDir[i] * (g_knockback * push / mass);
@@ -716,7 +722,10 @@ pub fn G_UseTargets2(
         }
 
         if !(*ent).targetShaderName.is_null() && !(*ent).targetShaderNewName.is_null() {
-            let f = (ctx.world.level.time as f32) * 0.001;
+            // C's `level.time * 0.001`: 0.001 is a double literal, so level.time
+            // promotes to f64 and narrows once at the store.
+            // Source: `oracle/codemp/game/g_utils.c:574`
+            let f = (ctx.world.level.time as f64 * 0.001) as f32;
             AddRemap(ctx, (*ent).targetShaderName, (*ent).targetShaderNewName, f);
             let config = BuildShaderStateConfig(ctx);
             trap::SetConfigstring(
@@ -2575,7 +2584,9 @@ pub fn ShortestLineSegBewteen2LineSegs(
             return current_dist;
         }
     } else {
-        current_dist = f32::INFINITY;
+        // Raven uses `Q3_INFINITE` (16777216), not a true infinity, as the
+        // parallel-line sentinel. Source: `oracle/codemp/game/g_utils.c:2212`
+        current_dist = Q3_INFINITE as f32;
     }
 
     let mut new_dist = Distance(start1, start2);

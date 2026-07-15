@@ -199,10 +199,18 @@ pub fn adjustRespawnTime(
             respawnTime *= 0.25;
         } else if numPlayingClients > 12 {
             // From 12-32, scale from 0.5 to 0.25;
-            respawnTime *= 20.0 / (numPlayingClients + 8) as f32;
+            // C: `respawnTime *= 20.0 / (float)(n+8)` — 20.0 is a double, so the
+            // divide and the `*=` both run in f64, narrowing once at the store;
+            // the int cast to (float) happens first.
+            // Source: `oracle/codemp/game/g_items.c:74`
+            respawnTime =
+                (respawnTime as f64 * (20.0f64 / (numPlayingClients + 8) as f32 as f64)) as f32;
         } else {
             // From 4-12, scale from 1.0 to 0.5;
-            respawnTime *= 8.0 / (numPlayingClients + 4) as f32;
+            // C: `respawnTime *= 8.0 / (float)(n+4)` — same f64 divide/`*=` shape.
+            // Source: `oracle/codemp/game/g_items.c:78`
+            respawnTime =
+                (respawnTime as f64 * (8.0f64 / (numPlayingClients + 4) as f32 as f64)) as f32;
         }
     }
 
@@ -999,9 +1007,12 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                         );
 
                         // Wind up turrets for a bit
-                        (*self_).attackDebounceTime = ctx.world.level.time
-                            + 900
-                            + (ctx.world.bg_state.rng.random() * 200.0) as c_int;
+                        // C: `level.time + 900 + random()*200` — the int sum promotes
+                        // to f32 against `random()*200`, truncating once at the store.
+                        // Source: `oracle/codemp/game/g_items.c:628`
+                        (*self_).attackDebounceTime = ((ctx.world.level.time + 900) as f32
+                            + ctx.world.bg_state.rng.random() * 200.0)
+                            as c_int;
                     }
 
                     G_SetEnemy(
@@ -1085,8 +1096,11 @@ pub fn pas_adjust_enemy(ctx: &mut GameContext, ent: EntityId) {
                 G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
             );
 
-            (*ent).bounceCount =
-                ctx.world.level.time + 500 + (ctx.world.bg_state.rng.random() * 150.0) as c_int;
+            // C: `level.time + 500 + random()*150` — single truncation of the
+            // promoted-to-f32 sum. Source: `oracle/codemp/game/g_items.c:690`
+            (*ent).bounceCount = ((ctx.world.level.time + 500) as f32
+                + ctx.world.bg_state.rng.random() * 150.0)
+                as c_int;
 
             // make turret play ping sound for 5 seconds
             (*ent).aimDebounceTime = ctx.world.level.time + 5000;
@@ -4354,9 +4368,12 @@ pub fn G_BounceItem(ctx: &mut GameContext, ent: EntityId, trace: *mut trace_t) {
         // kept verbatim via a re-derived raw pointer (Stage-2 body debt).
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         // reflect the velocity on the trace plane
-        let hitTime = ctx.world.level.previousTime
-            + ((ctx.world.level.time - ctx.world.level.previousTime) as f32 * (*trace).fraction)
-                as c_int;
+        // C: `previousTime + (level.time - previousTime) * trace->fraction` — the
+        // int base promotes to f32 against the float product; one truncation.
+        // Source: `oracle/codemp/game/g_items.c:3136`
+        let hitTime = (ctx.world.level.previousTime as f32
+            + (ctx.world.level.time - ctx.world.level.previousTime) as f32 * (*trace).fraction)
+            as c_int;
         let mut velocity: vec3_t = [0.0; 3];
         BG_EvaluateTrajectoryDelta(&(*ent).s.pos as *const trajectory_t, hitTime, &mut velocity);
         let dot = velocity[0] * (*trace).plane.normal[0]

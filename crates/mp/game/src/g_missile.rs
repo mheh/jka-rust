@@ -352,6 +352,9 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
         {
             if let Some(parent_id) = parent {
                 let client = ctx.entity(parent_id).client;
+                // §19: oracle derefs `parent->...client->accuracy_hits++`
+                // unconditionally (UB if the parent is a non-client entity); guard it.
+                // Source: `oracle/codemp/game/g_missile.c:245-252`
                 if !client.is_null() {
                     unsafe {
                         (*(client as *mut gclient_t)).accuracy_hits += 1;
@@ -981,6 +984,9 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                     || (*ent).s.weapon == WP_ROCKET_LAUNCHER
                 {
                     if (*ent).s.weapon == WP_FLECHETTE && (((*ent).s.eFlags & EF_ALT_FIRING) != 0) {
+                        // §19: oracle calls `ent->think(ent)` unconditionally (UB if
+                        // think is NULL); guard the dispatch.
+                        // Source: `oracle/codemp/game/g_missile.c:677`
                         if let Some(think_fn) = (*ent).think.get() {
                             // Call the think function
                             crate::ent_fn_enums::dispatch_think(ctx, think_fn, ent);
