@@ -1177,7 +1177,7 @@ pub fn G_G2PlayerAngles(
                 ciTorso,
                 &mut (*sc).corrTime as *mut c_int,
                 lookAngles,
-                (*sc).lastHeadAngles,
+                &mut (*sc).lastHeadAngles,
                 (*sc).lookTime,
                 emplaced,
                 core::ptr::null_mut(),

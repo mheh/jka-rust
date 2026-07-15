@@ -9155,15 +9155,16 @@ pub fn BG_G2PlayerAngles(
     ciTorso: c_int,
     corrTime: *mut c_int,
     lookAngles: vec3_t,
-    lastHeadAngles: vec3_t,
+    lastHeadAngles: &mut vec3_t,
     lookTime: c_int,
     emplaced: *mut entityState_t,
     crazySmoothFactor: *mut c_int,
 ) {
-    // by-value angle params the body mutates in place (LAW keeps them by value —
-    // the caller does not read the write-back).
+    // C `vec3_t lastHeadAngles` decays to float*: BG_UpdateLookAngles' final
+    // VectorCopy writes back into the caller's `client->lastHeadAngles` — that
+    // persistence is read next frame, so it must stay `&mut`. `lookAngles` is a
+    // caller local never read after the call → by value.
     let mut lookAngles: vec3_t = lookAngles;
-    let mut lastHeadAngles: vec3_t = lastHeadAngles;
 
     let mut adddir: c_int = 0;
     let dir: c_int;
@@ -9621,7 +9622,7 @@ pub fn BG_G2PlayerAngles(
 
         BG_UpdateLookAngles(
             lookTime,
-            &mut lastHeadAngles,
+            lastHeadAngles,
             time,
             &mut lookAngles,
             lookSpeed,
