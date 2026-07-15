@@ -55,8 +55,14 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 
 ## Open
 
-- Bot-feel verdict (task #11 tail): behavioral A/B vs OpenJK `jampded`
-  (same map, 4 bots — kill-feed rate + MOD histogram). Code-side audit of
-  the live botlib surface (EA, interface, chat delivery) is clean; the
-  remaining hypotheses are authentic retail bot quality or engine inputs
-  fed identically to both modules (lockstep-blind).
+- **Bot lethality gap — MEASURED 2026-07-15 (task #11 tail).** A/B on
+  mp/ffa3, four skill-4 bots: OpenJK reference lane 1.70 kills/min
+  (11 MOD_SABER — real engagements); our lane 0.08 kills/min (one falling
+  death in 12 min), botlib fixes included. Every historical soak ran at
+  our-lane rates; there was never a baseline to notice. Lockstep is blind
+  by construction (our engine feeds both modules identical inputs).
+  Next discriminator: lane 3 = our engine + the ORACLE module dylib —
+  passive lane 3 pins it on engine-side inputs (FS/waypoint loads, traces,
+  PVS) starving both modules' AI; a fighting lane 3 points module-adjacent.
+  Then probe enemy-acquisition gates both sides. Logs:
+  session scratchpad `ab-test2/`.
