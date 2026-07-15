@@ -103,6 +103,11 @@ impl Rng {
         self.irand(value1, value2)
     }
 
+    /// Current MSVC-CRT `holdrand`, read-only, for referee probes to dump RNG state.
+    pub fn dbg_holdrand(&self) -> u32 {
+        self.crt_holdrand
+    }
+
     /// The native module's `srand` — the MSVC CRT one retail links (called by
     /// `G_InitGame`'s `srand(randomSeed)`, `g_main.c:929`); reseeds
     /// `crt_holdrand`.

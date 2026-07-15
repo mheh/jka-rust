@@ -178,18 +178,18 @@ s = s.replace(old_randseed, new_randseed, 1)
 open(p, "w").write(s)
 PY
 
-# G6DBG diagnostic layer (permanent, env-gated): saber trace / muzzle / collide dumps.
+# REF_PROBES diagnostic layer (permanent, env-gated): saber trace / muzzle / collide dumps.
 # Diff the two engines' dump streams; first mismatch = the event. See memory/plan.
 python3 - <<'PY'
 p = "build/src/codemp/game/w_saber.c"
 s = open(p).read()
 
 helper = (
-    "/* TEMP G6DBG (frame-1806 hunt) */\n"
+    "/* REF_PROBES tap */\n"
     "static unsigned int g6b(float f){union{float f;unsigned int u;}x;x.f=f;return x.u;}\n"
     "static void g6t(const char *tag, const float *a, const float *b, const float *mn, const float *mx, float fr, int en){\n"
-    "\tif (!getenv(\"G6DBG\")) return;\n"
-    "\tfprintf(stderr, \"G6T %s t=%i a=%08x,%08x,%08x b=%08x,%08x,%08x mn=%08x mx=%08x fr=%08x en=%i\\n\",\n"
+    "\tif (!getenv(\"REF_PROBES\")) return;\n"
+    "\tfprintf(stderr, \"SAB_TRACE %s t=%i a=%08x,%08x,%08x b=%08x,%08x,%08x mn=%08x mx=%08x fr=%08x en=%i\\n\",\n"
     "\t\ttag, level.time, g6b(a[0]),g6b(a[1]),g6b(a[2]), g6b(b[0]),g6b(b[1]),g6b(b[2]), g6b(mn[0]), g6b(mx[0]), g6b(fr), en);\n"
     "}\n\n"
     "static GAME_INLINE qboolean G_G2TraceCollide")
@@ -199,8 +199,8 @@ s = s.replace(old_fn, helper, 1)
 
 old_cmp = "\t\tif (G2Trace[0].mEntityNum != g2Hit->s.number)"
 assert s.count(old_cmp) == 1
-new_cmp = ("\t\tif (getenv(\"G6DBG\"))\n"
-           "\t\t\tfprintf(stderr, \"G6C t=%i en=%i m=%i\\n\", level.time, (int)tr->entityNum, G2Trace[0].mEntityNum);\n"
+new_cmp = ("\t\tif (getenv(\"REF_PROBES\"))\n"
+           "\t\t\tfprintf(stderr, \"SAB_CD t=%i en=%i m=%i\\n\", level.time, (int)tr->entityNum, G2Trace[0].mEntityNum);\n"
            + old_cmp)
 s = s.replace(old_cmp, new_cmp, 1)
 
@@ -210,8 +210,8 @@ assert s.count(site2) == 1, s.count(site2)
 s = s.replace(site2, site2 + "\t\t\t\tg6t(\"i2\", saberEnd, saberStart, saberTrMins, saberTrMaxs, tr.fraction, (int)tr.entityNum);\n", 1)
 old_st = "\n\t\t\t\tself->client->saber[rSaberNum].blade[rBladeNum].storageTime = level.time;"
 assert s.count(old_st) == 1, s.count(old_st)
-new_st = ("\n\t\t\t\tif (getenv(\"G6DBG\")) { bladeInfo_t *g6bl = &self->client->saber[rSaberNum].blade[rBladeNum];\n"
-    "\t\t\t\t\tfprintf(stderr, \"G6M t=%i sn=%i bn=%i pO=%08x,%08x,%08x pA=%08x,%08x,%08x mP=%08x,%08x,%08x mD=%08x,%08x,%08x\\n\",\n"
+new_st = ("\n\t\t\t\tif (getenv(\"REF_PROBES\")) { bladeInfo_t *g6bl = &self->client->saber[rSaberNum].blade[rBladeNum];\n"
+    "\t\t\t\t\tfprintf(stderr, \"SAB_MUZZLE t=%i sn=%i bn=%i pO=%08x,%08x,%08x pA=%08x,%08x,%08x mP=%08x,%08x,%08x mD=%08x,%08x,%08x\\n\",\n"
     "\t\t\t\t\tlevel.time, rSaberNum, rBladeNum, g6b(properOrigin[0]),g6b(properOrigin[1]),g6b(properOrigin[2]),\n"
     "\t\t\t\t\tg6b(properAngles[0]),g6b(properAngles[1]),g6b(properAngles[2]),\n"
     "\t\t\t\t\tg6b(g6bl->muzzlePoint[0]),g6b(g6bl->muzzlePoint[1]),g6b(g6bl->muzzlePoint[2]),\n"
@@ -222,8 +222,8 @@ s = s.replace(old_st, new_st, 1)
 old_lerp = "{\n\tvec3_t baseOld, endOld;\n\tvec3_t mp1, mp2;\n\tvec3_t md1, md2;\n"
 assert s.count(old_lerp) == 1, s.count(old_lerp)
 new_lerp = (old_lerp +
-    "\tif (getenv(\"G6DBG\")) { saberTrail_t *g6tb = &self->client->saber[saberNum].blade[bladeNum].trail;\n"
-    "\t\tfprintf(stderr, \"G6L t=%i sn=%i bn=%i bN=%08x,%08x,%08x eN=%08x,%08x,%08x trB=%08x,%08x,%08x trT=%08x,%08x,%08x lt=%i\\n\",\n"
+    "\tif (getenv(\"REF_PROBES\")) { saberTrail_t *g6tb = &self->client->saber[saberNum].blade[bladeNum].trail;\n"
+    "\t\tfprintf(stderr, \"SAB_TRAIL t=%i sn=%i bn=%i bN=%08x,%08x,%08x eN=%08x,%08x,%08x trB=%08x,%08x,%08x trT=%08x,%08x,%08x lt=%i\\n\",\n"
     "\t\tlevel.time, saberNum, bladeNum, g6b(baseNew[0]),g6b(baseNew[1]),g6b(baseNew[2]), g6b(endNew[0]),g6b(endNew[1]),g6b(endNew[2]),\n"
     "\t\tg6b(g6tb->base[0]),g6b(g6tb->base[1]),g6b(g6tb->base[2]), g6b(g6tb->tip[0]),g6b(g6tb->tip[1]),g6b(g6tb->tip[2]), g6tb->lastTime); }\n")
 s = s.replace(old_lerp, new_lerp, 1)
@@ -234,26 +234,26 @@ s = s.replace(site3, site3 + "\t\t\tg6t(\"ex\", saberStart, saberEndExtrapolated
 assert s.count(site1) == 1, s.count(site1)
 s = s.replace(site1, site1 + "\t\t\tg6t(\"i1\", saberEnd, saberStart, saberTrMins, saberTrMaxs, tr.fraction, (int)tr.entityNum);\n", 1)
 
-# G6H: caller-side look inputs (G_G2PlayerAngles humanoid branch).
+# LOOK_TGT: caller-side look inputs (G_G2PlayerAngles humanoid branch).
 old_fwd = "#define LOOK_DEFAULT_SPEED"
 assert s.count(old_fwd) == 1
-s = s.replace(old_fwd, "static unsigned int g6b(float f); /* TEMP G6DBG fwd decl */\n" + old_fwd, 1)
+s = s.replace(old_fwd, "static unsigned int g6b(float f); /* REF_PROBES fwd decl */\n" + old_fwd, 1)
 old_h = "\t\tlookAngles[PITCH] = 0;\n"
 assert s.count(old_h) == 1, s.count(old_h)
 new_h = (old_h +
-    "\t\tif (getenv(\"G6DBG\"))\n"
-    "\t\t\tfprintf(stderr, \"G6H t=%i en=%i hlt=%i lkt=%i li=%08x,%08x,%08x\\n\",\n"
+    "\t\tif (getenv(\"REF_PROBES\"))\n"
+    "\t\t\tfprintf(stderr, \"LOOK_TGT t=%i en=%i hlt=%i lkt=%i li=%08x,%08x,%08x\\n\",\n"
     "\t\t\tlevel.time, ent->s.number, ent->client->ps.hasLookTarget, ent->client->lookTime,\n"
     "\t\t\tg6b(lookAngles[0]),g6b(lookAngles[1]),g6b(lookAngles[2]));\n")
 s = s.replace(old_h, new_h, 1)
 open(p, "w").write(s)
 PY
 
-# G6DBG diagnostic layer (permanent, env-gated): G_PickDeathAnim inputs + RNG state.
+# REF_PROBES diagnostic layer (permanent, env-gated): G_PickDeathAnim inputs + RNG state.
 python3 - <<'PY'
 p = "build/src/codemp/game/g_combat.c"
 s = open(p).read()
-helper = ("/* TEMP G6DBG (G7 death-anim hunt) */\n"
+helper = ("/* REF_PROBES tap */\n"
           "extern unsigned int jka_msvc_holdrand;\n"
           "static unsigned int g6b4(float f){union{float f;unsigned int u;}x;x.f=f;return x.u;}\n\n"
           "int G_PickDeathAnim(")
@@ -265,8 +265,8 @@ old_call = "\t\tanim = G_PickDeathAnim(self, self->pos1, damage, meansOfDeath, H
 assert s.count(old_call) == 1, s.count(old_call)
 new_call = ("\t\t{ unsigned int g6rin = jka_msvc_holdrand;\n"
     + old_call + "\n"
-    "\t\tif (getenv(\"G6DBG\"))\n"
-    "\t\t\tfprintf(stderr, \"G6D t=%i en=%i dmg=%i mod=%i p=%08x,%08x,%08x rin=%08x rout=%08x anim=%i\\n\",\n"
+    "\t\tif (getenv(\"REF_PROBES\"))\n"
+    "\t\t\tfprintf(stderr, \"DEATH_ANIM t=%i en=%i dmg=%i mod=%i p=%08x,%08x,%08x rin=%08x rout=%08x anim=%i\\n\",\n"
     "\t\t\tlevel.time, self->s.number, damage, meansOfDeath,\n"
     "\t\t\tg6b4(self->pos1[0]),g6b4(self->pos1[1]),g6b4(self->pos1[2]),\n"
     "\t\t\tg6rin, jka_msvc_holdrand, anim); }\n")
@@ -274,11 +274,11 @@ s = s.replace(old_call, new_call, 1)
 open(p, "w").write(s)
 PY
 
-# G6DBG diagnostic layer (permanent, env-gated): CalcMuzzlePoint pre-snap muzzle + aim.
+# REF_PROBES diagnostic layer (permanent, env-gated): CalcMuzzlePoint pre-snap muzzle + aim.
 python3 - <<'PY'
 p = "build/src/codemp/game/g_weapon.c"
 s = open(p).read()
-helper = ("/* TEMP G6DBG (G7 muzzle hunt) */\n"
+helper = ("/* REF_PROBES tap */\n"
           "static unsigned int g6b3(float f){union{float f;unsigned int u;}x;x.f=f;return x.u;}\n\n"
           "void CalcMuzzlePoint ( gentity_t *ent,")
 old_fn = "void CalcMuzzlePoint ( gentity_t *ent,"
@@ -288,8 +288,8 @@ s = s.replace(old_fn, helper, 1)
 fn_start = s.index(helper)
 snap_line = "\tSnapVector( muzzlePoint );"
 snap_at = s.index(snap_line, fn_start)
-dump = ("\tif (getenv(\"G6DBG\"))\n"
-    "\t\tfprintf(stderr, \"G6P t=%i en=%i w=%i pre=%08x,%08x,%08x tb=%08x,%08x,%08x fw=%08x,%08x,%08x\\n\",\n"
+dump = ("\tif (getenv(\"REF_PROBES\"))\n"
+    "\t\tfprintf(stderr, \"MUZZLE t=%i en=%i w=%i pre=%08x,%08x,%08x tb=%08x,%08x,%08x fw=%08x,%08x,%08x\\n\",\n"
     "\t\tlevel.time, ent->s.number, weapontype,\n"
     "\t\tg6b3(muzzlePoint[0]),g6b3(muzzlePoint[1]),g6b3(muzzlePoint[2]),\n"
     "\t\tg6b3(ent->s.pos.trBase[0]),g6b3(ent->s.pos.trBase[1]),g6b3(ent->s.pos.trBase[2]),\n"
@@ -298,12 +298,12 @@ s = s[:snap_at] + dump + s[snap_at:]
 open(p, "w").write(s)
 PY
 
-# G6DBG diagnostic layer (permanent, env-gated): BG_UpdateLookAngles in/out taps.
+# REF_PROBES diagnostic layer (permanent, env-gated): BG_UpdateLookAngles in/out taps.
 python3 - <<'PY'
 p = "build/src/codemp/game/bg_pmove.c"
 s = open(p).read()
 
-helper = ("/* TEMP G6DBG (frame-1806 hunt) */\n"
+helper = ("/* REF_PROBES tap */\n"
           "#include <stdio.h>\n"
           "#include <stdlib.h>\n"
           "static unsigned int g6b2(float f){union{float f;unsigned int u;}x;x.f=f;return x.u;}\n\n"
@@ -314,13 +314,13 @@ s = s.replace(old_fn, helper, 1)
 
 old_call = "\tBG_UpdateLookAngles(lookTime, lastHeadAngles, time, lookAngles, lookSpeed, -50.0f, 50.0f, -70.0f, 70.0f, -30.0f, 30.0f);"
 assert s.count(old_call) == 1
-new_call = ("\tif (getenv(\"G6DBG\"))\n"
-    "\t\tfprintf(stderr, \"G6U t=%i en=%i li=%08x,%08x,%08x lt=%i lh=%08x,%08x,%08x\\n\",\n"
+new_call = ("\tif (getenv(\"REF_PROBES\"))\n"
+    "\t\tfprintf(stderr, \"LOOK_UPD t=%i en=%i li=%08x,%08x,%08x lt=%i lh=%08x,%08x,%08x\\n\",\n"
     "\t\ttime, cent->number, g6b2(lookAngles[0]),g6b2(lookAngles[1]),g6b2(lookAngles[2]),\n"
     "\t\tlookTime, g6b2(lastHeadAngles[0]),g6b2(lastHeadAngles[1]),g6b2(lastHeadAngles[2]));\n"
     + old_call + "\n"
-    "\tif (getenv(\"G6DBG\"))\n"
-    "\t\tfprintf(stderr, \"G6W t=%i en=%i lo=%08x,%08x,%08x\\n\",\n"
+    "\tif (getenv(\"REF_PROBES\"))\n"
+    "\t\tfprintf(stderr, \"LOOK_WB t=%i en=%i lo=%08x,%08x,%08x\\n\",\n"
     "\t\ttime, cent->number, g6b2(lookAngles[0]),g6b2(lookAngles[1]),g6b2(lookAngles[2]));\n")
 s = s.replace(old_call, new_call, 1)
 open(p, "w").write(s)

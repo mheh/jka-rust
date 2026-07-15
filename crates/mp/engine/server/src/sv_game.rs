@@ -11,6 +11,7 @@
 use core::ffi::{c_char, c_int, c_ulong, c_void};
 
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
+use mp_qshared::probe;
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
 use mp_qshared::common::mp::qcommon::failedEdge_t;
 use mp_qshared::common::mp::qcommon::parms::parms_t;
@@ -3099,6 +3100,21 @@ pub fn SV_GameSystemCalls(
                 .to_str()
                 .unwrap_or("");
             let angles = *(vma(view.common, args, 4) as *const vec3_t);
+            // Referee probe: per-frame G2 bone-angle override args (floats the digest never hashed).
+            probe!(
+                "BONE_ANG",
+                "b={} a={:08x},{:08x},{:08x} fl={:x} o={},{},{} bt={} ct={}",
+                bone_name,
+                angles[0].to_bits(),
+                angles[1].to_bits(),
+                angles[2].to_bits(),
+                *args.offset(5) as c_int,
+                *args.offset(6) as c_int,
+                *args.offset(7) as c_int,
+                *args.offset(8) as c_int,
+                *args.offset(10) as c_int,
+                *args.offset(11) as c_int,
+            );
             // Raven casts the arg words straight to `Eorientations`
             // (`sv_game.cpp:1371`); transmute reproduces that (§19 for an
             // out-of-range word — Raven's own UB).
@@ -3124,6 +3140,20 @@ pub fn SV_GameSystemCalls(
             let bone_name = core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
                 .to_str()
                 .unwrap_or("");
+            // Referee probe: G2 bone-anim override args the module passed (digest never hashed them).
+            probe!(
+                "BONE_ANIM",
+                "m={} b={} sf={} ef={} fl={:x} sp={:08x} ct={} setf={:08x} bt={}",
+                *args.offset(2) as c_int,
+                bone_name,
+                *args.offset(4) as c_int,
+                *args.offset(5) as c_int,
+                *args.offset(6) as c_int,
+                vmf(args, 7).to_bits(),
+                *args.offset(8) as c_int,
+                vmf(args, 9).to_bits(),
+                *args.offset(10) as c_int,
+            );
             return g2api_set_bone_anim(
                 g2,
                 ghoul2,

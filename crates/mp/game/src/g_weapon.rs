@@ -10,6 +10,7 @@ use crate::prelude::*;
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
+use mp_qshared::probe;
 
 // Pass-2: entity fn-pointer dispatch as fn-ID enums and the
 // `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
@@ -4509,6 +4510,23 @@ pub fn CalcMuzzlePoint(
                 (*((*ent).client as *mut gclient_t)).ps.viewheight as f32 + muzzleOffPoint[2];
         }
 
+        // Referee probe: CalcMuzzlePoint pre-snap muzzle, trBase, and aim forward.
+        probe!(
+            "MUZZLE",
+            "t={} en={} w={} pre={:08x},{:08x},{:08x} tb={:08x},{:08x},{:08x} fw={:08x},{:08x},{:08x}",
+            ctx.world.level.time,
+            (*ent).s.number,
+            weapontype,
+            muzzlePoint[0].to_bits(),
+            muzzlePoint[1].to_bits(),
+            muzzlePoint[2].to_bits(),
+            (*ent).s.pos.trBase[0].to_bits(),
+            (*ent).s.pos.trBase[1].to_bits(),
+            (*ent).s.pos.trBase[2].to_bits(),
+            forward[0].to_bits(),
+            forward[1].to_bits(),
+            forward[2].to_bits(),
+        );
         // snap to integer coordinates for more efficient network bandwidth usage
         snap_vector(muzzlePoint);
     }

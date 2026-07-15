@@ -9,6 +9,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod common;
+pub mod probes;
 pub mod shared;
 
 // `rmAutomapSymbol_t` relocated here from `mp_engine_client` (RMG-D4d/RMG-D2(b),

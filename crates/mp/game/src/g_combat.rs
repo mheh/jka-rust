@@ -32,6 +32,7 @@ use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::g2_model_parts::g2ModelParts_t;
 use mp_bg::public::stat_index::statIndex_t;
+use mp_qshared::probe;
 use mp_qshared::shared::MAX_CLIENTS;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
@@ -2791,6 +2792,8 @@ pub fn player_die(
             // normal death
             let mut i_val = DEATH_ANIM_I.load(core::sync::atomic::Ordering::Relaxed);
 
+            // Referee probe capture: holdrand before the death-anim draw.
+            let probe_rin = ctx.world.bg_state.rng.dbg_holdrand();
             let anim = G_PickDeathAnim(
                 ctx,
                 ctx.entity_id_of(self_),
@@ -2798,6 +2801,21 @@ pub fn player_die(
                 damage,
                 meansOfDeath,
                 HL_NONE,
+            );
+            // Referee probe: G_PickDeathAnim inputs (pos, dmg, mod) + RNG in/out.
+            probe!(
+                "DEATH_ANIM",
+                "t={} en={} dmg={} mod={} p={:08x},{:08x},{:08x} rin={:08x} rout={:08x} anim={}",
+                ctx.world.level.time,
+                (*self_).s.number,
+                damage,
+                meansOfDeath,
+                (*self_).pos1[0].to_bits(),
+                (*self_).pos1[1].to_bits(),
+                (*self_).pos1[2].to_bits(),
+                probe_rin,
+                ctx.world.bg_state.rng.dbg_holdrand(),
+                anim,
             );
 
             if anim >= 1 {

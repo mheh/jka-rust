@@ -32,6 +32,7 @@ use mp_bg::public::saber_move_name::{
     LS_REFLECT_LR, LS_REFLECT_UL, LS_REFLECT_UP, LS_REFLECT_UR,
 };
 use mp_bg::public::weaponstate::weaponstate_t;
+use mp_qshared::probe;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
@@ -1149,6 +1150,18 @@ pub fn G_G2PlayerAngles(
                 _VectorCopy((*sc).ps.origin, &mut lookAngles);
             }
             lookAngles[PITCH as usize] = 0.0;
+            // Referee probe: caller-side look-target angles + hasLookTarget/lookTime.
+            probe!(
+                "LOOK_TGT",
+                "t={} en={} hlt={} lkt={} li={:08x},{:08x},{:08x}",
+                ctx.world.level.time,
+                (*ent).s.number,
+                (*sc).ps.hasLookTarget,
+                (*sc).lookTime,
+                lookAngles[0].to_bits(),
+                lookAngles[1].to_bits(),
+                lookAngles[2].to_bits(),
+            );
 
             if (*sc).ps.emplacedIndex != 0 {
                 emplaced = &mut ctx.world.g_entities[(*sc).ps.emplacedIndex as usize].s
@@ -2882,6 +2895,28 @@ pub fn G_ClientIdleInWorld(ent: &gentity_t) -> qboolean {
 /// Raven `G_G2TraceCollide`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2336-2426`
+// Referee probe: one saber-trace call (start/end, trace bounds, fraction, hit ent).
+fn g6t(
+    ctx: &GameContext,
+    tag: &str,
+    a: &vec3_t,
+    b: &vec3_t,
+    mn: &vec3_t,
+    mx: &vec3_t,
+    fr: f32,
+    en: i32,
+) {
+    let t = ctx.world.level.time;
+    probe!(
+        "SAB_TRACE",
+        "{} t={} a={:08x},{:08x},{:08x} b={:08x},{:08x},{:08x} mn={:08x} mx={:08x} fr={:08x} en={}",
+        tag, t,
+        a[0].to_bits(), a[1].to_bits(), a[2].to_bits(),
+        b[0].to_bits(), b[1].to_bits(), b[2].to_bits(),
+        mn[0].to_bits(), mx[0].to_bits(), fr.to_bits(), en
+    );
+}
+
 pub fn G_G2TraceCollide(
     ctx: &mut GameContext,
     tr: *mut trace_t,
@@ -2980,6 +3015,14 @@ pub fn G_G2TraceCollide(
                 );
             }
 
+            // Referee probe: saber ghoul2 collide check — trace ent vs G2 hit ent.
+            probe!(
+                "SAB_CD",
+                "t={} en={} m={}",
+                ctx.world.level.time,
+                (*tr).entityNum,
+                G2Trace[0].mEntityNum
+            );
             if G2Trace[0].mEntityNum != (*g2Hit).s.number {
                 (*tr).fraction = 1.0f32;
                 (*tr).entityNum = ENTITYNUM_NONE as c_short;
@@ -4774,6 +4817,16 @@ pub fn CheckSaberDamage(
                     ),
                 );
 
+                g6t(
+                    ctx,
+                    "i1",
+                    &*saberEnd,
+                    &saberStart,
+                    &saberTrMins,
+                    &saberTrMaxs,
+                    tr.fraction,
+                    tr.entityNum as i32,
+                ); // TEMP G6
                 _VectorCopy(*saberEnd, &mut lastValidStart);
                 _VectorCopy(saberStart, &mut lastValidEnd);
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
@@ -4859,6 +4912,16 @@ pub fn CheckSaberDamage(
                         ),
                     );
 
+                    g6t(
+                        ctx,
+                        "i2",
+                        &*saberEnd,
+                        &saberStart,
+                        &saberTrMins,
+                        &saberTrMaxs,
+                        tr.fraction,
+                        tr.entityNum as i32,
+                    ); // TEMP G6
                     _VectorCopy(*saberEnd, &mut lastValidStart);
                     _VectorCopy(saberStart, &mut lastValidEnd);
                     if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
@@ -4919,6 +4982,16 @@ pub fn CheckSaberDamage(
                     ),
                 );
 
+                g6t(
+                    ctx,
+                    "ex",
+                    &saberStart,
+                    &saberEndExtrapolated,
+                    &saberTrMins,
+                    &saberTrMaxs,
+                    tr.fraction,
+                    tr.entityNum as i32,
+                ); // TEMP G6
                 _VectorCopy(saberStart, &mut lastValidStart);
                 _VectorCopy(saberEndExtrapolated, &mut lastValidEnd);
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
@@ -6298,6 +6371,20 @@ pub fn G_SPSaberDamageTraceLerped(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let ec = (*self_).client as *mut gclient_t;
+        // Referee probe: saber trail lerp — new base/tip vs stored trail base/tip.
+        {
+            let tb = &(*ec).saber[saberNum as usize].blade[bladeNum as usize].trail;
+            probe!(
+                "SAB_TRAIL",
+                "t={} sn={} bn={} bN={:08x},{:08x},{:08x} eN={:08x},{:08x},{:08x} trB={:08x},{:08x},{:08x} trT={:08x},{:08x},{:08x} lt={}",
+                ctx.world.level.time, saberNum, bladeNum,
+                baseNew[0].to_bits(), baseNew[1].to_bits(), baseNew[2].to_bits(),
+                endNew[0].to_bits(), endNew[1].to_bits(), endNew[2].to_bits(),
+                tb.base[0].to_bits(), tb.base[1].to_bits(), tb.base[2].to_bits(),
+                tb.tip[0].to_bits(), tb.tip[1].to_bits(), tb.tip[2].to_bits(),
+                tb.lastTime
+            );
+        }
         let mut baseOld: vec3_t = [0.0; 3];
         let mut endOld: vec3_t = [0.0; 3];
         let mut mp1: vec3_t = [0.0; 3];
@@ -11135,6 +11222,19 @@ pub fn WP_SaberPositionUpdate(
                             );
                         }
 
+                        // Referee probe: saber blade proper origin/angles + stored muzzle point/dir.
+                        {
+                            let bl = &(*client).saber[rSaberNum as usize].blade[rBladeNum as usize];
+                            probe!(
+                                "SAB_MUZZLE",
+                                "t={} sn={} bn={} pO={:08x},{:08x},{:08x} pA={:08x},{:08x},{:08x} mP={:08x},{:08x},{:08x} mD={:08x},{:08x},{:08x}",
+                                ctx.world.level.time, rSaberNum, rBladeNum,
+                                properOrigin[0].to_bits(), properOrigin[1].to_bits(), properOrigin[2].to_bits(),
+                                properAngles[0].to_bits(), properAngles[1].to_bits(), properAngles[2].to_bits(),
+                                bl.muzzlePoint[0].to_bits(), bl.muzzlePoint[1].to_bits(), bl.muzzlePoint[2].to_bits(),
+                                bl.muzzleDir[0].to_bits(), bl.muzzleDir[1].to_bits(), bl.muzzleDir[2].to_bits()
+                            );
+                        }
                         (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].storageTime =
                             ctx.world.level.time;
 

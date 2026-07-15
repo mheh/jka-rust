@@ -55,6 +55,7 @@ use crate::bg_saber::BG_ForcePowerDrain;
 use crate::q_math::{CrossProduct, VectorLength};
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
+use mp_qshared::probe;
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
 use mp_qshared::shared::shared_eik_move_state::sharedEIKMoveState::{IKS_DYNAMIC, IKS_NONE};
 
@@ -9620,6 +9621,20 @@ pub fn BG_G2PlayerAngles(
         }
         AnglesSubtract(lookAngles, eyeAngles, &mut lookAngles);
 
+        // Referee probe: BG_UpdateLookAngles inputs (look angles in, lookTime, last head angles).
+        probe!(
+            "LOOK_UPD",
+            "t={} en={} li={:08x},{:08x},{:08x} lt={} lh={:08x},{:08x},{:08x}",
+            time,
+            (*cent).number,
+            lookAngles[0].to_bits(),
+            lookAngles[1].to_bits(),
+            lookAngles[2].to_bits(),
+            lookTime,
+            lastHeadAngles[0].to_bits(),
+            lastHeadAngles[1].to_bits(),
+            lastHeadAngles[2].to_bits(),
+        );
         BG_UpdateLookAngles(
             lookTime,
             lastHeadAngles,
@@ -9632,6 +9647,16 @@ pub fn BG_G2PlayerAngles(
             70.0,
             -30.0,
             30.0,
+        );
+        // Referee probe: BG_UpdateLookAngles output look angles (write-back).
+        probe!(
+            "LOOK_WB",
+            "t={} en={} lo={:08x},{:08x},{:08x}",
+            time,
+            (*cent).number,
+            lookAngles[0].to_bits(),
+            lookAngles[1].to_bits(),
+            lookAngles[2].to_bits(),
         );
 
         BG_G2ClientNeckAngles(

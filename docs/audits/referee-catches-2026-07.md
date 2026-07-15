@@ -22,6 +22,7 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 | `0b41dc4e` | `holdrand` | `c_ulong` is platform-width, not `u32` (t2_wedge NPC-type pick). Predates the CRT-rand finding above. |
 | `dfcfa240` | MD4 | Raven's `UINT4` truncates to 32 bits; wider arithmetic broke sv_pure checksums. |
 | `855b73ef` / `4138f7d0` | NPC class ids / `G_LogWeaponPowerup` | Raven UB sites (§19): out-of-range enum reads and a mis-sized stats array — pick one defined behavior, note it at the site. |
+| *(fix in flight, task #1)* | `Rng::crandom` → `Drop_Item` toss velocity | Translation bug, **class F1**: the `crandom()` macro (`q_shared.h:1592`, no `#ifdef` variants) is `2.0 * (random() - 0.5)` — double arithmetic, double result — and `velocity[2] += 200 + crandom() * 50` stays double until the f32 store. The port translated `crandom` as an all-f32 fn. Brute force over all 32,768 `rand()` draws: 7.1% narrow to a different f32 (1 ULP) — rare enough that 12k-frame soaks stayed clean; the 27k-frame human session hit one (ent115 `weapon_thermal` toss, frame 14282). Diagnosed from the tape alone, no live repro. |
 
 ## Width/ABI catches (engine + harness plumbing)
 
@@ -46,6 +47,7 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 
 ## Open
 
-- `ent115.pos.trDelta+8` (live frame 14282): death-dropped item toss-velocity
-  z at spawn — `LaunchItem` path. Task #1.
+- `ent115.pos.trDelta+8` (live frame 14282): **root cause found 2026-07-14**
+  — the `Rng::crandom` translation bug above; fix + tape-replay verification
+  in flight. Task #1.
 - Replica-connect syscall-count blips (equal digests). Task #2.

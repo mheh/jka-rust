@@ -56,13 +56,28 @@ Ordered; F-items float unordered.
 4. **G8 land.** Plan-doc statuses (lockstep plan G7/G8), refresh the stale
    README Status block (dated 2026-07-11), lift the push hold
    (29+ held commits).
-5. **Safe-state Stage 4** — overlay/shared-buffer casts behind typed seam
+5. **Translation-bug audit — file-by-file oracle comparison of `mp_game`**
+   (ordered before the pointer scrub while ported bodies still mirror the C
+   line-for-line; side-by-side comparison gets harder after every
+   structural pass). All 108 files / ~206k lines audited against their
+   oracle `.c` sources for the bug classes in
+   `docs/audits/referee-catches-2026-07.md`: F1 unsuffixed-double literals
+   and double-returning macros (crandom class); F2 dropped nullable-pointer
+   guards; dropped out-param/vec3 write-backs; entry-time snapshots of live
+   globals; short-circuit evaluation order; integer width/promotion
+   (size_t, c_ulong, char signedness); unmarked always-fail stubs
+   (G2_Add_Bolt class); QVM-vs-native variant choice. Live-in-FFA files
+   first (g_*, bg_*, w_*), NPC_*/ai_* after. Agent-per-file findings with
+   oracle cites, adversarially verified, fixes in referee-gated batches
+   (soak + human-tape replay signature). Subsumes floating items F1/F2
+   below.
+6. **Safe-state Stage 4** — overlay/shared-buffer casts behind typed seam
    adapters (findings F5/F6) + the unsafe-retiring slice of porting-rules
    §C7. Referee-gated shards. Plan:
    `docs/plans/2026-07-12-safe-state-migration.md` (Stages 0–3 DONE).
-6. **Safe-state Stage 5** — bg crate split (ends the ruling-19 deferral;
+7. **Safe-state Stage 5** — bg crate split (ends the ruling-19 deferral;
    mp_bg holds no fn bodies today — a split, not a dedup).
-7. **Ratify the seam split, then dissolve the tail.** The design sketch is
+8. **Ratify the seam split, then dissolve the tail.** The design sketch is
    in `docs/roadmap-final-stages.md` Stage 2 (2026-07-14): `gentity_t`/
    `gclient_t` → `#[repr(C)] EntitySeam {s, r}`/`ps` registered arrays +
    parallel idiomatic arenas; module-chosen `LocateGameData` stride keeps
@@ -70,8 +85,8 @@ Ordered; F-items float unordered.
    retire the 27 marked Stage-2b irreducibles and the entity/gclient deref
    regime ("2c territory").
 
-Floating (unordered, run when convenient — each instance found prevents a
-future referee interruption):
+Floating (now folded into item 5's checklist as lenses 1–2; kept here as
+class descriptions):
 
 - **F1 — Class-bug sweep: unsuffixed C double literals flattened to f32.**
   Two confirmed kills: `f51f89e9` (BG_G2ClientNeckAngles 0.4/0.6/0.1),
