@@ -47,6 +47,16 @@ one taught. Kept as a checklist of *classes* to watch for; F1/F2 sweeps in
 | `23d7748a` | Replicas were mislabeled `NA_BOT` (a wire-capture-skip shortcut): 8 engine sites branched to the bot path for a mirrored human — `SV_DropClient` ran `SV_BotFreeClient` where the primary ran the human drop (the frame-5883 syscall delta, which vanished once fixed). Replicas now carry NA_LOOPBACK + a dedicated flag; transmit primitives gate on it. Injected C/B/D transition windows suppress the syscall-count compare (digests stay authoritative). |
 | `93f88b0b` | Reliable-command acks are mirror state: the socketless replica never acked, pooling a session of broadcasts that the slot's successor bot drained in one 74-call `BOTLIB_GET_CONSOLE_MESSAGE` burst (frame 5964). Raven hands a reused slot's unacked tail to the new occupant — on the primary, exactly the two drop-time broadcasts the leaving human could never ack. Replicas now auto-ack while live, never during CS_ZOMBIE; the flag clears at slot reallocation. F5964 matches call-for-call (967 == 967). |
 
+## Audit catches (referee-blind surface, found by file-by-file audit)
+
+| Commit | Finding |
+|---|---|
+| `fddd3eca` | **Botlib vec3_t out-params ported by-value — 25 silently inert fns.** The callee wrote a shadowed local (`let mut x = x;`) and the caller never received the result: zero-size presence bboxes, item goals at the world origin, jump-pad/mover/swim reachability dead, movement prediction gravity-only. Plus: `EVALUATERECURSIVELY` IS defined so `FuzzyWeight` runs the recursive arm — whose scale divide is C int/int, always 0 in-branch (Raven's "interpolation" returns w2; kept faithful); the oracle compares a file-local shadow enum `ET_MOVER=4`; five sv_game trap arms deref'd VMA pointers by value. Found by full-crate stub sweep after live play felt off; the live-session syscall histogram proves JKA MP bots never call AAS/goal/weight traps, so these are latent for FFA — botlib is REFEREE-BLIND (bot usercmds are taped inputs), which is why an audit, not the referee, had to find them. |
+
 ## Open
 
-*(none — all known catches resolved as of 2026-07-15)*
+- Bot-feel verdict (task #11 tail): behavioral A/B vs OpenJK `jampded`
+  (same map, 4 bots — kill-feed rate + MOD histogram). Code-side audit of
+  the live botlib surface (EA, interface, chat delivery) is clean; the
+  remaining hypotheses are authentic retail bot quality or engine inputs
+  fed identically to both modules (lockstep-blind).
