@@ -64,6 +64,14 @@ Ordered; F-items float unordered.
    is now batch-on-request (CI cost, user 2026-07-14). Original brief: Plan-doc statuses (lockstep plan G7/G8), refresh the stale
    README Status block (dated 2026-07-11), lift the push hold
    (29+ held commits).
+4b. **DONE 2026-07-15 (`fddd3eca`) — botlib audit + fix batch (task #11).**
+   Botlib is referee-blind (bot usercmds are taped inputs); a full-crate
+   audit found 25 vec3_t out-params ported by-value (silent no-ops) plus
+   the FuzzyWeight `EVALUATERECURSIVELY` arm — all fixed, adversarially
+   validated. Live-session syscall histogram: JKA MP bots call only the EA
+   layer (audited clean) — findings were latent for FFA. OPEN TAIL:
+   behavioral A/B vs OpenJK jampded for the bot-feel verdict.
+
 5. **Translation-bug audit — file-by-file oracle comparison of `mp_game`**
    (ordered before the pointer scrub while ported bodies still mirror the C
    line-for-line; side-by-side comparison gets harder after every
@@ -92,14 +100,6 @@ Ordered; F-items float unordered.
    2003/OpenJK drop-in compat. Interactive sit-down to ratify, then shards
    retire the 27 marked Stage-2b irreducibles and the entity/gclient deref
    regime ("2c territory").
-
-4b. **DONE 2026-07-15 (`fddd3eca`) — botlib audit + fix batch (task #11).**
-   Botlib is referee-blind (bot usercmds are taped inputs); a full-crate
-   audit found 25 vec3_t out-params ported by-value (silent no-ops) plus
-   the FuzzyWeight `EVALUATERECURSIVELY` arm — all fixed, adversarially
-   validated. Live-session syscall histogram: JKA MP bots call only the EA
-   layer (audited clean) — findings were latent for FFA. OPEN TAIL:
-   behavioral A/B vs OpenJK jampded for the bot-feel verdict.
 
 Floating (now folded into item 5's checklist as lenses 1–2; kept here as
 class descriptions):
