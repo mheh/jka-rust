@@ -73,8 +73,12 @@ pub fn FuzzyWeight_r(inventory: *mut c_int, fs: *mut fuzzyseperator_t) -> f32 {
                     w2 = (*(*fs).next).weight;
                 }
                 // the scale factor
-                scale = (*inventory.offset((*fs).index as isize) - (*fs).value) as f32
-                    / ((*(*fs).next).value - (*fs).value) as f32;
+                // C computes this with all-int operands: integer division
+                // THEN widens to float. Since value <= inventory[index] <
+                // next->value here, the quotient is always 0 (returns w2).
+                // Source: `oracle/codemp/botlib/be_ai_weight.cpp:579`
+                scale = ((*inventory.offset((*fs).index as isize) - (*fs).value)
+                    / ((*(*fs).next).value - (*fs).value)) as f32;
                 // scale between the two weights
                 return scale * w1 + (1.0 - scale) * w2;
             }
@@ -276,8 +280,12 @@ pub fn FuzzyWeightUndecided_r(
                             * ((*(*fs).next).maxweight - (*(*fs).next).minweight);
                 }
                 // the scale factor
-                scale = (*inventory.offset((*fs).index as isize) - (*fs).value) as f32
-                    / ((*(*fs).next).value - (*fs).value) as f32;
+                // C computes this with all-int operands: integer division
+                // THEN widens to float. Since value <= inventory[index] <
+                // next->value here, the quotient is always 0 (returns w2).
+                // Source: `oracle/codemp/botlib/be_ai_weight.cpp:613`
+                scale = ((*inventory.offset((*fs).index as isize) - (*fs).value)
+                    / ((*(*fs).next).value - (*fs).value)) as f32;
                 // scale between the two weights
                 return scale * w1 + (1.0 - scale) * w2;
             }
@@ -287,34 +295,14 @@ pub fn FuzzyWeightUndecided_r(
     }
 }
 
-/// Raven `FuzzyWeight` — iterative (non-`EVALUATERECURSIVELY`) evaluation of
-/// `wc`'s `weightnum`th separator tree against `inventory`.
+/// Raven `FuzzyWeight` — `EVALUATERECURSIVELY` evaluation of `wc`'s
+/// `weightnum`th separator tree against `inventory`.
 ///
+/// `EVALUATERECURSIVELY` is defined (be_ai_weight.cpp:31), so the `#ifdef` arm
+/// (interpolating `FuzzyWeight_r`) is live.
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:627-651`
-///
-/// PORT-NOTE(EVALUATERECURSIVELY): unresolved const, not defined by the
-/// oracle build (no rosetta row) — the `#else` (iterative) arm is the live
-/// one per porting-rules §C10; transcribed here, the `#ifdef` arm dropped.
 pub fn FuzzyWeight(inventory: *mut c_int, wc: *mut weightconfig_t, weightnum: c_int) -> f32 {
-    unsafe {
-        let mut s: *mut fuzzyseperator_t = (*wc).weights[weightnum as usize].firstseperator;
-        if s.is_null() {
-            return 0.0;
-        }
-        loop {
-            if *inventory.offset((*s).index as isize) < (*s).value {
-                if !(*s).child.is_null() {
-                    s = (*s).child;
-                } else {
-                    return (*s).weight;
-                }
-            } else if !(*s).next.is_null() {
-                s = (*s).next;
-            } else {
-                return (*s).weight;
-            }
-        }
-    }
+    unsafe { FuzzyWeight_r(inventory, (*wc).weights[weightnum as usize].firstseperator) }
 }
 
 /// Raven `EvolveWeightConfig` — evolve every fuzzy weight tree in `config`.
@@ -412,14 +400,12 @@ pub fn FreeWeightConfig2(bot: &mut BotLib, config: *mut weightconfig_t) {
     }
 }
 
-/// Raven `FuzzyWeightUndecided` — iterative counterpart of
-/// `FuzzyWeightUndecided_r`, evaluating undecided leaves with a random
-/// value within their bounds.
+/// Raven `FuzzyWeightUndecided` — `EVALUATERECURSIVELY` evaluation, undecided
+/// leaves resolving to a random value within their bounds.
 ///
+/// `EVALUATERECURSIVELY` is defined (be_ai_weight.cpp:31), so the `#ifdef` arm
+/// (interpolating `FuzzyWeightUndecided_r`) is live.
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:658-682`
-///
-/// PORT-NOTE(EVALUATERECURSIVELY): see `FuzzyWeight` — same unresolved,
-/// undefined const; the iterative `#else` arm is the live one.
 pub fn FuzzyWeightUndecided(
     common: &mut Common,
     inventory: *mut c_int,
@@ -427,25 +413,11 @@ pub fn FuzzyWeightUndecided(
     weightnum: c_int,
 ) -> f32 {
     unsafe {
-        let mut s: *mut fuzzyseperator_t = (*wc).weights[weightnum as usize].firstseperator;
-        if s.is_null() {
-            return 0.0;
-        }
-        loop {
-            if *inventory.offset((*s).index as isize) < (*s).value {
-                if !(*s).child.is_null() {
-                    s = (*s).child;
-                } else {
-                    return (*s).minweight
-                        + common.qrand.flrand(0.0, 1.0) * ((*s).maxweight - (*s).minweight);
-                }
-            } else if !(*s).next.is_null() {
-                s = (*s).next;
-            } else {
-                return (*s).minweight
-                    + common.qrand.flrand(0.0, 1.0) * ((*s).maxweight - (*s).minweight);
-            }
-        }
+        FuzzyWeightUndecided_r(
+            common,
+            inventory,
+            (*wc).weights[weightnum as usize].firstseperator,
+        )
     }
 }
 

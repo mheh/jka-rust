@@ -83,8 +83,8 @@ struct aas_linkstack_t {
 pub fn AAS_PresenceTypeBoundingBox(
     bot: &mut BotLib,
     presencetype: c_int,
-    _mins: vec3_t,
-    _maxs: vec3_t,
+    mins: *mut vec3_t,
+    maxs: *mut vec3_t,
 ) {
     //bounding box size for each presence type
     let boxmins: [vec3_t; 3] = [
@@ -108,9 +108,10 @@ pub fn AAS_PresenceTypeBoundingBox(
         }
         index = 2;
     }
-    let mins = boxmins[index];
-    let maxs = boxmaxs[index];
-    let _ = (mins, maxs);
+    unsafe {
+        *mins = boxmins[index];
+        *maxs = boxmaxs[index];
+    }
 }
 
 /// Raven `AAS_AllocAASLink`.
@@ -527,15 +528,14 @@ pub fn AAS_PointInsideFace(
 /// Raven `AAS_FacePlane`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_sample.cpp:1035-1042`
-pub fn AAS_FacePlane(bot: &mut BotLib, facenum: c_int, _normal: vec3_t, dist: *mut f32) {
+pub fn AAS_FacePlane(bot: &mut BotLib, facenum: c_int, normal: *mut vec3_t, dist: *mut f32) {
     unsafe {
         let plane: *mut aas_plane_t = bot
             .aasworld
             .planes
             .add((*bot.aasworld.faces.add(facenum as usize)).planenum as usize);
-        let normal = (*plane).normal;
+        *normal = (*plane).normal;
         *dist = (*plane).dist;
-        let _ = normal;
     }
 }
 
@@ -927,9 +927,9 @@ pub fn AAS_AreaEntityCollision(
     trace: *mut aas_trace_t,
 ) -> qboolean {
     unsafe {
-        let boxmins: vec3_t = [0.0; 3];
-        let boxmaxs: vec3_t = [0.0; 3];
-        AAS_PresenceTypeBoundingBox(bot, presencetype, boxmins, boxmaxs);
+        let mut boxmins: vec3_t = [0.0; 3];
+        let mut boxmaxs: vec3_t = [0.0; 3];
+        AAS_PresenceTypeBoundingBox(bot, presencetype, &mut boxmins, &mut boxmaxs);
 
         let mut bsptrace = core::mem::zeroed::<bsp_trace_t>();
         Com_Memset(
@@ -981,10 +981,10 @@ pub fn AAS_LinkEntityClientBBox(
     entnum: c_int,
     presencetype: c_int,
 ) -> *mut aas_link_t {
-    let mins: vec3_t = [0.0; 3];
-    let maxs: vec3_t = [0.0; 3];
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
 
-    AAS_PresenceTypeBoundingBox(bot, presencetype, mins, maxs);
+    AAS_PresenceTypeBoundingBox(bot, presencetype, &mut mins, &mut maxs);
     let newabsmins: vec3_t = [
         absmins[0] - maxs[0],
         absmins[1] - maxs[1],

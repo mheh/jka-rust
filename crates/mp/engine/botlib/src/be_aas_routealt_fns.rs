@@ -110,7 +110,7 @@ pub fn AAS_AlternativeRouteGoals(
         }
         // travel time towards the goal area
         let goaltraveltime =
-            AAS_AreaTravelTimeToGoalArea(bot, startareanum, start, goalareanum, travelflags);
+            AAS_AreaTravelTimeToGoalArea(bot, startareanum, &start, goalareanum, travelflags);
         // clear the midrange areas
         Com_Memset(
             bot.midrangeareas as *mut (),
@@ -141,7 +141,7 @@ pub fn AAS_AlternativeRouteGoals(
                 continue;
             }
             // travel time from the area to the start area
-            let starttime = AAS_AreaTravelTimeToGoalArea(bot, startareanum, start, i, travelflags);
+            let starttime = AAS_AreaTravelTimeToGoalArea(bot, startareanum, &start, i, travelflags);
             if starttime == 0 {
                 continue;
             }
@@ -150,12 +150,14 @@ pub fn AAS_AlternativeRouteGoals(
                 continue;
             }
             // travel time from the area to the goal area
-            // PORT-NOTE(null-origin): Raven passes NULL for `origin` here (only used
-            // when the from-area equals the current area, which never holds for `i`);
-            // the resolved signature takes `vec3_t` by value, so a zeroed vec3 is
-            // passed — matches the callee never reading it on this path.
-            let goaltime =
-                AAS_AreaTravelTimeToGoalArea(bot, i, [0.0, 0.0, 0.0], goalareanum, travelflags);
+            // Raven passes NULL for `origin` here; the callee branches on it.
+            let goaltime = AAS_AreaTravelTimeToGoalArea(
+                bot,
+                i,
+                core::ptr::null(),
+                goalareanum,
+                travelflags,
+            );
             if goaltime == 0 {
                 continue;
             }

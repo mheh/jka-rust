@@ -567,13 +567,13 @@ pub fn BotGetSecondGoal(bot: &mut BotLib, goalstate: c_int, goal: *mut bot_goal_
 ///
 /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:1592-1614`
 pub fn BotTouchingGoal(bot: &mut BotLib, origin: vec3_t, goal: *mut bot_goal_t) -> c_int {
-    let boxmins: vec3_t = [0.0; 3];
-    let boxmaxs: vec3_t = [0.0; 3];
+    let mut boxmins: vec3_t = [0.0; 3];
+    let mut boxmaxs: vec3_t = [0.0; 3];
     let safety_maxs: vec3_t = [0.0, 0.0, 0.0]; //{4, 4, 10};
     let safety_mins: vec3_t = [0.0, 0.0, 0.0]; //{-4, -4, 0};
 
     unsafe {
-        AAS_PresenceTypeBoundingBox(bot, PRESENCE_NORMAL, boxmins, boxmaxs);
+        AAS_PresenceTypeBoundingBox(bot, PRESENCE_NORMAL, &mut boxmins, &mut boxmaxs);
         let mut absmins = vec_sub((*goal).mins, boxmaxs);
         let mut absmaxs = vec_sub((*goal).maxs, boxmins);
         absmins = vec_add(absmins, (*goal).origin);
@@ -877,7 +877,7 @@ pub fn BotInitInfoEntities(bot: &mut BotLib) {
                         bot,
                         ent,
                         c"origin".as_ptr() as *mut c_char,
-                        (*ml).origin,
+                        &mut (*ml).origin,
                     );
                     AAS_ValueForBSPEpairKey(
                         bot,
@@ -899,7 +899,7 @@ pub fn BotInitInfoEntities(bot: &mut BotLib) {
                         bot,
                         ent,
                         c"origin".as_ptr() as *mut c_char,
-                        (*cs).origin,
+                        &mut (*cs).origin,
                     );
                     //cs->origin[2] += 16;
                     AAS_ValueForBSPEpairKey(
@@ -1082,7 +1082,7 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                             (*li).origin,
                                             (*ii).mins,
                                             (*ii).maxs,
-                                            (*li).goalorigin,
+                                            &mut (*li).goalorigin,
                                         );
                                     }
                                 }
@@ -1129,7 +1129,7 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                                         (*li2).origin,
                                                         (*ii).mins,
                                                         (*ii).maxs,
-                                                        (*li2).goalorigin,
+                                                        &mut (*li2).goalorigin,
                                                     );
                                                 }
                                                 linked = true;
@@ -1170,7 +1170,7 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                             (*newli).origin,
                                             (*ii).mins,
                                             (*ii).maxs,
-                                            (*newli).goalorigin,
+                                            &mut (*newli).goalorigin,
                                         );
                                         //never go for items dropped into jumppads
                                         if AAS_AreaJumpPad(bot, (*newli).goalareanum) != 0 {
@@ -1332,8 +1332,8 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                     continue;
                 }
                 //get the origin of the item
-                let origin: vec3_t = [0.0; 3];
-                if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, origin)
+                let mut origin: vec3_t = [0.0; 3];
+                if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin)
                     == 0
                 {
                     bot.botimport.Print.unwrap()(
@@ -1425,7 +1425,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                 }
                 //if not a stationary item
                 if spawnflags & 1 == 0 {
-                    if AAS_DropToFloor(bot, origin, (*ii).mins, (*ii).maxs) == 0 {
+                    if AAS_DropToFloor(bot, &mut origin, (*ii).mins, (*ii).maxs) == 0 {
                         bot.botimport.Print.unwrap()(
                             PRT_MESSAGE,
                             c"%s in solid at (%1.1f %1.1f %1.1f)\n".as_ptr() as *mut c_char,
@@ -1451,7 +1451,7 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                         origin,
                         (*ii).mins,
                         (*ii).maxs,
-                        (*li).goalorigin,
+                        &mut (*li).goalorigin,
                     );
                     if (*li).goalareanum == 0 {
                         bot.botimport.Print.unwrap()(
@@ -1562,7 +1562,7 @@ pub fn BotChooseLTGItem(
                         let t = AAS_AreaTravelTimeToGoalArea(
                             bot,
                             areanum,
-                            origin,
+                            &origin,
                             (*li).goalareanum,
                             travelflags,
                         );
@@ -1662,7 +1662,7 @@ pub fn BotChooseNBGItem(
             return qfalse;
         }
         let ltg_time = if !ltg.is_null() {
-            AAS_AreaTravelTimeToGoalArea(bot, areanum, origin, (*ltg).areanum, travelflags)
+            AAS_AreaTravelTimeToGoalArea(bot, areanum, &origin, (*ltg).areanum, travelflags)
         } else {
             99999
         };
@@ -1710,7 +1710,7 @@ pub fn BotChooseNBGItem(
                         let mut t = AAS_AreaTravelTimeToGoalArea(
                             bot,
                             areanum,
-                            origin,
+                            &origin,
                             (*li).goalareanum,
                             travelflags,
                         );
@@ -1727,7 +1727,7 @@ pub fn BotChooseNBGItem(
                                         t = AAS_AreaTravelTimeToGoalArea(
                                             bot,
                                             (*li).goalareanum,
-                                            (*li).goalorigin,
+                                            &(*li).goalorigin,
                                             (*ltg).areanum,
                                             travelflags,
                                         );

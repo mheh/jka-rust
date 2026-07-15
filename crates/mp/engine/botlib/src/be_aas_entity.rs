@@ -28,7 +28,6 @@ use mp_qshared::common::mp::botlib::solid_t::solid_t;
 use mp_qshared::shared::limits::ENTITYNUM_WORLD;
 use mp_qshared::shared::vec3_t;
 
-use mp_bg::public::entity_type::entityType_t;
 
 use crate::aasfile::presence_type::PRESENCE_NORMAL;
 use crate::be_aas_def::bsp_entdata_s::bsp_entdata_t;
@@ -46,7 +45,7 @@ use crate::be_aas_sample_fns::{AAS_LinkEntityClientBBox, AAS_UnlinkFromAreas};
 /// Raven `AAS_EntityOrigin`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_entity.cpp:178-188`
-pub fn AAS_EntityOrigin(bot: &mut BotLib, entnum: c_int, origin: vec3_t) {
+pub fn AAS_EntityOrigin(bot: &mut BotLib, entnum: c_int, origin: *mut vec3_t) {
     unsafe {
         if entnum < 0 || entnum >= bot.aasworld.maxentities {
             bot.botimport.Print.unwrap()(
@@ -54,18 +53,16 @@ pub fn AAS_EntityOrigin(bot: &mut BotLib, entnum: c_int, origin: vec3_t) {
                 c"AAS_EntityOrigin: entnum %d out of range\n".as_ptr() as *mut c_char,
                 entnum,
             );
-            let mut origin = origin;
-            origin[0] = 0.0;
-            origin[1] = 0.0;
-            origin[2] = 0.0;
+            (*origin)[0] = 0.0;
+            (*origin)[1] = 0.0;
+            (*origin)[2] = 0.0;
             return;
         } //end if
 
         let ent = &*bot.aasworld.entities.add(entnum as usize);
-        let mut origin = origin;
-        origin[0] = ent.i.origin[0];
-        origin[1] = ent.i.origin[1];
-        origin[2] = ent.i.origin[2];
+        (*origin)[0] = ent.i.origin[0];
+        (*origin)[1] = ent.i.origin[1];
+        (*origin)[2] = ent.i.origin[2];
     }
 }
 
@@ -131,16 +128,17 @@ pub fn AAS_EntityModelNum(bot: &mut BotLib, entnum: c_int) -> c_int {
 /// Raven `AAS_OriginOfMoverWithModelNum`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_entity.cpp:244-262`
-pub fn AAS_OriginOfMoverWithModelNum(bot: &mut BotLib, modelnum: c_int, origin: vec3_t) -> c_int {
+pub fn AAS_OriginOfMoverWithModelNum(bot: &mut BotLib, modelnum: c_int, origin: *mut vec3_t) -> c_int {
     unsafe {
-        let mut origin = origin;
         for i in 0..bot.aasworld.maxentities {
             let ent = &*bot.aasworld.entities.add(i as usize);
-            if ent.i.r#type == entityType_t::ET_MOVER as c_int {
+            // Oracle compares against its file-local shadow enum (ET_MOVER = 4),
+            // not entityType_t::ET_MOVER (6). Source: oracle/codemp/botlib/be_aas_entity.cpp:32-37,252
+            if ent.i.r#type == 4 {
                 if ent.i.modelindex == modelnum {
-                    origin[0] = ent.i.origin[0];
-                    origin[1] = ent.i.origin[1];
-                    origin[2] = ent.i.origin[2];
+                    (*origin)[0] = ent.i.origin[0];
+                    (*origin)[1] = ent.i.origin[1];
+                    (*origin)[2] = ent.i.origin[2];
                     return native_types::qtrue as c_int;
                 } //end if
             } //end if
@@ -152,7 +150,7 @@ pub fn AAS_OriginOfMoverWithModelNum(bot: &mut BotLib, modelnum: c_int, origin: 
 /// Raven `AAS_EntitySize`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_entity.cpp:269-284`
-pub fn AAS_EntitySize(bot: &mut BotLib, entnum: c_int, mins: vec3_t, maxs: vec3_t) {
+pub fn AAS_EntitySize(bot: &mut BotLib, entnum: c_int, mins: *mut vec3_t, maxs: *mut vec3_t) {
     unsafe {
         if bot.aasworld.initialized == 0 {
             return;
@@ -168,14 +166,12 @@ pub fn AAS_EntitySize(bot: &mut BotLib, entnum: c_int, mins: vec3_t, maxs: vec3_
         } //end if
 
         let ent = &*bot.aasworld.entities.add(entnum as usize);
-        let mut mins = mins;
-        let mut maxs = maxs;
-        mins[0] = ent.i.mins[0];
-        mins[1] = ent.i.mins[1];
-        mins[2] = ent.i.mins[2];
-        maxs[0] = ent.i.maxs[0];
-        maxs[1] = ent.i.maxs[1];
-        maxs[2] = ent.i.maxs[2];
+        (*mins)[0] = ent.i.mins[0];
+        (*mins)[1] = ent.i.mins[1];
+        (*mins)[2] = ent.i.mins[2];
+        (*maxs)[0] = ent.i.maxs[0];
+        (*maxs)[1] = ent.i.maxs[1];
+        (*maxs)[2] = ent.i.maxs[2];
     }
 }
 
@@ -403,9 +399,9 @@ pub fn AAS_UpdateEntity(bot: &mut BotLib, entnum: c_int, state: *mut bot_entitys
                 bot,
                 ent.i.modelindex,
                 ent.i.angles,
-                ent.i.mins,
-                ent.i.maxs,
-                [0.0; 3],
+                &mut ent.i.mins,
+                &mut ent.i.maxs,
+                &mut [0.0; 3],
             );
         //end if
         } else if ent.i.solid == solid_t::SOLID_BBOX as c_int {

@@ -13,6 +13,7 @@ use mp_qshared::common::mp::botlib::botlib_error::{BLERR_CANNOTLOADICHAT, BLERR_
 use mp_qshared::common::mp::botlib::botlib_misc::BOTFILESBASEFOLDER;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::shared::limits::MAX_CLIENTS;
+use mp_qshared::shared::q_string::Q_strncpyz;
 
 use crate::be_ai_chat::bot_chat_s::bot_chat_t;
 use crate::be_ai_chat::bot_chatmessage_s::bot_chatmessage_t;
@@ -2868,15 +2869,15 @@ pub fn BotLoadChatFile(
             )
                 as *mut crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
             (*bot.ichatdata[avail as usize]).chat = (*cs).chat;
-            libc::strncpy(
+            Q_strncpyz(
                 (*bot.ichatdata[avail as usize]).chatname.as_mut_ptr(),
                 chatname,
-                core::mem::size_of_val(&(*bot.ichatdata[avail as usize]).chatname),
+                core::mem::size_of_val(&(*bot.ichatdata[avail as usize]).chatname) as c_int,
             );
-            libc::strncpy(
+            Q_strncpyz(
                 (*bot.ichatdata[avail as usize]).filename.as_mut_ptr(),
                 chatfile,
-                core::mem::size_of_val(&(*bot.ichatdata[avail as usize]).filename),
+                core::mem::size_of_val(&(*bot.ichatdata[avail as usize]).filename) as c_int,
             );
         }
     }

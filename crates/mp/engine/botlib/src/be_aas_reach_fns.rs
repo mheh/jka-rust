@@ -17,9 +17,6 @@
 //! (`CrossProduct`/`VectorLength`/`VectorNormalize`/`VectorInverse`/
 //! `AngleVectors`) are called through the (not-yet-wired) q_math surface — see
 //! missing_symbols.
-//! PORT-NOTE(out-vec): several resolved signatures take `vec3_t` out-params by
-//! value (§C mechanical). Raven writes through the array; bodies write into the
-//! `mut` copy. Reported in shape_mismatches — integration owns the seam shape.
 //! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers (`aasworld.*`);
 //! bodies deref explicitly inside `unsafe` per porting-rules §D11.
 
@@ -139,26 +136,26 @@ pub fn AAS_FaceArea(bot: &mut BotLib, face: *mut aas_face_t) -> f32 {
 /// Raven `AAS_FaceCenter` — centroid of an AAS face.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:547-565`
-pub fn AAS_FaceCenter(bot: &mut BotLib, facenum: c_int, mut center: vec3_t) {
+pub fn AAS_FaceCenter(bot: &mut BotLib, facenum: c_int, center: *mut vec3_t) {
     unsafe {
         let face: *mut aas_face_t = bot.aasworld.faces.add(facenum as usize);
 
-        center = [0.0; 3];
+        *center = [0.0; 3];
         let mut i = 0;
         while i < (*face).numedges {
             let edgeidx = *bot.aasworld.edgeindex.add(((*face).firstedge + i) as usize);
             let edge: *mut aas_edge_t = bot.aasworld.edges.add(edgeidx.unsigned_abs() as usize);
             let a = *bot.aasworld.vertexes.add((*edge).v[0] as usize);
             let b = *bot.aasworld.vertexes.add((*edge).v[1] as usize);
-            center = [
-                center[0] + a[0] + b[0],
-                center[1] + a[1] + b[1],
-                center[2] + a[2] + b[2],
+            *center = [
+                (*center)[0] + a[0] + b[0],
+                (*center)[1] + a[1] + b[1],
+                (*center)[2] + a[2] + b[2],
             ];
             i += 1;
         }
         let scale = 0.5 / (*face).numedges as f32;
-        center = [center[0] * scale, center[1] * scale, center[2] * scale];
+        *center = [(*center)[0] * scale, (*center)[1] * scale, (*center)[2] * scale];
     }
 }
 
@@ -340,14 +337,6 @@ pub fn VectorBetweenVectors(v: vec3_t, v1: vec3_t, v2: vec3_t) -> c_int {
     (dir1[0] * dir2[0] + dir1[1] * dir2[1] + dir1[2] * dir2[2] <= 0.0) as c_int
 }
 
-/// Raven `VectorMiddle`.
-///
-/// Source: `oracle/codemp/botlib/be_aas_reach.cpp:1622-1626`
-pub fn VectorMiddle(v1: vec3_t, v2: vec3_t, mut middle: vec3_t) {
-    middle = [v1[0] + v2[0], v1[1] + v2[1], v1[2] + v2[2]];
-    middle = [middle[0] * 0.5, middle[1] * 0.5, middle[2] * 0.5];
-}
-
 /// Raven `AAS_AreaVolume`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:128-161`
@@ -510,9 +499,6 @@ pub fn AAS_NearbySolidOrGap(bot: &mut BotLib, start: vec3_t, end: vec3_t) -> c_i
 
 /// Raven `AAS_ClosestEdgePoints` — shortest distance between two ground edges.
 ///
-/// PORT-NOTE(out-vec): `plane1`/`plane2` are read-only raw pointers; the
-/// `beststart*`/`bestend*` out-vectors are by-value per §C (Raven writes
-/// through). See shape_mismatches.
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:1814-2076`
 pub fn AAS_ClosestEdgePoints(
     v1: vec3_t,
@@ -521,10 +507,10 @@ pub fn AAS_ClosestEdgePoints(
     v4: vec3_t,
     plane1: *mut aas_plane_t,
     plane2: *mut aas_plane_t,
-    mut beststart1: vec3_t,
-    mut bestend1: vec3_t,
-    mut beststart2: vec3_t,
-    mut bestend2: vec3_t,
+    beststart1: *mut vec3_t,
+    bestend1: *mut vec3_t,
+    beststart2: *mut vec3_t,
+    bestend2: *mut vec3_t,
     mut bestdist: f32,
 ) -> f32 {
     unsafe {
@@ -624,120 +610,120 @@ pub fn AAS_ClosestEdgePoints(
         if VectorBetweenVectors(p1, v3, v4) != 0 {
             dist = VectorDistance(v1, p1);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(beststart1, v1);
-                dist2 = VectorDistance(beststart2, v1);
+                dist1 = VectorDistance(*beststart1, v1);
+                dist2 = VectorDistance(*beststart2, v1);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(beststart1, beststart2) {
-                        beststart2 = v1;
+                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                        *beststart2 = v1;
                     }
-                } else if dist2 > VectorDistance(beststart1, beststart2) {
-                    beststart1 = v1;
+                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                    *beststart1 = v1;
                 }
-                dist1 = VectorDistance(bestend1, p1);
-                dist2 = VectorDistance(bestend2, p1);
+                dist1 = VectorDistance(*bestend1, p1);
+                dist2 = VectorDistance(*bestend2, p1);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(bestend1, bestend2) {
-                        bestend2 = p1;
+                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                        *bestend2 = p1;
                     }
-                } else if dist2 > VectorDistance(bestend1, bestend2) {
-                    bestend1 = p1;
+                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                    *bestend1 = p1;
                 }
             } else if dist < bestdist {
                 bestdist = dist;
-                beststart1 = v1;
-                beststart2 = v1;
-                bestend1 = p1;
-                bestend2 = p1;
+                *beststart1 = v1;
+                *beststart2 = v1;
+                *bestend1 = p1;
+                *bestend2 = p1;
             }
             founddist = qtrue;
         }
         if VectorBetweenVectors(p2, v3, v4) != 0 {
             dist = VectorDistance(v2, p2);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(beststart1, v2);
-                dist2 = VectorDistance(beststart2, v2);
+                dist1 = VectorDistance(*beststart1, v2);
+                dist2 = VectorDistance(*beststart2, v2);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(beststart1, beststart2) {
-                        beststart2 = v2;
+                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                        *beststart2 = v2;
                     }
-                } else if dist2 > VectorDistance(beststart1, beststart2) {
-                    beststart1 = v2;
+                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                    *beststart1 = v2;
                 }
-                dist1 = VectorDistance(bestend1, p2);
-                dist2 = VectorDistance(bestend2, p2);
+                dist1 = VectorDistance(*bestend1, p2);
+                dist2 = VectorDistance(*bestend2, p2);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(bestend1, bestend2) {
-                        bestend2 = p2;
+                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                        *bestend2 = p2;
                     }
-                } else if dist2 > VectorDistance(bestend1, bestend2) {
-                    bestend1 = p2;
+                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                    *bestend1 = p2;
                 }
             } else if dist < bestdist {
                 bestdist = dist;
-                beststart1 = v2;
-                beststart2 = v2;
-                bestend1 = p2;
-                bestend2 = p2;
+                *beststart1 = v2;
+                *beststart2 = v2;
+                *bestend1 = p2;
+                *bestend2 = p2;
             }
             founddist = qtrue;
         }
         if VectorBetweenVectors(p3, v1, v2) != 0 {
             dist = VectorDistance(v3, p3);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(beststart1, p3);
-                dist2 = VectorDistance(beststart2, p3);
+                dist1 = VectorDistance(*beststart1, p3);
+                dist2 = VectorDistance(*beststart2, p3);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(beststart1, beststart2) {
-                        beststart2 = p3;
+                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                        *beststart2 = p3;
                     }
-                } else if dist2 > VectorDistance(beststart1, beststart2) {
-                    beststart1 = p3;
+                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                    *beststart1 = p3;
                 }
-                dist1 = VectorDistance(bestend1, v3);
-                dist2 = VectorDistance(bestend2, v3);
+                dist1 = VectorDistance(*bestend1, v3);
+                dist2 = VectorDistance(*bestend2, v3);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(bestend1, bestend2) {
-                        bestend2 = v3;
+                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                        *bestend2 = v3;
                     }
-                } else if dist2 > VectorDistance(bestend1, bestend2) {
-                    bestend1 = v3;
+                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                    *bestend1 = v3;
                 }
             } else if dist < bestdist {
                 bestdist = dist;
-                beststart1 = p3;
-                beststart2 = p3;
-                bestend1 = v3;
-                bestend2 = v3;
+                *beststart1 = p3;
+                *beststart2 = p3;
+                *bestend1 = v3;
+                *bestend2 = v3;
             }
             founddist = qtrue;
         }
         if VectorBetweenVectors(p4, v1, v2) != 0 {
             dist = VectorDistance(v4, p4);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(beststart1, p4);
-                dist2 = VectorDistance(beststart2, p4);
+                dist1 = VectorDistance(*beststart1, p4);
+                dist2 = VectorDistance(*beststart2, p4);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(beststart1, beststart2) {
-                        beststart2 = p4;
+                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                        *beststart2 = p4;
                     }
-                } else if dist2 > VectorDistance(beststart1, beststart2) {
-                    beststart1 = p4;
+                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                    *beststart1 = p4;
                 }
-                dist1 = VectorDistance(bestend1, v4);
-                dist2 = VectorDistance(bestend2, v4);
+                dist1 = VectorDistance(*bestend1, v4);
+                dist2 = VectorDistance(*bestend2, v4);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(bestend1, bestend2) {
-                        bestend2 = v4;
+                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                        *bestend2 = v4;
                     }
-                } else if dist2 > VectorDistance(bestend1, bestend2) {
-                    bestend1 = v4;
+                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                    *bestend1 = v4;
                 }
             } else if dist < bestdist {
                 bestdist = dist;
-                beststart1 = p4;
-                beststart2 = p4;
-                bestend1 = v4;
-                bestend2 = v4;
+                *beststart1 = p4;
+                *beststart2 = p4;
+                *bestend1 = v4;
+                *bestend2 = v4;
             }
             founddist = qtrue;
         }
@@ -747,34 +733,34 @@ pub fn AAS_ClosestEdgePoints(
             dist = VectorDistance(v1, v3);
             if dist < bestdist {
                 bestdist = dist;
-                beststart1 = v1;
-                beststart2 = v1;
-                bestend1 = v3;
-                bestend2 = v3;
+                *beststart1 = v1;
+                *beststart2 = v1;
+                *bestend1 = v3;
+                *bestend2 = v3;
             }
             dist = VectorDistance(v1, v4);
             if dist < bestdist {
                 bestdist = dist;
-                beststart1 = v1;
-                beststart2 = v1;
-                bestend1 = v4;
-                bestend2 = v4;
+                *beststart1 = v1;
+                *beststart2 = v1;
+                *bestend1 = v4;
+                *bestend2 = v4;
             }
             dist = VectorDistance(v2, v3);
             if dist < bestdist {
                 bestdist = dist;
-                beststart1 = v2;
-                beststart2 = v2;
-                bestend1 = v3;
-                bestend2 = v3;
+                *beststart1 = v2;
+                *beststart2 = v2;
+                *bestend1 = v3;
+                *bestend2 = v3;
             }
             dist = VectorDistance(v2, v4);
             if dist < bestdist {
                 bestdist = dist;
-                beststart1 = v2;
-                beststart2 = v2;
-                bestend1 = v4;
-                bestend2 = v4;
+                *beststart1 = v2;
+                *beststart2 = v2;
+                *bestend1 = v4;
+                *bestend2 = v4;
             }
         }
         bestdist
@@ -883,8 +869,8 @@ pub fn AAS_Reachability_Swim(bot: &mut BotLib, area1num: c_int, area2num: c_int)
                 .abs();
                 //
                 if face1num == face2num {
-                    let start: vec3_t = [0.0; 3];
-                    AAS_FaceCenter(bot, face1num, start);
+                    let mut start: vec3_t = [0.0; 3];
+                    AAS_FaceCenter(bot, face1num, &mut start);
                     //
                     if AAS_PointContents(bot, start)
                         & (CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_WATER)
@@ -1151,9 +1137,9 @@ pub fn AAS_FindFaceReachabilities(
         let mut hordist: f32;
         let mut dist: f32;
         let mut beststart: vec3_t = [0.0; 3];
-        let beststart2: vec3_t = [0.0; 3];
+        let mut beststart2: vec3_t = [0.0; 3];
         let mut bestend: vec3_t = [0.0; 3];
-        let bestend2: vec3_t = [0.0; 3];
+        let mut bestend2: vec3_t = [0.0; 3];
         let mut tmp: vec3_t;
         let mut hordir: vec3_t;
         let mut testpoint: vec3_t;
@@ -1196,8 +1182,8 @@ pub fn AAS_FindFaceReachabilities(
                         let v3 = *facepoints.add(l as usize);
                         let v4 = *facepoints.add(((l + 1) % numpoints) as usize);
                         dist = AAS_ClosestEdgePoints(
-                            v1, v2, v3, v4, faceplane, plane, beststart, bestend, beststart2,
-                            bestend2, bestdist,
+                            v1, v2, v3, v4, faceplane, plane, &mut beststart, &mut bestend, &mut beststart2,
+                            &mut bestend2, bestdist,
                         );
                         if dist < bestdist {
                             bestfacenum = facenum;
@@ -1382,10 +1368,10 @@ pub fn AAS_TravelFlagsForTeam(bot: &mut BotLib, ent: c_int) -> c_int {
 pub fn AAS_GetJumpPadInfo(
     bot: &mut BotLib,
     ent: c_int,
-    mut areastart: vec3_t,
-    mut absmins: vec3_t,
-    mut absmaxs: vec3_t,
-    mut velocity: vec3_t,
+    areastart: *mut vec3_t,
+    absmins: *mut vec3_t,
+    absmaxs: *mut vec3_t,
+    velocity: *mut vec3_t,
 ) -> c_int {
     unsafe {
         let modelnum: c_int;
@@ -1393,7 +1379,7 @@ pub fn AAS_GetJumpPadInfo(
         let mut origin: vec3_t = [0.0; 3];
         let angles: vec3_t;
         let mut teststart: vec3_t;
-        let ent2origin: vec3_t = [0.0; 3];
+        let mut ent2origin: vec3_t = [0.0; 3];
         let trace: aas_trace_t;
         let mut model: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut target: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
@@ -1418,21 +1404,21 @@ pub fn AAS_GetJumpPadInfo(
         } else {
             modelnum = 0;
         }
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, absmins, absmaxs, origin);
-        absmins = [
-            origin[0] + absmins[0],
-            origin[1] + absmins[1],
-            origin[2] + absmins[2],
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, absmins, absmaxs, &mut origin);
+        *absmins = [
+            origin[0] + (*absmins)[0],
+            origin[1] + (*absmins)[1],
+            origin[2] + (*absmins)[2],
         ];
-        absmaxs = [
-            origin[0] + absmaxs[0],
-            origin[1] + absmaxs[1],
-            origin[2] + absmaxs[2],
+        *absmaxs = [
+            origin[0] + (*absmaxs)[0],
+            origin[1] + (*absmaxs)[1],
+            origin[2] + (*absmaxs)[2],
         ];
         origin = [
-            absmins[0] + absmaxs[0],
-            absmins[1] + absmaxs[1],
-            absmins[2] + absmaxs[2],
+            (*absmins)[0] + (*absmaxs)[0],
+            (*absmins)[1] + (*absmaxs)[1],
+            (*absmins)[2] + (*absmaxs)[2],
         ];
         origin = [origin[0] * 0.5, origin[1] * 0.5, origin[2] * 0.5];
         //get the start areas
@@ -1444,11 +1430,11 @@ pub fn AAS_GetJumpPadInfo(
                 PRT_MESSAGE,
                 c"trigger_push start solid\n".as_ptr() as *mut c_char,
             );
-            areastart = origin;
+            *areastart = origin;
         } else {
-            areastart = trace.endpos;
+            *areastart = trace.endpos;
         }
-        areastart[2] += 0.125;
+        (*areastart)[2] += 0.125;
         //
         //get the target entity
         AAS_ValueForBSPEpairKey(
@@ -1484,7 +1470,7 @@ pub fn AAS_GetJumpPadInfo(
             );
             return qfalse;
         }
-        AAS_VectorForBSPEpairKey(bot, ent2, c"origin".as_ptr() as *mut c_char, ent2origin);
+        AAS_VectorForBSPEpairKey(bot, ent2, c"origin".as_ptr() as *mut c_char, &mut ent2origin);
         //
         let height = ent2origin[2] - origin[2];
         let gravity = bot.aassettings.phys_gravity;
@@ -1497,21 +1483,21 @@ pub fn AAS_GetJumpPadInfo(
             return qfalse;
         }
         // set s.origin2 to the push velocity
-        velocity = [
+        *velocity = [
             ent2origin[0] - origin[0],
             ent2origin[1] - origin[1],
             ent2origin[2] - origin[2],
         ];
-        let dist = VectorNormalize(&mut velocity);
+        let dist = VectorNormalize(&mut *velocity);
         let mut forward = dist / time;
         // Raven note: why multiply by 1.1
         forward *= 1.1;
-        velocity = [
-            velocity[0] * forward,
-            velocity[1] * forward,
-            velocity[2] * forward,
+        *velocity = [
+            (*velocity)[0] * forward,
+            (*velocity)[1] * forward,
+            (*velocity)[2] * forward,
         ];
-        velocity[2] = time * gravity;
+        (*velocity)[2] = time * gravity;
         qtrue
     }
 }
@@ -1524,7 +1510,7 @@ pub fn AAS_BestReachableArea(
     origin: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
-    mut goalorigin: vec3_t,
+    goalorigin: *mut vec3_t,
 ) -> c_int {
     unsafe {
         let mut areanum: c_int;
@@ -1573,7 +1559,7 @@ pub fn AAS_BestReachableArea(
             trace = AAS_TraceClientBBox(bot, start, end, PRESENCE_CROUCH, -1);
             if trace.startsolid == 0 {
                 areanum = AAS_PointAreaNum(bot, trace.endpos);
-                goalorigin = trace.endpos;
+                *goalorigin = trace.endpos;
                 // Raven note: cannot enable next line right now because the reachability
                 // does not have to be calculated when the level items are loaded
                 if areanum != 0 {
@@ -1583,14 +1569,14 @@ pub fn AAS_BestReachableArea(
                 //it can very well happen that the AAS_PointAreaNum function tells that
                 //a point is in an area and that starting a AAS_TraceClientBBox from that
                 //point will return trace.startsolid qtrue
-                goalorigin = start;
+                *goalorigin = start;
                 return areanum;
             }
         }
         //
         //NOTE: the goal origin does not have to be in the goal area
         // because the bot will have to move towards the item origin anyway
-        goalorigin = origin;
+        *goalorigin = origin;
         //
         let absmins: vec3_t = [
             origin[0] + mins[0],
@@ -1620,7 +1606,7 @@ pub fn AAS_SetWeaponJumpAreaFlags(bot: &mut BotLib) {
     unsafe {
         let mins: vec3_t = [-15.0, -15.0, -15.0];
         let maxs: vec3_t = [15.0, 15.0, 15.0];
-        let origin: vec3_t = [0.0; 3];
+        let mut origin: vec3_t = [0.0; 3];
         let mut areanum: c_int;
         let mut spawnflags: c_int;
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
@@ -1647,7 +1633,7 @@ pub fn AAS_SetWeaponJumpAreaFlags(bot: &mut BotLib) {
                 || strcmp(classname.as_ptr(), c"weapon_flechette".as_ptr()) == 0
                 || strcmp(classname.as_ptr(), c"weapon_rocket_launcher".as_ptr()) == 0
             {
-                if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, origin)
+                if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin)
                     != 0
                 {
                     spawnflags = 0;
@@ -1659,7 +1645,7 @@ pub fn AAS_SetWeaponJumpAreaFlags(bot: &mut BotLib) {
                     );
                     //if not a stationary item
                     if spawnflags & 1 == 0 {
-                        if AAS_DropToFloor(bot, origin, mins, maxs) == 0 {
+                        if AAS_DropToFloor(bot, &mut origin, mins, maxs) == 0 {
                             bot.botimport.Print.unwrap()(
                                 PRT_MESSAGE,
                                 c"%s in solid at (%1.1f %1.1f %1.1f)\n".as_ptr() as *mut c_char,
@@ -1670,7 +1656,7 @@ pub fn AAS_SetWeaponJumpAreaFlags(bot: &mut BotLib) {
                             );
                         }
                     }
-                    areanum = AAS_BestReachableArea(bot, origin, mins, maxs, origin);
+                    areanum = AAS_BestReachableArea(bot, origin, mins, maxs, &mut origin);
                     //the bot may rocket jump towards this area
                     (*bot.aasworld.areasettings.add(areanum as usize)).areaflags |= AREA_WEAPONJUMP;
                     //
@@ -2728,7 +2714,7 @@ pub fn AAS_Reachability_Elevator(bot: &mut BotLib) {
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
-        let origin: vec3_t = [0.0; 3];
+        let mut origin: vec3_t = [0.0; 3];
         let angles: vec3_t = [0.0, 0.0, 0.0];
         let mut pos1: vec3_t;
         let mut pos2: vec3_t;
@@ -2786,9 +2772,9 @@ pub fn AAS_Reachability_Elevator(bot: &mut BotLib) {
                     continue;
                 }
                 //get the mins, maxs and origin of the model
-                AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, origin);
+                AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut origin);
                 //
-                AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, origin);
+                AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin);
                 //pos1 is the top position, pos2 is the bottom
                 pos1 = origin;
                 pos2 = origin;
@@ -3114,11 +3100,11 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
                 continue;
             }
             //if the entity has an origin set then use it
-            if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, origin) == 0 {
+            if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin) == 0 {
                 origin = [0.0, 0.0, 0.0];
             }
             //
-            AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, [0.0, 0.0, 0.0]);
+            AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut [0.0, 0.0, 0.0]);
             //
             mins = [
                 mins[0] + origin[0],
@@ -3389,7 +3375,7 @@ pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_i
         let mut bsptrace: bsp_trace_t;
         let mut trace: aas_trace_t;
         let mut areastart: vec3_t = [0.0; 3];
-        let facecenter: vec3_t = [0.0; 3];
+        let mut facecenter: vec3_t = [0.0; 3];
         let mut start: vec3_t;
         let mut end: vec3_t;
         let mut dir: vec3_t;
@@ -3471,7 +3457,7 @@ pub fn AAS_Reachability_Grapple(bot: &mut BotLib, area1num: c_int, area2num: c_i
                 continue;
             }
             //get the center of the face
-            AAS_FaceCenter(bot, face2num, facecenter);
+            AAS_FaceCenter(bot, face2num, &mut facecenter);
             //only go higher up with the grapple
             if facecenter[2] < areastart[2] + 64.0 {
                 i += 1;
@@ -3936,11 +3922,11 @@ pub fn AAS_BestReachableFromJumpPadArea(
         let bot_visualizejumppads: c_int;
         let mut volume: f32;
         let mut bestareavolume: f32;
-        let areastart: vec3_t = [0.0; 3];
+        let mut areastart: vec3_t = [0.0; 3];
         let mut cmdmove: vec3_t;
-        let absmins: vec3_t = [0.0; 3];
-        let absmaxs: vec3_t = [0.0; 3];
-        let velocity: vec3_t = [0.0; 3];
+        let mut absmins: vec3_t = [0.0; 3];
+        let mut absmaxs: vec3_t = [0.0; 3];
+        let mut velocity: vec3_t = [0.0; 3];
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
 
@@ -3977,7 +3963,9 @@ pub fn AAS_BestReachableFromJumpPadArea(
                 continue;
             }
             //
-            if AAS_GetJumpPadInfo(bot, ent, areastart, absmins, absmaxs, velocity) == 0 {
+            if AAS_GetJumpPadInfo(bot, ent, &mut areastart, &mut absmins, &mut absmaxs, &mut velocity)
+                == 0
+            {
                 ent = AAS_NextBSPEntity(bot, ent);
                 continue;
             }
@@ -4069,9 +4057,9 @@ pub fn AAS_Reachability_Jump(bot: &mut BotLib, area1num: c_int, area2num: c_int)
         let mut bestdist: f32;
         let mut speed: f32 = 0.0;
         let mut beststart: vec3_t = [0.0; 3];
-        let beststart2: vec3_t = [0.0; 3];
+        let mut beststart2: vec3_t = [0.0; 3];
         let mut bestend: vec3_t = [0.0; 3];
-        let bestend2: vec3_t = [0.0; 3];
+        let mut bestend2: vec3_t = [0.0; 3];
         let mut teststart: vec3_t;
         let mut testend: vec3_t = [0.0; 3];
         let mut dir: vec3_t;
@@ -4173,8 +4161,8 @@ pub fn AAS_Reachability_Jump(bot: &mut BotLib, area1num: c_int, area2num: c_int)
                             bot.aasworld.planes.add((*face2).planenum as usize);
                         //
                         bestdist = AAS_ClosestEdgePoints(
-                            v1, v2, v3, v4, plane1, plane2, beststart, bestend, beststart2,
-                            bestend2, bestdist,
+                            v1, v2, v3, v4, plane1, plane2, &mut beststart, &mut bestend, &mut beststart2,
+                            &mut bestend2, bestdist,
                         );
                         l += 1;
                     }
@@ -4468,7 +4456,7 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut model: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
         let mut angle: f32 = 0.0;
-        let origin: vec3_t = [0.0; 3];
+        let mut origin: vec3_t = [0.0; 3];
         let mut destorigin: vec3_t = [0.0; 3];
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
@@ -4512,9 +4500,9 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
                     bot,
                     atoi(model.as_ptr().wrapping_add(1)),
                     angles,
-                    mins,
-                    maxs,
-                    origin,
+                    &mut mins,
+                    &mut maxs,
+                    &mut origin,
                 );
                 //
                 if AAS_ValueForBSPEpairKey(
@@ -4604,9 +4592,9 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
                     bot,
                     atoi(model.as_ptr().wrapping_add(1)),
                     angles,
-                    mins,
-                    maxs,
-                    origin,
+                    &mut mins,
+                    &mut maxs,
+                    &mut origin,
                 );
                 //
                 if AAS_ValueForBSPEpairKey(
@@ -4658,7 +4646,7 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
                 ent = AAS_NextBSPEntity(bot, ent);
                 continue;
             }
-            if AAS_VectorForBSPEpairKey(bot, dest, c"origin".as_ptr() as *mut c_char, destorigin)
+            if AAS_VectorForBSPEpairKey(bot, dest, c"origin".as_ptr() as *mut c_char, &mut destorigin)
                 == 0
             {
                 bot.botimport.Print.unwrap()(
@@ -4809,7 +4797,7 @@ pub fn AAS_Reachability_WeaponJump(bot: &mut BotLib, area1num: c_int, area2num: 
         let mut zvel: f32;
         let mut hordist: f32;
         let mut areastart: vec3_t = [0.0; 3];
-        let facecenter: vec3_t = [0.0; 3];
+        let mut facecenter: vec3_t = [0.0; 3];
         let start: vec3_t;
         let mut end: vec3_t;
         let mut dir: vec3_t;
@@ -4870,7 +4858,7 @@ pub fn AAS_Reachability_WeaponJump(bot: &mut BotLib, area1num: c_int, area2num: 
                 continue;
             }
             //get the center of the face
-            AAS_FaceCenter(bot, face2num, facecenter);
+            AAS_FaceCenter(bot, face2num, &mut facecenter);
             //only go higher up with weapon jumps
             if facecenter[2] < areastart[2] + 64.0 {
                 i += 1;
@@ -4979,12 +4967,12 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
         let mut speed: f32 = 0.0;
         let mut zvel: f32;
         let mut hordist: f32;
-        let facecenter: vec3_t = [0.0; 3];
+        let mut facecenter: vec3_t = [0.0; 3];
         let mut dir: vec3_t;
         let mut cmdmove: vec3_t;
         let mut velocity: vec3_t = [0.0; 3];
-        let absmins: vec3_t = [0.0; 3];
-        let absmaxs: vec3_t = [0.0; 3];
+        let mut absmins: vec3_t = [0.0; 3];
+        let mut absmaxs: vec3_t = [0.0; 3];
         let mut areastart: vec3_t = [0.0; 3];
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         let mut classname: [c_char; MAX_EPAIRKEY as usize] = [0; MAX_EPAIRKEY as usize];
@@ -5012,7 +5000,9 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
                 continue;
             }
             //
-            if AAS_GetJumpPadInfo(bot, ent, areastart, absmins, absmaxs, velocity) == 0 {
+            if AAS_GetJumpPadInfo(bot, ent, &mut areastart, &mut absmins, &mut absmaxs, &mut velocity)
+                == 0
+            {
                 ent = AAS_NextBSPEntity(bot, ent);
                 continue;
             }
@@ -5174,7 +5164,7 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
                         continue;
                     }
                     //get the center of the face
-                    AAS_FaceCenter(bot, face2num, facecenter);
+                    AAS_FaceCenter(bot, face2num, &mut facecenter);
                     //only go higher up
                     if facecenter[2] < areastart[2] {
                         i += 1;

@@ -159,7 +159,7 @@ pub fn BotAddToTarget(
     end: vec3_t,
     maxdist: f32,
     dist: *mut f32,
-    mut target: vec3_t,
+    target: *mut vec3_t,
 ) -> c_int {
     unsafe {
         let mut dir: vec3_t = [0.0; 3];
@@ -168,11 +168,11 @@ pub fn BotAddToTarget(
         _VectorSubtract(end, start, &mut dir);
         curdist = VectorNormalize(&mut dir);
         if *dist + curdist < maxdist {
-            _VectorCopy(end, &mut target);
+            _VectorCopy(end, &mut *target);
             *dist += curdist;
             qfalse
         } else {
-            _VectorMA(start, maxdist - *dist, dir, &mut target);
+            _VectorMA(start, maxdist - *dist, dir, &mut *target);
             *dist = maxdist;
             qtrue
         }
@@ -221,7 +221,7 @@ pub fn BotAirControl(
     origin: vec3_t,
     velocity: vec3_t,
     goal: vec3_t,
-    mut dir: vec3_t,
+    dir: *mut vec3_t,
     speed: *mut f32,
 ) -> c_int {
     unsafe {
@@ -239,8 +239,8 @@ pub fn BotAirControl(
             if vel[2] < 0.0 && org[2] + vel[2] < goal[2] {
                 _VectorScale(vel, (goal[2] - org[2]) / vel[2], &mut vel);
                 _VectorAdd(org, vel, &mut org);
-                _VectorSubtract(goal, org, &mut dir);
-                dist = VectorNormalize(&mut dir);
+                _VectorSubtract(goal, org, &mut *dir);
+                dist = VectorNormalize(&mut *dir);
                 if dist > 32.0 {
                     dist = 32.0;
                 }
@@ -251,7 +251,7 @@ pub fn BotAirControl(
             }
             i += 1;
         }
-        VectorSet(&mut dir, 0.0, 0.0, 0.0);
+        VectorSet(&mut *dir, 0.0, 0.0, 0.0);
         *speed = 400.0;
         qfalse
     }
@@ -380,9 +380,9 @@ pub fn BotOnMover(
 
         modelnum = (*reach).facenum & 0x0000FFFF;
         //get some bsp model info
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, [0.0; 3]);
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut [0.0; 3]);
         //
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, modelorigin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut modelorigin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"no entity with model %d\n".as_ptr() as *mut c_char,
@@ -438,9 +438,9 @@ pub fn MoverDown(bot: &mut BotLib, reach: *mut aas_reachability_t) -> c_int {
 
         modelnum = (*reach).facenum & 0x0000FFFF;
         //get some bsp model info
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, origin);
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut origin);
         //
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, origin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut origin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"no entity with model %d\n".as_ptr() as *mut c_char,
@@ -466,7 +466,7 @@ pub fn BotOnTopOfEntity(bot: &mut BotLib, ms: *mut bot_movestate_t) -> c_int {
         let up: vec3_t = [0.0, 0.0, 1.0];
         let trace: bsp_trace_t;
 
-        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, mins, maxs);
+        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
         _VectorMA((*ms).origin, -3.0, up, &mut end);
         trace = AAS_Trace(
             bot,
@@ -529,7 +529,7 @@ pub fn DistanceFromLineSquared(p: vec3_t, lp1: vec3_t, lp2: vec3_t) -> f32 {
     let mut dir: vec3_t = [0.0; 3];
     let mut j: usize;
 
-    AAS_ProjectPointOntoVector(p, lp1, lp2, proj);
+    AAS_ProjectPointOntoVector(p, lp1, lp2, &mut proj);
     j = 0;
     while j < 3 {
         if (proj[j] > lp1[j] && proj[j] > lp2[j]) || (proj[j] < lp1[j] && proj[j] < lp2[j]) {
@@ -610,7 +610,7 @@ pub fn BotVisible(bot: &mut BotLib, ent: c_int, eye: vec3_t, target: vec3_t) -> 
 pub fn MoverBottomCenter(
     bot: &mut BotLib,
     reach: *mut aas_reachability_t,
-    mut bottomcenter: vec3_t,
+    bottomcenter: *mut vec3_t,
 ) {
     unsafe {
         let modelnum: c_int;
@@ -622,9 +622,9 @@ pub fn MoverBottomCenter(
 
         modelnum = (*reach).facenum & 0x0000FFFF;
         //get some bsp model info
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, origin);
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut origin);
         //
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, origin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut origin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"no entity with model %d\n".as_ptr() as *mut c_char,
@@ -633,8 +633,8 @@ pub fn MoverBottomCenter(
         }
         //get a point just above the plat in the bottom position
         _VectorAdd(mins, maxs, &mut mids);
-        _VectorMA(origin, 0.5, mids, &mut bottomcenter);
-        bottomcenter[2] = (*reach).start[2];
+        _VectorMA(origin, 0.5, mids, &mut *bottomcenter);
+        (*bottomcenter)[2] = (*reach).start[2];
     }
 }
 
@@ -855,9 +855,9 @@ pub fn BotTravel_Ladder(
 pub fn BotFuncBobStartEnd(
     bot: &mut BotLib,
     reach: *mut aas_reachability_t,
-    mut start: vec3_t,
-    mut end: vec3_t,
-    mut origin: vec3_t,
+    start: *mut vec3_t,
+    end: *mut vec3_t,
+    origin: *mut vec3_t,
 ) {
     unsafe {
         let spawnflags: c_int;
@@ -870,21 +870,21 @@ pub fn BotFuncBobStartEnd(
         let mut num1: c_int;
 
         modelnum = (*reach).facenum & 0x0000FFFF;
-        if AAS_OriginOfMoverWithModelNum(bot, modelnum, origin) == 0 {
+        if AAS_OriginOfMoverWithModelNum(bot, modelnum, &mut *origin) == 0 {
             (bot.botimport.Print.unwrap())(
                 PRT_MESSAGE,
                 c"BotFuncBobStartEnd: no entity with model %d\n".as_ptr() as *mut c_char,
                 modelnum,
             );
-            VectorSet(&mut start, 0.0, 0.0, 0.0);
-            VectorSet(&mut end, 0.0, 0.0, 0.0);
+            VectorSet(&mut *start, 0.0, 0.0, 0.0);
+            VectorSet(&mut *end, 0.0, 0.0, 0.0);
             return;
         }
-        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, mins, maxs, [0.0; 3]);
+        AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut [0.0; 3]);
         _VectorAdd(mins, maxs, &mut mid);
         _VectorScale(mid, 0.5, &mut mid);
-        _VectorCopy(mid, &mut start);
-        _VectorCopy(mid, &mut end);
+        _VectorCopy(mid, &mut *start);
+        _VectorCopy(mid, &mut *end);
         spawnflags = (*reach).facenum >> 16;
         num0 = (*reach).edgenum >> 16;
         if num0 > 0x00007FFF {
@@ -895,26 +895,26 @@ pub fn BotFuncBobStartEnd(
             num1 |= 0xFFFF0000u32 as c_int;
         }
         if spawnflags & 1 != 0 {
-            start[0] = num0 as f32;
-            end[0] = num1 as f32;
+            (*start)[0] = num0 as f32;
+            (*end)[0] = num1 as f32;
             //
-            origin[0] += mid[0];
-            origin[1] = mid[1];
-            origin[2] = mid[2];
+            (*origin)[0] += mid[0];
+            (*origin)[1] = mid[1];
+            (*origin)[2] = mid[2];
         } else if spawnflags & 2 != 0 {
-            start[1] = num0 as f32;
-            end[1] = num1 as f32;
+            (*start)[1] = num0 as f32;
+            (*end)[1] = num1 as f32;
             //
-            origin[0] = mid[0];
-            origin[1] += mid[1];
-            origin[2] = mid[2];
+            (*origin)[0] = mid[0];
+            (*origin)[1] += mid[1];
+            (*origin)[2] = mid[2];
         } else {
-            start[2] = num0 as f32;
-            end[2] = num1 as f32;
+            (*start)[2] = num0 as f32;
+            (*end)[2] = num1 as f32;
             //
-            origin[0] = mid[0];
-            origin[1] = mid[1];
-            origin[2] += mid[2];
+            (*origin)[0] = mid[0];
+            (*origin)[1] = mid[1];
+            (*origin)[2] += mid[2];
         }
     }
 }
@@ -1074,7 +1074,7 @@ pub fn BotFinishTravel_WeaponJump(
             (*ms).origin,
             (*ms).velocity,
             (*reach).end,
-            hordir,
+            &mut hordir,
             &mut speed,
         ) == 0
         {
@@ -1486,7 +1486,7 @@ pub fn BotCheckBlocked(
         let mut trace: bsp_trace_t;
 
         //test for entities obstructing the bot's path
-        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, mins, maxs);
+        AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
         //
         if _DotProduct(dir, up).abs() < 0.7 {
             mins[2] += (*bot.sv_maxstep).value; //if the bot can step on
@@ -1510,7 +1510,7 @@ pub fn BotCheckBlocked(
         //if not in an area with reachability
         else if checkbottom != 0 && AAS_AreaReachability(bot, (*ms).areanum) == 0 {
             //check if the bot is standing on something
-            AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, mins, maxs);
+            AAS_PresenceTypeBoundingBox(bot, (*ms).presencetype, &mut mins, &mut maxs);
             _VectorMA((*ms).origin, -3.0, up, &mut end);
             trace = AAS_Trace(
                 bot,
@@ -1547,7 +1547,7 @@ pub fn BotFinishTravel_Elevator(
 
         BotClearMoveResult(&mut result);
         //
-        MoverBottomCenter(bot, reach, bottomcenter);
+        MoverBottomCenter(bot, reach, &mut bottomcenter);
         _VectorSubtract(bottomcenter, (*ms).origin, &mut bottomdir);
         //
         _VectorSubtract((*reach).end, (*ms).origin, &mut topdir);
@@ -1583,7 +1583,7 @@ pub fn BotFinishTravel_FuncBobbing(
 
         BotClearMoveResult(&mut result);
         //
-        BotFuncBobStartEnd(bot, reach, bob_start, bob_end, bob_origin);
+        BotFuncBobStartEnd(bot, reach, &mut bob_start, &mut bob_end, &mut bob_origin);
         //
         _VectorSubtract(bob_origin, bob_end, &mut dir);
         dist = VectorLength(dir);
@@ -1609,7 +1609,7 @@ pub fn BotFinishTravel_FuncBobbing(
                 result.flags |= MOVERESULT_SWIMVIEW;
             }
         } else {
-            MoverBottomCenter(bot, reach, bottomcenter);
+            MoverBottomCenter(bot, reach, &mut bottomcenter);
             _VectorSubtract(bottomcenter, (*ms).origin, &mut hordir);
             if (*ms).moveflags & MFL_SWIMMING == 0 {
                 hordir[2] = 0.0;
@@ -1908,7 +1908,7 @@ pub fn BotFinishTravel_WalkOffLedge(
             _VectorCopy((*reach).end, &mut end);
         }
         //
-        if BotAirControl(bot, (*ms).origin, (*ms).velocity, end, hordir, &mut speed) == 0 {
+        if BotAirControl(bot, (*ms).origin, (*ms).velocity, end, &mut hordir, &mut speed) == 0 {
             //go straight to the reachability end
             _VectorCopy(dir, &mut hordir);
             hordir[2] = 0.0;
@@ -2153,7 +2153,7 @@ pub fn BotFinishTravel_JumpPad(
             (*ms).origin,
             (*ms).velocity,
             (*reach).end,
-            hordir,
+            &mut hordir,
             &mut speed,
         ) == 0
         {
@@ -2300,7 +2300,7 @@ pub fn BotReachabilityArea(bot: &mut BotLib, origin: vec3_t, client: c_int) -> c
         let trace: aas_trace_t;
 
         //check if the bot is standing on something
-        AAS_PresenceTypeBoundingBox(bot, PRESENCE_CROUCH, mins, maxs);
+        AAS_PresenceTypeBoundingBox(bot, PRESENCE_CROUCH, &mut mins, &mut maxs);
         _VectorMA(origin, -3.0, up, &mut end);
         bsptrace = AAS_Trace(
             bot,
@@ -2577,7 +2577,7 @@ pub fn BotTravel_Elevator(
             }
             //if not really close to the center of the elevator
             else {
-                MoverBottomCenter(bot, reach, bottomcenter);
+                MoverBottomCenter(bot, reach, &mut bottomcenter);
                 _VectorSubtract(bottomcenter, (*ms).origin, &mut hordir);
                 hordir[2] = 0.0;
                 dist = VectorNormalize(&mut hordir);
@@ -2655,7 +2655,7 @@ pub fn BotTravel_Elevator(
                 return result;
             }
             //get direction and distance to elevator bottom center
-            MoverBottomCenter(bot, reach, bottomcenter);
+            MoverBottomCenter(bot, reach, &mut bottomcenter);
             _VectorSubtract(bottomcenter, (*ms).origin, &mut dir2);
             if (*ms).moveflags & MFL_SWIMMING == 0 {
                 dir2[2] = 0.0;
@@ -2718,7 +2718,7 @@ pub fn BotTravel_FuncBobbing(
 
         BotClearMoveResult(&mut result);
         //
-        BotFuncBobStartEnd(bot, reach, bob_start, bob_end, bob_origin);
+        BotFuncBobStartEnd(bot, reach, &mut bob_start, &mut bob_end, &mut bob_origin);
         //if standing ontop of the func_bobbing
         if BotOnMover(bot, (*ms).origin, (*ms).entitynum, reach) != 0 {
             //if near end point of reachability
@@ -2735,7 +2735,7 @@ pub fn BotTravel_FuncBobbing(
             }
             //if not really close to the center of the elevator
             else {
-                MoverBottomCenter(bot, reach, bottomcenter);
+                MoverBottomCenter(bot, reach, &mut bottomcenter);
                 _VectorSubtract(bottomcenter, (*ms).origin, &mut hordir);
                 hordir[2] = 0.0;
                 dist = VectorNormalize(&mut hordir);
@@ -2814,7 +2814,7 @@ pub fn BotTravel_FuncBobbing(
                 return result;
             }
             //get direction and distance to func_bob bottom center
-            MoverBottomCenter(bot, reach, bottomcenter);
+            MoverBottomCenter(bot, reach, &mut bottomcenter);
             _VectorSubtract(bottomcenter, (*ms).origin, &mut dir2);
             if (*ms).moveflags & MFL_SWIMMING == 0 {
                 dir2[2] = 0.0;
@@ -3063,7 +3063,7 @@ pub fn BotGetReachabilityToGoal(
                 t = AAS_AreaTravelTimeToGoalArea(
                     bot,
                     reach.areanum,
-                    reach.end,
+                    &reach.end,
                     (*goal).areanum,
                     travelflags,
                 );
@@ -3140,7 +3140,7 @@ pub fn BotTravel_Jump(
 
         BotClearMoveResult(&mut result);
         //
-        AAS_JumpReachRunStart(common, bot, reach, runstart);
+        AAS_JumpReachRunStart(common, bot, reach, &mut runstart);
         //
         hordir[0] = runstart[0] - (*reach).start[0];
         hordir[1] = runstart[1] - (*reach).start[1];
@@ -3211,7 +3211,7 @@ pub fn BotMovementViewTarget(
     goal: *mut bot_goal_t,
     travelflags: c_int,
     lookahead: f32,
-    mut target: vec3_t,
+    target: *mut vec3_t,
 ) -> c_int {
     unsafe {
         let mut reach: aas_reachability_t = core::mem::zeroed();
@@ -3296,7 +3296,7 @@ pub fn BotPredictVisiblePosition(
     mut areanum: c_int,
     goal: *mut bot_goal_t,
     travelflags: c_int,
-    mut target: vec3_t,
+    target: *mut vec3_t,
 ) -> c_int {
     unsafe {
         let mut reach: aas_reachability_t = core::mem::zeroed();
@@ -3356,17 +3356,17 @@ pub fn BotPredictVisiblePosition(
             AAS_ReachabilityFromNum(bot, reachnum, &mut reach);
             //
             if BotVisible(bot, (*goal).entitynum, (*goal).origin, reach.start) != 0 {
-                _VectorCopy(reach.start, &mut target);
+                _VectorCopy(reach.start, &mut *target);
                 return qtrue;
             }
             //
             if BotVisible(bot, (*goal).entitynum, (*goal).origin, reach.end) != 0 {
-                _VectorCopy(reach.end, &mut target);
+                _VectorCopy(reach.end, &mut *target);
                 return qtrue;
             }
             //
             if reach.areanum == (*goal).areanum {
-                _VectorCopy(reach.end, &mut target);
+                _VectorCopy(reach.end, &mut *target);
                 return qtrue;
             }
             //

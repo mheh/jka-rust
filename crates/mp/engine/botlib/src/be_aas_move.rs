@@ -106,57 +106,49 @@ use mp_engine_qcommon::common_fns::Com_Memset;
 // module-level `pub const`s) — not actually importable. Reported in
 // shape_mismatches; values transcribed inline from the same oracle cite in
 // the interim.
-// PORT-NOTE(shape-mismatch): `movedir` is a plain `vec3_t` (by value) per the
-// packet's mechanically-resolved signature, matching the `vec3_t`-out-param
-// convention already established by the ported `AAS_PresenceTypeBoundingBox`
-// (the write does not propagate to the caller as C's array decay would —
-// reported in shape_mismatches).
-pub fn AAS_SetMovedir(bot: &mut BotLib, angles: vec3_t, movedir: vec3_t) {
+pub fn AAS_SetMovedir(bot: &mut BotLib, angles: vec3_t, movedir: *mut vec3_t) {
     const VEC_UP: vec3_t = [0.0, -1.0, 0.0];
     const MOVEDIR_UP: vec3_t = [0.0, 0.0, 1.0];
     const VEC_DOWN: vec3_t = [0.0, -2.0, 0.0];
     const MOVEDIR_DOWN: vec3_t = [0.0, 0.0, -1.0];
 
-    let mut movedir = movedir;
-    if VectorCompare(angles, VEC_UP) != 0 {
-        VectorCopy(MOVEDIR_UP, &mut movedir);
-    } else if VectorCompare(angles, VEC_DOWN) != 0 {
-        VectorCopy(MOVEDIR_DOWN, &mut movedir);
-    } else {
-        AngleVectors(angles, Some(&mut movedir), None, None);
+    unsafe {
+        if VectorCompare(angles, VEC_UP) != 0 {
+            VectorCopy(MOVEDIR_UP, &mut *movedir);
+        } else if VectorCompare(angles, VEC_DOWN) != 0 {
+            VectorCopy(MOVEDIR_DOWN, &mut *movedir);
+        } else {
+            AngleVectors(angles, Some(&mut *movedir), None, None);
+        }
     }
-    let _ = movedir;
 }
 
 /// Raven `AAS_Accelerate`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_move.cpp:347-366`
 // q2 style
-// PORT-NOTE(shape-mismatch): `velocity` is plain `vec3_t` (by value) per the
-// packet's resolved signature (see `AAS_SetMovedir` note); the accelerate
-// write does not propagate to the caller in this shape.
 pub fn AAS_Accelerate(
-    velocity: vec3_t,
+    velocity: *mut vec3_t,
     frametime: f32,
     wishdir: vec3_t,
     wishspeed: f32,
     accel: f32,
 ) {
-    let mut velocity = velocity;
-    let currentspeed = DotProduct(velocity, wishdir);
-    let addspeed = wishspeed - currentspeed;
-    if addspeed <= 0.0 {
-        return;
-    }
-    let mut accelspeed = accel * frametime * wishspeed;
-    if accelspeed > addspeed {
-        accelspeed = addspeed;
-    }
+    unsafe {
+        let currentspeed = DotProduct(*velocity, wishdir);
+        let addspeed = wishspeed - currentspeed;
+        if addspeed <= 0.0 {
+            return;
+        }
+        let mut accelspeed = accel * frametime * wishspeed;
+        if accelspeed > addspeed {
+            accelspeed = addspeed;
+        }
 
-    for i in 0..3 {
-        velocity[i] += accelspeed * wishdir[i];
+        for i in 0..3 {
+            (*velocity)[i] += accelspeed * wishdir[i];
+        }
     }
-    let _ = velocity;
 }
 
 /// Raven `AAS_AirControl`.
@@ -170,24 +162,21 @@ pub fn AAS_AirControl(start: vec3_t, end: vec3_t, velocity: vec3_t, cmdmove: vec
 /// Raven `AAS_ApplyFriction`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_move.cpp:386-402`
-// PORT-NOTE(shape-mismatch): `vel` is plain `vec3_t` (by value) per the
-// packet's resolved signature (see `AAS_SetMovedir` note); the friction write
-// does not propagate to the caller in this shape.
-pub fn AAS_ApplyFriction(vel: vec3_t, friction: f32, stopspeed: f32, frametime: f32) {
-    let mut vel = vel;
-    // horizontal speed
-    let speed = (vel[0] * vel[0] + vel[1] * vel[1]).sqrt();
-    if speed != 0.0 {
-        let control = if speed < stopspeed { stopspeed } else { speed };
-        let mut newspeed = speed - frametime * control * friction;
-        if newspeed < 0.0 {
-            newspeed = 0.0;
+pub fn AAS_ApplyFriction(vel: *mut vec3_t, friction: f32, stopspeed: f32, frametime: f32) {
+    unsafe {
+        // horizontal speed
+        let speed = ((*vel)[0] * (*vel)[0] + (*vel)[1] * (*vel)[1]).sqrt();
+        if speed != 0.0 {
+            let control = if speed < stopspeed { stopspeed } else { speed };
+            let mut newspeed = speed - frametime * control * friction;
+            if newspeed < 0.0 {
+                newspeed = 0.0;
+            }
+            newspeed /= speed;
+            (*vel)[0] *= newspeed;
+            (*vel)[1] *= newspeed;
         }
-        newspeed /= speed;
-        vel[0] *= newspeed;
-        vel[1] *= newspeed;
     }
-    let _ = vel;
 }
 
 /// Raven `AAS_HorizontalVelocityForJump`.
@@ -239,21 +228,16 @@ pub fn AAS_HorizontalVelocityForJump(
 /// Raven `AAS_DropToFloor`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_move.cpp:39-50`
-// PORT-NOTE(shape-mismatch): `origin` is plain `vec3_t` (by value) per the
-// packet's resolved signature (see `AAS_SetMovedir` note); the drop-to-floor
-// write does not propagate to the caller in this shape.
-pub fn AAS_DropToFloor(bot: &mut BotLib, origin: vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
+pub fn AAS_DropToFloor(bot: &mut BotLib, origin: *mut vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
     unsafe {
-        let mut origin = origin;
         let mut end: vec3_t = [0.0; 3];
-        VectorCopy(origin, &mut end);
+        VectorCopy(*origin, &mut end);
         end[2] -= 100.0;
-        let trace = AAS_Trace(bot, origin, mins, maxs, end, 0, CONTENTS_SOLID);
+        let trace = AAS_Trace(bot, *origin, mins, maxs, end, 0, CONTENTS_SOLID);
         if trace.startsolid != 0 {
             return 0;
         }
-        VectorCopy(trace.endpos, &mut origin);
-        let _ = origin;
+        VectorCopy(trace.endpos, &mut *origin);
         1
     }
 }
@@ -410,17 +394,13 @@ pub fn AAS_ClipToBBox(
     maxs: vec3_t,
 ) -> c_int {
     unsafe {
-        let bboxmins: vec3_t = [0.0; 3];
-        let bboxmaxs: vec3_t = [0.0; 3];
-        // PORT-NOTE(shape-mismatch): `AAS_PresenceTypeBoundingBox` is already
-        // ported taking `mins`/`maxs` BY VALUE (not `&mut`) and never writes
-        // its result back to the caller (existing bug in the ported callee,
-        // reported in shape_mismatches) — called as-is per the LAW rule.
+        let mut bboxmins: vec3_t = [0.0; 3];
+        let mut bboxmaxs: vec3_t = [0.0; 3];
         crate::be_aas_sample_fns::AAS_PresenceTypeBoundingBox(
             bot,
             presencetype,
-            bboxmins,
-            bboxmaxs,
+            &mut bboxmins,
+            &mut bboxmaxs,
         );
         let mut absmins: vec3_t = [0.0; 3];
         let mut absmaxs: vec3_t = [0.0; 3];
@@ -699,7 +679,7 @@ pub fn AAS_ClientMovementPrediction(
                 };
                 // apply friction
                 VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
-                AAS_ApplyFriction(frame_test_vel, friction, phys_stopspeed, frametime);
+                AAS_ApplyFriction(&mut frame_test_vel, friction, phys_stopspeed, frametime);
                 VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
             }
             let mut crouch = 0;
@@ -737,7 +717,7 @@ pub fn AAS_ClientMovementPrediction(
                     wishspeed = maxvel;
                 }
                 VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
-                AAS_Accelerate(frame_test_vel, frametime, wishdir, wishspeed, accelerate);
+                AAS_Accelerate(&mut frame_test_vel, frametime, wishdir, wishspeed, accelerate);
                 VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
             }
             if crouch != 0 {
@@ -1217,17 +1197,13 @@ pub fn AAS_ClientMovementHitBBox(
 /// Raven `AAS_JumpReachRunStart`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_move.cpp:239-265`
-// PORT-NOTE(shape-mismatch): `runstart` is plain `vec3_t` (by value) per the
-// packet's resolved signature (see `AAS_SetMovedir` note); the write does not
-// propagate to the caller in this shape.
 pub fn AAS_JumpReachRunStart(
     common: &mut Common,
     bot: &mut BotLib,
     reach: *mut aas_reachability_t,
-    runstart: vec3_t,
+    runstart: *mut vec3_t,
 ) {
     let _ = common;
-    let mut runstart = runstart;
     unsafe {
         let mut hordir: vec3_t = [0.0; 3];
         hordir[0] = (*reach).start[0] - (*reach).end[0];
@@ -1259,12 +1235,11 @@ pub fn AAS_JumpReachRunStart(
             0,
             0,
         );
-        VectorCopy(r#move.endpos, &mut runstart);
+        VectorCopy(r#move.endpos, &mut *runstart);
         // don't enter slime or lava and don't fall from too high
         if r#move.stopevent & (SE_ENTERSLIME | SE_ENTERLAVA | SE_HITGROUNDDAMAGE) != 0 {
-            VectorCopy(start, &mut runstart);
+            VectorCopy(start, &mut *runstart);
         }
-        let _ = runstart;
     }
 }
 

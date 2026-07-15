@@ -812,7 +812,7 @@ pub fn AAS_ShowReachability(common: &mut Common, bot: &mut BotLib, reach: *mut a
             );
             //
             if traveltype == TRAVEL_JUMP {
-                crate::be_aas_move::AAS_JumpReachRunStart(common, bot, reach, dir);
+                crate::be_aas_move::AAS_JumpReachRunStart(common, bot, reach, &mut dir);
                 AAS_DrawCross(bot, dir, 4.0, LINECOLOR_BLUE);
             }
         } else if traveltype == TRAVEL_ROCKETJUMP {

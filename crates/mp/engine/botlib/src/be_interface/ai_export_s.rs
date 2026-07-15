@@ -224,7 +224,7 @@ pub struct ai_export_s {
             goal: *mut bot_goal_t,
             travelflags: c_int,
             lookahead: f32,
-            target: vec3_t,
+            target: *mut vec3_t,
         ) -> c_int,
     >,
     pub BotPredictVisiblePosition: Option<
@@ -234,7 +234,7 @@ pub struct ai_export_s {
             areanum: c_int,
             goal: *mut bot_goal_t,
             travelflags: c_int,
-            target: vec3_t,
+            target: *mut vec3_t,
         ) -> c_int,
     >,
     pub BotAllocMoveState: Option<fn(bot: &mut BotLib) -> c_int>,

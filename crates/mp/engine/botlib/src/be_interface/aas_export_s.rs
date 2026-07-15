@@ -28,7 +28,7 @@ pub struct aas_export_s {
     //-----------------------------------
     pub AAS_Initialized: Option<fn(bot: &mut BotLib) -> c_int>,
     pub AAS_PresenceTypeBoundingBox:
-        Option<fn(bot: &mut BotLib, presencetype: c_int, mins: vec3_t, maxs: vec3_t)>,
+        Option<fn(bot: &mut BotLib, presencetype: c_int, mins: *mut vec3_t, maxs: *mut vec3_t)>,
     pub AAS_Time: Option<fn(bot: &mut BotLib) -> f32>,
     //--------------------------------------------
     // be_aas_sample.c
@@ -71,7 +71,7 @@ pub struct aas_export_s {
         ) -> c_int,
     >,
     pub AAS_VectorForBSPEpairKey:
-        Option<fn(bot: &mut BotLib, ent: c_int, key: *mut c_char, v: vec3_t) -> c_int>,
+        Option<fn(bot: &mut BotLib, ent: c_int, key: *mut c_char, v: *mut vec3_t) -> c_int>,
     pub AAS_FloatForBSPEpairKey:
         Option<fn(bot: &mut BotLib, ent: c_int, key: *mut c_char, value: *mut f32) -> c_int>,
     pub AAS_IntForBSPEpairKey:
@@ -87,7 +87,7 @@ pub struct aas_export_s {
         fn(
             bot: &mut BotLib,
             areanum: c_int,
-            origin: vec3_t,
+            origin: *const vec3_t,
             goalareanum: c_int,
             travelflags: c_int,
         ) -> c_int,

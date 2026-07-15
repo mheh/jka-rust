@@ -32,10 +32,10 @@
 //!
 //! PORT-NOTE(unsafe): raw-pointer epair-list walks and `botimport` fn-ptr
 //! calls are confined in `unsafe` per porting-rules §D11, matching the
-//! sibling `be_aas_entity.rs`/`be_aas_cluster_fns.rs` convention. Out-param
-//! `vec3_t` values are shadowed with `let mut x = x;` before being written,
-//! matching the established `be_aas_entity.rs::AAS_EntityOrigin` convention
-//! (the resolved signature passes them by value, not by reference).
+//! sibling `be_aas_entity.rs`/`be_aas_cluster_fns.rs` convention. Input
+//! `vec3_t` args are shadowed with `let mut x = x;` only to hand a `&mut`
+//! to the `botimport` callbacks (whose fn-ptr type is `*mut vec3_t` though
+//! they read the arg); true out-params take `*mut vec3_t`.
 //!
 //! PORT-NOTE(callee-signatures): `ScriptError`/`FreeScript`/
 //! `GetClearedHunkMemory`/`GetHunkMemory`/`LoadScriptMemory`/
@@ -147,21 +147,18 @@ pub fn AAS_BSPModelMinsMaxsOrigin(
     bot: &mut BotLib,
     modelnum: c_int,
     angles: vec3_t,
-    mins: vec3_t,
-    maxs: vec3_t,
-    origin: vec3_t,
+    mins: *mut vec3_t,
+    maxs: *mut vec3_t,
+    origin: *mut vec3_t,
 ) {
     unsafe {
         let mut angles = angles;
-        let mut mins = mins;
-        let mut maxs = maxs;
-        let mut origin = origin;
         (bot.botimport.BSPModelMinsMaxsOrigin.unwrap())(
             modelnum,
             &mut angles,
-            &mut mins,
-            &mut maxs,
-            &mut origin,
+            mins,
+            maxs,
+            origin,
         );
     }
 }
@@ -338,15 +335,14 @@ pub fn AAS_VectorForBSPEpairKey(
     bot: &mut BotLib,
     ent: c_int,
     key: *mut c_char,
-    v: vec3_t,
+    v: *mut vec3_t,
 ) -> c_int {
     unsafe {
-        let mut v = v;
         let mut buf = [0 as c_char; MAX_EPAIRKEY as usize];
 
-        v[0] = 0.0;
-        v[1] = 0.0;
-        v[2] = 0.0;
+        (*v)[0] = 0.0;
+        (*v)[1] = 0.0;
+        (*v)[2] = 0.0;
         if AAS_ValueForBSPEpairKey(bot, ent, key, buf.as_mut_ptr(), MAX_EPAIRKEY) == 0 {
             return qfalse;
         }
@@ -359,9 +355,9 @@ pub fn AAS_VectorForBSPEpairKey(
             &mut v2,
             &mut v3,
         );
-        v[0] = v1 as f32;
-        v[1] = v2 as f32;
-        v[2] = v3 as f32;
+        (*v)[0] = v1 as f32;
+        (*v)[1] = v2 as f32;
+        (*v)[2] = v3 as f32;
         qtrue
     }
 }

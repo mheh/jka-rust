@@ -1817,8 +1817,8 @@ pub fn SV_GameSystemCalls(
             ((*sv.botlib_export).aas.AAS_PresenceTypeBoundingBox.unwrap())(
                 bot,
                 *args.offset(1) as c_int,
-                *(vma(view.common, args, 2) as *const vec3_t),
-                *(vma(view.common, args, 3) as *const vec3_t),
+                vma(view.common, args, 2) as *mut vec3_t,
+                vma(view.common, args, 3) as *mut vec3_t,
             );
             return 0;
         } else if trap == G::BOTLIB_AAS_TIME as isize {
@@ -1890,7 +1890,7 @@ pub fn SV_GameSystemCalls(
                 bot,
                 *args.offset(1) as c_int,
                 vma(view.common, args, 2) as *mut c_char,
-                *(vma(view.common, args, 3) as *const vec3_t),
+                vma(view.common, args, 3) as *mut vec3_t,
             ) as isize;
         } else if trap == G::BOTLIB_AAS_FLOAT_FOR_BSP_EPAIR_KEY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
@@ -1930,7 +1930,7 @@ pub fn SV_GameSystemCalls(
                 .unwrap())(
                 bot,
                 *args.offset(1) as c_int,
-                *(vma(view.common, args, 2) as *const vec3_t),
+                vma(view.common, args, 2) as *const vec3_t,
                 *args.offset(3) as c_int,
                 *args.offset(4) as c_int,
             ) as isize;
@@ -2817,7 +2817,8 @@ pub fn SV_GameSystemCalls(
                 vma(view.common, args, 2) as *mut bot_goal_t,
                 *args.offset(3) as c_int,
                 vmf(args, 4),
-                *(vma(view.common, args, 5) as *const vec3_t),
+                // oracle sv_game.cpp:1282 passes `(float *)VMA(5)` — out-param.
+                vma(view.common, args, 5) as *mut vec3_t,
             ) as isize;
         } else if trap == G::BOTLIB_AI_PREDICT_VISIBLE_POSITION as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
@@ -2829,7 +2830,8 @@ pub fn SV_GameSystemCalls(
                 *args.offset(2) as c_int,
                 vma(view.common, args, 3) as *mut bot_goal_t,
                 *args.offset(4) as c_int,
-                *(vma(view.common, args, 5) as *const vec3_t),
+                // oracle sv_game.cpp:1284 passes `(float *)VMA(5)` — out-param.
+                vma(view.common, args, 5) as *mut vec3_t,
             ) as isize;
         } else if trap == G::BOTLIB_AI_ALLOC_MOVE_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.

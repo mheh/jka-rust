@@ -563,11 +563,8 @@ pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) 
 ///
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:2049-2056`
 pub fn DistancePointToLine(v1: vec3_t, v2: vec3_t, point: vec3_t) -> f32 {
-    // PORT-NOTE(vProj): `AAS_ProjectPointOntoVector`'s resolved signature takes
-    // `vProj` by value (see its own PORT-NOTE), so it cannot write back through
-    // this call; matches the documented shape mismatch there.
-    let p2: vec3_t = [0.0, 0.0, 0.0];
-    crate::be_aas_main::AAS_ProjectPointOntoVector(point, v1, v2, p2);
+    let mut p2: vec3_t = [0.0, 0.0, 0.0];
+    crate::be_aas_main::AAS_ProjectPointOntoVector(point, v1, v2, &mut p2);
     let vec = [point[0] - p2[0], point[1] - p2[1], point[2] - p2[2]];
     (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt()
 }
@@ -1318,14 +1315,12 @@ pub fn AAS_NearestHideArea(
                         (*reach).start,
                     );
 
-                // PORT-NOTE(vProj): see `DistancePointToLine` above — the resolved
-                // signature cannot write back through this call.
-                let p: vec3_t = [0.0, 0.0, 0.0];
+                let mut p: vec3_t = [0.0, 0.0, 0.0];
                 crate::be_aas_main::AAS_ProjectPointOntoVector(
                     enemyorigin,
                     (*curupdate).start,
                     (*reach).end,
-                    p,
+                    &mut p,
                 );
                 let mut j = 0;
                 while j < 3 {
@@ -1887,7 +1882,7 @@ pub fn AAS_AreaRouteToGoalArea(
 pub fn AAS_AreaTravelTimeToGoalArea(
     bot: &mut BotLib,
     areanum: c_int,
-    origin: vec3_t,
+    origin: *const vec3_t,
     goalareanum: c_int,
     travelflags: c_int,
 ) -> c_int {
@@ -1896,7 +1891,7 @@ pub fn AAS_AreaTravelTimeToGoalArea(
     if AAS_AreaRouteToGoalArea(
         bot,
         areanum,
-        &origin,
+        origin,
         goalareanum,
         travelflags,
         &mut traveltime,
@@ -1960,7 +1955,7 @@ pub fn AAS_CreateAllRoutingCache(bot: &mut BotLib) {
                 let _t = AAS_AreaTravelTimeToGoalArea(
                     bot,
                     i,
-                    (*bot.aasworld.areas.add(i as usize)).center,
+                    &(*bot.aasworld.areas.add(i as usize)).center,
                     j,
                     TFL_DEFAULT,
                 );
@@ -2128,7 +2123,7 @@ pub fn AAS_RandomGoalArea(
                 let t = AAS_AreaTravelTimeToGoalArea(
                     bot,
                     areanum,
-                    (*bot.aasworld.areas.add(areanum as usize)).center,
+                    &(*bot.aasworld.areas.add(areanum as usize)).center,
                     n,
                     travelflags,
                 );

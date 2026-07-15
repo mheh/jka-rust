@@ -36,8 +36,6 @@ use crate::be_aas_cluster_fns::AAS_InitClustering;
 use crate::be_aas_entity::{
     AAS_InvalidateEntities, AAS_ResetEntityLinks, AAS_UnlinkInvalidEntities,
 };
-// UNRESOLVED (rule 5): AAS_LoadAASFile/AAS_WriteAASFile/AAS_DumpAASData are
-// genuinely unported; this is their canonical future home.
 use crate::be_aas_file_fns::{AAS_DumpAASData, AAS_LoadAASFile, AAS_WriteAASFile};
 use crate::be_aas_move::AAS_InitSettings;
 use crate::be_aas_optimize_fns::AAS_Optimize;
@@ -434,13 +432,7 @@ pub fn AAS_LoadMap(bot: &mut BotLib, mapname: *const c_char) -> c_int {
 /// Raven `AAS_ProjectPointOntoVector`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:277-286`
-///
-/// PORT-NOTE(vProj): the resolved signature carries `vProj: vec3_t` by value
-/// (the packet's mechanical `T*`-decay reading of Raven's `vec3_t` array
-/// param), so the write below lands only in this fn's local copy and does
-/// not propagate to the caller — see shape_mismatches; Raven's C array decay
-/// makes `vProj` a true out-param, which this signature cannot express.
-pub fn AAS_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vEnd: vec3_t, mut vProj: vec3_t) {
+pub fn AAS_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vEnd: vec3_t, vProj: *mut vec3_t) {
     let mut pVec = [0.0f32; 3];
     let mut vec = [0.0f32; 3];
 
@@ -448,14 +440,9 @@ pub fn AAS_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vEnd: vec3_t, m
     VectorSubtract(vEnd, vStart, &mut vec);
     mp_game::q_math::VectorNormalize(&mut vec);
     // project onto the directional vector for this segment
-    VectorMA(vStart, DotProduct(pVec, vec), vec, &mut vProj);
+    VectorMA(vStart, DotProduct(pVec, vec), vec, unsafe { &mut *vProj });
 }
 
-// PORT-NOTE(macros): Raven's vector `#define`s (`VectorSubtract`, `VectorMA`,
-// `DotProduct`) expand inline here, faithful to the preprocessor, matching
-// the sibling `be_aas_move.rs`/`be_aas_debug_fns.rs` convention. `vProj` is a
-// faithful out-param (`vec3_t` decays to a raw pointer at the ABI seam, so
-// the write lands in the caller's array).
 fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }

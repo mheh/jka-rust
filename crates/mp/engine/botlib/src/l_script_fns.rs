@@ -295,10 +295,9 @@ pub fn NumberValue(
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:768-802`
 ///
-/// PORT-NOTE(PUNCTABLE): Raven's `#ifdef PUNCTABLE` hashed-table lookup is
-/// dropped per porting-rules §C10 (control-flow behavior, not shape) — the
-/// linear `#else` scan over `script->punctuations[]` is transcribed, matching
-/// the `PUNCTABLE`-undefined build already assumed elsewhere in this file.
+/// PUNCTABLE is defined in the oracle build, but its first-char-bucketed
+/// lookup returns the same longest match as this linear scan over the
+/// length-ordered `script->punctuations[]`, so the scan is transcribed.
 pub fn PS_ReadPunctuation(script: *mut script_t, token: *mut token_t) -> c_int {
     unsafe {
         let mut i = 0isize;
