@@ -8822,30 +8822,36 @@ pub fn BG_G2ClientNeckAngles(
     }
 
     //split it up between the neck and cranium
+    // Raven's `0.4`/`0.1`/`0.6` are UNSUFFIXED double literals (the `0.5f` and
+    // neck `0.2f`/`0.3f` are floats): the thoracic/head expressions run in
+    // f64 and narrow once on store. f32-flattening here was a 1-ULP cranium
+    // divergence (lockstep t=10250 find, 2026-07-14).
     if thoracicAngles[PITCH] != 0.0 {
         //already been set above, blend them
-        thoracicAngles[PITCH] = (thoracicAngles[PITCH] + (lA[PITCH] * 0.4)) * 0.5;
+        thoracicAngles[PITCH] =
+            ((thoracicAngles[PITCH] as f64 + (lA[PITCH] as f64 * 0.4)) * 0.5) as f32;
     } else {
-        thoracicAngles[PITCH] = lA[PITCH] * 0.4;
+        thoracicAngles[PITCH] = (lA[PITCH] as f64 * 0.4) as f32;
     }
     if thoracicAngles[YAW] != 0.0 {
-        thoracicAngles[YAW] = (thoracicAngles[YAW] + (lA[YAW] * 0.1)) * 0.5;
+        thoracicAngles[YAW] = ((thoracicAngles[YAW] as f64 + (lA[YAW] as f64 * 0.1)) * 0.5) as f32;
     } else {
-        thoracicAngles[YAW] = lA[YAW] * 0.1;
+        thoracicAngles[YAW] = (lA[YAW] as f64 * 0.1) as f32;
     }
     if thoracicAngles[ROLL] != 0.0 {
-        thoracicAngles[ROLL] = (thoracicAngles[ROLL] + (lA[ROLL] * 0.1)) * 0.5;
+        thoracicAngles[ROLL] =
+            ((thoracicAngles[ROLL] as f64 + (lA[ROLL] as f64 * 0.1)) * 0.5) as f32;
     } else {
-        thoracicAngles[ROLL] = lA[ROLL] * 0.1;
+        thoracicAngles[ROLL] = (lA[ROLL] as f64 * 0.1) as f32;
     }
 
     neckAngles[PITCH] = lA[PITCH] * 0.2;
     neckAngles[YAW] = lA[YAW] * 0.3;
     neckAngles[ROLL] = lA[ROLL] * 0.3;
 
-    headAngles[PITCH] = lA[PITCH] * 0.4;
-    headAngles[YAW] = lA[YAW] * 0.6;
-    headAngles[ROLL] = lA[ROLL] * 0.6;
+    headAngles[PITCH] = (lA[PITCH] as f64 * 0.4) as f32;
+    headAngles[YAW] = (lA[YAW] as f64 * 0.6) as f32;
+    headAngles[ROLL] = (lA[ROLL] as f64 * 0.6) as f32;
 
     unsafe {
         strap_G2API_SetBoneAngles(
