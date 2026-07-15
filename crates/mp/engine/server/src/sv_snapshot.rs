@@ -88,6 +88,11 @@ pub fn SV_SendClientMessages(view: &mut EngineHostView, sv: &mut Server) {
                 continue; // not connected
             }
 
+            // A replay replica has no socket; skip its outbound send entirely.
+            if crate::sv_referee::ref_is_replica(sv, i) {
+                continue;
+            }
+
             if sv.svs.time < (*c).nextSnapshotTime {
                 continue; // not time yet
             }
@@ -187,6 +192,13 @@ pub fn SV_SendMessageToClient(
     client: *mut client_t,
 ) {
     unsafe {
+        // A replay replica has no socket; suppress every transmit to it.
+        let slot = (client as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+            / core::mem::size_of::<client_t>() as isize;
+        if crate::sv_referee::ref_is_replica(sv, slot as c_int) {
+            return;
+        }
+
         // MW - my attempt to fix illegible server message errors caused by
         // packet fragmentation of initial snapshot.
         while (*client).state as c_int != 0 && (*client).netchan.unsentFragments != 0 {
@@ -255,6 +267,13 @@ pub fn SV_SendMessageToClient(
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:719-798`
 pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
     unsafe {
+        // A replay replica has no socket; suppress its snapshot send.
+        let slot = (client as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+            / core::mem::size_of::<client_t>() as isize;
+        if crate::sv_referee::ref_is_replica(sv, slot as c_int) {
+            return;
+        }
+
         let mut msg_buf = [0u8; MAX_MSGLEN as usize];
         let mut msg: msg_t = core::mem::zeroed();
 

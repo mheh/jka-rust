@@ -1124,9 +1124,17 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
 /// Source: `oracle/codemp/server/sv_client.cpp:697-817`
 pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
     unsafe {
+        // A replay replica has no socket; the transmit primitive is skipped for
+        // it (the trailing SV_SendMessageToClient is gated the same way), while
+        // the CS_PRIMED state transition below still runs the human path.
+        let slot = ((client as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+            / core::mem::size_of::<client_t>() as isize) as c_int;
+        let replica = crate::sv_referee::ref_is_replica(sv, slot);
+
         // MW - my attempt to fix illegible server message errors caused by
         // packet fragmentation of initial snapshot.
-        while (*client).state != clientState_t::CS_FREE as clientState_t as _
+        while !replica
+            && (*client).state != clientState_t::CS_FREE as clientState_t as _
             && (*client).netchan.unsentFragments != qfalse
         {
             // send additional message fragments if the last message
