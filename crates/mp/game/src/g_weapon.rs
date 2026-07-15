@@ -5815,6 +5815,11 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
             );
         }
 
+        // C passes the live file-scope forward/vright/up arrays; re-copy after
+        // the AngleVectors branch above (the entry-time copies are stale).
+        let forward = ctx.world.globals.forward;
+        let vright = ctx.world.globals.vright;
+        let up = ctx.world.globals.up;
         CalcMuzzlePoint(ctx, ent_eid, forward, vright, up, muzzle_out);
 
         match (*ent).s.weapon {
