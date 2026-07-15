@@ -231,3 +231,24 @@ The existing six-scenario mock referee STAYS as the per-commit gate.
 - Verification pass B halted mid-measurement by this directive; its one
   complete pre-pin sample produced the MOD-histogram skew above.
 - Servers all stopped. Oracle dylib currently UNPATCHED for 64-bit vmMain.
+
+## Status (2026-07-15) — G7/G8 CLOSED, plan complete
+
+- **G7 done.** Six module fixes over the soak ladder (record 11,985 frames /
+  0 divergences), then the user redirected the hour-soak bar to a live
+  mirrored human session (2026-07-14, 23 minutes, 27,316 frames). That
+  session exposed three harness gaps (pending-event wipe `2158aba6`, ping as
+  tape input + replica timeout `d6902d8b`, replica NA_BOT mislabel + reliable
+  acks `23d7748a`/`93f88b0b`) and one module bug (`crandom()` double
+  semantics, `d6ef7674`). After the fixes the full tape replays with zero
+  module state divergences and call-for-call syscall parity at every client
+  lifecycle frame; the catch ledger
+  (`docs/audits/referee-catches-2026-07.md`) has an empty Open list.
+- **G8 done.** The held chain (42 commits) pushed 2026-07-15, CI fully green
+  (run 29388167811), rolling `latest` release published. The diagnostic taps
+  are permanent by ruling: env `G6DBG` → `REF_PROBES`, `probe!` macro,
+  descriptive tags byte-identical with the oracle `build.sh` patch blocks
+  (`ddbd6ddf`). Subsequent commits batch-push on request (CI-frequency
+  preference, 2026-07-14).
+- Forward plan lives in `docs/GOAL.md` (campaign step list): next is the
+  file-by-file translation-bug audit of `mp_game` before the pointer scrub.
