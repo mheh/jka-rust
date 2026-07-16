@@ -32,8 +32,8 @@ use mp_qshared::shared::q_string::{Q_stricmp, Q_strlen};
 /// Source: `oracle/codemp/game/bg_public.h:25`
 pub const GIB_HEALTH: c_int = -40;
 
-use mp_bg::public::fieldtype::fieldtype_t;
-use mp_bg::public::stat_index::statIndex_t;
+use crate::public::fieldtype::fieldtype_t;
+use crate::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::player_state::{MAX_POWERUPS, MAX_PS_EVENTS};
 
 // Raven angle-vector indices (`q_shared.h`): PITCH=0, YAW=1, ROLL=2. Local
@@ -1499,8 +1499,11 @@ pub fn BG_ValidateSkinForTeam(
 /// rounding mode.
 ///
 /// Source: `oracle/codemp/game/q_shared.h:1408-1427`
+// `pub` (widened from `pub(crate)` in the S5-6 crate move) so game-tier callers
+// (`g_items`/`g_missile`/`g_turret*`/`g_utils`/`g_weapon`) reach it across the
+// crate wall, as they did when `bg_misc` lived in `mp_game`.
 #[inline]
-pub(crate) fn snap_vector(v: &mut vec3_t) {
+pub fn snap_vector(v: &mut vec3_t) {
     v[0] = v[0].round_ties_even();
     v[1] = v[1].round_ties_even();
     v[2] = v[2].round_ties_even();

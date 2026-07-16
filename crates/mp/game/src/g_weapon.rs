@@ -5305,7 +5305,9 @@ pub fn WP_VehCheckTraceFromCamPos(
                 // game-tier caller builds both adapters from `ctx`.
                 let camTraceEntNum = crate::bg_pmove::BG_VehTraceFromCamPos(
                     &mut extraTrace,
-                    ent as *mut bgEntity_t,
+                    // S5-6 seam cast: the bg fn now takes `mp_bg`'s narrow
+                    // `bgEntity_t`; the game's `gentity_t` head is layout-identical.
+                    ent as *mut mp_bg::public::bg_entity::bgEntity_t,
                     (*ent).r.currentOrigin,
                     shotStart,
                     end,

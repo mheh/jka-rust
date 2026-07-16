@@ -14,7 +14,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use mp_bg::public::pmove_t::MAXTOUCH;
+use crate::public::pmove_t::MAXTOUCH;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -47,8 +47,8 @@ use crate::bg_panimate::{
     PM_InRollComplete, PM_InSaberAnim, PM_LandingAnim, PM_PainAnim, PM_SaberInStart,
 };
 use crate::bg_saber::BG_ForcePowerDrain;
-use mp_bg::public::anim_number::animNumber_t;
-use mp_bg::vehicles::MIN_LANDING_SLOPE;
+use crate::public::anim_number::animNumber_t;
+use crate::vehicles::MIN_LANDING_SLOPE;
 use mp_qshared::probe;
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
 use mp_qshared::shared::q_math::{CrossProduct, VectorLength};
@@ -59,7 +59,7 @@ use mp_qshared::shared::shared_eik_move_state::sharedEIKMoveState::{IKS_DYNAMIC,
 // pmove working set the skeletons parked on.
 use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
 // Vehicle-type discriminants for the `PM_Friction` vehicle-friction branch.
-use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
+use crate::vehicles::vehicle_type_t::vehicleType_t;
 
 // --- `bg_pmove.c` file-scope movement parameters (globals 41-55). These are
 // read-only tunables, so they stay module `const`s.
@@ -1345,7 +1345,7 @@ impl PmoveContext<'_> {
                 // we are a vehicle
                 let veh = self.pm_entSelf;
                 if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
-                    (*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_fTimeModifier =
+                    (*((*veh).m_pVehicle as *mut crate::vehicles::Vehicle_t)).m_fTimeModifier =
                         self.pml.frametime * 60.0;
                 }
             } else if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
@@ -1567,7 +1567,7 @@ impl PmoveContext<'_> {
                 if (*ps).clientNum >= MAX_CLIENTS as c_int
                     && !self.pm_entSelf.is_null()
                     && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
-                    && (*(*((*self.pm_entSelf).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t))
+                    && (*(*((*self.pm_entSelf).m_pVehicle as *mut crate::vehicles::Vehicle_t))
                         .m_pVehicleInfo)
                         .r#type as c_int
                         != VH_ANIMAL as c_int
@@ -1587,10 +1587,10 @@ impl PmoveContext<'_> {
 
                 if !veh.is_null()
                     && !(*veh).m_pVehicle.is_null()
-                    && ((*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo)
+                    && ((*(*((*veh).m_pVehicle as *mut crate::vehicles::Vehicle_t)).m_pVehicleInfo)
                         .r#type as c_int
                         == VH_WALKER as c_int
-                        || (*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t))
+                        || (*(*((*veh).m_pVehicle as *mut crate::vehicles::Vehicle_t))
                             .m_pVehicleInfo)
                             .r#type as c_int
                             == VH_FIGHTER as c_int)
@@ -1648,7 +1648,7 @@ impl PmoveContext<'_> {
             {
                 // we are a vehicle
                 let veh = self.pm_entSelf;
-                let pVeh = (*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+                let pVeh = (*veh).m_pVehicle as *mut crate::vehicles::Vehicle_t;
 
                 debug_assert!(
                     !veh.is_null()
@@ -2392,7 +2392,7 @@ impl PmoveContext<'_> {
 /// Raven `BG_ForceWallJumpStrength`.
 /// Source: `oracle/codemp/game/bg_pmove.c:1602-1605`
 pub fn BG_ForceWallJumpStrength() -> f32 {
-    mp_bg::local::forceJumpStrength[FORCE_LEVEL_3 as usize] / 2.5
+    crate::local::forceJumpStrength[FORCE_LEVEL_3 as usize] / 2.5
 }
 
 impl PmoveContext<'_> {
@@ -2594,8 +2594,8 @@ impl PmoveContext<'_> {
     /// Raven `PM_CheckJump`. `METROID_JUMP` is defined, so that block is compiled.
     /// Source: `oracle/codemp/game/bg_pmove.c:1788-2775`
     pub fn PM_CheckJump(&mut self) -> qboolean {
+        use crate::public::jump_velocity::JUMP_VELOCITY;
         use animNumber_t::*;
-        use mp_bg::public::jump_velocity::JUMP_VELOCITY;
         unsafe {
             let pm = self.pm;
             let ps = (*pm).ps;
@@ -10139,10 +10139,10 @@ impl PmoveContext<'_> {
         clientNum: c_int,
         tracemask: c_int,
     ) {
-        // `DEFAULT_MINS_2` canonical in `mp_bg::public::viewheight` (`c_int`,
+        // `DEFAULT_MINS_2` canonical in `crate::public::viewheight` (`c_int`,
         // cast here to match the `vec3_t` component it seeds).
         // Source: `oracle/codemp/game/bg_public.h:41`
-        const DEFAULT_MINS_2: f32 = mp_bg::public::viewheight::DEFAULT_MINS_2 as f32;
+        const DEFAULT_MINS_2: f32 = crate::public::viewheight::DEFAULT_MINS_2 as f32;
 
         unsafe {
             if veh.is_null() {

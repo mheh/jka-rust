@@ -40,9 +40,9 @@ use mp_qshared::shared::com_parse::COM_Parse;
 // Raven `#define MAX_ANIM_FILES 64`.
 // Source: `oracle/codemp/game/bg_public.h:255`
 pub const MAX_ANIM_FILES: c_int = 64;
-use mp_bg::public::anim_number::animNumber_t;
-use mp_bg::public::broken_limb::brokenLimb_t;
-use mp_bg::public::saber_move_name::{
+use crate::public::anim_number::animNumber_t;
+use crate::public::broken_limb::brokenLimb_t;
+use crate::public::saber_move_name::{
     LS_A1_SPECIAL, LS_A2_SPECIAL, LS_A3_SPECIAL, LS_A_BACK, LS_A_BACKFLIP_ATK, LS_A_BACKSTAB,
     LS_A_BACK_CR, LS_A_FLIP_SLASH, LS_A_FLIP_STAB, LS_A_JUMP_T__B_, LS_A_LUNGE, LS_A_T2B,
     LS_A_TL2BR, LS_B1_BL, LS_B1_BR, LS_B1_TL, LS_B1_TR, LS_B1_T_, LS_B1__L, LS_B1__R,
@@ -61,7 +61,7 @@ use mp_bg::public::saber_move_name::{
     LS_TAUNTAUN_ATTACK_RIGHT, LS_UPSIDE_DOWN_ATTACK, LS_V1_BL, LS_V1_BR, LS_V1_B_, LS_V1_TL,
     LS_V1_TR, LS_V1_T_, LS_V1__L, LS_V1__R,
 };
-use mp_bg::public::saber_quadrant::{Q_B, Q_BL, Q_BR, Q_L, Q_R, Q_T, Q_TL, Q_TR};
+use crate::public::saber_quadrant::{Q_B, Q_BL, Q_BR, Q_L, Q_R, Q_T, Q_TL, Q_TR};
 
 // Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
 // `qtrue`/`qfalse` spellings are not exported here (see `bg_saber.rs`), so the

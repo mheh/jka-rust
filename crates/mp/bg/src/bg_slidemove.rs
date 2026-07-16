@@ -17,7 +17,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use mp_bg::vehicles::MIN_LANDING_SLOPE;
+use crate::vehicles::MIN_LANDING_SLOPE;
 use mp_qshared::shared::q_math::{
     AngleNormalize180, AnglesSubtract, VectorLength, VectorNormalize2,
 };

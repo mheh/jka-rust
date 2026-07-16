@@ -15,16 +15,16 @@
 use core::ffi::{c_char, c_int};
 
 use crate::prelude::*;
-use crate::q_shared::QSharedScratch;
+use mp_qshared::shared::com_parse::QSharedScratch;
 
 use super::rng::Rng;
 use crate::bg_panimate::MAX_ANIM_FILES;
-use mp_bg::public::anim_number::animNumber_t;
-use mp_bg::public::bg_loaded_anim::bgLoadedAnim_t;
-use mp_bg::public::bg_loaded_events::bgLoadedEvents_t;
-use mp_bg::public::saber_move_data::saberMoveData_t;
-use mp_bg::public::saber_move_data_table::saberMoveData;
-use mp_bg::vehicles::vehicle_s::MAX_VEHICLES;
+use crate::public::anim_number::animNumber_t;
+use crate::public::bg_loaded_anim::bgLoadedAnim_t;
+use crate::public::bg_loaded_events::bgLoadedEvents_t;
+use crate::public::saber_move_data::saberMoveData_t;
+use crate::public::saber_move_data_table::saberMoveData;
+use crate::vehicles::vehicle_s::MAX_VEHICLES;
 use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 
 /// The bg tier's session-lifetime state, owned by `GameWorld`.

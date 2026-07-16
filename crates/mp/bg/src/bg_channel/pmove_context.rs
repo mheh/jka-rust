@@ -17,7 +17,7 @@ use super::bg_state::BgState;
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
 // `pml_t` (pmove-local scratch) is not in the game prelude; import it directly.
-use mp_bg::local::pml_t::pml_t;
+use crate::local::pml_t::pml_t;
 
 /// The pmove working set for one `Pmove` call plus the bg channel handles.
 ///

@@ -18,7 +18,7 @@
 //! Source: `oracle/codemp/game/bg_vehicleLoad.c:66-671`
 #![allow(non_upper_case_globals, non_snake_case)]
 
-use mp_bg::vehicles::{
+use crate::vehicles::{
     turretStats_t, vehFieldType_t, vehField_t, vehWeaponInfo_t, vehWeaponStats_t, vehicleInfo_t,
 };
 use mp_qshared::shared::string_id_table::stringID_table_t;

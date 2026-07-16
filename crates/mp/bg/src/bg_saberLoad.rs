@@ -20,11 +20,10 @@ use mp_qshared::shared::com_parse::{
     COM_BeginParseSession, COM_ParseExt, QSharedScratch, SkipBracedSection, SkipRestOfLine,
 };
 use mp_qshared::shared::q_string::{COM_Compress, GetIDForString, Q_strcat, Q_stricmp, Q_stricmpn};
-// BLOCKED (S5-5 step-3 pre-check): `COM_ParseString`/`Int`/`Float` still route
-// their "unexpected EOF" diagnostic through `crate::g_main::Com_Printf` (and
-// `Int`/`Float` also call `cstr_util::atoi`/`bg_lib::atof`), none reachable from
-// `mp_qshared`; they stay game-tier pending an orchestrator ruling.
-use crate::q_shared::{COM_ParseFloat, COM_ParseInt, COM_ParseString};
+// S5-6: `COM_ParseString`/`Int`/`Float` twins live in `crate::com_parse` (bg
+// tier); they route the "unexpected EOF" diagnostic through `traps.com_printf`
+// (the game copies in `mp_game::q_shared` stay untouched).
+use crate::com_parse::{COM_ParseFloat, COM_ParseInt, COM_ParseString};
 
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
@@ -34,7 +33,7 @@ use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t::*;
 // `SaberMoveTable`/`SaberTable` id spellings (LS_*/SABER_*) + the force-power
 // name table shared with `bg_saga`.
 use crate::bg_saga::FPTable;
-use mp_bg::public::saber_move_name::*;
+use crate::public::saber_move_name::*;
 
 /// Raven `SaberTable` — saber-type name/id lookup table.
 /// Source: `oracle/codemp/game/bg_saberLoad.c:46-61`
@@ -341,7 +340,7 @@ pub static SaberMoveTable: [stringID_table_t; 60] = [
 // PORT-NOTE(missing-symbol): `MAX_ANIMATIONS` is an `animNumber_t` enum
 // terminator (anims.h), not yet exposed as a bare const; referenced through
 // the enum per zero-park policy.
-use mp_bg::public::anim_number::animNumber_t;
+use crate::public::anim_number::animNumber_t;
 use mp_qshared::shared::limits::MAX_CLIENTS_I32;
 
 // Local helper: mirrors `!Q_stricmp(name, lit)` (Q_stricmp returns 0 on
@@ -1019,7 +1018,7 @@ pub fn WP_SaberParseParms(
             macro_rules! parse_string_field {
                 () => {{
                     let mut value: *const c_char = std::ptr::null();
-                    if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                         continue;
                     }
                     value
@@ -1027,7 +1026,7 @@ pub fn WP_SaberParseParms(
             }
             macro_rules! parse_int_field {
                 ($n:expr) => {{
-                    if COM_ParseInt(&mut bg.qs, &mut p, &mut $n) != qfalse {
+                    if COM_ParseInt(&mut bg.qs, &mut p, &mut $n, traps) != qfalse {
                         SkipRestOfLine(&mut bg.qs, &mut p);
                         continue;
                     }
@@ -1035,7 +1034,7 @@ pub fn WP_SaberParseParms(
             }
             macro_rules! parse_float_field {
                 ($f:expr) => {{
-                    if COM_ParseFloat(&mut bg.qs, &mut p, &mut $f) != qfalse {
+                    if COM_ParseFloat(&mut bg.qs, &mut p, &mut $f, traps) != qfalse {
                         SkipRestOfLine(&mut bg.qs, &mut p);
                         continue;
                     }
@@ -1798,7 +1797,7 @@ pub fn WP_SaberParseParms(
             // `trap_R_RegisterShader` call is CGAME-only dead code here (§20).
             if qstricmp_eq(tok, c"g2MarksShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                     SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
@@ -1807,7 +1806,7 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                     SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
@@ -1989,7 +1988,7 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2MarksShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                     SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
@@ -1998,7 +1997,7 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                     SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
@@ -2235,7 +2234,7 @@ pub fn WP_SaberParseParm(
 
             if Q_stricmp(token as *const c_char, parmname) == 0 {
                 let mut value: *const c_char = std::ptr::null();
-                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value, traps) != qfalse {
                     continue;
                 }
                 c_strcpy(saberData, value);

@@ -34,23 +34,23 @@ use crate::bg_pmove::{
     BG_InKnockDown, BG_InSlopeAnim, BG_KnockDownable, BG_SabersOff, PM_RunningAnim,
     PM_SwimmingAnim, PM_WalkingAnim,
 };
-use mp_bg::local::force_power_needed::forcePowerNeeded;
-use mp_bg::public::anim_number::animNumber_t;
-use mp_bg::public::anim_number::animNumber_t as A;
-use mp_bg::public::anim_number::SABER_ANIM_GROUP_SIZE;
-use mp_bg::public::parry_debounce_table::bg_parryDebounce;
-use mp_bg::public::saber_move_data_table::saberMoveData;
-use mp_bg::public::saber_move_name as ls;
-use mp_bg::public::saber_move_name::{
+use crate::local::force_power_needed::forcePowerNeeded;
+use crate::public::anim_number::animNumber_t;
+use crate::public::anim_number::animNumber_t as A;
+use crate::public::anim_number::SABER_ANIM_GROUP_SIZE;
+use crate::public::parry_debounce_table::bg_parryDebounce;
+use crate::public::saber_move_data_table::saberMoveData;
+use crate::public::saber_move_name as ls;
+use crate::public::saber_move_name::{
     LS_A_BL2TR, LS_A_BR2TL, LS_A_L2R, LS_A_R2L, LS_A_T2B, LS_A_TL2BR, LS_A_TR2BL, LS_B1_BL,
     LS_B1_BR, LS_D1_BL, LS_D1_BR, LS_H1_BL, LS_H1_BR, LS_H1_B_, LS_H1_TL, LS_H1_TR, LS_H1_T_,
     LS_NONE, LS_PARRY_LL, LS_PARRY_LR, LS_PARRY_UL, LS_PARRY_UP, LS_PARRY_UR, LS_READY, LS_V1_BL,
     LS_V1_BR, LS_V1_B_, LS_V1_TL, LS_V1_TR, LS_V1_T_, LS_V1__L, LS_V1__R,
 };
-use mp_bg::public::saber_move_transition_angle_table::saberMoveTransitionAngle;
-use mp_bg::public::saber_quadrant::saberQuadrant_t;
-use mp_bg::public::saberlock::SABERLOCK_WIN;
-use mp_bg::public::transition_move_table::transitionMove;
+use crate::public::saber_move_transition_angle_table::saberMoveTransitionAngle;
+use crate::public::saber_quadrant::saberQuadrant_t;
+use crate::public::saberlock::SABERLOCK_WIN;
+use crate::public::transition_move_table::transitionMove;
 use mp_qshared::shared::force_powers::{
     FP_GRIP, FP_LEVITATION, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE,
 };
