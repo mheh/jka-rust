@@ -56,41 +56,43 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
     // Source: `oracle/codemp/game/b_local.h:164`
     const ALERT_CLEAR_TIME: c_int = 200;
 
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        ctx.world.globals.ucmd = usercmd_t::default();
-        // STAGE-2b: irreducible — raw &ucmd alias into ctx.world handed alongside
-        // ctx to the raw-ABI ClientThink.
-        let ucmd_ptr = &raw mut ctx.world.globals.ucmd;
-        crate::g_active::ClientThink(ctx, (*self_).s.number, ucmd_ptr);
+    ctx.world.globals.ucmd = usercmd_t::default();
+    // STAGE-2b: irreducible — raw &ucmd alias into ctx.world handed alongside
+    // ctx to the raw-ABI ClientThink.
+    let ucmd_ptr = &raw mut ctx.world.globals.ucmd;
+    let self_num = ctx.world.entity(self_).s.number;
+    crate::g_active::ClientThink(ctx, self_num, ucmd_ptr);
 
-        // §19: oracle derefs `self->client` (NPC_class, ps, respawnTime, …)
-        // unconditionally throughout; the `!client.is_null()` guards below are
-        // defensive. Source: oracle/codemp/game/NPC.c:54-103
-        let client = (*self_).client;
+    // FLAG: NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) — not a
+    // `level.clients` slot; pointer read via the safe entity borrow, dereffed
+    // raw exactly as Raven does (recipe 2b).
+    // §19: oracle derefs `self->client` (NPC_class, ps, respawnTime, …)
+    // unconditionally throughout; the `!client.is_null()` guards below are
+    // defensive. Source: oracle/codemp/game/NPC.c:54-103
+    let client = ctx.world.entity(self_).client;
+    unsafe {
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
-            let self_id = ctx.entity_id_of(self_).unwrap();
-            crate::NPC_AI_GalakMech::GM_Dying(ctx, self_id);
+            crate::NPC_AI_GalakMech::GM_Dying(ctx, self_);
         }
 
         //FIXME: match my pitch and roll for the slope of my groundPlane
         if (*client).ps.groundEntityNum != ENTITYNUM_NONE
-            && ((*self_).s.eFlags & EF_DISINTEGRATION) == 0
+            && (ctx.world.entity(self_).s.eFlags & EF_DISINTEGRATION) == 0
         {
-            let self_id = ctx.entity_id_of(self_).unwrap();
             //on the ground
             //FIXME: check 4 corners
-            pitch_roll_for_slope(ctx, self_id, None);
+            pitch_roll_for_slope(ctx, self_, None);
         }
 
         if ctx.world.globals.eventClearTime == ctx.world.level.time + ALERT_CLEAR_TIME {
             //events were just cleared out so add me again
             if !client.is_null() && ((*client).ps.eFlags & EF_NODRAW) == 0 {
+                let enemy = ctx.world.entity(self_).enemy;
+                let origin = ctx.world.entity(self_).r.currentOrigin;
                 crate::NPC_senses::AddSightEvent(
                     ctx,
-                    (*self_).enemy,
-                    (*self_).r.currentOrigin,
+                    enemy,
+                    origin,
                     384.0,
                     alertEventLevel_e::AEL_DISCOVERED,
                     0.0,
@@ -98,7 +100,7 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
             }
         }
 
-        if ctx.world.level.time - (*self_).s.time > 3000 {
+        if ctx.world.level.time - ctx.world.entity(self_).s.time > 3000 {
             //been dead for 3 seconds
             if ctx.world.cvars.g_dismember.integer < 11381138
                 && ctx.world.cvars.g_saberRealisticCombat.integer == 0
@@ -114,18 +116,18 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
         if !client.is_null() && (*client).respawnTime < ctx.world.level.time + 500 {
             //don't turn "nonsolid" until about 1 second after actual death
             if !client.is_null() && ((*client).ps.eFlags & EF_DISINTEGRATION) != 0 {
-                (*self_).r.contents = 0;
+                ctx.world.entity_mut(self_).r.contents = 0;
             } else if !client.is_null()
                 && (*client).NPC_class != class_t::CLASS_MARK1
                 && (*client).NPC_class != class_t::CLASS_INTERROGATOR
             {
                 // The Mark1 & Interrogator stays solid.
-                (*self_).r.contents = CONTENTS_CORPSE;
+                ctx.world.entity_mut(self_).r.contents = CONTENTS_CORPSE;
                 //self->r.maxs[2] = -8;
             }
 
-            if !(*self_).message.is_null() {
-                (*self_).r.contents |= CONTENTS_TRIGGER;
+            if !ctx.world.entity(self_).message.is_null() {
+                ctx.world.entity_mut(self_).r.contents |= CONTENTS_TRIGGER;
             }
         }
     }
@@ -143,39 +145,40 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
     // through the prelude glob — imported explicitly below.
     use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
 
+    CorpsePhysics(ctx, self_);
+
+    ctx.world.entity_mut(self_).nextthink = ctx.world.level.time + FRAMETIME;
+
+    // FLAG: gNPC_t (NPCInfo) and NPC pool `gclient_t` have no accessor; the
+    // pointers are read via the safe entity borrow and dereffed raw exactly as
+    // Raven does (recipe 2b/2c).
+    // §19: oracle derefs `self->NPC` and `self->client` unconditionally
+    // throughout; the `!npc.is_null()`/`!client.is_null()` guards below are
+    // defensive. Source: oracle/codemp/game/NPC.c:115-223
+    let npc = ctx.world.entity(self_).NPC;
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        CorpsePhysics(ctx, ctx.entity_id_of(self_).unwrap());
-
-        (*self_).nextthink = ctx.world.level.time + FRAMETIME;
-
-        // §19: oracle derefs `self->NPC` and `self->client` unconditionally
-        // throughout; the `!npc.is_null()`/`!client.is_null()` guards below are
-        // defensive. Source: oracle/codemp/game/NPC.c:115-223
-        let npc = (*self_).NPC;
         if !npc.is_null() && (*npc).nextBStateThink <= ctx.world.level.time {
+            let self_num = ctx.world.entity(self_).s.number;
             trap::ICARUS_MaintainTaskManager(
                 ctx.engine,
-                mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+                mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new(self_num),
             );
         }
         if !npc.is_null() {
             (*npc).nextBStateThink = ctx.world.level.time + FRAMETIME;
         }
 
-        if !(*self_).message.is_null() {
+        if !ctx.world.entity(self_).message.is_null() {
             //I still have a key
             return;
         }
 
-        let client = (*self_).client;
+        let client = ctx.world.entity(self_).client;
 
         // I don't consider this a hack, it's creative coding . . .
         // I agree, very creative... need something like this for ATST and GALAKMECH too!
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_MARK1 {
-            let self_id = ctx.entity_id_of(self_);
-            crate::NPC_AI_Mark1::Mark1_dying(ctx, self_id);
+            crate::NPC_AI_Mark1::Mark1_dying(ctx, Some(self_));
         }
 
         // Since these blow up, remove the bounding box.
@@ -187,28 +190,23 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
                 || (*client).NPC_class == class_t::CLASS_MARK2)
         {
             //if ( !self->taskManager || !self->taskManager->IsRunning() )
+            let self_num = ctx.world.entity(self_).s.number;
             if trap::ICARUS_IsRunning(
                 ctx.engine,
-                mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(
-                    (*self_).s.number,
-                ),
+                mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(self_num),
             ) == 0
             {
-                let activator = match (*self_).activator {
-                    Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
+                let activator_id = ctx.world.entity(self_).activator;
+                let activator_client = match activator_id {
+                    Some(id) => ctx.world.entity(id).client,
                     None => core::ptr::null_mut(),
                 };
-                let activator_client = if activator.is_null() {
-                    core::ptr::null_mut()
-                } else {
-                    (*activator).client
-                };
-                if activator.is_null()
+                if activator_id.is_none()
                     || activator_client.is_null()
                     || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                 {
                     //not being held by a Rancor
-                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(self_));
+                    crate::g_utils::G_FreeEntity(ctx, Some(self_));
                 }
             }
             return;
@@ -216,11 +214,12 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
 
         //FIXME: don't ever inflate back up?
         if !client.is_null() {
-            (*self_).r.maxs[2] =
-                (*client).renderInfo.eyePoint[2] - (*self_).r.currentOrigin[2] + 4.0;
+            let eye_z = (*client).renderInfo.eyePoint[2];
+            let origin_z = ctx.world.entity(self_).r.currentOrigin[2];
+            ctx.world.entity_mut(self_).r.maxs[2] = eye_z - origin_z + 4.0;
         }
-        if (*self_).r.maxs[2] < -8.0 {
-            (*self_).r.maxs[2] = -8.0;
+        if ctx.world.entity(self_).r.maxs[2] < -8.0 {
+            ctx.world.entity_mut(self_).r.maxs[2] = -8.0;
         }
 
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
@@ -235,8 +234,9 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
                 && ((*client).playerTeam == crate::teams::npcteam::NPCTEAM_ENEMY
                     || (*client).NPC_class == class_t::CLASS_PROTOCOL)
             {
-                (*self_).nextthink = ctx.world.level.time + FRAMETIME; // try back in a second
-                                                                       //Don't care about this for MP I guess.
+                ctx.world.entity_mut(self_).nextthink = ctx.world.level.time + FRAMETIME;
+                // try back in a second
+                //Don't care about this for MP I guess.
             }
 
             //FIXME: there are some conditions - such as heavy combat - in which we want
@@ -245,25 +245,20 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
             //			placed as dead NPCs by a designer...
             //			For now we just assume that a corpse with no enemy was
             //			placed in the map as a corpse
-            if !(*self_).enemy.is_none() {
+            if !ctx.world.entity(self_).enemy.is_none() {
                 //if ( !self->taskManager || !self->taskManager->IsRunning() )
+                let self_num = ctx.world.entity(self_).s.number;
                 if trap::ICARUS_IsRunning(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(
-                        (*self_).s.number,
-                    ),
+                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(self_num),
                 ) == 0
                 {
-                    let activator = match (*self_).activator {
-                        Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
+                    let activator_id = ctx.world.entity(self_).activator;
+                    let activator_client = match activator_id {
+                        Some(id) => ctx.world.entity(id).client,
                         None => core::ptr::null_mut(),
                     };
-                    let activator_client = if activator.is_null() {
-                        core::ptr::null_mut()
-                    } else {
-                        (*activator).client
-                    };
-                    if activator.is_null()
+                    if activator_id.is_none()
                         || activator_client.is_null()
                         || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                     {
@@ -272,14 +267,10 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
                             && (*client).ps.saberEntityNum > 0
                             && (*client).ps.saberEntityNum < ENTITYNUM_WORLD
                         {
-                            let saberent = ctx
-                                .world
-                                .g_entities
-                                .as_mut_ptr()
-                                .add((*client).ps.saberEntityNum as usize);
-                            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(saberent));
+                            let saber_id = EntityId::from_num((*client).ps.saberEntityNum);
+                            crate::g_utils::G_FreeEntity(ctx, saber_id);
                         }
-                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(self_));
+                        crate::g_utils::G_FreeEntity(ctx, Some(self_));
                     }
                 }
             }
@@ -295,11 +286,12 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
 pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
     // Ctx-free leaf takes `&gentity_t`; the `ent.is_null()` guard is vacuous
     // behind a reference (dropped); the `client` null guard is preserved.
+    // FLAG: NPC pool `gclient_t` has no accessor; deref stays raw (recipe 2b).
+    let client = ent.client;
+    if client.is_null() {
+        return 0;
+    }
     unsafe {
-        let client = (*ent).client;
-        if client.is_null() {
-            return 0;
-        }
         match (*client).NPC_class {
             class_t::CLASS_MOUSE
             | class_t::CLASS_GONK
@@ -325,19 +317,20 @@ pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/NPC.c:323-378`
 pub fn NPC_RemoveBodyEffect(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        if npc.is_null() {
-            return;
-        }
-        let client = (*npc).client;
-        if client.is_null() || ((*npc).s.eFlags & EF_NODRAW) != 0 {
-            return;
-        }
-        // Raven: the per-class droid/species branches below are `stub code` —
-        // every arm is commented-out upstream (dead debug-effect scaffolding);
-        // the switch itself has no live behavior beyond the guard above.
+    let npc = ctx.world.globals.NPC;
+    if npc.is_null() {
+        return;
     }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC pool `gclient_t` has no accessor; pointer read via the safe
+    // entity borrow (only null-checked here, never dereffed) (recipe 2b).
+    let client = ctx.world.entity(npc_id).client;
+    if client.is_null() || (ctx.world.entity(npc_id).s.eFlags & EF_NODRAW) != 0 {
+        return;
+    }
+    // Raven: the per-class droid/species branches below are `stub code` —
+    // every arm is commented-out upstream (dead debug-effect scaffolding);
+    // the switch itself has no live behavior beyond the guard above.
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Trace`/
@@ -357,13 +350,14 @@ pub fn pitch_roll_for_slope(
 ) {
     // `PITCH`/`ROLL` resolve to the canonical `crate::q_math` consts via the prelude.
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let forwhom: *mut gentity_t = ctx.entity_mut(forwhom);
+        let currentOrigin = ctx.world.entity(forwhom).r.currentOrigin;
+        let mins = ctx.world.entity(forwhom).r.mins;
+        let number = ctx.world.entity(forwhom).s.number;
         // if we don't have a slope, get one
         let slope: vec3_t = match pass_slope {
             None => {
-                let mut startspot = (*forwhom).r.currentOrigin;
-                startspot[2] += (*forwhom).r.mins[2] + 4.0;
+                let mut startspot = currentOrigin;
+                startspot[2] += mins[2] + 4.0;
                 let mut endspot = startspot;
                 endspot[2] -= 300.0;
 
@@ -372,11 +366,11 @@ pub fn pitch_roll_for_slope(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                         &mut trace as *mut trace_t,
-                        &(*forwhom).r.currentOrigin as *const vec3_t,
+                        &currentOrigin as *const vec3_t,
                         core::ptr::null(),
                         core::ptr::null(),
                         &endspot as *const vec3_t,
-                        (*forwhom).s.number,
+                        number,
                         MASK_SOLID,
                     ),
                 );
@@ -396,8 +390,8 @@ pub fn pitch_roll_for_slope(
                 if *p == VEC3_ORIGIN {
                     // Raven falls through the `!pass_slope` branch (retracing) when
                     // an all-zero slope is explicitly passed too.
-                    let mut startspot = (*forwhom).r.currentOrigin;
-                    startspot[2] += (*forwhom).r.mins[2] + 4.0;
+                    let mut startspot = currentOrigin;
+                    startspot[2] += mins[2] + 4.0;
                     let mut endspot = startspot;
                     endspot[2] -= 300.0;
                     let mut trace: trace_t = core::mem::zeroed();
@@ -405,11 +399,11 @@ pub fn pitch_roll_for_slope(
                         ctx.engine,
                         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                             &mut trace as *mut trace_t,
-                            &(*forwhom).r.currentOrigin as *const vec3_t,
+                            &currentOrigin as *const vec3_t,
                             core::ptr::null(),
                             core::ptr::null(),
                             &endspot as *const vec3_t,
-                            (*forwhom).s.number,
+                            number,
                             MASK_SOLID,
                         ),
                     );
@@ -428,12 +422,8 @@ pub fn pitch_roll_for_slope(
 
         let mut ovf: vec3_t = [0.0; 3];
         let mut ovr: vec3_t = [0.0; 3];
-        crate::q_math::AngleVectors(
-            (*forwhom).r.currentAngles,
-            Some(&mut ovf),
-            Some(&mut ovr),
-            None,
-        );
+        let currentAngles = ctx.world.entity(forwhom).r.currentAngles;
+        crate::q_math::AngleVectors(currentAngles, Some(&mut ovf), Some(&mut ovr), None);
 
         let mut new_angles: vec3_t = [0.0, 0.0, 0.0];
         crate::q_math::vectoangles(slope, &mut new_angles);
@@ -451,29 +441,34 @@ pub fn pitch_roll_for_slope(
 
         let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
 
-        let client = (*forwhom).client;
+        // FLAG: NPC pool `gclient_t` has no accessor; deref stays raw (recipe 2b).
+        let client = ctx.world.entity(forwhom).client;
         if !client.is_null() {
             (*client).ps.viewangles[PITCH] = dot * pitch;
             (*client).ps.viewangles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * mod_;
-            let oldmins2 = (*forwhom).r.mins[2];
+            let oldmins2 = ctx.world.entity(forwhom).r.mins[2];
             // C promotes through `double`: `fabs()` is double libm and `/180.0f`
             // widens the quotient, so the whole expr is f64, narrowed on store.
-            (*forwhom).r.mins[2] =
+            let new_mins2 =
                 (-24.0_f64 + 12.0 * ((*client).ps.viewangles[PITCH] as f64).abs() / 180.0) as f32;
+            ctx.world.entity_mut(forwhom).r.mins[2] = new_mins2;
             //FIXME: if it gets bigger, move up
-            if oldmins2 > (*forwhom).r.mins[2] {
+            if oldmins2 > new_mins2 {
                 //our mins is now lower, need to move up
                 //FIXME: trace?
-                (*client).ps.origin[2] += oldmins2 - (*forwhom).r.mins[2];
-                (*forwhom).r.currentOrigin[2] = (*client).ps.origin[2];
+                (*client).ps.origin[2] += oldmins2 - new_mins2;
+                let origin_z = (*client).ps.origin[2];
+                ctx.world.entity_mut(forwhom).r.currentOrigin[2] = origin_z;
+                let forwhom_ptr = ctx.world.entity_mut(forwhom) as *mut gentity_t;
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom.cast()),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom_ptr.cast()),
                 );
             }
         } else {
-            (*forwhom).r.currentAngles[PITCH] = dot * pitch;
-            (*forwhom).r.currentAngles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * mod_;
+            ctx.world.entity_mut(forwhom).r.currentAngles[PITCH] = dot * pitch;
+            ctx.world.entity_mut(forwhom).r.currentAngles[ROLL] =
+                (1.0 - Q_fabs(dot)) * pitch * mod_;
         }
     }
 }
@@ -491,92 +486,116 @@ pub fn DeadThink(ctx: &mut GameContext) {
     // kept local (not consolidated).
     const FRAMETIME: c_int = 100;
 
+    let npc_ent = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+    // FLAG: gNPC_t (NPCInfo) and NPC pool `gclient_t` have no accessor; the
+    // pointers are read via the safe entity borrow and dereffed raw exactly as
+    // Raven does (recipe 2b/2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let client = ctx.world.entity(npc_id).client;
     unsafe {
-        let npc_ent = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*npc_ent).client;
-
         //HACKHACKHACKHACKHACK
         //We should really have a seperate G2 bounding box (seperate from the physics bbox) for G2 collisions only
         //FIXME: don't ever inflate back up?
-        (*npc_ent).r.maxs[2] =
-            (*client).renderInfo.eyePoint[2] - (*npc_ent).r.currentOrigin[2] + 4.0;
-        if (*npc_ent).r.maxs[2] < -8.0 {
-            (*npc_ent).r.maxs[2] = -8.0;
+        let eye_z = (*client).renderInfo.eyePoint[2];
+        let origin_z = ctx.world.entity(npc_id).r.currentOrigin[2];
+        ctx.world.entity_mut(npc_id).r.maxs[2] = eye_z - origin_z + 4.0;
+        if ctx.world.entity(npc_id).r.maxs[2] < -8.0 {
+            ctx.world.entity_mut(npc_id).r.maxs[2] = -8.0;
         }
         if (*client).ps.velocity == VEC3_ORIGIN {
             //not flying through the air
             let mut trace: trace_t = core::mem::zeroed();
-            if (*npc_ent).r.mins[0] > -32.0 {
-                (*npc_ent).r.mins[0] -= 1.0;
+            if ctx.world.entity(npc_id).r.mins[0] > -32.0 {
+                ctx.world.entity_mut(npc_id).r.mins[0] -= 1.0;
+                let currentOrigin = ctx.world.entity(npc_id).r.currentOrigin;
+                let mins = ctx.world.entity(npc_id).r.mins;
+                let maxs = ctx.world.entity(npc_id).r.maxs;
+                let number = ctx.world.entity(npc_id).s.number;
+                let clipmask = ctx.world.entity(npc_id).clipmask;
                 trap::Trace(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                         &mut trace as *mut trace_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        &(*npc_ent).r.mins as *const vec3_t,
-                        &(*npc_ent).r.maxs as *const vec3_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        (*npc_ent).s.number,
-                        (*npc_ent).clipmask,
+                        &currentOrigin as *const vec3_t,
+                        &mins as *const vec3_t,
+                        &maxs as *const vec3_t,
+                        &currentOrigin as *const vec3_t,
+                        number,
+                        clipmask,
                     ),
                 );
                 if trace.allsolid != 0 {
-                    (*npc_ent).r.mins[0] += 1.0;
+                    ctx.world.entity_mut(npc_id).r.mins[0] += 1.0;
                 }
             }
-            if (*npc_ent).r.maxs[0] < 32.0 {
-                (*npc_ent).r.maxs[0] += 1.0;
+            if ctx.world.entity(npc_id).r.maxs[0] < 32.0 {
+                ctx.world.entity_mut(npc_id).r.maxs[0] += 1.0;
+                let currentOrigin = ctx.world.entity(npc_id).r.currentOrigin;
+                let mins = ctx.world.entity(npc_id).r.mins;
+                let maxs = ctx.world.entity(npc_id).r.maxs;
+                let number = ctx.world.entity(npc_id).s.number;
+                let clipmask = ctx.world.entity(npc_id).clipmask;
                 trap::Trace(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                         &mut trace as *mut trace_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        &(*npc_ent).r.mins as *const vec3_t,
-                        &(*npc_ent).r.maxs as *const vec3_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        (*npc_ent).s.number,
-                        (*npc_ent).clipmask,
+                        &currentOrigin as *const vec3_t,
+                        &mins as *const vec3_t,
+                        &maxs as *const vec3_t,
+                        &currentOrigin as *const vec3_t,
+                        number,
+                        clipmask,
                     ),
                 );
                 if trace.allsolid != 0 {
-                    (*npc_ent).r.maxs[0] -= 1.0;
+                    ctx.world.entity_mut(npc_id).r.maxs[0] -= 1.0;
                 }
             }
-            if (*npc_ent).r.mins[1] > -32.0 {
-                (*npc_ent).r.mins[1] -= 1.0;
+            if ctx.world.entity(npc_id).r.mins[1] > -32.0 {
+                ctx.world.entity_mut(npc_id).r.mins[1] -= 1.0;
+                let currentOrigin = ctx.world.entity(npc_id).r.currentOrigin;
+                let mins = ctx.world.entity(npc_id).r.mins;
+                let maxs = ctx.world.entity(npc_id).r.maxs;
+                let number = ctx.world.entity(npc_id).s.number;
+                let clipmask = ctx.world.entity(npc_id).clipmask;
                 trap::Trace(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                         &mut trace as *mut trace_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        &(*npc_ent).r.mins as *const vec3_t,
-                        &(*npc_ent).r.maxs as *const vec3_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        (*npc_ent).s.number,
-                        (*npc_ent).clipmask,
+                        &currentOrigin as *const vec3_t,
+                        &mins as *const vec3_t,
+                        &maxs as *const vec3_t,
+                        &currentOrigin as *const vec3_t,
+                        number,
+                        clipmask,
                     ),
                 );
                 if trace.allsolid != 0 {
-                    (*npc_ent).r.mins[1] += 1.0;
+                    ctx.world.entity_mut(npc_id).r.mins[1] += 1.0;
                 }
             }
-            if (*npc_ent).r.maxs[1] < 32.0 {
-                (*npc_ent).r.maxs[1] += 1.0;
+            if ctx.world.entity(npc_id).r.maxs[1] < 32.0 {
+                ctx.world.entity_mut(npc_id).r.maxs[1] += 1.0;
+                let currentOrigin = ctx.world.entity(npc_id).r.currentOrigin;
+                let mins = ctx.world.entity(npc_id).r.mins;
+                let maxs = ctx.world.entity(npc_id).r.maxs;
+                let number = ctx.world.entity(npc_id).s.number;
+                let clipmask = ctx.world.entity(npc_id).clipmask;
                 trap::Trace(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                         &mut trace as *mut trace_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        &(*npc_ent).r.mins as *const vec3_t,
-                        &(*npc_ent).r.maxs as *const vec3_t,
-                        &(*npc_ent).r.currentOrigin as *const vec3_t,
-                        (*npc_ent).s.number,
-                        (*npc_ent).clipmask,
+                        &currentOrigin as *const vec3_t,
+                        &mins as *const vec3_t,
+                        &maxs as *const vec3_t,
+                        &currentOrigin as *const vec3_t,
+                        number,
+                        clipmask,
                     ),
                 );
                 if trace.allsolid != 0 {
-                    (*npc_ent).r.maxs[1] -= 1.0;
+                    ctx.world.entity_mut(npc_id).r.maxs[1] -= 1.0;
                 }
             }
         }
@@ -587,27 +606,30 @@ pub fn DeadThink(ctx: &mut GameContext) {
 
         // Raven's commented-out `!NPCInfo->timeOfDeath` branch is dead code
         // upstream (`/* ... */`); only the live `else` block runs.
-        if ctx.world.level.time >= (*npc_info).timeOfDeath + BodyRemovalPadTime(&*npc_ent) {
+        if ctx.world.level.time
+            >= (*npc_info).timeOfDeath + BodyRemovalPadTime(ctx.world.entity(npc_id))
+        {
             //death anim done (or were given a specific amount of time to wait before removal), wait the requisite amount of time them remove
             if ((*client).ps.eFlags & EF_NODRAW) != 0 {
+                let number = ctx.world.entity(npc_id).s.number;
                 if trap::ICARUS_IsRunning(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(
-                        (*npc_ent).s.number,
-                    ),
+                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(number),
                 ) == 0
                 {
                     //if ( !NPC->taskManager || !NPC->taskManager->IsRunning() )
-                    (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity).into();
-                    (*npc_ent).nextthink = ctx.world.level.time + FRAMETIME;
+                    ctx.world.entity_mut(npc_id).think =
+                        Some(crate::ent_fn_enums::EntThink::G_FreeEntity).into();
+                    ctx.world.entity_mut(npc_id).nextthink = ctx.world.level.time + FRAMETIME;
                 }
             } else {
                 // Start the body effect first, then delay 400ms before ditching the corpse
                 NPC_RemoveBodyEffect(ctx);
 
                 //FIXME: keep it running through physics somehow?
-                (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::NPC_RemoveBody).into();
-                (*npc_ent).nextthink = ctx.world.level.time + FRAMETIME;
+                ctx.world.entity_mut(npc_id).think =
+                    Some(crate::ent_fn_enums::EntThink::NPC_RemoveBody).into();
+                ctx.world.entity_mut(npc_id).nextthink = ctx.world.level.time + FRAMETIME;
                 let npc_class = (*client).NPC_class;
                 // check for droids
                 if npc_class == class_t::CLASS_SEEKER
@@ -630,23 +652,26 @@ pub fn DeadThink(ctx: &mut GameContext) {
         }
 
         // If the player is on the ground and the resting position contents haven't been set yet...(BounceCount tracks the contents)
-        if (*npc_ent).bounceCount < 0 && (*npc_ent).s.groundEntityNum >= 0 {
+        if ctx.world.entity(npc_id).bounceCount < 0
+            && ctx.world.entity(npc_id).s.groundEntityNum >= 0
+        {
             // if client is in a nodrop area, make him/her nodraw
+            let currentOrigin = ctx.world.entity(npc_id).r.currentOrigin;
             let contents = trap::PointContents(
                 ctx.engine,
                 mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
-                    &(*npc_ent).r.currentOrigin as *const vec3_t,
+                    &currentOrigin as *const vec3_t,
                     -1,
                 ),
             );
-            (*npc_ent).bounceCount = contents;
+            ctx.world.entity_mut(npc_id).bounceCount = contents;
 
             if (contents & CONTENTS_NODROP) != 0 {
                 (*client).ps.eFlags |= EF_NODRAW;
             }
         }
 
-        CorpsePhysics(ctx, ctx.entity_id_of(npc_ent).unwrap());
+        CorpsePhysics(ctx, npc_id);
     }
 }
 
@@ -657,14 +682,16 @@ pub fn DeadThink(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC.c:617-623`
 pub fn SetNPCGlobals(ctx: &mut GameContext, ent: EntityId) {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        ctx.world.globals.NPC = ent;
-        ctx.world.globals.NPCInfo = (*ent).NPC;
-        ctx.world.globals.client = (*ent).client;
-        ctx.world.globals.ucmd = usercmd_t::default();
-    }
+    // FLAG: gNPC_t (NPCInfo) and NPC pool `gclient_t` globals hold raw pointers
+    // with no accessor; the fields are read via the safe entity borrow and
+    // stored verbatim (recipe 2b/2c).
+    let npc_info = ctx.world.entity(ent).NPC;
+    let client = ctx.world.entity(ent).client;
+    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+    ctx.world.globals.NPC = ent_ptr;
+    ctx.world.globals.NPCInfo = npc_info;
+    ctx.world.globals.client = client;
+    ctx.world.globals.ucmd = usercmd_t::default();
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): same file-scope
@@ -709,42 +736,46 @@ pub fn ClearNPCGlobals(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC.c:664-681`
 pub fn NPC_ShowDebugInfo(ctx: &mut GameContext) {
-    unsafe {
-        if ctx.world.globals.showBBoxes == 0 {
-            return;
-        }
-        // Raven `NPCDEBUG_RED` (`NPC.c:658`) — const color, not GameWorld state.
-        pub const NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
-        // Raven `FOFS(classname)` macro.
-        let fieldofs = core::mem::offset_of!(gentity_t, classname) as c_int;
+    if ctx.world.globals.showBBoxes == 0 {
+        return;
+    }
+    // Raven `NPCDEBUG_RED` (`NPC.c:658`) — const color, not GameWorld state.
+    const NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
+    // Raven `FOFS(classname)` macro.
+    let fieldofs = core::mem::offset_of!(gentity_t, classname) as c_int;
 
-        let mut found: *mut gentity_t = core::ptr::null_mut();
-        loop {
-            let found_id = ctx.entity_id_of(found);
-            found = crate::g_utils::G_Find(ctx, found_id, fieldofs, c"NPC".as_ptr());
-            if found.is_null() {
-                break;
-            }
-            if trap::InPVS(
-                ctx.engine,
-                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                    &(*found).r.currentOrigin as *const vec3_t,
-                    &ctx.world.g_entities[0].r.currentOrigin as *const vec3_t,
-                ),
-            ) != 0
-            {
-                let mins = [
-                    (*found).r.currentOrigin[0] + (*found).r.mins[0],
-                    (*found).r.currentOrigin[1] + (*found).r.mins[1],
-                    (*found).r.currentOrigin[2] + (*found).r.mins[2],
-                ];
-                let maxs = [
-                    (*found).r.currentOrigin[0] + (*found).r.maxs[0],
-                    (*found).r.currentOrigin[1] + (*found).r.maxs[1],
-                    (*found).r.currentOrigin[2] + (*found).r.maxs[2],
-                ];
-                crate::g_nav::G_Cube(mins, maxs, NPCDEBUG_RED, 0.25);
-            }
+    let mut found: *mut gentity_t = core::ptr::null_mut();
+    loop {
+        let found_id = ctx.entity_id_of(found);
+        found = crate::g_utils::G_Find(ctx, found_id, fieldofs, c"NPC".as_ptr());
+        if found.is_null() {
+            break;
+        }
+        let fid = ctx.entity_id_of(found).unwrap();
+        let found_origin = ctx.world.entity(fid).r.currentOrigin;
+        let player_origin = ctx.world.g_entities[0].r.currentOrigin;
+        if trap::InPVS(
+            ctx.engine,
+            mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                &found_origin as *const vec3_t,
+                &player_origin as *const vec3_t,
+            ),
+        ) != 0
+        {
+            let f_origin = ctx.world.entity(fid).r.currentOrigin;
+            let f_mins = ctx.world.entity(fid).r.mins;
+            let f_maxs = ctx.world.entity(fid).r.maxs;
+            let mins = [
+                f_origin[0] + f_mins[0],
+                f_origin[1] + f_mins[1],
+                f_origin[2] + f_mins[2],
+            ];
+            let maxs = [
+                f_origin[0] + f_maxs[0],
+                f_origin[1] + f_maxs[1],
+                f_origin[2] + f_maxs[2],
+            ];
+            crate::g_nav::G_Cube(mins, maxs, NPCDEBUG_RED, 0.25);
         }
     }
 }
@@ -762,8 +793,9 @@ pub fn NPC_ApplyScriptFlags(ctx: &mut GameContext) {
         BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_USE, BUTTON_WALKING,
     };
 
+    // FLAG: gNPC_t (NPCInfo) has no accessor; all derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_info = ctx.world.globals.NPCInfo;
         let scriptFlags = (*npc_info).scriptFlags;
         let level_time = ctx.world.level.time;
 
@@ -823,17 +855,20 @@ pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
     // const through the prelude glob.
     use mp_bg::public::entity_event::entity_event_t;
 
+    let npc_ent = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; all derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_ent = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
         //FIXME: make these flags checks a function call like NPC_CheckAIFlagsAndTimers
         if ((*npc_info).aiFlags & NPCAI_LOST) != 0 {
             //Print that you need help!
             //FIXME: shouldn't remove this just yet if cg_draw needs it
             (*npc_info).aiFlags &= !NPCAI_LOST;
 
-            if !(*npc_info).goalEntity.is_none() && (*npc_info).goalEntity == (*npc_ent).enemy {
+            if !(*npc_info).goalEntity.is_none()
+                && (*npc_info).goalEntity == ctx.world.entity(npc_id).enemy
+            {
                 //We can't nav to our enemy
                 //Drop enemy and see if we should search for him
                 crate::NPC_AI_Default::NPC_LostEnemyDecideChase(ctx);
@@ -854,7 +889,6 @@ pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
                 entity_event_t::EV_VICTORY3 as c_int,
             );
             let debounce = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-            let npc_id = ctx.entity_id_of(npc_ent).unwrap();
             crate::NPC_sounds::G_AddVoiceEvent(ctx, npc_id, ev, debounce);
             (*npc_info).greetingDebounceTime = 0;
         }
@@ -906,12 +940,13 @@ pub fn NPC_CheckAttackScript(ctx: &mut GameContext) {
 pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
     use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_ATTACK;
 
+    let npc_ent = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_ent = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
         // If they don't have an enemy they shouldn't hold their attack anim.
-        if (*npc_ent).enemy.is_none() {
+        if ctx.world.entity(npc_id).enemy.is_none() {
             (*npc_info).attackHoldTime = 0;
             return;
         }
@@ -919,9 +954,9 @@ pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
         // Raven's borg-specific `/* ... */`'d branch is dead code upstream —
         // only the live `else` block (everyone else) runs.
         // Guaranteed `Some` — the early return above covers the `None` case.
-        let enemy = &mut ctx.world.g_entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
-        let enemy_origin = (*enemy).r.currentOrigin;
-        let self_origin = (*npc_ent).r.currentOrigin;
+        let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+        let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
+        let self_origin = ctx.world.entity(npc_id).r.currentOrigin;
         let vec: vec3_t = [
             enemy_origin[0] - self_origin[0],
             enemy_origin[1] - self_origin[1],
@@ -954,9 +989,9 @@ pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
 pub fn NPC_KeepCurrentFacing(ctx: &mut GameContext) {
     // `PITCH`/`YAW` resolve to the canonical `crate::q_math` consts via the prelude.
 
+    // FLAG: NPC pool `gclient_t` has no accessor; derefs stay raw (recipe 2b).
+    let client = ctx.world.globals.client;
     unsafe {
-        let client = ctx.world.globals.client;
-
         if ctx.world.globals.ucmd.angles[YAW] == 0 {
             // Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`.
             let angle2short = |x: f32| -> c_int { ((x * 65536.0 / 360.0) as c_int) & 65535 };
@@ -1273,13 +1308,17 @@ pub fn NPC_BehaviorSet_Rancor(ctx: &mut GameContext, bState: c_int) {
 ///
 /// Source: `oracle/codemp/game/NPC.c:1384-1564`
 pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
+    let npc_ent = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+    // FLAG: gNPC_t (NPCInfo) and NPC pool `gclient_t` have no accessor; the
+    // pointers are read via the safe entity borrow and dereffed raw exactly as
+    // Raven does (recipe 2b/2c). `npc_ent` is retained only as the raw ABI
+    // handle passed across the trap seam.
+    let npc_info = ctx.world.globals.NPCInfo;
+    let client = ctx.world.entity(npc_id).client;
     unsafe {
-        let npc_ent = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*npc_ent).client;
-
-        if (*npc_ent).s.NPC_class == class_t::CLASS_VEHICLE as c_int
-            && !(*npc_ent).m_pVehicle.is_null()
+        if ctx.world.entity(npc_id).s.NPC_class == class_t::CLASS_VEHICLE as c_int
+            && !ctx.world.entity(npc_id).m_pVehicle.is_null()
         {
             //vehicles don't do AI!
             return;
@@ -1306,7 +1345,7 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
             NPC_BehaviorSet_Seeker(ctx, bState);
         } else if (*client).NPC_class == class_t::CLASS_BOBAFETT {
             //bounty hunter
-            if crate::NPC_AI_Jedi::Boba_Flying(&*npc_ent) != 0 {
+            if crate::NPC_AI_Jedi::Boba_Flying(ctx.world.entity(npc_id)) != 0 {
                 NPC_BehaviorSet_Seeker(ctx, bState);
             } else {
                 NPC_BehaviorSet_Jedi(ctx, bState);
@@ -1362,8 +1401,8 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
                         _ => {}
                     }
 
-                    if !(*npc_ent).enemy.is_none()
-                        && (*npc_ent).s.weapon == WP_NONE
+                    if !ctx.world.entity(npc_id).enemy.is_none()
+                        && ctx.world.entity(npc_id).s.weapon == WP_NONE
                         && bState != bState_t::BS_HUNT_AND_KILL as c_int
                         && trap::ICARUS_TaskIDPending(
                             ctx.engine,
@@ -1376,8 +1415,9 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
                         //if in battle and have no weapon, run away, fixme: when in BS_HUNT_AND_KILL, they just stand there
                         if bState != bState_t::BS_FLEE as c_int {
                             // Guaranteed `Some` — covered by the `enemy.is_none()` guard above.
-                            let enemy = &mut ctx.world.g_entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
-                            crate::NPC_behavior::NPC_StartFlee(ctx, ctx.entity_id_of(enemy), (*enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
+                            let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+                            let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
+                            crate::NPC_behavior::NPC_StartFlee(ctx, Some(enemy_id), enemy_origin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
                         } else {
                             crate::NPC_behavior::NPC_BSFlee(ctx);
                         }
@@ -1451,19 +1491,23 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
     use mp_bg::public::weaponstate::weaponstate_t::{WEAPON_IDLE, WEAPON_READY};
     use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
 
+    let npc_ent = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+    // FLAG: gNPC_t (NPCInfo) and NPC pool `gclient_t` have no accessor; the
+    // pointers are read via the safe entity borrow and dereffed raw exactly as
+    // Raven does (recipe 2b/2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let client = ctx.world.globals.client;
     unsafe {
-        let npc_ent = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = ctx.world.globals.client;
-
         NPC_HandleAIFlags(ctx);
 
         //FIXME: these next three bits could be a function call, some sort of setup/cleanup func
         //Lookmode must be reset every think cycle
-        if (*npc_ent).delayScriptTime != 0 && (*npc_ent).delayScriptTime <= ctx.world.level.time {
-            let npc_id = ctx.entity_id_of(npc_ent);
-            crate::NPC_utils::G_ActivateBehavior(ctx, npc_id, bSet_t::BSET_DELAYED as c_int);
-            (*npc_ent).delayScriptTime = 0;
+        if ctx.world.entity(npc_id).delayScriptTime != 0
+            && ctx.world.entity(npc_id).delayScriptTime <= ctx.world.level.time
+        {
+            crate::NPC_utils::G_ActivateBehavior(ctx, Some(npc_id), bSet_t::BSET_DELAYED as c_int);
+            ctx.world.entity_mut(npc_id).delayScriptTime = 0;
         }
 
         //Clear this and let bState set it itself, so it automatically handles changing bStates... but we need a set bState wrapper func
@@ -1483,37 +1527,33 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
         //Pick the proper bstate for us and run it
         NPC_RunBehavior(ctx, (*client).playerTeam as c_int, bState as c_int);
 
-        if let Some(enemy_id) = (*npc_ent).enemy {
-            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
-            if (*enemy).inuse == 0 {
+        if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+            if ctx.world.entity(enemy_id).inuse == 0 {
                 //just in case bState doesn't catch this
-                crate::NPC_combat::G_ClearEnemy(ctx, ctx.entity_id_of(npc_ent).unwrap());
+                crate::NPC_combat::G_ClearEnemy(ctx, npc_id);
             }
         }
 
         if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
             let look_time = ctx.world.level.time + 1000;
-            let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+            let saber_enemy = (*client).ps.saberLockEnemy;
             let look_ent = ctx.entity_mut(npc_id);
-            crate::NPC_utils::NPC_SetLookTarget(look_ent, (*client).ps.saberLockEnemy, look_time);
-        } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, ctx.entity_id_of(npc_ent).unwrap())
-            == 0
-        {
-            if let Some(enemy_id) = (*npc_ent).enemy {
-                let enemy_number = ctx.world.g_entities[enemy_id.index()].s.number;
-                let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+            crate::NPC_utils::NPC_SetLookTarget(look_ent, saber_enemy, look_time);
+        } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_id) == 0 {
+            if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+                let enemy_number = ctx.world.entity(enemy_id).s.number;
                 let look_ent = ctx.entity_mut(npc_id);
                 crate::NPC_utils::NPC_SetLookTarget(look_ent, enemy_number, 0);
             }
         }
 
-        if let Some(enemy_id) = (*npc_ent).enemy {
-            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
-            if ((*enemy).flags & FL_DONT_SHOOT) != 0 {
+        if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+            if (ctx.world.entity(enemy_id).flags & FL_DONT_SHOOT) != 0 {
                 ctx.world.globals.ucmd.buttons &= !BUTTON_ATTACK;
                 ctx.world.globals.ucmd.buttons &= !BUTTON_ALT_ATTACK;
             } else if (*client).playerTeam != crate::teams::npcteam::NPCTEAM_ENEMY {
-                let enemy_npc = (*enemy).NPC;
+                // FLAG: enemy's gNPC_t (NPCInfo) has no accessor; deref stays raw.
+                let enemy_npc = ctx.world.entity(enemy_id).NPC;
                 if !enemy_npc.is_null()
                     && ((*enemy_npc).surrenderTime > ctx.world.level.time
                         || ((*enemy_npc).scriptFlags & 0x00010000) != 0)
@@ -1532,11 +1572,10 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
         }
 
         if (ctx.world.globals.ucmd.buttons & BUTTON_ATTACK) == 0
-            && (*npc_ent).attackDebounceTime > ctx.world.level.time
+            && ctx.world.entity(npc_id).attackDebounceTime > ctx.world.level.time
         {
             //We just shot but aren't still shooting, so hold the gun up for a while
             if (*client).ps.weapon == WP_SABER {
-                let npc_id = ctx.entity_id_of(npc_ent).unwrap();
                 //One-handed
                 NPC_SetAnim(
                     ctx,
@@ -1546,7 +1585,6 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
                     SETANIM_FLAG_NORMAL,
                 );
             } else if (*client).ps.weapon == WP_BRYAR_PISTOL {
-                let npc_id = ctx.entity_id_of(npc_ent).unwrap();
                 //Sniper pose
                 NPC_SetAnim(
                     ctx,
@@ -1556,12 +1594,11 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
                     SETANIM_FLAG_NORMAL,
                 );
             }
-        } else if (*npc_ent).enemy.is_none() {
+        } else if ctx.world.entity(npc_id).enemy.is_none() {
             //HACK!
-            if (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY1 as c_int
-                || (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
+            if ctx.world.entity(npc_id).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY1 as c_int
+                || ctx.world.entity(npc_id).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
             {
-                let npc_id = ctx.entity_id_of(npc_ent).unwrap();
                 //we look ready for action, using one of the first 2 weapon, let's rest our weapon on our shoulder
                 NPC_SetAnim(
                     ctx,
@@ -1591,10 +1628,13 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
         NPC_CheckAttackScript(ctx);
         NPC_KeepCurrentFacing(ctx);
 
-        if (*npc_ent).next_roff_time == 0 || (*npc_ent).next_roff_time < ctx.world.level.time {
+        if ctx.world.entity(npc_id).next_roff_time == 0
+            || ctx.world.entity(npc_id).next_roff_time < ctx.world.level.time
+        {
             //If we were following a roff, we don't do normal pmoves.
             let mut ucmd = ctx.world.globals.ucmd;
-            crate::g_active::ClientThink(ctx, (*npc_ent).s.number, &mut ucmd as *mut usercmd_t);
+            let number = ctx.world.entity(npc_id).s.number;
+            crate::g_active::ClientThink(ctx, number, &mut ucmd as *mut usercmd_t);
         } else {
             crate::NPC_move::NPC_ApplyRoff(ctx);
         }
@@ -1615,31 +1655,39 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC.c:1764-1785`
 pub fn NPC_CheckInSolid(ctx: &mut GameContext) {
+    let npc_ent = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc_ent).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    // `npc_ent` is retained only as the raw ABI handle passed across the seam.
+    let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_ent = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
-        let mut point = (*npc_ent).r.currentOrigin;
+        let mut point = ctx.world.entity(npc_id).r.currentOrigin;
         point[2] -= 0.25;
 
+        let currentOrigin = ctx.world.entity(npc_id).r.currentOrigin;
+        let mins = ctx.world.entity(npc_id).r.mins;
+        let maxs = ctx.world.entity(npc_id).r.maxs;
+        let number = ctx.world.entity(npc_id).s.number;
+        let clipmask = ctx.world.entity(npc_id).clipmask;
         let mut trace: trace_t = core::mem::zeroed();
         trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                 &mut trace as *mut trace_t,
-                &(*npc_ent).r.currentOrigin as *const vec3_t,
-                &(*npc_ent).r.mins as *const vec3_t,
-                &(*npc_ent).r.maxs as *const vec3_t,
+                &currentOrigin as *const vec3_t,
+                &mins as *const vec3_t,
+                &maxs as *const vec3_t,
                 &point as *const vec3_t,
-                (*npc_ent).s.number,
-                (*npc_ent).clipmask,
+                number,
+                clipmask,
             ),
         );
         if trace.startsolid == 0 && trace.allsolid == 0 {
-            (*npc_info).lastClearOrigin = (*npc_ent).r.currentOrigin;
+            (*npc_info).lastClearOrigin = ctx.world.entity(npc_id).r.currentOrigin;
         } else if crate::q_math::VectorLengthSquared((*npc_info).lastClearOrigin) != 0.0 {
             //			Com_Printf("%s stuck in solid at %s: fixing...\n", NPC->script_targetname, vtos(NPC->r.currentOrigin));
-            crate::g_utils::G_SetOrigin(&mut *(npc_ent), (*npc_info).lastClearOrigin);
+            let lco = (*npc_info).lastClearOrigin;
+            crate::g_utils::G_SetOrigin(ctx.world.entity_mut(npc_id), lco);
             trap::LinkEntity(
                 ctx.engine,
                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent.cast()),
@@ -1652,16 +1700,15 @@ pub fn NPC_CheckInSolid(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC.c:1787-1814`
 pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
+    // FLAG: NPC pool `gclient_t` has no accessor; pointer read via the safe
+    // entity borrow, dereffed raw (recipe 2b).
+    let client = ctx.world.entity(self_).client;
+    if client.is_null() {
+        return;
+    }
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let client = (*self_).client;
-        if client.is_null() {
-            return;
-        }
-
         // Raven: make the noises
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"patrolNoise".as_ptr()) != 0
+        if crate::g_timer::TIMER_Done(ctx, Some(self_), c"patrolNoise".as_ptr()) != 0
             && ctx.world.bg_state.rng.Q_irand(0, 20) == 0
         {
             let npc_class = (*client).NPC_class;
@@ -1693,21 +1740,11 @@ pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
             };
 
             if let Some(sound_path) = sound_path {
-                crate::g_utils::G_SoundOnEnt(
-                    ctx,
-                    ctx.entity_id_of(self_).unwrap(),
-                    CHAN_AUTO,
-                    cstr(&sound_path).as_ptr(),
-                );
+                crate::g_utils::G_SoundOnEnt(ctx, self_, CHAN_AUTO, cstr(&sound_path).as_ptr());
             }
 
             let duration = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(self_),
-                c"patrolNoise".as_ptr(),
-                duration,
-            );
+            crate::g_timer::TIMER_Set(ctx, Some(self_), c"patrolNoise".as_ptr(), duration);
         }
     }
 }
@@ -1726,43 +1763,47 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
     const FRAMETIME: c_int = 100;
     use mp_bg::vehicles::vehicle_s::Vehicle_t;
 
+    ctx.world.entity_mut(self_).nextthink = ctx.world.level.time + FRAMETIME;
+
+    SetNPCGlobals(ctx, self_);
+
+    ctx.world.globals.ucmd = usercmd_t::default();
+
+    // FLAG: gNPC_t (NPCInfo, `npc`) and NPC pool `gclient_t` (`client`) have no
+    // accessor; the pointers are read via the safe entity borrow and dereffed
+    // raw exactly as Raven does (recipe 2b/2c).
+    // Raven reads `self->client->ps.moveDir` unconditionally before the
+    // null check below (`self->client` is always valid by the time
+    // `NPC_Think` is wired as an entity think — matching the oracle's
+    // implicit non-null assumption here).
+    let client = ctx.world.entity(self_).client;
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        (*self_).nextthink = ctx.world.level.time + FRAMETIME;
-
-        SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
-
-        ctx.world.globals.ucmd = usercmd_t::default();
-
-        // Raven reads `self->client->ps.moveDir` unconditionally before the
-        // null check below (`self->client` is always valid by the time
-        // `NPC_Think` is wired as an entity think — matching the oracle's
-        // implicit non-null assumption here).
-        let client = (*self_).client;
         let oldMoveDir = (*client).ps.moveDir;
-        if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int {
+        if ctx.world.entity(self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int {
             //YOU ARE BREAKING MY PREDICTION. Bad clear.
             (*client).ps.moveDir = VEC3_ORIGIN;
         }
 
-        if self_.is_null() || (*self_).NPC.is_null() || (*self_).client.is_null() {
+        // Raven's `self` NULL guard is vacuous behind the `EntityId` handle
+        // (dropped, §F2); the `NPC`/`client` NULL guards are preserved.
+        if ctx.world.entity(self_).NPC.is_null() || ctx.world.entity(self_).client.is_null() {
             return;
         }
 
-        let npc = (*self_).NPC;
+        let npc = ctx.world.entity(self_).NPC;
 
         // dead NPCs have a special think, don't run scripts (for now)
         //FIXME: this breaks deathscripts
-        if (*self_).health <= 0 {
+        if ctx.world.entity(self_).health <= 0 {
             DeadThink(ctx);
             if (*npc).nextBStateThink <= ctx.world.level.time {
+                let number = ctx.world.entity(self_).s.number;
                 trap::ICARUS_MaintainTaskManager(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+                    mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new(number),
                 );
             }
-            (*client).ps.origin = (*self_).r.currentOrigin;
+            (*client).ps.origin = ctx.world.entity(self_).r.currentOrigin;
             return;
         }
 
@@ -1771,23 +1812,28 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
         // prelude glob (the former local const here had a guessed 0x400, so the
         // freeze check masked the wrong svFlags bit — a live bug).
         if ctx.world.cvars.debugNPCFreeze.value != 0.0
-            || ((*self_).r.svFlags & SVF_ICARUS_FREEZE) != 0
+            || (ctx.world.entity(self_).r.svFlags & SVF_ICARUS_FREEZE) != 0
         {
             crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
             let mut ucmd = ctx.world.globals.ucmd;
-            crate::g_active::ClientThink(ctx, (*self_).s.number, &mut ucmd as *mut usercmd_t);
-            (*client).ps.origin = (*self_).r.currentOrigin;
+            let number = ctx.world.entity(self_).s.number;
+            crate::g_active::ClientThink(ctx, number, &mut ucmd as *mut usercmd_t);
+            (*client).ps.origin = ctx.world.entity(self_).r.currentOrigin;
             return;
         }
 
-        (*self_).nextthink = ctx.world.level.time + FRAMETIME / 2;
+        ctx.world.entity_mut(self_).nextthink = ctx.world.level.time + FRAMETIME / 2;
 
         for i in 0..MAX_CLIENTS {
-            let player = ctx.world.g_entities.as_mut_ptr().add(i as usize);
-            if (*player).inuse != 0
-                && !(*player).client.is_null()
-                && (*((*player).client)).sess.sessionTeam != TEAM_SPECTATOR
-                && (((*((*player).client)).ps.pm_flags & PMF_FOLLOW) == 0)
+            let player_id = EntityId::from_num(i as c_int).unwrap();
+            // FLAG: player-slot `gclient_t` read via the safe entity borrow;
+            // condition is pure and its body is dead (below), so the raw derefs
+            // are only reads.
+            let player_client = ctx.world.entity(player_id).client;
+            if ctx.world.entity(player_id).inuse != 0
+                && !player_client.is_null()
+                && (*player_client).sess.sessionTeam != TEAM_SPECTATOR
+                && (((*player_client).ps.pm_flags & PMF_FOLLOW) == 0)
             {
                 // Raven `if (0) //rwwFIXMEFIXME: Allow controlling ents` — this
                 // whole arm is dead in the shipped oracle (condition always
@@ -1800,9 +1846,10 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
             if (*client).ps.m_iVehicleNum != 0 {
                 //we don't think on our own
                 //well, run scripts, though...
+                let number = ctx.world.entity(self_).s.number;
                 trap::ICARUS_MaintainTaskManager(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+                    mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new(number),
                 );
                 return;
             } else {
@@ -1813,23 +1860,28 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
                 (*client).pers.cmd.buttons = 0;
                 // §19: oracle derefs `self->m_pVehicle->m_ucmd` unconditionally.
                 // Source: oracle/codemp/game/NPC.c:1914
-                if !(*self_).m_pVehicle.is_null() {
-                    (*((*self_).m_pVehicle)).m_ucmd = (*client).pers.cmd;
+                // FLAG: `m_pVehicle` (Vehicle_t*) has no accessor; deref stays raw.
+                if !ctx.world.entity(self_).m_pVehicle.is_null() {
+                    let veh = ctx.world.entity(self_).m_pVehicle;
+                    let cmd = (*client).pers.cmd;
+                    (*veh).m_ucmd = cmd;
                 }
             }
-        } else if (*self_).s.m_iVehicleNum != 0 {
+        } else if ctx.world.entity(self_).s.m_iVehicleNum != 0 {
             //droid in a vehicle?
-            G_DroidSounds(ctx, ctx.entity_id_of(self_).unwrap());
+            G_DroidSounds(ctx, self_);
         }
 
-        if (*npc).nextBStateThink <= ctx.world.level.time && (*self_).s.m_iVehicleNum == 0 {
+        if (*npc).nextBStateThink <= ctx.world.level.time
+            && ctx.world.entity(self_).s.m_iVehicleNum == 0
+        {
             //NPCs sitting in Vehicles do NOTHING
-            if (*self_).s.eType != entityType_t::ET_NPC as c_int {
+            if ctx.world.entity(self_).s.eType != entityType_t::ET_NPC as c_int {
                 //Something drastic happened in our script
                 return;
             }
 
-            if (*self_).s.weapon == WP_SABER
+            if ctx.world.entity(self_).s.weapon == WP_SABER
                 && ctx.world.cvars.g_spskill.integer >= 2
                 && (*npc).rank > RANK_LT_JG
             {
@@ -1841,33 +1893,37 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
             }
 
             //nextthink is set before this so something in here can override it
-            if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int
-                || (*self_).m_pVehicle.is_null()
+            if ctx.world.entity(self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int
+                || ctx.world.entity(self_).m_pVehicle.is_null()
             {
                 //ok, let's not do this at all for vehicles.
-                NPC_ExecuteBState(ctx, ctx.entity_id_of(self_).unwrap());
+                NPC_ExecuteBState(ctx, self_);
             }
         } else {
             (*client).ps.moveDir = oldMoveDir;
             //or use client->pers.lastCommand?
             (*npc).last_ucmd.serverTime = ctx.world.level.time - 50;
-            if (*self_).next_roff_time == 0 || (*self_).next_roff_time < ctx.world.level.time {
+            if ctx.world.entity(self_).next_roff_time == 0
+                || ctx.world.entity(self_).next_roff_time < ctx.world.level.time
+            {
                 //If we were following a roff, we don't do normal pmoves.
                 //FIXME: firing angles (no aim offset) or regular angles?
                 crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
                 ctx.world.globals.ucmd = (*npc).last_ucmd;
                 let mut ucmd = ctx.world.globals.ucmd;
-                crate::g_active::ClientThink(ctx, (*self_).s.number, &mut ucmd as *mut usercmd_t);
+                let number = ctx.world.entity(self_).s.number;
+                crate::g_active::ClientThink(ctx, number, &mut ucmd as *mut usercmd_t);
             } else {
                 crate::NPC_move::NPC_ApplyRoff(ctx);
             }
         }
         //must update icarus *every* frame because of certain animation completions in the pmove stuff that can leave a 50ms gap between ICARUS animation commands
+        let number = ctx.world.entity(self_).s.number;
         trap::ICARUS_MaintainTaskManager(
             ctx.engine,
-            mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+            mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new(number),
         );
-        (*client).ps.origin = (*self_).r.currentOrigin;
+        (*client).ps.origin = ctx.world.entity(self_).r.currentOrigin;
     }
 }
 
