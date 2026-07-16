@@ -1174,7 +1174,7 @@ pub fn G_ResetDuelists(ctx: &mut GameContext) {
             ctx.world.globals.g_noPDuelCheck = qfalse;
             trap::UnlinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent),
+                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent.cast()),
             );
             ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
 
@@ -3683,7 +3683,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                 if ctx.world.cvars.d_altRoutes.integer != 0 {
                     trap::Nav_CheckFailedNodes(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_NAV_CHECKFAILEDNODES::GNavCheckfailednodesArgs::new(ent),
+                        mp_abi::game::syscalls::G_NAV_CHECKFAILEDNODES::GNavCheckfailednodesArgs::new(ent.cast()),
                     );
                 }
                 i += 1;
@@ -3738,7 +3738,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                     (*ent).unlinkAfterEvent = qfalse;
                     trap::UnlinkEntity(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent),
+                        mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent.cast()),
                     );
                 }
             }

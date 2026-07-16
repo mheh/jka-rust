@@ -6,8 +6,8 @@
 
 use core::ffi::c_int;
 
+use crate::entity::gentity_t;
 use mp_bg::team_t;
-use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::shared::{qboolean, vec3_t};
 
 use super::consts::{MAX_GROUP_MEMBERS, NUM_SQUAD_STATES};

@@ -4,26 +4,26 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 /// `G_NAV_GETBESTPATHBETWEENENTS` outbound game-to-engine syscall.
 #[derive(Debug)]
 pub struct GNavGetbestpathbetweenentsArgs {
-    ent: *mut gentity_t,
-    goal: *mut gentity_t,
+    ent: *mut gentity_s,
+    goal: *mut gentity_s,
     flags: c_int,
 }
 
 impl GNavGetbestpathbetweenentsArgs {
-    pub fn new(ent: *mut gentity_t, goal: *mut gentity_t, flags: c_int) -> Self {
+    pub fn new(ent: *mut gentity_s, goal: *mut gentity_s, flags: c_int) -> Self {
         Self { ent, goal, flags }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 
-    pub fn goal(&self) -> *mut gentity_t {
+    pub fn goal(&self) -> *mut gentity_s {
         self.goal
     }
 

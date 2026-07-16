@@ -6,8 +6,8 @@
 
 use core::ffi::{c_char, c_int, c_uint, c_void};
 
+use crate::entity::gentity_t;
 use mp_qshared::common::mp::entity_id::EntityId;
-use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::common::mp::qcommon::{playerState_t, saberInfo_t, MAX_SABERS};
 use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
 

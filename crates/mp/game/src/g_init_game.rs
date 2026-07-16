@@ -221,7 +221,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         trap::LocateGameData(
             ctx.engine,
             GLocateGameDataArgs::new(
-                entities_base,
+                entities_base.cast(),
                 ctx.world.level.num_entities,
                 core::mem::size_of::<gentity_t>() as c_int,
                 clients_base,

@@ -48,7 +48,7 @@ pub fn G_AddVoiceEvent(
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                self_,
+                self_.cast(),
                 TID_CHAN_VOICE as c_int,
             ),
         ) != qfalse

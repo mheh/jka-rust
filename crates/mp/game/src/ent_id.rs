@@ -1,17 +1,22 @@
-//! `EntityId` -> `gentity_t*` seam helper: the index->pointer half
-//! of the `Option<EntityId>` retrofit, complementing `mp_qshared`'s pointer->index
-//! `ent_id`/`ent_id_opt` (see `crate::world`/`crate::ent_id`).
+//! `EntityId` <-> `gentity_t*` seam helpers: both halves of the
+//! `Option<EntityId>` retrofit, colocated here (DEC-26) because they all do
+//! pointer arithmetic over the concrete `gentity_t`, which lives in `mp_game`
+//! (`crate::entity::gentity`).
 //!
-//! Raven code dereferences a `gentity_t*` field directly (e.g.
-//! `ent->activator`); that field is ported as `Option<EntityId>`, so call
-//! sites re-derive the live pointer via `base.add(id.index())` before
-//! dereferencing — Raven's exact `g_entities + entityNum` idiom.
+//! - [`resolve`] is the index->pointer half: Raven code dereferences a
+//!   `gentity_t*` field directly (e.g. `ent->activator`); that field is ported
+//!   as `Option<EntityId>`, so call sites re-derive the live pointer via
+//!   `base.add(id.index())` before dereferencing — Raven's `g_entities +
+//!   entityNum` idiom.
+//! - [`ent_id`]/[`ent_id_opt`] are the pointer->index half (Raven's
+//!   `ent - g_entities`), filling the stored `Option<EntityId>` fields at
+//!   pointer-assignment sites.
 //!
-//! Source: `oracle/codemp/game/g_utils.c` (the `g_entities + i` idiom,
-//! e.g. `G_Find`/`ENT_STATE`).
+//! Source: `oracle/codemp/game/g_utils.c` (the `g_entities + i` /
+//! `ent - g_entities` idioms, e.g. `G_Find`/`ENTITYNUM`).
 
+use crate::entity::gentity_t;
 use crate::world::EntityId;
-use mp_qshared::common::mp::gentity::gentity_t;
 
 /// Resolve a possibly-absent [`EntityId`] back to Raven's `gentity_t*`, given
 /// the `g_entities` array base. NULL-aware counterpart to `ent_id_opt`: `None`
@@ -25,5 +30,38 @@ pub unsafe fn resolve(base: *mut gentity_t, id: Option<EntityId>) -> *mut gentit
     match id {
         Some(id) => unsafe { base.add(id.index()) },
         None => core::ptr::null_mut(),
+    }
+}
+
+/// The `ent - g_entities` seam helper: recover an [`EntityId`] from a
+/// live `gentity_t*` given the `g_entities` array base. This is the pointer→index
+/// half of the retrofit — the `Option<EntityId>` stored fields are filled
+/// via `Some(ent_id(base, ent))` at pointer-assignment sites, and reloaded via
+/// `&world.g_entities[id.index()]` at deref sites.
+///
+/// Unsafe seam (§D11): the caller guarantees `ent` points into the contiguous
+/// `g_entities` array whose first element is `base` (Raven's exact
+/// `ent - g_entities` arithmetic; both are `#[repr(C)]` and the array is one
+/// allocation). Confined here so safe module logic never does pointer math.
+///
+/// Source: `oracle/codemp/game/g_utils.c` (the `ent - g_entities` idiom,
+/// e.g. `G_FreeEntity`/`ENTITYNUM`).
+#[inline]
+pub unsafe fn ent_id(base: *const gentity_t, ent: *const gentity_t) -> EntityId {
+    // `offset_from` yields the element delta (Raven's `ent - g_entities`).
+    EntityId(unsafe { ent.offset_from(base) } as u32)
+}
+
+/// NULL-aware [`ent_id`]: Raven's nullable `gentity_t*` → `Option<EntityId>`
+/// (NULL becomes `None`; entity 0 is valid so there is no sentinel).
+///
+/// # Safety
+/// Same contract as [`ent_id`] when `ent` is non-null.
+#[inline]
+pub unsafe fn ent_id_opt(base: *const gentity_t, ent: *const gentity_t) -> Option<EntityId> {
+    if ent.is_null() {
+        None
+    } else {
+        Some(unsafe { ent_id(base, ent) })
     }
 }

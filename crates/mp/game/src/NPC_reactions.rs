@@ -174,7 +174,7 @@ pub fn NPC_SetPainEvent(ctx: &mut GameContext, self_: EntityId) {
             let client = (*self_).client as *mut gclient_t;
             let pending = trap::ICARUS_TaskIDPending(
                 ctx.engine,
-                GIcarusTaskidpendingArgs::new(self_, taskID_t::TID_CHAN_VOICE as c_int),
+                GIcarusTaskidpendingArgs::new(self_.cast(), taskID_t::TID_CHAN_VOICE as c_int),
             );
             if pending == 0 && !client.is_null() {
                 let stat_max_health = (*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize];

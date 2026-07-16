@@ -877,7 +877,7 @@ pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
         (*e).r.ownerNum = mp_qshared::shared::ENTITYNUM_NONE;
         (*e).s.modelGhoul2 = 0; // assume not
 
-        trap::ICARUS_FreeEnt(ctx.engine, GIcarusFreeentArgs::new(e)); // ICARUS information must be added after this point
+        trap::ICARUS_FreeEnt(ctx.engine, GIcarusFreeentArgs::new(e.cast())); // ICARUS information must be added after this point
     }
 }
 
@@ -1011,7 +1011,7 @@ pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
         trap::LocateGameData(
             ctx.engine,
             GLocateGameDataArgs::new(
-                entities_base,
+                entities_base.cast(),
                 ctx.world.level.num_entities,
                 core::mem::size_of::<gentity_t>() as c_int,
                 clients_base,
@@ -1105,8 +1105,8 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
             return;
         }
 
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ed)); // unlink from world
-        trap::ICARUS_FreeEnt(ctx.engine, GIcarusFreeentArgs::new(ed)); // ICARUS information must be added after this point
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ed.cast())); // unlink from world
+        trap::ICARUS_FreeEnt(ctx.engine, GIcarusFreeentArgs::new(ed.cast())); // ICARUS information must be added after this point
 
         if (*ed).neverFree != qfalse {
             return;
@@ -1234,7 +1234,7 @@ pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> *mut
         // bandwidth...? (Raven comment, preserved.)
 
         // find cluster for PVS
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e.cast()));
 
         e
     }
@@ -1264,7 +1264,7 @@ pub fn G_SoundTempEntity(
         G_SetOrigin(&mut *(e), snapped);
 
         // find cluster for PVS
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e.cast()));
 
         e
     }
@@ -2320,7 +2320,7 @@ pub fn G_CheckInSolid(ctx: &mut GameContext, self_: EntityId, fix: qboolean) -> 
                 let mut neworg = trace.endpos;
                 neworg[2] -= (*self_).r.mins[2];
                 G_SetOrigin(&mut *(self_), neworg);
-                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
 
                 return G_CheckInSolid(ctx, ctx.entity_id_of(self_).unwrap(), qfalse);
             } else {

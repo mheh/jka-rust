@@ -151,7 +151,7 @@ pub fn NPC_ReachedGoal(ctx: &mut GameContext) {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
-                npc,
+                npc.cast(),
                 TID_MOVE_NAV as c_int,
             ),
         );

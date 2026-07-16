@@ -236,7 +236,7 @@ pub fn NPC_SetMoveGoal(
         (*npc).goalEntity = Some(temp_goal_id);
         (*npc).goalRadius = radius;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(temp_goal));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(temp_goal.cast()));
     }
 }
 
@@ -495,7 +495,7 @@ pub fn NAV_FindClosestWaypointForEnt(ctx: &mut GameContext, ent: EntityId, targW
         let ent: *mut gentity_t = ctx.entity_mut(ent);
         trap::Nav_GetNearestNode(
             ctx.engine,
-            GNavGetnearestnodeArgs::new(ent, (*ent).waypoint, NF_CLEAR_PATH, targWp),
+            GNavGetnearestnodeArgs::new(ent.cast(), (*ent).waypoint, NF_CLEAR_PATH, targWp),
         )
     }
 }
@@ -527,7 +527,12 @@ pub fn NAV_FindClosestWaypointForPoint(
 
         let bestWP = trap::Nav_GetNearestNode(
             ctx.engine,
-            GNavGetnearestnodeArgs::new(marker, (*marker).waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
+            GNavGetnearestnodeArgs::new(
+                marker.cast(),
+                (*marker).waypoint,
+                NF_CLEAR_PATH,
+                WAYPOINT_NONE,
+            ),
         );
 
         G_FreeEntity(ctx, ctx.entity_id_of(marker));
@@ -557,7 +562,12 @@ pub fn NAV_FindClosestWaypointForPoint2(ctx: &mut GameContext, point: vec3_t) ->
 
         let bestWP = trap::Nav_GetNearestNode(
             ctx.engine,
-            GNavGetnearestnodeArgs::new(marker, (*marker).waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
+            GNavGetnearestnodeArgs::new(
+                marker.cast(),
+                (*marker).waypoint,
+                NF_CLEAR_PATH,
+                WAYPOINT_NONE,
+            ),
         );
 
         G_FreeEntity(ctx, ctx.entity_id_of(marker));
@@ -1562,7 +1572,7 @@ pub fn NAV_GetNearestNode(ctx: &mut GameContext, self_: EntityId, lastNode: c_in
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     trap::Nav_GetNearestNode(
         ctx.engine,
-        GNavGetnearestnodeArgs::new(self_, lastNode, NF_CLEAR_PATH, WAYPOINT_NONE),
+        GNavGetnearestnodeArgs::new(self_.cast(), lastNode, NF_CLEAR_PATH, WAYPOINT_NONE),
     )
 }
 
@@ -1822,7 +1832,7 @@ pub fn SP_waypoint(ctx: &mut GameContext, ent: EntityId) {
             (*ent).r.contents = CONTENTS_TRIGGER;
             (*ent).clipmask = MASK_DEADSOLID;
 
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
             (*ent).count = -1;
             (*ent).classname = c"waypoint".as_ptr() as *mut c_char;
@@ -1878,7 +1888,7 @@ pub fn SP_waypoint_small(ctx: &mut GameContext, ent: EntityId) {
             (*ent).r.contents = CONTENTS_TRIGGER;
             (*ent).clipmask = MASK_DEADSOLID;
 
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
             (*ent).count = -1;
             (*ent).classname = c"waypoint".as_ptr() as *mut c_char;
@@ -2163,7 +2173,7 @@ pub fn Svcmd_Nav_f(ctx: &mut GameContext) {
                 ctx.world.globals.NAVDEBUG_curGoal = trap::Nav_GetNearestNode(
                     ctx.engine,
                     GNavGetnearestnodeArgs::new(
-                        ent0,
+                        ent0.cast(),
                         (*ent0).waypoint,
                         NF_CLEAR_PATH,
                         WAYPOINT_NONE,
@@ -2463,7 +2473,7 @@ pub fn NAV_ShowDebugInfo(ctx: &mut GameContext) {
             // Get the nearest node to the player
             let mut nearestNode = trap::Nav_GetNearestNode(
                 ctx.engine,
-                GNavGetnearestnodeArgs::new(ent0, (*ent0).waypoint, NF_ANY, WAYPOINT_NONE),
+                GNavGetnearestnodeArgs::new(ent0.cast(), (*ent0).waypoint, NF_ANY, WAYPOINT_NONE),
             );
             let testNode = trap::Nav_GetBestNode(
                 ctx.engine,
@@ -2525,7 +2535,12 @@ pub fn NAV_FindPlayerWaypoint(ctx: &mut GameContext, clNum: c_int) {
         let ent = &mut ctx.world.g_entities[clNum as usize] as *mut gentity_t;
         (*ent).waypoint = trap::Nav_GetNearestNode(
             ctx.engine,
-            GNavGetnearestnodeArgs::new(ent, (*ent).lastWaypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
+            GNavGetnearestnodeArgs::new(
+                ent.cast(),
+                (*ent).lastWaypoint,
+                NF_CLEAR_PATH,
+                WAYPOINT_NONE,
+            ),
         );
     }
 }

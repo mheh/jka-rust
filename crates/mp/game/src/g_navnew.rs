@@ -1011,7 +1011,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
         else if {
             bestNode = trap::Nav_GetBestPathBetweenEnts(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETBESTPATHBETWEENENTS::GNavGetbestpathbetweenentsArgs::new(self_, goal_ent_ptr, NF_CLEAR_PATH),
+                mp_abi::game::syscalls::G_NAV_GETBESTPATHBETWEENENTS::GNavGetbestpathbetweenentsArgs::new(self_.cast(), goal_ent_ptr.cast(), NF_CLEAR_PATH),
             );
             bestNode == NODE_NONE
         } {
@@ -1194,7 +1194,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         trap::Nav_AddFailedNode(
                             ctx.engine,
                             mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(
-                                self_,
+                                self_.cast(),
                                 (*self_).waypoint,
                             ),
                         );
@@ -1254,7 +1254,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         trap::Nav_AddFailedNode(
                             ctx.engine,
                             mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(
-                                self_,
+                                self_.cast(),
                                 (*self_).waypoint,
                             ),
                         );

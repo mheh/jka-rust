@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -12,15 +12,15 @@ use abi_transport::generic::{
 /// pointer, so it is held as a raw pointer rather than turned into a return.
 #[derive(Debug)]
 pub struct GLinkentityArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
 }
 
 impl GLinkentityArgs {
-    pub const fn new(ent: *mut gentity_t) -> Self {
+    pub const fn new(ent: *mut gentity_s) -> Self {
         Self { ent }
     }
 
-    pub const fn ent(&self) -> *mut gentity_t {
+    pub const fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 }

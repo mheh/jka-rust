@@ -4,18 +4,18 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 /// `G_ICARUS_TASKIDSET` outbound game-to-engine syscall.
 #[derive(Debug)]
 pub struct GIcarusTaskidsetArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     task_type: c_int,
     task_id: c_int,
 }
 
 impl GIcarusTaskidsetArgs {
-    pub fn new(ent: *mut gentity_t, task_type: c_int, task_id: c_int) -> Self {
+    pub fn new(ent: *mut gentity_s, task_type: c_int, task_id: c_int) -> Self {
         Self {
             ent,
             task_type,
@@ -23,7 +23,7 @@ impl GIcarusTaskidsetArgs {
         }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
     pub fn task_type(&self) -> c_int {

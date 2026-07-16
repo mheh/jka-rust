@@ -39,6 +39,7 @@ const VTYPE_STRING: c_int = 2;
 const VTYPE_VECTOR: c_int = 3;
 
 use crate::ent_fn_enums::{EntBlocked, EntReached, EntThink};
+use crate::ent_id::ent_id;
 use crate::ent_id::resolve;
 use crate::g_client::SetClientViewAngle;
 use crate::g_combat::{player_die, G_Damage};
@@ -58,7 +59,6 @@ use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
 use mp_abi::game::syscalls::G_ROFF_PLAY::GRoffPlayArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
-use mp_qshared::common::mp::entity_id::ent_id;
 use std::ffi::CString;
 
 /// Raven `Q3_TaskIDClear`.
@@ -293,7 +293,7 @@ pub fn Q3_PlaySound(
             }
             trap::ICARUS_TaskIDSet(
                 ctx.engine,
-                GIcarusTaskidsetArgs::new(ent, taskID_t::TID_CHAN_VOICE as c_int, taskID),
+                GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_CHAN_VOICE as c_int, taskID),
             );
             return qfalse;
         }
@@ -334,13 +334,13 @@ pub fn Q3_Play(
                 // Save this off for later
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int, taskID),
                 );
 
                 (*ent).s.origin2 = (*ent).r.currentOrigin;
                 (*ent).s.angles2 = (*ent).r.currentAngles;
 
-                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
                 trap::ROFF_Play(
                     ctx.engine,
@@ -362,7 +362,7 @@ pub fn anglerCallback(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
-            GIcarusTaskidcompleteArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int),
+            GIcarusTaskidcompleteArgs::new(ent.cast(), taskID_t::TID_ANGLE_FACE as c_int),
         );
 
         // VectorMA(trBase, trDuration*0.001, trDelta, currentAngles)
@@ -386,7 +386,7 @@ pub fn anglerCallback(ctx: &mut GameContext, ent: EntityId) {
         // unconditionally clearing is behaviorally equivalent.
         (*ent).think = FnId::NONE;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -401,7 +401,7 @@ pub fn moverCallback(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
-            GIcarusTaskidcompleteArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int),
+            GIcarusTaskidcompleteArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int),
         );
 
         (*ent).s.loopSound = 0;
@@ -524,12 +524,12 @@ pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duratio
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
-            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+            GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int, taskID),
         );
         G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -570,12 +570,12 @@ pub fn Q3_Lerp2End(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration:
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
-            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+            GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int, taskID),
         );
         G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -657,7 +657,7 @@ pub fn Q3_Lerp2Pos(
             (*ent).reached = Some(EntReached::moveAndRotateCallback).into();
             trap::ICARUS_TaskIDSet(
                 ctx.engine,
-                GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_ANGLE_FACE as c_int, taskID),
             );
         } else {
             (*ent).reached = Some(EntReached::moverCallback).into();
@@ -669,12 +669,12 @@ pub fn Q3_Lerp2Pos(
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
-            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+            GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int, taskID),
         );
         G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -714,13 +714,13 @@ pub fn Q3_Lerp2Angles(
 
         trap::ICARUS_TaskIDSet(
             ctx.engine,
-            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+            GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_ANGLE_FACE as c_int, taskID),
         );
 
         (*ent).think = Some(EntThink::anglerCallback).into();
         (*ent).nextthink = ctx.world.level.time + duration as c_int;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1576,7 +1576,7 @@ pub fn MoveOwner(ctx: &mut GameContext, self_: EntityId) {
             G_SetOrigin(&mut *(owner), (*self_).r.currentOrigin);
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
-                GIcarusTaskidcompleteArgs::new(owner, taskID_t::TID_MOVE_NAV as c_int),
+                GIcarusTaskidcompleteArgs::new(owner.cast(), taskID_t::TID_MOVE_NAV as c_int),
             );
         }
     }
@@ -1617,7 +1617,7 @@ pub fn Q3_SetOrigin(ctx: &mut GameContext, entID: c_int, origin: vec3_t) {
     unsafe {
         let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
 
         if !(*ent).client.is_null() {
             let client = (*ent).client as *mut gclient_t;
@@ -1634,7 +1634,7 @@ pub fn Q3_SetOrigin(ctx: &mut GameContext, entID: c_int, origin: vec3_t) {
             G_SetOrigin(&mut *(ent), origin);
         }
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1702,7 +1702,7 @@ pub fn Q3_SetAngles(ctx: &mut GameContext, entID: c_int, angles: vec3_t) {
         } else {
             SetClientViewAngle(&mut *ent, angles);
         }
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1765,14 +1765,14 @@ pub fn Q3_Lerp2Origin(
         if taskID != -1 {
             trap::ICARUS_TaskIDSet(
                 ctx.engine,
-                GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int, taskID),
             );
         }
 
         G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
         G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1970,7 +1970,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             (*npc).goalEntity = None;
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
-                GIcarusTaskidcompleteArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int),
+                GIcarusTaskidcompleteArgs::new(ent.cast(), taskID_t::TID_MOVE_NAV as c_int),
             );
             return qfalse;
         }
@@ -3551,7 +3551,7 @@ pub fn SolidifyOwner(ctx: &mut GameContext, self_: EntityId) {
         } else {
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
-                GIcarusTaskidcompleteArgs::new(owner, taskID_t::TID_RESIZE as c_int),
+                GIcarusTaskidcompleteArgs::new(owner.cast(), taskID_t::TID_RESIZE as c_int),
             );
         }
     }
@@ -4202,7 +4202,11 @@ pub fn Q3_Set(
                 if Q3_SetTeleportDest(ctx, entID, vector_data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_MOVE_NAV as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse;
                 }
@@ -4241,7 +4245,11 @@ pub fn Q3_Set(
                 if Q3_SetNavGoal(ctx, entID, data) != qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_MOVE_NAV as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse; //Don't call it back
                 }
@@ -4252,7 +4260,11 @@ pub fn Q3_Set(
                     Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the top
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_ANIM_UPPER as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse; //Don't call it back
                 }
@@ -4263,7 +4275,11 @@ pub fn Q3_Set(
                     Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the bottom
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_ANIM_LOWER as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse; //Don't call it back
                 }
@@ -4274,7 +4290,11 @@ pub fn Q3_Set(
                 if Q3_SetAnimUpper(ctx, entID, data) != qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_ANIM_UPPER as c_int,
+                            taskID,
+                        ),
                     );
                     both += 1;
                 } else {
@@ -4292,7 +4312,11 @@ pub fn Q3_Set(
                 if Q3_SetAnimLower(ctx, entID, data) != qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_ANIM_LOWER as c_int,
+                            taskID,
+                        ),
                     );
                     both += 1;
                 } else {
@@ -4310,7 +4334,11 @@ pub fn Q3_Set(
                 if both >= 2 {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_BOTH as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_ANIM_BOTH as c_int,
+                            taskID,
+                        ),
                     );
                 }
                 if both != 0 {
@@ -4324,7 +4352,11 @@ pub fn Q3_Set(
                 Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the bottom
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANIM_LOWER as c_int,
+                        taskID,
+                    ),
                 );
                 return qfalse; //Don't call it back
             }
@@ -4335,7 +4367,11 @@ pub fn Q3_Set(
                 Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the top
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANIM_UPPER as c_int,
+                        taskID,
+                    ),
                 );
                 return qfalse; //Don't call it back
             }
@@ -4346,15 +4382,23 @@ pub fn Q3_Set(
                 Q3_SetAnimHoldTime(ctx, entID, int_data, qtrue);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_BOTH as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_ANIM_BOTH as c_int, taskID),
                 );
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANIM_UPPER as c_int,
+                        taskID,
+                    ),
                 );
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANIM_LOWER as c_int,
+                        taskID,
+                    ),
                 );
                 return qfalse; //Don't call it back
             }
@@ -4389,7 +4433,11 @@ pub fn Q3_Set(
                 if Q3_SetBState(ctx, entID, data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_BSTATE as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_BSTATE as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse; //don't complete
                 }
@@ -4401,7 +4449,11 @@ pub fn Q3_Set(
                 if Q3_SetTempBState(ctx, entID, data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_BSTATE as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_BSTATE as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse; //don't complete
                 }
@@ -4415,7 +4467,11 @@ pub fn Q3_Set(
                 Q3_SetDPitch(ctx, entID, float_data);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANGLE_FACE as c_int,
+                        taskID,
+                    ),
                 );
                 return qfalse;
             }
@@ -4425,7 +4481,11 @@ pub fn Q3_Set(
                 Q3_SetDYaw(ctx, entID, float_data);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANGLE_FACE as c_int,
+                        taskID,
+                    ),
                 );
                 return qfalse;
             }
@@ -4436,7 +4496,11 @@ pub fn Q3_Set(
                 Q3_SetViewTarget(ctx, entID, data);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(
+                        ent.cast(),
+                        taskID_t::TID_ANGLE_FACE as c_int,
+                        taskID,
+                    ),
                 );
                 return qfalse;
             }
@@ -4628,7 +4692,11 @@ pub fn Q3_Set(
                 if Q3_SetLocation(ctx, entID, data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
-                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_LOCATION as c_int, taskID),
+                        GIcarusTaskidsetArgs::new(
+                            ent.cast(),
+                            taskID_t::TID_LOCATION as c_int,
+                            taskID,
+                        ),
                     );
                     return qfalse;
                 }
@@ -4903,7 +4971,11 @@ pub fn Q3_Set(
                     if Q3_SetSolid(ctx, entID, qtrue) == qfalse {
                         trap::ICARUS_TaskIDSet(
                             ctx.engine,
-                            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_RESIZE as c_int, taskID),
+                            GIcarusTaskidsetArgs::new(
+                                ent.cast(),
+                                taskID_t::TID_RESIZE as c_int,
+                                taskID,
+                            ),
                         );
                         return qfalse;
                     }
@@ -5043,7 +5115,7 @@ pub fn Q3_Set(
 
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
-                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_BOTH as c_int, taskID),
+                    GIcarusTaskidsetArgs::new(ent.cast(), taskID_t::TID_ANIM_BOTH as c_int, taskID),
                 );
                 return qfalse;
             }

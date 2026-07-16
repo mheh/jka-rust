@@ -431,12 +431,12 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
         if exact != qfalse
             && trap::ICARUS_TaskIDPending(
                 ctx.engine,
-                GIcarusTaskidpendingArgs::new(npc, taskID_t::TID_ANGLE_FACE as c_int),
+                GIcarusTaskidpendingArgs::new(npc.cast(), taskID_t::TID_ANGLE_FACE as c_int),
             ) != 0
         {
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
-                GIcarusTaskidcompleteArgs::new(npc, taskID_t::TID_ANGLE_FACE as c_int),
+                GIcarusTaskidcompleteArgs::new(npc.cast(), taskID_t::TID_ANGLE_FACE as c_int),
             );
         }
         exact
@@ -755,7 +755,7 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
             let script_path_c = cstr(&script_path);
             trap::ICARUS_RunScript(
                 ctx.engine,
-                GIcarusRunscriptArgs::new(self_, script_path_c.as_ptr()),
+                GIcarusRunscriptArgs::new(self_.cast(), script_path_c.as_ptr()),
             );
         }
         qtrue

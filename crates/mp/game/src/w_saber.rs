@@ -551,7 +551,7 @@ pub fn SaberUpdateSelf(ctx: &mut GameContext, ent: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
 
         (*ent).nextthink = level_time;
@@ -1836,7 +1836,7 @@ pub fn WP_SabersCheckLock2(
             if !(*attacker).client.is_null() {
                 _VectorCopy(trace.endpos, &mut (*ac).ps.origin);
             }
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(attacker));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(attacker.cast()));
         }
         // now get the defender's dist and do it for him too
         _VectorSubtract(
@@ -1864,7 +1864,7 @@ pub fn WP_SabersCheckLock2(
                 _VectorCopy(trace.endpos, &mut (*dc).ps.origin);
             }
             G_SetOrigin(&mut *(defender), trace.endpos);
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(defender));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(defender.cast()));
         }
 
         // DONE!
@@ -7711,7 +7711,7 @@ pub fn MakeDeadSaber(ctx: &mut GameContext, ent: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent.cast()),
         );
     }
 }
@@ -7900,7 +7900,7 @@ pub fn saberReactivate(ctx: &mut GameContext, saberent: EntityId, saberOwner: En
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent.cast()),
         );
     }
 }
@@ -7992,7 +7992,7 @@ pub fn saberKnockDown(
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent.cast()),
         );
 
         if (*soc).saber[0].soundOff != 0 {
@@ -10938,14 +10938,18 @@ pub fn WP_SaberPositionUpdate(
 
                         trap::LinkEntity(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent),
+                            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
+                                saberent.cast(),
+                            ),
                         );
                     } else if (*client).ps.saberEntityNum != 0 {
                         // only do this stuff if your saber is active and has not been knocked out of the air.
                         crate::q_math::_VectorCopy(boltOrigin, &mut (*saberent).pos1);
                         trap::LinkEntity(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(saberent),
+                            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
+                                saberent.cast(),
+                            ),
                         );
 
                         if (*saberent).genericValue5 == PROPER_THROWN_VALUE {
@@ -11606,7 +11610,7 @@ pub fn WP_SaberPositionUpdate(
                 if !mySaber.is_null() && (*mySaber).inuse != 0 {
                     trap::LinkEntity(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(mySaber),
+                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(mySaber.cast()),
                     );
                 }
 

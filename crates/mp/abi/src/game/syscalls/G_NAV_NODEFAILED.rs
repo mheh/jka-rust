@@ -3,7 +3,7 @@ use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use core::ffi::c_int;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 use mp_qshared::shared::qboolean;
 
 /// `G_NAV_NODEFAILED` outbound game-to-engine syscall.
@@ -11,16 +11,16 @@ use mp_qshared::shared::qboolean;
 /// Mirrors `trap_Nav_NodeFailed(ent, node_id)` → `qboolean`.
 #[derive(Debug)]
 pub struct GNavNodefailedArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     node_id: c_int,
 }
 
 impl GNavNodefailedArgs {
-    pub fn new(ent: *mut gentity_t, node_id: c_int) -> Self {
+    pub fn new(ent: *mut gentity_s, node_id: c_int) -> Self {
         Self { ent, node_id }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -10,14 +10,14 @@ use abi_transport::generic::{
 /// `G_NAV_GETNEARESTNODE` outbound game-to-engine syscall.
 #[derive(Debug)]
 pub struct GNavGetnearestnodeArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     last_id: c_int,
     flags: c_int,
     target_id: c_int,
 }
 
 impl GNavGetnearestnodeArgs {
-    pub fn new(ent: *mut gentity_t, last_id: c_int, flags: c_int, target_id: c_int) -> Self {
+    pub fn new(ent: *mut gentity_s, last_id: c_int, flags: c_int, target_id: c_int) -> Self {
         Self {
             ent,
             last_id,
@@ -26,7 +26,7 @@ impl GNavGetnearestnodeArgs {
         }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
     pub fn last_id(&self) -> c_int {

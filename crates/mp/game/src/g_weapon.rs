@@ -2486,7 +2486,7 @@ pub fn thermalDetonatorExplode(ctx: &mut GameContext, ent: EntityId) {
 
             trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
             );
         }
     }
@@ -3043,7 +3043,7 @@ pub fn laserTrapThink(ctx: &mut GameContext, ent: EntityId) {
         // just relink it every think
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
 
         // turn on the beam effect
@@ -3345,7 +3345,7 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(laserTrap),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(laserTrap.cast()),
         );
     }
 }
@@ -3686,7 +3686,7 @@ pub fn drop_charge(ctx: &mut GameContext, self_: EntityId, start: vec3_t, dir: v
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(bolt),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(bolt.cast()),
         );
     }
 }
@@ -6443,7 +6443,7 @@ pub fn SP_emplaced_gun(ctx: &mut GameContext, ent: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
     }
 }

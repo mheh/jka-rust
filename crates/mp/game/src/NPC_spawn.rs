@@ -810,7 +810,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
             crate::g_utils::G_KillBox(ctx, ctx.entity_id_of(ent).unwrap());
             trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
             );
         }
 
@@ -848,7 +848,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
 
         trap::ICARUS_InitEnt(
             ctx.engine,
-            mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent),
+            mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent.cast()),
         );
 
         SetNPCGlobals(ctx, ctx.entity_id_of(ent).unwrap());
@@ -918,7 +918,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
 
         if (*client).playerTeam == NPCTEAM_ENEMY {
@@ -1000,7 +1000,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                             trap::LinkEntity(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
-                                    droid_ent,
+                                    droid_ent.cast(),
                                 ),
                             );
                             crate::q_math::_VectorCopy(
@@ -1403,7 +1403,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         (*newent).NPC_type = (*ent).NPC_type;
         trap::UnlinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(newent),
+            mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(newent.cast()),
         );
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*newent).s.angles);
@@ -1416,7 +1416,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent.cast()),
         );
         (*newent).spawnflags = (*ent).spawnflags;
 
@@ -1486,7 +1486,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent.cast()),
         );
 
         if (*ent).use_.is_none() {
@@ -3034,7 +3034,7 @@ pub fn NPC_SpawnType(
 
     trap::LinkEntity(
         ctx.engine,
-        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_spawner),
+        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_spawner.cast()),
     );
 
     unsafe {

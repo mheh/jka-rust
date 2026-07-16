@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 use mp_qshared::shared::qboolean;
 
 use abi_transport::generic::{
@@ -13,16 +13,16 @@ use abi_transport::generic::{
 /// Queries whether task `task_id` is still pending on entity `ent`.
 #[derive(Debug)]
 pub struct GIcarusTaskidpendingArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     task_id: c_int,
 }
 
 impl GIcarusTaskidpendingArgs {
-    pub fn new(ent: *mut gentity_t, task_id: c_int) -> Self {
+    pub fn new(ent: *mut gentity_s, task_id: c_int) -> Self {
         Self { ent, task_id }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

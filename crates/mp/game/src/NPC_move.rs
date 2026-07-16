@@ -562,7 +562,7 @@ pub fn NPC_ApplyRoff(ctx: &mut GameContext) {
         // use the precise origin for linking
         crate::trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc.cast()),
         );
     }
 }

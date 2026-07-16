@@ -75,7 +75,7 @@ use common::{
 };
 
 use mp_abi::game::exports::MpGameExport;
-use mp_qshared::common::mp::gentity::gentity_t;
+use mp_game::entity::gentity_t;
 use mp_qshared::common::mp::qcommon::player_state::forcedata_t;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 use mp_qshared::shared::limits::MAX_GENTITIES;

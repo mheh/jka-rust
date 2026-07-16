@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -8,15 +8,15 @@ use abi_transport::generic::{
 /// `G_ICARUS_ASSOCIATEENT` outbound game-to-engine syscall.
 #[derive(Debug)]
 pub struct GIcarusAssociateentArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
 }
 
 impl GIcarusAssociateentArgs {
-    pub fn new(ent: *mut gentity_t) -> Self {
+    pub fn new(ent: *mut gentity_s) -> Self {
         Self { ent }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 }

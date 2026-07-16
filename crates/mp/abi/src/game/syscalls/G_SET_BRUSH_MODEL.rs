@@ -2,7 +2,7 @@ use core::ffi::c_char;
 use std::ffi::CString;
 
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -16,17 +16,17 @@ use abi_transport::generic::{
 #[derive(Debug)]
 pub struct GSetBrushModelArgs {
     /// Entity whose brush model is being set.
-    pub ent: *mut gentity_t,
+    pub ent: *mut gentity_s,
     /// Null-terminated name of the inline brush model (e.g. `"*3"`).
     pub name: CString,
 }
 
 impl GSetBrushModelArgs {
-    pub fn new(ent: *mut gentity_t, name: CString) -> Self {
+    pub fn new(ent: *mut gentity_s, name: CString) -> Self {
         Self { ent, name }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

@@ -597,7 +597,7 @@ pub fn ST_HoldPosition(ctx: &mut GameContext) {
         // NPCInfo->combatPoint = -1;//??? (Raven comment).
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
-            GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
+            GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
         ) == 0
         {
             // don't have a script waiting for me to get to my point, okay to stop
@@ -698,7 +698,7 @@ pub fn ST_Move(ctx: &mut GameContext) -> qboolean {
             // (Raven comment).
             if trap::ICARUS_TaskIDPending(
                 ctx.engine,
-                GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
+                GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
             ) == 0
             {
                 // can't transfer movegoal or stop when a script we're running is
@@ -1680,7 +1680,7 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
-            GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
+            GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
         ) != 0
         {
             // moving toward a goal that a script is waiting on, so don't stop for
@@ -1784,7 +1784,7 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
             ) != qfalse
                 || (trap::ICARUS_TaskIDPending(
                     ctx.engine,
-                    GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
+                    GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
                 ) == 0
                     && (*NPCInfo).squadState == SQUAD_SCOUT
                     && ctx.world.globals.enemyLOS != qfalse
@@ -2207,7 +2207,7 @@ pub fn ST_TransferMoveGoal(ctx: &mut GameContext, self_: EntityId, other: Entity
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
-            GIcarusTaskidpendingArgs::new(self_, TID_MOVE_NAV as c_int),
+            GIcarusTaskidpendingArgs::new(self_.cast(), TID_MOVE_NAV as c_int),
         ) != 0
         {
             // can't transfer movegoal when a script we're running is waiting to
@@ -2372,7 +2372,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                 let npc_id_2 = ctx.entity_id_of(NPC).unwrap();
                 if trap::ICARUS_TaskIDPending(
                     ctx.engine,
-                    GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
+                    GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
                 ) != 0
                 {
                     // running somewhere that a script requires us to go, don't break
@@ -2508,7 +2508,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
 
             if trap::ICARUS_TaskIDPending(
                 ctx.engine,
-                GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int),
+                GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
             ) != 0
             {
                 // running somewhere that a script requires us to go

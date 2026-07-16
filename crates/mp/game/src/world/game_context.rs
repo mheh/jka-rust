@@ -74,7 +74,7 @@ impl GameContext<'_> {
 
 use core::ffi::{c_char, c_int};
 
-use mp_qshared::common::mp::gentity::gentity_t;
+use crate::entity::gentity_t;
 use mp_qshared::shared::{qboolean, vec3_t};
 
 use crate::prelude::*;

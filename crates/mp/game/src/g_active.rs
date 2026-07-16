@@ -717,7 +717,7 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
                 mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
                     &mins as *const vec3_t,
                     &maxs as *const vec3_t,
-                    hit as *const gentity_t,
+                    (hit as *const gentity_t).cast(),
                 ),
             ) == qfalse
             {
@@ -832,7 +832,7 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
                     mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
                         &mins as *const vec3_t,
                         &maxs as *const vec3_t,
-                        hit as *const gentity_t,
+                        (hit as *const gentity_t).cast(),
                     ),
                 ) == qfalse
                 {
@@ -923,7 +923,7 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
             }
             trap::UnlinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent),
+                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent.cast()),
             );
         }
 
@@ -1090,7 +1090,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
             G_SetOrigin(&mut *(droidEnt), (*droidEnt).r.currentOrigin);
             trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(droidEnt),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(droidEnt.cast()),
             );
 
             if !(*droidEnt).NPC.is_null() {
@@ -1891,7 +1891,7 @@ pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut 
                 G_SetAngles(&mut *(ent), (*cl).ps.viewangles);
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
                 ); //redundant?
             }
         }
@@ -3752,7 +3752,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         // link entity now, after any personal teleporters have been used
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
         if (*client).noclip == qfalse {
             G_TouchTriggers(ctx, ctx.entity_id_of(ent).unwrap());

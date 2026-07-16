@@ -244,8 +244,10 @@ pub use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 pub use mp_qshared::common::mp::botlib::print_type::{
     PRT_ERROR, PRT_EXIT, PRT_FATAL, PRT_MESSAGE, PRT_WARNING,
 };
+// `gentity_t` moved to `mp_game` (DEC-26); its constants/typedefs stay in qshared.
+pub use crate::entity::gentity_t;
 pub use mp_qshared::common::mp::gentity::{
-    gentity_t, material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
+    material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
     MAT_ELEC_METAL, MAT_GLASS, MAT_GLASS_METAL, MAT_GRATE1, MAT_GREY_STONE, MAT_LT_STONE,
     MAT_METAL, MAT_METAL2, MAT_METAL3, MAT_NONE, MAT_ROPE, MAT_SNOWY_ROCK, MAT_WHITE_METAL,
     MOVER_1TO2, MOVER_2TO1, MOVER_POS1, MOVER_POS2, NUM_MATERIALS,
@@ -257,7 +259,7 @@ pub use mp_qshared::common::mp::gentity::{
 // parameters cast through bgEntity_t, we re-export gentity_t under the bgEntity_t name to allow
 // those accesses (e.g. `(*bgEntity).spawnflags`).
 // Source: oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
-pub use mp_qshared::common::mp::gentity::gentity_t as bgEntity_t;
+pub use crate::entity::gentity_t as bgEntity_t;
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 pub use mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t;

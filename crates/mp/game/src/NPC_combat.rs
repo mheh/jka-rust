@@ -2442,7 +2442,7 @@ pub fn SP_point_combat(ctx: &mut GameContext, self_: EntityId) {
         G_SetOrigin(&mut *(self_), (*self_).s.origin);
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_.cast()),
         );
 
         if G_CheckInSolid(ctx, ctx.entity_id_of(self_).unwrap(), 1) != 0 {
@@ -3024,7 +3024,11 @@ pub fn NPC_SearchForWeapons(ctx: &mut GameContext) -> *mut gentity_t {
                     if dist < bestDist {
                         if trap::Nav_GetBestPathBetweenEnts(
                             ctx.engine,
-                            GNavGetbestpathbetweenentsArgs::new(npc, found, NF_CLEAR_PATH_LOCAL),
+                            GNavGetbestpathbetweenentsArgs::new(
+                                npc.cast(),
+                                found.cast(),
+                                NF_CLEAR_PATH_LOCAL,
+                            ),
                         ) == qfalse as c_int
                             || trap::Nav_GetBestNodeAltRoute2(
                                 ctx.engine,

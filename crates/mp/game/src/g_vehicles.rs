@@ -223,7 +223,7 @@ pub fn G_VehicleSpawn(ctx: &mut GameContext, self_: EntityId) {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         (*self_).s.origin = (*self_).r.currentOrigin;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
 
         if (*self_).count == 0 {
             (*self_).count = 1;
@@ -318,7 +318,7 @@ pub fn G_AttachToVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>, ucmd: *m
             &mut (*entClient).ps.origin,
         );
         crate::g_utils::G_SetOrigin(&mut *(ent), (*entClient).ps.origin);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1586,7 +1586,7 @@ pub fn UpdateRider(
 
                     if trap::ICARUS_TaskIDPending(
                         ctx.engine,
-                        GIcarusTaskidpendingArgs::new(rider, TID_CHAN_VOICE as c_int),
+                        GIcarusTaskidpendingArgs::new(rider.cast(), TID_CHAN_VOICE as c_int),
                     ) == qfalse
                     {
                         crate::g_utils::G_AddEvent(&mut *(rider), (EV_JUMP) as i32, 0);
@@ -1667,7 +1667,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             // assuming we updated him relative to the bolt in AttachRidersGeneric
             let pcl = (*pilot).client as *mut gclient_t;
             crate::g_utils::G_SetOrigin(&mut *(pilot), (*pcl).ps.origin);
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot.cast()));
         }
 
         if !(*pVeh).m_pOldPilot.is_null() {
@@ -1677,7 +1677,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
             let pcl = (*oldpilot).client as *mut gclient_t;
             crate::g_utils::G_SetOrigin(&mut *(oldpilot), (*pcl).ps.origin);
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(oldpilot));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(oldpilot.cast()));
         }
 
         // attach passengers
@@ -1721,7 +1721,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 );
 
                 crate::g_utils::G_SetOrigin(&mut *(pilot), (*ppc).ps.origin);
-                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot));
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot.cast()));
             }
             i += 1;
         }
@@ -1771,7 +1771,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 crate::g_utils::G_SetOrigin(&mut *(droid), (*dcl).ps.origin);
                 crate::g_utils::G_SetAngles(&mut *(droid), (*dcl).ps.viewangles);
                 crate::g_client::SetClientViewAngle(&mut *droid, (*dcl).ps.viewangles);
-                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(droid));
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(droid.cast()));
 
                 if !(*droid).NPC.is_null() {
                     crate::npc_c::NPC_SetAnim(
@@ -2615,7 +2615,7 @@ pub fn Eject(
             // Move them to the exit position.
             G_SetOrigin(&mut *(ent), vExitPos);
             (*((*ent).client as *mut gclient_t)).ps.origin = (*ent).r.currentOrigin;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
             // If it's the player, stop overrides. (MP: the override-clear body is
             // `#ifndef _JK2MP` — nothing to do here.)

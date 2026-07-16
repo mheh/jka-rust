@@ -666,7 +666,7 @@ pub fn GM_HoldPosition(ctx: &mut GameContext) {
         let pending = trap::ICARUS_TaskIDPending(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                npc_ent,
+                npc_ent.cast(),
                 taskID_t::TID_MOVE_NAV as c_int,
             ),
         );
@@ -707,7 +707,7 @@ pub fn GM_Move(ctx: &mut GameContext) -> qboolean {
             if trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                    npc_ent,
+                    npc_ent.cast(),
                     taskID_t::TID_MOVE_NAV as c_int,
                 ),
             ) == 0
@@ -751,7 +751,7 @@ pub fn GM_CheckMoveState(ctx: &mut GameContext) {
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                npc_ent,
+                npc_ent.cast(),
                 taskID_t::TID_MOVE_NAV as c_int,
             ),
         ) != 0
@@ -777,7 +777,7 @@ pub fn GM_CheckMoveState(ctx: &mut GameContext) {
             let script_pending = trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                    npc_ent,
+                    npc_ent.cast(),
                     taskID_t::TID_MOVE_NAV as c_int,
                 ),
             ) != 0;

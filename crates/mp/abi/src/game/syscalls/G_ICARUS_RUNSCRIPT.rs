@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -13,17 +13,17 @@ use abi_transport::generic::{
 #[derive(Debug)]
 pub struct GIcarusRunscriptArgs {
     /// Entity to run the script on.
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     /// Script name (null-terminated C string).
     name: *const c_char,
 }
 
 impl GIcarusRunscriptArgs {
-    pub fn new(ent: *mut gentity_t, name: *const c_char) -> Self {
+    pub fn new(ent: *mut gentity_s, name: *const c_char) -> Self {
         Self { ent, name }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

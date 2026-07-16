@@ -123,7 +123,7 @@ pub fn G_RunExPhys(
             (*ent).epVelocity[1] = 0.0;
             (*ent).epVelocity[2] = 0.0;
             (*ent).epGravFactor = 0.0;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
             return;
         }
 
@@ -239,7 +239,7 @@ pub fn G_RunExPhys(
         }
 
         G_SetOrigin(&mut *(ent), tr.endpos);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         if tr.fraction == 1.0f32 {
             return;

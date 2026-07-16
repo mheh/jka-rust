@@ -2,7 +2,7 @@
 
 use core::ffi::c_int;
 
-use mp_qshared::common::mp::gentity_t;
+use crate::entity::gentity_t;
 use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
 
 use crate::client::gclient_t;

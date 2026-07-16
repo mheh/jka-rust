@@ -4,7 +4,7 @@ use super::super::MpGameImport;
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 /// `G_ICARUS_TASKIDCOMPLETE` outbound game-to-engine syscall.
 ///
@@ -12,16 +12,16 @@ use mp_qshared::common::mp::gentity_t;
 /// Mirrors the C ABI: `void trap_ICARUS_TaskIDComplete(gentity_t *ent, int task_type)`.
 #[derive(Debug)]
 pub struct GIcarusTaskidcompleteArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     task_type: c_int,
 }
 
 impl GIcarusTaskidcompleteArgs {
-    pub fn new(ent: *mut gentity_t, task_type: c_int) -> Self {
+    pub fn new(ent: *mut gentity_s, task_type: c_int) -> Self {
         Self { ent, task_type }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

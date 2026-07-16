@@ -267,7 +267,7 @@ pub fn SP_light(ctx: &mut GameContext, self_: EntityId) {
             &mut (*self_).fly_sound_debounce_time as *mut c_int,
         );
         G_SetOrigin(&mut *(self_), (*self_).s.origin);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
 
         (*self_).use_ = Some(EntUse::misc_dlight_use).into();
 
@@ -313,7 +313,7 @@ pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, a
         }
 
         // unlink to make sure it can't possibly interfere with G_KillBox
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(player));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(player.cast()));
 
         crate::q_math::_VectorCopy(
             origin,
@@ -360,7 +360,7 @@ pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, a
         );
 
         if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(player));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(player.cast()));
         }
     }
 }
@@ -468,7 +468,7 @@ pub fn SP_misc_portal_surface(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         (*ent).r.mins = [0.0, 0.0, 0.0];
         (*ent).r.maxs = [0.0, 0.0, 0.0];
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         (*ent).r.svFlags = SVF_PORTAL;
         (*ent).s.eType = entityType_t::ET_PORTAL as c_int;
@@ -493,7 +493,7 @@ pub fn SP_misc_portal_camera(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         (*ent).r.mins = [0.0, 0.0, 0.0];
         (*ent).r.maxs = [0.0, 0.0, 0.0];
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         let mut roll: f32 = 0.0;
         G_SpawnFloat(ctx, c"roll".as_ptr(), c"0".as_ptr(), &mut roll as *mut f32);
@@ -560,7 +560,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         write_cstr_field(&mut temp, &format!("#{}", cstr_to_str(out)));
         trap::SetBrushModel(
             ctx.engine,
-            GSetBrushModelArgs::new(ent, cstr(&cstr_to_str(temp.as_ptr()))),
+            GSetBrushModelArgs::new(ent.cast(), cstr(&cstr_to_str(temp.as_ptr()))),
         ); // SV_SetBrushModel -- sets mins and maxs
         crate::g_utils::G_BSPIndex(ctx, temp.as_ptr());
 
@@ -590,7 +590,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
 
         (*ent).s.eType = entityType_t::ET_MOVER as c_int;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         trap::SetActiveSubBSP(ctx.engine, GSetActiveSubbspArgs::new((*ent).s.modelindex));
         crate::g_spawn::G_SpawnEntitiesFromString(ctx, qtrue);
@@ -626,7 +626,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.angles = [0.0, 0.0, 0.0];
         trap::SetBrushModel(
             ctx.engine,
-            GSetBrushModelArgs::new(ent, cstr(&cstr_to_str((*ent).model))),
+            GSetBrushModelArgs::new(ent.cast(), cstr(&cstr_to_str((*ent).model))),
         );
 
         // Get the shader from the top of the brush
@@ -800,7 +800,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.eType = entityType_t::ET_TERRAIN as c_int;
 
         // Hook into the world so physics will work
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         // If running RMG then initialize the terrain and handle team skins
         if ctx.world.cvars.g_RMG.integer != 0 {
@@ -1226,7 +1226,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
 
                     (*ent).pos2[0] = 0.0;
 
-                    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+                    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
                     justthink(ent, ctx);
                     return;
@@ -1244,7 +1244,7 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
 
             (*ent).pos2[0] = 0.0;
 
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
         }
 
         justthink(ent, ctx);
@@ -1362,7 +1362,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
 
         (*ent).touch = Some(EntTouch::HolocronTouch).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         (*ent).think = Some(EntThink::HolocronThink).into();
         (*ent).nextthink = ctx.world.level.time + 50;
@@ -1481,7 +1481,7 @@ pub fn InitShooter(ctx: &mut GameContext, ent: EntityId, weapon: c_int) {
             (*ent).think = Some(EntThink::InitShooter_Finish).into();
             (*ent).nextthink = ctx.world.level.time + 500;
         }
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1927,7 +1927,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).use_ = Some(EntUse::ammo_generic_power_converter_use).into();
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         G_SoundIndex(c"sound/interface/ammocon_run".as_ptr());
         (*ent).genericValue7 = G_SoundIndex(c"sound/interface/ammocon_done".as_ptr());
@@ -2047,7 +2047,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).use_ = Some(EntUse::shield_power_converter_use).into();
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         G_SoundIndex(c"sound/interface/shieldcon_run".as_ptr());
         (*ent).genericValue7 = G_SoundIndex(c"sound/interface/shieldcon_done".as_ptr());
@@ -2102,7 +2102,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: &mut GameContext, ent: EntityId
 
         G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         //G_SoundIndex("sound/movers/objects/useshieldstation.wav");
 
@@ -2248,7 +2248,7 @@ pub fn SP_misc_model_ammo_power_converter(ctx: &mut GameContext, ent: EntityId) 
 
         G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         //G_SoundIndex("sound/movers/objects/useshieldstation.wav");
     }
@@ -2370,7 +2370,7 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
 
         G_SetOrigin(&mut *(ent), (*ent).s.origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         //G_SoundIndex("sound/movers/objects/useshieldstation.wav");
         G_SoundIndex(c"sound/player/pickuphealth.wav".as_ptr());
@@ -2711,7 +2711,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
         (*ent).r.maxs = [FX_ENT_RADIUS, FX_ENT_RADIUS, FX_ENT_RADIUS];
         crate::q_math::_VectorScale((*ent).r.maxs, -1.0, &mut (*ent).r.mins);
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -3062,7 +3062,7 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
         (*self_).health = 10;
         (*self_).die = Some(EntDie::maglock_die).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
 }
 
@@ -3219,7 +3219,7 @@ pub fn misc_faller_create(
         (*faller).epVelocity[0] = ctx.world.bg_state.rng.flrand(-256.0, 256.0);
         (*faller).epVelocity[1] = ctx.world.bg_state.rng.flrand(-256.0, 256.0);
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(faller));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(faller.cast()));
     }
 }
 

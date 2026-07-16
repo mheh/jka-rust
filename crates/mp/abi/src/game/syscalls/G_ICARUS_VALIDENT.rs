@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 use mp_qshared::shared::qboolean;
 
 use abi_transport::generic::{
@@ -13,15 +13,15 @@ use abi_transport::generic::{
 #[derive(Debug)]
 pub struct GIcarusValidentArgs {
     /// Entity to query.
-    pub ent: *mut gentity_t,
+    pub ent: *mut gentity_s,
 }
 
 impl GIcarusValidentArgs {
-    pub fn new(ent: *mut gentity_t) -> Self {
+    pub fn new(ent: *mut gentity_s) -> Self {
         Self { ent }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 }

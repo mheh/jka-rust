@@ -706,7 +706,7 @@ pub fn BodyRid(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
         (*ent).physicsObject = qfalse;
     }
 }
@@ -2933,7 +2933,7 @@ pub fn player_die(
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_.cast()),
         );
 
         if !(*self_).NPC.is_null() {
@@ -3741,7 +3741,7 @@ pub fn G_Dismember(
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(limb),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(limb.cast()),
         );
     }
 }

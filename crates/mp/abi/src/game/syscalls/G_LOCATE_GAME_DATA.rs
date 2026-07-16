@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 use mp_qshared::common::mp::qcommon::playerState_t;
 
 use abi_transport::generic::{
@@ -13,7 +13,7 @@ use abi_transport::generic::{
 /// Mirrors: `syscall( G_LOCATE_GAME_DATA, gEnts, numGEntities, sizeofGEntity_t, clients, sizeofGClient )`
 #[derive(Debug)]
 pub struct GLocateGameDataArgs {
-    g_ents: *mut gentity_t,
+    g_ents: *mut gentity_s,
     num_g_entities: c_int,
     sizeof_g_entity_t: c_int,
     clients: *mut playerState_t,
@@ -22,7 +22,7 @@ pub struct GLocateGameDataArgs {
 
 impl GLocateGameDataArgs {
     pub fn new(
-        g_ents: *mut gentity_t,
+        g_ents: *mut gentity_s,
         num_g_entities: c_int,
         sizeof_g_entity_t: c_int,
         clients: *mut playerState_t,
@@ -37,7 +37,7 @@ impl GLocateGameDataArgs {
         }
     }
 
-    pub fn g_ents(&self) -> *mut gentity_t {
+    pub fn g_ents(&self) -> *mut gentity_s {
         self.g_ents
     }
 

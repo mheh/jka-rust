@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use mp_qshared::common::mp::gentity::gentity_t;
+use crate::entity::gentity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::vec3_t;
 

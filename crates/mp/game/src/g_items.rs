@@ -371,7 +371,7 @@ pub fn ShieldGoSolid(ctx: &mut GameContext, self_: EntityId) {
             // gah, we can't activate yet
             (*self_).nextthink = ctx.world.level.time + 200;
             (*self_).think = Some(EntThink::ShieldGoSolid).into();
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
         } else {
             // get hard... huh-huh...
             (*self_).s.eFlags &= !EF_NODRAW;
@@ -380,7 +380,7 @@ pub fn ShieldGoSolid(ctx: &mut GameContext, self_: EntityId) {
             (*self_).nextthink = ctx.world.level.time + 1000;
             (*self_).think = Some(EntThink::ShieldThink).into();
             (*self_).takedamage = qtrue;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
 
             // Play raising sound...
             G_AddEvent(
@@ -411,7 +411,7 @@ pub fn ShieldGoNotSolid(ctx: &mut GameContext, self_: EntityId) {
         (*self_).nextthink = ctx.world.level.time + 200;
         (*self_).think = Some(EntThink::ShieldGoSolid).into();
         (*self_).takedamage = qfalse;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
 
         // Play kill sound...
         G_AddEvent(
@@ -621,7 +621,7 @@ pub fn CreateShield(ctx: &mut GameContext, ent: EntityId) {
             (*ent).nextthink = ctx.world.level.time + 200;
             (*ent).think = Some(EntThink::ShieldGoSolid).into();
             (*ent).takedamage = qfalse;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
         } else {
             // Get solid.
             (*ent).r.contents = CONTENTS_PLAYERCLIP | CONTENTS_SHOTCLIP; //CONTENTS_SOLID;
@@ -630,7 +630,7 @@ pub fn CreateShield(ctx: &mut GameContext, ent: EntityId) {
             (*ent).think = Some(EntThink::ShieldThink).into();
 
             (*ent).takedamage = qtrue;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
             // Play raising sound...
             G_AddEvent(
@@ -764,7 +764,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
                 (*shield).s.eFlags &= !EF_NODRAW;
                 (*shield).r.svFlags &= !SVF_NOCLIENT;
 
-                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(shield));
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(shield.cast()));
 
                 (*shield).s.owner = (*playerent).s.number;
                 (*shield).s.shouldtarget = qtrue;
@@ -1541,7 +1541,7 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         (*((*ent).client as *mut gclient_t)).ps.fd.sentryDeployed = qtrue;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(sentry));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(sentry.cast()));
 
         (*sentry).s.owner = (*ent).s.number;
         (*sentry).s.shouldtarget = qtrue;
@@ -1956,7 +1956,7 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
 
             G_SetOrigin(&mut *(eItem), pos);
             (*eItem).s.origin = (*eItem).r.currentOrigin;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(eItem));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(eItem.cast()));
 
             G_SpecialSpawnItem(ctx, ctx.entity_id_of(eItem).unwrap(), item);
 
@@ -2865,7 +2865,7 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         (*ent).angle = 0.0;
 
         (*ent).r.ownerNum = (*spawner).s.number;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         // store off the owner's current weapons, we will be forcing him to use the "emplaced" weapon
         (*ent).genericValue11 =
@@ -3434,7 +3434,7 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
         //ent->s.eFlags &= ~EF_NODRAW;
         (*ent).s.eFlags &= !(EF_NODRAW | EF_ITEMPLACEHOLDER);
         (*ent).r.svFlags &= !SVF_NOCLIENT;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         if (*(*ent).item).giType == IT_POWERUP {
             // play powerup spawn sound to all clients
@@ -3869,7 +3869,7 @@ pub fn Touch_Item(
             (*ent).nextthink = ctx.world.level.time + respawn * 1000;
             (*ent).think = Some(EntThink::RespawnItem).into();
         }
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -3954,7 +3954,7 @@ pub fn LaunchItem(
 
         (*dropped).physicsObject = qtrue;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(dropped));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(dropped.cast()));
 
         dropped
     }
@@ -4175,7 +4175,7 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -4493,7 +4493,7 @@ pub fn G_RunItem(ctx: &mut GameContext, ent: EntityId) {
             tr.fraction = 0.0;
         }
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent)); // FIXME: avoid this for stationary?
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast())); // FIXME: avoid this for stationary?
 
         // check think function
         G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());

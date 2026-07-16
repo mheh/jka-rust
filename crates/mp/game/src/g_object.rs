@@ -161,7 +161,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
             crate::q_math::_VectorCopy(tr.endpos, &mut (*ent).r.currentOrigin);
             crate::trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(&mut *ent),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(&mut *ent.cast()),
             );
         } else {
             // if ( tr.startsolid )

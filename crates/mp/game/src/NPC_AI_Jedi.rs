@@ -6330,7 +6330,9 @@ pub fn Jedi_Combat(ctx: &mut GameContext) {
                         crate::g_utils::G_SetOrigin(&mut *(tempGoal), (*npc_info).blockedDest);
                         crate::trap::LinkEntity(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(tempGoal),
+                            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
+                                tempGoal.cast(),
+                            ),
                         );
                         if Jedi_TryJump(ctx, ctx.entity_id_of(tempGoal)) != qfalse {
                             //going to jump to the dest
@@ -7175,7 +7177,7 @@ pub fn NPC_BSJedi_FollowLeader(ctx: &mut GameContext) {
                     crate::g_utils::G_SetOrigin(&mut *(tempGoal), (*npc_info).blockedDest);
                     crate::trap::LinkEntity(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(tempGoal),
+                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(tempGoal.cast()),
                     );
                     crate::g_timer::TIMER_Set(
                         ctx,

@@ -6,7 +6,7 @@
 
 use core::ffi::c_int;
 
-use mp_qshared::common::mp::gentity::gentity_t;
+use crate::entity::gentity_t;
 use mp_qshared::shared::vec3_t;
 
 /// Raven `MAX_ALERT_EVENTS`. Source: `oracle/codemp/game/g_local.h:777`

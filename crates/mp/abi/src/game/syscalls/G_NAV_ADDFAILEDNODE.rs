@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 
 use abi_transport::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -8,16 +8,16 @@ use abi_transport::generic::{
 /// `G_NAV_ADDFAILEDNODE` outbound game-to-engine syscall.
 #[derive(Debug)]
 pub struct GNavAddfailednodeArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     node_id: i32,
 }
 
 impl GNavAddfailednodeArgs {
-    pub fn new(ent: *mut gentity_t, node_id: i32) -> Self {
+    pub fn new(ent: *mut gentity_s, node_id: i32) -> Self {
         Self { ent, node_id }
     }
 
-    pub fn ent(&self) -> *mut gentity_t {
+    pub fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

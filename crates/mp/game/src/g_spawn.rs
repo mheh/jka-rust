@@ -861,8 +861,8 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         }
 
         // Tag on the ICARUS scripting information only to valid recipients
-        if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(ent)) != qfalse {
-            trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(ent));
+        if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(ent.cast())) != qfalse {
+            trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(ent.cast()));
 
             if !(*ent).classname.is_null() && *(*ent).classname != 0 {
                 if Q_strncmp(c"NPC_".as_ptr(), (*ent).classname, 4) != 0 {
@@ -1516,7 +1516,7 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
                 (*script_runner).nextthink = ctx.world.level.time + 100;
 
                 if (*script_runner).inuse != qfalse {
-                    trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(script_runner));
+                    trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(script_runner.cast()));
                 }
             }
         }

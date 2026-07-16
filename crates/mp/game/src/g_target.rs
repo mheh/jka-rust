@@ -83,7 +83,7 @@ pub fn Use_Target_Give(
 
             // make sure it isn't going to respawn or show any events
             (*t).nextthink = 0;
-            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(t));
+            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(t.cast()));
         }
     }
 }
@@ -503,7 +503,10 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
         e.s.soundSetIndex = soundset;
         e.s.eFlags = mp_bg::public::entity_flags::EF_PERMANENT;
         e.s.pos.trBase = e.s.origin;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ctx.entity_mut(ent)));
+        trap::LinkEntity(
+            ctx.engine,
+            GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(ent)).cast()),
+        );
         return;
     }
 
@@ -551,7 +554,10 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
     e.s.pos.trBase = e.s.origin;
 
     // must link the entity so we get areas and clusters
-    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ctx.entity_mut(ent)));
+    trap::LinkEntity(
+        ctx.engine,
+        GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(ent)).cast()),
+    );
 }
 
 /// Raven `target_laser_think`.
@@ -635,7 +641,10 @@ pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
     s.s.origin2[1] = tr.endpos[1];
     s.s.origin2[2] = tr.endpos[2];
 
-    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ctx.entity_mut(self_)));
+    trap::LinkEntity(
+        ctx.engine,
+        GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(self_)).cast()),
+    );
     ctx.entity_mut(self_).nextthink = ctx.world.level.time + crate::g_items::FRAMETIME;
 }
 
@@ -654,7 +663,10 @@ pub fn target_laser_on(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_target.c:386-390`
 pub fn target_laser_off(ctx: &mut GameContext, self_: EntityId) {
-    trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ctx.entity_mut(self_)));
+    trap::UnlinkEntity(
+        ctx.engine,
+        GUnlinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(self_)).cast()),
+    );
     ctx.entity_mut(self_).nextthink = 0;
 }
 
@@ -1167,8 +1179,10 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
                     }
                 }
 
-                if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(activator_ent)) != 0 {
-                    trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(activator_ent));
+                if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(activator_ent.cast()))
+                    != 0
+                {
+                    trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(activator_ent.cast()));
                 } else {
                     if ctx.world.cvars.g_developer.integer != 0 {
                         // Informational debug message
@@ -1188,7 +1202,7 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
             );
             trap::ICARUS_RunScript(
                 ctx.engine,
-                GIcarusRunscriptArgs::new(activator_ent, cstr(&script_path).as_ptr()),
+                GIcarusRunscriptArgs::new(activator_ent.cast(), cstr(&script_path).as_ptr()),
             );
         } else {
             let self_ptr: *mut gentity_t = ctx.entity_mut(self_);

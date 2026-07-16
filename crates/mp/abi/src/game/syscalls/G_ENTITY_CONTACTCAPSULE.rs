@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 use mp_qshared::shared::qboolean;
 use mp_qshared::shared::vec3_t;
 
@@ -14,11 +14,11 @@ use abi_transport::generic::{
 pub struct GEntityContactcapsuleArgs {
     mins: *const vec3_t,
     maxs: *const vec3_t,
-    ent: *const gentity_t,
+    ent: *const gentity_s,
 }
 
 impl GEntityContactcapsuleArgs {
-    pub fn new(mins: *const vec3_t, maxs: *const vec3_t, ent: *const gentity_t) -> Self {
+    pub fn new(mins: *const vec3_t, maxs: *const vec3_t, ent: *const gentity_s) -> Self {
         Self { mins, maxs, ent }
     }
 
@@ -30,7 +30,7 @@ impl GEntityContactcapsuleArgs {
         self.maxs
     }
 
-    pub fn ent(&self) -> *const gentity_t {
+    pub fn ent(&self) -> *const gentity_s {
         self.ent
     }
 }

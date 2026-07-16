@@ -18,6 +18,7 @@
 use crate::bg_misc::vectoyaw;
 use crate::bg_panimate::PM_InKnockDown;
 use crate::ent_fn_enums::EntThink;
+use crate::ent_id::ent_id_opt;
 use crate::g_nav::NPC_SetMoveGoal;
 use crate::g_nav::{NAV_FindClosestWaypointForEnt, NAV_GetNearestNode};
 use crate::g_timer::{TIMER_Done, TIMER_Set};
@@ -57,7 +58,6 @@ use mp_abi::game::syscalls::G_NAV_GETNODEEDGE::GNavGetnodeedgeArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODENUMEDGES::GNavGetnodenumedgesArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
-use mp_qshared::common::mp::entity_id::ent_id_opt;
 use mp_qshared::shared::MASK_SHOT;
 
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
@@ -269,7 +269,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
             {
                 trap::ICARUS_TaskIDComplete(
                     ctx.engine,
-                    GIcarusTaskidcompleteArgs::new(NPC, taskID_t::TID_BSTATE as c_int),
+                    GIcarusTaskidcompleteArgs::new(NPC.cast(), taskID_t::TID_BSTATE as c_int),
                 );
             }
         }
@@ -913,7 +913,7 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
                     (*NPC).flags &= !FL_NO_KNOCKBACK;
                     trap::ICARUS_TaskIDComplete(
                         ctx.engine,
-                        GIcarusTaskidcompleteArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int),
+                        GIcarusTaskidcompleteArgs::new(NPC.cast(), taskID_t::TID_MOVE_NAV as c_int),
                     );
                 }
             }
@@ -1398,7 +1398,7 @@ pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
-            GIcarusTaskidpendingArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int),
+            GIcarusTaskidpendingArgs::new(NPC.cast(), taskID_t::TID_MOVE_NAV as c_int),
         ) == 0
             && (*npc_client).ps.groundEntityNum != ENTITYNUM_NONE
             && (*npc_client).ps.weaponTime == 0
@@ -1588,7 +1588,7 @@ pub fn NPC_StartFlee(
         let npc_id = ctx.entity_id_of(NPC);
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
-            GIcarusTaskidpendingArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int),
+            GIcarusTaskidpendingArgs::new(NPC.cast(), taskID_t::TID_MOVE_NAV as c_int),
         ) != 0
         {
             return;

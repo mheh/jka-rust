@@ -111,7 +111,10 @@ pub fn InitTrigger(ctx: &mut GameContext, self_id: EntityId) {
 
         trap::SetBrushModel(
             ctx.engine,
-            GSetBrushModelArgs::new(self_, std::ffi::CStr::from_ptr((*self_).model).to_owned()),
+            GSetBrushModelArgs::new(
+                self_.cast(),
+                std::ffi::CStr::from_ptr((*self_).model).to_owned(),
+            ),
         );
         (*self_).r.contents = CONTENTS_TRIGGER; // replaces the -1 from trap_SetBrushModel
         (*self_).r.svFlags = SVF_NOCLIENT;
@@ -836,7 +839,7 @@ pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
         }
 
         InitTrigger(ctx, ent_id);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -893,7 +896,7 @@ pub fn SP_trigger_once(ctx: &mut GameContext, ent_id: EntityId) {
         (*ent).delay *= 1000; // 1 = 1 msec, 1000 = 1 sec
 
         InitTrigger(ctx, ent_id);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1079,7 +1082,7 @@ pub fn SP_trigger_lightningstrike(ctx: &mut GameContext, ent_id: EntityId) {
         }
 
         InitTrigger(ctx, ent_id);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -1344,7 +1347,7 @@ pub fn SP_trigger_push(ctx: &mut GameContext, self_id: EntityId) {
 
         (*self_).think = Some(EntThink::AimAtTarget).into();
         (*self_).nextthink = ctx.world.level.time + FRAMETIME;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
 }
 
@@ -1500,7 +1503,7 @@ pub fn SP_trigger_teleport(ctx: &mut GameContext, self_id: EntityId) {
         (*self_).s.eType = ET_TELEPORT_TRIGGER as c_int;
         (*self_).touch = Some(EntTouch::trigger_teleporter_touch).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
 }
 
@@ -1527,9 +1530,9 @@ pub fn hurt_use(
         G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
 
         if (*self_).r.linked != 0 {
-            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_));
+            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_.cast()));
         } else {
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
         }
     }
 }
@@ -1733,9 +1736,9 @@ pub fn SP_trigger_hurt(ctx: &mut GameContext, self_id: EntityId) {
 
         // link in to the world if starting active
         if (*self_).spawnflags & 1 == 0 {
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
         } else if (*self_).r.linked != 0 {
-            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_));
+            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_.cast()));
         }
     }
 }
@@ -1817,7 +1820,7 @@ pub fn SP_trigger_space(ctx: &mut GameContext, self_id: EntityId) {
 
         (*self_).touch = Some(EntTouch::space_touch).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
 }
 
@@ -1888,7 +1891,7 @@ pub fn shipboundary_touch(
         }
 
         // make sure this sucker is linked so the prediction knows where to go
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         (*other_client).ps.vehTurnaroundIndex = (*ent).s.number;
         (*other_client).ps.vehTurnaroundTime = ctx.world.level.time + (*self_).genericValue1 * 2;
@@ -1986,7 +1989,7 @@ pub fn SP_trigger_shipboundary(ctx: &mut GameContext, self_id: EntityId) {
         (*self_).nextthink = ctx.world.level.time + 500;
         (*self_).touch = Some(EntTouch::shipboundary_touch).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
 }
 
@@ -2215,7 +2218,7 @@ pub fn SP_trigger_hyperspace(ctx: &mut GameContext, self_id: EntityId) {
 
         (*self_).touch = Some(EntTouch::hyperspace_touch).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
 
         // self->think = trigger_hyperspace_find_targets;
         // self->nextthink = level.time + FRAMETIME;
@@ -2570,7 +2573,10 @@ pub fn SP_trigger_asteroid_field(ctx: &mut GameContext, self_: EntityId) {
         let self_ = ctx.entity_mut(self_) as *mut gentity_t;
         trap::SetBrushModel(
             ctx.engine,
-            GSetBrushModelArgs::new(self_, std::ffi::CStr::from_ptr((*self_).model).to_owned()),
+            GSetBrushModelArgs::new(
+                self_.cast(),
+                std::ffi::CStr::from_ptr((*self_).model).to_owned(),
+            ),
         );
         // self->r.contents = CONTENTS_TRIGGER; // replaces the -1 from trap_SetBrushModel
         (*self_).r.contents = 0;
@@ -2587,6 +2593,6 @@ pub fn SP_trigger_asteroid_field(ctx: &mut GameContext, self_: EntityId) {
         (*self_).think = Some(EntThink::asteroid_field_think).into();
         (*self_).nextthink = ctx.world.level.time + 100;
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
 }

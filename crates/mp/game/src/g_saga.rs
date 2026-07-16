@@ -1726,7 +1726,7 @@ pub fn SP_info_siege_objective(ctx: &mut GameContext, ent: EntityId) {
         (*ent).s.frame = (*ent).objective;
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
     }
 }
@@ -1807,7 +1807,7 @@ pub fn SP_info_siege_radaricon(ctx: &mut GameContext, ent: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
     }
 }
@@ -2090,7 +2090,7 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
                 crate::q_math::_VectorCopy(new_origin, &mut (*ent).r.currentOrigin);
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
                 );
             }
         } else if (*ent).genericValue1 != 0 {
@@ -2412,7 +2412,7 @@ pub fn SiegeItemUse(
                 G_SetOrigin(&mut *(ent), (*targ).r.currentOrigin);
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
                 );
             }
         }
@@ -2686,7 +2686,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
     }
 }

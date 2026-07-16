@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use mp_qshared::common::mp::gentity_t;
+use mp_qshared::common::mp::gentity_s;
 use mp_qshared::shared::qboolean;
 
 use abi_transport::generic::{
@@ -12,16 +12,16 @@ use abi_transport::generic::{
 /// PVS and area connectivity. `open` is a `qboolean`.
 #[derive(Debug)]
 pub struct GAdjustAreaPortalStateArgs {
-    ent: *mut gentity_t,
+    ent: *mut gentity_s,
     open: qboolean,
 }
 
 impl GAdjustAreaPortalStateArgs {
-    pub const fn new(ent: *mut gentity_t, open: qboolean) -> Self {
+    pub const fn new(ent: *mut gentity_s, open: qboolean) -> Self {
         Self { ent, open }
     }
 
-    pub const fn ent(&self) -> *mut gentity_t {
+    pub const fn ent(&self) -> *mut gentity_s {
         self.ent
     }
 

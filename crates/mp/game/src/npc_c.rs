@@ -468,7 +468,7 @@ pub fn pitch_roll_for_slope(
                 (*forwhom).r.currentOrigin[2] = (*client).ps.origin[2];
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom.cast()),
                 );
             }
         } else {
@@ -1368,7 +1368,7 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
                         && trap::ICARUS_TaskIDPending(
                             ctx.engine,
                             mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                                npc_ent,
+                                npc_ent.cast(),
                                 taskID_t::TID_MOVE_NAV as c_int,
                             ),
                         ) == 0
@@ -1642,7 +1642,7 @@ pub fn NPC_CheckInSolid(ctx: &mut GameContext) {
             crate::g_utils::G_SetOrigin(&mut *(npc_ent), (*npc_info).lastClearOrigin);
             trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent.cast()),
             );
         }
     }

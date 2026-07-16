@@ -373,7 +373,9 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
 
     trap::LinkEntity(
         ctx.engine,
-        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ctx.entity_mut(ent)),
+        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
+            core::ptr::from_mut(ctx.entity_mut(ent)).cast(),
+        ),
     );
 }
 
@@ -638,7 +640,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 }
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
                 );
                 return;
             }
@@ -709,7 +711,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 }
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
                 );
                 return;
             }
@@ -1167,7 +1169,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
         );
     }
 }
@@ -1281,13 +1283,13 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
             crate::q_math::_VectorCopy(origin, &mut (*ent).r.currentOrigin);
             trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
             );
             // Fall through to passthrough label
         } else {
             trap::LinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
             );
 
             if (*ent).s.weapon == G2_MODEL_PART && (*ent).bounceCount == 0 {

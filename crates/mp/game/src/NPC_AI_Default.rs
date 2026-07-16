@@ -383,7 +383,7 @@ pub fn NPC_BSFace(ctx: &mut GameContext) {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
-                ctx.world.globals.NPC,
+                ctx.world.globals.NPC.cast(),
                 TID_BSTATE as c_int,
             ),
         );
@@ -413,7 +413,7 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
-                ctx.world.globals.NPC,
+                ctx.world.globals.NPC.cast(),
                 TID_BSTATE as c_int,
             ),
         );
@@ -431,7 +431,7 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
-                    ctx.world.globals.NPC,
+                    ctx.world.globals.NPC.cast(),
                     TID_BSTATE as c_int,
                 ),
             );
@@ -479,7 +479,7 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
         trap::ICARUS_TaskIDComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
-                ctx.world.globals.NPC,
+                ctx.world.globals.NPC.cast(),
                 TID_BSTATE as c_int,
             ),
         );
@@ -621,7 +621,7 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
             && trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                    ctx.world.globals.NPC,
+                    ctx.world.globals.NPC.cast(),
                     TID_MOVE_NAV as c_int,
                 ),
             ) == 0
@@ -639,7 +639,7 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
             && trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
-                    ctx.world.globals.NPC,
+                    ctx.world.globals.NPC.cast(),
                     TID_MOVE_NAV as c_int,
                 ),
             ) == 0

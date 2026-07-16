@@ -473,7 +473,7 @@ pub fn ThrowSaberToAttacker(ctx: &mut GameContext, self_: EntityId, attacker: Op
             (*ent).s.origin = (*ent).s.origin2;
             (*ent).r.currentOrigin = (*ent).s.origin2;
             (*ent).pos2[0] = 0.0;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
             return;
         }
 
@@ -495,7 +495,7 @@ pub fn ThrowSaberToAttacker(ctx: &mut GameContext, self_: EntityId, attacker: Op
             (*ent).s.pos.trDelta[2] = 256.0;
         }
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
     }
 }
 
@@ -530,7 +530,7 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
 
                 (*ent).pos2[0] = 1.0;
                 (*ent).pos2[1] = 0.0; // respawn next think
-                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
             } else {
                 (*ent).pos2[1] = (ctx.world.level.time + JMSABER_RESPAWN_TIME) as f32;
             }
@@ -539,7 +539,7 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
             (*ent).s.origin = (*ent).s.origin2;
             (*ent).r.currentOrigin = (*ent).s.origin2;
             (*ent).pos2[0] = 0.0;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
         }
 
         (*ent).nextthink = ctx.world.level.time + 50;
@@ -702,7 +702,7 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
 
         (*ent).touch = Some(EntTouch::JMSaberTouch).into();
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         (*ent).think = Some(EntThink::JMSaberThink).into();
         (*ent).nextthink = ctx.world.level.time + 50;
@@ -1242,7 +1242,7 @@ pub fn BodySink(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         if ctx.world.level.time - (*ent).timestamp > BODY_SINK_TIME + 2500 {
             // the body ques are never actually freed, they are just unlinked
-            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
             (*ent).physicsObject = qfalse;
             return;
         }
@@ -1268,7 +1268,7 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
             return qfalse;
         }
 
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
 
         // if client is in a nodrop area, don't leave the body
         let contents = trap::PointContents(
@@ -1291,7 +1291,7 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         ctx.world.level.bodyQueIndex =
             (ctx.world.level.bodyQueIndex + 1) % (BODY_QUEUE_SIZE) as i32;
 
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(body));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(body.cast()));
         (*body).s = (*ent).s;
 
         // avoid oddly angled corpses floating around
@@ -1392,7 +1392,7 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         }
 
         crate::q_math::_VectorCopy((*body).s.pos.trBase, &mut (*body).r.currentOrigin);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(body));
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(body.cast()));
 
         qtrue
     }
@@ -1463,7 +1463,7 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             if ctx.world.cvars.g_siegeRespawn.integer != 0 {
@@ -1480,7 +1480,7 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] = 0;
                     (*client).ps.stats[STAT_HOLDABLE_ITEM as usize] = 0;
                     (*ent).takedamage = qfalse;
-                    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+                    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
                     // Respawn time.
                     if (*ent).s.number < MAX_CLIENTS as c_int {
@@ -2066,7 +2066,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
         let client = ctx.world.clients.as_mut_ptr().add(clientNum as usize);
 
         if (*ent).r.linked != qfalse {
-            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
         }
         crate::g_utils::G_InitGentity(ctx, ctx.entity_id_of(ent).unwrap());
         (*ent).touch = FnId::NONE;
@@ -3373,7 +3373,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             // (nothing)
         } else {
             crate::g_utils::G_KillBox(ctx, ctx.entity_id_of(ent).unwrap());
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
             if (*client).ps.weapon <= WP_NONE {
                 (*client).ps.weapon = WP_BRYAR_PISTOL;
@@ -3455,7 +3455,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                 (*((*ent).client as *mut gclient_t)).ps.origin,
                 &mut (*ent).r.currentOrigin,
             );
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
         }
 
         if ctx.world.cvars.g_spawnInvulnerability.integer != 0 {
@@ -3473,11 +3473,11 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         // rww - make sure client has a valid icarus instance
         trap::ICARUS_FreeEnt(
             ctx.engine,
-            mp_abi::game::syscalls::G_ICARUS_FREEENT::GIcarusFreeentArgs::new(ent),
+            mp_abi::game::syscalls::G_ICARUS_FREEENT::GIcarusFreeentArgs::new(ent.cast()),
         );
         trap::ICARUS_InitEnt(
             ctx.engine,
-            mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent),
+            mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent.cast()),
         );
     }
 }
@@ -3645,7 +3645,7 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
             i += 1;
         }
 
-        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
         (*ent).s.modelindex = 0;
         (*ent).inuse = qfalse;
         (*ent).classname = b"disconnected\0".as_ptr() as *mut c_char;

@@ -1512,7 +1512,7 @@ pub fn finish_spawning_turretG2(ctx: &mut GameContext, base: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base.cast()),
         );
     }
 }

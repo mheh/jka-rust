@@ -1755,7 +1755,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     crate::g_utils::G_SetOrigin(&mut *(NPC), (*NPC).s.origin);
                     trap::LinkEntity(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(NPC),
+                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(NPC.cast()),
                     );
                 } else {
                     (*NPC).r.mins[2] = DEFAULT_MINS_2; //Cannot change

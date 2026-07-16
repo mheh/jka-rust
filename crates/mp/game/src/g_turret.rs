@@ -934,7 +934,7 @@ pub fn SP_misc_turret(ctx: &mut GameContext, base: EntityId) {
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base.cast()),
         );
 
         if turret_base_spawn_top(ctx, ctx.entity_id_of(base).unwrap()) == 0 {
@@ -1099,7 +1099,7 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
 
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(top),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(top.cast()),
         );
         qtrue
     }
