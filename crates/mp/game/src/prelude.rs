@@ -10,6 +10,9 @@
 //! No new behavior lives here — only re-exports. The `//TODO: Port` markers for
 //! the still-unported parameter types stay at their call sites in the skeletons.
 
+// safe-state (2c): this module is pure re-exports — no code, no unsafe.
+#![deny(unsafe_code)]
+
 // Raven scalar / handle / ffi primitives. `native_*` is not a direct dependency
 // of `mp_game`; the cross-mode primitives are reached through `mp_qshared`'s
 // re-export umbrella, exactly as the live modules already spell them.
