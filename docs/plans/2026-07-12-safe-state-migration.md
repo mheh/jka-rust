@@ -184,6 +184,26 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
     `g_active.rs` `gentity_t`→`bgEntity_t` base-pointer overlay (D12 layout
     contract), `ghoul2` identity casts feeding G2API traps, botlib trap-arg
     packing in `ai_main.rs`.
+- **Stage 4 — DONE except 4D (2026-07-15)**, four referee-gated commits, each
+  six-scenario byte-identical + workspace tests + fmt; i686 lane green at
+  stage end:
+  - 4A `b39f16b7` — ICARUS `SharedBuffer` typed adapter (17 accessors,
+    align(8) + per-payload const-asserts); all GameIcarus* arms safe.
+    Adversarial gate-2 confirmed the copy-in/write-back out-param arms and
+    that the reentrancy/strcpy-overlap hazards are oracle behaviors
+    preserved verbatim.
+  - 4B `bc20e8dc` — g_timer `gtimer_t*` signatures restored (void* was
+    port-introduced; oracle g_timer.c:79/106/187); g_svcmds
+    `from_ne_bytes`/`to_ne_bytes` reinterprets + `StringToFilter` param
+    typing (raw ptr kept per the STAGE-2b aliasing constraint).
+  - 4C `a26be7ca` — `gClPtrs` pool restored to Raven's `gclient_t*`
+    elements (`gNPCPtrs` was already typed).
+  - 4F `e3b6f3e7` — safe `cstr_from_chars` helper; 28 `CStr::from_ptr`
+    sites over provably Rust-owned arrays converted; entity-field/param
+    sites left for 4D.
+  - **4D remains** (client/NPC/m_pVehicle re-typing, ~2,440 sites + the
+    entity-field CStr half) — one design decision, folded into the task-#7
+    seam-ratification sit-down.
 - **Stage 3 — DONE**: zero `static mut` in mp_game; q_shared parse/format
   state in `BgState.qs` per the execution amendment, game-only scratch in
   `GameWorld.scratch`; ~224 call sites threaded across both tiers; botlib's
