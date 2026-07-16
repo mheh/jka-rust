@@ -559,9 +559,9 @@ pub fn G_CreateFakeClient(ctx: &mut GameContext, entNum: c_int, cl: *mut *mut gc
             ctx.world.globals.gClPtrs.0[entNum as usize] = crate::bg_misc::BG_Alloc(
                 core::mem::size_of::<gclient_t>() as c_int,
                 &mut ctx.world.bg_state,
-            );
+            ) as *mut gclient_t;
         }
-        *cl = ctx.world.globals.gClPtrs.0[entNum as usize] as *mut gclient_t;
+        *cl = ctx.world.globals.gClPtrs.0[entNum as usize];
     }
 }
 

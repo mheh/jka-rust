@@ -529,7 +529,7 @@ impl Default for RemappedShaders {
 /// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) — the dynamically
 /// allocated NPC `gclient_t` backing store, indexed by entity number.
 /// Source: `oracle/codemp/game/g_utils.c:428`
-pub struct GClPtrs(pub [*mut c_void; mp_qshared::shared::MAX_GENTITIES]);
+pub struct GClPtrs(pub [*mut gclient_t; mp_qshared::shared::MAX_GENTITIES]);
 
 impl Default for GClPtrs {
     fn default() -> Self {
@@ -1133,10 +1133,8 @@ pub struct GameGlobals {
     /// `gTrigFallSound`. Source: `oracle/codemp/game/g_trigger.c:6`
     pub gTrigFallSound: c_int,
     // --- `g_utils.c` file-scope globals ---
-    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (see `GClPtrs`). Held as
-    /// `*mut c_void` — same tiering rationale as `gentity_t.client`
-    /// (`gentity.rs`): the real `gclient_t` pointee type isn't nameable from
-    /// this field's declaration site without a cast at each use.
+    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (see `GClPtrs`). Restored to Raven's
+    /// `gclient_t*` element typing (safe-state Stage 4); reads no longer cast.
     /// Source: `oracle/codemp/game/g_utils.c:428`
     pub gClPtrs: GClPtrs,
     /// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (see `GG2KillIndex`).
