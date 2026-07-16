@@ -428,12 +428,14 @@ pub fn BotDoChat(
                     None
                 };
 
-                // Raven derefs `cobject->client->pers.netname`; for a client entity
-                // that client is `level.clients[entnum]` (id.0, the G_InitGame
-                // invariant), so the safe client accessor reads the same bytes.
+                // Raven derefs `cobject->client->pers.netname`. chatObject can be
+                // an NPC (lastHurt = any attacker), whose client is pool-allocated,
+                // NOT level.clients[entnum] — so the netname read must go through
+                // the entity's client pointer (gclient deref regime, task #7).
                 if let Some(id) = cobject_id {
-                    if !ctx.world.entity(id).client.is_null() {
-                        let netname = ctx.world.client(id.0 as usize).pers.netname;
+                    let client = ctx.world.entity(id).client;
+                    if !client.is_null() {
+                        let netname = unsafe { (*client).pers.netname };
                         let mut inc_n = 0isize;
 
                         while netname[inc_n as usize] != 0 {
