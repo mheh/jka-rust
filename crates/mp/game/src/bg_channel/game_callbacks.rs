@@ -189,4 +189,60 @@ pub trait GameCallbacks {
     /// through [`crate::veh_dispatch::attach_riders`].
     /// Source: `oracle/codemp/game/bg_pmove.c:11146-11149`.
     fn attach_riders(&mut self, vehEntNum: c_int);
+
+    /// Raven `BG_MySaber(clientNum, saberNum)` — the `#ifdef QAGAME` branch that
+    /// returns `&g_entities[clientNum].client->saber[saberNum]`, or NULL unless
+    /// the client is in use, has a `client`, and that saber has a model. The
+    /// game arena is not bg-nameable, so bg reaches it here by entity number.
+    /// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
+    fn my_saber(&mut self, client_num: c_int, saber_num: c_int) -> *mut saberInfo_t;
+
+    /// `PM_GroundTrace` suspended-vehicle boarding gate: the landed vehicle
+    /// entity's `client` is non-null, its `client->ps.m_iVehicleNum == 0`, and
+    /// its `spawnflags & 2` (SUSPENDED) is set.
+    /// Source: `oracle/codemp/game/bg_pmove.c` (PM_GroundTrace suspended-vehicle board).
+    fn suspended_vehicle_boardable(&self, veh_ent_num: c_int) -> qboolean;
+
+    /// `PM_CrashLand` landed-vehicle boarding gate: the traced entity is an
+    /// in-use vehicle NPC (`inuse`, non-null `client`, `eType == ET_NPC`,
+    /// `NPC_class == CLASS_VEHICLE`), not already ridden
+    /// (`client->ps.m_iVehicleNum == 0`), with a non-null `m_pVehicle` that is
+    /// not a WALKER/FIGHTER, and the boarder's team is allowed
+    /// (`gametype < GT_TEAM || tr.alliedTeam == 0 || tr.alliedTeam ==
+    /// self.client->sess.sessionTeam`). `gametype` is read bg-side from
+    /// `pm->gametype` and passed in, preserving the current bg/game read split.
+    /// Source: `oracle/codemp/game/bg_pmove.c` (PM_CrashLand landed-vehicle board).
+    fn landed_vehicle_boardable(
+        &self,
+        tr_ent_num: c_int,
+        self_num: c_int,
+        gametype: c_int,
+    ) -> qboolean;
+
+    /// `PM_AdjustBBox` solidHack: when the client is in use and has a `client`,
+    /// stamp `client->solidHack = level.time + 200`.
+    /// Source: `oracle/codemp/game/bg_pmove.c` (PM_AdjustBBox solidHack).
+    fn set_solid_hack(&mut self, ent_num: c_int);
+
+    /// `PM_Weapon` NPC-with-no-weapon humanoid test: entity is in use, has a
+    /// `client`, and `localAnimIndex == 0`.
+    /// Source: `oracle/codemp/game/bg_pmove.c` (PM_Weapon NPC no-weapon branch).
+    fn humanoid_inuse_client(&self, ent_num: c_int) -> qboolean;
+
+    /// `PM_VehicleImpact` fighter turn-away gate: the hit entity is NOT suspended
+    /// (`(spawnflags & 2) == 0`).
+    /// Source: `oracle/codemp/game/bg_slidemove.c:313-398`
+    fn fighter_not_suspended(&self, ent_num: c_int) -> qboolean;
+
+    /// `PM_VehicleImpact` knockdown: stamp the hit client's non-playerState
+    /// killer-credit fields (`otherKillerMOD`/`otherKillerVehWeapon`/
+    /// `otherKillerWeaponType`), which live on `gclient_t`, not `ps`.
+    /// Source: `oracle/codemp/game/bg_slidemove.c:402-542`
+    fn set_other_killer(
+        &mut self,
+        ent_num: c_int,
+        mod_: c_int,
+        veh_weapon: c_int,
+        weapon_type: c_int,
+    );
 }

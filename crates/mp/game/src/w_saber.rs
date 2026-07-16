@@ -2806,7 +2806,13 @@ pub fn G_GetAttackDamage(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            ctx.world.g_entities.as_mut_ptr(),
+            // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
+            // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
+            // arena by client number (replaces the old `g_entities` base arg).
+            &mut crate::bg_channel::GameCallbacksImpl {
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            },
         );
         let speedDif = (attackAnimLength - (attackAnimLength * animSpeedFactor)) as c_int;
         attackAnimLength += speedDif as f32;
@@ -2860,7 +2866,13 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            ctx.world.g_entities.as_mut_ptr(),
+            // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
+            // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
+            // arena by client number (replaces the old `g_entities` base arg).
+            &mut crate::bg_channel::GameCallbacksImpl {
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            },
         );
         let speedDif = (attackAnimLength - (attackAnimLength * animSpeedFactor)) as c_int;
         attackAnimLength += speedDif as f32;

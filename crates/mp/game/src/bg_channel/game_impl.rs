@@ -853,4 +853,102 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             crate::veh_dispatch::attach_riders(&mut ctx, pVeh);
         }
     }
+    fn my_saber(&mut self, client_num: c_int, saber_num: c_int) -> *mut saberInfo_t {
+        // Reproduces the QAGAME `BG_MySaber` body over the game arena: NULL
+        // unless the client is in use, has a `client`, and that saber has a
+        // model. Source: `oracle/codemp/game/bg_saber.c:4100-4141`.
+        unsafe {
+            let ent = &(*self.world).g_entities[client_num as usize] as *const gentity_t;
+            if (*ent).inuse != 0 && !(*ent).client.is_null() {
+                let saber = &mut (*((*ent).client as *mut gclient_t)).saber[saber_num as usize]
+                    as *mut saberInfo_t;
+                if (*saber).model[0] == 0 {
+                    return core::ptr::null_mut();
+                }
+                return saber;
+            }
+            core::ptr::null_mut()
+        }
+    }
+    fn suspended_vehicle_boardable(&self, veh_ent_num: c_int) -> qboolean {
+        // `PM_GroundTrace` suspended-vehicle gate. Source: `bg_pmove.c`.
+        unsafe {
+            let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
+            (!(*ent).client.is_null()
+                && (*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum == 0
+                && (*ent).spawnflags & 2 != 0) as qboolean
+        }
+    }
+    fn landed_vehicle_boardable(
+        &self,
+        tr_ent_num: c_int,
+        self_num: c_int,
+        gametype: c_int,
+    ) -> qboolean {
+        // `PM_CrashLand` landed-vehicle gate, verbatim over the game arena;
+        // `gametype` is read bg-side (`pm->gametype`) and passed in. Source:
+        // `oracle/codemp/game/bg_pmove.c` (PM_CrashLand landed-vehicle board).
+        unsafe {
+            let trEnt = &(*self.world).g_entities[tr_ent_num as usize] as *const gentity_t;
+            let veh = (*trEnt).m_pVehicle as *mut Vehicle_t;
+            if (*trEnt).inuse != 0
+                && !(*trEnt).client.is_null()
+                && (*trEnt).s.eType == entityType_t::ET_NPC as c_int
+                && (*trEnt).s.NPC_class == CLASS_VEHICLE as c_int
+                && (*((*trEnt).client as *mut gclient_t)).ps.m_iVehicleNum == 0
+                && !veh.is_null()
+                && (*(*veh).m_pVehicleInfo).r#type as c_int != vehicleType_t::VH_WALKER as c_int
+                && (*(*veh).m_pVehicleInfo).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
+            {
+                let servEnt = &(*self.world).g_entities[self_num as usize] as *const gentity_t;
+                if gametype < GT_TEAM as c_int
+                    || (*trEnt).alliedTeam as c_int == 0
+                    || (*trEnt).alliedTeam as c_int
+                        == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam as c_int
+                {
+                    return qtrue;
+                }
+            }
+            qfalse
+        }
+    }
+    fn set_solid_hack(&mut self, ent_num: c_int) {
+        // `PM_AdjustBBox` solidHack. Source: `bg_pmove.c` (PM_AdjustBBox).
+        unsafe {
+            let time = (*self.world).level.time;
+            let ent = &(*self.world).g_entities[ent_num as usize] as *const gentity_t;
+            if (*ent).inuse != 0 && !(*ent).client.is_null() {
+                (*((*ent).client as *mut gclient_t)).solidHack = time + 200;
+            }
+        }
+    }
+    fn humanoid_inuse_client(&self, ent_num: c_int) -> qboolean {
+        // `PM_Weapon` NPC-no-weapon humanoid test. Source: `bg_pmove.c`.
+        unsafe {
+            let ent = &(*self.world).g_entities[ent_num as usize] as *const gentity_t;
+            ((*ent).inuse != 0 && !(*ent).client.is_null() && (*ent).localAnimIndex == 0)
+                as qboolean
+        }
+    }
+    fn fighter_not_suspended(&self, ent_num: c_int) -> qboolean {
+        // `PM_VehicleImpact` turn-away suspended gate.
+        // Source: `oracle/codemp/game/bg_slidemove.c:313-398`.
+        unsafe { ((*self.world).g_entities[ent_num as usize].spawnflags & 2 == 0) as qboolean }
+    }
+    fn set_other_killer(
+        &mut self,
+        ent_num: c_int,
+        mod_: c_int,
+        veh_weapon: c_int,
+        weapon_type: c_int,
+    ) {
+        // `PM_VehicleImpact` knockdown: the three `gclient_t` killer-credit
+        // fields (not on `ps`). Source: `oracle/codemp/game/bg_slidemove.c:402-542`.
+        unsafe {
+            let client = (*self.world).g_entities[ent_num as usize].client as *mut gclient_t;
+            (*client).otherKillerMOD = mod_;
+            (*client).otherKillerVehWeapon = veh_weapon;
+            (*client).otherKillerWeaponType = weapon_type;
+        }
+    }
 }

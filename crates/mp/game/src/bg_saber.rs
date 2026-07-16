@@ -403,49 +403,11 @@ pub fn PM_CheckPullAttack() -> saberMoveName_t {
     LS_NONE
 }
 
-/// Raven `BG_MySaber`.
-///
-/// Returns a pointer to the requested saber for a client, or NULL if the client
-/// doesn't have that saber equipped.
-///
-/// Raven: returns a pointer to the requested saberNum.
-///
-/// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
-// The QAGAME branch reads the game-tier `g_entities` arena, which bg code
-// cannot name; callers thread the arena base in — pmove callers from the
-// `pm->baseEnt` overlay, game-tier callers from `(*ctx.world_raw()).g_entities`.
-pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, ents: *mut gentity_t) -> *mut saberInfo_t {
-    unsafe {
-        // Per oracle C code (QAGAME branch):
-        // gentity_t *ent = &g_entities[clientNum];
-        // if ( ent->inuse && ent->client ) {
-        //   if ( !ent->client->saber[saberNum].model || !ent->client->saber[saberNum].model[0] )
-        //       return NULL;
-        //   return &ent->client->saber[saberNum];
-        // }
-        // return NULL;
-        if ents.is_null() || clientNum < 0 {
-            return core::ptr::null_mut();
-        }
-
-        let ent: *mut gentity_t = ents.add(clientNum as usize);
-
-        // Check inuse and client existence
-        if (*ent).inuse == 0 || (*ent).client.is_null() {
-            return core::ptr::null_mut();
-        }
-
-        // Check if the saber has a model. Raven's `!saber.model` tests a
-        // `char model[MAX_QPATH]` array, which never decays to NULL — so that
-        // clause is constant-false and only the empty-string check survives.
-        if (*((*ent).client as *mut gclient_t)).saber[saberNum as usize].model[0] as c_int == 0 {
-            return core::ptr::null_mut();
-        }
-
-        // Return mutable pointer to the saber
-        &mut (*((*ent).client as *mut gclient_t)).saber[saberNum as usize]
-    }
-}
+// `BG_MySaber` (both the free fn and the `PmoveContext` method) is retired in
+// safe-state S5-2: the QAGAME body reaches the game arena, so it is now the
+// `GameCallbacks::my_saber` upcall (bg reaches it by client number). All bg
+// callers route through `self.callbacks.my_saber` / `callbacks.my_saber`.
+// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
 
 // ============================================================================
 // Pass-3 real bodies: the pmove working-set functions previously skeletoned
@@ -558,8 +520,8 @@ impl PmoveContext<'_> {
     pub fn PM_CheckStabDown(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber1.is_null() && ((*saber1).saberFlags & SFL_NO_STABDOWN) != 0 {
                 return LS_NONE;
             }
@@ -1189,8 +1151,8 @@ impl PmoveContext<'_> {
     pub fn PM_SaberFlipOverAttackMove(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber1.is_null() && (*saber1).jumpAtkFwdMove != LS_INVALID {
                 if (*saber1).jumpAtkFwdMove != LS_NONE {
                     return (*saber1).jumpAtkFwdMove;
@@ -1230,8 +1192,8 @@ impl PmoveContext<'_> {
     pub fn PM_SaberBackflipAttackMove(&mut self) -> c_int {
         unsafe {
             let ps = (*self.pm).ps;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber1.is_null() && (*saber1).jumpAtkBackMove != LS_INVALID {
                 if (*saber1).jumpAtkBackMove != LS_NONE {
                     return (*saber1).jumpAtkBackMove;
@@ -1314,8 +1276,8 @@ impl PmoveContext<'_> {
     pub fn PM_SaberLungeAttackMove(&mut self, noSpecials: qboolean) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber1.is_null() && (*saber1).lungeAtkMove != LS_INVALID {
                 if (*saber1).lungeAtkMove != LS_NONE {
                     return (*saber1).lungeAtkMove;
@@ -1356,8 +1318,8 @@ impl PmoveContext<'_> {
     pub fn PM_SaberJumpAttackMove2(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber1.is_null() && (*saber1).jumpAtkFwdMove != LS_INVALID {
                 if (*saber1).jumpAtkFwdMove != LS_NONE {
                     return (*saber1).jumpAtkFwdMove;
@@ -1388,8 +1350,8 @@ impl PmoveContext<'_> {
     pub fn PM_SaberJumpAttackMove(&mut self) -> saberMoveName_t {
         unsafe {
             let ps = (*self.pm).ps;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber1.is_null() && (*saber1).jumpAtkFwdMove != LS_INVALID {
                 if (*saber1).jumpAtkFwdMove != LS_NONE {
                     return (*saber1).jumpAtkFwdMove;
@@ -1484,11 +1446,11 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             if (*ps).weapon == WP_SABER as c_int {
-                let saber = self.BG_MySaber((*ps).clientNum, 0);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 0);
                 if !saber.is_null() && ((*saber).saberFlags & SFL_NO_MIRROR_ATTACKS) != 0 {
                     return 0;
                 }
-                let saber = self.BG_MySaber((*ps).clientNum, 1);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber.is_null() && ((*saber).saberFlags & SFL_NO_MIRROR_ATTACKS) != 0 {
                     return 0;
                 }
@@ -1595,8 +1557,8 @@ impl PmoveContext<'_> {
 
             let ps = (*self.pm).ps;
             if (*ps).weapon == WP_SABER as c_int {
-                let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-                let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+                let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+                let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
 
                 if !saber1.is_null() && (*saber1).jumpAtkRightMove != LS_INVALID {
                     if (*saber1).jumpAtkRightMove != LS_NONE {
@@ -1913,11 +1875,11 @@ impl PmoveContext<'_> {
                 && cmd.upmove <= 0
                 && self.BG_EnoughForcePowerForMove(SABER_ALT_ATTACK_POWER) != 0
             {
-                let saber = self.BG_MySaber((*ps).clientNum, 0);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 0);
                 if !saber.is_null() && (*saber).kataMove == LS_NONE {
                     return 0;
                 }
-                let saber = self.BG_MySaber((*ps).clientNum, 1);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber.is_null() && (*saber).kataMove == LS_NONE {
                     return 0;
                 }
@@ -1933,11 +1895,11 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             if (*ps).weapon == WP_SABER as c_int {
-                let saber = self.BG_MySaber((*ps).clientNum, 0);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 0);
                 if !saber.is_null() && ((*saber).saberFlags & SFL_NO_KICKS) != 0 {
                     return 0;
                 }
-                let saber = self.BG_MySaber((*ps).clientNum, 1);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber.is_null() && ((*saber).saberFlags & SFL_NO_KICKS) != 0 {
                     return 0;
                 }
@@ -1978,11 +1940,11 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             if (*ps).weapon == WP_SABER as c_int {
-                let saber = self.BG_MySaber((*ps).clientNum, 0);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 0);
                 if !saber.is_null() && ((*saber).saberFlags & SFL_NO_ROLL_STAB) != 0 {
                     return 0;
                 }
-                let saber = self.BG_MySaber((*ps).clientNum, 1);
+                let saber = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber.is_null() && ((*saber).saberFlags & SFL_NO_ROLL_STAB) != 0 {
                     return 0;
                 }
@@ -2374,8 +2336,8 @@ impl PmoveContext<'_> {
 
             if self.PM_CanDoKata() != 0 {
                 let mut overrideMove = LS_INVALID;
-                let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-                let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+                let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+                let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber1.is_null() && (*saber1).kataMove != LS_INVALID {
                     if (*saber1).kataMove != LS_NONE {
                         overrideMove = (*saber1).kataMove;
@@ -2731,8 +2693,8 @@ impl PmoveContext<'_> {
             }
 
             if newMove == LS_DRAW {
-                let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-                let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+                let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+                let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber1.is_null() && (*saber1).drawAnim != -1 {
                     anim = (*saber1).drawAnim;
                 } else if !saber2.is_null() && (*saber2).drawAnim != -1 {
@@ -2743,8 +2705,8 @@ impl PmoveContext<'_> {
                     anim = BOTH_S1_S6 as c_int;
                 }
             } else if newMove == LS_PUTAWAY {
-                let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-                let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+                let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+                let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber1.is_null() && (*saber1).putawayAnim != -1 {
                     anim = (*saber1).putawayAnim;
                 } else if !saber2.is_null() && (*saber2).putawayAnim != -1 {
@@ -2932,31 +2894,6 @@ impl PmoveContext<'_> {
                     (*ps).saberBlocked = BLOCKED_NONE as c_int;
                 }
             }
-        }
-    }
-
-    /// Raven `BG_MySaber`.
-    ///
-    /// PORT-NOTE(client-saber-field): the oracle reads
-    /// `g_entities[clientNum].client->saber[saberNum]`. `gclient_t.saber` is
-    /// not yet present on the ported struct — referenced here via the entity
-    /// overlay idiom; a fixer must land the field.
-    /// Source: `oracle/codemp/game/bg_saber.c:4100-4141`
-    pub fn BG_MySaber(&mut self, clientNum: c_int, saberNum: c_int) -> *mut saberInfo_t {
-        unsafe {
-            let ent = self.PM_BGEntForNum(clientNum) as *mut gentity_t;
-            if ent.is_null() {
-                return core::ptr::null_mut();
-            }
-            if (*ent).inuse != 0 && !(*ent).client.is_null() {
-                let saber = &mut (*((*ent).client as *mut gclient_t)).saber[saberNum as usize]
-                    as *mut saberInfo_t;
-                if (*saber).model[0] == 0 {
-                    return core::ptr::null_mut();
-                }
-                return saber;
-            }
-            core::ptr::null_mut()
         }
     }
 }

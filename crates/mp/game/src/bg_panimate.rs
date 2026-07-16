@@ -32,8 +32,8 @@
 //! read game-side, mirroring the compiled-out C global.)
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_channel::GameCallbacks;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
-use crate::bg_saber::BG_MySaber;
 use crate::prelude::*;
 use crate::q_shared::COM_Parse;
 
@@ -2343,19 +2343,19 @@ pub fn BG_SaberStartTransAnim(
     anim: c_int,
     animSpeed: *mut f32,
     broken: c_int,
-    // Game-tier entity arena base for `BG_MySaber` (bg code cannot name the
-    // arena; pmove callers pass `pm->baseEnt`, game callers `g_entities`).
-    ents: *mut gentity_t,
+    // `BG_MySaber` is now the `my_saber` upcall; the game arena is reached by
+    // client number through `callbacks` rather than a threaded arena base.
+    callbacks: &mut dyn GameCallbacks,
 ) {
     use animNumber_t::*;
     unsafe {
         if anim >= BOTH_A1_T__B_ as c_int && anim <= BOTH_ROLL_STAB as c_int {
             if weapon == WP_SABER {
-                let mut saber = BG_MySaber(clientNum, 0, ents);
+                let mut saber = callbacks.my_saber(clientNum, 0);
                 if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
                     *animSpeed *= (*saber).animSpeedScale;
                 }
-                saber = BG_MySaber(clientNum, 1, ents);
+                saber = callbacks.my_saber(clientNum, 1);
                 if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
                     *animSpeed *= (*saber).animSpeedScale;
                 }
@@ -2418,15 +2418,9 @@ impl PmoveContext<'_> {
             blendTime = 0;
 
             // Raven's `BG_SetAnim` contract is pm-free (bg_panimate.c:2984 "do not
-            // reference pm in this function"), and `BG_MySaber` (the sole consumer of
-            // this arg) null-checks ents. Game-tier callers build a pm-null
-            // `PmoveContext` to reach `BG_SetAnim`, so guard here: a null `pm`/`baseEnt`
-            // degrades to a missing-saber lookup rather than a null-deref.
-            let baseEnt = if self.pm.is_null() || (*self.pm).baseEnt.is_null() {
-                core::ptr::null_mut()
-            } else {
-                (*self.pm).baseEnt as *mut gentity_t
-            };
+            // reference pm in this function"). `my_saber` resolves the game arena
+            // by client number (like the oracle QAGAME `BG_MySaber`, which reads
+            // `g_entities[clientNum]` unconditionally), so no pm/arena threading.
             BG_SaberStartTransAnim(
                 (*ps).clientNum,
                 (*ps).fd.saberAnimLevel,
@@ -2434,7 +2428,7 @@ impl PmoveContext<'_> {
                 anim,
                 &mut editAnimSpeed,
                 (*ps).brokenLimbs,
-                baseEnt,
+                self.callbacks,
             );
 
             // Set torso anim

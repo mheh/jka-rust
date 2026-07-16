@@ -2564,7 +2564,13 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
                 f,
                 &mut animSpeedScale as *mut f32,
                 (*((*self_).client as *mut gclient_t)).ps.brokenLimbs,
-                ctx.world.g_entities.as_mut_ptr(),
+                // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
+                // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
+                // arena by client number (replaces the old `g_entities` base arg).
+                &mut crate::bg_channel::GameCallbacksImpl {
+                    world: ctx.world_raw(),
+                    engine: ctx.engine,
+                },
             );
 
             let all_anims = &(&ctx.world.bg_state.bgAllAnims)[(*self_).localAnimIndex as usize];

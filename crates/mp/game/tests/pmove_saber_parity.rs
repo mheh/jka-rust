@@ -700,6 +700,29 @@ impl GameCallbacks for TestCallbacks {
     fn attach_riders(&mut self, _v: c_int) {
         unreachable!()
     }
+    fn my_saber(&mut self, _c: c_int, _s: c_int) -> *mut saberInfo_t {
+        // The `g_entities`/bgEntity arena is zeroed (module doc), so BG_MySaber
+        // returns NULL on both sides — no per-saber saberInfo is read.
+        core::ptr::null_mut()
+    }
+    fn suspended_vehicle_boardable(&self, _v: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn landed_vehicle_boardable(&self, _t: c_int, _s: c_int, _g: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn set_solid_hack(&mut self, _e: c_int) {
+        unreachable!()
+    }
+    fn humanoid_inuse_client(&self, _e: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn fighter_not_suspended(&self, _e: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn set_other_killer(&mut self, _e: c_int, _m: c_int, _v: c_int, _w: c_int) {
+        unreachable!()
+    }
 }
 
 // ================================ ps baseline ================================

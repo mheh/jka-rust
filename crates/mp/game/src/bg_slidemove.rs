@@ -316,17 +316,18 @@ impl PmoveContext<'_> {
                             // needs the same gentity_t-only fields as above
                             // (client/spawnflags/m_pVehicle). Transcribed literally
                             // below; several field accesses are bg-tier gaps.
-                            // S5-1: `client->ps.X` reads retype to `(*playerState).X`
-                            // (identical memory, see the hitSpeed note above);
-                            // `.spawnflags` stays raw (S5-2 `fighter_not_suspended`
-                            // callback). Source: `oracle/codemp/game/bg_slidemove.c:313-398`
+                            // `client->ps.X` reads go through `(*playerState).X`
+                            // (identical memory, see the hitSpeed note above); the
+                            // `spawnflags` NOT-suspended test is a game-side read via
+                            // the `fighter_not_suspended` upcall.
+                            // Source: `oracle/codemp/game/bg_slidemove.c:313-398`
                             if turnHitEnt != 0
                                 && !(*hitEnt).playerState.is_null()
                                 && FighterIsLanded(
                                     ((*hitEnt).m_pVehicle as *mut Vehicle_t),
                                     (*hitEnt).playerState,
                                 ) == 0
-                                && ((*hitEnt).spawnflags & 2) == 0
+                                && self.callbacks.fighter_not_suspended((*hitEnt).s.number) != 0
                             {
                                 let l = (*(*hitEnt).playerState).speed;
                                 for i in 0..3 {
@@ -548,11 +549,14 @@ impl PmoveContext<'_> {
                                     (*self.pm).cmd.serverTime + 5000;
                                 (*(*hitEnt).playerState).otherKillerDebounceTime =
                                     (*self.pm).cmd.serverTime + 100;
-                                (*((*hitEnt).client as *mut gclient_t)).otherKillerMOD =
-                                    MOD_COLLISION as c_int;
-                                (*((*hitEnt).client as *mut gclient_t)).otherKillerVehWeapon = 0;
-                                (*((*hitEnt).client as *mut gclient_t)).otherKillerWeaponType =
-                                    WP_NONE as c_int;
+                                // S5-2: the three gclient killer-credit fields (not
+                                // on ps) are stamped game-side via the upcall.
+                                self.callbacks.set_other_killer(
+                                    (*hitEnt).s.number,
+                                    MOD_COLLISION as c_int,
+                                    0,
+                                    WP_NONE as c_int,
+                                );
                                 for i in 0..3 {
                                     (*(*hitEnt).playerState).velocity[i] += (*ps).velocity[i];
                                 }

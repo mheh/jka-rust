@@ -26,7 +26,6 @@ use crate::bg_panimate::{
     BG_InRoll, BG_SaberInAttack, BG_SaberInSpecial, BG_SaberLockBreakAnim, BG_SpinningSaberAnim,
     PM_CanRollFromSoulCal, PM_SaberInTransition,
 };
-use crate::bg_saber::BG_MySaber;
 use crate::g_strap::strap_G2API_SetBoneAngles;
 use crate::g_strap::{
     strap_G2API_AnimateG2Models, strap_G2API_GetBoltMatrix, strap_G2API_GetBoneAnim,
@@ -179,8 +178,8 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             let mut anim = BOTH_STAND2 as c_int;
-            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+            let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+            let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
 
             if (*ps).saberEntityNum == 0 {
                 //lost it
@@ -1632,10 +1631,9 @@ impl PmoveContext<'_> {
                     && !self.pm_entSelf.is_null()
                     && !(*pEnt).m_pVehicle.is_null()
                 {
-                    let gEnt = pEnt as *mut gentity_t;
-                    if !(*gEnt).client.is_null()
-                        && (*((*gEnt).client as *mut gclient_t)).ps.m_iVehicleNum == 0
-                        && (*gEnt).spawnflags & 2 != 0
+                    // S5-2: the client/m_iVehicleNum/spawnflags gate is a game-side
+                    // read; reach it by entity number through the upcall.
+                    if self.callbacks.suspended_vehicle_boardable((*pEnt).s.number) != 0
                     // SUSPENDED
                     {
                         // it's a vehicle, get in it. The vehicle `Board` body is
@@ -2642,8 +2640,8 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weapon == WP_SABER as c_int {
-                let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-                let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+                let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+                let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_FLIPS != 0 {
                     allowFlips = qfalse;
                 }
@@ -2931,8 +2929,8 @@ impl PmoveContext<'_> {
                 let mut allowFlips = qtrue;
                 let mut allowWallGrabs = qtrue;
                 if (*ps).weapon == WP_SABER as c_int {
-                    let saber1 = self.BG_MySaber((*ps).clientNum, 0);
-                    let saber2 = self.BG_MySaber((*ps).clientNum, 1);
+                    let saber1 = self.callbacks.my_saber((*ps).clientNum, 0);
+                    let saber2 = self.callbacks.my_saber((*ps).clientNum, 1);
                     if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_WALL_RUNS != 0 {
                         allowWallRuns = qfalse;
                     }
@@ -4147,11 +4145,11 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weapon == WP_SABER as c_int {
-                let mut saber = self.BG_MySaber((*ps).clientNum, 0);
+                let mut saber = self.callbacks.my_saber((*ps).clientNum, 0);
                 if !saber.is_null() && (*saber).saberFlags & SFL_NO_ROLLS != 0 {
                     return 0;
                 }
-                saber = self.BG_MySaber((*ps).clientNum, 1);
+                saber = self.callbacks.my_saber((*ps).clientNum, 1);
                 if !saber.is_null() && (*saber).saberFlags & SFL_NO_ROLLS != 0 {
                     return 0;
                 }
@@ -4818,44 +4816,31 @@ impl PmoveContext<'_> {
                     && (*ps).zoomMode == 0
                     && !self.pm_entSelf.is_null()
                 {
-                    let trEnt = self.PM_BGEntForNum(trace.entityNum as c_int) as *mut gentity_t;
-                    let veh = (*trEnt).m_pVehicle as *mut Vehicle_t;
-                    if (*trEnt).inuse != 0
-                        && !(*trEnt).client.is_null()
-                        && (*trEnt).s.eType == entityType_t::ET_NPC as c_int
-                        && (*trEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                        && (*((*trEnt).client as *mut gclient_t)).ps.m_iVehicleNum == 0
-                        && !veh.is_null()
-                        && (*(*veh).m_pVehicleInfo).r#type as c_int
-                            != vehicleType_t::VH_WALKER as c_int
-                        && (*(*veh).m_pVehicleInfo).r#type as c_int
-                            != vehicleType_t::VH_FIGHTER as c_int
+                    //it's a vehicle alright, let's board it.. if it's not an atst or ship
+                    // S5-2: the boardable gate (inuse/client/eType/NPC_class/
+                    // m_iVehicleNum/m_pVehicle type) and the team gate (alliedTeam/
+                    // sess.sessionTeam) are game-side reads folded into one upcall.
+                    // gametype stays a bg-side read (`pm->gametype`) passed in, per
+                    // PORT-NOTE(g_gametype) (same value as g_gametype.integer). The
+                    // bg-side gate (BG_SaberInSpecial/forceHandExtend/weaponTime)
+                    // stays here; its pure reads now follow the game gate with no
+                    // observable change.
+                    let trEntNum = trace.entityNum as c_int;
+                    if self.callbacks.landed_vehicle_boardable(
+                        trEntNum,
+                        (*self.pm_entSelf).s.number,
+                        (*pm).gametype,
+                    ) != 0
+                        && BG_SaberInSpecial((*ps).saberMove) == qfalse
+                        && (*ps).forceHandExtend == HANDEXTEND_NONE as c_int
+                        && (*ps).weaponTime <= 0
                     {
-                        //it's a vehicle alright, let's board it.. if it's not an atst or ship
-                        if BG_SaberInSpecial((*ps).saberMove) == qfalse
-                            && (*ps).forceHandExtend == HANDEXTEND_NONE as c_int
-                            && (*ps).weaponTime <= 0
-                        {
-                            let servEnt = self.pm_entSelf as *mut gentity_t;
-                            // PORT-NOTE(g_gametype): bg tier has no game-cvar channel; gametype
-                            // value is read from pm->gametype (same value as g_gametype.integer).
-                            if (*pm).gametype < GT_TEAM as c_int
-                                || (*trEnt).alliedTeam as c_int == 0
-                                || (*trEnt).alliedTeam as c_int
-                                    == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam
-                                        as c_int
-                            {
-                                //not belonging to a team, or client is on same team
-                                // The vehicle `Board` body is game-tier;
-                                // bg reaches it via the GameCallbacks upcall (by
-                                // entity number), which dispatches through
-                                // `crate::veh_dispatch::board`.
-                                self.callbacks.board_vehicle(
-                                    trace.entityNum as c_int,
-                                    (*self.pm_entSelf).s.number,
-                                );
-                            }
-                        }
+                        //not belonging to a team, or client is on same team
+                        // The vehicle `Board` body is game-tier; bg reaches it via
+                        // the GameCallbacks upcall (by entity number), which
+                        // dispatches through `crate::veh_dispatch::board`.
+                        self.callbacks
+                            .board_vehicle(trEntNum, (*self.pm_entSelf).s.number);
                     }
                 }
 
@@ -5038,12 +5023,9 @@ impl PmoveContext<'_> {
                         //whoops, can't fit here. Down to 0!
                         VectorClear(&mut (*pm).mins);
                         VectorClear(&mut (*pm).maxs);
-                        // QAGAME solidHack
-                        let me = self.PM_BGEntForNum((*ps).clientNum) as *mut gentity_t;
-                        if (*me).inuse != 0 && !(*me).client.is_null() {
-                            (*((*me).client as *mut gclient_t)).solidHack =
-                                self.callbacks.get_time() + 200;
-                        }
+                        // QAGAME solidHack — game-side inuse/client guard + the
+                        // `client->solidHack = level.time + 200` write, by number.
+                        self.callbacks.set_solid_hack((*ps).clientNum);
                     }
                 }
             } else {
@@ -7051,8 +7033,12 @@ impl PmoveContext<'_> {
                 && (*pm).cmd.weapon as c_int == WP_NONE as c_int
                 && !self.pm_entSelf.is_null()
             {
-                let gent = self.pm_entSelf as *mut gentity_t;
-                if (*gent).inuse != 0 && !(*gent).client.is_null() && (*gent).localAnimIndex == 0 {
+                // S5-2: inuse/client/localAnimIndex are game-side reads, by number.
+                if self
+                    .callbacks
+                    .humanoid_inuse_client((*self.pm_entSelf).s.number)
+                    != 0
+                {
                     //humanoid
                     (*ps).torsoAnim = (*ps).legsAnim;
                     (*ps).torsoTimer = (*ps).legsTimer;
@@ -8378,11 +8364,11 @@ impl PmoveContext<'_> {
                 // Automatically slow down as the roll ends.
             }
 
-            let mut saber = self.BG_MySaber((*ps).clientNum, 0);
+            let mut saber = self.callbacks.my_saber((*ps).clientNum, 0);
             if !saber.is_null() && (*saber).moveSpeedScale != 1.0 {
                 (*ps).speed *= (*saber).moveSpeedScale;
             }
-            saber = self.BG_MySaber((*ps).clientNum, 1);
+            saber = self.callbacks.my_saber((*ps).clientNum, 1);
             if !saber.is_null() && (*saber).moveSpeedScale != 1.0 {
                 (*ps).speed *= (*saber).moveSpeedScale;
             }
