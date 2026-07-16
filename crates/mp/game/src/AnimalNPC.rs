@@ -62,8 +62,13 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let fWalkSpeedMax: f32;
         let curTime: c_int = level_time(ctx);
 
+        // `pVeh` (Vehicle_t) and its `m_pVehicleInfo` (bg vehicleInfo_t) are pool
+        // objects with no accessor — their fields stay raw. `m_pParentEntity` is a
+        // g_entities arena entity: recover its handle and read `playerState` (a
+        // pool-client ptr, derefed raw below) through the accessor.
         let parent = (*pVeh).m_pParentEntity;
-        let parentPS = (*parent).playerState;
+        let parent_id = ctx.entity_id_of(parent as *const gentity_t).unwrap();
+        let parentPS = ctx.world.entity(parent_id).playerState;
 
         speedIdleDec = (*(*pVeh).m_pVehicleInfo).decelIdle * (*pVeh).m_fTimeModifier;
         speedMax = (*(*pVeh).m_pVehicleInfo).speedMax;
@@ -151,74 +156,41 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 /// Source: `oracle/codemp/game/AnimalNPC.c:338-464`
 pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
+        // `pVeh` (Vehicle_t) and `m_pVehicleInfo` have no accessor — raw. `parent`
+        // and the owner-derived `rider` are g_entities arena entities: read their
+        // `playerState` (pool-client ptrs, derefed raw) through the accessor.
         let parent = (*pVeh).m_pParentEntity;
-        let parentPS = (*parent).playerState;
+        let parent_id = ctx.entity_id_of(parent as *const gentity_t).unwrap();
 
-        let rider = if (*parent).s.owner != ENTITYNUM_NONE {
-            // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
-            // `ctx` now threads the world, so index the game arena directly.
-            ctx.world
-                .g_entities
-                .as_mut_ptr()
-                .add((*parent).s.owner as usize) as *mut bgEntity_t
-        } else {
-            core::ptr::null_mut()
-        };
+        // Oracle `_JK2MP`: `if (owner != ENTITYNUM_NONE) rider =
+        // PM_BGEntForNum(owner);` (== `&g_entities[owner]`) then `if (!rider)
+        // rider = parent;`. `EntityId::from_num` maps NONE → the parent fallback.
+        let owner = ctx.world.entity(parent_id).s.owner;
+        let rider_id = EntityId::from_num(owner).unwrap_or(parent_id);
 
-        if rider.is_null() || rider == parent as *mut bgEntity_t {
-            let rider_ent = parent;
-            let riderPS = (*rider_ent).playerState;
+        let parentPS = ctx.world.entity(parent_id).playerState;
+        let riderPS = ctx.world.entity(rider_id).playerState;
 
-            // Oracle: `if (!rider) rider = parent;` then `if (rider)` — always
-            // true here, so key the yaw block off the reassigned rider (parent).
-            if !rider_ent.is_null() {
-                let mut angDif = crate::q_math::AngleSubtract(
-                    *(*pVeh).m_vOrientation.add(YAW),
-                    (*riderPS).viewangles[YAW],
-                );
-                if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
-                    let mut s = (*parentPS).speed;
-                    let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
-                    if s < 0.0f32 {
-                        s = -s;
-                    }
-                    angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
-                    if angDif > maxDif {
-                        angDif = maxDif;
-                    } else if angDif < -maxDif {
-                        angDif = -maxDif;
-                    }
-                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(
-                        *(*pVeh).m_vOrientation.add(YAW)
-                            - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
-                    );
-                }
+        // Oracle: `if (rider)` — always true after the fallback above.
+        let mut angDif = crate::q_math::AngleSubtract(
+            *(*pVeh).m_vOrientation.add(YAW),
+            (*riderPS).viewangles[YAW],
+        );
+        if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
+            let mut s = (*parentPS).speed;
+            let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
+            if s < 0.0f32 {
+                s = -s;
             }
-        } else {
-            let riderPS = (*rider).playerState;
-            if !rider.is_null() {
-                let mut angDif = crate::q_math::AngleSubtract(
-                    *(*pVeh).m_vOrientation.add(YAW),
-                    (*riderPS).viewangles[YAW],
-                );
-                if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
-                    let mut s = (*parentPS).speed;
-                    let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
-                    if s < 0.0f32 {
-                        s = -s;
-                    }
-                    angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
-                    if angDif > maxDif {
-                        angDif = maxDif;
-                    } else if angDif < -maxDif {
-                        angDif = -maxDif;
-                    }
-                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(
-                        *(*pVeh).m_vOrientation.add(YAW)
-                            - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
-                    );
-                }
+            angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
+            if angDif > maxDif {
+                angDif = maxDif;
+            } else if angDif < -maxDif {
+                angDif = -maxDif;
             }
+            *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(
+                *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+            );
         }
     }
 }
@@ -241,18 +213,21 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let mut iBlend: c_int = 300;
         let pilot = (*pVeh).m_pPilot as *mut gentity_t;
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+        let parent_id = ctx.entity_id_of(parent).unwrap();
         let level_time = level_time(ctx);
 
         // We're dead.
-        if (*parent).health <= 0 {
+        if ctx.world.entity(parent_id).health <= 0 {
             return;
         }
 
-        // If they're bucking, play the animation and leave...
-        if (*parent).client.is_null() == false
-            && (*((*parent).client)).ps.legsAnim == BOTH_VT_BUCK as c_int
+        // If they're bucking, play the animation and leave... `parent->client` is
+        // a pool-allocated gclient_t for vehicle NPCs: read the ptr via the
+        // accessor, deref it raw (recipe 2c pool-client).
+        let parent_client = ctx.world.entity(parent_id).client;
+        if parent_client.is_null() == false && (*parent_client).ps.legsAnim == BOTH_VT_BUCK as c_int
         {
-            if (*((*parent).client)).ps.legsTimer <= 0 {
+            if (*parent_client).ps.legsTimer <= 0 {
                 (*pVeh).m_ulFlags &= !(VEH_BUCKING as u64);
             } else {
                 return;
@@ -285,9 +260,10 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                     anim = BOTH_VT_MOUNT_B;
                 }
 
+                let local_anim_index = ctx.world.entity(parent_id).localAnimIndex;
                 iAnimLen = (crate::bg_panimate::BG_AnimLength(
                     &ctx.world.bg_state,
-                    (*parent).localAnimIndex,
+                    local_anim_index,
                     anim as c_int,
                 ) as f32
                     * 0.7f32) as c_int;
@@ -318,8 +294,9 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             }
         }
 
-        let fSpeedPercToMax = if !(*parent).client.is_null() {
-            (*((*parent).client)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+        let parent_client = ctx.world.entity(parent_id).client;
+        let fSpeedPercToMax = if !parent_client.is_null() {
+            (*parent_client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
             0.0f32
         };
@@ -329,7 +306,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             iBlend = 600;
         } else {
             let turbo = fSpeedPercToMax > 0.0f32 && level_time < (*pVeh).m_iTurboTime;
-            let walking = if !(*parent).client.is_null() {
+            let walking = if !parent_client.is_null() {
                 fSpeedPercToMax > 0.0f32
                     && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0
                         || fSpeedPercToMax <= 0.275f32)
@@ -381,8 +358,19 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let mut iBlend: c_int = 500;
         let pilot = (*pVeh).m_pPilot as *mut gentity_t;
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
-        let pilotPS = (*pVeh).m_pPilot.as_ref().map(|p| (*p).playerState);
-        let parentPS = (*parent).playerState;
+        let parent_id = ctx.entity_id_of(parent).unwrap();
+        // `pilot` may be NULL; when present it's an arena entity — read its
+        // `playerState` (pool-client ptr, derefed raw below) via the accessor.
+        let pilotPS = if pilot.is_null() {
+            None
+        } else {
+            Some(
+                ctx.world
+                    .entity(ctx.entity_id_of(pilot).unwrap())
+                    .playerState,
+            )
+        };
+        let parentPS = ctx.world.entity(parent_id).playerState;
         let level_time = level_time(ctx);
 
         // Boarding animation.
@@ -390,8 +378,9 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             return;
         }
 
-        let fSpeedPercToMax = if !(*parent).client.is_null() {
-            (*((*parent).client)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+        let parent_client = ctx.world.entity(parent_id).client;
+        let fSpeedPercToMax = if !parent_client.is_null() {
+            (*parent_client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
             0.0f32
         };

@@ -123,9 +123,9 @@ use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 ///
 /// Source: `oracle/codemp/game/g_active.c:20-24`
 pub fn P_SetTwitchInfo(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: gclient param reshaped to its owning entity's EntityId; raw
-    // client re-derived verbatim (Stage-2 debt).
-    let client: *mut gclient_t = ctx.entity_mut(ent).client;
+    // `ent`'s `gclient_t*` read through the checked entity borrow; deref stays
+    // raw (may be an NPC pool client — recipe 2b).
+    let client: *mut gclient_t = ctx.world.entity(ent).client;
     unsafe {
         (*client).ps.painTime = ctx.world.level.time;
         (*client).ps.painDirection ^= 1;
@@ -136,10 +136,10 @@ pub fn P_SetTwitchInfo(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:36-118`
 pub fn P_DamageFeedback(ctx: &mut GameContext, player: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let player: *mut gentity_t = ctx.entity_mut(player);
+    // `player` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    let client = ctx.world.entity(player).client;
     unsafe {
-        let client = (*player).client;
         if (*client).ps.pm_type == PM_DEAD as c_int {
             return;
         }
@@ -177,19 +177,20 @@ pub fn P_DamageFeedback(ctx: &mut GameContext, player: EntityId) {
         }
 
         // play an apropriate pain sound
-        if (ctx.world.level.time > (*player).pain_debounce_time)
-            && ((*player).flags & FL_GODMODE) == 0
-            && ((*player).s.eFlags & EF_DEAD) == 0
+        if (ctx.world.level.time > ctx.world.entity(player).pain_debounce_time)
+            && (ctx.world.entity(player).flags & FL_GODMODE) == 0
+            && (ctx.world.entity(player).s.eFlags & EF_DEAD) == 0
         {
             // don't do more than two pain sounds a second
             // nmckenzie: also don't make him loud and whiny if he's only getting nicked.
             if ctx.world.level.time - (*client).ps.painTime < 500 || count < 10.0 {
                 return;
             }
-            P_SetTwitchInfo(ctx, ctx.entity_id_of(player).unwrap());
-            (*player).pain_debounce_time = ctx.world.level.time + 700;
+            P_SetTwitchInfo(ctx, player);
+            ctx.world.entity_mut(player).pain_debounce_time = ctx.world.level.time + 700;
 
-            G_AddEvent(&mut *(player), EV_PAIN as c_int, (*player).health);
+            let health = ctx.world.entity(player).health;
+            G_AddEvent(ctx.world.entity_mut(player), EV_PAIN as c_int, health);
             (*client).ps.damageEvent += 1;
 
             if (*client).damage_armor != 0 && (*client).damage_blood == 0 {
@@ -214,16 +215,16 @@ pub fn P_DamageFeedback(ctx: &mut GameContext, player: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:129-205`
 pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    let client = ctx.world.entity(ent).client;
     unsafe {
-        let client = (*ent).client;
         if (*client).noclip != 0 {
             (*client).airOutTime = ctx.world.level.time + 12000; // don't need air
             return;
         }
 
-        let waterlevel = (*ent).waterlevel;
+        let waterlevel = ctx.world.entity(ent).waterlevel;
 
         let envirosuit: qboolean =
             ((*client).ps.powerups[PW_BATTLESUIT as usize] > ctx.world.level.time) as c_int;
@@ -239,48 +240,49 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
             if (*client).airOutTime < ctx.world.level.time {
                 // drown!
                 (*client).airOutTime += 1000;
-                if (*ent).health > 0 {
+                if ctx.world.entity(ent).health > 0 {
                     // take more damage the longer underwater
-                    (*ent).damage += 2;
-                    if (*ent).damage > 15 {
-                        (*ent).damage = 15;
+                    ctx.world.entity_mut(ent).damage += 2;
+                    if ctx.world.entity(ent).damage > 15 {
+                        ctx.world.entity_mut(ent).damage = 15;
                     }
 
                     // play a gurp sound instead of a normal pain sound
-                    if (*ent).health <= (*ent).damage {
+                    if ctx.world.entity(ent).health <= ctx.world.entity(ent).damage {
                         G_Sound(
                             ctx,
-                            ctx.entity_id_of(ent),
+                            Some(ent),
                             CHAN_VOICE as c_int,
                             G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
                         );
                     } else if ctx.world.bg_state.rng.rand() & 1 != 0 {
                         G_Sound(
                             ctx,
-                            ctx.entity_id_of(ent),
+                            Some(ent),
                             CHAN_VOICE as c_int,
                             G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
                         );
                     } else {
                         G_Sound(
                             ctx,
-                            ctx.entity_id_of(ent),
+                            Some(ent),
                             CHAN_VOICE as c_int,
                             G_SoundIndex(cstr("sound/player/gurp2.wav").as_ptr()),
                         );
                     }
 
                     // don't play a normal pain sound
-                    (*ent).pain_debounce_time = ctx.world.level.time + 200;
+                    ctx.world.entity_mut(ent).pain_debounce_time = ctx.world.level.time + 200;
 
+                    let dmg = ctx.world.entity(ent).damage;
                     G_Damage(
                         ctx,
-                        ctx.entity_id_of(ent),
-                        ctx.entity_id_of(core::ptr::null_mut()),
-                        ctx.entity_id_of(core::ptr::null_mut()),
+                        Some(ent),
+                        None,
+                        None,
                         None,
                         [0.0; 3],
-                        (*ent).damage,
+                        dmg,
                         DAMAGE_NO_ARMOR,
                         MOD_WATER as c_int,
                     );
@@ -288,21 +290,25 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
             }
         } else {
             (*client).airOutTime = ctx.world.level.time + 12000;
-            (*ent).damage = 2;
+            ctx.world.entity_mut(ent).damage = 2;
         }
 
         // check for sizzle damage (move to pmove?)
-        if waterlevel != 0 && ((*ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0 {
-            if (*ent).health > 0 && (*ent).pain_debounce_time <= ctx.world.level.time {
+        if waterlevel != 0
+            && (ctx.world.entity(ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0
+        {
+            if ctx.world.entity(ent).health > 0
+                && ctx.world.entity(ent).pain_debounce_time <= ctx.world.level.time
+            {
                 if envirosuit != 0 {
-                    G_AddEvent(&mut *(ent), EV_POWERUP_BATTLESUIT as c_int, 0);
+                    G_AddEvent(ctx.world.entity_mut(ent), EV_POWERUP_BATTLESUIT as c_int, 0);
                 } else {
-                    if (*ent).watertype & CONTENTS_LAVA != 0 {
+                    if ctx.world.entity(ent).watertype & CONTENTS_LAVA != 0 {
                         G_Damage(
                             ctx,
-                            ctx.entity_id_of(ent),
-                            ctx.entity_id_of(core::ptr::null_mut()),
-                            ctx.entity_id_of(core::ptr::null_mut()),
+                            Some(ent),
+                            None,
+                            None,
                             None,
                             [0.0; 3],
                             30 * waterlevel,
@@ -311,12 +317,12 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
                         );
                     }
 
-                    if (*ent).watertype & CONTENTS_SLIME != 0 {
+                    if ctx.world.entity(ent).watertype & CONTENTS_SLIME != 0 {
                         G_Damage(
                             ctx,
-                            ctx.entity_id_of(ent),
-                            ctx.entity_id_of(core::ptr::null_mut()),
-                            ctx.entity_id_of(core::ptr::null_mut()),
+                            Some(ent),
+                            None,
+                            None,
                             None,
                             [0.0; 3],
                             10 * waterlevel,
@@ -334,44 +340,45 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:213-405`
 pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageSelf: qboolean) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let other: *mut gentity_t = ctx.entity_mut(other);
+    // `self_`/`other` fields via checked entity borrows (distinct slots); the
+    // `gclient_t*` selfCl (may be an NPC pool client — recipe 2b) is dereffed
+    // raw. The one cross-entity write (splashRadius from self_ dims) copies out.
     unsafe {
         let mut velocity: vec3_t = [0.0; 3];
         let mut my_mass: f32;
         let cont: c_int;
         let mut easyBreakBrush: qboolean = qtrue;
 
-        let selfCl = (*self_).client;
+        let selfCl = ctx.world.entity(self_).client;
         if !selfCl.is_null() {
             velocity = (*selfCl).ps.velocity;
-            if (*self_).mass == 0.0 {
+            if ctx.world.entity(self_).mass == 0.0 {
                 my_mass = 10.0;
             } else {
-                my_mass = (*self_).mass;
+                my_mass = ctx.world.entity(self_).mass;
             }
         } else {
-            velocity = (*self_).s.pos.trDelta;
-            if (*self_).s.pos.trType == TR_GRAVITY {
+            velocity = ctx.world.entity(self_).s.pos.trDelta;
+            if ctx.world.entity(self_).s.pos.trType == TR_GRAVITY {
                 velocity[2] -= 0.25 * ctx.world.cvars.g_gravity.value;
             }
-            if (*self_).mass == 0.0 {
+            if ctx.world.entity(self_).mass == 0.0 {
                 my_mass = 1.0;
-            } else if (*self_).mass <= 10.0 {
+            } else if ctx.world.entity(self_).mass <= 10.0 {
                 my_mass = 10.0;
             } else {
-                my_mass = (*self_).mass; // /10;
+                my_mass = ctx.world.entity(self_).mass; // /10;
             }
         }
 
         let mut magnitude: f32 = VectorLength(velocity) * my_mass / 10.0;
 
-        if (*other).material == MAT_GLASS
-            || (*other).material == MAT_GLASS_METAL
-            || (*other).material == MAT_GRATE1
-            || (((*other).flags & FL_BBRUSH) != 0 && ((*other).spawnflags & 8/*THIN*/) != 0)
-            || ((*other).r.svFlags & SVF_GLASS_BRUSH) != 0
+        if ctx.world.entity(other).material == MAT_GLASS
+            || ctx.world.entity(other).material == MAT_GLASS_METAL
+            || ctx.world.entity(other).material == MAT_GRATE1
+            || ((ctx.world.entity(other).flags & FL_BBRUSH) != 0
+                && (ctx.world.entity(other).spawnflags & 8/*THIN*/) != 0)
+            || (ctx.world.entity(other).r.svFlags & SVF_GLASS_BRUSH) != 0
         {
             easyBreakBrush = qtrue;
         }
@@ -390,15 +397,16 @@ pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageS
             }
 
             //damage them
-            if magnitude >= 100.0 && (*other).s.number < ENTITYNUM_WORLD {
+            if magnitude >= 100.0 && ctx.world.entity(other).s.number < ENTITYNUM_WORLD {
                 dir1 = velocity;
                 VectorNormalize(&mut dir1);
-                if VectorCompare((*other).r.currentOrigin, vec3_origin) != qfalse {
+                if VectorCompare(ctx.world.entity(other).r.currentOrigin, vec3_origin) != qfalse {
                     //a brush with no origin
                     dir2 = dir1;
                 } else {
                     for i in 0..3 {
-                        dir2[i] = (*other).r.currentOrigin[i] - (*self_).r.currentOrigin[i];
+                        dir2[i] = ctx.world.entity(other).r.currentOrigin[i]
+                            - ctx.world.entity(self_).r.currentOrigin[i];
                     }
                     VectorNormalize(&mut dir2);
                 }
@@ -413,59 +421,66 @@ pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageS
 
                 force *= magnitude / 50.0;
 
+                let other_num = ctx.world.entity(other).s.number;
                 cont = trap::PointContents(
                     ctx.engine,
                     mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
-                        &(*other).r.absmax as *const vec3_t,
-                        (*other).s.number,
+                        &ctx.world.entity(other).r.absmax as *const vec3_t,
+                        other_num,
                     ),
                 );
                 if (cont & CONTENTS_WATER) != 0 {
                     force /= 3.0; //water absorbs 2/3 velocity
                 }
 
-                if (force >= 1.0 && (*other).s.number != 0) || force >= 10.0 {
-                    if (*other).r.svFlags & SVF_GLASS_BRUSH != 0 {
-                        (*other).splashRadius =
-                            (((*self_).r.maxs[0] - (*self_).r.mins[0]) / 4.0) as c_int;
+                if (force >= 1.0 && ctx.world.entity(other).s.number != 0) || force >= 10.0 {
+                    if ctx.world.entity(other).r.svFlags & SVF_GLASS_BRUSH != 0 {
+                        let sr = ((ctx.world.entity(self_).r.maxs[0]
+                            - ctx.world.entity(self_).r.mins[0])
+                            / 4.0) as c_int;
+                        ctx.world.entity_mut(other).splashRadius = sr;
                     }
-                    if (*other).takedamage != 0 {
+                    if ctx.world.entity(other).takedamage != 0 {
+                        let origin = ctx.world.entity(self_).r.currentOrigin;
                         G_Damage(
                             ctx,
-                            ctx.entity_id_of(other),
-                            ctx.entity_id_of(self_),
-                            ctx.entity_id_of(self_),
+                            Some(other),
+                            Some(self_),
+                            Some(self_),
                             Some(&mut velocity),
-                            (*self_).r.currentOrigin,
+                            origin,
                             force as c_int,
                             DAMAGE_NO_ARMOR,
                             MOD_CRUSH as c_int,
                         ); //FIXME: MOD_IMPACT
                     } else {
-                        G_ApplyKnockback(ctx, ctx.entity_id_of(other).unwrap(), dir2, force);
+                        G_ApplyKnockback(ctx, other, dir2, force);
                     }
                 }
             }
 
-            if damageSelf != 0 && (*self_).takedamage != 0 {
+            if damageSelf != 0 && ctx.world.entity(self_).takedamage != 0 {
                 //Now damage me
                 if !selfCl.is_null() && (*selfCl).ps.fd.forceJumpZStart != 0.0 {
                     //we were force-jumping
-                    if (*self_).r.currentOrigin[2] >= (*selfCl).ps.fd.forceJumpZStart {
+                    if ctx.world.entity(self_).r.currentOrigin[2] >= (*selfCl).ps.fd.forceJumpZStart
+                    {
                         //we landed at same height or higher than we landed
                         magnitude = 0.0;
                     } else {
-                        magnitude =
-                            ((*selfCl).ps.fd.forceJumpZStart - (*self_).r.currentOrigin[2]) / 3.0;
+                        magnitude = ((*selfCl).ps.fd.forceJumpZStart
+                            - ctx.world.entity(self_).r.currentOrigin[2])
+                            / 3.0;
                     }
                 }
-                if (magnitude >= 100.0 + (*self_).health as f32
-                    && (*self_).s.number != 0
-                    && (*self_).s.weapon != WP_SABER)
+                if (magnitude >= 100.0 + ctx.world.entity(self_).health as f32
+                    && ctx.world.entity(self_).s.number != 0
+                    && ctx.world.entity(self_).s.weapon != WP_SABER)
                     || (magnitude >= 700.0)
                 {
                     //health here is used to simulate structural integrity
-                    if ((*self_).s.weapon == WP_SABER || (*self_).s.number == 0)
+                    if (ctx.world.entity(self_).s.weapon == WP_SABER
+                        || ctx.world.entity(self_).s.number == 0)
                         && !selfCl.is_null()
                         && (*selfCl).ps.groundEntityNum < ENTITYNUM_NONE
                         && magnitude < 1000.0
@@ -476,13 +491,14 @@ pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageS
                     magnitude /= 40.0;
                     magnitude = magnitude - force / 2.0; //If damage other, subtract half of that damage off of own injury
                     if magnitude >= 1.0 {
+                        let origin = ctx.world.entity(self_).r.currentOrigin;
                         G_Damage(
                             ctx,
-                            ctx.entity_id_of(self_),
-                            ctx.entity_id_of(core::ptr::null_mut()),
-                            ctx.entity_id_of(core::ptr::null_mut()),
+                            Some(self_),
                             None,
-                            (*self_).r.currentOrigin,
+                            None,
+                            None,
+                            origin,
                             (magnitude / 2.0) as c_int,
                             DAMAGE_NO_ARMOR,
                             MOD_FALLING as c_int,
@@ -502,22 +518,21 @@ pub fn Client_CheckImpactBBrush(
     self_: Option<EntityId>,
     other: Option<EntityId>,
 ) {
-    // STAGE-1: Option params (body null-checks both), raw re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), self_) };
-    let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
+    // `self_`/`other` fields via checked entity borrow; selfCl (`gclient_t*`,
+    // may be an NPC pool client — recipe 2b) is dereffed raw.
+    let Some(other) = other else {
+        return;
+    };
+    if ctx.world.entity(other).inuse == 0 {
+        return;
+    }
+    let selfCl = match self_ {
+        Some(s) => ctx.world.entity(s).client,
+        None => core::ptr::null_mut(),
+    };
     unsafe {
-        if other.is_null() || (*other).inuse == 0 {
-            return;
-        }
-        let selfCl = if self_.is_null() {
-            core::ptr::null_mut()
-        } else {
-            (*self_).client
-        };
-        if self_.is_null()
-            || (*self_).inuse == 0
+        if self_.is_none()
+            || ctx.world.entity(self_.unwrap()).inuse == 0
             || selfCl.is_null()
             || (*selfCl).tempSpectate >= ctx.world.level.time
             || (*selfCl).sess.sessionTeam == TEAM_SPECTATOR
@@ -525,21 +540,19 @@ pub fn Client_CheckImpactBBrush(
             //hmm.. let's not let spectators ram into breakables.
             return;
         }
+        let self_ = self_.unwrap();
 
-        if (*other).material == MAT_GLASS
-            || (*other).material == MAT_GLASS_METAL
-            || (*other).material == MAT_GRATE1
-            || (((*other).flags & FL_BBRUSH) != 0 && ((*other).spawnflags & 8/*THIN*/) != 0)
-            || (((*other).flags & FL_BBRUSH) != 0 && (*other).health <= 10)
-            || ((*other).r.svFlags & SVF_GLASS_BRUSH) != 0
+        if ctx.world.entity(other).material == MAT_GLASS
+            || ctx.world.entity(other).material == MAT_GLASS_METAL
+            || ctx.world.entity(other).material == MAT_GRATE1
+            || ((ctx.world.entity(other).flags & FL_BBRUSH) != 0
+                && (ctx.world.entity(other).spawnflags & 8/*THIN*/) != 0)
+            || ((ctx.world.entity(other).flags & FL_BBRUSH) != 0
+                && ctx.world.entity(other).health <= 10)
+            || (ctx.world.entity(other).r.svFlags & SVF_GLASS_BRUSH) != 0
         {
             //clients only do impact damage against easy-break breakables
-            DoImpact(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                ctx.entity_id_of(other).unwrap(),
-                qfalse,
-            );
+            DoImpact(ctx, self_, other, qfalse);
         }
     }
 }
@@ -548,31 +561,31 @@ pub fn Client_CheckImpactBBrush(
 ///
 /// Source: `oracle/codemp/game/g_active.c:444-467`
 pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    let client = ctx.world.entity(ent).client;
     unsafe {
-        let client = (*ent).client;
         let level_time = ctx.world.level.time;
         if !client.is_null() && (*client).isHacking != 0 {
             //loop hacking sound
             (*client).ps.loopSound = ctx.world.level.snd_hack;
-            (*ent).s.loopIsSoundset = qfalse;
+            ctx.world.entity_mut(ent).s.loopIsSoundset = qfalse;
         } else if !client.is_null() && (*client).isMedHealed > level_time {
             //loop healing sound
             (*client).ps.loopSound = ctx.world.level.snd_medHealed;
-            (*ent).s.loopIsSoundset = qfalse;
+            ctx.world.entity_mut(ent).s.loopIsSoundset = qfalse;
         } else if !client.is_null() && (*client).isMedSupplied > level_time {
             //loop supplying sound
             (*client).ps.loopSound = ctx.world.level.snd_medSupplied;
-            (*ent).s.loopIsSoundset = qfalse;
-        } else if (*ent).waterlevel != 0
-            && ((*ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0
+            ctx.world.entity_mut(ent).s.loopIsSoundset = qfalse;
+        } else if ctx.world.entity(ent).waterlevel != 0
+            && (ctx.world.entity(ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0
         {
             (*client).ps.loopSound = ctx.world.level.snd_fry;
-            (*ent).s.loopIsSoundset = qfalse;
+            ctx.world.entity_mut(ent).s.loopIsSoundset = qfalse;
         } else {
             (*client).ps.loopSound = 0;
-            (*ent).s.loopIsSoundset = qfalse;
+            ctx.world.entity_mut(ent).s.loopIsSoundset = qfalse;
         }
     }
 }
@@ -584,8 +597,9 @@ pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:478-506`
 pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`/`other` fields via checked entity borrows; the raw `*mut gentity_t`
+    // pairs are re-acquired at the point of use for the `dispatch_touch` seam
+    // (which threads `ctx` alongside the two entity pointers).
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
@@ -601,32 +615,35 @@ pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
                 i += 1;
                 continue; // duplicated
             }
-            let other =
-                &mut ctx.world.g_entities[(*pm).touchents[i as usize] as usize] as *mut gentity_t;
+            let other = EntityId::from_num((*pm).touchents[i as usize]).unwrap();
 
-            if (*ent).r.svFlags & SVF_BOT != 0 {
-                if let Some(t) = (*ent).touch.get() {
+            if ctx.world.entity(ent).r.svFlags & SVF_BOT != 0 {
+                if let Some(t) = ctx.world.entity(ent).touch.get() {
+                    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+                    let other_ptr = ctx.world.entity_mut(other) as *mut gentity_t;
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
-                        ent,
-                        other,
+                        ent_ptr,
+                        other_ptr,
                         &mut trace as *mut trace_t,
                     );
                 }
             }
 
-            let other_touch = (*other).touch.get();
+            let other_touch = ctx.world.entity(other).touch.get();
             let Some(other_touch) = other_touch else {
                 i += 1;
                 continue;
             };
 
+            let other_ptr = ctx.world.entity_mut(other) as *mut gentity_t;
+            let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
             crate::ent_fn_enums::dispatch_touch(
                 ctx,
                 other_touch,
-                other,
-                ent,
+                other_ptr,
+                ent_ptr,
                 &mut trace as *mut trace_t,
             );
             i += 1;
@@ -641,13 +658,14 @@ pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:516-590`
 pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`/`hit` fields via checked entity borrows; the `gclient_t*` (may be an
+    // NPC pool client — recipe 2b) is dereffed raw. Raw `*mut gentity_t` pairs
+    // are re-acquired at the `dispatch_touch` seam calls.
+    let client = ctx.world.entity(ent).client;
     unsafe {
-        if (*ent).client.is_null() {
+        if client.is_null() {
             return;
         }
-        let client = (*ent).client;
 
         // dead clients don't activate triggers!
         if (*client).ps.stats[STAT_HEALTH as usize] <= 0 {
@@ -674,29 +692,31 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
         );
 
         // can't use ent->r.absmin, because that has a one unit pad
-        crate::q_math::_VectorAdd((*client).ps.origin, (*ent).r.mins, &mut mins);
-        crate::q_math::_VectorAdd((*client).ps.origin, (*ent).r.maxs, &mut maxs);
+        let ent_mins = ctx.world.entity(ent).r.mins;
+        let ent_maxs = ctx.world.entity(ent).r.maxs;
+        crate::q_math::_VectorAdd((*client).ps.origin, ent_mins, &mut mins);
+        crate::q_math::_VectorAdd((*client).ps.origin, ent_maxs, &mut maxs);
 
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
         while i < num {
-            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
+            let hit = EntityId::from_num(touch[i as usize]).unwrap();
 
-            if (*hit).touch.is_none() && (*ent).touch.is_none() {
+            if ctx.world.entity(hit).touch.is_none() && ctx.world.entity(ent).touch.is_none() {
                 i += 1;
                 continue;
             }
-            if (*hit).r.contents & CONTENTS_TRIGGER == 0 {
+            if ctx.world.entity(hit).r.contents & CONTENTS_TRIGGER == 0 {
                 i += 1;
                 continue;
             }
 
             // ignore most entities if a spectator
             if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-                if (*hit).s.eType != ET_TELEPORT_TRIGGER as c_int
+                if ctx.world.entity(hit).s.eType != ET_TELEPORT_TRIGGER as c_int
                     // this is ugly but adding a new ET_? type will
                     // most likely cause network incompatibilities
-                    && (*hit).touch.get() != Some(EntTouch::Touch_DoorTrigger)
+                    && ctx.world.entity(hit).touch.get() != Some(EntTouch::Touch_DoorTrigger)
                 {
                     i += 1;
                     continue;
@@ -705,39 +725,52 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
 
             // use seperate code for determining if an item is picked up
             // so you don't have to actually contact its bounding box
-            if (*hit).s.eType == ET_ITEM as c_int {
-                if BG_PlayerTouchesItem(&mut (*client).ps, &mut (*hit).s, ctx.world.level.time)
-                    == qfalse
+            if ctx.world.entity(hit).s.eType == ET_ITEM as c_int {
+                let level_time = ctx.world.level.time;
+                let hit_s = &mut ctx.world.entity_mut(hit).s as *mut _;
+                if BG_PlayerTouchesItem(&mut (*client).ps, hit_s, level_time) == qfalse {
+                    i += 1;
+                    continue;
+                }
+            } else {
+                let hit_ptr = ctx.world.entity(hit) as *const gentity_t;
+                if trap::EntityContact(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
+                        &mins as *const vec3_t,
+                        &maxs as *const vec3_t,
+                        hit_ptr.cast(),
+                    ),
+                ) == qfalse
                 {
                     i += 1;
                     continue;
                 }
-            } else if trap::EntityContact(
-                ctx.engine,
-                mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
-                    &mins as *const vec3_t,
-                    &maxs as *const vec3_t,
-                    (hit as *const gentity_t).cast(),
-                ),
-            ) == qfalse
-            {
-                i += 1;
-                continue;
             }
 
             trace = core::mem::zeroed();
 
-            if let Some(t) = (*hit).touch.get() {
-                crate::ent_fn_enums::dispatch_touch(ctx, t, hit, ent, &mut trace as *mut trace_t);
+            if let Some(t) = ctx.world.entity(hit).touch.get() {
+                let hit_ptr = ctx.world.entity_mut(hit) as *mut gentity_t;
+                let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+                crate::ent_fn_enums::dispatch_touch(
+                    ctx,
+                    t,
+                    hit_ptr,
+                    ent_ptr,
+                    &mut trace as *mut trace_t,
+                );
             }
 
-            if (*ent).r.svFlags & SVF_BOT != 0 {
-                if let Some(t) = (*ent).touch.get() {
+            if ctx.world.entity(ent).r.svFlags & SVF_BOT != 0 {
+                if let Some(t) = ctx.world.entity(ent).touch.get() {
+                    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+                    let hit_ptr = ctx.world.entity_mut(hit) as *mut gentity_t;
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
-                        ent,
-                        hit,
+                        ent_ptr,
+                        hit_ptr,
                         &mut trace as *mut trace_t,
                     );
                 }
@@ -761,24 +794,28 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:601-671`
 pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: vec3_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`/`hit` fields via checked entity borrows; raw `*mut gentity_t` pairs
+    // are re-acquired at the `dispatch_touch` seam call.
     unsafe {
         // non-moving movers don't hit triggers!
-        if VectorLengthSquared((*ent).s.pos.trDelta) == 0.0 {
+        if VectorLengthSquared(ctx.world.entity(ent).s.pos.trDelta) == 0.0 {
             return;
         }
 
         let range: vec3_t = [40.0, 40.0, 52.0];
         let mut size: vec3_t = [0.0; 3];
-        crate::q_math::_VectorSubtract((*ent).r.mins, (*ent).r.maxs, &mut size);
+        crate::q_math::_VectorSubtract(
+            ctx.world.entity(ent).r.mins,
+            ctx.world.entity(ent).r.maxs,
+            &mut size,
+        );
         let mut stepSize = VectorLength(size);
         if stepSize < 1.0 {
             stepSize = 1.0;
         }
 
         let mut dir: vec3_t = [0.0; 3];
-        crate::q_math::_VectorSubtract((*ent).r.currentOrigin, oldOrg, &mut dir);
+        crate::q_math::_VectorSubtract(ctx.world.entity(ent).r.currentOrigin, oldOrg, &mut dir);
         let dist = VectorNormalize(&mut dir);
 
         let mut mins: vec3_t = [0.0; 3];
@@ -790,7 +827,12 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
         let mut step = 0.0f32;
         while step <= dist {
             let mut checkSpot: vec3_t = [0.0; 3];
-            crate::q_math::_VectorMA((*ent).r.currentOrigin, step, dir, &mut checkSpot);
+            crate::q_math::_VectorMA(
+                ctx.world.entity(ent).r.currentOrigin,
+                step,
+                dir,
+                &mut checkSpot,
+            );
             crate::q_math::_VectorSubtract(checkSpot, range, &mut mins);
             crate::q_math::_VectorAdd(checkSpot, range, &mut maxs);
 
@@ -805,34 +847,37 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
             );
 
             // can't use ent->r.absmin, because that has a one unit pad
-            crate::q_math::_VectorAdd(checkSpot, (*ent).r.mins, &mut mins);
-            crate::q_math::_VectorAdd(checkSpot, (*ent).r.maxs, &mut maxs);
+            let ent_mins = ctx.world.entity(ent).r.mins;
+            let ent_maxs = ctx.world.entity(ent).r.maxs;
+            crate::q_math::_VectorAdd(checkSpot, ent_mins, &mut mins);
+            crate::q_math::_VectorAdd(checkSpot, ent_maxs, &mut maxs);
 
             let mut i = 0;
             while i < num {
-                let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
+                let hit = EntityId::from_num(touch[i as usize]).unwrap();
 
-                if (*hit).s.eType != ET_PUSH_TRIGGER as c_int {
+                if ctx.world.entity(hit).s.eType != ET_PUSH_TRIGGER as c_int {
                     i += 1;
                     continue;
                 }
 
-                if (*hit).touch.is_none() {
+                if ctx.world.entity(hit).touch.is_none() {
                     i += 1;
                     continue;
                 }
 
-                if (*hit).r.contents & CONTENTS_TRIGGER == 0 {
+                if ctx.world.entity(hit).r.contents & CONTENTS_TRIGGER == 0 {
                     i += 1;
                     continue;
                 }
 
+                let hit_ptr = ctx.world.entity(hit) as *const gentity_t;
                 if trap::EntityContact(
                     ctx.engine,
                     mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
                         &mins as *const vec3_t,
                         &maxs as *const vec3_t,
-                        (hit as *const gentity_t).cast(),
+                        hit_ptr.cast(),
                     ),
                 ) == qfalse
                 {
@@ -842,12 +887,14 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
 
                 trace = core::mem::zeroed();
 
-                if let Some(t) = (*hit).touch.get() {
+                if let Some(t) = ctx.world.entity(hit).touch.get() {
+                    let hit_ptr = ctx.world.entity_mut(hit) as *mut gentity_t;
+                    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
-                        hit,
-                        ent,
+                        hit_ptr,
+                        ent_ptr,
                         &mut trace as *mut trace_t,
                     );
                 }
@@ -867,11 +914,10 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
 ///
 /// Source: `oracle/codemp/game/g_active.c:678-740`
 pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw. `pm`/`ucmd` stay raw.
+    let client = ctx.world.entity(ent).client;
     unsafe {
-        let client = (*ent).client;
-
         if (*client).sess.spectatorState != SPECTATOR_FOLLOW {
             (*client).ps.pm_type = (PM_SPECTATOR) as i32;
             (*client).ps.speed = 400.0; // faster than normal
@@ -916,14 +962,18 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
                 &mut callbacks,
             );
             // save results of pmove
-            crate::q_math::_VectorCopy((*client).ps.origin, &mut (*ent).s.origin);
+            crate::q_math::_VectorCopy(
+                (*client).ps.origin,
+                &mut ctx.world.entity_mut(ent).s.origin,
+            );
 
             if (*client).tempSpectate < ctx.world.level.time {
-                G_TouchTriggers(ctx, ctx.entity_id_of(ent).unwrap());
+                G_TouchTriggers(ctx, ent);
             }
+            let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
             trap::UnlinkEntity(
                 ctx.engine,
-                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent.cast()),
+                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent_ptr.cast()),
             );
         }
 
@@ -933,12 +983,12 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
         if (*client).tempSpectate < ctx.world.level.time {
             // attack button cycles through spectators
             if (*client).buttons & BUTTON_ATTACK != 0 && (*client).oldbuttons & BUTTON_ATTACK == 0 {
-                Cmd_FollowCycle_f(ctx, ctx.entity_id_of(ent).unwrap(), 1);
+                Cmd_FollowCycle_f(ctx, ent, 1);
             }
 
             if (*client).sess.spectatorState == SPECTATOR_FOLLOW && (*ucmd).upmove > 0 {
                 // jump now removes you from follow mode
-                StopFollowing(ctx, ctx.entity_id_of(ent).unwrap());
+                StopFollowing(ctx, ent);
             }
         }
     }
@@ -948,9 +998,9 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
 ///
 /// Source: `oracle/codemp/game/g_active.c:751-774`
 pub fn ClientInactivityTimer(ctx: &mut GameContext, ent: EntityId) -> qboolean {
-    // STAGE-1: gclient param reshaped to its owning entity's EntityId; raw
-    // client re-derived verbatim (Stage-2 debt).
-    let client: *mut gclient_t = ctx.entity_mut(ent).client;
+    // `ent`'s `gclient_t*` read through the checked entity borrow; deref stays
+    // raw (may be an NPC pool client — recipe 2b). Body is all client-side.
+    let client: *mut gclient_t = ctx.world.entity(ent).client;
     unsafe {
         let level_time = ctx.world.level.time;
         let clients = ctx.world.level.clients;
@@ -997,18 +1047,18 @@ pub fn ClientInactivityTimer(ctx: &mut GameContext, ent: EntityId) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_active.c:783-803`
 pub fn ClientTimerActions(ent: &mut gentity_t, msec: c_int) {
-    // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; raw re-derived (Stage-2 debt).
-    let ent: *mut gentity_t = ent;
+    // `ent` accessed through its borrow; the `gclient_t*` (may be an NPC pool
+    // client — recipe 2b) is dereffed raw.
+    let client = ent.client;
     unsafe {
-        let client = (*ent).client;
         (*client).timeResidual += msec;
 
         while (*client).timeResidual >= 1000 {
             (*client).timeResidual -= 1000;
 
             // count down health when over max
-            if (*ent).health > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
-                (*ent).health -= 1;
+            if ent.health > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
+                ent.health -= 1;
             }
 
             // count down armor when over max
@@ -1025,23 +1075,18 @@ pub fn ClientTimerActions(ent: &mut gentity_t, msec: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:810-823`
 pub fn ClientIntermissionThink(client: &mut gclient_t) {
-    // STAGE-1: ctx-free gclient leaf borrows &mut gclient_t; raw re-derived (Stage-2 debt).
-    let client: *mut gclient_t = client;
-    unsafe {
-        (*client).ps.eFlags &= !EF_TALK;
-        (*client).ps.eFlags &= !EF_FIRING;
+    // ctx-free `&mut gclient_t` leaf — accessed directly through its borrow.
+    client.ps.eFlags &= !EF_TALK;
+    client.ps.eFlags &= !EF_FIRING;
 
-        // swap and latch button actions
-        (*client).oldbuttons = (*client).buttons;
-        (*client).buttons = (*client).pers.cmd.buttons;
-        if (*client).buttons
-            & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE)
-            & ((*client).oldbuttons ^ (*client).buttons)
-            != 0
-        {
-            // this used to be an ^1 but once a player says ready, it should stick
-            (*client).readyToExit = 1;
-        }
+    // swap and latch button actions
+    client.oldbuttons = client.buttons;
+    client.buttons = client.pers.cmd.buttons;
+    if client.buttons & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE) & (client.oldbuttons ^ client.buttons)
+        != 0
+    {
+        // this used to be an ^1 but once a player says ready, it should stick
+        client.readyToExit = 1;
     }
 }
 
@@ -1049,54 +1094,64 @@ pub fn ClientIntermissionThink(client: &mut gclient_t) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:826-854`
 pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
-    // STAGE-1: EntityId param (Raven's post-deref null-check is vacuous), raw
-    // body re-derived verbatim (Stage-2 debt).
-    let vehEnt: *mut gentity_t = ctx.entity_mut(vehEnt);
+    // `vehEnt`/`droidEnt` fields via checked entity borrow; the `Vehicle_t*`
+    // `veh` (no accessor — recipe 2c) and the `gclient_t*` droidCl are dereffed
+    // raw. Raven's post-deref `!vehEnt` null-check is vacuous, dropped.
+    let veh = ctx.world.entity(vehEnt).m_pVehicle;
     unsafe {
-        let veh = (*vehEnt).m_pVehicle;
-        if !vehEnt.is_null() && !veh.is_null() && !(*veh).m_pDroidUnit.is_null() {
+        if !veh.is_null() && !(*veh).m_pDroidUnit.is_null() {
             let droidEnt = (*veh).m_pDroidUnit as *mut gentity_t;
+            let droid_id = ctx.entity_id_of(droidEnt).unwrap();
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
             let mut fwd: vec3_t = [0.0; 3];
 
+            let ghoul2 = ctx.world.entity(vehEnt).ghoul2;
+            let droidTag = (*veh).m_iDroidUnitTag;
+            let vehAngles = ctx.world.entity(vehEnt).r.currentAngles;
+            let vehOrigin = ctx.world.entity(vehEnt).r.currentOrigin;
+            let vehScale = ctx.world.entity(vehEnt).modelScale;
+            let time = ctx.world.level.time;
             trap::G2API_GetBoltMatrix(
                 ctx.engine,
                 mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                    (*vehEnt).ghoul2,
+                    ghoul2,
                     0,
-                    (*veh).m_iDroidUnitTag,
+                    droidTag,
                     &mut boltMatrix as *mut mdxaBone_t,
-                    &(*vehEnt).r.currentAngles as *const vec3_t,
-                    &(*vehEnt).r.currentOrigin as *const vec3_t,
-                    ctx.world.level.time,
+                    &vehAngles as *const vec3_t,
+                    &vehOrigin as *const vec3_t,
+                    time,
                     core::ptr::null_mut(),
-                    &(*vehEnt).modelScale as *const vec3_t,
+                    &vehScale as *const vec3_t,
                 ),
             );
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix,
                 Eorientations::ORIGIN as c_int,
-                &mut (*droidEnt).r.currentOrigin,
+                &mut ctx.world.entity_mut(droid_id).r.currentOrigin,
             );
             BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut fwd);
-            vectoangles(fwd, &mut (*droidEnt).r.currentAngles);
+            vectoangles(fwd, &mut ctx.world.entity_mut(droid_id).r.currentAngles);
 
-            let droidCl = (*droidEnt).client;
+            let droidCl = ctx.world.entity(droid_id).client;
             if !droidCl.is_null() {
-                (*droidCl).ps.viewangles = (*droidEnt).r.currentAngles;
-                (*droidCl).ps.origin = (*droidEnt).r.currentOrigin;
+                let ca = ctx.world.entity(droid_id).r.currentAngles;
+                let co = ctx.world.entity(droid_id).r.currentOrigin;
+                (*droidCl).ps.viewangles = ca;
+                (*droidCl).ps.origin = co;
             }
 
-            G_SetOrigin(&mut *(droidEnt), (*droidEnt).r.currentOrigin);
+            let co2 = ctx.world.entity(droid_id).r.currentOrigin;
+            G_SetOrigin(ctx.world.entity_mut(droid_id), co2);
             trap::LinkEntity(
                 ctx.engine,
                 mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(droidEnt.cast()),
             );
 
-            if !(*droidEnt).NPC.is_null() {
+            if !ctx.world.entity(droid_id).NPC.is_null() {
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(droidEnt).unwrap(),
+                    droid_id,
                     SETANIM_BOTH as c_int,
                     BOTH_STAND2 as c_int,
                     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD) as c_int,
@@ -1110,27 +1165,28 @@ pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:857-895`
 pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
+    // Entity fields via checked entity borrows; the `Vehicle_t*` veh (no
+    // accessor — recipe 2c) and the `gclient_t*`s (may be NPC pool clients —
+    // recipe 2b) are dereffed raw.
+    let ent = EntityId::from_num(entNum).unwrap();
     unsafe {
-        let ent = &mut ctx.world.g_entities[entNum as usize] as *mut gentity_t;
-
-        if (*ent).inuse == 0 || (*ent).client.is_null() {
+        if ctx.world.entity(ent).inuse == 0 || ctx.world.entity(ent).client.is_null() {
             return;
         }
 
-        let cl = (*ent).client;
+        let cl = ctx.world.entity(ent).client;
 
         if ev == EV_FIRE_WEAPON as c_int {
-            let veh = (*ent).m_pVehicle;
+            let veh = ctx.world.entity(ent).m_pVehicle;
             if !veh.is_null()
                 && (*(*veh).m_pVehicleInfo).r#type == VH_SPEEDER
                 && (*cl).ps.m_iVehicleNum != 0
             {
                 //a speeder with a pilot
-                let rider = &mut ctx.world.g_entities[((*cl).ps.m_iVehicleNum - 1) as usize]
-                    as *mut gentity_t;
-                if (*rider).inuse != 0 && !(*rider).client.is_null() {
+                let rider = EntityId::from_num((*cl).ps.m_iVehicleNum - 1).unwrap();
+                if ctx.world.entity(rider).inuse != 0 && !ctx.world.entity(rider).client.is_null() {
                     //pilot is valid...
-                    let rcl = (*rider).client;
+                    let rcl = ctx.world.entity(rider).client;
                     if (*rcl).ps.weapon != WP_MELEE
                         && ((*rcl).ps.weapon != WP_SABER || (*rcl).ps.saberHolstered == 0)
                     {
@@ -1140,12 +1196,12 @@ pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
                 }
             }
 
-            FireWeapon(ctx, ctx.entity_id_of(ent), qfalse);
+            FireWeapon(ctx, Some(ent), qfalse);
             (*cl).dangerTime = ctx.world.level.time;
             (*cl).ps.eFlags &= !EF_INVULNERABLE;
             (*cl).invulnerableTimer = 0;
         } else if ev == EV_ALT_FIRE as c_int {
-            FireWeapon(ctx, ctx.entity_id_of(ent), qtrue);
+            FireWeapon(ctx, Some(ent), qtrue);
             (*cl).dangerTime = ctx.world.level.time;
             (*cl).ps.eFlags &= !EF_INVULNERABLE;
             (*cl).invulnerableTimer = 0;
@@ -1157,10 +1213,10 @@ pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:909-1052`
 pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    let client = ctx.world.entity(ent).client;
     unsafe {
-        let client = (*ent).client;
         let mut oldEventSequence = oldEventSequence;
 
         if oldEventSequence < (*client).ps.eventSequence - MAX_PS_EVENTS as c_int {
@@ -1176,11 +1232,11 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                 let mut damage: c_int;
 
                 'blk: loop {
-                    if !(*ent).client.is_null() && (*client).ps.fallingToDeath != 0 {
+                    if !ctx.world.entity(ent).client.is_null() && (*client).ps.fallingToDeath != 0 {
                         break 'blk;
                     }
 
-                    if (*ent).s.eType != ET_PLAYER as c_int {
+                    if ctx.world.entity(ent).s.eType != ET_PLAYER as c_int {
                         break 'blk; // not in the player model
                     }
 
@@ -1211,12 +1267,12 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                     }
 
                     let dir: vec3_t = [0.0, 0.0, 1.0];
-                    (*ent).pain_debounce_time = ctx.world.level.time + 200; // no normal pain sound
+                    ctx.world.entity_mut(ent).pain_debounce_time = ctx.world.level.time + 200; // no normal pain sound
                     G_Damage(
                         ctx,
-                        ctx.entity_id_of(ent),
-                        ctx.entity_id_of(core::ptr::null_mut()),
-                        ctx.entity_id_of(core::ptr::null_mut()),
+                        Some(ent),
+                        None,
+                        None,
                         None,
                         [0.0; 3],
                         damage,
@@ -1224,10 +1280,10 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                         MOD_FALLING as c_int,
                     );
 
-                    if (*ent).health < 1 {
+                    if ctx.world.entity(ent).health < 1 {
                         G_Sound(
                             ctx,
-                            ctx.entity_id_of(ent),
+                            Some(ent),
                             CHAN_AUTO as c_int,
                             G_SoundIndex(cstr("sound/player/fallsplat.wav").as_ptr()),
                         );
@@ -1235,12 +1291,12 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                     break 'blk;
                 }
             } else if event == EV_FIRE_WEAPON as c_int {
-                FireWeapon(ctx, ctx.entity_id_of(ent), qfalse);
+                FireWeapon(ctx, Some(ent), qfalse);
                 (*client).dangerTime = ctx.world.level.time;
                 (*client).ps.eFlags &= !EF_INVULNERABLE;
                 (*client).invulnerableTimer = 0;
             } else if event == EV_ALT_FIRE as c_int {
-                FireWeapon(ctx, ctx.entity_id_of(ent), qtrue);
+                FireWeapon(ctx, Some(ent), qtrue);
                 (*client).dangerTime = ctx.world.level.time;
                 (*client).ps.eFlags &= !EF_INVULNERABLE;
                 (*client).invulnerableTimer = 0;
@@ -1250,35 +1306,35 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                 (*client).invulnerableTimer = 0;
             } else if event == EV_USE_ITEM1 as c_int {
                 //seeker droid
-                ItemUse_Seeker(ctx, ctx.entity_id_of(ent).unwrap());
+                ItemUse_Seeker(ctx, ent);
             } else if event == EV_USE_ITEM2 as c_int {
                 //shield
-                ItemUse_Shield(ctx, ctx.entity_id_of(ent).unwrap());
+                ItemUse_Shield(ctx, ent);
             } else if event == EV_USE_ITEM3 as c_int {
                 //medpack
-                ItemUse_MedPack(&mut *ent);
+                ItemUse_MedPack(ctx.world.entity_mut(ent));
             } else if event == EV_USE_ITEM4 as c_int {
                 //big medpack
-                ItemUse_MedPack_Big(&mut *ent);
+                ItemUse_MedPack_Big(ctx.world.entity_mut(ent));
             } else if event == EV_USE_ITEM5 as c_int {
                 //binoculars
-                ItemUse_Binoculars(ctx, ctx.entity_id_of(ent));
+                ItemUse_Binoculars(ctx, Some(ent));
             } else if event == EV_USE_ITEM6 as c_int {
                 //sentry gun
-                ItemUse_Sentry(ctx, ctx.entity_id_of(ent));
+                ItemUse_Sentry(ctx, Some(ent));
             } else if event == EV_USE_ITEM7 as c_int {
                 //jetpack
-                ItemUse_Jetpack(ctx, ctx.entity_id_of(ent).unwrap());
+                ItemUse_Jetpack(ctx, ent);
             } else if event == EV_USE_ITEM8 as c_int {
                 //health disp — ItemUse_UseDisp(ent, HI_HEALTHDISP);
             } else if event == EV_USE_ITEM9 as c_int {
                 //ammo disp — ItemUse_UseDisp(ent, HI_AMMODISP);
             } else if event == EV_USE_ITEM10 as c_int {
                 //eweb
-                ItemUse_UseEWeb(ctx, ctx.entity_id_of(ent).unwrap());
+                ItemUse_UseEWeb(ctx, ent);
             } else if event == EV_USE_ITEM11 as c_int {
                 //cloak
-                ItemUse_UseCloak(ctx, ctx.entity_id_of(ent).unwrap());
+                ItemUse_UseCloak(ctx, ent);
             }
 
             i += 1;
@@ -1321,15 +1377,14 @@ pub fn SendPendingPredictableEvents(ctx: &mut GameContext, ps: *mut playerState_
 ///
 /// Source: `oracle/codemp/game/g_active.c:1103-1147`
 pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    // `self_`/`ent` fields via checked entity borrow; the `gclient_t*`s selfCl/
+    // entCl are read through the borrow then dereffed raw (recipe 2b).
+    let selfCl = ctx.world.entity(self_).client;
     unsafe {
         // Any clients with force sight on should see this client
         let numConnectedClients = ctx.world.level.numConnectedClients;
-        let selfCl = (*self_).client;
         for i in 0..numConnectedClients {
-            let ent = &mut ctx.world.g_entities[ctx.world.level.sortedClients[i as usize] as usize]
-                as *mut gentity_t;
+            let ent = EntityId::from_num(ctx.world.level.sortedClients[i as usize]).unwrap();
             let dist: f32;
             let mut angles: vec3_t = [0.0; 3];
 
@@ -1337,7 +1392,7 @@ pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
                 continue;
             }
 
-            let entCl = (*ent).client;
+            let entCl = ctx.world.entity(ent).client;
             // Not using force sight so we shouldnt broadcast to this one
             if (*entCl).ps.fd.forcePowersActive & (1 << FP_SEE) == 0 {
                 continue;
@@ -1362,8 +1417,8 @@ pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
 
             // Turn on the broadcast bit for the master and since there is only one
             // master we are done
-            (*self_).r.broadcastClients[((*ent).s.clientNum / 32) as usize] |=
-                1 << ((*ent).s.clientNum % 32);
+            let cn = ctx.world.entity(ent).s.clientNum;
+            ctx.world.entity_mut(self_).r.broadcastClients[(cn / 32) as usize] |= 1 << (cn % 32);
 
             break;
         }
@@ -1374,11 +1429,10 @@ pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:1149-1197`
 pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    // `self_`/`ent` fields via checked entity borrow; the `gclient_t*`s selfCl/
+    // entCl are read through the borrow then dereffed raw (recipe 2b).
+    let selfCl = ctx.world.entity(self_).client;
     unsafe {
-        let selfCl = (*self_).client;
-
         // Not jedi master mode then nothing to do
         if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
             return;
@@ -1392,8 +1446,7 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
         // Broadcast ourself to all clients within range
         let numConnectedClients = ctx.world.level.numConnectedClients;
         for i in 0..numConnectedClients {
-            let ent = &mut ctx.world.g_entities[ctx.world.level.sortedClients[i as usize] as usize]
-                as *mut gentity_t;
+            let ent = EntityId::from_num(ctx.world.level.sortedClients[i as usize]).unwrap();
             let dist: f32;
             let mut angles: vec3_t = [0.0; 3];
 
@@ -1401,7 +1454,7 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
                 continue;
             }
 
-            let entCl = (*ent).client;
+            let entCl = ctx.world.entity(ent).client;
             for k in 0..3 {
                 angles[k] = (*selfCl).ps.origin[k] - (*entCl).ps.origin[k];
             }
@@ -1421,8 +1474,8 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
 
             // Turn on the broadcast bit for the master and since there is only one
             // master we are done
-            (*self_).r.broadcastClients[((*ent).s.clientNum / 32) as usize] |=
-                1 << ((*ent).s.clientNum % 32);
+            let cn = ctx.world.entity(ent).s.clientNum;
+            ctx.world.entity_mut(self_).r.broadcastClients[(cn / 32) as usize] |= 1 << (cn % 32);
         }
     }
 }
@@ -1431,32 +1484,29 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:1199-1209`
 pub fn G_UpdateClientBroadcasts(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        // Clear all the broadcast bits for this client
-        (*self_).r.broadcastClients = [0; 2];
+    // Clear all the broadcast bits for this client
+    ctx.world.entity_mut(self_).r.broadcastClients = [0; 2];
 
-        // The jedi master is broadcast to everyone in range
-        G_UpdateJediMasterBroadcasts(ctx, ctx.entity_id_of(self_).unwrap());
+    // The jedi master is broadcast to everyone in range
+    G_UpdateJediMasterBroadcasts(ctx, self_);
 
-        // Anyone with force sight on should see this client
-        G_UpdateForceSightBroadcasts(ctx, ctx.entity_id_of(self_).unwrap());
-    }
+    // Anyone with force sight on should see this client
+    G_UpdateForceSightBroadcasts(ctx, self_);
 }
 
 /// Raven `G_AddPushVecToUcmd` — fold a client's push vector into its ucmd.
 ///
 /// Source: `oracle/codemp/game/g_active.c:1211-1244`
 pub fn G_AddPushVecToUcmd(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
+    // `self_`'s `gclient_t*` read through the checked entity borrow; deref stays
+    // raw (may be an NPC pool client — recipe 2b). `ucmd` stays raw. Body is all
+    // client/ucmd-side.
+    let cl = ctx.world.entity(self_).client;
     unsafe {
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
         let mut moveDir: vec3_t = [0.0; 3];
 
-        let cl = (*self_).client;
         if cl.is_null() {
             return;
         }
@@ -1543,32 +1593,31 @@ pub fn G_ActionButtonPressed(buttons: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_active.c:1302-1430`
 pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut usercmd_t) {
-    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw. `ucmd` stays raw.
+    let cl = match ent {
+        Some(e) => ctx.world.entity(e).client,
+        None => core::ptr::null_mut(),
+    };
     unsafe {
         let mut viewChange: vec3_t = [0.0; 3];
         let actionPressed: qboolean;
         let mut buttons: c_int;
 
-        let cl = if ent.is_null() {
-            core::ptr::null_mut()
-        } else {
-            (*ent).client
-        };
-        if ent.is_null()
+        if ent.is_none()
             || cl.is_null()
-            || (*ent).health <= 0
+            || ctx.world.entity(ent.unwrap()).health <= 0
             || (*cl).ps.stats[STAT_HEALTH as usize] <= 0
             || (*cl).sess.sessionTeam == TEAM_SPECTATOR
             || ((*cl).ps.pm_flags & PMF_FOLLOW) != 0
         {
             return;
         }
+        let ent = ent.unwrap();
 
         buttons = (*ucmd).buttons;
 
-        if (*ent).r.svFlags & SVF_BOT != 0 {
+        if ctx.world.entity(ent).r.svFlags & SVF_BOT != 0 {
             //they press use all the time..
             buttons &= !BUTTON_USE;
         }
@@ -1584,7 +1633,8 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
             || (*ucmd).rightmove != 0
             || (*ucmd).upmove != 0
             || G_StandingAnim((*cl).ps.legsAnim) == qfalse
-            || ((*ent).health + (*cl).ps.stats[STAT_ARMOR as usize]) != (*cl).idleHealth
+            || (ctx.world.entity(ent).health + (*cl).ps.stats[STAT_ARMOR as usize])
+                != (*cl).idleHealth
             || VectorLength(viewChange) > 10.0
             || (*cl).ps.legsTimer > 0
             || (*cl).ps.torsoTimer > 0
@@ -1598,7 +1648,7 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
             || (*cl).ps.saberBlocking >= level_time
             || (*cl).ps.weapon == WP_MELEE
             || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32
-                && (*ent).s.eType != ET_NPC as c_int)
+                && ctx.world.entity(ent).s.eType != ET_NPC as c_int)
         {
             //FIXME: also check for turning?
             let mut brokeOut: qboolean = qfalse;
@@ -1608,7 +1658,8 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
                 || (*ucmd).forwardmove != 0
                 || (*ucmd).rightmove != 0
                 || (*ucmd).upmove != 0
-                || ((*ent).health + (*cl).ps.stats[STAT_ARMOR as usize]) != (*cl).idleHealth
+                || (ctx.world.entity(ent).health + (*cl).ps.stats[STAT_ARMOR as usize])
+                    != (*cl).idleHealth
                 || (*cl).ps.zoomMode != 0
                 || ((*cl).ps.weaponstate != WEAPON_READY as c_int && (*cl).ps.weapon != WP_SABER)
                 || ((*cl).ps.weaponTime > 0 && (*cl).ps.weapon == WP_SABER)
@@ -1619,7 +1670,7 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
                 || (*cl).ps.saberBlocking >= level_time
                 || (*cl).ps.weapon == WP_MELEE
                 || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32
-                    && (*ent).s.eType != ET_NPC as c_int)
+                    && ctx.world.entity(ent).s.eType != ET_NPC as c_int)
             {
                 //if in an idle, break out
                 let la = (*cl).ps.legsAnim;
@@ -1646,7 +1697,8 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
                 }
             }
             //
-            (*cl).idleHealth = (*ent).health + (*cl).ps.stats[STAT_ARMOR as usize];
+            let eh = ctx.world.entity(ent).health;
+            (*cl).idleHealth = eh + (*cl).ps.stats[STAT_ARMOR as usize];
             (*cl).idleViewAngles = (*cl).ps.viewangles;
             if (*cl).idleTime < level_time {
                 (*cl).idleTime = level_time;
@@ -1679,7 +1731,7 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
             if idleAnim != -1 && idleAnim > 0 && idleAnim < MAX_ANIMATIONS as c_int {
                 G_SetAnim(
                     ctx,
-                    ctx.entity_id_of(ent).unwrap(),
+                    ent,
                     ucmd,
                     SETANIM_BOTH as c_int,
                     idleAnim,
@@ -1699,14 +1751,13 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
 ///
 /// Source: `oracle/codemp/game/g_active.c:1432-1486`
 pub fn NPC_Accelerate(ent: &gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboolean) {
-    // STAGE-1: ctx-free gentity leaf borrows &gentity_t; raw re-derived (Stage-2 debt).
-    let ent: *const gentity_t = ent;
+    // `ent` accessed through its borrow; the `gNPC_t*` NPC (no accessor —
+    // recipe 2c) is dereffed raw.
+    if ent.client.is_null() || ent.NPC.is_null() {
+        return;
+    }
+    let npc = ent.NPC;
     unsafe {
-        if (*ent).client.is_null() || (*ent).NPC.is_null() {
-            return;
-        }
-        let npc = (*ent).NPC;
-
         if (*npc).stats.acceleration == 0 {
             //No acceleration means just start and stop
             (*npc).currentSpeed = (*npc).desiredSpeed;
@@ -1752,13 +1803,13 @@ pub fn NPC_Accelerate(ent: &gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboole
 ///
 /// Source: `oracle/codemp/game/g_active.c:1494-1510`
 pub fn NPC_GetWalkSpeed(ent: &gentity_t) -> c_int {
-    // STAGE-1: ctx-free gentity leaf borrows &gentity_t; raw re-derived (Stage-2 debt).
-    let ent: *const gentity_t = ent;
+    // `ent` accessed through its borrow; the `gNPC_t*` NPC (no accessor —
+    // recipe 2c) is dereffed raw.
+    if ent.client.is_null() || ent.NPC.is_null() {
+        return 0;
+    }
+    let npc = ent.NPC;
     unsafe {
-        if (*ent).client.is_null() || (*ent).NPC.is_null() {
-            return 0;
-        }
-        let npc = (*ent).NPC;
         // Raven's switch on playerTeam has only the NPCTEAM_PLAYER / default arm,
         // both yielding walkSpeed (stub code).
         (*npc).stats.walkSpeed
@@ -1769,15 +1820,14 @@ pub fn NPC_GetWalkSpeed(ent: &gentity_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_active.c:1517-1573`
 pub fn NPC_GetRunSpeed(ent: &gentity_t) -> c_int {
-    // STAGE-1: ctx-free gentity leaf borrows &gentity_t; raw re-derived (Stage-2 debt).
-    let ent: *const gentity_t = ent;
+    // `ent` accessed through its borrow; the `gclient_t*`/`gNPC_t*` (no
+    // accessors — recipes 2b/2c) are dereffed raw.
+    if ent.client.is_null() || ent.NPC.is_null() {
+        return 0;
+    }
+    let cl = ent.client;
+    let npc = ent.NPC;
     unsafe {
-        if (*ent).client.is_null() || (*ent).NPC.is_null() {
-            return 0;
-        }
-        let cl = (*ent).client;
-        let npc = (*ent).NPC;
-
         // team no longer indicates species/race. Use NPC_class to adjust speed.
         let runSpeed: c_int = match (*cl).NPC_class {
             CLASS_PROBE | CLASS_GONK | CLASS_R2D2 | CLASS_R5D2 | CLASS_MARK1 | CLASS_MARK2
@@ -1795,39 +1845,39 @@ pub fn NPC_GetRunSpeed(ent: &gentity_t) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_active.c:1577-1614`
 pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw. `ucmd` stays raw.
+    let cl = ctx.world.entity(ent).client;
     unsafe {
-        let cl = (*ent).client;
         if !cl.is_null() {
-            if (!(*ent).NPC.is_null() && VectorCompare(vec3_origin, (*cl).ps.moveDir) == qfalse) //moving using moveDir
+            if (!ctx.world.entity(ent).NPC.is_null() && VectorCompare(vec3_origin, (*cl).ps.moveDir) == qfalse) //moving using moveDir
                 || (*ucmd).forwardmove != 0
                 || (*ucmd).rightmove != 0 //moving using ucmds
-                || ((*ucmd).upmove != 0 && FlyingCreature(&*ent) != 0) //flier using ucmds to move
-                || (FlyingCreature(&*ent) != 0
+                || ((*ucmd).upmove != 0 && FlyingCreature(ctx.world.entity(ent)) != 0) //flier using ucmds to move
+                || (FlyingCreature(ctx.world.entity(ent)) != 0
                     && VectorCompare(vec3_origin, (*cl).ps.velocity) == qfalse
-                    && (*ent).health > 0)
+                    && ctx.world.entity(ent).health > 0)
             {
                 //flier using velocity to move
                 match (*cl).NPC_class {
                     CLASS_R2D2 => {
-                        (*ent).s.loopSound =
+                        ctx.world.entity_mut(ent).s.loopSound =
                             G_SoundIndex(cstr("sound/chars/r2d2/misc/r2_move_lp.wav").as_ptr());
                     }
                     CLASS_R5D2 => {
-                        (*ent).s.loopSound =
+                        ctx.world.entity_mut(ent).s.loopSound =
                             G_SoundIndex(cstr("sound/chars/r2d2/misc/r2_move_lp2.wav").as_ptr());
                     }
                     CLASS_MARK2 => {
-                        (*ent).s.loopSound =
+                        ctx.world.entity_mut(ent).s.loopSound =
                             G_SoundIndex(cstr("sound/chars/mark2/misc/mark2_move_lp").as_ptr());
                     }
                     CLASS_MOUSE => {
-                        (*ent).s.loopSound =
+                        ctx.world.entity_mut(ent).s.loopSound =
                             G_SoundIndex(cstr("sound/chars/mouse/misc/mouse_lp").as_ptr());
                     }
                     CLASS_PROBE => {
-                        (*ent).s.loopSound =
+                        ctx.world.entity_mut(ent).s.loopSound =
                             G_SoundIndex(cstr("sound/chars/probe/misc/probedroidloop").as_ptr());
                     }
                     _ => {}
@@ -1840,7 +1890,7 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
                     || (*cl).NPC_class == CLASS_MOUSE
                     || (*cl).NPC_class == CLASS_PROBE
                 {
-                    (*ent).s.loopSound = 0;
+                    ctx.world.entity_mut(ent).s.loopSound = 0;
                 }
             }
         }
@@ -1851,33 +1901,40 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
 ///
 /// Source: `oracle/codemp/game/g_active.c:1616-1651`
 pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut *mut usercmd_t) {
-    // STAGE-1: Option param (body null-checks ent), raw re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    // `ent`/`monster` fields via checked entity borrow; the `gclient_t*`s cl/mcl
+    // (may be NPC pool clients — recipe 2b) are dereffed raw. The Rancor attach
+    // is a bg-seam call over raw client `ps`. `ucmd` stays raw.
+    let cl = match ent {
+        Some(e) => ctx.world.entity(e).client,
+        None => core::ptr::null_mut(),
+    };
     unsafe {
-        let cl = if ent.is_null() {
-            core::ptr::null_mut()
-        } else {
-            (*ent).client
-        };
         //NOTE: lookTarget is an entity number, so this presumes that client 0 is NOT a Rancor...
-        if !ent.is_null() && !cl.is_null() && (*cl).ps.hasLookTarget != 0 {
-            let monster = &mut ctx.world.g_entities[(*cl).ps.lookTarget as usize] as *mut gentity_t;
-            let mcl = (*monster).client;
-            if !monster.is_null() && !mcl.is_null() {
+        if ent.is_some() && !cl.is_null() && (*cl).ps.hasLookTarget != 0 {
+            let ent = ent.unwrap();
+            let monster = EntityId::from_num((*cl).ps.lookTarget).unwrap();
+            let mcl = ctx.world.entity(monster).client;
+            if !mcl.is_null() {
                 //take the monster's waypoint as your own
-                (*ent).waypoint = (*monster).waypoint;
-                if (*monster).s.NPC_class == CLASS_RANCOR as c_int {
+                let wp = ctx.world.entity(monster).waypoint;
+                ctx.world.entity_mut(ent).waypoint = wp;
+                if ctx.world.entity(monster).s.NPC_class == CLASS_RANCOR as c_int {
                     //only possibility right now, may add Wampa and Sand Creature later
+                    let mghoul2 = ctx.world.entity(monster).ghoul2;
+                    let myaw = ctx.world.entity(monster).r.currentAngles[YAW];
+                    let morigin = ctx.world.entity(monster).r.currentOrigin;
+                    let mscale = ctx.world.entity(monster).modelScale;
+                    let time = ctx.world.level.time;
+                    let eflags2 = (*mcl).ps.eFlags2 & EF2_GENERIC_NPC_FLAG;
                     let traps = GameBgTraps::new(ctx.engine);
                     BG_AttachToRancor(
-                        (*monster).ghoul2, //ghoul2 info
-                        (*monster).r.currentAngles[YAW],
-                        (*monster).r.currentOrigin,
-                        ctx.world.level.time,
+                        mghoul2, //ghoul2 info
+                        myaw,
+                        morigin,
+                        time,
                         core::ptr::null_mut(),
-                        (*monster).modelScale,
-                        (*mcl).ps.eFlags2 & EF2_GENERIC_NPC_FLAG,
+                        mscale,
+                        eflags2,
                         &mut (*cl).ps.origin,
                         &mut (*cl).ps.viewangles,
                         core::ptr::null_mut(),
@@ -1886,12 +1943,13 @@ pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut 
                     );
                 }
                 (*cl).ps.velocity = [0.0; 3];
-                G_SetOrigin(&mut *(ent), (*cl).ps.origin);
-                SetClientViewAngle(&mut *ent, (*cl).ps.viewangles);
-                G_SetAngles(&mut *(ent), (*cl).ps.viewangles);
+                G_SetOrigin(ctx.world.entity_mut(ent), (*cl).ps.origin);
+                SetClientViewAngle(ctx.world.entity_mut(ent), (*cl).ps.viewangles);
+                G_SetAngles(ctx.world.entity_mut(ent), (*cl).ps.viewangles);
+                let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
                 trap::LinkEntity(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent.cast()),
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent_ptr.cast()),
                 ); //redundant?
             }
         }
@@ -1906,10 +1964,10 @@ pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut 
 ///
 /// Source: `oracle/codemp/game/g_active.c:1662-1926`
 pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    let cl = ctx.world.entity(ent).client;
     unsafe {
-        let cl = (*ent).client;
         let level_time = ctx.world.level.time;
 
         if (*cl).pers.cmd.upmove != 0
@@ -1949,7 +2007,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                             //turn off second saber
                             G_Sound(
                                 ctx,
-                                ctx.entity_id_of(ent),
+                                Some(ent),
                                 CHAN_WEAPON as c_int,
                                 (*cl).saber[1].soundOff,
                             );
@@ -1957,7 +2015,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                             //turn off first
                             G_Sound(
                                 ctx,
-                                ctx.entity_id_of(ent),
+                                Some(ent),
                                 CHAN_WEAPON as c_int,
                                 (*cl).saber[0].soundOff,
                             );
@@ -1972,32 +2030,17 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     } else if saberAnimLevel == SS_DUAL as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn on second saber
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[1].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
                         } else if (*cl).ps.saberHolstered == 2 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_DUAL_TAUNT as c_int;
                     } else if saberAnimLevel == SS_STAFF as c_int {
                         if (*cl).ps.saberHolstered > 0 {
                             //turn on all blades
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_STAFF_TAUNT as c_int;
@@ -2015,7 +2058,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off second saber
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[1].soundOff,
                     );
@@ -2023,7 +2066,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off first
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[0].soundOff,
                     );
@@ -2041,7 +2084,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off second saber
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[1].soundOff,
                     );
@@ -2049,7 +2092,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off first
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[0].soundOff,
                     );
@@ -2059,20 +2102,10 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                 if (*cl).ps.weapon == WP_SABER {
                     if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                         //turn on second saber
-                        G_Sound(
-                            ctx,
-                            ctx.entity_id_of(ent),
-                            CHAN_WEAPON as c_int,
-                            (*cl).saber[1].soundOn,
-                        );
+                        G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
                     } else if (*cl).ps.saberHolstered == 2 {
                         //turn on first
-                        G_Sound(
-                            ctx,
-                            ctx.entity_id_of(ent),
-                            CHAN_WEAPON as c_int,
-                            (*cl).saber[0].soundOn,
-                        );
+                        G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                     }
                     (*cl).ps.saberHolstered = 0;
                     if (*cl).saber[0].flourishAnim != -1 {
@@ -2112,44 +2145,24 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     {
                         if (*cl).ps.saberHolstered != 0 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_STRONG as c_int;
                     } else if saberAnimLevel == SS_DUAL as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn on second saber
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[1].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
                         } else if (*cl).ps.saberHolstered == 2 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_DUAL as c_int;
                     } else if saberAnimLevel == SS_STAFF as c_int {
                         if (*cl).ps.saberHolstered != 0 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_STAFF as c_int;
@@ -2160,16 +2173,17 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                 if (*cl).ps.groundEntityNum != ENTITYNUM_NONE {
                     (*cl).ps.forceHandExtend = HANDEXTEND_TAUNT as c_int;
                     (*cl).ps.forceDodgeAnim = anim;
+                    let local_anim_index = ctx.world.entity(ent).localAnimIndex;
                     (*cl).ps.forceHandExtendTime = level_time
                         + crate::bg_panimate::BG_AnimLength(
                             &ctx.world.bg_state,
-                            (*ent).localAnimIndex,
+                            local_anim_index,
                             anim,
                         );
                 }
                 if taunt != TAUNT_MEDITATE && taunt != TAUNT_BOW {
                     //no sound for meditate or bow
-                    G_AddEvent(&mut *(ent), EV_TAUNT as c_int, taunt);
+                    G_AddEvent(ctx.world.entity_mut(ent), EV_TAUNT as c_int, taunt);
                 }
             }
         }
@@ -3922,10 +3936,10 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:3620-3640`
 pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`'s `gclient_t*` read through the checked entity borrow; deref stays
+    // raw (may be an NPC pool client — recipe 2b). Body is all client-side.
+    let cl = ctx.world.entity(ent).client;
     unsafe {
-        let cl = (*ent).client;
         // Only timeout supported right now is the timeout to spectator mode
         if ctx.world.cvars.g_timeouttospec.integer == 0 {
             return;
@@ -3943,11 +3957,7 @@ pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
             > ctx.world.cvars.g_timeouttospec.integer * 1000
         {
             let s = cstr("spectator");
-            SetTeam(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                s.as_ptr() as *mut c_char,
-            );
+            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
         }
     }
 }
@@ -3956,9 +3966,11 @@ pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:3649-3720`
 pub fn ClientThink(ctx: &mut GameContext, clientNum: c_int, ucmd: *mut usercmd_t) {
+    // `ent`'s fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw. `ucmd` stays raw.
+    let ent = EntityId::from_num(clientNum).unwrap();
+    let cl = ctx.world.entity(ent).client;
     unsafe {
-        let ent = &mut ctx.world.g_entities[clientNum as usize] as *mut gentity_t;
-        let cl = (*ent).client;
         if clientNum < (MAX_CLIENTS) as i32 {
             trap::GetUsercmd(
                 ctx.engine,
@@ -3977,13 +3989,15 @@ pub fn ClientThink(ctx: &mut GameContext, clientNum: c_int, ucmd: *mut usercmd_t
             (*cl).pers.cmd = *ucmd;
         }
 
-        if (*ent).r.svFlags & SVF_BOT == 0 && ctx.world.cvars.g_synchronousClients.integer == 0 {
-            ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
+        if ctx.world.entity(ent).r.svFlags & SVF_BOT == 0
+            && ctx.world.cvars.g_synchronousClients.integer == 0
+        {
+            ClientThink_real(ctx, ent);
         }
         // vehicles are clients and when running synchronous they still need to
         // think here so special case them.
         else if clientNum >= (MAX_CLIENTS) as i32 {
-            ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
+            ClientThink_real(ctx, ent);
         }
     }
 }
@@ -3992,15 +4006,17 @@ pub fn ClientThink(ctx: &mut GameContext, clientNum: c_int, ucmd: *mut usercmd_t
 ///
 /// Source: `oracle/codemp/game/g_active.c:3723-3729`
 pub fn G_RunClient(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`'s fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    if ctx.world.entity(ent).r.svFlags & SVF_BOT == 0
+        && ctx.world.cvars.g_synchronousClients.integer == 0
+    {
+        return;
+    }
+    let cl = ctx.world.entity(ent).client;
     unsafe {
-        if (*ent).r.svFlags & SVF_BOT == 0 && ctx.world.cvars.g_synchronousClients.integer == 0 {
-            return;
-        }
-        let cl = (*ent).client;
         (*cl).pers.cmd.serverTime = ctx.world.level.time;
-        ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
+        ClientThink_real(ctx, ent);
     }
 }
 
@@ -4008,12 +4024,12 @@ pub fn G_RunClient(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:3738-3783`
 pub fn SpectatorClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`'s fields via checked entity borrow; the `gclient_t*` entCl (may be
+    // an NPC pool client — recipe 2b) and the followed client `cl` (level.clients
+    // direct — a real followed slot) are dereffed raw.
+    let entCl = ctx.world.entity(ent).client;
     unsafe {
-        let entCl = (*ent).client;
-
-        if (*ent).s.eType == ET_NPC as c_int {
+        if ctx.world.entity(ent).s.eType == ET_NPC as c_int {
             debug_assert!(false, "SpectatorClientEndFrame called on ET_NPC");
             return;
         }
@@ -4060,19 +4076,18 @@ pub fn SpectatorClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:3794-3874`
 pub fn ClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` entCl (may be an
+    // NPC pool client — recipe 2b) is dereffed raw.
+    let mut isNPC: qboolean = qfalse;
+
+    if ctx.world.entity(ent).s.eType == ET_NPC as c_int {
+        isNPC = qtrue;
+    }
+
+    let entCl = ctx.world.entity(ent).client;
     unsafe {
-        let mut isNPC: qboolean = qfalse;
-
-        if (*ent).s.eType == ET_NPC as c_int {
-            isNPC = qtrue;
-        }
-
-        let entCl = (*ent).client;
-
         if (*entCl).sess.sessionTeam == TEAM_SPECTATOR {
-            SpectatorClientEndFrame(ctx, ctx.entity_id_of(ent).unwrap());
+            SpectatorClientEndFrame(ctx, ent);
             return;
         }
 
@@ -4086,43 +4101,46 @@ pub fn ClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
         // If the end of unit layout is displayed, don't give the player any
         // normal movement attributes
         if ctx.world.level.intermissiontime != 0 {
-            if (*ent).s.number < (MAX_CLIENTS) as i32 || (*entCl).NPC_class == CLASS_VEHICLE {
+            if ctx.world.entity(ent).s.number < (MAX_CLIENTS) as i32
+                || (*entCl).NPC_class == CLASS_VEHICLE
+            {
                 //players and vehicles do nothing in intermissions
                 return;
             }
         }
 
         // burn from lava, etc
-        P_WorldEffects(ctx, ctx.entity_id_of(ent).unwrap());
+        P_WorldEffects(ctx, ent);
 
         // apply all the damage taken this frame
-        P_DamageFeedback(ctx, ctx.entity_id_of(ent).unwrap());
+        P_DamageFeedback(ctx, ent);
 
         // add the EF_CONNECTION flag if we haven't gotten commands recently
         if ctx.world.level.time - (*entCl).lastCmdTime > 1000 {
-            (*ent).s.eFlags |= EF_CONNECTION;
+            ctx.world.entity_mut(ent).s.eFlags |= EF_CONNECTION;
         } else {
-            (*ent).s.eFlags &= !EF_CONNECTION;
+            ctx.world.entity_mut(ent).s.eFlags &= !EF_CONNECTION;
         }
 
-        (*entCl).ps.stats[STAT_HEALTH as usize] = (*ent).health; // FIXME: get rid of ent->health...
+        let health = ctx.world.entity(ent).health;
+        (*entCl).ps.stats[STAT_HEALTH as usize] = health; // FIXME: get rid of ent->health...
 
-        G_SetClientSound(ctx, ctx.entity_id_of(ent).unwrap());
+        G_SetClientSound(ctx, ent);
 
         // set the latest infor
         if ctx.world.cvars.g_smoothClients.integer != 0 {
             BG_PlayerStateToEntityStateExtraPolate(
                 &mut (*entCl).ps,
-                &mut (*ent).s,
+                &mut ctx.world.entity_mut(ent).s,
                 (*entCl).ps.commandTime,
                 qfalse,
             );
         } else {
-            BG_PlayerStateToEntityState(&mut (*entCl).ps, &mut (*ent).s, qfalse);
+            BG_PlayerStateToEntityState(&mut (*entCl).ps, &mut ctx.world.entity_mut(ent).s, qfalse);
         }
 
         if isNPC != 0 {
-            (*ent).s.eType = ET_NPC as c_int;
+            ctx.world.entity_mut(ent).s.eType = ET_NPC as c_int;
         }
 
         SendPendingPredictableEvents(ctx, &mut (*entCl).ps);

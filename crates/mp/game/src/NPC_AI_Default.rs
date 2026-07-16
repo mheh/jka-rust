@@ -22,9 +22,9 @@ pub fn NPC_LostEnemyDecideChase(ctx: &mut GameContext) {
             // Oracle: `NPC->enemy == NPCInfo->goalEntity && NPC->enemy->lastWaypoint != WAYPOINT_NONE`.
             if let Some(enemy_id) = npc.enemy {
                 if npc.enemy == npc_info.goalEntity {
-                    let enemy = unsafe { &*ctx.world.g_entities.as_ptr().add(enemy_id.0 as usize) };
-                    if enemy.lastWaypoint != WAYPOINT_NONE {
-                        NPC_BSSearchStart(ctx, enemy.lastWaypoint, BS_SEARCH);
+                    let last_waypoint = ctx.entity(enemy_id).lastWaypoint;
+                    if last_waypoint != WAYPOINT_NONE {
+                        NPC_BSSearchStart(ctx, last_waypoint, BS_SEARCH);
                     }
                 }
             }
@@ -75,11 +75,12 @@ pub fn NPC_StandTrackAndShoot(ctx: &mut GameContext, NPC: EntityId, canDuck: qbo
     {
         if !duck_ok {
             if let Some(enemy_id) = npc.enemy {
-                let enemy = unsafe { &*ctx.world.g_entities.as_ptr().add(enemy_id.0 as usize) };
+                let enemy = ctx.entity(enemy_id);
                 if !enemy.client.is_null() {
-                    if let Some(enemy_enemy) = (*enemy).enemy {
+                    if let Some(enemy_enemy) = enemy.enemy {
                         if enemy_enemy.0 == npc.s.number as u32 {
-                            if (unsafe { &*(enemy.client) }.buttons & BUTTON_ATTACK as i32) != 0 {
+                            let buttons = unsafe { &*enemy.client }.buttons;
+                            if (buttons & BUTTON_ATTACK as i32) != 0 {
                                 if NPC_CheckDefend(ctx, 1.0) != 0 {
                                     duck_ok = true;
                                 }
@@ -193,19 +194,12 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
     );
 
     if let Some(enemy_id) = npc.enemy {
-        let enemy = unsafe { &*ctx.world.g_entities.as_ptr().add(enemy_id.0 as usize) };
-        let enemy_ent_id = ctx.entity_id_of(enemy as *const _ as *mut _);
+        let enemy_ent_id = Some(enemy_id);
         o_evis = NPC_CheckVisibility(ctx, enemy_ent_id, CHECK_FOV | CHECK_SHOOT);
         ctx.world.globals.enemyVisibility = o_evis;
 
         if o_evis as i32 > VIS_PVS as i32 {
-            if NPC_EnemyTooFar(
-                ctx,
-                ctx.entity_id_of(enemy as *const _ as *mut _),
-                0.0,
-                qtrue,
-            ) == 0
-            {
+            if NPC_EnemyTooFar(ctx, Some(enemy_id), 0.0, qtrue) == 0 {
                 NPC_CheckCanAttack(ctx, 1.0, qfalse);
                 turned = true;
             }
@@ -218,7 +212,8 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
             && cur_anim as i32 != BOTH_MELEE1 as i32
             && cur_anim as i32 != BOTH_MELEE2 as i32
         {
-            crate::q_math::_VectorSubtract((*enemy).r.currentOrigin, npc.r.currentOrigin, &mut vec);
+            let enemy_origin = ctx.entity(enemy_id).r.currentOrigin;
+            crate::q_math::_VectorSubtract(enemy_origin, npc.r.currentOrigin, &mut vec);
             enemy_dist = crate::q_math::VectorLength(vec);
 
             // `1.5` is a double literal, so the scaled square is computed in f64
@@ -333,12 +328,8 @@ pub fn NPC_BSRunAndShoot(ctx: &mut GameContext) {
             let mut vec = [0.0; 3];
 
             if let Some(enemy_id) = npc.enemy {
-                let enemy = unsafe { &*ctx.world.g_entities.as_ptr().add(enemy_id.0 as usize) };
-                crate::q_math::_VectorSubtract(
-                    (*enemy).r.currentOrigin,
-                    npc.r.currentOrigin,
-                    &mut vec,
-                );
+                let enemy_origin = ctx.entity(enemy_id).r.currentOrigin;
+                crate::q_math::_VectorSubtract(enemy_origin, npc.r.currentOrigin, &mut vec);
                 vec[2] = 0.0;
 
                 if crate::q_math::VectorLength(vec) > 128.0 || npc.cantHitEnemyCounter >= 10 {
@@ -421,9 +412,9 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
     }
 
     if let Some(enemy_id) = npc.enemy {
-        let enemy = unsafe { &*ctx.world.g_entities.as_ptr().add(enemy_id.0 as usize) };
-        if ((*enemy).inuse as qboolean) == 0
-            || ((*enemy).NPC != core::ptr::null_mut() && (*enemy).health <= 0)
+        let enemy = ctx.entity(enemy_id);
+        if (enemy.inuse as qboolean) == 0
+            || (enemy.NPC != core::ptr::null_mut() && enemy.health <= 0)
         {
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
@@ -441,11 +432,10 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
 
     CalcEntitySpot(ctx, npc_id, SPOT_WEAPON, &mut muzzle);
     if let Some(enemy_id) = npc.enemy {
-        let enemy = unsafe { &*ctx.world.g_entities.as_ptr().add(enemy_id.0 as usize) };
-        let enemy_ent_id = ctx.entity_id_of(enemy as *const _ as *mut _);
+        let enemy_ent_id = Some(enemy_id);
         CalcEntitySpot(ctx, enemy_ent_id, SPOT_HEAD, &mut org);
 
-        if !(*enemy).client.is_null() {
+        if !ctx.entity(enemy_id).client.is_null() {
             org[2] -= 12.0;
         }
     }
@@ -650,13 +640,8 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
                 npc_info.combatMove = 0;
 
                 if let Some(goal_id) = npc_info.goalEntity {
-                    let goal_entity =
-                        unsafe { &*ctx.world.g_entities.as_ptr().add(goal_id.0 as usize) };
-                    crate::q_math::_VectorSubtract(
-                        (*goal_entity).r.currentOrigin,
-                        npc.r.currentOrigin,
-                        &mut dir,
-                    );
+                    let goal_origin = ctx.entity(goal_id).r.currentOrigin;
+                    crate::q_math::_VectorSubtract(goal_origin, npc.r.currentOrigin, &mut dir);
                     crate::q_math::vectoangles(dir, &mut angles);
                     npc_info.desiredYaw = angles[YAW];
                     if npc_info.goalEntity == npc.enemy {

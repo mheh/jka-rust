@@ -6,7 +6,6 @@
 //! are reached through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::ent_id::resolve;
 use crate::prelude::*;
 use crate::q_shared::Q_stricmp;
 use core::ffi::c_char;
@@ -66,20 +65,19 @@ pub fn TIMER_Clear(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_timer.c:49-74`
 pub fn TIMER_Clear2(ctx: &mut GameContext, ent: Option<EntityId>) {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    // Rudimentary safety check: oracle derefs `ent->s.number` (UB if null); port
+    // guards. Entity read is an accessor borrow (2c); the `gtimer_t` free-list
+    // walk below stays raw (intrusive `*mut gtimer_t` pool, not entity/client).
+    let Some(ent) = ent else {
+        return;
+    };
+    let entity_num = ctx.entity(ent).s.number as usize;
+
+    if entity_num == 0 || entity_num >= MAX_GENTITIES as usize {
+        return;
+    }
+
     unsafe {
-        // Rudimentary safety checks
-        if ent.is_null() {
-            return;
-        }
-        let ent_ref = &*ent;
-        let entity_num = ent_ref.s.number as usize;
-
-        if entity_num == 0 || entity_num >= MAX_GENTITIES as usize {
-            return;
-        }
-
         let mut p = ctx.world.globals.g_timers.0[entity_num];
 
         // No timers at all -> do nothing
@@ -166,21 +164,20 @@ pub fn TIMER_Set(
     identifier: *const c_char,
     duration: c_int,
 ) {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    // §19: oracle derefs `ent->s.number` unconditionally (UB if null); port
+    // guards and returns early. Source: g_timer.c:131. Entity read is an
+    // accessor borrow (2c); the `gtimer_t` pool write stays raw.
+    let Some(ent) = ent else {
+        return;
+    };
+    let number = ctx.entity(ent).s.number;
+    let timer = TIMER_GetNew(ctx, number, identifier);
+
+    if timer.is_null() {
+        return;
+    }
+
     unsafe {
-        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
-        // port guards and returns early. Source: g_timer.c:131
-        if ent.is_null() {
-            return;
-        }
-        let ent_ref = &*ent;
-        let timer = TIMER_GetNew(ctx, ent_ref.s.number, identifier);
-
-        if timer.is_null() {
-            return;
-        }
-
         (*timer).name = identifier;
         (*timer).time = ctx.world.level.time + duration;
     }
@@ -190,23 +187,20 @@ pub fn TIMER_Set(
 ///
 /// Source: `oracle/codemp/game/g_timer.c:147-157`
 pub fn TIMER_Get(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *const c_char) -> c_int {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    unsafe {
-        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
-        // port guards and returns early. Source: g_timer.c:149
-        if ent.is_null() {
-            return -1;
-        }
-        let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
+    // §19: oracle derefs `ent->s.number` unconditionally (UB if null); port
+    // guards and returns early. Source: g_timer.c:149. Entity read is an
+    // accessor borrow (2c); the `gtimer_t` pool read stays raw.
+    let Some(ent) = ent else {
+        return -1;
+    };
+    let number = ctx.entity(ent).s.number;
+    let timer = TIMER_GetExisting(ctx, number, identifier);
 
-        if timer.is_null() {
-            return -1;
-        }
-
-        (*timer).time
+    if timer.is_null() {
+        return -1;
     }
+
+    unsafe { (*timer).time }
 }
 
 /// Raven `TIMER_Done`.
@@ -217,26 +211,23 @@ pub fn TIMER_Done(
     ent: Option<EntityId>,
     identifier: *const c_char,
 ) -> qboolean {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    unsafe {
-        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
-        // port guards and returns early. Source: g_timer.c:167
-        if ent.is_null() {
-            return qtrue;
-        }
-        let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
+    // §19: oracle derefs `ent->s.number` unconditionally (UB if null); port
+    // guards and returns early. Source: g_timer.c:167. Entity read is an
+    // accessor borrow (2c); the `gtimer_t` pool read stays raw.
+    let Some(ent) = ent else {
+        return qtrue;
+    };
+    let number = ctx.entity(ent).s.number;
+    let timer = TIMER_GetExisting(ctx, number, identifier);
 
-        if timer.is_null() {
-            return qtrue;
-        }
+    if timer.is_null() {
+        return qtrue;
+    }
 
-        if (*timer).time < ctx.world.level.time {
-            qtrue
-        } else {
-            qfalse
-        }
+    if unsafe { (*timer).time } < ctx.world.level.time {
+        qtrue
+    } else {
+        qfalse
     }
 }
 
@@ -292,33 +283,30 @@ pub fn TIMER_Done2(
     identifier: *const c_char,
     remove: qboolean,
 ) -> qboolean {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    unsafe {
-        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
-        // port guards and returns early. Source: g_timer.c:225
-        if ent.is_null() {
-            return qfalse;
-        }
-        let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
+    // §19: oracle derefs `ent->s.number` unconditionally (UB if null); port
+    // guards and returns early. Source: g_timer.c:225. Entity read is an
+    // accessor borrow (2c); the `gtimer_t` pool read stays raw.
+    let Some(ent) = ent else {
+        return qfalse;
+    };
+    let number = ctx.entity(ent).s.number;
+    let timer = TIMER_GetExisting(ctx, number, identifier);
 
-        if timer.is_null() {
-            return qfalse;
-        }
+    if timer.is_null() {
+        return qfalse;
+    }
 
-        let res = (*timer).time < ctx.world.level.time;
+    let res = unsafe { (*timer).time } < ctx.world.level.time;
 
-        if res && remove == qtrue {
-            // Put it back on the free list
-            TIMER_RemoveHelper(ctx, ent_ref.s.number, timer);
-        }
+    if res && remove == qtrue {
+        // Put it back on the free list
+        TIMER_RemoveHelper(ctx, number, timer);
+    }
 
-        if res {
-            qtrue
-        } else {
-            qfalse
-        }
+    if res {
+        qtrue
+    } else {
+        qfalse
     }
 }
 
@@ -330,22 +318,19 @@ pub fn TIMER_Exists(
     ent: Option<EntityId>,
     identifier: *const c_char,
 ) -> qboolean {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    unsafe {
-        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
-        // port guards and returns early. Source: g_timer.c:251
-        if ent.is_null() {
-            return qfalse;
-        }
-        let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
+    // §19: oracle derefs `ent->s.number` unconditionally (UB if null); port
+    // guards and returns early. Source: g_timer.c:251. Entity read is an
+    // accessor borrow (2c).
+    let Some(ent) = ent else {
+        return qfalse;
+    };
+    let number = ctx.entity(ent).s.number;
+    let timer = TIMER_GetExisting(ctx, number, identifier);
 
-        if timer.is_null() {
-            qfalse
-        } else {
-            qtrue
-        }
+    if timer.is_null() {
+        qfalse
+    } else {
+        qtrue
     }
 }
 
@@ -355,24 +340,21 @@ pub fn TIMER_Exists(
 ///
 /// Source: `oracle/codemp/game/g_timer.c:267-278`
 pub fn TIMER_Remove(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *const c_char) {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    unsafe {
-        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
-        // port guards and returns early. Source: g_timer.c:269
-        if ent.is_null() {
-            return;
-        }
-        let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
+    // §19: oracle derefs `ent->s.number` unconditionally (UB if null); port
+    // guards and returns early. Source: g_timer.c:269. Entity read is an
+    // accessor borrow (2c).
+    let Some(ent) = ent else {
+        return;
+    };
+    let number = ctx.entity(ent).s.number;
+    let timer = TIMER_GetExisting(ctx, number, identifier);
 
-        if timer.is_null() {
-            return;
-        }
-
-        // Put it back on the free list
-        TIMER_RemoveHelper(ctx, ent_ref.s.number, timer);
+    if timer.is_null() {
+        return;
     }
+
+    // Put it back on the free list
+    TIMER_RemoveHelper(ctx, number, timer);
 }
 
 /// Raven `TIMER_Start`.

@@ -19,11 +19,18 @@
 //! site referencing them carries a `PORT-NOTE(cvar-placement)` /
 //! `PORT-NOTE(missing-const)` /`PORT-NOTE(missing-global)` tag.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`. Bodies re-derive the
-//! raw pointers verbatim at the top (`// STAGE-1:` markers) — Stage-2 debt.
-//! Returns of `*mut gentity_t` stay raw (out of Stage-1 scope). Callers bridge
-//! at the boundary via `ctx.entity_id_of(ptr)`.
+//! Safe-state migration **Stage 2** (campaign 2c): entity-pointer params are
+//! `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`, and
+//! entity field access goes through the `GameContext` accessors
+//! (`ctx.entity()` / `ctx.entity_mut()`) at the point of use — the STAGE-1
+//! fn-top raw re-derives are gone. Entity-scan loops walk by `EntityId(i)`.
+//! Returns of `*mut gentity_t` and the raw `gentity_t*` globals (`eFlag*`,
+//! `gSpawnPoints`, `flag*`) stay raw: the pointer is produced at the boundary
+//! via `ent_ptr(ctx, id)` and consumed by callers via `ctx.entity_id_of(ptr)`.
+//! Player-client (`ent->client->ps`) derefs stay raw in tight `unsafe`
+//! blocks (§2b — pool clients have no accessor), as do the waypoint-arena
+//! (`wpobject_t`/`nodeobject_t`), `gitem_t`, and route-file byte-buffer
+//! pointers, which are not entities and have no owned home.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::{GetNearestVisibleWP, OrgVisible, OrgVisibleBox};
@@ -272,14 +279,13 @@ pub fn GetFlagStr(ctx: &mut GameContext, flags: c_int) -> *mut c_char {
 pub fn G_TestLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     let ev_testline = mp_bg::public::entity_event::entity_event_t::EV_TESTLINE as c_int;
     // `SVF_BROADCAST` comes from the prelude (`crate::g_public_consts`).
-    unsafe {
-        let te = G_TempEntity(ctx, start, ev_testline);
-        (*te).s.origin = start;
-        (*te).s.origin2 = end;
-        (*te).s.time2 = time;
-        (*te).s.weapon = color;
-        (*te).r.svFlags |= SVF_BROADCAST;
-    }
+    let te = G_TempEntity(ctx, start, ev_testline);
+    let te_id = ctx.entity_id_of(te).unwrap();
+    ctx.entity_mut(te_id).s.origin = start;
+    ctx.entity_mut(te_id).s.origin2 = end;
+    ctx.entity_mut(te_id).s.time2 = time;
+    ctx.entity_mut(te_id).s.weapon = color;
+    ctx.entity_mut(te_id).r.svFlags |= SVF_BROADCAST;
 }
 
 /// Raven `BotWaypointRender`.
@@ -307,8 +313,9 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                     let p = ctx.world.globals.gWPArray.0[i as usize];
                     if !p.is_null() && (*p).inuse != 0 {
                         let plum = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
-                        (*plum).r.svFlags |= SVF_BROADCAST;
-                        (*plum).s.time = i;
+                        let plum_id = ctx.entity_id_of(plum).unwrap();
+                        ctx.entity_mut(plum_id).r.svFlags |= SVF_BROADCAST;
+                        ctx.entity_mut(plum_id).s.time = i;
 
                         let mut n: c_int = 0;
                         while n < (*p).neighbornum {
@@ -348,9 +355,9 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 return;
             }
 
-            let viewent: *mut gentity_t = &mut ctx.world.g_entities[0];
+            let viewent_id = EntityId(0);
 
-            if viewent.is_null() || (*viewent).client.is_null() {
+            if ctx.entity(viewent_id).client.is_null() {
                 // client isn't in the game yet?
                 return;
             }
@@ -362,7 +369,9 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
             while i < ctx.world.globals.gWPNum {
                 let p = ctx.world.globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
-                    let vo = (*((*viewent).client)).ps.origin;
+                    // §2b: pool client (index 0 view client); deref raw as Raven does.
+                    let vc = ctx.entity(viewent_id).client;
+                    let vo = (*vc).ps.origin;
                     let a = [
                         vo[0] - (*p).origin[0],
                         vo[1] - (*p).origin[1],
@@ -402,8 +411,9 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 B_TempFree(ctx, 128); // flagstr
 
                 let plum = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
-                (*plum).r.svFlags |= SVF_BROADCAST;
-                (*plum).s.time = bestindex; // render it once
+                let plum_id = ctx.entity_id_of(plum).unwrap();
+                ctx.entity_mut(plum_id).r.svFlags |= SVF_BROADCAST;
+                ctx.entity_mut(plum_id).s.time = bestindex; // render it once
             } else if !gotbestindex {
                 ctx.world.globals.gLastPrintedIndex = -1;
             }
@@ -796,9 +806,11 @@ pub fn CreateNewWP_InsertUnder(
 /// Source: `oracle/codemp/game/ai_wpnav.c:716-758`
 pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_int) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let pl: *mut gentity_t = ent_ptr(ctx, pl);
-        if pl.is_null() || (*pl).client.is_null() {
+        let Some(pl) = pl else {
+            return;
+        };
+        // §2b: player pool client; deref the entity's own client pointer raw.
+        if ctx.entity(pl).client.is_null() {
             return;
         }
 
@@ -829,8 +841,10 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
             return;
         }
 
-        let cl = (*pl).client;
-        (*cl).ps.origin = (*ctx.world.globals.gWPArray.0[foundindex as usize]).origin;
+        // §2b: player pool client; deref raw as Raven does.
+        let cl = ctx.entity(pl).client;
+        let origin = (*ctx.world.globals.gWPArray.0[foundindex as usize]).origin;
+        (*cl).ps.origin = origin;
     }
 }
 
@@ -1809,29 +1823,21 @@ pub fn CalculatePaths(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1715-1732`
 pub fn GetObjectThatTargets(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        if (*ent).targetname.is_null() {
-            return core::ptr::null_mut();
-        }
-
-        // `FOFS(target)` — byte offset of `gentity_t::target` — is the field
-        // this scan matches against.
-        let fieldofs = core::mem::offset_of!(gentity_t, target) as c_int;
-        let next = G_Find(
-            ctx,
-            ctx.entity_id_of(core::ptr::null_mut()),
-            fieldofs,
-            (*ent).targetname,
-        );
-
-        if !next.is_null() {
-            return next;
-        }
-
-        core::ptr::null_mut()
+    let targetname = ctx.entity(ent).targetname;
+    if targetname.is_null() {
+        return core::ptr::null_mut();
     }
+
+    // `FOFS(target)` — byte offset of `gentity_t::target` — is the field
+    // this scan matches against.
+    let fieldofs = core::mem::offset_of!(gentity_t, target) as c_int;
+    let next = G_Find(ctx, None, fieldofs, targetname);
+
+    if !next.is_null() {
+        return next;
+    }
+
+    core::ptr::null_mut()
 }
 
 /// Raven `CalculateSiegeGoals`.
@@ -1842,53 +1848,59 @@ pub fn CalculateSiegeGoals(ctx: &mut GameContext) {
         let mut i: c_int = 0;
 
         while i < ctx.world.level.num_entities {
-            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
+            let ent_id = EntityId(i as u32);
 
-            let mut tent: *mut gentity_t = core::ptr::null_mut();
+            let mut tent: Option<EntityId> = None;
 
-            if !ent.is_null()
-                && !(*ent).classname.is_null()
-                && c_str_eq((*ent).classname, b"info_siege_objective")
+            if !ctx.entity(ent_id).classname.is_null()
+                && c_str_eq(ctx.entity(ent_id).classname, b"info_siege_objective")
             {
-                tent = ent;
-                let mut t2ent = GetObjectThatTargets(ctx, ctx.entity_id_of(tent).unwrap());
+                tent = Some(ent_id);
+                let raw = GetObjectThatTargets(ctx, tent.unwrap());
+                let mut t2ent = ctx.entity_id_of(raw);
                 let mut looptracker: c_int = 0;
 
-                while !t2ent.is_null() && looptracker < 2048 {
+                while t2ent.is_some() && looptracker < 2048 {
                     // looptracker keeps us from getting stuck in case something is set up weird on this map
                     tent = t2ent;
-                    t2ent = GetObjectThatTargets(ctx, ctx.entity_id_of(tent).unwrap());
+                    let raw = GetObjectThatTargets(ctx, tent.unwrap());
+                    t2ent = ctx.entity_id_of(raw);
                     looptracker += 1;
                 }
 
                 if looptracker >= 2048 {
                     // something unpleasent has happened
-                    tent = core::ptr::null_mut();
+                    tent = None;
                     break;
                 }
             }
 
-            if !tent.is_null() && !ent.is_null() && tent != ent {
-                // tent should now be the object attached to the mission objective
-                let dif = [
-                    ((*tent).r.absmax[0] + (*tent).r.absmin[0]) / 2.0,
-                    ((*tent).r.absmax[1] + (*tent).r.absmin[1]) / 2.0,
-                    ((*tent).r.absmax[2] + (*tent).r.absmin[2]) / 2.0,
-                ];
+            if let Some(tent) = tent {
+                if tent != ent_id {
+                    // tent should now be the object attached to the mission objective
+                    let absmax = ctx.entity(tent).r.absmax;
+                    let absmin = ctx.entity(tent).r.absmin;
+                    let dif = [
+                        (absmax[0] + absmin[0]) / 2.0,
+                        (absmax[1] + absmin[1]) / 2.0,
+                        (absmax[2] + absmin[2]) / 2.0,
+                    ];
 
-                let wpindex = GetNearestVisibleWP(ctx, dif, (*tent).s.number);
+                    let tent_number = ctx.entity(tent).s.number;
+                    let wpindex = GetNearestVisibleWP(ctx, dif, tent_number);
 
-                if wpindex != -1 {
-                    let p = ctx.world.globals.gWPArray.0[wpindex as usize];
-                    if !p.is_null() && (*p).inuse != 0 {
-                        // found the waypoint nearest the center of this objective-related object
-                        if (*ent).side == SIEGETEAM_TEAM1 {
-                            (*p).flags |= WPFLAG_SIEGE_IMPERIALOBJ;
-                        } else {
-                            (*p).flags |= WPFLAG_SIEGE_REBELOBJ;
+                    if wpindex != -1 {
+                        let p = ctx.world.globals.gWPArray.0[wpindex as usize];
+                        if !p.is_null() && (*p).inuse != 0 {
+                            // found the waypoint nearest the center of this objective-related object
+                            if ctx.entity(ent_id).side == SIEGETEAM_TEAM1 {
+                                (*p).flags |= WPFLAG_SIEGE_IMPERIALOBJ;
+                            } else {
+                                (*p).flags |= WPFLAG_SIEGE_REBELOBJ;
+                            }
+
+                            (*p).associated_entity = tent_number;
                         }
-
-                        (*p).associated_entity = (*tent).s.number;
                     }
                 }
             }
@@ -1978,36 +1990,42 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
         i = 0;
 
         while i < ctx.world.level.num_entities {
-            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
+            let ent_id = EntityId(i as u32);
 
             let mut weight: f32 = 0.0;
 
-            if !ent.is_null() && !(*ent).classname.is_null() {
-                if c_str_eq((*ent).classname, b"item_seeker") {
+            let classname = ctx.entity(ent_id).classname;
+            // `item` is a `*mut gitem_t` (bg item-table pointer, no accessor);
+            // its derefs below stay raw.
+            let item = ctx.entity(ent_id).item;
+            if !classname.is_null() {
+                if c_str_eq(classname, b"item_seeker") {
                     weight = 2.0;
-                } else if c_str_eq((*ent).classname, b"item_shield") {
+                } else if c_str_eq(classname, b"item_shield") {
                     weight = 2.0;
-                } else if c_str_eq((*ent).classname, b"item_medpac") {
+                } else if c_str_eq(classname, b"item_medpac") {
                     weight = 2.0;
-                } else if c_str_eq((*ent).classname, b"item_sentry_gun") {
+                } else if c_str_eq(classname, b"item_sentry_gun") {
                     weight = 2.0;
-                } else if c_str_eq((*ent).classname, b"item_force_enlighten_dark") {
+                } else if c_str_eq(classname, b"item_force_enlighten_dark") {
                     weight = 5.0;
-                } else if c_str_eq((*ent).classname, b"item_force_enlighten_light") {
+                } else if c_str_eq(classname, b"item_force_enlighten_light") {
                     weight = 5.0;
-                } else if c_str_eq((*ent).classname, b"item_force_boon") {
+                } else if c_str_eq(classname, b"item_force_boon") {
                     weight = 5.0;
-                } else if c_str_eq((*ent).classname, b"item_ysalimari") {
+                } else if c_str_eq(classname, b"item_ysalimari") {
                     weight = 2.0;
-                } else if c_str_contains((*ent).classname, b"weapon_") && !(*ent).item.is_null() {
-                    weight = botGlobalNavWeaponWeights[(*(*ent).item).giTag as usize];
-                } else if !(*ent).item.is_null() && (*(*ent).item).giType == IT_AMMO {
+                } else if c_str_contains(classname, b"weapon_") && !item.is_null() {
+                    weight = botGlobalNavWeaponWeights[(*item).giTag as usize];
+                } else if !item.is_null() && (*item).giType == IT_AMMO {
                     weight = 3.0;
                 }
             }
 
-            if !ent.is_null() && weight != 0.0 {
-                let wpindex = GetNearestVisibleWPToItem(ctx, (*ent).s.pos.trBase, (*ent).s.number);
+            if weight != 0.0 {
+                let trBase = ctx.entity(ent_id).s.pos.trBase;
+                let number = ctx.entity(ent_id).s.number;
+                let wpindex = GetNearestVisibleWPToItem(ctx, trBase, number);
 
                 if wpindex != -1 {
                     let p = ctx.world.globals.gWPArray.0[wpindex as usize];
@@ -2015,7 +2033,7 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
                         // found the waypoint nearest the center of this object
                         (*p).weight = weight;
                         (*p).flags |= WPFLAG_GOALPOINT;
-                        (*p).associated_entity = (*ent).s.number;
+                        (*p).associated_entity = number;
                     }
                 }
             }
@@ -2327,22 +2345,23 @@ pub fn FlagObjects(ctx: &mut GameContext) {
         let mut found: c_int = 0;
         let mut bestdist: f32 = 999999.0;
         let mut tlen: f32;
-        let mut flag_red: *mut gentity_t = core::ptr::null_mut();
-        let mut flag_blue: *mut gentity_t = core::ptr::null_mut();
+        let mut flag_red: Option<EntityId> = None;
+        let mut flag_blue: Option<EntityId> = None;
         let mins: vec3_t = [-15.0, -15.0, -5.0];
         let maxs: vec3_t = [15.0, 15.0, 5.0];
         let mut tr: trace_t = core::mem::zeroed();
 
         while i < ctx.world.level.num_entities {
-            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
-            if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
-                if flag_red.is_null() && c_str_eq((*ent).classname, b"team_CTF_redflag") {
-                    flag_red = ent;
-                } else if flag_blue.is_null() && c_str_eq((*ent).classname, b"team_CTF_blueflag") {
-                    flag_blue = ent;
+            let ent_id = EntityId(i as u32);
+            let classname = ctx.entity(ent_id).classname;
+            if ctx.entity(ent_id).inuse != 0 && !classname.is_null() {
+                if flag_red.is_none() && c_str_eq(classname, b"team_CTF_redflag") {
+                    flag_red = Some(ent_id);
+                } else if flag_blue.is_none() && c_str_eq(classname, b"team_CTF_blueflag") {
+                    flag_blue = Some(ent_id);
                 }
 
-                if !flag_red.is_null() && !flag_blue.is_null() {
+                if flag_red.is_some() && flag_blue.is_some() {
                     break;
                 }
             }
@@ -2351,30 +2370,24 @@ pub fn FlagObjects(ctx: &mut GameContext) {
 
         i = 0;
 
-        if flag_red.is_null() || flag_blue.is_null() {
+        if flag_red.is_none() || flag_blue.is_none() {
             return;
         }
+        let flag_red = flag_red.unwrap();
+        let flag_blue = flag_blue.unwrap();
 
         while i < ctx.world.globals.gWPNum {
             let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 {
-                let rb = (*flag_red).s.pos.trBase;
+                let rb = ctx.entity(flag_red).s.pos.trBase;
+                let fr_number = ctx.entity(flag_red).s.number;
                 let po = (*p).origin;
                 tlen = VectorLength([rb[0] - po[0], rb[1] - po[1], rb[2] - po[2]]);
 
                 if tlen < bestdist {
-                    wp_trace(
-                        ctx,
-                        &mut tr,
-                        &rb,
-                        &mins,
-                        &maxs,
-                        &po,
-                        (*flag_red).s.number,
-                        MASK_SOLID,
-                    );
+                    wp_trace(ctx, &mut tr, &rb, &mins, &maxs, &po, fr_number, MASK_SOLID);
 
-                    if tr.fraction == 1.0 || tr.entityNum as c_int == (*flag_red).s.number {
+                    if tr.fraction == 1.0 || tr.entityNum as c_int == fr_number {
                         bestdist = tlen;
                         bestindex = i;
                         found = 1;
@@ -2389,7 +2402,9 @@ pub fn FlagObjects(ctx: &mut GameContext) {
             (*p).flags |= WPFLAG_RED_FLAG;
             ctx.world.globals.flagRed = p;
             ctx.world.globals.oFlagRed = ctx.world.globals.flagRed;
-            ctx.world.globals.eFlagRed = flag_red;
+            // Store the raw entity pointer into the global at the boundary.
+            let fr_ptr = ent_ptr(ctx, Some(flag_red));
+            ctx.world.globals.eFlagRed = fr_ptr;
         }
 
         bestdist = 999999.0;
@@ -2400,23 +2415,15 @@ pub fn FlagObjects(ctx: &mut GameContext) {
         while i < ctx.world.globals.gWPNum {
             let p = ctx.world.globals.gWPArray.0[i as usize];
             if !p.is_null() && (*p).inuse != 0 {
-                let bb = (*flag_blue).s.pos.trBase;
+                let bb = ctx.entity(flag_blue).s.pos.trBase;
+                let fb_number = ctx.entity(flag_blue).s.number;
                 let po = (*p).origin;
                 tlen = VectorLength([bb[0] - po[0], bb[1] - po[1], bb[2] - po[2]]);
 
                 if tlen < bestdist {
-                    wp_trace(
-                        ctx,
-                        &mut tr,
-                        &bb,
-                        &mins,
-                        &maxs,
-                        &po,
-                        (*flag_blue).s.number,
-                        MASK_SOLID,
-                    );
+                    wp_trace(ctx, &mut tr, &bb, &mins, &maxs, &po, fb_number, MASK_SOLID);
 
-                    if tr.fraction == 1.0 || tr.entityNum as c_int == (*flag_blue).s.number {
+                    if tr.fraction == 1.0 || tr.entityNum as c_int == fb_number {
                         bestdist = tlen;
                         bestindex = i;
                         found = 1;
@@ -2431,7 +2438,9 @@ pub fn FlagObjects(ctx: &mut GameContext) {
             (*p).flags |= WPFLAG_BLUE_FLAG;
             ctx.world.globals.flagBlue = p;
             ctx.world.globals.oFlagBlue = ctx.world.globals.flagBlue;
-            ctx.world.globals.eFlagBlue = flag_blue;
+            // Store the raw entity pointer into the global at the boundary.
+            let fb_ptr = ent_ptr(ctx, Some(flag_blue));
+            ctx.world.globals.eFlagBlue = fb_ptr;
         }
     }
 }
@@ -2920,10 +2929,19 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
 
         let et_terrain = mp_bg::public::entity_type::entityType_t::ET_TERRAIN as c_int;
 
-        if terrain.is_null() || (*terrain).inuse == 0 || (*terrain).s.eType != et_terrain {
+        let terrain_id = ctx.entity_id_of(terrain);
+        if terrain_id.is_none()
+            || ctx.entity(terrain_id.unwrap()).inuse == 0
+            || ctx.entity(terrain_id.unwrap()).s.eType != et_terrain
+        {
             G_Printf(ctx, cstr("Error: RMG with no terrain!\n").as_ptr());
             return;
         }
+        let terrain_id = terrain_id.unwrap();
+        // terrain bounds are loop-invariant (this fn never mutates the terrain
+        // entity); hoist to value copies so the loops below hold no entity borrow.
+        let t_absmin = ctx.entity(terrain_id).r.absmin;
+        let t_absmax = ctx.entity(terrain_id).r.absmax;
 
         ctx.world.globals.nodenum = 0;
         for i in 0..MAX_NODETABLE_SIZE as usize {
@@ -2933,19 +2951,19 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
         let tr_mins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
         let tr_maxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
 
-        let mut place_x = (*terrain).r.absmin[0];
-        let mut place_y = (*terrain).r.absmin[1];
-        let place_z = (*terrain).r.absmax[2] - 400.0;
+        let mut place_x = t_absmin[0];
+        let mut place_y = t_absmin[1];
+        let place_z = t_absmax[2] - 400.0;
         let grid_spacing = DEFAULT_GRID_SPACING;
 
         // skim through the entirety of the terrain limits and drop nodes, removing
         // nodes that start in solid or fall too high on the terrain.
-        while place_y < (*terrain).r.absmax[1] {
+        while place_y < t_absmax[1] {
             if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                 break;
             }
 
-            while place_x < (*terrain).r.absmax[0] {
+            while place_x < t_absmax[0] {
                 if ctx.world.globals.nodenum >= MAX_NODETABLE_SIZE {
                     break;
                 }
@@ -2971,7 +2989,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
 
                 if (tr.entityNum as c_int >= ENTITYNUM_WORLD
                     || ctx.world.g_entities[tr.entityNum as usize].s.eType == et_terrain)
-                    && tr.endpos[2] < (*terrain).r.absmin[2] + 750.0
+                    && tr.endpos[2] < t_absmin[2] + 750.0
                 {
                     // only drop nodes on terrain directly
                     ctx.world.globals.nodetable.0[n].origin = tr.endpos;
@@ -2983,7 +3001,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                 place_x += grid_spacing;
             }
 
-            place_x = (*terrain).r.absmin[0];
+            place_x = t_absmin[0];
             place_y += grid_spacing;
         }
 
@@ -2994,14 +3012,24 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
         while i < ctx.world.globals.gSpawnPointNum - 1 {
             let sp0 = ctx.world.globals.gSpawnPoints.0[i as usize];
             let sp1 = ctx.world.globals.gSpawnPoints.0[(i + 1) as usize];
+            let sp0_id = ctx.entity_id_of(sp0);
+            let sp1_id = ctx.entity_id_of(sp1);
 
-            if sp0.is_null() || (*sp0).inuse == 0 || sp1.is_null() || (*sp1).inuse == 0 {
+            if sp0_id.is_none()
+                || ctx.entity(sp0_id.unwrap()).inuse == 0
+                || sp1_id.is_none()
+                || ctx.entity(sp1_id.unwrap()).inuse == 0
+            {
                 i += 1;
                 continue;
             }
+            let sp0_id = sp0_id.unwrap();
+            let sp1_id = sp1_id.unwrap();
 
-            let nearest_index = G_NearestNodeToPoint(ctx, (*sp0).s.origin);
-            let nearest_index_for_next = G_NearestNodeToPoint(ctx, (*sp1).s.origin);
+            let sp0_origin = ctx.entity(sp0_id).s.origin;
+            let sp1_origin = ctx.entity(sp1_id).s.origin;
+            let nearest_index = G_NearestNodeToPoint(ctx, sp0_origin);
+            let nearest_index_for_next = G_NearestNodeToPoint(ctx, sp1_origin);
 
             if nearest_index == -1 || nearest_index_for_next == -1 {
                 // Looks like there is no grid data near one of the points. Ideally, this will never happen.
@@ -3026,7 +3054,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                 nearest_index_for_next,
                 0,
                 qtrue,
-                (*terrain).r.absmin[2],
+                t_absmin[2],
             ) != nearest_index_for_next
             {
                 // failed to branch to where we want. Oh well, try it without trace checks.
@@ -3038,7 +3066,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                     nearest_index_for_next,
                     0,
                     qfalse,
-                    (*terrain).r.absmin[2],
+                    t_absmin[2],
                 ) != nearest_index_for_next
                 {
                     // still failed somehow. Just disregard this point.
@@ -3060,13 +3088,18 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
             ) != 0
             {
                 // successfully connected the trail from nearestIndex to nearestIndexForNext
-                if (*sp1).inuse != 0 && !(*sp1).item.is_null() && (*(*sp1).item).giType == IT_TEAM {
+                // `item` is a `*mut gitem_t` (bg item-table pointer, no accessor);
+                // its derefs stay raw.
+                let sp1_inuse = ctx.entity(sp1_id).inuse;
+                let sp1_item = ctx.entity(sp1_id).item;
+                if sp1_inuse != 0 && !sp1_item.is_null() && (*sp1_item).giType == IT_TEAM {
                     // This point is actually a CTF flag.
-                    if (*(*sp1).item).giTag == PW_REDFLAG || (*(*sp1).item).giTag == PW_BLUEFLAG {
+                    if (*sp1_item).giTag == PW_REDFLAG || (*sp1_item).giTag == PW_BLUEFLAG {
                         // Place a waypoint on the flag next in the trail, so the nearest grid point will link to it.
+                        let sp1_origin = ctx.entity(sp1_id).s.origin;
                         CreateNewWP_InsertUnder(
                             ctx,
-                            (*sp1).s.origin,
+                            sp1_origin,
                             WPFLAG_NEVERONEWAY,
                             ctx.world.globals.gWPNum - 1,
                         );
@@ -3100,29 +3133,34 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
         CreateNewWP(ctx, crate::q_math::vec3_origin, 0); // create a dummy waypoint to insert under
 
         while i < ctx.world.level.num_entities {
-            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
+            let ent_id = EntityId(i as u32);
+            let inuse = ctx.entity(ent_id).inuse;
+            let classname = ctx.entity(ent_id).classname;
+            // `item` is a `*mut gitem_t` (bg item-table pointer, no accessor);
+            // its derefs below stay raw.
+            let item = ctx.entity(ent_id).item;
 
-            if !ent.is_null()
-                && (*ent).inuse != 0
-                && !(*ent).classname.is_null()
-                && *(*ent).classname != 0
-                && Q_stricmp((*ent).classname, c"info_player_deathmatch".as_ptr()) == 0
+            if inuse != 0
+                && !classname.is_null()
+                && *classname != 0
+                && Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0
             {
-                if (*ent).s.origin[2] < 1280.0 {
+                if ctx.entity(ent_id).s.origin[2] < 1280.0 {
                     // h4x
+                    let sp_ptr = ent_ptr(ctx, Some(ent_id));
                     let n = ctx.world.globals.gSpawnPointNum as usize;
-                    ctx.world.globals.gSpawnPoints.0[n] = ent;
+                    ctx.world.globals.gSpawnPoints.0[n] = sp_ptr;
                     ctx.world.globals.gSpawnPointNum += 1;
                 }
-            } else if !ent.is_null()
-                && (*ent).inuse != 0
-                && !(*ent).item.is_null()
-                && (*(*ent).item).giType == IT_TEAM
-                && ((*(*ent).item).giTag == PW_REDFLAG || (*(*ent).item).giTag == PW_BLUEFLAG)
+            } else if inuse != 0
+                && !item.is_null()
+                && (*item).giType == IT_TEAM
+                && ((*item).giTag == PW_REDFLAG || (*item).giTag == PW_BLUEFLAG)
             {
                 // also make it path to flags in CTF.
+                let sp_ptr = ent_ptr(ctx, Some(ent_id));
                 let n = ctx.world.globals.gSpawnPointNum as usize;
-                ctx.world.globals.gSpawnPoints.0[n] = ent;
+                ctx.world.globals.gSpawnPoints.0[n] = sp_ptr;
                 ctx.world.globals.gSpawnPointNum += 1;
             }
 
@@ -3239,17 +3277,19 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
 
         // set the flag entities
         while i < ctx.world.level.num_entities {
-            let ent: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
+            let ent_id = EntityId(i as u32);
+            let classname = ctx.entity(ent_id).classname;
 
-            if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
-                if ctx.world.globals.eFlagRed.is_null()
-                    && c_str_eq((*ent).classname, b"team_CTF_redflag")
+            if ctx.entity(ent_id).inuse != 0 && !classname.is_null() {
+                if ctx.world.globals.eFlagRed.is_null() && c_str_eq(classname, b"team_CTF_redflag")
                 {
-                    ctx.world.globals.eFlagRed = ent;
+                    let ptr = ent_ptr(ctx, Some(ent_id));
+                    ctx.world.globals.eFlagRed = ptr;
                 } else if ctx.world.globals.eFlagBlue.is_null()
-                    && c_str_eq((*ent).classname, b"team_CTF_blueflag")
+                    && c_str_eq(classname, b"team_CTF_blueflag")
                 {
-                    ctx.world.globals.eFlagBlue = ent;
+                    let ptr = ent_ptr(ctx, Some(ent_id));
+                    ctx.world.globals.eFlagBlue = ptr;
                 }
 
                 if !ctx.world.globals.eFlagRed.is_null() && !ctx.world.globals.eFlagBlue.is_null() {
@@ -3270,32 +3310,33 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/ai_wpnav.c:3425-3457`
 pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let mut closest_spawn: *mut gentity_t = core::ptr::null_mut();
+        let mut closest_index: Option<EntityId> = None;
         let mut closest_dist: f32 = -1.0;
         let mut i: c_int = MAX_CLIENTS as c_int;
 
         while i < ctx.world.level.num_entities {
-            let spawn: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
-            if !spawn.is_null()
-                && (*spawn).inuse != 0
-                && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
-                    || Q_stricmp((*spawn).classname, c"info_player_deathmatch".as_ptr()) == 0)
+            let spawn_id = EntityId(i as u32);
+            let classname = ctx.entity(spawn_id).classname;
+            if ctx.entity(spawn_id).inuse != 0
+                && (Q_stricmp(classname, c"info_player_start".as_ptr()) == 0
+                    || Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0)
             {
-                let eo = (*((*ent).client)).ps.origin;
-                let so = (*spawn).r.currentOrigin;
+                // §2b: player pool client; deref raw as Raven does.
+                let cl = ctx.entity(ent).client;
+                let eo = (*cl).ps.origin;
+                let so = ctx.entity(spawn_id).r.currentOrigin;
                 let check_dist = VectorLength([eo[0] - so[0], eo[1] - so[1], eo[2] - so[2]]);
 
                 if closest_dist == -1.0 || check_dist < closest_dist {
-                    closest_spawn = spawn;
+                    closest_index = Some(spawn_id);
                     closest_dist = check_dist;
                 }
             }
             i += 1;
         }
 
-        closest_spawn
+        // Produce the raw entity pointer at the return boundary.
+        ent_ptr(ctx, closest_index)
     }
 }
 
@@ -3307,42 +3348,41 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 /// Source: `oracle/codemp/game/ai_wpnav.c:3459-3499`
 pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mut gentity_t {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let currentSpawn: *mut gentity_t = ctx.entity_mut(currentSpawn);
-        let mut next_spawn: *mut gentity_t = core::ptr::null_mut();
-        let mut i: c_int = (*currentSpawn).s.number + 1;
+        let mut next_index: Option<EntityId> = None;
+        let mut i: c_int = ctx.entity(currentSpawn).s.number + 1;
 
         while i < ctx.world.level.num_entities {
-            let spawn: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
-            if !spawn.is_null()
-                && (*spawn).inuse != 0
-                && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
-                    || Q_stricmp((*spawn).classname, c"info_player_deathmatch".as_ptr()) == 0)
+            let spawn_id = EntityId(i as u32);
+            let classname = ctx.entity(spawn_id).classname;
+            if ctx.entity(spawn_id).inuse != 0
+                && (Q_stricmp(classname, c"info_player_start".as_ptr()) == 0
+                    || Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0)
             {
-                next_spawn = spawn;
+                next_index = Some(spawn_id);
                 break;
             }
             i += 1;
         }
 
-        if next_spawn.is_null() {
+        if next_index.is_none() {
             // loop back around to 0 (client range end)
             i = MAX_CLIENTS as c_int;
             while i < ctx.world.level.num_entities {
-                let spawn: *mut gentity_t = &mut ctx.world.g_entities[i as usize];
-                if !spawn.is_null()
-                    && (*spawn).inuse != 0
-                    && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
-                        || Q_stricmp((*spawn).classname, c"info_player_deathmatch".as_ptr()) == 0)
+                let spawn_id = EntityId(i as u32);
+                let classname = ctx.entity(spawn_id).classname;
+                if ctx.entity(spawn_id).inuse != 0
+                    && (Q_stricmp(classname, c"info_player_start".as_ptr()) == 0
+                        || Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0)
                 {
-                    next_spawn = spawn;
+                    next_index = Some(spawn_id);
                     break;
                 }
                 i += 1;
             }
         }
 
-        next_spawn
+        // Produce the raw entity pointer at the return boundary.
+        ent_ptr(ctx, next_index)
     }
 }
 
@@ -3351,9 +3391,6 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
 /// Source: `oracle/codemp/game/ai_wpnav.c:3501-3813`
 pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<EntityId>) -> c_int {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let pl: *mut gentity_t = ent_ptr(ctx, pl);
-
         if ctx.world.globals.gBotEdit == 0.0 {
             return 0;
         }
@@ -3367,7 +3404,11 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         // if a waypoint editing related command is issued, bots will deactivate.
         // once bot_wp_save is issued and the trail is recalculated, bots will activate again.
 
-        if pl.is_null() || (*pl).client.is_null() {
+        let Some(pl) = pl else {
+            return 0;
+        };
+        // §2b: player pool client; deref the entity's own client pointer raw.
+        if ctx.entity(pl).client.is_null() {
             return 0;
         }
 
@@ -3400,10 +3441,13 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
                 optional_argument = atoi(optional_s_argument);
             }
 
+            // §2b: player pool client; deref raw as Raven does.
+            let cl = ctx.entity(pl).client;
+            let origin = (*cl).ps.origin;
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
-                CreateNewWP_InTrail(ctx, (*((*pl).client)).ps.origin, 0, optional_argument);
+                CreateNewWP_InTrail(ctx, origin, 0, optional_argument);
             } else {
-                CreateNewWP(ctx, (*((*pl).client)).ps.origin, 0);
+                CreateNewWP(ctx, origin, 0);
             }
             return 1;
         }
@@ -3435,29 +3479,33 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
-                TeleportToWP(ctx, ctx.entity_id_of(pl), optional_argument);
+                TeleportToWP(ctx, Some(pl), optional_argument);
             } else {
                 G_Printf(
                     ctx,
                     cstr("^3You didn't specify an index. Assuming last.\n").as_ptr(),
                 );
-                TeleportToWP(ctx, ctx.entity_id_of(pl), ctx.world.globals.gWPNum - 1);
+                TeleportToWP(ctx, Some(pl), ctx.world.globals.gWPNum - 1);
             }
             return 1;
         }
 
         if Q_stricmp(cmd, c"bot_wp_spawntele".as_ptr()) == 0 {
-            let mut closest_spawn = GetClosestSpawn(ctx, ctx.entity_id_of(pl).unwrap());
+            let closest_spawn = GetClosestSpawn(ctx, pl);
 
             if closest_spawn.is_null() {
                 // There should always be a spawn point..
                 return 1;
             }
 
-            closest_spawn = GetNextSpawnInIndex(ctx, ctx.entity_id_of(closest_spawn).unwrap());
+            let closest_spawn = GetNextSpawnInIndex(ctx, ctx.entity_id_of(closest_spawn).unwrap());
 
             if !closest_spawn.is_null() {
-                (*((*pl).client)).ps.origin = (*closest_spawn).r.currentOrigin;
+                let cs_id = ctx.entity_id_of(closest_spawn).unwrap();
+                let currentOrigin = ctx.entity(cs_id).r.currentOrigin;
+                // §2b: player pool client; deref raw as Raven does.
+                let cl = ctx.entity(pl).client;
+                (*cl).ps.origin = currentOrigin;
             }
             return 1;
         }
@@ -3505,15 +3553,13 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
                 optional_argument = atoi(optional_s_argument);
             }
 
+            // §2b: player pool client; deref raw as Raven does.
+            let cl = ctx.entity(pl).client;
+            let origin = (*cl).ps.origin;
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
-                CreateNewWP_InTrail(
-                    ctx,
-                    (*((*pl).client)).ps.origin,
-                    flags_from_argument,
-                    optional_argument,
-                );
+                CreateNewWP_InTrail(ctx, origin, flags_from_argument, optional_argument);
             } else {
-                CreateNewWP(ctx, (*((*pl).client)).ps.origin, flags_from_argument);
+                CreateNewWP(ctx, origin, flags_from_argument);
             }
             return 1;
         }

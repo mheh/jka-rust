@@ -9,18 +9,19 @@
 //! `move`/`shoot`/`enemyDist` — genuine cross-frame state)
 //! reach through `ctx.world`/`ctx.world.globals`.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
-//! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; the ctx-free leaf
-//! `ST_AggressionAdjust` takes `&gentity_t`. Non-leaf bodies re-derive the raw
-//! pointers verbatim at the top (`// STAGE-1:` markers, via `ctx.entity_mut` /
-//! `ent_resolve_opt`) — Stage-2 debt. Callers bridge via `ctx.entity_id_of(ptr)`.
-//!
-//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())`
-//! raw-deref regime (and its hoisted `let world = &mut *ctx.world_raw()`
-//! aliases) is gone. The per-body entity/`gNPC_t`/`gclient_t` re-derives stay
-//! raw by design, so the `// STAGE-1:` markers and their `unsafe` blocks
-//! legitimately hold genuine raw ops. Behavior is byte-identical, referee-verified.
+//! Safe-state migration **Campaign 2c** (deref regime): entity-pointer params
+//! are `EntityId` / `Option<EntityId>` handles (§B5); the ctx-free leaf
+//! `ST_AggressionAdjust` takes `&gentity_t`. Entity fields are read/written
+//! through `ctx.world.entity(id)` / `ctx.world.entity_mut(id)` at the point of
+//! use — the Stage-1 fn-top raw re-derives are gone. The ambient `NPC` global
+//! stays a raw `*mut gentity_t` value only where a syscall needs `.cast()` or a
+//! pointer compare (`NPC == group->commander`) demands it; its `npc_id` handle
+//! feeds every field reach. Genuinely accessorless graphs stay raw in tight
+//! `unsafe` blocks with `// FLAG:` notes: `gNPC_t` (`NPCInfo`, no accessor),
+//! the `AIGroupInfo` group graph (`group`/`group.enemy`/`group.commander`/
+//! `member[]`, reached only through `gNPC_t.group`), and BG_Alloc'd pool
+//! clients (`ent.client`, read via the safe entity borrow then deref'd raw per
+//! trap 2b). Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::{
@@ -96,27 +97,6 @@ pub const CAUTIOUS_THRESHOLD: f32 = REALIZE_THRESHOLD * 0.75;
 // `MIN_ROCKET_DIST_SQUARED` (`b_local.h`) — 128*128.
 pub const MIN_ROCKET_DIST_SQUARED: f32 = 16384.0;
 
-// EntityId seam helpers (local to this file, mirroring the `g_missile.rs`
-// precedent): `gentity_t*` stored fields (`enemy`/`goalEntity`/`tempGoal`/…)
-// are `Option<EntityId>`; these resolve an id back to the live pointer at
-// call sites that still take raw `*mut gentity_t`, and build the id back at
-// assignment sites.
-#[inline]
-unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
-    ctx.world.g_entities.as_ptr()
-}
-#[inline]
-unsafe fn ent_resolve(ctx: &mut GameContext, id: EntityId) -> *mut gentity_t {
-    &mut ctx.world.g_entities[id.index()] as *mut gentity_t
-}
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => unsafe { ent_resolve(ctx, i) },
-        None => core::ptr::null_mut(),
-    }
-}
-
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
 // (file-scope local state, `gNPC_t::localState`) — not a central type, ported
 // as file-local consts matching the C values.
@@ -174,93 +154,31 @@ pub fn ST_AggressionAdjust(self_: &gentity_t, change: c_int) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:88-104`
 pub fn ST_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    TIMER_Set(ctx, Some(ent), c"chatter".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"duck".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"stand".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"shuffleTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"sleepTime".as_ptr() as *const c_char, 0);
     TIMER_Set(
         ctx,
-        ctx.entity_id_of(ent),
-        c"chatter".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"duck".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"stand".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"shuffleTime".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"sleepTime".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
+        Some(ent),
         c"enemyLastVisible".as_ptr() as *const c_char,
         0,
     );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"roamTime".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"hideTime".as_ptr() as *const c_char,
-        0,
-    );
+    TIMER_Set(ctx, Some(ent), c"roamTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"hideTime".as_ptr() as *const c_char, 0);
     // FIXME: Slant for difficulty levels (Raven comment).
+    TIMER_Set(ctx, Some(ent), c"attackDelay".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"stick".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"scoutTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, Some(ent), c"flee".as_ptr() as *const c_char, 0);
     TIMER_Set(
         ctx,
-        ctx.entity_id_of(ent),
-        c"attackDelay".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"stick".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"scoutTime".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"flee".as_ptr() as *const c_char,
-        0,
-    );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
+        Some(ent),
         c"interrogating".as_ptr() as *const c_char,
         0,
     );
-    TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"verifyCP".as_ptr() as *const c_char,
-        0,
-    );
+    TIMER_Set(ctx, Some(ent), c"verifyCP".as_ptr() as *const c_char, 0);
 }
 
 /// Raven `ST_Speech`.
@@ -268,8 +186,6 @@ pub fn ST_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:124-225`
 pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, failChance: f32) {
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
         // Raven's `random()` macro: `(rand() & 0x7fff) / (float)0x7fff`.
         // Source: `oracle/codemp/game/q_shared.h:1591`
         let random_val = ctx.world.bg_state.rng.random();
@@ -277,8 +193,10 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
             return;
         }
 
-        let npc = (*self_).NPC;
-        let client = (*self_).client;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
+        // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+        let client = ctx.world.entity(self_).client;
 
         if failChance >= 0.0 {
             // a negative failChance makes it always talk
@@ -296,7 +214,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                     }
                 }
                 */
-            } else if TIMER_Done(ctx, ctx.entity_id_of(self_), c"chatter".as_ptr()) == 0 {
+            } else if TIMER_Done(ctx, Some(self_), c"chatter".as_ptr()) == 0 {
                 // personal timer
                 return;
             } else if ctx.world.globals.groupSpeechDebounceTime[(*client).playerTeam as usize]
@@ -316,9 +234,8 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
             (*(*npc).group).speechDebounceTime =
                 ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(2000, 4000);
         } else {
-            let self_id = ctx.entity_id_of(self_);
             let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-            TIMER_Set(ctx, self_id, c"chatter".as_ptr(), delay);
+            TIMER_Set(ctx, Some(self_), c"chatter".as_ptr(), delay);
         }
         ctx.world.globals.groupSpeechDebounceTime[(*client).playerTeam as usize] =
             ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(2000, 4000);
@@ -329,7 +246,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
 
         match speechType {
             SPEECH_CHASE => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -338,7 +255,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_CONFUSED => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -347,7 +264,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_COVER => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -356,7 +273,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_DETECTED => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -365,7 +282,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_GIVEUP => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -374,7 +291,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_LOOK => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -382,14 +299,9 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                     .Q_irand(EV_LOOK1 as c_int, EV_LOOK2 as c_int);
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
-            SPEECH_LOST => G_AddVoiceEvent(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                EV_LOST1 as c_int,
-                2000,
-            ),
+            SPEECH_LOST => G_AddVoiceEvent(ctx, self_, EV_LOST1 as c_int, 2000),
             SPEECH_OUTFLANK => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -398,7 +310,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_ESCAPING => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -407,7 +319,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_SIGHT => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -416,7 +328,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_SOUND => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -425,7 +337,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_SUSPICIOUS => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -434,7 +346,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_YELL => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -443,7 +355,7 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
                 G_AddVoiceEvent(ctx, self_id, voice_event, 2000)
             }
             SPEECH_PUSHED => {
-                let self_id = ctx.entity_id_of(self_).unwrap();
+                let self_id = self_;
                 let voice_event = ctx
                     .world
                     .bg_state
@@ -463,25 +375,24 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:227-240`
 pub fn ST_MarkToCover(ctx: &mut GameContext, self_: Option<EntityId>) {
     unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_resolve_opt(ctx, self_);
-        if self_.is_null() || (*self_).NPC.is_null() {
+        if self_.is_none() || ctx.world.entity(self_.unwrap()).NPC.is_null() {
             return;
         }
-        let npc = (*self_).NPC;
+        let self_id = self_.unwrap();
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let npc = ctx.world.entity(self_id).NPC;
         (*npc).localState = LSTATE_UNDERFIRE;
-        let self_id = ctx.entity_id_of(self_);
         let delay = ctx.world.bg_state.rng.Q_irand(500, 2500);
         TIMER_Set(
             ctx,
-            self_id,
+            Some(self_id),
             c"attackDelay".as_ptr() as *const c_char,
             delay,
         );
-        ST_AggressionAdjust(&*self_, -3);
+        ST_AggressionAdjust(ctx.world.entity(self_id), -3);
         if !(*npc).group.is_null() && (*(*npc).group).numGroup > 1 {
             // FIXME: flee sound? (Raven comment).
-            ST_Speech(ctx, ctx.entity_id_of(self_).unwrap(), SPEECH_COVER, 0.0);
+            ST_Speech(ctx, self_id, SPEECH_COVER, 0.0);
         }
     }
 }
@@ -499,25 +410,24 @@ pub fn ST_StartFlee(
     maxTime: c_int,
 ) {
     unsafe {
-        // STAGE-1: Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_resolve_opt(ctx, self_);
-        let enemy: *mut gentity_t = ent_resolve_opt(ctx, enemy);
-        if self_.is_null() || (*self_).NPC.is_null() {
+        if self_.is_none() || ctx.world.entity(self_.unwrap()).NPC.is_null() {
             return;
         }
+        let self_id = self_.unwrap();
         G_StartFlee(
             ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(enemy),
+            self_id,
+            enemy,
             dangerPoint,
             dangerLevel,
             minTime,
             maxTime,
         );
-        let npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let npc = ctx.world.entity(self_id).NPC;
         if !(*npc).group.is_null() && (*(*npc).group).numGroup > 1 {
             // FIXME: flee sound? (Raven comment).
-            ST_Speech(ctx, ctx.entity_id_of(self_).unwrap(), SPEECH_COVER, 0.0);
+            ST_Speech(ctx, self_id, SPEECH_COVER, 0.0);
         }
     }
 }
@@ -532,40 +442,18 @@ pub fn NPC_ST_Pain(
     damage: c_int,
 ) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let attacker: *mut gentity_t = ent_resolve_opt(ctx, attacker);
-        let npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(
-            ctx,
-            ctx.entity_id_of(self_),
-            c"duck".as_ptr() as *const c_char,
-            -1,
-        );
-        TIMER_Set(
-            ctx,
-            ctx.entity_id_of(self_),
-            c"hideTime".as_ptr() as *const c_char,
-            -1,
-        );
-        TIMER_Set(
-            ctx,
-            ctx.entity_id_of(self_),
-            c"stand".as_ptr() as *const c_char,
-            2000,
-        );
+        TIMER_Set(ctx, Some(self_), c"duck".as_ptr() as *const c_char, -1);
+        TIMER_Set(ctx, Some(self_), c"hideTime".as_ptr() as *const c_char, -1);
+        TIMER_Set(ctx, Some(self_), c"stand".as_ptr() as *const c_char, 2000);
 
-        NPC_Pain(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(attacker),
-            damage,
-        );
+        NPC_Pain(ctx, self_, attacker, damage);
 
-        if damage == 0 && (*self_).health > 0 {
-            let self_id = ctx.entity_id_of(self_).unwrap();
+        if damage == 0 && ctx.world.entity(self_).health > 0 {
+            let self_id = self_;
             let voice_event = ctx
                 .world
                 .bg_state
@@ -582,17 +470,17 @@ pub fn NPC_ST_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:282-302`
 pub fn ST_HoldPosition(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
-        let npc_id = ctx.entity_id_of(NPC);
         let delay = ctx.world.bg_state.rng.Q_irand(1000, 3000);
         if (*NPCInfo).squadState == SQUAD_RETREAT {
-            let npc_id_2 = ctx.entity_id_of(NPC);
-            TIMER_Set(ctx, npc_id_2, c"flee".as_ptr(), -ctx.world.level.time);
+            TIMER_Set(ctx, Some(npc_id), c"flee".as_ptr(), -ctx.world.level.time);
         }
         // don't look for another one for a few seconds
-        TIMER_Set(ctx, npc_id, c"verifyCP".as_ptr(), delay);
+        TIMER_Set(ctx, Some(npc_id), c"verifyCP".as_ptr(), delay);
         NPC_FreeCombatPoint(ctx, (*NPCInfo).combatPoint, qtrue);
         // NPCInfo->combatPoint = -1;//??? (Raven comment).
         if trap::ICARUS_TaskIDPending(
@@ -602,7 +490,11 @@ pub fn ST_HoldPosition(ctx: &mut GameContext) {
         {
             // don't have a script waiting for me to get to my point, okay to stop
             // trying and stand
-            AI_GroupUpdateSquadstates((*NPCInfo).group, &mut *NPC, SQUAD_STAND_AND_SHOOT);
+            AI_GroupUpdateSquadstates(
+                (*NPCInfo).group,
+                ctx.world.entity_mut(npc_id),
+                SQUAD_STAND_AND_SHOOT,
+            );
             (*NPCInfo).goalEntity = None;
         }
 
@@ -619,8 +511,9 @@ pub fn ST_HoldPosition(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:304-325`
 pub fn NPC_ST_SayMovementSpeech(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
 
         if (*NPCInfo).movementSpeech == 0 {
             return;
@@ -659,7 +552,8 @@ pub fn NPC_ST_SayMovementSpeech(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:327-331`
 pub fn NPC_ST_StoreMovementSpeech(ctx: &mut GameContext, speech: c_int, chance: f32) {
     unsafe {
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
         (*NPCInfo).movementSpeech = speech;
         (*NPCInfo).movementSpeechChance = chance;
     }
@@ -670,8 +564,10 @@ pub fn NPC_ST_StoreMovementSpeech(ctx: &mut GameContext, speech: c_int, chance: 
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:338-390`
 pub fn ST_Move(ctx: &mut GameContext) -> qboolean {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
         // always move straight toward our goal
         (*NPCInfo).combatMove = qtrue;
@@ -687,7 +583,7 @@ pub fn ST_Move(ctx: &mut GameContext) -> qboolean {
         // If we hit our target, then stop and fire!
         if (info.flags & 0x00000004) != 0 {
             // NIF_COLLISION = 0x00000004 (b_local.h:305); was wrongly 0x1 (NIF_FAILED).
-            if ent_id_opt(ent_base(ctx), info.blocker) == (*NPC).enemy {
+            if ctx.entity_id_of(info.blocker) == ctx.world.entity(npc_id).enemy {
                 ST_HoldPosition(ctx);
             }
         }
@@ -703,6 +599,8 @@ pub fn ST_Move(ctx: &mut GameContext) -> qboolean {
             {
                 // can't transfer movegoal or stop when a script we're running is
                 // waiting to complete
+                // FLAG: `info.blocker` is a raw nav out-param entity pointer for an
+                // arbitrary entity; its `.NPC`/gNPC_t graph stays raw (trap 2b).
                 if !info.blocker.is_null()
                     && !(*info.blocker).NPC.is_null()
                     && !(*NPCInfo).group.is_null()
@@ -742,7 +640,7 @@ pub fn ST_Move(ctx: &mut GameContext) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:399-439`
 pub fn NPC_ST_SleepShuffle(ctx: &mut GameContext) {
-    let NPC = ctx.world.globals.NPC as *mut gentity_t;
+    let NPC = ctx.world.globals.NPC;
 
     // Play an awake script if we have one
     if G_ActivateBehavior(ctx, ctx.entity_id_of(NPC), bSet_t::BSET_AWAKE as c_int) != 0 {
@@ -781,8 +679,9 @@ pub fn NPC_ST_SleepShuffle(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:447-468`
 pub fn NPC_BSST_Sleep(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
 
         // only check sounds since we're asleep!
         let alertEvent = NPC_CheckAlertEvents(ctx, qfalse, qtrue, -1, qfalse, AEL_MINOR as c_int);
@@ -817,29 +716,32 @@ pub fn NPC_BSST_Sleep(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:476-725`
 pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let target: *mut gentity_t = ctx.entity_mut(target);
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
+        // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+        let npc_client = ctx.world.entity(npc_id).client;
 
         // any closer than 40 and we definitely notice
         let mut minDist: f32 = 40.0;
 
         // In case we aquired one some other way
-        if (*NPC).enemy != None {
+        if ctx.world.entity(npc_id).enemy != None {
             return qtrue;
         }
 
         // Ignore notarget
-        if ((*target).flags & FL_NOTARGET) != 0 {
+        if (ctx.world.entity(target).flags & FL_NOTARGET) != 0 {
             return qfalse;
         }
 
-        if (*target).health <= 0 {
+        if ctx.world.entity(target).health <= 0 {
             return qfalse;
         }
 
-        let tclient = (*target).client;
+        // FLAG: target carries a BG_Alloc'd pool client; deref raw (trap 2b).
+        let tclient = ctx.world.entity(target).client;
         if (*tclient).ps.weapon == WP_SABER
             && (*tclient).ps.saberHolstered == 0
             && (*tclient).ps.saberInFlight == qfalse
@@ -849,7 +751,10 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             minDist = 100.0;
         }
 
-        let mut target_dist = DistanceSquared((*target).r.currentOrigin, (*NPC).r.currentOrigin);
+        let mut target_dist = DistanceSquared(
+            ctx.world.entity(target).r.currentOrigin,
+            ctx.world.entity(npc_id).r.currentOrigin,
+        );
 
         // If the target is this close, then wake up regardless
         if ((*tclient).ps.pm_flags & PMF_DUCKED) == 0
@@ -857,7 +762,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             && target_dist < (minDist * minDist)
         {
             let npc_id = ctx.entity_id_of(NPC).unwrap();
-            let target_id = ctx.entity_id_of(target);
+            let target_id = Some(target);
             G_SetEnemy(ctx, npc_id, target_id);
             (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
             let npc_id_2 = ctx.entity_id_of(NPC);
@@ -868,7 +773,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
 
         let mut maxViewDist = MAX_VIEW_DIST;
 
-        let target_id = ctx.entity_id_of(target);
+        let target_id = Some(target);
         let npc_id = ctx.entity_id_of(NPC).unwrap();
         if (*NPCInfo).stats.visrange > maxViewDist {
             // FIXME: should we always just set maxViewDist to this? (Raven comment).
@@ -893,38 +798,35 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
         }
 
         // clearLOS = ( target->client->ps.leanofs ) ? NPC_ClearLOS5( ... ) : NPC_ClearLOS4( target );
-        let target_id_2 = ctx.entity_id_of(target);
+        let target_id_2 = Some(target);
         let clearLOS = NPC_ClearLOS4(ctx, target_id_2);
 
         // Now check for clear line of vision
         if clearLOS != qfalse {
             if (*tclient).NPC_class == CLASS_ATST {
                 // can't miss 'em!
-                G_SetEnemy(
-                    ctx,
-                    ctx.entity_id_of(NPC).unwrap(),
-                    ctx.entity_id_of(target),
-                );
+                G_SetEnemy(ctx, ctx.entity_id_of(NPC).unwrap(), Some(target));
                 let npc_id_2 = ctx.entity_id_of(NPC);
                 let delay = ctx.world.bg_state.rng.Q_irand(500, 2500);
                 TIMER_Set(ctx, npc_id_2, c"attackDelay".as_ptr(), delay);
                 return qtrue;
             }
             let targ_org: vec3_t = [
-                (*target).r.currentOrigin[0],
-                (*target).r.currentOrigin[1],
-                (*target).r.currentOrigin[2] + (*target).r.maxs[2] - 4.0,
+                ctx.world.entity(target).r.currentOrigin[0],
+                ctx.world.entity(target).r.currentOrigin[1],
+                ctx.world.entity(target).r.currentOrigin[2] + ctx.world.entity(target).r.maxs[2]
+                    - 4.0,
             ];
             let mut hAngle_perc = NPC_GetHFOVPercentage(
                 targ_org,
-                (*((*NPC).client)).renderInfo.eyePoint,
-                (*((*NPC).client)).renderInfo.eyeAngles,
+                (*npc_client).renderInfo.eyePoint,
+                (*npc_client).renderInfo.eyeAngles,
                 (*NPCInfo).stats.hfov as f32,
             );
             let mut vAngle_perc = NPC_GetVFOVPercentage(
                 targ_org,
-                (*((*NPC).client)).renderInfo.eyePoint,
-                (*((*NPC).client)).renderInfo.eyeAngles,
+                (*npc_client).renderInfo.eyePoint,
+                (*npc_client).renderInfo.eyeAngles,
                 (*NPCInfo).stats.vfov as f32,
             );
 
@@ -933,7 +835,10 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             hAngle_perc *= hAngle_perc * hAngle_perc;
 
             // Assess the player's current status
-            target_dist = Distance((*target).r.currentOrigin, (*NPC).r.currentOrigin);
+            target_dist = Distance(
+                ctx.world.entity(target).r.currentOrigin,
+                ctx.world.entity(npc_id).r.currentOrigin,
+            );
 
             let target_speed = VectorLength((*tclient).ps.velocity);
             let target_crouching = (*tclient).pers.cmd.upmove < 0;
@@ -952,11 +857,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
 
             // Too close?
             if dist_rating < DISTANCE_THRESHOLD {
-                G_SetEnemy(
-                    ctx,
-                    ctx.entity_id_of(NPC).unwrap(),
-                    ctx.entity_id_of(target),
-                );
+                G_SetEnemy(ctx, ctx.entity_id_of(NPC).unwrap(), Some(target));
                 let npc_id_2 = ctx.entity_id_of(NPC);
                 let delay = ctx.world.bg_state.rng.Q_irand(500, 2500);
                 TIMER_Set(ctx, npc_id_2, c"attackDelay".as_ptr(), delay);
@@ -988,19 +889,22 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             // Now award any final bonuses to this number
             let contents = trap::PointContents(
                 ctx.engine,
-                GPointContentsArgs::new(&targ_org as *const vec3_t, (*target).s.number),
+                GPointContentsArgs::new(
+                    &targ_org as *const vec3_t,
+                    ctx.world.entity(target).s.number,
+                ),
             );
             if (contents & CONTENTS_WATER) != 0 {
                 let myContents = trap::PointContents(
                     ctx.engine,
                     GPointContentsArgs::new(
-                        &(*((*NPC).client)).renderInfo.eyePoint as *const vec3_t,
-                        (*NPC).s.number,
+                        &(*npc_client).renderInfo.eyePoint as *const vec3_t,
+                        ctx.world.entity(npc_id).s.number,
                     ),
                 );
                 if (myContents & CONTENTS_WATER) == 0 {
                     // I'm not in water
-                    if (*((*NPC).client)).NPC_class == CLASS_SWAMPTROOPER {
+                    if (*npc_client).NPC_class == CLASS_SWAMPTROOPER {
                         // these guys can see in in/through water pretty well
                         vis_rating = 0.10;
                     } else {
@@ -1008,7 +912,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
                     }
                 } else {
                     // else, if we're both in water
-                    if (*((*NPC).client)).NPC_class == CLASS_SWAMPTROOPER {
+                    if (*npc_client).NPC_class == CLASS_SWAMPTROOPER {
                         // I can see him just fine
                     } else {
                         vis_rating = 0.15;
@@ -1031,7 +935,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             }
 
             // If he's violated the threshold, then realize him
-            let (realize, cautious) = if (*((*NPC).client)).NPC_class == CLASS_SWAMPTROOPER {
+            let (realize, cautious) = if (*npc_client).NPC_class == CLASS_SWAMPTROOPER {
                 // swamptroopers can see much better
                 (CAUTIOUS_THRESHOLD, CAUTIOUS_THRESHOLD * 0.75)
             } else {
@@ -1040,7 +944,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
 
             if target_rating > realize && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
                 let npc_id_2 = ctx.entity_id_of(NPC).unwrap();
-                let target_id_3 = ctx.entity_id_of(target);
+                let target_id_3 = Some(target);
                 G_SetEnemy(ctx, npc_id_2, target_id_3);
                 (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
                 let npc_id_3 = ctx.entity_id_of(NPC);
@@ -1067,7 +971,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
                     NPC_TempLookTarget(
                         ctx,
                         ctx.entity_id_of(NPC).unwrap(),
-                        (*target).s.number,
+                        ctx.world.entity(target).s.number,
                         lookTime,
                         lookTime,
                     );
@@ -1084,7 +988,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
                         let npc_id_3 = ctx.entity_id_of(NPC);
                         TIMER_Set(ctx, npc_id_3, c"interrogating".as_ptr(), interrogateTime);
                         let npc_id_4 = ctx.entity_id_of(NPC).unwrap();
-                        let target_id_3 = ctx.entity_id_of(target);
+                        let target_id_3 = Some(target);
                         G_SetEnemy(ctx, npc_id_4, target_id_3);
                         (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
                         TIMER_Set(
@@ -1101,7 +1005,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
                         );
                     } else {
                         let npc_id_2 = ctx.entity_id_of(NPC).unwrap();
-                        let target_id_3 = ctx.entity_id_of(target);
+                        let target_id_3 = Some(target);
                         G_SetEnemy(ctx, npc_id_2, target_id_3);
                         (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
                         let npc_id_3 = ctx.entity_id_of(NPC);
@@ -1129,25 +1033,29 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:727-757`
 pub fn NPC_CheckPlayerTeamStealth(ctx: &mut GameContext) -> qboolean {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
+        let NPC = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
         /*
         NPC_CheckEnemyStealth( &g_entities[0] );	//Change this pointer to assess other entities
         */
         for i in 0..ENTITYNUM_WORLD {
-            let enemy = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
+            let enemy_id = EntityId::from_num(i as c_int).unwrap();
 
-            if (*enemy).inuse == qfalse {
+            if ctx.world.entity(enemy_id).inuse == qfalse {
                 continue;
             }
 
-            if !enemy.is_null()
-                && !(*enemy).client.is_null()
-                && NPC_ValidEnemy(ctx, ctx.entity_id_of(enemy)) != qfalse
-                && (*((*enemy).client)).playerTeam == (*((*NPC).client)).enemyTeam
+            // FLAG: arbitrary-arena entity may be an NPC — pool clients deref raw
+            // via the safe entity borrow (trap 2b).
+            let enemy_client = ctx.world.entity(enemy_id).client;
+            let npc_client = ctx.world.entity(npc_id).client;
+            if !enemy_client.is_null()
+                && NPC_ValidEnemy(ctx, Some(enemy_id)) != qfalse
+                && (*enemy_client).playerTeam == (*npc_client).enemyTeam
             {
                 // Change this pointer to assess other entities
-                if NPC_CheckEnemyStealth(ctx, ctx.entity_id_of(enemy).unwrap()) != qfalse {
+                if NPC_CheckEnemyStealth(ctx, enemy_id) != qfalse {
                     return qtrue;
                 }
             }
@@ -1165,8 +1073,10 @@ pub fn NPC_ST_InvestigateEvent(
     extraSuspicious: qboolean,
 ) -> qboolean {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
         // If they've given themselves away, just take them as an enemy
         if (*NPCInfo).confusionTime < ctx.world.level.time {
@@ -1175,11 +1085,21 @@ pub fn NPC_ST_InvestigateEvent(
             {
                 (*NPCInfo).lastAlertID = ctx.world.level.alertEvents[eventID as usize].ID;
                 let owner = ctx.world.level.alertEvents[eventID as usize].owner;
-                if owner.is_null()
-                    || (*owner).client.is_null()
-                    || (*owner).health <= 0
-                    || (*((*owner).client)).playerTeam != (*((*NPC).client)).enemyTeam
-                {
+                let owner_id = ctx.entity_id_of(owner);
+                // FLAG: owner/NPC carry BG_Alloc'd pool clients (owner may be an
+                // NPC) — deref raw via the safe entity borrow (trap 2b).
+                let is_enemy = match owner_id {
+                    None => false,
+                    Some(oid) => {
+                        let owner_client = ctx.world.entity(oid).client;
+                        let owner_health = ctx.world.entity(oid).health;
+                        let npc_client = ctx.world.entity(npc_id).client;
+                        !owner_client.is_null()
+                            && owner_health > 0
+                            && (*owner_client).playerTeam == (*npc_client).enemyTeam
+                    }
+                };
+                if !is_enemy {
                     // not an enemy
                     return qfalse;
                 }
@@ -1254,13 +1174,17 @@ pub fn NPC_ST_InvestigateEvent(
             // bbox-expanded value persists in the field in every branch (including
             // the `trace.fraction >= 1.0` "too high to bother" branch). Write
             // directly into the field, not a local copy.
+            let npc_mins = ctx.world.entity(npc_id).r.mins;
+            let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+            let npc_num = ctx.world.entity(npc_id).s.number;
+            let npc_clipmask = ctx.world.entity(npc_id).clipmask;
             if G_ExpandPointToBBox(
                 ctx,
                 &mut (*NPCInfo).investigateGoal,
-                (*NPC).r.mins,
-                (*NPC).r.maxs,
-                (*NPC).s.number,
-                ((*NPC).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+                npc_mins,
+                npc_maxs,
+                npc_num,
+                (npc_clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
             ) != qfalse
             {
                 // we were able to move the investigateGoal to a point in which our
@@ -1273,11 +1197,11 @@ pub fn NPC_ST_InvestigateEvent(
                     GTraceArgs::new(
                         &mut trace as *mut trace_t,
                         &(*NPCInfo).investigateGoal as *const vec3_t,
-                        &(*NPC).r.mins as *const vec3_t,
-                        &(*NPC).r.maxs as *const vec3_t,
+                        &npc_mins as *const vec3_t,
+                        &npc_maxs as *const vec3_t,
                         &end as *const vec3_t,
                         ENTITYNUM_NONE,
-                        ((*NPC).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+                        (npc_clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
                     ),
                 );
                 if trace.fraction >= 1.0 {
@@ -1318,6 +1242,8 @@ pub fn NPC_ST_InvestigateEvent(
             // FIXME: only if have others in group... (Raven comment).
             if (*NPCInfo).investigateDebounceTime + (*NPCInfo).pauseTime > ctx.world.level.time {
                 // was already investigating
+                // FLAG: AIGroupInfo (reached via gNPC_t.group) has no accessor;
+                // its entity/pool-client graph stays raw (recipe 2c).
                 let group = (*NPCInfo).group;
                 if !group.is_null()
                     && !(*group).commander.is_null()
@@ -1380,22 +1306,21 @@ pub fn NPC_ST_InvestigateEvent(
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:927-938`
 pub fn ST_OffsetLook(ctx: &mut GameContext, offset: f32, out: &mut vec3_t) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
+        let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
 
         let mut angles: vec3_t = [0.0; 3];
-        GetAnglesForDirection(
-            (*NPC).r.currentOrigin,
-            (*NPCInfo).investigateGoal,
-            &mut angles,
-        );
+        GetAnglesForDirection(npc_origin, (*NPCInfo).investigateGoal, &mut angles);
         angles[1] += offset; // YAW
         let mut forward: vec3_t = [0.0; 3];
         AngleVectors(angles, Some(&mut forward), None, None);
         // VectorMA( NPC->r.currentOrigin, 64, forward, out );
-        out[0] = (*NPC).r.currentOrigin[0] + 64.0 * forward[0];
-        out[1] = (*NPC).r.currentOrigin[1] + 64.0 * forward[1];
-        out[2] = (*NPC).r.currentOrigin[2] + 64.0 * forward[2];
+        out[0] = npc_origin[0] + 64.0 * forward[0];
+        out[1] = npc_origin[1] + 64.0 * forward[1];
+        out[2] = npc_origin[2] + 64.0 * forward[2];
 
         let mut temp: vec3_t = [0.0; 3];
         CalcEntitySpot(ctx, ctx.entity_id_of(NPC), SPOT_HEAD, &mut temp);
@@ -1408,8 +1333,9 @@ pub fn ST_OffsetLook(ctx: &mut GameContext, offset: f32, out: &mut vec3_t) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:946-970`
 pub fn ST_LookAround(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
 
         let mut lookPos: vec3_t = [0.0; 3];
         let perc = (ctx.world.level.time - (*NPCInfo).pauseTime) as f32
@@ -1438,13 +1364,14 @@ pub fn ST_LookAround(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:978-1069`
 pub fn NPC_BSST_Investigate(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
 
-        let npc_id = ctx.entity_id_of(NPC);
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
         // get group- mainly for group speech debouncing, but may use for group
         // scouting/investigating AI, too
-        AI_GetGroup(ctx, npc_id);
+        AI_GetGroup(ctx, Some(npc_id));
 
         if ((*NPCInfo).scriptFlags & SCF_FIRE_WEAPON) != 0 {
             WeaponThink(ctx, qtrue);
@@ -1492,7 +1419,8 @@ pub fn NPC_BSST_Investigate(ctx: &mut GameContext) {
         // If we're done looking, then just return to what we were doing
         if ((*NPCInfo).investigateDebounceTime + (*NPCInfo).pauseTime) < ctx.world.level.time {
             (*NPCInfo).tempBehavior = BS_DEFAULT;
-            (*NPCInfo).goalEntity = ent_id_opt(ent_base(ctx), UpdateGoal(ctx));
+            let goal = UpdateGoal(ctx);
+            (*NPCInfo).goalEntity = ctx.entity_id_of(goal);
 
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             // Say something
@@ -1504,18 +1432,14 @@ pub fn NPC_BSST_Investigate(ctx: &mut GameContext) {
 
         // See if we're searching for the noise's origin
         if (*NPCInfo).localState == LSTATE_INVESTIGATE && (*NPCInfo).goalEntity != None {
-            let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
+            let goal_id = (*NPCInfo).goalEntity.unwrap();
             // See if we're there
-            let flying = FlyingCreature(&*NPC);
-            if NAV_HitNavGoal(
-                (*NPC).r.currentOrigin,
-                (*NPC).r.mins,
-                (*NPC).r.maxs,
-                (*goalEnt).r.currentOrigin,
-                32,
-                flying,
-            ) == qfalse
-            {
+            let flying = FlyingCreature(ctx.world.entity(npc_id));
+            let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+            let npc_mins = ctx.world.entity(npc_id).r.mins;
+            let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+            let goal_origin = ctx.world.entity(goal_id).r.currentOrigin;
+            if NAV_HitNavGoal(npc_origin, npc_mins, npc_maxs, goal_origin, 32, flying) == qfalse {
                 ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
 
                 // Try and move there
@@ -1545,16 +1469,18 @@ pub fn NPC_BSST_Investigate(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1077-1181`
 pub fn NPC_BSST_Patrol(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let client = (*NPC).client;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
+        // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+        let client = ctx.world.entity(npc_id).client;
 
-        let npc_id = ctx.entity_id_of(NPC);
         // FIXME: pick up on bodies of dead buddies? (Raven comment).
 
         // get group- mainly for group speech debouncing, but may use for group
         // scouting/investigating AI, too
-        AI_GetGroup(ctx, npc_id);
+        AI_GetGroup(ctx, Some(npc_id));
 
         if (*NPCInfo).confusionTime < ctx.world.level.time {
             // Look for any enemies
@@ -1595,8 +1521,9 @@ pub fn NPC_BSST_Patrol(ctx: &mut GameContext) {
                 if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"enemyLastVisible".as_ptr()) != 0 {
                     // nothing suspicious, look around
                     if ctx.world.bg_state.rng.Q_irand(0, 30) == 0 {
-                        (*NPCInfo).desiredYaw = (*NPC).s.angles[1] as f32
-                            + ctx.world.bg_state.rng.Q_irand(-90, 90) as f32;
+                        let npc_yaw = ctx.world.entity(npc_id).s.angles[1] as f32;
+                        (*NPCInfo).desiredYaw =
+                            npc_yaw + ctx.world.bg_state.rng.Q_irand(-90, 90) as f32;
                     }
                     if ctx.world.bg_state.rng.Q_irand(0, 30) == 0 {
                         (*NPCInfo).desiredPitch = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
@@ -1671,8 +1598,10 @@ pub fn NPC_BSST_Patrol(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1212-1358`
 pub fn ST_CheckMoveState(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
@@ -1683,10 +1612,9 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
             // anything!
             ctx.world.globals.r#move = qtrue;
         } else if (*NPCInfo).squadState == SQUAD_SCOUT {
-            let npc_id = ctx.entity_id_of(NPC);
             // See if we're a scout
             // If we're supposed to stay put, then stand there and fire
-            if TIMER_Done(ctx, npc_id, c"stick".as_ptr()) == qfalse {
+            if TIMER_Done(ctx, Some(npc_id), c"stick".as_ptr()) == qfalse {
                 ctx.world.globals.r#move = qfalse;
                 return;
             }
@@ -1695,10 +1623,10 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
             if ctx.world.globals.enemyLOS != qfalse {
                 if ctx.world.globals.enemyCS != qfalse {
                     // if we're going after our enemy, we can stop now
-                    if (*NPCInfo).goalEntity == (*NPC).enemy {
+                    if (*NPCInfo).goalEntity == ctx.world.entity(npc_id).enemy {
                         AI_GroupUpdateSquadstates(
                             (*NPCInfo).group,
-                            &mut *NPC,
+                            ctx.world.entity_mut(npc_id),
                             SQUAD_STAND_AND_SHOOT,
                         );
                         ctx.world.globals.r#move = qfalse;
@@ -1736,10 +1664,13 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
                 (*NPCInfo).squadState = SQUAD_STAND_AND_SHOOT;
             }
         } else if (*NPCInfo).squadState == SQUAD_POINT {
-            let npc_id = ctx.entity_id_of(NPC);
             // see if we're at point, duck and fire
-            if TIMER_Done(ctx, npc_id, c"stick".as_ptr()) != 0 {
-                AI_GroupUpdateSquadstates((*NPCInfo).group, &mut *NPC, SQUAD_STAND_AND_SHOOT);
+            if TIMER_Done(ctx, Some(npc_id), c"stick".as_ptr()) != 0 {
+                AI_GroupUpdateSquadstates(
+                    (*NPCInfo).group,
+                    ctx.world.entity_mut(npc_id),
+                    SQUAD_STAND_AND_SHOOT,
+                );
                 return;
             }
 
@@ -1766,18 +1697,17 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
         }
 
         // See if we're moving towards a goal, not the enemy
-        if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != None) {
-            let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
+        if ((*NPCInfo).goalEntity != ctx.world.entity(npc_id).enemy)
+            && ((*NPCInfo).goalEntity != None)
+        {
+            let goal_id = (*NPCInfo).goalEntity.unwrap();
             // Did we make it?
-            let flying = FlyingCreature(&*NPC);
-            if NAV_HitNavGoal(
-                (*NPC).r.currentOrigin,
-                (*NPC).r.mins,
-                (*NPC).r.maxs,
-                (*goalEnt).r.currentOrigin,
-                16,
-                flying,
-            ) != qfalse
+            let flying = FlyingCreature(ctx.world.entity(npc_id));
+            let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+            let npc_mins = ctx.world.entity(npc_id).r.mins;
+            let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+            let goal_origin = ctx.world.entity(goal_id).r.currentOrigin;
+            if NAV_HitNavGoal(npc_origin, npc_mins, npc_maxs, goal_origin, 16, flying) != qfalse
                 || (trap::ICARUS_TaskIDPending(
                     ctx.engine,
                     GIcarusTaskidpendingArgs::new(NPC.cast(), TID_MOVE_NAV as c_int),
@@ -1795,14 +1725,11 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
                 match (*NPCInfo).squadState {
                     x if x == SQUAD_RETREAT => {
                         // was running away — done fleeing, obviously
-                        let client = (*NPC).client;
-                        let npc_id_2 = ctx.entity_id_of(NPC);
-                        TIMER_Set(
-                            ctx,
-                            npc_id_2,
-                            c"duck".as_ptr(),
-                            ((*client).pers.maxHealth - (*NPC).health) * 100,
-                        );
+                        // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+                        let client = ctx.world.entity(npc_id).client;
+                        let duck_time =
+                            ((*client).pers.maxHealth - ctx.world.entity(npc_id).health) * 100;
+                        TIMER_Set(ctx, Some(npc_id), c"duck".as_ptr(), duck_time);
                         let npc_id_3 = ctx.entity_id_of(NPC);
                         let delay_2 = ctx.world.bg_state.rng.Q_irand(3000, 7000);
                         TIMER_Set(ctx, npc_id_3, c"hideTime".as_ptr(), delay_2);
@@ -1821,7 +1748,11 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
                     }
                     _ => {}
                 }
-                AI_GroupUpdateSquadstates((*NPCInfo).group, &mut *NPC, newSquadState);
+                AI_GroupUpdateSquadstates(
+                    (*NPCInfo).group,
+                    ctx.world.entity_mut(npc_id),
+                    newSquadState,
+                );
                 NPC_ReachedGoal(ctx);
                 let npc_id_2 = ctx.entity_id_of(NPC);
                 let delay_2 = ctx.world.bg_state.rng.Q_irand(250, 500);
@@ -1848,8 +1779,9 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1360-1403`
 pub fn ST_ResolveBlockedShot(ctx: &mut GameContext, hit: c_int) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
 
         let npc_id = ctx.entity_id_of(NPC);
         let npc_id_2 = ctx.entity_id_of(NPC);
@@ -1866,13 +1798,13 @@ pub fn ST_ResolveBlockedShot(ctx: &mut GameContext, hit: c_int) {
         if TIMER_Done(ctx, npc_id_3, c"duck".as_ptr()) != 0 {
             // we're not ducking
             if AI_GroupContainsEntNum((*NPCInfo).group, hit) != qfalse {
-                let member = &mut ctx.world.g_entities[hit as usize] as *mut gentity_t;
-                if TIMER_Done(ctx, ctx.entity_id_of(member), c"duck".as_ptr()) != 0 {
+                let member_id = EntityId::from_num(hit);
+                if TIMER_Done(ctx, member_id, c"duck".as_ptr()) != 0 {
                     // they aren't ducking
-                    if TIMER_Done(ctx, ctx.entity_id_of(member), c"stand".as_ptr()) != 0 {
+                    if TIMER_Done(ctx, member_id, c"stand".as_ptr()) != 0 {
                         // they're not being forced to stand
                         // tell them to duck at least as long as I'm not moving
-                        TIMER_Set(ctx, ctx.entity_id_of(member), c"duck".as_ptr(), stuckTime);
+                        TIMER_Set(ctx, member_id, c"duck".as_ptr(), stuckTime);
                         return;
                     }
                 }
@@ -1903,9 +1835,12 @@ pub fn ST_ResolveBlockedShot(ctx: &mut GameContext, hit: c_int) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1411-1534`
 pub fn ST_CheckFireState(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let client = (*NPC).client;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
+        // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+        let client = ctx.world.entity(npc_id).client;
 
         if ctx.world.globals.enemyCS != qfalse {
             // if have a clear shot, always try
@@ -1947,8 +1882,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
                     let mut tooClose = qfalse;
                     let mut tooFar = qfalse;
 
-                    let npc_id = ctx.entity_id_of(NPC);
-                    CalcEntitySpot(ctx, npc_id, SPOT_HEAD, &mut muzzle);
+                    CalcEntitySpot(ctx, Some(npc_id), SPOT_HEAD, &mut muzzle);
                     if VectorCompare(ctx.world.globals.impactPos, vec3_origin) != qfalse {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut forward: vec3_t = [0.0; 3];
@@ -1967,7 +1901,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
                                 &vec3_origin as *const vec3_t,
                                 &vec3_origin as *const vec3_t,
                                 &end as *const vec3_t,
-                                (*NPC).s.number,
+                                ctx.world.entity(npc_id).s.number,
                                 MASK_SHOT,
                             ),
                         );
@@ -1976,7 +1910,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
 
                     // see if impact would be too close to me
                     let mut distThreshold: f32 = 16384.0; // default 128*128
-                    match (*NPC).s.weapon {
+                    match ctx.world.entity(npc_id).s.weapon {
                         WP_ROCKET_LAUNCHER | WP_FLECHETTE | WP_THERMAL | WP_TRIP_MINE
                         | WP_DET_PACK => {
                             distThreshold = 65536.0; // 256*256
@@ -2001,7 +1935,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
                         // we've haven't seen them in the last 5 seconds — see if
                         // it's too far from where he is
                         distThreshold = 65536.0; // default 256*256
-                        match (*NPC).s.weapon {
+                        match ctx.world.entity(npc_id).s.weapon {
                             WP_ROCKET_LAUNCHER | WP_FLECHETTE | WP_THERMAL | WP_TRIP_MINE
                             | WP_DET_PACK => {
                                 distThreshold = 262144.0; // 512*512
@@ -2053,36 +1987,27 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1536-1548`
 pub fn ST_TrackEnemy(ctx: &mut GameContext, self_: EntityId, enemyPos: vec3_t) {
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let self_id = ctx.entity_id_of(self_);
+        let self_id = Some(self_);
         let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
         // clear timers
         TIMER_Set(ctx, self_id, c"attackDelay".as_ptr(), delay);
-        let self_id_2 = ctx.entity_id_of(self_);
+        let self_id_2 = Some(self_);
         let delay_2 = ctx.world.bg_state.rng.Q_irand(500, 1500);
         // TIMER_Set( self, "duck", -1 ); (Raven, commented out).
         TIMER_Set(ctx, self_id_2, c"stick".as_ptr(), delay_2);
-        let self_id_3 = ctx.entity_id_of(self_);
+        let self_id_3 = Some(self_);
         TIMER_Set(ctx, self_id_3, c"stand".as_ptr(), -1);
-        let self_id_4 = ctx.entity_id_of(self_);
-        let self_id_5 = ctx.entity_id_of(self_);
+        let self_id_4 = Some(self_);
+        let self_id_5 = Some(self_);
         let delay_3 = TIMER_Get(ctx, self_id_5, c"stick".as_ptr()) - ctx.world.level.time
             + ctx.world.bg_state.rng.Q_irand(5000, 10000);
         TIMER_Set(ctx, self_id_4, c"scoutTime".as_ptr(), delay_3);
         // leave my combat point
-        let npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; deref raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
         NPC_FreeCombatPoint(ctx, (*npc).combatPoint, qfalse);
         // go after his last seen pos
-        NPC_SetMoveGoal(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            enemyPos,
-            16,
-            qfalse,
-            -1,
-            None,
-        );
+        NPC_SetMoveGoal(ctx, self_, enemyPos, 16, qfalse, -1, None);
     }
 }
 
@@ -2091,24 +2016,23 @@ pub fn ST_TrackEnemy(ctx: &mut GameContext, self_: EntityId, enemyPos: vec3_t) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1550-1561`
 pub fn ST_ApproachEnemy(ctx: &mut GameContext, self_: EntityId) -> c_int {
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let self_id = ctx.entity_id_of(self_);
+        let self_id = Some(self_);
         let delay = ctx.world.bg_state.rng.Q_irand(250, 500);
         TIMER_Set(ctx, self_id, c"attackDelay".as_ptr(), delay);
-        let self_id_2 = ctx.entity_id_of(self_);
+        let self_id_2 = Some(self_);
         let delay_2 = ctx.world.bg_state.rng.Q_irand(1000, 2000);
         // TIMER_Set( self, "duck", -1 ); (Raven, commented out).
         TIMER_Set(ctx, self_id_2, c"stick".as_ptr(), delay_2);
-        let self_id_3 = ctx.entity_id_of(self_);
+        let self_id_3 = Some(self_);
         TIMER_Set(ctx, self_id_3, c"stand".as_ptr(), -1);
-        let self_id_4 = ctx.entity_id_of(self_);
-        let self_id_5 = ctx.entity_id_of(self_);
+        let self_id_4 = Some(self_);
+        let self_id_5 = Some(self_);
         let delay_3 = TIMER_Get(ctx, self_id_5, c"stick".as_ptr()) - ctx.world.level.time
             + ctx.world.bg_state.rng.Q_irand(5000, 10000);
         TIMER_Set(ctx, self_id_4, c"scoutTime".as_ptr(), delay_3);
         // leave my combat point
-        let npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; deref raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
         NPC_FreeCombatPoint(ctx, (*npc).combatPoint, qfalse);
         // return the relevant combat point flags
         CP_CLEAR | CP_CLOSEST
@@ -2120,17 +2044,16 @@ pub fn ST_ApproachEnemy(ctx: &mut GameContext, self_: EntityId) -> c_int {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1563-1577`
 pub fn ST_HuntEnemy(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
         // TIMER_Set( NPC, "attackDelay", ctx.world.bg_state.rng.Q_irand( 250, 500 ) ); // Disabled this
         // for now, guys who couldn't hunt would never attack (Raven comment).
-        let npc_id = ctx.entity_id_of(NPC);
         let delay = ctx.world.bg_state.rng.Q_irand(250, 1000);
         // TIMER_Set( NPC, "duck", -1 ); (Raven, commented out).
-        TIMER_Set(ctx, npc_id, c"stick".as_ptr(), delay);
+        TIMER_Set(ctx, Some(npc_id), c"stick".as_ptr(), delay);
         let npc_id_2 = ctx.entity_id_of(NPC);
         TIMER_Set(ctx, npc_id_2, c"stand".as_ptr(), -1);
         let npc_id_3 = ctx.entity_id_of(NPC);
@@ -2142,8 +2065,9 @@ pub fn ST_HuntEnemy(ctx: &mut GameContext, self_: EntityId) {
         NPC_FreeCombatPoint(ctx, (*NPCInfo).combatPoint, qfalse);
         // go directly after the enemy
         if ((*NPCInfo).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
-            let self_npc = (*self_).NPC;
-            (*self_npc).goalEntity = (*NPC).enemy;
+            // FLAG: gNPC_t (self_ NPC) has no accessor; deref raw (recipe 2c).
+            let self_npc = ctx.world.entity(self_).NPC;
+            (*self_npc).goalEntity = ctx.world.entity(npc_id).enemy;
         }
     }
 }
@@ -2152,41 +2076,38 @@ pub fn ST_HuntEnemy(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1579-1593`
 pub fn ST_TransferTimers(ctx: &mut GameContext, self_: EntityId, other: EntityId) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let other: *mut gentity_t = ctx.entity_mut(other);
-    let other_id = ctx.entity_id_of(other);
-    let self_id = ctx.entity_id_of(self_);
+    let other_id = Some(other);
+    let self_id = Some(self_);
     let attackdelay_left = TIMER_Get(ctx, self_id, c"attackDelay".as_ptr()) - ctx.world.level.time;
     TIMER_Set(ctx, other_id, c"attackDelay".as_ptr(), attackdelay_left);
-    let other_id_2 = ctx.entity_id_of(other);
-    let self_id_2 = ctx.entity_id_of(self_);
+    let other_id_2 = Some(other);
+    let self_id_2 = Some(self_);
     let duck_left = TIMER_Get(ctx, self_id_2, c"duck".as_ptr()) - ctx.world.level.time;
     TIMER_Set(ctx, other_id_2, c"duck".as_ptr(), duck_left);
-    let other_id_3 = ctx.entity_id_of(other);
-    let self_id_3 = ctx.entity_id_of(self_);
+    let other_id_3 = Some(other);
+    let self_id_3 = Some(self_);
     let stick_left = TIMER_Get(ctx, self_id_3, c"stick".as_ptr()) - ctx.world.level.time;
     TIMER_Set(ctx, other_id_3, c"stick".as_ptr(), stick_left);
-    let other_id_4 = ctx.entity_id_of(other);
-    let self_id_4 = ctx.entity_id_of(self_);
+    let other_id_4 = Some(other);
+    let self_id_4 = Some(self_);
     let scout_left = TIMER_Get(ctx, self_id_4, c"scout".as_ptr()) - ctx.world.level.time;
     // Raven reads timer key `"scout"`, not `"scoutTime"` — likely a bug, kept
     // verbatim for parity (S19: preserve the faithful reading).
     TIMER_Set(ctx, other_id_4, c"scoutTime".as_ptr(), scout_left);
-    let other_id_5 = ctx.entity_id_of(other);
-    let self_id_5 = ctx.entity_id_of(self_);
+    let other_id_5 = Some(other);
+    let self_id_5 = Some(self_);
     let roamtime_left = TIMER_Get(ctx, self_id_5, c"roamTime".as_ptr()) - ctx.world.level.time;
     TIMER_Set(ctx, other_id_5, c"roamTime".as_ptr(), roamtime_left);
-    let other_id_6 = ctx.entity_id_of(other);
-    let self_id_6 = ctx.entity_id_of(self_);
+    let other_id_6 = Some(other);
+    let self_id_6 = Some(self_);
     let stand_left = TIMER_Get(ctx, self_id_6, c"stand".as_ptr()) - ctx.world.level.time;
     TIMER_Set(ctx, other_id_6, c"stand".as_ptr(), stand_left);
-    TIMER_Set(ctx, ctx.entity_id_of(self_), c"attackDelay".as_ptr(), -1);
-    TIMER_Set(ctx, ctx.entity_id_of(self_), c"duck".as_ptr(), -1);
-    TIMER_Set(ctx, ctx.entity_id_of(self_), c"stick".as_ptr(), -1);
-    TIMER_Set(ctx, ctx.entity_id_of(self_), c"scoutTime".as_ptr(), -1);
-    TIMER_Set(ctx, ctx.entity_id_of(self_), c"roamTime".as_ptr(), -1);
-    TIMER_Set(ctx, ctx.entity_id_of(self_), c"stand".as_ptr(), -1);
+    TIMER_Set(ctx, Some(self_), c"attackDelay".as_ptr(), -1);
+    TIMER_Set(ctx, Some(self_), c"duck".as_ptr(), -1);
+    TIMER_Set(ctx, Some(self_), c"stick".as_ptr(), -1);
+    TIMER_Set(ctx, Some(self_), c"scoutTime".as_ptr(), -1);
+    TIMER_Set(ctx, Some(self_), c"roamTime".as_ptr(), -1);
+    TIMER_Set(ctx, Some(self_), c"stand".as_ptr(), -1);
 }
 
 /// Raven `ST_TransferMoveGoal`.
@@ -2194,16 +2115,18 @@ pub fn ST_TransferTimers(ctx: &mut GameContext, self_: EntityId, other: EntityId
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1595-1626`
 pub fn ST_TransferMoveGoal(ctx: &mut GameContext, self_: EntityId, other: EntityId) {
     unsafe {
-        // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let other: *mut gentity_t = ctx.entity_mut(other);
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let selfNpc = (*self_).NPC;
-        let otherNpc = (*other).NPC;
+        // FLAG: gNPC_t (NPCInfo/self/other NPC) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let selfNpc = ctx.world.entity(self_).NPC;
+        let otherNpc = ctx.world.entity(other).NPC;
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
-            GIcarusTaskidpendingArgs::new(self_.cast(), TID_MOVE_NAV as c_int),
+            // Seam: materialize the entity pointer for the ICARUS syscall.
+            GIcarusTaskidpendingArgs::new(
+                (&mut ctx.world.g_entities[self_.index()] as *mut gentity_t).cast(),
+                TID_MOVE_NAV as c_int,
+            ),
         ) != 0
         {
             // can't transfer movegoal when a script we're running is waiting to
@@ -2218,40 +2141,37 @@ pub fn ST_TransferMoveGoal(ctx: &mut GameContext, self_: EntityId, other: Entity
         } else {
             // I must be going for a goal, give that to him instead
             if (*selfNpc).goalEntity == (*selfNpc).tempGoal {
-                let tempGoalEnt = ent_resolve_opt(ctx, (*selfNpc).tempGoal);
-                let isNavGoal = if ((*tempGoalEnt).flags & FL_NAVGOAL) != 0 {
+                let temp_goal_id = (*selfNpc).tempGoal.unwrap();
+                let isNavGoal = if (ctx.world.entity(temp_goal_id).flags & FL_NAVGOAL) != 0 {
                     qtrue
                 } else {
                     qfalse
                 };
-                NPC_SetMoveGoal(
-                    ctx,
-                    ctx.entity_id_of(other).unwrap(),
-                    (*tempGoalEnt).r.currentOrigin,
-                    (*selfNpc).goalRadius,
-                    isNavGoal,
-                    -1,
-                    None,
-                );
+                let goal_origin = ctx.world.entity(temp_goal_id).r.currentOrigin;
+                let goal_radius = (*selfNpc).goalRadius;
+                NPC_SetMoveGoal(ctx, other, goal_origin, goal_radius, isNavGoal, -1, None);
             } else {
                 (*otherNpc).goalEntity = (*selfNpc).goalEntity;
             }
         }
         // give him my squadstate
-        AI_GroupUpdateSquadstates((*selfNpc).group, &mut *other, (*NPCInfo).squadState);
-
-        // give him my timers and clear mine
-        ST_TransferTimers(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(other).unwrap(),
+        AI_GroupUpdateSquadstates(
+            (*selfNpc).group,
+            ctx.world.entity_mut(other),
+            (*NPCInfo).squadState,
         );
 
+        // give him my timers and clear mine
+        ST_TransferTimers(ctx, self_, other);
+
         // now make me stand around for a second or two at least
-        AI_GroupUpdateSquadstates((*selfNpc).group, &mut *self_, SQUAD_STAND_AND_SHOOT);
-        let self_id = ctx.entity_id_of(self_);
+        AI_GroupUpdateSquadstates(
+            (*selfNpc).group,
+            ctx.world.entity_mut(self_),
+            SQUAD_STAND_AND_SHOOT,
+        );
         let delay = ctx.world.bg_state.rng.Q_irand(1000, 3000);
-        TIMER_Set(ctx, self_id, c"stand".as_ptr(), delay);
+        TIMER_Set(ctx, Some(self_), c"stand".as_ptr(), delay);
     }
 }
 
@@ -2260,13 +2180,17 @@ pub fn ST_TransferMoveGoal(ctx: &mut GameContext, self_: EntityId, other: Entity
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1628-1710`
 pub fn ST_GetCPFlags(ctx: &mut GameContext) -> c_int {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
         let mut cpFlags: c_int = 0;
 
         if !NPC.is_null() && !(*NPCInfo).group.is_null() {
+            // FLAG: AIGroupInfo (via gNPC_t.group) + NPC pool client deref raw
+            // (recipe 2c / trap 2b); NPC pointer compare stays raw.
             let group = (*NPCInfo).group;
-            let client = (*NPC).client;
+            let npc_id = ctx.entity_id_of(NPC).unwrap();
+            let client = ctx.world.entity(npc_id).client;
             if NPC == (*group).commander && (*client).NPC_class == CLASS_IMPERIAL {
                 // imperials hang back and give orders
                 if (*group).numGroup > 1
@@ -2333,8 +2257,11 @@ pub fn ST_GetCPFlags(ctx: &mut GameContext) -> c_int {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:1724-2401`
 pub fn ST_Commander(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        // FLAG: AIGroupInfo (via gNPC_t.group) has no accessor; its entity/
+        // pool-client graph (group.enemy/commander/member) stays raw (recipe 2c).
         let group = (*NPCInfo).group;
         let mut runner = qfalse;
         let mut enemyLost = qfalse;
@@ -2381,17 +2308,21 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                 // Lost enemy for three minutes? go into search mode?
                 G_ClearEnemy(ctx, npc_id_2);
                 let npc_id_3 = ctx.entity_id_of(NPC).unwrap();
-                (*NPC).waypoint =
-                    NAV_FindClosestWaypointForEnt(ctx, npc_id_3, (*(*group).enemy).waypoint);
-                if (*NPC).waypoint == WAYPOINT_NONE {
+                let wp = NAV_FindClosestWaypointForEnt(ctx, npc_id_3, (*(*group).enemy).waypoint);
+                ctx.world.entity_mut(npc_id_3).waypoint = wp;
+                if ctx.world.entity(npc_id_3).waypoint == WAYPOINT_NONE {
                     (*NPCInfo).behaviorState = BS_DEFAULT; // BS_PATROL;
                 } else if (*(*group).enemy).waypoint == WAYPOINT_NONE
                     || trap::Nav_GetPathCost(
                         ctx.engine,
-                        GNavGetpathcostArgs::new((*NPC).waypoint, (*(*group).enemy).waypoint),
+                        GNavGetpathcostArgs::new(
+                            ctx.world.entity(npc_id_3).waypoint,
+                            (*(*group).enemy).waypoint,
+                        ),
                     ) >= Q3_INFINITE
                 {
-                    NPC_BSSearchStart(ctx, (*NPC).waypoint, BS_SEARCH);
+                    let wp2 = ctx.world.entity(npc_id_3).waypoint;
+                    NPC_BSSearchStart(ctx, wp2, BS_SEARCH);
                 } else {
                     NPC_BSSearchStart(ctx, (*(*group).enemy).waypoint, BS_SEARCH);
                 }
@@ -2487,14 +2418,16 @@ pub fn ST_Commander(ctx: &mut GameContext) {
             let member = &mut ctx.world.g_entities[(*group).member[i as usize].number as usize]
                 as *mut gentity_t;
             let member_id = ctx.entity_id_of(member).unwrap();
-            if (*member).enemy == None {
+            if ctx.world.entity(member_id).enemy == None {
                 // don't include guys that aren't angry
                 continue;
             }
             SetNPCGlobals(ctx, member_id);
             // re-fetch NPC/NPCInfo after SetNPCGlobals swaps the ambient pointers
-            let NPC = ctx.world.globals.NPC as *mut gentity_t;
-            let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+            let NPC = ctx.world.globals.NPC;
+            // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+            let NPCInfo = ctx.world.globals.NPCInfo;
+            let npc_eid = ctx.entity_id_of(NPC).unwrap();
 
             let npc_id = ctx.entity_id_of(NPC);
             if TIMER_Done(ctx, npc_id, c"flee".as_ptr()) == 0 {
@@ -2511,13 +2444,22 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                 continue;
             }
 
-            let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
-            if (*NPC).s.weapon == WP_NONE
+            if ctx.world.entity(npc_eid).s.weapon == WP_NONE
                 && (*NPCInfo).goalEntity != None
                 && (*NPCInfo).goalEntity == (*NPCInfo).tempGoal
-                && !goalEnt.is_null()
-                && (*goalEnt).enemy != None
-                && (*ent_resolve_opt(ctx, (*goalEnt).enemy)).s.eType == ET_ITEM as c_int
+                && (*NPCInfo).goalEntity.is_some()
+                && ctx.world.entity((*NPCInfo).goalEntity.unwrap()).enemy != None
+                && ctx
+                    .world
+                    .entity(
+                        ctx.world
+                            .entity((*NPCInfo).goalEntity.unwrap())
+                            .enemy
+                            .unwrap(),
+                    )
+                    .s
+                    .eType
+                    == ET_ITEM as c_int
             {
                 // running to pick up a gun, don't do other logic
                 continue;
@@ -2544,30 +2486,35 @@ pub fn ST_Commander(ctx: &mut GameContext) {
             // check the local state
             if (*NPCInfo).squadState != SQUAD_RETREAT {
                 // not already retreating
-                let client = (*NPC).client;
+                // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+                let client = ctx.world.entity(npc_eid).client;
                 if (*client).ps.weapon == WP_NONE {
                     // weaponless, should be hiding
-                    let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
-                    if goalEnt.is_null()
-                        || (*goalEnt).enemy == None
-                        || (*ent_resolve_opt(ctx, (*goalEnt).enemy)).s.eType != ET_ITEM as c_int
+                    let goalEnt = (*NPCInfo).goalEntity;
+                    if goalEnt.is_none()
+                        || ctx.world.entity(goalEnt.unwrap()).enemy == None
+                        || ctx
+                            .world
+                            .entity(ctx.world.entity(goalEnt.unwrap()).enemy.unwrap())
+                            .s
+                            .eType
+                            != ET_ITEM as c_int
                     {
                         // not running after a pickup
-                        let enemyEnt = ent_resolve_opt(ctx, (*NPC).enemy);
+                        let enemyEnt = ctx.world.entity(npc_eid).enemy;
+                        let group_enemy_origin = (*(*group).enemy).r.currentOrigin;
+                        let npc_origin = ctx.world.entity(npc_eid).r.currentOrigin;
                         if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"hideTime".as_ptr()) != 0
-                            || (DistanceSquared(
-                                (*(*group).enemy).r.currentOrigin,
-                                (*NPC).r.currentOrigin,
-                            ) < 65536.0
-                                && NPC_ClearLOS4(ctx, ctx.entity_id_of(enemyEnt)) != qfalse)
+                            || (DistanceSquared(group_enemy_origin, npc_origin) < 65536.0
+                                && NPC_ClearLOS4(ctx, enemyEnt) != qfalse)
                         {
-                            let enemy_id = ctx.entity_id_of(enemyEnt);
                             // done hiding or enemy near and can see us — er, start
                             // another flee I guess?
+                            let enemy_origin = ctx.world.entity(enemyEnt.unwrap()).r.currentOrigin;
                             NPC_StartFlee(
                                 ctx,
-                                enemy_id,
-                                (*enemyEnt).r.currentOrigin,
+                                enemyEnt,
+                                enemy_origin,
                                 AEL_DANGER_GREAT as c_int,
                                 5000,
                                 10000,
@@ -2578,12 +2525,12 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                 }
                 if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"roamTime".as_ptr()) != 0
                     && TIMER_Done(ctx, ctx.entity_id_of(NPC), c"hideTime".as_ptr()) != 0
-                    && (*NPC).health > 10
+                    && ctx.world.entity(npc_eid).health > 10
                     && trap::InPVS(
                         ctx.engine,
                         GInPvsArgs::new(
                             &(*(*group).enemy).r.currentOrigin as *const vec3_t,
-                            &(*NPC).r.currentOrigin as *const vec3_t,
+                            &ctx.world.entity(npc_eid).r.currentOrigin as *const vec3_t,
                         ),
                     ) == 0
                 {
@@ -2594,7 +2541,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                     let enemyClient = (*(*group).enemy).client;
                     match (*enemyClient).ps.weapon {
                         WP_SABER => {
-                            if DistanceSquared((*(*group).enemy).r.currentOrigin, (*NPC).r.currentOrigin) < 65536.0 {
+                            if DistanceSquared((*(*group).enemy).r.currentOrigin, ctx.world.entity(npc_eid).r.currentOrigin) < 65536.0 {
                                 cpFlags |= CP_AVOID_ENEMY | CP_COVER | CP_AVOID | CP_RETREAT;
                                 if (*group).commander.is_null()
                                     || (*((*(*group).commander).NPC)).rank < RANK_ENSIGN
@@ -2608,7 +2555,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                             cpFlags |= CP_COVER;
                         }
                     }
-                    if (*NPC).health <= 10 {
+                    if ctx.world.entity(npc_eid).health <= 10 {
                         if (*group).commander.is_null()
                             || (*((*(*group).commander).NPC)).rank < RANK_ENSIGN
                         {
@@ -2621,7 +2568,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                     if trap::InPVS(
                         ctx.engine,
                         GInPvsArgs::new(
-                            &(*NPC).r.currentOrigin as *const vec3_t,
+                            &ctx.world.entity(npc_eid).r.currentOrigin as *const vec3_t,
                             &(*(*group).enemy).r.currentOrigin as *const vec3_t,
                         ),
                     ) != 0
@@ -2630,7 +2577,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                         if (*client).ps.weapon == WP_ROCKET_LAUNCHER
                             && DistanceSquared(
                                 (*(*group).enemy).r.currentOrigin,
-                                (*NPC).r.currentOrigin,
+                                ctx.world.entity(npc_eid).r.currentOrigin,
                             ) < MIN_ROCKET_DIST_SQUARED
                             && (*NPCInfo).squadState != SQUAD_TRANSITION
                         {
@@ -2645,7 +2592,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                                 if (*enemyClient).ps.saberHolstered == 0 {
                                     if DistanceSquared(
                                         (*(*group).enemy).r.currentOrigin,
-                                        (*NPC).r.currentOrigin,
+                                        ctx.world.entity(npc_eid).r.currentOrigin,
                                     ) < 65536.0
                                     {
                                         if TIMER_Done(
@@ -2682,7 +2629,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                         // it's not us
                         if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"verifyCP".as_ptr()) != 0
                             && DistanceSquared(
-                                (*NPC).r.currentOrigin,
+                                ctx.world.entity(npc_eid).r.currentOrigin,
                                 ctx.world.level.combatPoints[(*NPCInfo).combatPoint as usize]
                                     .origin,
                             ) > 64.0 * 64.0
@@ -2737,7 +2684,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                                 // see if you're there since, for some reason,
                                 // you've stopped running...
                                 if DistanceSquared(
-                                    (*NPC).r.currentOrigin,
+                                    ctx.world.entity(npc_eid).r.currentOrigin,
                                     ctx.world.level.combatPoints[(*NPCInfo).combatPoint as usize]
                                         .origin,
                                 ) > 64.0 * 64.0
@@ -2761,7 +2708,11 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                         // one, so go after him...
                         ST_TrackEnemy(ctx, npc_id_2, (*group).enemyLastSeenPos);
                         // set me into scout mode
-                        AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
+                        AI_GroupUpdateSquadstates(
+                            group,
+                            ctx.world.entity_mut(npc_eid),
+                            SQUAD_SCOUT,
+                        );
                         // we're not using a cp, so we need to set runner to true
                         // right here
                         runner = qtrue;
@@ -2779,7 +2730,11 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                             // feel like it
                             cpFlags |= ST_ApproachEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                             // set me into scout mode
-                            AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
+                            AI_GroupUpdateSquadstates(
+                                group,
+                                ctx.world.entity_mut(npc_eid),
+                                SQUAD_SCOUT,
+                            );
                         }
                     } else {
                         // group can see and has been shooting at the enemy — see
@@ -2821,7 +2776,11 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                                         // FIXME: what if we can't shoot from a
                                         // ducked pos? (Raven comment).
                                         TIMER_Set(ctx, npc_id_4, c"duck".as_ptr(), delay_3);
-                                        AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_POINT);
+                                        AI_GroupUpdateSquadstates(
+                                            group,
+                                            ctx.world.entity_mut(npc_eid),
+                                            SQUAD_POINT,
+                                        );
                                     }
                                 } else if i == (*group).numGroup - 1 {
                                     // farthest from the enemy
@@ -2838,7 +2797,11 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                                         cpFlags |=
                                             ST_ApproachEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                                         // set me into scout mode
-                                        AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
+                                        AI_GroupUpdateSquadstates(
+                                            group,
+                                            ctx.world.entity_mut(npc_eid),
+                                            SQUAD_SCOUT,
+                                        );
                                     } else {
                                         // use normal decision making process
                                         cpFlags |= ST_GetCPFlags(ctx);
@@ -2925,11 +2888,13 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                 // now get a combat point
                 if cp == -1 {
                     // may have had some set above
+                    let npc_origin = ctx.world.entity(npc_eid).r.currentOrigin;
+                    let group_enemy_origin = (*(*group).enemy).r.currentOrigin;
                     cp = NPC_FindCombatPoint(
                         ctx,
-                        (*NPC).r.currentOrigin,
-                        (*NPC).r.currentOrigin,
-                        (*(*group).enemy).r.currentOrigin,
+                        npc_origin,
+                        npc_origin,
+                        group_enemy_origin,
                         cpFlags | CP_HAS_ROUTE,
                         avoidDist,
                         (*NPCInfo).lastFailedCombatPoint,
@@ -2979,11 +2944,13 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                         cpFlags = CP_ANY;
                     }
                     // now try again
+                    let npc_origin = ctx.world.entity(npc_eid).r.currentOrigin;
+                    let group_enemy_origin = (*(*group).enemy).r.currentOrigin;
                     cp = NPC_FindCombatPoint(
                         ctx,
-                        (*NPC).r.currentOrigin,
-                        (*NPC).r.currentOrigin,
-                        (*(*group).enemy).r.currentOrigin,
+                        npc_origin,
+                        npc_origin,
+                        group_enemy_origin,
                         cpFlags | CP_HAS_ROUTE,
                         avoidDist,
                         -1,
@@ -3019,13 +2986,25 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                         // info... (Raven comment). set us up so others know
                         // we're on the move
                         if squadState != SQUAD_IDLE {
-                            AI_GroupUpdateSquadstates(group, &mut *NPC, squadState);
+                            AI_GroupUpdateSquadstates(
+                                group,
+                                ctx.world.entity_mut(npc_eid),
+                                squadState,
+                            );
                         } else if (cpFlags & CP_FLEE) != 0 {
                             // outright running for your life
-                            AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_RETREAT);
+                            AI_GroupUpdateSquadstates(
+                                group,
+                                ctx.world.entity_mut(npc_eid),
+                                SQUAD_RETREAT,
+                            );
                         } else {
                             // any other kind of transition between combat points
-                            AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_TRANSITION);
+                            AI_GroupUpdateSquadstates(
+                                group,
+                                ctx.world.entity_mut(npc_eid),
+                                SQUAD_TRANSITION,
+                            );
                         }
 
                         // unless we're trying to flee, walk slowly
@@ -3051,11 +3030,11 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                                 if ctx.world.bg_state.rng.Q_irand(0, 3) == 0 {
                                     // 25% of the time, see if we're flanking the enemy
                                     let mut eDir2Me: vec3_t = [
-                                        (*NPC).r.currentOrigin[0]
+                                        ctx.world.entity(npc_eid).r.currentOrigin[0]
                                             - (*(*group).enemy).r.currentOrigin[0],
-                                        (*NPC).r.currentOrigin[1]
+                                        ctx.world.entity(npc_eid).r.currentOrigin[1]
                                             - (*(*group).enemy).r.currentOrigin[1],
-                                        (*NPC).r.currentOrigin[2]
+                                        ctx.world.entity(npc_eid).r.currentOrigin[2]
                                             - (*(*group).enemy).r.currentOrigin[2],
                                     ];
                                     VectorNormalize(&mut eDir2Me);
@@ -3106,7 +3085,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                     // after him directly
                     ST_HuntEnemy(ctx, ctx.entity_id_of(NPC).unwrap());
                     // set me into scout mode
-                    AI_GroupUpdateSquadstates(group, &mut *NPC, SQUAD_SCOUT);
+                    AI_GroupUpdateSquadstates(group, ctx.world.entity_mut(npc_eid), SQUAD_SCOUT);
                     // AI should take care of rest
                 }
             }
@@ -3121,12 +3100,15 @@ pub fn ST_Commander(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:2409-2724`
 pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let client = (*NPC).client;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_eid = ctx.entity_id_of(NPC).unwrap();
+        // FLAG: NPC carries a BG_Alloc'd pool client; deref raw (trap 2b).
+        let client = ctx.world.entity(npc_eid).client;
 
         // Don't do anything if we're hurt
-        if (*NPC).painDebounceTime > ctx.world.level.time {
+        if ctx.world.entity(npc_eid).painDebounceTime > ctx.world.level.time {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
             return;
         }
@@ -3135,7 +3117,7 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
         // NPC_CheckEnemy( qtrue, qfalse ); (Raven, commented out).
         // If we don't have an enemy, just idle
         if NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
-            (*NPC).enemy = None;
+            ctx.world.entity_mut(npc_eid).enemy = None;
             if (*client).playerTeam == NPCTEAM_PLAYER {
                 NPC_BSPatrol(ctx);
             } else {
@@ -3171,12 +3153,12 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
             }
         }
 
-        if (*NPC).enemy == None {
+        if ctx.world.entity(npc_eid).enemy == None {
             // WTF? somehow we lost our enemy?
             NPC_BSST_Patrol(ctx); // FIXME: or patrol? (Raven comment).
             return;
         }
-        let enemy = ent_resolve_opt(ctx, (*NPC).enemy);
+        let enemy_id = ctx.world.entity(npc_eid).enemy.unwrap();
 
         ctx.world.globals.enemyLOS = qfalse;
         ctx.world.globals.enemyCS = qfalse;
@@ -3186,13 +3168,14 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
         ctx.world.globals.shoot = qfalse;
         ctx.world.globals.hitAlly = qfalse;
         ctx.world.globals.impactPos = [0.0, 0.0, 0.0];
-        ctx.world.globals.enemyDist =
-            DistanceSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin);
+        let npc_origin = ctx.world.entity(npc_eid).r.currentOrigin;
+        let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
+        ctx.world.globals.enemyDist = DistanceSquared(npc_origin, enemy_origin);
 
         let mut enemyDir: vec3_t = [
-            (*enemy).r.currentOrigin[0] - (*NPC).r.currentOrigin[0],
-            (*enemy).r.currentOrigin[1] - (*NPC).r.currentOrigin[1],
-            (*enemy).r.currentOrigin[2] - (*NPC).r.currentOrigin[2],
+            enemy_origin[0] - npc_origin[0],
+            enemy_origin[1] - npc_origin[1],
+            enemy_origin[2] - npc_origin[2],
         ];
         VectorNormalize(&mut enemyDir);
         let mut shootDir: vec3_t = [0.0; 3];
@@ -3228,8 +3211,9 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
         }
 
         // can we see our target?
-        if NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy)) != qfalse {
-            AI_GroupUpdateEnemyLastSeen(ctx, (*NPCInfo).group, (*enemy).r.currentOrigin);
+        if NPC_ClearLOS4(ctx, Some(enemy_id)) != qfalse {
+            let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
+            AI_GroupUpdateEnemyLastSeen(ctx, (*NPCInfo).group, enemy_origin);
             (*NPCInfo).enemyLastSeenTime = ctx.world.level.time;
             ctx.world.globals.enemyLOS = qtrue;
 
@@ -3247,36 +3231,33 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
                 } else if ctx.world.globals.enemyInFOV != qfalse {
                     // if enemy is FOV, go ahead and check for shooting
                     let mut impactPos = ctx.world.globals.impactPos;
-                    let enemy_id = ctx.entity_id_of(enemy);
-                    let hit = NPC_ShotEntity(ctx, enemy_id, Some(&mut impactPos));
+                    let hit = NPC_ShotEntity(ctx, Some(enemy_id), Some(&mut impactPos));
                     ctx.world.globals.impactPos = impactPos;
-                    let hitEnt = &mut ctx.world.g_entities[hit as usize] as *mut gentity_t;
-                    let hitClient = (*hitEnt).client;
+                    // FLAG: hit entity may be an NPC — pool client deref raw (trap 2b).
+                    // `EntityId(hit)` mirrors Raven's direct `g_entities[hit]` index
+                    // (any entityNum in the arena, incl. ENTITYNUM_WORLD/NONE).
+                    let hit_id = EntityId(hit as u32);
+                    let hitClient = ctx.world.entity(hit_id).client;
 
-                    if hit == (*enemy).s.number
-                        || (!hitEnt.is_null()
-                            && !(*hitEnt).client.is_null()
-                            && (*hitClient).playerTeam == (*client).enemyTeam)
-                        || (!hitEnt.is_null()
-                            && (*hitEnt).takedamage != qfalse
-                            && (((*hitEnt).r.svFlags & SVF_GLASS_BRUSH) != 0
-                                || (*hitEnt).health < 40
-                                || (*NPC).s.weapon == WP_EMPLACED_GUN))
+                    if hit == ctx.world.entity(enemy_id).s.number
+                        || (!hitClient.is_null() && (*hitClient).playerTeam == (*client).enemyTeam)
+                        || (ctx.world.entity(hit_id).takedamage != qfalse
+                            && ((ctx.world.entity(hit_id).r.svFlags & SVF_GLASS_BRUSH) != 0
+                                || ctx.world.entity(hit_id).health < 40
+                                || ctx.world.entity(npc_eid).s.weapon == WP_EMPLACED_GUN))
                     {
                         // can hit enemy or enemy ally or will hit glass or other
                         // minor breakable (or in emplaced gun), so shoot anyway
                         AI_GroupUpdateClearShotTime(ctx, (*NPCInfo).group);
                         ctx.world.globals.enemyCS = qtrue;
                         NPC_AimAdjust(ctx, 2); // adjust aim better longer we have clear shot at enemy
-                        (*NPCInfo).enemyLastSeenLocation = (*enemy).r.currentOrigin;
+                        (*NPCInfo).enemyLastSeenLocation =
+                            ctx.world.entity(enemy_id).r.currentOrigin;
                     } else {
                         // Hmm, have to get around this bastard
                         NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
                         ST_ResolveBlockedShot(ctx, hit);
-                        if !hitEnt.is_null()
-                            && !(*hitEnt).client.is_null()
-                            && (*hitClient).playerTeam == (*client).playerTeam
-                        {
+                        if !hitClient.is_null() && (*hitClient).playerTeam == (*client).playerTeam {
                             // would hit an ally, don't fire!!!
                             ctx.world.globals.hitAlly = qtrue;
                         } else {
@@ -3290,8 +3271,8 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
         } else if trap::InPVS(
             ctx.engine,
             GInPvsArgs::new(
-                &(*enemy).r.currentOrigin as *const vec3_t,
-                &(*NPC).r.currentOrigin as *const vec3_t,
+                &ctx.world.entity(enemy_id).r.currentOrigin as *const vec3_t,
+                &ctx.world.entity(npc_eid).r.currentOrigin as *const vec3_t,
             ),
         ) != 0
         {
@@ -3327,13 +3308,13 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
 
         if ((*NPCInfo).scriptFlags & SCF_CHASE_ENEMIES) == 0 {
             // not supposed to chase my enemies
-            if (*NPCInfo).goalEntity == (*NPC).enemy {
+            if (*NPCInfo).goalEntity == ctx.world.entity(npc_eid).enemy {
                 // goal is my entity, so don't move
                 ctx.world.globals.r#move = qfalse;
             }
         }
 
-        if (*client).ps.weaponTime > 0 && (*NPC).s.weapon == WP_ROCKET_LAUNCHER {
+        if (*client).ps.weaponTime > 0 && ctx.world.entity(npc_eid).s.weapon == WP_ROCKET_LAUNCHER {
             ctx.world.globals.r#move = qfalse;
         }
 
@@ -3383,9 +3364,14 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
             ctx.world.globals.shoot = qfalse;
         }
 
-        if (*NPC).enemy != None && (*enemy).enemy != None {
-            if (*enemy).s.weapon == WP_SABER
-                && (*ent_resolve_opt(ctx, (*enemy).enemy)).s.weapon == WP_SABER
+        if ctx.world.entity(npc_eid).enemy != None && ctx.world.entity(enemy_id).enemy != None {
+            if ctx.world.entity(enemy_id).s.weapon == WP_SABER
+                && ctx
+                    .world
+                    .entity(ctx.world.entity(enemy_id).enemy.unwrap())
+                    .s
+                    .weapon
+                    == WP_SABER
             {
                 // don't shoot at an enemy jedi who is fighting another jedi, for
                 // fear of injuring one or causing rogue blaster deflections
@@ -3395,7 +3381,7 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
         }
         // FIXME: don't shoot right away! (Raven comment).
         if (*client).ps.weaponTime > 0 {
-            if (*NPC).s.weapon == WP_ROCKET_LAUNCHER {
+            if ctx.world.entity(npc_eid).s.weapon == WP_ROCKET_LAUNCHER {
                 if ctx.world.globals.enemyLOS == qfalse || ctx.world.globals.enemyCS == qfalse {
                     // cancel it
                     (*client).ps.weaponTime = 0;
@@ -3414,7 +3400,7 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
                     WeaponThink(ctx, qtrue);
                 }
                 // NASTY
-                if (*NPC).s.weapon == WP_ROCKET_LAUNCHER
+                if ctx.world.entity(npc_eid).s.weapon == WP_ROCKET_LAUNCHER
                     && (ctx.world.globals.ucmd.buttons & BUTTON_ATTACK) != 0
                     && ctx.world.globals.r#move == qfalse
                     && ctx.world.cvars.g_spskill.integer > 1
@@ -3435,14 +3421,16 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:2726-2742`
 pub fn NPC_BSST_Default(ctx: &mut GameContext) {
     unsafe {
-        let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
+        let NPC = ctx.world.globals.NPC;
+        // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+        let NPCInfo = ctx.world.globals.NPCInfo;
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
 
         if ((*NPCInfo).scriptFlags & SCF_FIRE_WEAPON) != 0 {
             WeaponThink(ctx, qtrue);
         }
 
-        if (*NPC).enemy == None {
+        if ctx.world.entity(npc_id).enemy == None {
             // don't have an enemy, look for one
             NPC_BSST_Patrol(ctx);
         } else {

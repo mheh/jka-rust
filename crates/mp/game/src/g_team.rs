@@ -172,20 +172,20 @@ pub fn PrintCTFMessage(ctx: &mut GameContext, plIndex: c_int, teamIndex: c_int, 
     let plIndex = if plIndex == -1 { 32 + 1 } else { plIndex };
     let teamIndex = if teamIndex == -1 { 50 } else { teamIndex };
 
-    unsafe {
-        let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], entity_event_t::EV_CTFMESSAGE as c_int);
-        (*te).r.svFlags |= SVF_BROADCAST;
-        (*te).s.eventParm = ctfMessage;
-        (*te).s.trickedentindex = plIndex;
-        if ctfMessage == ctfMsg_t::CTFMESSAGE_PLAYER_CAPTURED_FLAG as c_int {
-            (*te).s.trickedentindex2 = if teamIndex == TEAM_RED {
-                TEAM_BLUE
-            } else {
-                TEAM_RED
-            };
+    let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], entity_event_t::EV_CTFMESSAGE as c_int);
+    let te_id = ctx.entity_id_of(te).unwrap();
+    let te = ctx.world.entity_mut(te_id);
+    te.r.svFlags |= SVF_BROADCAST;
+    te.s.eventParm = ctfMessage;
+    te.s.trickedentindex = plIndex;
+    if ctfMessage == ctfMsg_t::CTFMESSAGE_PLAYER_CAPTURED_FLAG as c_int {
+        te.s.trickedentindex2 = if teamIndex == TEAM_RED {
+            TEAM_BLUE
         } else {
-            (*te).s.trickedentindex2 = teamIndex;
-        }
+            TEAM_RED
+        };
+    } else {
+        te.s.trickedentindex2 = teamIndex;
     }
 }
 
@@ -193,42 +193,34 @@ pub fn PrintCTFMessage(ctx: &mut GameContext, plIndex: c_int, teamIndex: c_int, 
 ///
 /// Source: `oracle/codemp/game/g_team.c:142-179`
 pub fn AddTeamScore(ctx: &mut GameContext, origin: vec3_t, team: c_int, score: c_int) {
-    unsafe {
-        let te = G_TempEntity(ctx, origin, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
-        (*te).r.svFlags |= SVF_BROADCAST;
+    let te = G_TempEntity(ctx, origin, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+    let te_id = ctx.entity_id_of(te).unwrap();
 
-        if team == TEAM_RED {
-            if ctx.world.level.teamScores[TEAM_RED as usize] + score
-                == ctx.world.level.teamScores[TEAM_BLUE as usize]
-            {
-                (*te).s.eventParm = global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int;
-            } else if ctx.world.level.teamScores[TEAM_RED as usize]
-                <= ctx.world.level.teamScores[TEAM_BLUE as usize]
-                && ctx.world.level.teamScores[TEAM_RED as usize] + score
-                    > ctx.world.level.teamScores[TEAM_BLUE as usize]
-            {
-                (*te).s.eventParm = global_team_sound_t::GTS_REDTEAM_TOOK_LEAD as c_int;
-            } else {
-                (*te).s.eventParm = global_team_sound_t::GTS_REDTEAM_SCORED as c_int;
-            }
+    let red = ctx.world.level.teamScores[TEAM_RED as usize];
+    let blue = ctx.world.level.teamScores[TEAM_BLUE as usize];
+    let event_parm = if team == TEAM_RED {
+        if red + score == blue {
+            global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int
+        } else if red <= blue && red + score > blue {
+            global_team_sound_t::GTS_REDTEAM_TOOK_LEAD as c_int
         } else {
-            if ctx.world.level.teamScores[TEAM_BLUE as usize] + score
-                == ctx.world.level.teamScores[TEAM_RED as usize]
-            {
-                (*te).s.eventParm = global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int;
-            } else if ctx.world.level.teamScores[TEAM_BLUE as usize]
-                <= ctx.world.level.teamScores[TEAM_RED as usize]
-                && ctx.world.level.teamScores[TEAM_BLUE as usize] + score
-                    > ctx.world.level.teamScores[TEAM_RED as usize]
-            {
-                (*te).s.eventParm = global_team_sound_t::GTS_BLUETEAM_TOOK_LEAD as c_int;
-            } else {
-                (*te).s.eventParm = global_team_sound_t::GTS_BLUETEAM_SCORED as c_int;
-            }
+            global_team_sound_t::GTS_REDTEAM_SCORED as c_int
         }
+    } else {
+        if blue + score == red {
+            global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int
+        } else if blue <= red && blue + score > red {
+            global_team_sound_t::GTS_BLUETEAM_TOOK_LEAD as c_int
+        } else {
+            global_team_sound_t::GTS_BLUETEAM_SCORED as c_int
+        }
+    };
 
-        ctx.world.level.teamScores[team as usize] += score;
-    }
+    let te = ctx.world.entity_mut(te_id);
+    te.r.svFlags |= SVF_BROADCAST;
+    te.s.eventParm = event_parm;
+
+    ctx.world.level.teamScores[team as usize] += score;
 }
 
 /// Raven `OnSameTeam`.
@@ -239,31 +231,37 @@ pub fn OnSameTeam(
     ent1: Option<EntityId>,
     ent2: Option<EntityId>,
 ) -> qboolean {
-    // STAGE-1: Option<EntityId> params, raw body re-derived verbatim (Stage-2 debt).
-    let base = ctx.world.g_entities.as_mut_ptr();
-    let ent1: *mut gentity_t = unsafe { resolve(base, ent1) };
-    let ent2: *mut gentity_t = unsafe { resolve(base, ent2) };
+    // Option<EntityId> params. Entity fields route through the checked
+    // arena accessor; the `.client` pointer is dereffed raw (see FLAG below).
+    let (Some(ent1), Some(ent2)) = (ent1, ent2) else {
+        return qfalse;
+    };
+    // FLAG (task #7): `.client` may be an NPC/vehicle pool `gclient_t` (`gClPtrs`,
+    // g_utils.c:430), not a `level.clients` slot — read the pointer via the safe
+    // entity borrow and deref it raw exactly as Raven does. (recipe 2c)
+    let c1 = ctx.world.entity(ent1).client;
+    let c2 = ctx.world.entity(ent2).client;
     unsafe {
-        if (*ent1).client.is_null() || (*ent2).client.is_null() {
+        if c1.is_null() || c2.is_null() {
             return qfalse;
         }
 
         let gametype = ctx.world.cvars.g_gametype.integer;
 
         if gametype == GT_POWERDUEL as c_int {
-            if (*((*ent1).client)).sess.duelTeam == (*((*ent2).client)).sess.duelTeam {
+            if (*c1).sess.duelTeam == (*c2).sess.duelTeam {
                 return qtrue;
             }
             return qfalse;
         }
 
         if gametype == GT_SINGLE_PLAYER as c_int {
-            let ent1IsBot = if (*ent1).r.svFlags & SVF_BOT != 0 {
+            let ent1IsBot = if ctx.world.entity(ent1).r.svFlags & SVF_BOT != 0 {
                 qtrue
             } else {
                 qfalse
             };
-            let ent2IsBot = if (*ent2).r.svFlags & SVF_BOT != 0 {
+            let ent2IsBot = if ctx.world.entity(ent2).r.svFlags & SVF_BOT != 0 {
                 qtrue
             } else {
                 qfalse
@@ -279,56 +277,51 @@ pub fn OnSameTeam(
             return qfalse;
         }
 
-        if (*ent1).s.eType == entityType_t::ET_NPC as c_int
-            && (*ent1).s.NPC_class as c_int == class_t::CLASS_VEHICLE as c_int
-            && !(*ent1).client.is_null()
-            && (*((*ent1).client)).sess.sessionTeam as c_int != TEAM_FREE
-            && !(*ent2).client.is_null()
-            && (*((*ent1).client)).sess.sessionTeam as c_int
-                == (*((*ent2).client)).sess.sessionTeam as c_int
+        if ctx.world.entity(ent1).s.eType == entityType_t::ET_NPC as c_int
+            && ctx.world.entity(ent1).s.NPC_class as c_int == class_t::CLASS_VEHICLE as c_int
+            && !c1.is_null()
+            && (*c1).sess.sessionTeam as c_int != TEAM_FREE
+            && !c2.is_null()
+            && (*c1).sess.sessionTeam as c_int == (*c2).sess.sessionTeam as c_int
         {
             return qtrue;
         }
-        if (*ent2).s.eType == entityType_t::ET_NPC as c_int
-            && (*ent2).s.NPC_class as c_int == class_t::CLASS_VEHICLE as c_int
-            && !(*ent2).client.is_null()
-            && (*((*ent2).client)).sess.sessionTeam as c_int != TEAM_FREE
-            && !(*ent1).client.is_null()
-            && (*((*ent2).client)).sess.sessionTeam as c_int
-                == (*((*ent1).client)).sess.sessionTeam as c_int
+        if ctx.world.entity(ent2).s.eType == entityType_t::ET_NPC as c_int
+            && ctx.world.entity(ent2).s.NPC_class as c_int == class_t::CLASS_VEHICLE as c_int
+            && !c2.is_null()
+            && (*c2).sess.sessionTeam as c_int != TEAM_FREE
+            && !c1.is_null()
+            && (*c2).sess.sessionTeam as c_int == (*c1).sess.sessionTeam as c_int
         {
             return qtrue;
         }
 
-        if (*((*ent1).client)).sess.sessionTeam as c_int == TEAM_FREE
-            && (*((*ent2).client)).sess.sessionTeam as c_int == TEAM_FREE
-            && (*ent1).s.eType == entityType_t::ET_NPC as c_int
-            && (*ent2).s.eType == entityType_t::ET_NPC as c_int
+        if (*c1).sess.sessionTeam as c_int == TEAM_FREE
+            && (*c2).sess.sessionTeam as c_int == TEAM_FREE
+            && ctx.world.entity(ent1).s.eType == entityType_t::ET_NPC as c_int
+            && ctx.world.entity(ent2).s.eType == entityType_t::ET_NPC as c_int
         {
             return qfalse;
         }
 
-        if (*ent1).s.eType == entityType_t::ET_NPC as c_int
-            && (*ent2).s.eType == entityType_t::ET_PLAYER as c_int
+        if ctx.world.entity(ent1).s.eType == entityType_t::ET_NPC as c_int
+            && ctx.world.entity(ent2).s.eType == entityType_t::ET_PLAYER as c_int
         {
-            if G_CheckVehicleNPCTeamDamage(ent1.as_ref()) != 0 {
-                if (*((*ent1).client)).sess.sessionTeam as c_int
-                    == (*((*ent2).client)).sess.sessionTeam as c_int
-                    || (*ent1).teamnodmg == (*((*ent2).client)).sess.sessionTeam as c_int
+            if G_CheckVehicleNPCTeamDamage(Some(ctx.world.entity(ent1))) != 0 {
+                if (*c1).sess.sessionTeam as c_int == (*c2).sess.sessionTeam as c_int
+                    || ctx.world.entity(ent1).teamnodmg == (*c2).sess.sessionTeam as c_int
                 {
                     return qtrue;
                 }
             }
             return qfalse;
-        } else if (*ent1).s.eType == entityType_t::ET_PLAYER as c_int
-            && (*ent2).s.eType == entityType_t::ET_NPC as c_int
+        } else if ctx.world.entity(ent1).s.eType == entityType_t::ET_PLAYER as c_int
+            && ctx.world.entity(ent2).s.eType == entityType_t::ET_NPC as c_int
         {
             return qfalse;
         }
 
-        if (*((*ent1).client)).sess.sessionTeam as c_int
-            == (*((*ent2).client)).sess.sessionTeam as c_int
-        {
+        if (*c1).sess.sessionTeam as c_int == (*c2).sess.sessionTeam as c_int {
             return qtrue;
         }
 
@@ -395,17 +388,16 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
 ///
 /// Source: `oracle/codemp/game/g_team.c:320-330`
 pub fn Team_CheckDroppedItem(ctx: &mut GameContext, dropped: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let dropped: *mut gentity_t = ctx.entity_mut(dropped);
-    unsafe {
-        let giTag = (*(*dropped).item).giTag;
-        if giTag == PW_REDFLAG {
-            Team_SetFlagStatus(ctx, TEAM_RED, FLAG_DROPPED);
-        } else if giTag == PW_BLUEFLAG {
-            Team_SetFlagStatus(ctx, TEAM_BLUE, FLAG_DROPPED);
-        } else if giTag == PW_NEUTRALFLAG {
-            Team_SetFlagStatus(ctx, TEAM_FREE, FLAG_DROPPED);
-        }
+    // FLAG (task #7): `.item` is a `*mut gitem_t` (bg item table), no accessor;
+    // read the pointer via the safe entity borrow and deref it raw. (recipe 2c)
+    let item = ctx.world.entity(dropped).item;
+    let giTag = unsafe { (*item).giTag };
+    if giTag == PW_REDFLAG {
+        Team_SetFlagStatus(ctx, TEAM_RED, FLAG_DROPPED);
+    } else if giTag == PW_BLUEFLAG {
+        Team_SetFlagStatus(ctx, TEAM_BLUE, FLAG_DROPPED);
+    } else if giTag == PW_NEUTRALFLAG {
+        Team_SetFlagStatus(ctx, TEAM_FREE, FLAG_DROPPED);
     }
 }
 
@@ -413,23 +405,24 @@ pub fn Team_CheckDroppedItem(ctx: &mut GameContext, dropped: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_team.c:337-352`
 pub fn Team_ForceGesture(ctx: &mut GameContext, team: c_int) {
-    unsafe {
-        // Oracle loops fixed `MAX_CLIENTS`, not `g_maxclients.integer`.
-        // Source: g_team.c:341
-        for i in 0..MAX_CLIENTS {
-            let ent = &mut ctx.world.g_entities[i];
-            if (*ent).inuse == 0 {
-                continue;
-            }
-            if (*ent).client.is_null() {
-                continue;
-            }
-            if (*((*ent).client)).sess.sessionTeam as c_int != team {
-                continue;
-            }
-
-            (*ent).flags |= FL_FORCE_GESTURE;
+    // Oracle loops fixed `MAX_CLIENTS`, not `g_maxclients.integer`.
+    // Source: g_team.c:341
+    for i in 0..MAX_CLIENTS {
+        let id = EntityId(i as u32);
+        if ctx.world.entity(id).inuse == 0 {
+            continue;
         }
+        // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw
+        // as Raven does. (recipe 2c)
+        let client = ctx.world.entity(id).client;
+        if client.is_null() {
+            continue;
+        }
+        if unsafe { (*client).sess.sessionTeam } as c_int != team {
+            continue;
+        }
+
+        ctx.world.entity_mut(id).flags |= FL_FORCE_GESTURE;
     }
 }
 
@@ -442,22 +435,32 @@ pub fn Team_FragBonuses(
     inflictor: Option<EntityId>,
     attacker: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId targ + Option<EntityId> inflictor/attacker; raw body
-    // re-derived verbatim (Stage-2 debt). `inflictor` is an unused param.
-    let base = ctx.world.g_entities.as_mut_ptr();
-    let targ: *mut gentity_t = ctx.entity_mut(targ);
-    let attacker: *mut gentity_t = unsafe { resolve(base, attacker) };
-    unsafe {
-        // no bonus for fragging yourself or team mates
-        if (*targ).client.is_null()
-            || (*attacker).client.is_null()
-            || targ == attacker
-            || OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(attacker)) != 0
-        {
-            return;
-        }
+    // EntityId targ + Option<EntityId> inflictor/attacker (`inflictor`
+    // unused, as in Raven). Entity fields route through the checked arena
+    // accessor; `.client` pointers are dereffed raw (see FLAG below).
+    let Some(attacker) = attacker else {
+        return;
+    };
 
-        let team = (*((*targ).client)).sess.sessionTeam as c_int;
+    // no bonus for fragging yourself or team mates
+    if ctx.world.entity(targ).client.is_null()
+        || ctx.world.entity(attacker).client.is_null()
+        || targ == attacker
+        || OnSameTeam(ctx, Some(targ), Some(attacker)) != 0
+    {
+        return;
+    }
+
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
+    // Raven does (may be an NPC pool `gclient_t`, `gClPtrs`). (recipe 2c)
+    let targ_cl = ctx.world.entity(targ).client;
+    let attacker_cl = ctx.world.entity(attacker).client;
+    // Entity origins are not mutated in this function; read once.
+    let targ_origin = ctx.world.entity(targ).r.currentOrigin;
+    let attacker_origin = ctx.world.entity(attacker).r.currentOrigin;
+
+    unsafe {
+        let team = (*targ_cl).sess.sessionTeam as c_int;
         let otherteam = OtherTeam(team);
         if otherteam < 0 {
             return; // whoever died isn't on a team
@@ -474,19 +477,14 @@ pub fn Team_FragBonuses(
         // Oracle sets `tokens = 0` here (g_team.c:394) and never changes it, so the
         // `if (tokens)` block below is dead. Preserved as a dead branch (porting-rules §20).
         let tokens = 0;
-        if (*((*targ).client)).ps.powerups[enemy_flag_pw as usize] != 0 {
-            (*((*attacker).client)).pers.teamState.lastfraggedcarrier = ctx.world.level.time as f32;
-            let attacker_id = ctx.entity_id_of(attacker).unwrap();
-            AddScore(
-                ctx,
-                attacker_id,
-                (*targ).r.currentOrigin,
-                CTF_FRAG_CARRIER_BONUS,
-            );
-            (*((*attacker).client)).pers.teamState.fragcarrier += 1;
+        if (*targ_cl).ps.powerups[enemy_flag_pw as usize] != 0 {
+            (*attacker_cl).pers.teamState.lastfraggedcarrier = ctx.world.level.time as f32;
+            AddScore(ctx, attacker, targ_origin, CTF_FRAG_CARRIER_BONUS);
+            (*attacker_cl).pers.teamState.fragcarrier += 1;
+            let num = ctx.world.entity(attacker).s.number;
             PrintCTFMessage(
                 ctx,
-                (*attacker).s.number,
+                num,
                 team,
                 ctfMsg_t::CTFMESSAGE_FRAGGED_FLAG_CARRIER as c_int,
             );
@@ -494,9 +492,11 @@ pub fn Team_FragBonuses(
             // the target had the flag, clear the hurt carrier field on the other team
             let max_clients = ctx.world.cvars.g_maxclients.integer;
             for i in 0..max_clients {
-                let ent = &mut ctx.world.g_entities[i as usize];
-                if (*ent).inuse != 0 && (*((*ent).client)).sess.sessionTeam as c_int == otherteam {
-                    (*((*ent).client)).pers.teamState.lasthurtcarrier = 0.0;
+                let eid = EntityId(i as u32);
+                let ec = ctx.world.entity(eid).client;
+                if ctx.world.entity(eid).inuse != 0 && (*ec).sess.sessionTeam as c_int == otherteam
+                {
+                    (*ec).pers.teamState.lasthurtcarrier = 0.0;
                 }
             }
             return;
@@ -505,70 +505,58 @@ pub fn Team_FragBonuses(
         // did the attacker frag a head carrier? other->client->ps.generic1
         // Dead branch in oracle: `tokens` is always 0 (see above). g_team.c:413-429.
         if tokens != 0 {
-            (*((*attacker).client)).pers.teamState.lastfraggedcarrier = ctx.world.level.time as f32;
-            let attacker_id = ctx.entity_id_of(attacker).unwrap();
+            (*attacker_cl).pers.teamState.lastfraggedcarrier = ctx.world.level.time as f32;
             AddScore(
                 ctx,
-                attacker_id,
-                (*targ).r.currentOrigin,
+                attacker,
+                targ_origin,
                 CTF_FRAG_CARRIER_BONUS * tokens * tokens,
             );
-            (*((*attacker).client)).pers.teamState.fragcarrier += 1;
+            (*attacker_cl).pers.teamState.fragcarrier += 1;
 
             // the target had the flag, clear the hurt carrier field on the other team
             let max_clients = ctx.world.cvars.g_maxclients.integer;
             for i in 0..max_clients {
-                let ent = &mut ctx.world.g_entities[i as usize];
-                if (*ent).inuse != 0 && (*((*ent).client)).sess.sessionTeam as c_int == otherteam {
-                    (*((*ent).client)).pers.teamState.lasthurtcarrier = 0.0;
+                let eid = EntityId(i as u32);
+                let ec = ctx.world.entity(eid).client;
+                if ctx.world.entity(eid).inuse != 0 && (*ec).sess.sessionTeam as c_int == otherteam
+                {
+                    (*ec).pers.teamState.lasthurtcarrier = 0.0;
                 }
             }
             return;
         }
 
-        if (*((*targ).client)).pers.teamState.lasthurtcarrier != 0.0
-            && (ctx.world.level.time as f32) - (*((*targ).client)).pers.teamState.lasthurtcarrier < 8000.0 // CTF_CARRIER_DANGER_PROTECT_TIMEOUT
-            && (*((*attacker).client)).ps.powerups[flag_pw as usize] == 0
+        if (*targ_cl).pers.teamState.lasthurtcarrier != 0.0
+            && (ctx.world.level.time as f32) - (*targ_cl).pers.teamState.lasthurtcarrier < 8000.0 // CTF_CARRIER_DANGER_PROTECT_TIMEOUT
+            && (*attacker_cl).ps.powerups[flag_pw as usize] == 0
         {
-            let attacker_id = ctx.entity_id_of(attacker).unwrap();
             // attacker is on the same team as the flag carrier and fragged a guy who hurt our flag carrier
-            AddScore(
-                ctx,
-                attacker_id,
-                (*targ).r.currentOrigin,
-                CTF_CARRIER_DANGER_PROTECT_BONUS,
-            );
+            AddScore(ctx, attacker, targ_origin, CTF_CARRIER_DANGER_PROTECT_BONUS);
 
-            (*((*attacker).client)).pers.teamState.carrierdefense += 1;
-            (*((*targ).client)).pers.teamState.lasthurtcarrier = 0.0;
+            (*attacker_cl).pers.teamState.carrierdefense += 1;
+            (*targ_cl).pers.teamState.lasthurtcarrier = 0.0;
 
-            (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
-            let _team = (*((*attacker).client)).sess.sessionTeam as c_int;
-            (*((*attacker).client)).rewardTime = ctx.world.level.time + 2000;
+            (*attacker_cl).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+            let _team = (*attacker_cl).sess.sessionTeam as c_int;
+            (*attacker_cl).rewardTime = ctx.world.level.time + 2000;
 
             return;
         }
 
-        if (*((*targ).client)).pers.teamState.lasthurtcarrier != 0.0
-            && (ctx.world.level.time as f32) - (*((*targ).client)).pers.teamState.lasthurtcarrier
-                < 8000.0
+        if (*targ_cl).pers.teamState.lasthurtcarrier != 0.0
+            && (ctx.world.level.time as f32) - (*targ_cl).pers.teamState.lasthurtcarrier < 8000.0
         // CTF_CARRIER_DANGER_PROTECT_TIMEOUT
         {
-            let attacker_id = ctx.entity_id_of(attacker).unwrap();
             // attacker is on the same team as the skull carrier and
-            AddScore(
-                ctx,
-                attacker_id,
-                (*targ).r.currentOrigin,
-                CTF_CARRIER_DANGER_PROTECT_BONUS,
-            );
+            AddScore(ctx, attacker, targ_origin, CTF_CARRIER_DANGER_PROTECT_BONUS);
 
-            (*((*attacker).client)).pers.teamState.carrierdefense += 1;
-            (*((*targ).client)).pers.teamState.lasthurtcarrier = 0.0;
+            (*attacker_cl).pers.teamState.carrierdefense += 1;
+            (*targ_cl).pers.teamState.lasthurtcarrier = 0.0;
 
-            (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
-            let _team = (*((*attacker).client)).sess.sessionTeam as c_int;
-            (*((*attacker).client)).rewardTime = ctx.world.level.time + 2000;
+            (*attacker_cl).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+            let _team = (*attacker_cl).sess.sessionTeam as c_int;
+            (*attacker_cl).rewardTime = ctx.world.level.time + 2000;
 
             return;
         }
@@ -578,52 +566,55 @@ pub fn Team_FragBonuses(
         // we have to find the flag and carrier entities
 
         // find the flag
-        let c = if (*((*attacker).client)).sess.sessionTeam as c_int == TEAM_RED {
+        let c = if (*attacker_cl).sess.sessionTeam as c_int == TEAM_RED {
             c"team_CTF_redflag"
-        } else if (*((*attacker).client)).sess.sessionTeam as c_int == TEAM_BLUE {
+        } else if (*attacker_cl).sess.sessionTeam as c_int == TEAM_BLUE {
             c"team_CTF_blueflag"
         } else {
             return;
         };
 
         // find attacker's team's flag carrier
-        let mut carrier: *mut gentity_t = core::ptr::null_mut();
+        let mut carrier: Option<EntityId> = None;
         let max_clients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..max_clients {
-            carrier = &mut ctx.world.g_entities[i as usize];
-            if (*carrier).inuse != 0 && (*((*carrier).client)).ps.powerups[flag_pw as usize] != 0 {
+            let cid = EntityId(i as u32);
+            carrier = Some(cid);
+            let cl = ctx.world.entity(cid).client;
+            if ctx.world.entity(cid).inuse != 0 && (*cl).ps.powerups[flag_pw as usize] != 0 {
                 break;
             }
-            carrier = core::ptr::null_mut();
+            carrier = None;
         }
 
-        let mut flag: *mut gentity_t = core::ptr::null_mut();
+        let mut flag: Option<EntityId> = None;
         loop {
-            let flag_id = ctx.entity_id_of(flag);
-            flag = G_Find(ctx, flag_id, fofs_classname(), c.as_ptr());
-            if flag.is_null() {
+            let f = G_Find(ctx, flag, fofs_classname(), c.as_ptr());
+            flag = ctx.entity_id_of(f);
+            if f.is_null() {
                 break;
             }
-            if (*flag).flags & FL_DROPPED_ITEM == 0 {
+            if ctx.world.entity(flag.unwrap()).flags & FL_DROPPED_ITEM == 0 {
                 break;
             }
         }
 
-        if flag.is_null() {
+        let Some(flag) = flag else {
             return; // can't find attacker's flag
-        }
+        };
+        let flag_origin = ctx.world.entity(flag).r.currentOrigin;
 
         // ok we have the attackers flag and a pointer to the carrier
 
         // check to see if we are defending the base's flag
         let mut v1 = [0.0f32; 3];
         let mut v2 = [0.0f32; 3];
-        v1[0] = (*targ).r.currentOrigin[0] - (*flag).r.currentOrigin[0];
-        v1[1] = (*targ).r.currentOrigin[1] - (*flag).r.currentOrigin[1];
-        v1[2] = (*targ).r.currentOrigin[2] - (*flag).r.currentOrigin[2];
-        v2[0] = (*attacker).r.currentOrigin[0] - (*flag).r.currentOrigin[0];
-        v2[1] = (*attacker).r.currentOrigin[1] - (*flag).r.currentOrigin[1];
-        v2[2] = (*attacker).r.currentOrigin[2] - (*flag).r.currentOrigin[2];
+        v1[0] = targ_origin[0] - flag_origin[0];
+        v1[1] = targ_origin[1] - flag_origin[1];
+        v1[2] = targ_origin[2] - flag_origin[2];
+        v2[0] = attacker_origin[0] - flag_origin[0];
+        v2[1] = attacker_origin[1] - flag_origin[1];
+        v2[2] = attacker_origin[2] - flag_origin[2];
 
         let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
         let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
@@ -633,47 +624,41 @@ pub fn Team_FragBonuses(
             && trap::InPVS(
                 ctx.engine,
                 mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                    &(*flag).r.currentOrigin as *const vec3_t,
-                    &(*targ).r.currentOrigin as *const vec3_t,
+                    &flag_origin as *const vec3_t,
+                    &targ_origin as *const vec3_t,
                 ),
             ) != 0)
             || (v2_len < 1000.0
                 && trap::InPVS(
                     ctx.engine,
                     mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                        &(*flag).r.currentOrigin as *const vec3_t,
-                        &(*attacker).r.currentOrigin as *const vec3_t,
+                        &flag_origin as *const vec3_t,
+                        &attacker_origin as *const vec3_t,
                     ),
                 ) != 0))
-            && (*((*attacker).client)).sess.sessionTeam as c_int
-                != (*((*targ).client)).sess.sessionTeam as c_int
+            && (*attacker_cl).sess.sessionTeam as c_int != (*targ_cl).sess.sessionTeam as c_int
         {
-            let attacker_id = ctx.entity_id_of(attacker).unwrap();
             // we defended the base flag
-            AddScore(
-                ctx,
-                attacker_id,
-                (*targ).r.currentOrigin,
-                CTF_FLAG_DEFENSE_BONUS,
-            );
-            (*((*attacker).client)).pers.teamState.basedefense += 1;
+            AddScore(ctx, attacker, targ_origin, CTF_FLAG_DEFENSE_BONUS);
+            (*attacker_cl).pers.teamState.basedefense += 1;
 
-            (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
-            (*((*attacker).client)).rewardTime = ctx.world.level.time + 2000;
+            (*attacker_cl).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+            (*attacker_cl).rewardTime = ctx.world.level.time + 2000;
 
             return;
         }
 
-        if !carrier.is_null() && carrier != attacker {
+        if let Some(carrier) = carrier.filter(|&c| c != attacker) {
+            let carrier_origin = ctx.world.entity(carrier).r.currentOrigin;
             // Oracle typo (g_team.c:517-518): VectorSubtract writes v1 on BOTH lines,
             // so v2 is never recomputed here and stays stale (attacker-flag from the
             // base-flag block above). Preserved verbatim (porting-rules §19).
-            v1[0] = (*targ).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
-            v1[1] = (*targ).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
-            v1[2] = (*targ).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
-            v1[0] = (*attacker).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
-            v1[1] = (*attacker).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
-            v1[2] = (*attacker).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
+            v1[0] = targ_origin[0] - carrier_origin[0];
+            v1[1] = targ_origin[1] - carrier_origin[1];
+            v1[2] = targ_origin[2] - carrier_origin[2];
+            v1[0] = attacker_origin[0] - carrier_origin[0];
+            v1[1] = attacker_origin[1] - carrier_origin[1];
+            v1[2] = attacker_origin[2] - carrier_origin[2];
 
             let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
             let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
@@ -683,32 +668,25 @@ pub fn Team_FragBonuses(
                 && trap::InPVS(
                     ctx.engine,
                     mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                        &(*carrier).r.currentOrigin as *const vec3_t,
-                        &(*targ).r.currentOrigin as *const vec3_t,
+                        &carrier_origin as *const vec3_t,
+                        &targ_origin as *const vec3_t,
                     ),
                 ) != 0)
                 || (v2_len < 1000.0
                     && trap::InPVS(
                         ctx.engine,
                         mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                            &(*carrier).r.currentOrigin as *const vec3_t,
-                            &(*attacker).r.currentOrigin as *const vec3_t,
+                            &carrier_origin as *const vec3_t,
+                            &attacker_origin as *const vec3_t,
                         ),
                     ) != 0))
-                && (*((*attacker).client)).sess.sessionTeam as c_int
-                    != (*((*targ).client)).sess.sessionTeam as c_int
+                && (*attacker_cl).sess.sessionTeam as c_int != (*targ_cl).sess.sessionTeam as c_int
             {
-                let attacker_id = ctx.entity_id_of(attacker).unwrap();
-                AddScore(
-                    ctx,
-                    attacker_id,
-                    (*targ).r.currentOrigin,
-                    CTF_CARRIER_PROTECT_BONUS,
-                );
-                (*((*attacker).client)).pers.teamState.carrierdefense += 1;
+                AddScore(ctx, attacker, targ_origin, CTF_CARRIER_PROTECT_BONUS);
+                (*attacker_cl).pers.teamState.carrierdefense += 1;
 
-                (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
-                (*((*attacker).client)).rewardTime = ctx.world.level.time + 2000;
+                (*attacker_cl).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+                (*attacker_cl).rewardTime = ctx.world.level.time + 2000;
 
                 return;
             }
@@ -724,35 +702,38 @@ pub fn Team_CheckHurtCarrier(
     targ: Option<EntityId>,
     attacker: Option<EntityId>,
 ) {
-    // STAGE-1: Option<EntityId> params, raw body re-derived verbatim (Stage-2 debt).
-    let base = ctx.world.g_entities.as_mut_ptr();
-    let targ: *mut gentity_t = unsafe { resolve(base, targ) };
-    let attacker: *mut gentity_t = unsafe { resolve(base, attacker) };
-    unsafe {
-        if (*targ).client.is_null() || (*attacker).client.is_null() {
-            return;
-        }
+    // Option<EntityId> params. `.client` pointers dereffed raw (FLAG).
+    let (Some(targ), Some(attacker)) = (targ, attacker) else {
+        return;
+    };
+    if ctx.world.entity(targ).client.is_null() || ctx.world.entity(attacker).client.is_null() {
+        return;
+    }
 
-        let flag_pw = if (*((*targ).client)).sess.sessionTeam as c_int == TEAM_RED {
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
+    // Raven does. (recipe 2c)
+    let targ_cl = ctx.world.entity(targ).client;
+    let attacker_cl = ctx.world.entity(attacker).client;
+    let time = ctx.world.level.time as f32;
+    unsafe {
+        let flag_pw = if (*targ_cl).sess.sessionTeam as c_int == TEAM_RED {
             PW_BLUEFLAG
         } else {
             PW_REDFLAG
         };
 
         // flags
-        if (*((*targ).client)).ps.powerups[flag_pw as usize] != 0
-            && (*((*targ).client)).sess.sessionTeam as c_int
-                != (*((*attacker).client)).sess.sessionTeam as c_int
+        if (*targ_cl).ps.powerups[flag_pw as usize] != 0
+            && (*targ_cl).sess.sessionTeam as c_int != (*attacker_cl).sess.sessionTeam as c_int
         {
-            (*((*attacker).client)).pers.teamState.lasthurtcarrier = ctx.world.level.time as f32;
+            (*attacker_cl).pers.teamState.lasthurtcarrier = time;
         }
 
         // skulls
-        if (*((*targ).client)).ps.generic1 != 0
-            && (*((*targ).client)).sess.sessionTeam as c_int
-                != (*((*attacker).client)).sess.sessionTeam as c_int
+        if (*targ_cl).ps.generic1 != 0
+            && (*targ_cl).sess.sessionTeam as c_int != (*attacker_cl).sess.sessionTeam as c_int
         {
-            (*((*attacker).client)).pers.teamState.lasthurtcarrier = ctx.world.level.time as f32;
+            (*attacker_cl).pers.teamState.lasthurtcarrier = time;
         }
     }
 }
@@ -760,7 +741,7 @@ pub fn Team_CheckHurtCarrier(
 /// Raven `Team_ResetFlag`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:568-599`
-pub fn Team_ResetFlag(ctx: &mut GameContext, team: c_int) -> *mut gentity_t {
+pub fn Team_ResetFlag(ctx: &mut GameContext, team: c_int) -> Option<EntityId> {
     let classname: &CStr = if team == TEAM_RED {
         c"team_CTF_redflag"
     } else if team == TEAM_BLUE {
@@ -768,34 +749,29 @@ pub fn Team_ResetFlag(ctx: &mut GameContext, team: c_int) -> *mut gentity_t {
     } else if team == TEAM_FREE {
         c"team_CTF_neutralflag"
     } else {
-        return core::ptr::null_mut();
+        return None;
     };
 
-    unsafe {
-        let mut ent: *mut gentity_t = core::ptr::null_mut();
-        let mut rent: *mut gentity_t = core::ptr::null_mut();
-        loop {
-            ent = G_Find(
-                ctx,
-                ctx.entity_id_of(ent),
-                fofs_classname(),
-                classname.as_ptr(),
-            );
-            if ent.is_null() {
-                break;
-            }
-            if (*ent).flags & FL_DROPPED_ITEM != 0 {
-                G_FreeEntity(ctx, ctx.entity_id_of(ent));
-            } else {
-                rent = ent;
-                RespawnItem(ctx, ctx.entity_id_of(ent).unwrap());
-            }
+    let mut ent: Option<EntityId> = None;
+    let mut rent: Option<EntityId> = None;
+    loop {
+        let e = G_Find(ctx, ent, fofs_classname(), classname.as_ptr());
+        ent = ctx.entity_id_of(e);
+        if e.is_null() {
+            break;
         }
-
-        Team_SetFlagStatus(ctx, team, FLAG_ATBASE);
-
-        rent
+        let ent_id = ent.unwrap();
+        if ctx.world.entity(ent_id).flags & FL_DROPPED_ITEM != 0 {
+            G_FreeEntity(ctx, ent);
+        } else {
+            rent = ent;
+            RespawnItem(ctx, ent_id);
+        }
     }
+
+    Team_SetFlagStatus(ctx, team, FLAG_ATBASE);
+
+    rent
 }
 
 /// Raven `Team_ResetFlags`.
@@ -814,103 +790,88 @@ pub fn Team_ResetFlags(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_team.c:608-624`
 pub fn Team_ReturnFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    if ent.is_null() {
+    let Some(ent) = ent else {
         // G_Printf(ctx, "Warning:  NULL passed to Team_ReturnFlagSound\n") —
         // logging trap not resolved in this packet's call surface; behavior
         // (early return) preserved, message dropped.
         return;
-    }
+    };
 
-    unsafe {
-        let te = G_TempEntity(
-            ctx,
-            (*ent).s.pos.trBase,
-            entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int,
-        );
-        (*te).s.eventParm = if team == TEAM_BLUE {
-            global_team_sound_t::GTS_RED_RETURN as c_int
-        } else {
-            global_team_sound_t::GTS_BLUE_RETURN as c_int
-        };
-        (*te).r.svFlags |= SVF_BROADCAST;
-    }
+    let trbase = ctx.world.entity(ent).s.pos.trBase;
+    let te = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+    let te_id = ctx.entity_id_of(te).unwrap();
+    let te = ctx.world.entity_mut(te_id);
+    te.s.eventParm = if team == TEAM_BLUE {
+        global_team_sound_t::GTS_RED_RETURN as c_int
+    } else {
+        global_team_sound_t::GTS_BLUE_RETURN as c_int
+    };
+    te.r.svFlags |= SVF_BROADCAST;
 }
 
 /// Raven `Team_TakeFlagSound`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:626-662`
 pub fn Team_TakeFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    unsafe {
-        if ent.is_null() {
-            // G_Printf ("Warning:  NULL passed to Team_TakeFlagSound\n");
-            return;
-        }
+    let Some(ent) = ent else {
+        // G_Printf ("Warning:  NULL passed to Team_TakeFlagSound\n");
+        return;
+    };
 
-        // only play sound when the flag was at the base
-        // or not picked up the last 10 seconds
-        match team {
-            TEAM_RED => {
-                if ctx.world.globals.teamgame.blueStatus != FLAG_ATBASE {
-                    if ctx.world.globals.teamgame.blueTakenTime > ctx.world.level.time - 10000 {
-                        return;
-                    }
+    // only play sound when the flag was at the base
+    // or not picked up the last 10 seconds
+    match team {
+        TEAM_RED => {
+            if ctx.world.globals.teamgame.blueStatus != FLAG_ATBASE {
+                if ctx.world.globals.teamgame.blueTakenTime > ctx.world.level.time - 10000 {
+                    return;
                 }
-                ctx.world.globals.teamgame.blueTakenTime = ctx.world.level.time;
             }
-            TEAM_BLUE => {
-                if ctx.world.globals.teamgame.redStatus != FLAG_ATBASE {
-                    if ctx.world.globals.teamgame.redTakenTime > ctx.world.level.time - 10000 {
-                        return;
-                    }
+            ctx.world.globals.teamgame.blueTakenTime = ctx.world.level.time;
+        }
+        TEAM_BLUE => {
+            if ctx.world.globals.teamgame.redStatus != FLAG_ATBASE {
+                if ctx.world.globals.teamgame.redTakenTime > ctx.world.level.time - 10000 {
+                    return;
                 }
-                ctx.world.globals.teamgame.redTakenTime = ctx.world.level.time;
             }
-            _ => {}
+            ctx.world.globals.teamgame.redTakenTime = ctx.world.level.time;
         }
-
-        let te = G_TempEntity(
-            ctx,
-            (*ent).s.pos.trBase,
-            entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int,
-        );
-        if team == TEAM_BLUE {
-            (*te).s.eventParm = global_team_sound_t::GTS_RED_TAKEN as c_int;
-        } else {
-            (*te).s.eventParm = global_team_sound_t::GTS_BLUE_TAKEN as c_int;
-        }
-        (*te).r.svFlags |= SVF_BROADCAST;
+        _ => {}
     }
+
+    let trbase = ctx.world.entity(ent).s.pos.trBase;
+    let te = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+    let te_id = ctx.entity_id_of(te).unwrap();
+    let te = ctx.world.entity_mut(te_id);
+    if team == TEAM_BLUE {
+        te.s.eventParm = global_team_sound_t::GTS_RED_TAKEN as c_int;
+    } else {
+        te.s.eventParm = global_team_sound_t::GTS_BLUE_TAKEN as c_int;
+    }
+    te.r.svFlags |= SVF_BROADCAST;
 }
 
 /// Raven `Team_CaptureFlagSound`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:664-680`
 pub fn Team_CaptureFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_int) {
-    // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
-    if ent.is_null() {
+    let Some(ent) = ent else {
         // G_Printf(ctx, "Warning:  NULL passed to Team_CaptureFlagSound\n") —
         // logging trap not resolved in this packet's call surface.
         return;
-    }
+    };
 
-    unsafe {
-        let te = G_TempEntity(
-            ctx,
-            (*ent).s.pos.trBase,
-            entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int,
-        );
-        (*te).s.eventParm = if team == TEAM_BLUE {
-            global_team_sound_t::GTS_BLUE_CAPTURE as c_int
-        } else {
-            global_team_sound_t::GTS_RED_CAPTURE as c_int
-        };
-        (*te).r.svFlags |= SVF_BROADCAST;
-    }
+    let trbase = ctx.world.entity(ent).s.pos.trBase;
+    let te = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+    let te_id = ctx.entity_id_of(te).unwrap();
+    let te = ctx.world.entity_mut(te_id);
+    te.s.eventParm = if team == TEAM_BLUE {
+        global_team_sound_t::GTS_BLUE_CAPTURE as c_int
+    } else {
+        global_team_sound_t::GTS_RED_CAPTURE as c_int
+    };
+    te.r.svFlags |= SVF_BROADCAST;
 }
 
 /// Raven `Team_ReturnFlag`.
@@ -918,7 +879,7 @@ pub fn Team_CaptureFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team:
 /// Source: `oracle/codemp/game/g_team.c:682-691`
 pub fn Team_ReturnFlag(ctx: &mut GameContext, team: c_int) {
     let flag = Team_ResetFlag(ctx, team);
-    Team_ReturnFlagSound(ctx, ctx.entity_id_of(flag), team);
+    Team_ReturnFlagSound(ctx, flag, team);
     if team == TEAM_FREE {
         // PrintMsg(NULL, "The flag has returned!\n") — dead (StringEd-only
         // client-side messaging, g_team.c:685).
@@ -932,17 +893,16 @@ pub fn Team_ReturnFlag(ctx: &mut GameContext, team: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_team.c:693-703`
 pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let giTag = (*(*ent).item).giTag;
-        if giTag == PW_REDFLAG {
-            Team_ReturnFlag(ctx, TEAM_RED);
-        } else if giTag == PW_BLUEFLAG {
-            Team_ReturnFlag(ctx, TEAM_BLUE);
-        } else if giTag == PW_NEUTRALFLAG {
-            Team_ReturnFlag(ctx, TEAM_FREE);
-        }
+    // FLAG (task #7): `.item` is a `*mut gitem_t` (bg item table), no accessor;
+    // read the pointer via the safe entity borrow and deref it raw. (recipe 2c)
+    let item = ctx.world.entity(ent).item;
+    let giTag = unsafe { (*item).giTag };
+    if giTag == PW_REDFLAG {
+        Team_ReturnFlag(ctx, TEAM_RED);
+    } else if giTag == PW_BLUEFLAG {
+        Team_ReturnFlag(ctx, TEAM_BLUE);
+    } else if giTag == PW_NEUTRALFLAG {
+        Team_ReturnFlag(ctx, TEAM_FREE);
     }
 }
 
@@ -954,22 +914,21 @@ pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
 /// wiring for the assignment site is separate from this body.
 /// Source: `oracle/codemp/game/g_team.c:714-729`
 pub fn Team_DroppedFlagThink(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let giTag = (*(*ent).item).giTag;
-        let team = if giTag == PW_REDFLAG {
-            TEAM_RED
-        } else if giTag == PW_BLUEFLAG {
-            TEAM_BLUE
-        } else {
-            TEAM_FREE
-        };
+    // FLAG (task #7): `.item` is a `*mut gitem_t` (bg item table), no accessor;
+    // read the pointer via the safe entity borrow and deref it raw. (recipe 2c)
+    let item = ctx.world.entity(ent).item;
+    let giTag = unsafe { (*item).giTag };
+    let team = if giTag == PW_REDFLAG {
+        TEAM_RED
+    } else if giTag == PW_BLUEFLAG {
+        TEAM_BLUE
+    } else {
+        TEAM_FREE
+    };
 
-        // Team_ResetFlag will delete this entity.
-        let flag = Team_ResetFlag(ctx, team);
-        Team_ReturnFlagSound(ctx, ctx.entity_id_of(flag), team);
-    }
+    // Team_ResetFlag will delete this entity.
+    let flag = Team_ResetFlag(ctx, team);
+    Team_ReturnFlagSound(ctx, flag, team);
 }
 
 /// Raven `Team_TouchOurFlag`.
@@ -981,32 +940,36 @@ pub fn Team_TouchOurFlag(
     other: EntityId,
     team: c_int,
 ) -> c_int {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    let other: *mut gentity_t = ctx.entity_mut(other);
-    unsafe {
-        let cl = (*other).client;
+    // EntityId params. Entity fields route through the checked arena
+    // accessor; the `.client` pointer is dereffed raw (see FLAG below).
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
+    // Raven does. (recipe 2c)
+    let cl = ctx.world.entity(other).client;
+    let num = ctx.world.entity(other).s.number;
+    // `ent` (the flag) origins are not mutated before use; read once.
+    let ent_origin = ctx.world.entity(ent).r.currentOrigin;
+    let ent_trbase = ctx.world.entity(ent).s.pos.trBase;
+    let ent_dropped = ctx.world.entity(ent).flags & FL_DROPPED_ITEM != 0;
 
+    unsafe {
         let enemy_flag = if (*cl).sess.sessionTeam as c_int == TEAM_RED {
             PW_BLUEFLAG
         } else {
             PW_REDFLAG
         };
 
-        if (*ent).flags & FL_DROPPED_ITEM != 0 {
+        if ent_dropped {
             // flag is not at home, return it by teleporting it back
             PrintCTFMessage(
                 ctx,
-                (*other).s.number,
+                num,
                 team,
                 ctfMsg_t::CTFMESSAGE_PLAYER_RETURNED_FLAG as c_int,
             );
-            let other_id = ctx.entity_id_of(other).unwrap();
-            AddScore(ctx, other_id, (*ent).r.currentOrigin, CTF_RECOVERY_BONUS);
+            AddScore(ctx, other, ent_origin, CTF_RECOVERY_BONUS);
             (*cl).pers.teamState.flagrecovery += 1;
             (*cl).pers.teamState.lastreturnedflag = ctx.world.level.time as f32;
-            let reset_flag = Team_ResetFlag(ctx, team);
-            let reset_flag_id = ctx.entity_id_of(reset_flag);
+            let reset_flag_id = Team_ResetFlag(ctx, team);
             Team_ReturnFlagSound(ctx, reset_flag_id, team);
             return 0;
         }
@@ -1018,7 +981,7 @@ pub fn Team_TouchOurFlag(
 
         PrintCTFMessage(
             ctx,
-            (*other).s.number,
+            num,
             team,
             ctfMsg_t::CTFMESSAGE_PLAYER_CAPTURED_FLAG as c_int,
         );
@@ -1029,68 +992,50 @@ pub fn Team_TouchOurFlag(
         ctx.world.globals.teamgame.last_capture_team = team;
 
         // Increase the team's score
-        AddTeamScore(ctx, (*ent).s.pos.trBase, (*cl).sess.sessionTeam as c_int, 1);
+        let cl_team = (*cl).sess.sessionTeam as c_int;
+        AddTeamScore(ctx, ent_trbase, cl_team, 1);
 
         (*cl).pers.teamState.captures += 1;
         (*cl).rewardTime = ctx.world.level.time + 2000; // REWARD_SPRITE_TIME
         (*cl).ps.persistant[persEnum_t::PERS_CAPTURES as usize] += 1;
 
-        let other_id = ctx.entity_id_of(other).unwrap();
         // other gets another 10 frag bonus
-        AddScore(ctx, other_id, (*ent).r.currentOrigin, CTF_CAPTURE_BONUS);
+        AddScore(ctx, other, ent_origin, CTF_CAPTURE_BONUS);
 
-        let ent_id = ctx.entity_id_of(ent);
-        Team_CaptureFlagSound(ctx, ent_id, team);
+        Team_CaptureFlagSound(ctx, Some(ent), team);
 
         // Ok, let's do the player loop, hand out the bonuses
         let max_clients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..max_clients {
-            let player = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
-            if (*player).inuse == 0 {
+            let pid = EntityId(i as u32);
+            if ctx.world.entity(pid).inuse == 0 {
                 continue;
             }
 
-            if (*((*player).client)).sess.sessionTeam as c_int != (*cl).sess.sessionTeam as c_int {
-                (*((*player).client)).pers.teamState.lasthurtcarrier = -5.0;
-            } else if (*((*player).client)).sess.sessionTeam as c_int
-                == (*cl).sess.sessionTeam as c_int
-            {
-                if player as *mut gentity_t != other {
-                    let player_id = ctx.entity_id_of(player).unwrap();
-                    AddScore(ctx, player_id, (*ent).r.currentOrigin, CTF_TEAM_BONUS);
+            // FLAG (task #7): player `.client` dereffed raw as Raven does. (recipe 2c)
+            let pcl = ctx.world.entity(pid).client;
+            if (*pcl).sess.sessionTeam as c_int != (*cl).sess.sessionTeam as c_int {
+                (*pcl).pers.teamState.lasthurtcarrier = -5.0;
+            } else if (*pcl).sess.sessionTeam as c_int == (*cl).sess.sessionTeam as c_int {
+                if pid != other {
+                    AddScore(ctx, pid, ent_origin, CTF_TEAM_BONUS);
                 }
                 // award extra points for capture assists
-                if (*((*player).client)).pers.teamState.lastreturnedflag + 10000.0
-                    > ctx.world.level.time as f32
-                {
-                    let player_id = ctx.entity_id_of(player).unwrap();
+                if (*pcl).pers.teamState.lastreturnedflag + 10000.0 > ctx.world.level.time as f32 {
                     // CTF_RETURN_FLAG_ASSIST_TIMEOUT = 10000 (g_team.h:22)
-                    AddScore(
-                        ctx,
-                        player_id,
-                        (*ent).r.currentOrigin,
-                        CTF_RETURN_FLAG_ASSIST_BONUS,
-                    );
+                    AddScore(ctx, pid, ent_origin, CTF_RETURN_FLAG_ASSIST_BONUS);
                     (*cl).pers.teamState.assists += 1;
 
-                    (*((*player).client)).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] +=
-                        1;
-                    (*((*player).client)).rewardTime = ctx.world.level.time + 2000;
-                } else if (*((*player).client)).pers.teamState.lastfraggedcarrier + 10000.0
+                    (*pcl).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] += 1;
+                    (*pcl).rewardTime = ctx.world.level.time + 2000;
+                } else if (*pcl).pers.teamState.lastfraggedcarrier + 10000.0
                     > ctx.world.level.time as f32
                 {
-                    let player_id = ctx.entity_id_of(player).unwrap();
                     // CTF_FRAG_CARRIER_ASSIST_TIMEOUT = 10000 (g_team.h:21)
-                    AddScore(
-                        ctx,
-                        player_id,
-                        (*ent).r.currentOrigin,
-                        CTF_FRAG_CARRIER_ASSIST_BONUS,
-                    );
+                    AddScore(ctx, pid, ent_origin, CTF_FRAG_CARRIER_ASSIST_BONUS);
                     (*cl).pers.teamState.assists += 1;
-                    (*((*player).client)).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] +=
-                        1;
-                    (*((*player).client)).rewardTime = ctx.world.level.time + 2000;
+                    (*pcl).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] += 1;
+                    (*pcl).rewardTime = ctx.world.level.time + 2000;
                 }
             }
         }
@@ -1111,15 +1056,17 @@ pub fn Team_TouchEnemyFlag(
     other: EntityId,
     team: c_int,
 ) -> c_int {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    let other: *mut gentity_t = ctx.entity_mut(other);
+    // EntityId params. Entity fields route through the checked arena
+    // accessor; the `.client` pointer is dereffed raw (see FLAG below).
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
+    // Raven does. (recipe 2c)
+    let cl = ctx.world.entity(other).client;
+    let num = ctx.world.entity(other).s.number;
+    let ent_origin = ctx.world.entity(ent).r.currentOrigin;
     unsafe {
-        let cl = (*other).client;
-
         PrintCTFMessage(
             ctx,
-            (*other).s.number,
+            num,
             team,
             ctfMsg_t::CTFMESSAGE_PLAYER_GOT_FLAG as c_int,
         );
@@ -1132,10 +1079,9 @@ pub fn Team_TouchEnemyFlag(
 
         Team_SetFlagStatus(ctx, team, 1); // FLAG_TAKEN
 
-        let other_id = ctx.entity_id_of(other).unwrap();
-        AddScore(ctx, other_id, (*ent).r.currentOrigin, CTF_FLAG_BONUS);
+        AddScore(ctx, other, ent_origin, CTF_FLAG_BONUS);
         (*cl).pers.teamState.flagsince = ctx.world.level.time as f32;
-        Team_TakeFlagSound(ctx, ctx.entity_id_of(ent), team);
+        Team_TakeFlagSound(ctx, Some(ent), team);
 
         -1 // Do not respawn this automatically, but do delete it if it was FL_DROPPED
     }
@@ -1145,98 +1091,72 @@ pub fn Team_TouchEnemyFlag(
 ///
 /// Source: `oracle/codemp/game/g_team.c:848-871`
 pub fn Pickup_Team(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_int {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    let other: *mut gentity_t = ctx.entity_mut(other);
-    unsafe {
-        let classname = CStr::from_ptr((*ent).classname);
-        let team = if classname == c"team_CTF_redflag" {
-            TEAM_RED
-        } else if classname == c"team_CTF_blueflag" {
-            TEAM_BLUE
-        } else if classname == c"team_CTF_neutralflag" {
-            TEAM_FREE
-        } else {
-            // PrintMsg(other, "Don't know what team the flag is on.\n") — dead.
-            return 0;
-        };
+    // FLAG (task #7): `.classname` is a `*mut c_char` (bg/spawn string), read raw
+    // via the safe entity borrow. (recipe 2c)
+    let classname_ptr = ctx.world.entity(ent).classname;
+    let classname = unsafe { CStr::from_ptr(classname_ptr) };
+    let team = if classname == c"team_CTF_redflag" {
+        TEAM_RED
+    } else if classname == c"team_CTF_blueflag" {
+        TEAM_BLUE
+    } else if classname == c"team_CTF_neutralflag" {
+        TEAM_FREE
+    } else {
+        // PrintMsg(other, "Don't know what team the flag is on.\n") — dead.
+        return 0;
+    };
 
-        let cl = (*other).client;
-        if team == (*cl).sess.sessionTeam as c_int {
-            Team_TouchOurFlag(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                ctx.entity_id_of(other).unwrap(),
-                team,
-            )
-        } else {
-            Team_TouchEnemyFlag(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                ctx.entity_id_of(other).unwrap(),
-                team,
-            )
-        }
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw. (recipe 2c)
+    let cl = ctx.world.entity(other).client;
+    let cl_team = unsafe { (*cl).sess.sessionTeam } as c_int;
+    if team == cl_team {
+        Team_TouchOurFlag(ctx, ent, other, team)
+    } else {
+        Team_TouchEnemyFlag(ctx, ent, other, team)
     }
 }
 
 /// Raven `Team_GetLocation`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:880-909`
-pub fn Team_GetLocation(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut best: *mut gentity_t = core::ptr::null_mut();
-        let mut bestlen: f32 = 3.0 * 8192.0 * 8192.0;
+pub fn Team_GetLocation(ctx: &mut GameContext, ent: EntityId) -> Option<EntityId> {
+    let mut best: Option<EntityId> = None;
+    let mut bestlen: f32 = 3.0 * 8192.0 * 8192.0;
 
-        let mut origin = [0.0f32; 3];
-        origin[0] = (*ent).r.currentOrigin[0];
-        origin[1] = (*ent).r.currentOrigin[1];
-        origin[2] = (*ent).r.currentOrigin[2];
+    let origin = ctx.world.entity(ent).r.currentOrigin;
 
-        let mut eloc = ctx.world.level.locationHead;
-        while !eloc.is_null() {
-            let len = (origin[0] - (*eloc).r.currentOrigin[0])
-                * (origin[0] - (*eloc).r.currentOrigin[0])
-                + (origin[1] - (*eloc).r.currentOrigin[1])
-                    * (origin[1] - (*eloc).r.currentOrigin[1])
-                + (origin[2] - (*eloc).r.currentOrigin[2])
-                    * (origin[2] - (*eloc).r.currentOrigin[2]);
+    // `level.locationHead` is a raw `*mut gentity_t` chain-head; convert it to a
+    // handle and walk `nextTrain` (already `Option<EntityId>`) through the arena.
+    let mut eloc = ctx.entity_id_of(ctx.world.level.locationHead);
+    while let Some(eid) = eloc {
+        let eloc_origin = ctx.world.entity(eid).r.currentOrigin;
+        let len = (origin[0] - eloc_origin[0]) * (origin[0] - eloc_origin[0])
+            + (origin[1] - eloc_origin[1]) * (origin[1] - eloc_origin[1])
+            + (origin[2] - eloc_origin[2]) * (origin[2] - eloc_origin[2]);
 
-            if len > bestlen {
-                eloc = match (*eloc).nextTrain {
-                    Some(id) => &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t,
-                    None => core::ptr::null_mut(),
-                };
-                continue;
-            }
-
-            if trap::InPVS(
-                ctx.engine,
-                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                    &origin as *const vec3_t,
-                    &(*eloc).r.currentOrigin as *const vec3_t,
-                ),
-            ) == 0
-            {
-                eloc = match (*eloc).nextTrain {
-                    Some(id) => &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t,
-                    None => core::ptr::null_mut(),
-                };
-                continue;
-            }
-
-            bestlen = len;
-            best = eloc;
-            eloc = match (*eloc).nextTrain {
-                Some(id) => &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t,
-                None => core::ptr::null_mut(),
-            };
+        if len > bestlen {
+            eloc = ctx.world.entity(eid).nextTrain;
+            continue;
         }
 
-        best
+        if trap::InPVS(
+            ctx.engine,
+            mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                &origin as *const vec3_t,
+                &eloc_origin as *const vec3_t,
+            ),
+        ) == 0
+        {
+            eloc = ctx.world.entity(eid).nextTrain;
+            continue;
+        }
+
+        bestlen = len;
+        best = Some(eid);
+        eloc = ctx.world.entity(eid).nextTrain;
     }
+
+    best
 }
 
 /// Raven `Team_GetLocationMsg`.
@@ -1248,41 +1168,36 @@ pub fn Team_GetLocationMsg(
     loc: *mut c_char,
     loclen: c_int,
 ) -> qboolean {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let best = Team_GetLocation(ctx, ctx.entity_id_of(ent).unwrap());
+    let Some(best) = Team_GetLocation(ctx, ent) else {
+        return qfalse;
+    };
 
-        if best.is_null() {
-            return qfalse;
+    // FLAG (task #7): `.message` is a `*mut c_char` (spawn string), read raw via
+    // the safe entity borrow. (recipe 2c)
+    let message_ptr = ctx.world.entity(best).message;
+    let message = unsafe { CStr::from_ptr(message_ptr) }.to_string_lossy();
+
+    // Oracle gates on the original `best->count`, then clamps and writes the
+    // clamped value back into the entity (g_team.c:928-933).
+    let formatted = if ctx.world.entity(best).count != 0 {
+        if ctx.world.entity(best).count < 0 {
+            ctx.world.entity_mut(best).count = 0;
         }
+        if ctx.world.entity(best).count > 7 {
+            ctx.world.entity_mut(best).count = 7;
+        }
+        let count = ctx.world.entity(best).count;
+        format!("^{}{}{}", (count as u8 + b'0') as char, message, "^7")
+    } else {
+        message.to_string()
+    };
 
-        let message = CStr::from_ptr((*best).message).to_string_lossy();
+    // FLAG (task #7): `loc` is an engine-owned out-buffer; the raw slice write
+    // stays raw. (recipe 2c)
+    let loc_slice = unsafe { core::slice::from_raw_parts_mut(loc, loclen as usize) };
+    write_cstr_field(loc_slice, &formatted);
 
-        // Oracle gates on the original `best->count`, then clamps and writes the
-        // clamped value back into the entity (g_team.c:928-933).
-        let formatted = if (*best).count != 0 {
-            if (*best).count < 0 {
-                (*best).count = 0;
-            }
-            if (*best).count > 7 {
-                (*best).count = 7;
-            }
-            format!(
-                "^{}{}{}",
-                ((*best).count as u8 + b'0') as char,
-                message,
-                "^7"
-            )
-        } else {
-            message.to_string()
-        };
-
-        let loc_slice = core::slice::from_raw_parts_mut(loc, loclen as usize);
-        write_cstr_field(loc_slice, &formatted);
-
-        qtrue
-    }
+    qtrue
 }
 
 /// Raven `SelectRandomTeamSpawnPoint`.
@@ -1293,106 +1208,106 @@ pub fn SelectRandomTeamSpawnPoint(
     teamstate: c_int,
     team: team_t,
     siegeClass: c_int,
-) -> *mut gentity_t {
-    unsafe {
-        let classname: &CStr = if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int {
-            if team == SIEGETEAM_TEAM1 as team_t {
-                c"info_player_siegeteam1"
+) -> Option<EntityId> {
+    let classname: &CStr = if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int {
+        if team == SIEGETEAM_TEAM1 as team_t {
+            c"info_player_siegeteam1"
+        } else {
+            c"info_player_siegeteam2"
+        }
+    } else {
+        if teamstate == TEAM_BEGIN {
+            if team == TEAM_RED as team_t {
+                c"team_CTF_redplayer"
+            } else if team == TEAM_BLUE as team_t {
+                c"team_CTF_blueplayer"
             } else {
-                c"info_player_siegeteam2"
+                return None;
             }
         } else {
-            if teamstate == TEAM_BEGIN {
-                if team == TEAM_RED as team_t {
-                    c"team_CTF_redplayer"
-                } else if team == TEAM_BLUE as team_t {
-                    c"team_CTF_blueplayer"
-                } else {
-                    return core::ptr::null_mut();
-                }
+            if team == TEAM_RED as team_t {
+                c"team_CTF_redspawn"
+            } else if team == TEAM_BLUE as team_t {
+                c"team_CTF_bluespawn"
             } else {
-                if team == TEAM_RED as team_t {
-                    c"team_CTF_redspawn"
-                } else if team == TEAM_BLUE as team_t {
-                    c"team_CTF_bluespawn"
-                } else {
-                    return core::ptr::null_mut();
-                }
-            }
-        };
-
-        let mustBeEnabled = ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int;
-
-        // MAX_TEAM_SPAWN_POINTS = 32 (g_team.c:950)
-        let mut count: c_int = 0;
-        let mut spots: [*mut gentity_t; 32] = [core::ptr::null_mut(); 32];
-        let mut spot: *mut gentity_t = core::ptr::null_mut();
-
-        loop {
-            let prev_spot_id = ctx.entity_id_of(spot);
-            spot = G_Find(ctx, prev_spot_id, fofs_classname(), classname.as_ptr());
-            let spot_id = ctx.entity_id_of(spot).unwrap();
-            if spot.is_null() {
-                break;
-            }
-
-            if SpotWouldTelefrag(ctx, spot_id) != 0 {
-                continue;
-            }
-
-            if mustBeEnabled && (*spot).genericValue1 == 0 {
-                continue;
-            }
-
-            spots[count as usize] = spot;
-            count += 1;
-            if count == 32 {
-                break;
+                return None;
             }
         }
+    };
 
-        if count == 0 {
-            return G_Find(
-                ctx,
-                ctx.entity_id_of(core::ptr::null_mut()),
-                fofs_classname(),
-                classname.as_ptr(),
-            );
+    let mustBeEnabled = ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int;
+
+    // MAX_TEAM_SPAWN_POINTS = 32 (g_team.c:950)
+    let mut count: c_int = 0;
+    let mut spots: [Option<EntityId>; 32] = [None; 32];
+    let mut spot: Option<EntityId> = None;
+
+    loop {
+        // Oracle's `while ((spot = G_Find(...)) != NULL)` — break on null before
+        // taking an id (the STAGE-1 body unwrapped pre-null-check, which would
+        // panic on the terminating iteration; oracle just exits the loop).
+        let s = G_Find(ctx, spot, fofs_classname(), classname.as_ptr());
+        spot = ctx.entity_id_of(s);
+        if s.is_null() {
+            break;
+        }
+        let spot_id = spot.unwrap();
+
+        if SpotWouldTelefrag(ctx, spot_id) != 0 {
+            continue;
         }
 
-        if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int && siegeClass >= 0 {
-            let mut class_spots: [*mut gentity_t; 32] = [core::ptr::null_mut(); 32];
-            let mut class_count: c_int = 0;
-            let mut i: c_int = 0;
+        if mustBeEnabled && ctx.world.entity(spot_id).genericValue1 == 0 {
+            continue;
+        }
 
-            while i < count {
-                if !spots[i as usize].is_null()
-                    && !(*spots[i as usize]).idealclass.is_null()
-                    && *(*spots[i as usize]).idealclass != 0
-                {
+        spots[count as usize] = spot;
+        count += 1;
+        if count == 32 {
+            break;
+        }
+    }
+
+    if count == 0 {
+        let s = G_Find(ctx, None, fofs_classname(), classname.as_ptr());
+        return ctx.entity_id_of(s);
+    }
+
+    if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int && siegeClass >= 0 {
+        let mut class_spots: [Option<EntityId>; 32] = [None; 32];
+        let mut class_count: c_int = 0;
+        let mut i: c_int = 0;
+
+        while i < count {
+            if let Some(sid) = spots[i as usize] {
+                // FLAG (task #7): `.idealclass` is a `*mut c_char` (spawn string);
+                // read the pointer via the safe entity borrow, deref raw. (recipe 2c)
+                let idealclass = ctx.world.entity(sid).idealclass;
+                if !idealclass.is_null() && unsafe { *idealclass } != 0 {
                     let bg_classes = &ctx.world.bg_state.bgSiegeClasses;
-                    let class_name = CStr::from_ptr(bg_classes[siegeClass as usize].name.as_ptr());
-                    let spot_class = CStr::from_ptr((*spots[i as usize]).idealclass);
+                    let class_name =
+                        unsafe { CStr::from_ptr(bg_classes[siegeClass as usize].name.as_ptr()) };
+                    let spot_class = unsafe { CStr::from_ptr(idealclass) };
                     if Q_stricmp(class_name.as_ptr(), spot_class.as_ptr()) == 0 {
                         class_spots[class_count as usize] = spots[i as usize];
                         class_count += 1;
                     }
                 }
-                i += 1;
             }
-
-            if class_count > 0 {
-                let selection = (ctx.world.bg_state.rng.rand() % class_count) as usize;
-                // Oracle returns `spots[selection]` here (g_team.c:1034), not
-                // `classSpots[selection]` — a Raven bug (selection is classCount-bounded
-                // but indexes the full spots array). Preserved (porting-rules §19).
-                return spots[selection];
-            }
+            i += 1;
         }
 
-        let selection = (ctx.world.bg_state.rng.rand() % count) as usize;
-        spots[selection]
+        if class_count > 0 {
+            let selection = (ctx.world.bg_state.rng.rand() % class_count) as usize;
+            // Oracle returns `spots[selection]` here (g_team.c:1034), not
+            // `classSpots[selection]` — a Raven bug (selection is classCount-bounded
+            // but indexes the full spots array). Preserved (porting-rules §19).
+            return spots[selection];
+        }
     }
+
+    let selection = (ctx.world.bg_state.rng.rand() % count) as usize;
+    spots[selection]
 }
 
 /// Raven `SelectCTFSpawnPoint`.
@@ -1405,19 +1320,19 @@ pub fn SelectCTFSpawnPoint(
     origin: &mut vec3_t,
     angles: &mut vec3_t,
 ) -> *mut gentity_t {
-    unsafe {
-        let spot = SelectRandomTeamSpawnPoint(ctx, teamstate, team, -1);
+    let Some(spot) = SelectRandomTeamSpawnPoint(ctx, teamstate, team, -1) else {
+        return SelectSpawnPoint(ctx, [0.0, 0.0, 0.0], origin, angles, team);
+    };
 
-        if spot.is_null() {
-            return SelectSpawnPoint(ctx, [0.0, 0.0, 0.0], origin, angles, team);
-        }
+    let s_origin = ctx.world.entity(spot).s.origin;
+    let s_angles = ctx.world.entity(spot).s.angles;
+    crate::q_math::_VectorCopy(s_origin, origin);
+    (*origin)[2] += 9.0;
+    crate::q_math::_VectorCopy(s_angles, angles);
 
-        crate::q_math::_VectorCopy((*spot).s.origin, origin);
-        (*origin)[2] += 9.0;
-        crate::q_math::_VectorCopy((*spot).s.angles, angles);
-
-        spot
-    }
+    // External callers (`g_client.rs`) consume a raw `*mut gentity_t`; reconstruct
+    // it from the handle at the return boundary (a cast, not a deref).
+    ctx.world.entity_mut(spot) as *mut gentity_t
 }
 
 /// Raven `SelectSiegeSpawnPoint`.
@@ -1431,19 +1346,19 @@ pub fn SelectSiegeSpawnPoint(
     origin: &mut vec3_t,
     angles: &mut vec3_t,
 ) -> *mut gentity_t {
-    unsafe {
-        let spot = SelectRandomTeamSpawnPoint(ctx, teamstate, team, siegeClass);
+    let Some(spot) = SelectRandomTeamSpawnPoint(ctx, teamstate, team, siegeClass) else {
+        return SelectSpawnPoint(ctx, [0.0, 0.0, 0.0], origin, angles, team);
+    };
 
-        if spot.is_null() {
-            return SelectSpawnPoint(ctx, [0.0, 0.0, 0.0], origin, angles, team);
-        }
+    let s_origin = ctx.world.entity(spot).s.origin;
+    let s_angles = ctx.world.entity(spot).s.angles;
+    crate::q_math::_VectorCopy(s_origin, origin);
+    (*origin)[2] += 9.0;
+    crate::q_math::_VectorCopy(s_angles, angles);
 
-        crate::q_math::_VectorCopy((*spot).s.origin, origin);
-        (*origin)[2] += 9.0;
-        crate::q_math::_VectorCopy((*spot).s.angles, angles);
-
-        spot
-    }
+    // External callers (`g_client.rs`) consume a raw `*mut gentity_t`; reconstruct
+    // it from the handle at the return boundary (a cast, not a deref).
+    ctx.world.entity_mut(spot) as *mut gentity_t
 }
 
 /// Raven `SortClients`.
@@ -1457,12 +1372,14 @@ pub fn SortClients(a: *const c_void, b: *const c_void) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_team.c:1103-1159`
 pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
+    // Raven does. (recipe 2c)
+    let ent_cl = ctx.world.entity(ent).client;
     unsafe {
-        if (*((*ent).client)).pers.teamInfo == 0 {
+        if (*ent_cl).pers.teamInfo == 0 {
             return;
         }
+        let ent_team = (*ent_cl).sess.sessionTeam as c_int;
 
         // TEAM_MAXOVERLAY = 32 (bg_public.h:1031)
         let mut clients: [c_int; 32] = [0; 32];
@@ -1473,13 +1390,11 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
             if cnt >= 32 {
                 break;
             }
-            let player =
-                &mut ctx.world.g_entities[ctx.world.level.sortedClients[i as usize] as usize];
-            if (*player).inuse != 0
-                && (*((*player).client)).sess.sessionTeam as c_int
-                    == (*((*ent).client)).sess.sessionTeam as c_int
-            {
-                clients[cnt as usize] = ctx.world.level.sortedClients[i as usize];
+            let pnum = ctx.world.level.sortedClients[i as usize];
+            let pid = EntityId(pnum as u32);
+            let pcl = ctx.world.entity(pid).client;
+            if ctx.world.entity(pid).inuse != 0 && (*pcl).sess.sessionTeam as c_int == ent_team {
+                clients[cnt as usize] = pnum;
                 cnt += 1;
             }
         }
@@ -1500,24 +1415,23 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
             if cnt >= 32 {
                 break;
             }
-            let player = &mut ctx.world.g_entities[i as usize];
-            if (*player).inuse != 0
-                && (*((*player).client)).sess.sessionTeam as c_int
-                    == (*((*ent).client)).sess.sessionTeam as c_int
-            {
-                let h = (*((*player).client)).ps.stats[STAT_HEALTH as usize];
-                let a = (*((*player).client)).ps.stats[STAT_ARMOR as usize];
+            let pid = EntityId(i as u32);
+            let pcl = ctx.world.entity(pid).client;
+            if ctx.world.entity(pid).inuse != 0 && (*pcl).sess.sessionTeam as c_int == ent_team {
+                let h = (*pcl).ps.stats[STAT_HEALTH as usize];
+                let a = (*pcl).ps.stats[STAT_ARMOR as usize];
                 let h = if h < 0 { 0 } else { h };
                 let a = if a < 0 { 0 } else { a };
+                let powerups = ctx.world.entity(pid).s.powerups;
 
                 let entry = format!(
                     " {} {} {} {} {} {}",
                     i,
-                    (*((*player).client)).pers.teamState.location,
+                    (*pcl).pers.teamState.location,
                     h,
                     a,
-                    (*((*player).client)).ps.weapon,
-                    (*player).s.powerups
+                    (*pcl).ps.weapon,
+                    powerups
                 );
                 let entry_bytes = entry.as_bytes();
                 let entry_len = entry_bytes.len();
@@ -1534,8 +1448,7 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
             }
         }
 
-        let ent_idx = ((ent as usize) - (ctx.world.g_entities.as_ptr() as usize))
-            / core::mem::size_of::<gentity_t>();
+        let ent_idx = ent.index();
         let cmd = format!(
             "tinfo {} {}",
             cnt,
@@ -1555,54 +1468,54 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_team.c:1161-1202`
 pub fn CheckTeamStatus(ctx: &mut GameContext) {
-    unsafe {
-        const TEAM_LOCATION_UPDATE_TIME: c_int = 1000;
+    const TEAM_LOCATION_UPDATE_TIME: c_int = 1000;
 
-        if ctx.world.level.time - ctx.world.level.lastTeamLocationTime <= TEAM_LOCATION_UPDATE_TIME
-        {
-            return;
+    if ctx.world.level.time - ctx.world.level.lastTeamLocationTime <= TEAM_LOCATION_UPDATE_TIME {
+        return;
+    }
+
+    ctx.world.level.lastTeamLocationTime = ctx.world.level.time;
+
+    // FLAG (task #7): `.client` read via the safe entity borrow, dereffed raw as
+    // Raven does. (recipe 2c)
+    let max_clients = ctx.world.cvars.g_maxclients.integer;
+    for i in 0..max_clients {
+        let eid = EntityId(i as u32);
+        let client = ctx.world.entity(eid).client;
+
+        if client.is_null() {
+            continue;
         }
 
-        ctx.world.level.lastTeamLocationTime = ctx.world.level.time;
-
-        let max_clients = ctx.world.cvars.g_maxclients.integer;
-        for i in 0..max_clients {
-            let ent = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
-
-            if (*ent).client.is_null() {
-                continue;
-            }
-
-            if (*((*ent).client)).pers.connected != CON_CONNECTED as c_int {
-                continue;
-            }
-
-            if (*ent).inuse != 0
-                && ((*((*ent).client)).sess.sessionTeam as c_int == TEAM_RED
-                    || (*((*ent).client)).sess.sessionTeam as c_int == TEAM_BLUE)
-            {
-                let loc = Team_GetLocation(ctx, EntityId(i as u32));
-                if !loc.is_null() {
-                    (*((*ent).client)).pers.teamState.location = (*loc).health;
-                } else {
-                    (*((*ent).client)).pers.teamState.location = 0;
-                }
-            }
+        if unsafe { (*client).pers.connected } != CON_CONNECTED as c_int {
+            continue;
         }
 
-        for i in 0..max_clients {
-            let ent = &mut ctx.world.g_entities[i as usize];
-
-            if (*((*ent).client)).pers.connected != CON_CONNECTED as c_int {
-                continue;
+        let team = unsafe { (*client).sess.sessionTeam } as c_int;
+        if ctx.world.entity(eid).inuse != 0 && (team == TEAM_RED || team == TEAM_BLUE) {
+            let loc = Team_GetLocation(ctx, eid);
+            let location = match loc {
+                Some(lid) => ctx.world.entity(lid).health,
+                None => 0,
+            };
+            unsafe {
+                (*client).pers.teamState.location = location;
             }
+        }
+    }
 
-            if (*ent).inuse != 0
-                && ((*((*ent).client)).sess.sessionTeam as c_int == TEAM_RED
-                    || (*((*ent).client)).sess.sessionTeam as c_int == TEAM_BLUE)
-            {
-                TeamplayInfoMessage(ctx, EntityId(i as u32));
-            }
+    for i in 0..max_clients {
+        let eid = EntityId(i as u32);
+        // Oracle's second loop derefs `ent->client` without a null guard.
+        let client = ctx.world.entity(eid).client;
+
+        if unsafe { (*client).pers.connected } != CON_CONNECTED as c_int {
+            continue;
+        }
+
+        let team = unsafe { (*client).sess.sessionTeam } as c_int;
+        if ctx.world.entity(eid).inuse != 0 && (team == TEAM_RED || team == TEAM_BLUE) {
+            TeamplayInfoMessage(ctx, eid);
         }
     }
 }

@@ -30,17 +30,6 @@ use crate::NPC_utils::{
 };
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
-// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
-// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
-// precedent.
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 // Local state enums
 // Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17
 const LSTATE_NONE: i32 = 0;
@@ -97,18 +86,24 @@ pub fn NPC_Probe_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:49-170`
 pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+
+    // Update our angles regardless
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
+
     unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
-        // Update our angles regardless
-        NPC_UpdateAngles(ctx, qtrue, qtrue);
-
         // If we have an enemy, we should try to hover at about enemy eye level
-        if let Some(enemy_id) = (*npc).enemy {
-            let enemy = &mut ctx.world.g_entities[enemy_id.0 as usize];
+        if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
             // Find the height difference
-            let mut dif = (*enemy).r.currentOrigin[2] - (*npc).r.currentOrigin[2];
+            let enemy_z = ctx.world.entity(enemy_id).r.currentOrigin[2];
+            let npc_z = ctx.world.entity(npc_id).r.currentOrigin[2];
+            let mut dif = enemy_z - npc_z;
 
             // cap to prevent dramatic height shifts
             if dif.abs() > 8.0 {
@@ -116,19 +111,19 @@ pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
                     dif = if dif < 0.0 { -16.0 } else { 16.0 };
                 }
 
-                (*((*npc).client)).ps.velocity[2] = ((*((*npc).client)).ps.velocity[2] + dif) / 2.0;
+                (*client).ps.velocity[2] = ((*client).ps.velocity[2] + dif) / 2.0;
             }
         } else {
-            let mut goal: Option<*mut gentity_t> = None;
+            let goal_id = if (*npc_info).goalEntity.is_some() {
+                (*npc_info).goalEntity
+            } else {
+                (*npc_info).lastGoalEntity
+            };
 
-            if let Some(goal_entity_id) = (*npc_info).goalEntity {
-                goal = Some(&mut ctx.world.g_entities[goal_entity_id.0 as usize]);
-            } else if let Some(last_goal_id) = (*npc_info).lastGoalEntity {
-                goal = Some(&mut ctx.world.g_entities[last_goal_id.0 as usize]);
-            }
-
-            if let Some(goal_ent) = goal {
-                let mut dif = (*goal_ent).r.currentOrigin[2] - (*npc).r.currentOrigin[2];
+            if let Some(goal_id) = goal_id {
+                let goal_z = ctx.world.entity(goal_id).r.currentOrigin[2];
+                let npc_z = ctx.world.entity(npc_id).r.currentOrigin[2];
+                let dif = goal_z - npc_z;
 
                 if dif.abs() > 24.0 {
                     ctx.world.globals.ucmd.upmove = if ctx.world.globals.ucmd.upmove < 0 {
@@ -137,38 +132,38 @@ pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
                         4
                     };
                 } else {
-                    if (*((*npc).client)).ps.velocity[2] != 0.0 {
-                        (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY;
+                    if (*client).ps.velocity[2] != 0.0 {
+                        (*client).ps.velocity[2] *= VELOCITY_DECAY;
 
-                        if (*((*npc).client)).ps.velocity[2].abs() < 2.0 {
-                            (*((*npc).client)).ps.velocity[2] = 0.0;
+                        if (*client).ps.velocity[2].abs() < 2.0 {
+                            (*client).ps.velocity[2] = 0.0;
                         }
                     }
                 }
-            } else if (*((*npc).client)).ps.velocity[2] != 0.0 {
+            } else if (*client).ps.velocity[2] != 0.0 {
                 // Apply friction
-                (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY;
+                (*client).ps.velocity[2] *= VELOCITY_DECAY;
 
-                if (*((*npc).client)).ps.velocity[2].abs() < 1.0 {
-                    (*((*npc).client)).ps.velocity[2] = 0.0;
+                if (*client).ps.velocity[2].abs() < 1.0 {
+                    (*client).ps.velocity[2] = 0.0;
                 }
             }
         }
 
         // Apply friction
-        if (*((*npc).client)).ps.velocity[0] != 0.0 {
-            (*((*npc).client)).ps.velocity[0] *= VELOCITY_DECAY;
+        if (*client).ps.velocity[0] != 0.0 {
+            (*client).ps.velocity[0] *= VELOCITY_DECAY;
 
-            if (*((*npc).client)).ps.velocity[0].abs() < 1.0 {
-                (*((*npc).client)).ps.velocity[0] = 0.0;
+            if (*client).ps.velocity[0].abs() < 1.0 {
+                (*client).ps.velocity[0] = 0.0;
             }
         }
 
-        if (*((*npc).client)).ps.velocity[1] != 0.0 {
-            (*((*npc).client)).ps.velocity[1] *= VELOCITY_DECAY;
+        if (*client).ps.velocity[1] != 0.0 {
+            (*client).ps.velocity[1] *= VELOCITY_DECAY;
 
-            if (*((*npc).client)).ps.velocity[1].abs() < 1.0 {
-                (*((*npc).client)).ps.velocity[1] = 0.0;
+            if (*client).ps.velocity[1].abs() < 1.0 {
+                (*client).ps.velocity[1] = 0.0;
             }
         }
     }
@@ -178,17 +173,17 @@ pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:182-209`
 pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
 
-        let mut right = [0.0; 3];
-        AngleVectors(
-            (*((*npc).client)).renderInfo.eyeAngles,
-            None,
-            Some(&mut right),
-            None,
-        );
+    let mut right = [0.0; 3];
+    unsafe {
+        AngleVectors((*client).renderInfo.eyeAngles, None, Some(&mut right), None);
 
         // Pick a random strafe direction, then check to see if doing a strafe would be
         // reasonable valid
@@ -198,23 +193,25 @@ pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
             1
         };
         let mut end = [0.0; 3];
+        let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
         _VectorMA(
-            (*npc).r.currentOrigin,
+            current_origin,
             (HUNTER_STRAFE_DIS * dir) as f32,
             right,
             &mut end,
         );
 
         let mut tr: trace_t = core::mem::zeroed();
+        let s_number = ctx.world.entity(npc_id).s.number;
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
                 &mut tr as *mut trace_t,
-                &(*npc).r.currentOrigin as *const vec3_t,
+                &current_origin as *const vec3_t,
                 core::ptr::null(),
                 core::ptr::null(),
                 &end as *const vec3_t,
-                (*npc).s.number,
+                s_number,
                 MASK_SOLID,
             ),
         );
@@ -222,18 +219,19 @@ pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
         // Close enough
         if tr.fraction > 0.9 {
             _VectorMA(
-                (*((*npc).client)).ps.velocity,
+                (*client).ps.velocity,
                 (HUNTER_STRAFE_VEL * dir) as f32,
                 right,
-                &mut (*((*npc).client)).ps.velocity,
+                &mut (*client).ps.velocity,
             );
 
             // Add a slight upward push
-            (*((*npc).client)).ps.velocity[2] += HUNTER_UPWARD_PUSH as f32;
+            (*client).ps.velocity[2] += HUNTER_UPWARD_PUSH as f32;
 
             // Set the strafe start time so we can do a controlled roll
-            (*npc_info).standTime =
-                ctx.world.level.time + 3000 + (ctx.world.bg_state.rng.random() * 500.0) as i32;
+            let level_time = ctx.world.level.time;
+            let roll = (ctx.world.bg_state.rng.random() * 500.0) as i32;
+            (*npc_info).standTime = level_time + 3000 + roll;
         }
     }
 }
@@ -242,22 +240,26 @@ pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:220-261`
 pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+
+    let mut forward = [0.0; 3];
+    let mut distance = 0.0;
+
+    NPC_SetAnim(
+        ctx,
+        npc_id,
+        SETANIM_BOTH,
+        BOTH_RUN1 as c_int,
+        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+    );
+
     unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
-        let mut forward = [0.0; 3];
-        let mut distance = 0.0;
-
-        let npc_id = ctx.entity_id_of(npc).unwrap();
-        NPC_SetAnim(
-            ctx,
-            npc_id,
-            SETANIM_BOTH,
-            BOTH_RUN1 as c_int,
-            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-        );
-
         // If we're not supposed to stand still, pursue the player
         if (*npc_info).standTime < ctx.world.level.time {
             // Only strafe when we can see the player
@@ -275,7 +277,7 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
         // Only try and navigate if the player is visible
         if visible == 0 {
             // Move towards our goal
-            (*npc_info).goalEntity = (*npc).enemy;
+            (*npc_info).goalEntity = ctx.world.entity(npc_id).enemy;
             (*npc_info).goalRadius = 12;
 
             // Get our direction from the navigator if we can't see our target
@@ -283,13 +285,10 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
                 return;
             }
         } else {
-            if let Some(enemy_id) = (*npc).enemy {
-                let enemy = &mut ctx.world.g_entities[enemy_id.0 as usize];
-                _VectorSubtract(
-                    (*enemy).r.currentOrigin,
-                    (*npc).r.currentOrigin,
-                    &mut forward,
-                );
+            if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+                let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
+                let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+                _VectorSubtract(enemy_origin, npc_origin, &mut forward);
                 distance = VectorNormalize(&mut forward);
             }
         }
@@ -297,10 +296,10 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
         let speed = HUNTER_FORWARD_BASE_SPEED as f32
             + HUNTER_FORWARD_MULTIPLIER as f32 * ctx.world.cvars.g_spskill.integer as f32;
         _VectorMA(
-            (*((*npc).client)).ps.velocity,
+            (*client).ps.velocity,
             speed,
             forward,
-            &mut (*((*npc).client)).ps.velocity,
+            &mut (*client).ps.velocity,
         );
     }
 }
@@ -309,128 +308,125 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:268-324`
 pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        let mut muzzle1 = [0.0; 3];
-        let mut enemy_org1 = [0.0; 3];
-        let mut delta1 = [0.0; 3];
-        let mut angleToEnemy1 = [0.0; 3];
-        let mut forward = [0.0; 3];
-        let mut vright = [0.0; 3];
-        let mut up = [0.0; 3];
+    let mut muzzle1 = [0.0; 3];
+    let mut enemy_org1 = [0.0; 3];
+    let mut delta1 = [0.0; 3];
+    let mut angleToEnemy1 = [0.0; 3];
+    let mut forward = [0.0; 3];
+    let mut vright = [0.0; 3];
+    let mut up = [0.0; 3];
 
-        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
 
-        let gen_bolt_1 = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                (*npc).ghoul2,
-                0,
-                c"*flash".to_owned(),
-            ),
+    let ghoul2 = ctx.world.entity(npc_id).ghoul2;
+    let gen_bolt_1 = trap::G2API_AddBolt(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash".to_owned()),
+    );
+
+    let current_angles = ctx.world.entity(npc_id).r.currentAngles;
+    let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let model_scale = ctx.world.entity(npc_id).modelScale;
+    let level_time = ctx.world.level.time;
+    trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+            ghoul2,
+            0,
+            gen_bolt_1,
+            &mut boltMatrix as *mut mdxaBone_t,
+            &current_angles as *const vec3_t,
+            &current_origin as *const vec3_t,
+            level_time,
+            core::ptr::null_mut(),
+            &model_scale as *const vec3_t,
+        ),
+    );
+
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
+
+    G_PlayEffectID(
+        G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+        muzzle1,
+        [0.0; 3],
+    );
+
+    G_Sound(
+        ctx,
+        Some(npc_id),
+        CHAN_AUTO,
+        G_SoundIndex(c"sound/chars/probe/misc/fire".as_ptr()),
+    );
+
+    if ctx.world.entity(npc_id).health != 0 {
+        // `ctx.entity_id_of(enemy_ptr)` round-trips the entity's `.enemy`
+        // handle (None when null), so read it straight off the accessor.
+        let enemy_eid = ctx.world.entity(npc_id).enemy;
+        CalcEntitySpot(ctx, enemy_eid, SPOT_CHEST, &mut enemy_org1);
+        enemy_org1[0] += ctx.world.bg_state.rng.Q_irand(0, 10) as f32;
+        enemy_org1[1] += ctx.world.bg_state.rng.Q_irand(0, 10) as f32;
+        _VectorSubtract(enemy_org1, muzzle1, &mut delta1);
+        vectoangles(delta1, &mut angleToEnemy1);
+        AngleVectors(
+            angleToEnemy1,
+            Some(&mut forward),
+            Some(&mut vright),
+            Some(&mut up),
         );
-
-        trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                (*npc).ghoul2,
-                0,
-                gen_bolt_1,
-                &mut boltMatrix as *mut mdxaBone_t,
-                &(*npc).r.currentAngles as *const vec3_t,
-                &(*npc).r.currentOrigin as *const vec3_t,
-                ctx.world.level.time,
-                core::ptr::null_mut(),
-                &(*npc).modelScale as *const vec3_t,
-            ),
+    } else {
+        let current_angles = ctx.world.entity(npc_id).r.currentAngles;
+        AngleVectors(
+            current_angles,
+            Some(&mut forward),
+            Some(&mut vright),
+            Some(&mut up),
         );
-
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
-
-        G_PlayEffectID(
-            G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
-            muzzle1,
-            [0.0; 3],
-        );
-
-        let npc_id = ctx.entity_id_of(npc);
-        G_Sound(
-            ctx,
-            npc_id,
-            CHAN_AUTO,
-            G_SoundIndex(c"sound/chars/probe/misc/fire".as_ptr()),
-        );
-
-        let npc_id2 = ctx.entity_id_of(npc).unwrap();
-        if (*npc).health != 0 {
-            let enemy_ptr = if let Some(enemy_id) = (*npc).enemy {
-                &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t
-            } else {
-                core::ptr::null_mut()
-            };
-            let enemy_eid = ctx.entity_id_of(enemy_ptr);
-            CalcEntitySpot(ctx, enemy_eid, SPOT_CHEST, &mut enemy_org1);
-            enemy_org1[0] += ctx.world.bg_state.rng.Q_irand(0, 10) as f32;
-            enemy_org1[1] += ctx.world.bg_state.rng.Q_irand(0, 10) as f32;
-            _VectorSubtract(enemy_org1, muzzle1, &mut delta1);
-            vectoangles(delta1, &mut angleToEnemy1);
-            AngleVectors(
-                angleToEnemy1,
-                Some(&mut forward),
-                Some(&mut vright),
-                Some(&mut up),
-            );
-        } else {
-            AngleVectors(
-                (*npc).r.currentAngles,
-                Some(&mut forward),
-                Some(&mut vright),
-                Some(&mut up),
-            );
-        }
-
-        let npc_id3 = ctx.entity_id_of(npc).unwrap();
-        let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id3, 0);
-
-        (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
-        (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
-
-        if ctx.world.cvars.g_spskill.integer <= 1 {
-            (*missile).damage = 5;
-        } else {
-            (*missile).damage = 10;
-        }
-
-        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-        (*missile).methodOfDeath = MOD_UNKNOWN as c_int;
-        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
     }
+
+    let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, 0);
+    let missile_id = ctx.entity_id_of(missile).unwrap();
+
+    ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+    ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
+
+    if ctx.world.cvars.g_spskill.integer <= 1 {
+        ctx.world.entity_mut(missile_id).damage = 5;
+    } else {
+        ctx.world.entity_mut(missile_id).damage = 10;
+    }
+
+    ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
+    ctx.world.entity_mut(missile_id).methodOfDeath = MOD_UNKNOWN as c_int;
+    ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 }
 
 /// Raven `ImperialProbe_Ranged`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:331-363`
 pub fn ImperialProbe_Ranged(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+
+    if TIMER_Done(ctx, Some(npc_id), c"attackDelay".as_ptr()) != 0 {
+        let (_delay_min, _delay_max) = if ctx.world.cvars.g_spskill.integer == 0 {
+            (500, 3000)
+        } else if ctx.world.cvars.g_spskill.integer > 1 {
+            (500, 2000)
+        } else {
+            (300, 1500)
+        };
+
+        let atk_delay = ctx.world.bg_state.rng.Q_irand(500, 3000);
+        TIMER_Set(ctx, Some(npc_id), c"attackDelay".as_ptr(), atk_delay);
+        ImperialProbe_FireBlaster(ctx);
+    }
+
     unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
-        if TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay".as_ptr()) != 0 {
-            let (_delay_min, _delay_max) = if ctx.world.cvars.g_spskill.integer == 0 {
-                (500, 3000)
-            } else if ctx.world.cvars.g_spskill.integer > 1 {
-                (500, 2000)
-            } else {
-                (300, 1500)
-            };
-
-            let npc_id = ctx.entity_id_of(npc);
-            let atk_delay = ctx.world.bg_state.rng.Q_irand(500, 3000);
-            TIMER_Set(ctx, npc_id, c"attackDelay".as_ptr(), atk_delay);
-            ImperialProbe_FireBlaster(ctx);
-        }
-
         if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
             ImperialProbe_Hunt(ctx, visible, advance);
         }
@@ -441,77 +437,69 @@ pub fn ImperialProbe_Ranged(ctx: &mut GameContext, visible: qboolean, advance: q
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:377-426`
 pub fn ImperialProbe_AttackDecision(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        // Always keep a good height off the ground
-        ImperialProbe_MaintainHeight(ctx);
+    // Always keep a good height off the ground
+    ImperialProbe_MaintainHeight(ctx);
 
-        let npc_id = ctx.entity_id_of(npc);
-        let npc_id2 = ctx.entity_id_of(npc).unwrap();
-        // randomly talk
-        if TIMER_Done(ctx, npc_id, c"patrolNoise".as_ptr()) != 0 {
-            if TIMER_Done(ctx, ctx.entity_id_of(npc), c"angerNoise".as_ptr()) != 0 {
-                let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-                let npc_id3 = ctx.entity_id_of(npc).unwrap();
-                G_SoundOnEnt(ctx, npc_id3, CHAN_AUTO, cstr(&s).as_ptr());
+    // randomly talk
+    if TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
+        if TIMER_Done(ctx, Some(npc_id), c"angerNoise".as_ptr()) != 0 {
+            let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
+            let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
+            G_SoundOnEnt(ctx, npc_id, CHAN_AUTO, cstr(&s).as_ptr());
 
-                let npc_id4 = ctx.entity_id_of(npc);
-                let patrol_delay = ctx.world.bg_state.rng.Q_irand(4000, 10000);
-                TIMER_Set(ctx, npc_id4, c"patrolNoise".as_ptr(), patrol_delay);
-            }
+            let patrol_delay = ctx.world.bg_state.rng.Q_irand(4000, 10000);
+            TIMER_Set(ctx, Some(npc_id), c"patrolNoise".as_ptr(), patrol_delay);
         }
+    }
 
-        // If we don't have an enemy, just idle
-        if NPC_CheckEnemyExt(ctx, 0) == 0 {
-            ImperialProbe_Idle(ctx);
+    // If we don't have an enemy, just idle
+    if NPC_CheckEnemyExt(ctx, 0) == 0 {
+        ImperialProbe_Idle(ctx);
+        return;
+    }
+
+    NPC_SetAnim(
+        ctx,
+        npc_id,
+        SETANIM_BOTH,
+        BOTH_RUN1 as c_int,
+        SETANIM_FLAG_NORMAL,
+    );
+
+    // Rate our distance to the target, and our visibility
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let enemy_origin = if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+        ctx.world.entity(enemy_id).r.currentOrigin
+    } else {
+        [0.0; 3]
+    };
+    let distance = DistanceHorizontalSquared(npc_origin, enemy_origin) as c_int;
+    let visible = if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+        NPC_ClearLOS4(ctx, Some(enemy_id))
+    } else {
+        0
+    };
+    let advance = if distance > MIN_DISTANCE_SQR { 1 } else { 0 };
+
+    // If we cannot see our target, move to see it
+    if visible == 0 {
+        let script_flags = unsafe { (*npc_info).scriptFlags };
+        if (script_flags & SCF_CHASE_ENEMIES) != 0 {
+            ImperialProbe_Hunt(ctx, visible, advance);
             return;
         }
-
-        NPC_SetAnim(
-            ctx,
-            npc_id2,
-            SETANIM_BOTH,
-            BOTH_RUN1 as c_int,
-            SETANIM_FLAG_NORMAL,
-        );
-
-        // Rate our distance to the target, and our visibility
-        let distance = DistanceHorizontalSquared(
-            (*npc).r.currentOrigin,
-            if let Some(enemy_id) = (*npc).enemy {
-                (*ctx.world.g_entities.as_mut_ptr().add(enemy_id.0 as usize))
-                    .r
-                    .currentOrigin
-            } else {
-                [0.0; 3]
-            },
-        ) as c_int;
-        let visible = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
-            let enemy_eid = ctx.entity_id_of(enemy_ptr);
-            NPC_ClearLOS4(ctx, enemy_eid)
-        } else {
-            0
-        };
-        let advance = if distance > MIN_DISTANCE_SQR { 1 } else { 0 };
-
-        // If we cannot see our target, move to see it
-        if visible == 0 {
-            if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
-                ImperialProbe_Hunt(ctx, visible, advance);
-                return;
-            }
-        }
-
-        // Sometimes I have problems with facing the enemy I'm attacking, so force the issue so I don't look dumb
-        NPC_FaceEnemy(ctx, 1);
-
-        // Decide what type of attack to do
-        ImperialProbe_Ranged(ctx, visible, advance);
     }
+
+    // Sometimes I have problems with facing the enemy I'm attacking, so force the issue so I don't look dumb
+    NPC_FaceEnemy(ctx, 1);
+
+    // Decide what type of attack to do
+    ImperialProbe_Ranged(ctx, visible, advance);
 }
 
 /// Raven `NPC_Probe_Pain`.
@@ -523,90 +511,99 @@ pub fn NPC_Probe_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
-    unsafe {
-        let other = attacker;
-        let mod_ = ctx.world.globals.gPainMOD;
+    let mod_ = ctx.world.globals.gPainMOD;
 
-        // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-        _VectorCopy((*((*self_).NPC)).lastPathAngles, &mut (*self_).s.angles);
+    // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let self_npc = ctx.world.entity(self_).NPC;
+    let last_path_angles = unsafe { (*self_npc).lastPathAngles };
+    ctx.world.entity_mut(self_).s.angles = last_path_angles;
 
-        if (*self_).health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
-            let mut end_pos = [
-                (*self_).r.currentOrigin[0],
-                (*self_).r.currentOrigin[1],
-                (*self_).r.currentOrigin[2] - 128.0,
-            ];
-            let mut trace: trace_t = core::mem::zeroed();
+    if ctx.world.entity(self_).health < 30
+        || mod_ == MOD_DEMP2 as c_int
+        || mod_ == MOD_DEMP2_ALT as c_int
+    {
+        let current_origin = ctx.world.entity(self_).r.currentOrigin;
+        let mut end_pos = [
+            current_origin[0],
+            current_origin[1],
+            current_origin[2] - 128.0,
+        ];
+        let mut trace: trace_t = unsafe { core::mem::zeroed() };
+        let s_number = ctx.world.entity(self_).s.number;
 
-            trap::Trace(
-                ctx.engine,
-                GTraceArgs::new(
-                    &mut trace as *mut trace_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
-                    core::ptr::null(),
-                    core::ptr::null(),
-                    &end_pos as *const vec3_t,
-                    (*self_).s.number,
-                    MASK_SOLID,
-                ),
-            );
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut trace as *mut trace_t,
+                &current_origin as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                &end_pos as *const vec3_t,
+                s_number,
+                MASK_SOLID,
+            ),
+        );
 
-            if trace.fraction == 1.0 || mod_ == MOD_DEMP2 as c_int {
-                if (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
-                    && !other.is_null()
-                {
-                    let mut dir = [0.0; 3];
+        if trace.fraction == 1.0 || mod_ == MOD_DEMP2 as c_int {
+            if (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int) && attacker.is_some()
+            {
+                let attacker_id = attacker.unwrap();
+                let mut dir = [0.0; 3];
 
-                    let self_id = ctx.entity_id_of(self_).unwrap();
-                    NPC_SetAnim(
-                        ctx,
-                        self_id,
-                        SETANIM_BOTH,
-                        BOTH_PAIN1 as c_int,
-                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                    );
-
-                    _VectorSubtract((*self_).r.currentOrigin, (*other).r.currentOrigin, &mut dir);
-                    VectorNormalize(&mut dir);
-
-                    _VectorMA(
-                        (*((*self_).client)).ps.velocity,
-                        550.0,
-                        dir,
-                        &mut (*((*self_).client)).ps.velocity,
-                    );
-                    (*((*self_).client)).ps.velocity[2] -= 127.0;
-                }
-
-                (*((*self_).client)).ps.electrifyTime = ctx.world.level.time + 3000;
-
-                (*((*self_).NPC)).localState = LSTATE_DROP;
-            }
-        } else {
-            let self_id2 = ctx.entity_id_of(self_).unwrap();
-            let pain_chance = NPC_GetPainChance(ctx, self_id2, damage);
-
-            if ctx.world.bg_state.rng.random() < pain_chance {
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(self_).unwrap(),
+                    self_,
                     SETANIM_BOTH,
                     BOTH_PAIN1 as c_int,
-                    SETANIM_FLAG_OVERRIDE,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
+
+                let self_origin = ctx.world.entity(self_).r.currentOrigin;
+                let other_origin = ctx.world.entity(attacker_id).r.currentOrigin;
+                _VectorSubtract(self_origin, other_origin, &mut dir);
+                VectorNormalize(&mut dir);
+
+                // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+                let client = ctx.world.entity(self_).client;
+                unsafe {
+                    _VectorMA(
+                        (*client).ps.velocity,
+                        550.0,
+                        dir,
+                        &mut (*client).ps.velocity,
+                    );
+                    (*client).ps.velocity[2] -= 127.0;
+                }
+            }
+
+            let level_time = ctx.world.level.time;
+            // FLAG: pool client, deref raw via safe entity borrow (trap 2b).
+            let client = ctx.world.entity(self_).client;
+            unsafe {
+                (*client).ps.electrifyTime = level_time + 3000;
+            }
+
+            // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+            unsafe {
+                (*self_npc).localState = LSTATE_DROP;
             }
         }
+    } else {
+        let pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
-        NPC_Pain(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(attacker),
-            damage,
-        );
+        if ctx.world.bg_state.rng.random() < pain_chance {
+            NPC_SetAnim(
+                ctx,
+                self_,
+                SETANIM_BOTH,
+                BOTH_PAIN1 as c_int,
+                SETANIM_FLAG_OVERRIDE,
+            );
+        }
     }
+
+    NPC_Pain(ctx, self_, attacker, damage);
 }
 
 /// Raven `ImperialProbe_Idle`.
@@ -621,105 +618,101 @@ pub fn ImperialProbe_Idle(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:518-556`
 pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        ImperialProbe_MaintainHeight(ctx);
+    ImperialProbe_MaintainHeight(ctx);
 
-        if NPC_CheckPlayerTeamStealth(ctx) != 0 {
-            NPC_UpdateAngles(ctx, qtrue, qtrue);
-            return;
-        }
-
-        // If we have somewhere to go, then do that
-        if (*npc).enemy.is_none() {
-            let npc_id = ctx.entity_id_of(npc).unwrap();
-            NPC_SetAnim(
-                ctx,
-                npc_id,
-                SETANIM_BOTH,
-                BOTH_RUN1 as c_int,
-                SETANIM_FLAG_NORMAL,
-            );
-
-            if UpdateGoal(ctx) != core::ptr::null_mut() {
-                // start loop sound once we move
-                (*npc).s.loopSound =
-                    G_SoundIndex(c"sound/chars/probe/misc/probedroidloop".as_ptr());
-                ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
-                NPC_MoveToGoal(ctx, 1);
-            }
-            // randomly talk
-            if TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolNoise".as_ptr()) != 0 {
-                let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-                let npc_id2 = ctx.entity_id_of(npc).unwrap();
-                G_SoundOnEnt(ctx, npc_id2, CHAN_AUTO, cstr(&s).as_ptr());
-
-                let npc_id3 = ctx.entity_id_of(npc);
-                let patrol_delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-                TIMER_Set(ctx, npc_id3, c"patrolNoise".as_ptr(), patrol_delay);
-            }
-        } else {
-            let npc_id4 = ctx.entity_id_of(npc).unwrap();
-            // He's got an enemy. Make him angry.
-            G_SoundOnEnt(
-                ctx,
-                npc_id4,
-                CHAN_AUTO,
-                c"sound/chars/probe/misc/anger1".as_ptr(),
-            );
-            let npc_id5 = ctx.entity_id_of(npc);
-            let anger_delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-            TIMER_Set(ctx, npc_id5, c"angerNoise".as_ptr(), anger_delay);
-        }
-
+    if NPC_CheckPlayerTeamStealth(ctx) != 0 {
         NPC_UpdateAngles(ctx, qtrue, qtrue);
+        return;
     }
+
+    // If we have somewhere to go, then do that
+    if ctx.world.entity(npc_id).enemy.is_none() {
+        NPC_SetAnim(
+            ctx,
+            npc_id,
+            SETANIM_BOTH,
+            BOTH_RUN1 as c_int,
+            SETANIM_FLAG_NORMAL,
+        );
+
+        if UpdateGoal(ctx) != core::ptr::null_mut() {
+            // start loop sound once we move
+            let loop_sound = G_SoundIndex(c"sound/chars/probe/misc/probedroidloop".as_ptr());
+            ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
+            ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
+            NPC_MoveToGoal(ctx, 1);
+        }
+        // randomly talk
+        if TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
+            let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
+            let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
+            G_SoundOnEnt(ctx, npc_id, CHAN_AUTO, cstr(&s).as_ptr());
+
+            let patrol_delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+            TIMER_Set(ctx, Some(npc_id), c"patrolNoise".as_ptr(), patrol_delay);
+        }
+    } else {
+        // He's got an enemy. Make him angry.
+        G_SoundOnEnt(
+            ctx,
+            npc_id,
+            CHAN_AUTO,
+            c"sound/chars/probe/misc/anger1".as_ptr(),
+        );
+        let anger_delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+        TIMER_Set(ctx, Some(npc_id), c"angerNoise".as_ptr(), anger_delay);
+    }
+
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
 }
 
 /// Raven `ImperialProbe_Wait`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:563-582`
 pub fn ImperialProbe_Wait(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
+    unsafe {
         if (*npc_info).localState == LSTATE_DROP {
+            let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
             let mut end_pos = [
-                (*npc).r.currentOrigin[0],
-                (*npc).r.currentOrigin[1],
-                (*npc).r.currentOrigin[2] - 32.0,
+                current_origin[0],
+                current_origin[1],
+                current_origin[2] - 32.0,
             ];
             let mut trace: trace_t = core::mem::zeroed();
 
             (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 25.0);
 
+            let s_number = ctx.world.entity(npc_id).s.number;
             trap::Trace(
                 ctx.engine,
                 GTraceArgs::new(
                     &mut trace as *mut trace_t,
-                    &(*npc).r.currentOrigin as *const vec3_t,
+                    &current_origin as *const vec3_t,
                     core::ptr::null(),
                     core::ptr::null(),
                     &end_pos as *const vec3_t,
-                    (*npc).s.number,
+                    s_number,
                     MASK_SOLID,
                 ),
             );
 
             if trace.fraction != 1.0 {
-                let enemy_ptr = if let Some(enemy_id) = (*npc).enemy {
-                    &mut ctx.world.g_entities[enemy_id.0 as usize]
-                } else {
-                    core::ptr::null_mut()
-                };
+                // `ctx.entity_id_of(enemy_ptr)` round-trips the entity's `.enemy`
+                // handle (None when null), so read it straight off the accessor.
+                let enemy_id = ctx.world.entity(npc_id).enemy;
                 G_Damage(
                     ctx,
-                    ctx.entity_id_of(npc),
-                    ctx.entity_id_of(enemy_ptr),
-                    ctx.entity_id_of(enemy_ptr),
+                    Some(npc_id),
+                    enemy_id,
+                    enemy_id,
                     None,
                     [0.0; 3],
                     2000,
@@ -737,12 +730,14 @@ pub fn ImperialProbe_Wait(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_ImperialProbe.c:589-609`
 pub fn NPC_BSImperialProbe_Default(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if (*npc).enemy.is_some() {
-            (*npc_info).goalEntity = (*npc).enemy;
+    unsafe {
+        if ctx.world.entity(npc_id).enemy.is_some() {
+            (*npc_info).goalEntity = ctx.world.entity(npc_id).enemy;
             ImperialProbe_AttackDecision(ctx);
         } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
             ImperialProbe_Patrol(ctx);

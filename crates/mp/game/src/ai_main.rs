@@ -122,16 +122,6 @@ use mp_bg::public::entity_event::entity_event_t::{
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 // Raven `qboolean` is `c_int`; keep the source `qtrue`/`qfalse` spelling at
 // return sites (house style, mirrors `g_items.rs`).
 
@@ -213,8 +203,11 @@ pub fn BotReportStatus(ctx: &mut GameContext, bs: *mut bot_state_t) {
 /// Source: `oracle/codemp/game/ai_main.c:184-276`
 pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, ordernum: c_int) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
+        // `ent` reads through the checked entity borrow; `ent_cl` is its raw
+        // `gclient_t*`, dereffed raw. `bi` (bot_state_t) stays raw.
+        let Some(ent_h) = ent else {
+            return;
+        };
         let base = ctx.world.g_entities.as_mut_ptr();
         // STAGE-2b: irreducible — the botstates table is read across `ctx`-mutating
         // calls (OnSameTeam/BotReportStatus/BotDoChat), so it stays a raw pointer to
@@ -224,8 +217,8 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
         let mut stateMin: c_int = 0;
         let mut stateMax: c_int = 0;
 
-        if ent.is_null() || (*ent).client.is_null() || (*((*ent).client)).sess.teamLeader == qfalse
-        {
+        let ent_cl = ctx.world.entity(ent_h).client;
+        if ent_cl.is_null() || (*ent_cl).sess.teamLeader == qfalse {
             return;
         }
 
@@ -236,7 +229,7 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
         if clientnum != -1
             && OnSameTeam(
                 ctx,
-                ctx.entity_id_of(ent),
+                Some(ent_h),
                 ctx.entity_id_of(base.add(clientnum as usize)),
             ) == qfalse
         {
@@ -268,9 +261,9 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
             if ordernum == -1 {
                 BotReportStatus(ctx, bi);
             } else {
-                BotStraightTPOrderCheck(ctx.entity_id_of(ent), ordernum, bi);
+                BotStraightTPOrderCheck(Some(ent_h), ordernum, bi);
                 (*bi).state_Forced = ordernum;
-                (*bi).chatObject = Some(ent_id(base, ent));
+                (*bi).chatObject = Some(ent_h);
                 (*bi).chatAltObject = None;
                 let sect = cstr("OrderAccepted");
                 if crate::ai_util::BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 1) != 0 {
@@ -282,15 +275,14 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
             while i < MAX_CLIENTS {
                 let bi = (*botstates).0[i];
                 if !bi.is_null()
-                    && OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(base.add(i)))
-                        != qfalse
+                    && OnSameTeam(ctx, Some(ent_h), ctx.entity_id_of(base.add(i))) != qfalse
                 {
                     if ordernum == -1 {
                         BotReportStatus(ctx, bi);
                     } else {
-                        BotStraightTPOrderCheck(ctx.entity_id_of(ent), ordernum, bi);
+                        BotStraightTPOrderCheck(Some(ent_h), ordernum, bi);
                         (*bi).state_Forced = ordernum;
-                        (*bi).chatObject = Some(ent_id(base, ent));
+                        (*bi).chatObject = Some(ent_h);
                         (*bi).chatAltObject = None;
                         let sect = cstr("OrderAccepted");
                         if crate::ai_util::BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 0) != 0
@@ -388,21 +380,20 @@ pub fn BotAI_GetEntityState(
     state: *mut entityState_t,
 ) -> c_int {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
-        let ent = base.add(entityNum as usize);
         core::ptr::write_bytes(state, 0, 1);
-        if (*ent).inuse == qfalse {
+        let ent = ctx.world.entity(EntityId(entityNum as u32));
+        if ent.inuse == qfalse {
             return qfalse;
         }
-        if (*ent).r.linked == qfalse {
+        if ent.r.linked == qfalse {
             return qfalse;
         }
         // SVF_NOCLIENT: only a file-local const exists (g_items.rs); referenced
         // as cited and reported as a missing symbol pending a shared home.
-        if (*ent).r.svFlags & SVF_NOCLIENT != 0 {
+        if ent.r.svFlags & SVF_NOCLIENT != 0 {
             return qfalse;
         }
-        core::ptr::copy_nonoverlapping(&(*ent).s as *const entityState_t, state, 1);
+        core::ptr::copy_nonoverlapping(&ent.s as *const entityState_t, state, 1);
         qtrue
     }
 }
@@ -1124,8 +1115,8 @@ pub fn WPOrgVisible(
     ignore: c_int,
 ) -> c_int {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let bot: *mut gentity_t = ctx.entity_mut(bot);
+        // `bot`/`hitent`/`ownent` read through the checked entity borrow; the trace
+        // entity is recovered as an `EntityId` via `entity_id_of`.
         let base = ctx.world.g_entities.as_mut_ptr();
         let mut tr: trace_t = core::mem::zeroed();
 
@@ -1156,25 +1147,22 @@ pub fn WPOrgVisible(
                 ),
             );
 
-            if tr.fraction != 1.0
-                && (tr.entityNum as c_int) != ENTITYNUM_NONE
-                && (*base.add(tr.entityNum as usize)).s.eType == ET_SPECIAL as c_int
-            {
-                let hitent = base.add(tr.entityNum as usize);
-                if (*hitent).parent.is_some()
-                    && !(*crate::ent_id::resolve(base, (*hitent).parent))
-                        .client
-                        .is_null()
-                {
-                    let ownent = crate::ent_id::resolve(base, (*hitent).parent);
-
-                    if OnSameTeam(ctx, ctx.entity_id_of(bot), ctx.entity_id_of(ownent)) != qfalse
-                        || (*bot).s.number == (*ownent).s.number
-                    {
-                        return 1;
+            if tr.fraction != 1.0 && (tr.entityNum as c_int) != ENTITYNUM_NONE {
+                let hitent_id = ctx.entity_id_of(base.add(tr.entityNum as usize)).unwrap();
+                if ctx.world.entity(hitent_id).s.eType == ET_SPECIAL as c_int {
+                    let parent = ctx.world.entity(hitent_id).parent;
+                    if let Some(parent_id) = parent {
+                        if !ctx.world.entity(parent_id).client.is_null() {
+                            let ownent_num = ctx.world.entity(parent_id).s.number;
+                            if OnSameTeam(ctx, Some(bot), Some(parent_id)) != qfalse
+                                || ctx.world.entity(bot).s.number == ownent_num
+                            {
+                                return 1;
+                            }
+                        }
                     }
+                    return 2;
                 }
-                return 2;
             }
 
             return 1;
@@ -1976,26 +1964,29 @@ pub fn PassStandardEnemyChecks(
     en: Option<EntityId>,
 ) -> c_int {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let en: *mut gentity_t = ent_ptr(ctx, en);
+        // `en` reads through the checked entity borrow; `en_cl` is that entity's raw
+        // `gclient_t*` (may be an NPC pool client — recipe 2b), dereffed raw. `bs`
+        // (bot_state_t) stays raw. `en.s.number` is invariant, read once up front.
         let base = ctx.world.g_entities.as_mut_ptr();
 
-        if bs.is_null() || en.is_null() {
+        if bs.is_null() || en.is_none() {
             // shouldn't happen
             return 0;
         }
+        let en_id = en.unwrap();
+        let en_num = ctx.world.entity(en_id).s.number;
 
-        if (*en).client.is_null() {
+        if ctx.world.entity(en_id).client.is_null() {
             // not a client, don't care about him
             return 0;
         }
 
-        if (*en).health < 1 {
+        if ctx.world.entity(en_id).health < 1 {
             // he's already dead
             return 0;
         }
 
-        if (*en).takedamage == qfalse {
+        if ctx.world.entity(en_id).takedamage == qfalse {
             // a client that can't take damage?
             return 0;
         }
@@ -2007,7 +1998,7 @@ pub fn PassStandardEnemyChecks(
             return 0;
         }
 
-        let en_cl = (*en).client;
+        let en_cl = ctx.world.entity(en_id).client;
 
         if (*en_cl).ps.pm_type == PM_INTERMISSION as c_int
             || (*en_cl).ps.pm_type == PM_SPECTATOR as c_int
@@ -2022,12 +2013,12 @@ pub fn PassStandardEnemyChecks(
             return 0;
         }
 
-        if (*en).s.solid == 0 {
+        if ctx.world.entity(en_id).s.solid == 0 {
             // shouldn't happen
             return 0;
         }
 
-        if (*bs).client == (*en).s.number {
+        if (*bs).client == en_num {
             // don't attack yourself
             return 0;
         }
@@ -2035,23 +2026,24 @@ pub fn PassStandardEnemyChecks(
         if OnSameTeam(
             ctx,
             ctx.entity_id_of(base.add((*bs).client as usize)),
-            ctx.entity_id_of(en),
+            Some(en_id),
         ) != qfalse
         {
             // don't attack teammates
             return 0;
         }
 
-        if BotMindTricked(ctx, (*bs).client, (*en).s.number) != 0 {
-            let currentEnemy = crate::ent_id::resolve(base, (*bs).currentEnemy);
-            if !currentEnemy.is_null() && (*currentEnemy).s.number == (*en).s.number {
-                // if mindtricked by this enemy, be less "aware" of them
-                let mut vs: vec3_t = [0.0; 3];
-                crate::q_math::_VectorSubtract((*bs).origin, (*en_cl).ps.origin, &mut vs);
-                let vLen = crate::q_math::VectorLength(vs);
+        if BotMindTricked(ctx, (*bs).client, en_num) != 0 {
+            if let Some(ce_id) = (*bs).currentEnemy {
+                if ctx.world.entity(ce_id).s.number == en_num {
+                    // if mindtricked by this enemy, be less "aware" of them
+                    let mut vs: vec3_t = [0.0; 3];
+                    crate::q_math::_VectorSubtract((*bs).origin, (*en_cl).ps.origin, &mut vs);
+                    let vLen = crate::q_math::VectorLength(vs);
 
-                if vLen > 64.0 {
-                    return 0;
+                    if vLen > 64.0 {
+                        return 0;
+                    }
                 }
             }
         }
@@ -2061,7 +2053,7 @@ pub fn PassStandardEnemyChecks(
             return 0;
         }
 
-        if (*bs).cur_ps.duelInProgress != qfalse && (*en).s.number != (*bs).cur_ps.duelIndex {
+        if (*bs).cur_ps.duelInProgress != qfalse && en_num != (*bs).cur_ps.duelIndex {
             // ditto, the other way around
             return 0;
         }
@@ -2096,13 +2088,19 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
     // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder
     // (indexed as intended).
     unsafe {
-        // STAGE-1: `bot` is the hurt entity's `EntityId`; re-derive its `gclient_t*`
-        // (Raven's `bot`). `attacker` is an `Option<EntityId>` handle. Body verbatim.
-        let bot: *mut gclient_t = ctx.entity_mut(bot).client;
-        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
+        // `bot` is the hurt entity's raw `gclient_t*` (Raven's `bot`; may be an NPC
+        // pool client — recipe 2b), dereffed raw. `attacker` reads through the
+        // checked entity borrow; its `s.number` is invariant, read once up front.
+        let bot: *mut gclient_t = ctx.world.entity(bot).client;
         let base = ctx.world.g_entities.as_mut_ptr();
 
-        if bot.is_null() || attacker.is_null() || (*attacker).client.is_null() {
+        if bot.is_null() {
+            return;
+        }
+        let Some(attacker_id) = attacker else {
+            return;
+        };
+        if ctx.world.entity(attacker_id).client.is_null() {
             return;
         }
 
@@ -2111,13 +2109,14 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
             return;
         }
 
-        if (*attacker).s.number >= MAX_CLIENTS as c_int {
+        let attacker_num = ctx.world.entity(attacker_id).s.number;
+        if attacker_num >= MAX_CLIENTS as c_int {
             // if attacker is an npc also don't care I suppose.
             return;
         }
 
         let bot_ent_id = Some(ent_id(base, base.add((*bot).ps.clientNum as usize)));
-        let bs_a = (&ctx.world.globals.botstates)[(*attacker).s.number as usize];
+        let bs_a = (&ctx.world.globals.botstates)[attacker_num as usize];
 
         if !bs_a.is_null() {
             // if the client attacking us is a bot as well
@@ -2153,21 +2152,21 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
             return;
         }
 
-        (*bs).lastHurt = Some(ent_id(base, attacker));
+        (*bs).lastHurt = Some(attacker_id);
 
         if (*bs).currentEnemy.is_some() {
             // we don't care about the guy attacking us if we have an enemy already
             return;
         }
 
-        if PassStandardEnemyChecks(ctx, bs, ctx.entity_id_of(attacker)) == 0 {
+        if PassStandardEnemyChecks(ctx, bs, Some(attacker_id)) == 0 {
             // the person that hurt us is not a valid enemy
             return;
         }
 
-        if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(attacker)) != 0 {
+        if PassLovedOneCheck(ctx, bs, Some(attacker_id)) != 0 {
             // the person that hurt us is the one we love!
-            (*bs).currentEnemy = Some(ent_id(base, attacker));
+            (*bs).currentEnemy = Some(attacker_id);
             (*bs).enemySeenTime = (ctx.world.level.time + ENEMY_FORGET_MS) as f32;
         }
     }
@@ -2183,14 +2182,17 @@ pub fn BotCanHear(
     endist: f32,
 ) -> c_int {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let en: *mut gentity_t = ent_ptr(ctx, en);
-
-        if en.is_null() || (*en).client.is_null() {
+        // `en` reads through the checked entity borrow; `en_cl` is that entity's
+        // raw `gclient_t*` (may be an NPC pool client — recipe 2b), dereffed raw.
+        // `en.s.number` is invariant here, read once up front.
+        let Some(en_id) = en else {
+            return 0;
+        };
+        let en_cl = ctx.world.entity(en_id).client;
+        if en_cl.is_null() {
             return 0;
         }
-
-        let en_cl = (*en).client;
+        let en_num = ctx.world.entity(en_id).s.number;
         let lt = ctx.world.level.time;
 
         let mut minlen: f32 = 'compute: {
@@ -2204,7 +2206,7 @@ pub fn BotCanHear(
                 break 'compute 256.0;
             }
 
-            let et = &ctx.world.globals.gBotEventTracker[(*en).s.number as usize];
+            let et = &ctx.world.globals.gBotEventTracker[en_num as usize];
             if et.eventTime < lt as f32 {
                 // no recent events to check
                 return 0;
@@ -2235,7 +2237,7 @@ pub fn BotCanHear(
             }
         };
 
-        if BotMindTricked(ctx, (*bs).client, (*en).s.number) != 0 {
+        if BotMindTricked(ctx, (*bs).client, en_num) != 0 {
             // if mindtricked by this person, cut down on minlen
             minlen /= 4.0;
         }
@@ -2310,8 +2312,9 @@ pub fn PassLovedOneCheck(
     ent: Option<EntityId>,
 ) -> c_int {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
+        // `ent` reads through the checked entity borrow; `bs`/`loved` (bot_state_t)
+        // and the raw `clients` array stay raw. `ent.s.number` is invariant, read
+        // once (after the early returns that never touch it, matching Raven).
         let base = ctx.world.g_entities.as_mut_ptr();
         let clients = ctx.world.level.clients;
 
@@ -2327,7 +2330,8 @@ pub fn PassLovedOneCheck(
 
         let mut i: c_int = 0;
 
-        if (&ctx.world.globals.botstates)[(*ent).s.number as usize].is_null() {
+        let ent_num = ctx.world.entity(ent.unwrap()).s.number;
+        if (&ctx.world.globals.botstates)[ent_num as usize].is_null() {
             // not a bot
             return 1;
         }
@@ -2336,7 +2340,7 @@ pub fn PassLovedOneCheck(
             return 1;
         }
 
-        let loved = (&ctx.world.globals.botstates)[(*ent).s.number as usize];
+        let loved = (&ctx.world.globals.botstates)[ent_num as usize];
 
         while i < (*bs).lovednum {
             let netname = (*clients.add((*loved).client as usize))
@@ -3012,9 +3016,11 @@ pub fn BotGetFlagHome(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 /// Source: `oracle/codemp/game/ai_main.c:2739-2801`
 pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: EntityId, team: c_int) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        // `wp` (wpobject_t, not an entity) stays raw.
-        let flagEnt: *mut gentity_t = ctx.entity_mut(flagEnt);
+        // `wp` (wpobject_t, not an entity) stays raw. `flagEnt` reads through the
+        // checked entity borrow; its `s.pos.trBase`/`s.number` are invariant over
+        // this fn (flagEnt is never mutated), so they are read once up front.
+        let flag_base = ctx.world.entity(flagEnt).s.pos.trBase;
+        let flag_num = ctx.world.entity(flagEnt).s.number;
         let mut i: c_int = 0;
         let mut a: vec3_t = [0.0; 3];
         let mut mins: vec3_t = [0.0; 3];
@@ -3032,7 +3038,7 @@ pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: Enti
         maxs[1] = 15.0;
         maxs[2] = 5.0;
 
-        _VectorSubtract((*wp).origin, (*flagEnt).s.pos.trBase, &mut a);
+        _VectorSubtract((*wp).origin, flag_base, &mut a);
 
         bestdist = VectorLength(a);
 
@@ -3044,8 +3050,8 @@ pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: Enti
                     &(*wp).origin,
                     &mins,
                     &maxs,
-                    &(*flagEnt).s.pos.trBase,
-                    (*flagEnt).s.number,
+                    &flag_base,
+                    flag_num,
                     MASK_SOLID,
                 ),
             );
@@ -3059,7 +3065,7 @@ pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: Enti
         while i < ctx.world.globals.gWPNum {
             _VectorSubtract(
                 (*ctx.world.globals.gWPArray.0[i as usize]).origin,
-                (*flagEnt).s.pos.trBase,
+                flag_base,
                 &mut a,
             );
             testdist = VectorLength(a);
@@ -3072,8 +3078,8 @@ pub fn GetNewFlagPoint(ctx: &mut GameContext, wp: *mut wpobject_t, flagEnt: Enti
                         &(*ctx.world.globals.gWPArray.0[i as usize]).origin,
                         &mins,
                         &maxs,
-                        &(*flagEnt).s.pos.trBase,
-                        (*flagEnt).s.number,
+                        &flag_base,
+                        flag_num,
                         MASK_SOLID,
                     ),
                 );
@@ -3869,42 +3875,45 @@ pub fn JMTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 /// Source: `oracle/codemp/game/ai_main.c:3500-3554`
 pub fn BotHasAssociated(ctx: &mut GameContext, bs: *mut bot_state_t, wp: *mut wpobject_t) -> c_int {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
-        let as_ent: *mut gentity_t;
-
         if (*wp).associated_entity == ENTITYNUM_NONE {
             // make it think this is an item we have so we don't go after nothing
             return 1;
         }
 
-        as_ent = base.add((*wp).associated_entity as usize);
+        // `as_ent`'s only field read is its `*mut gitem_t` `item` (Copy); the
+        // arena entity is borrowed momentarily to fetch it, and the pointer is
+        // dereffed raw (gitem_t has no accessor). The original `as_ent.is_null()`
+        // guard was dead (`&g_entities[i]` is never NULL), so only `item.is_null()`
+        // survives.
+        let item = ctx
+            .world
+            .entity(EntityId((*wp).associated_entity as u32))
+            .item;
 
-        if as_ent.is_null() || (*as_ent).item.is_null() {
+        if item.is_null() {
             return 0;
         }
 
-        if (*(*as_ent).item).giType == IT_WEAPON {
-            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << (*(*as_ent).item).giTag) != 0 {
+        if (*item).giType == IT_WEAPON {
+            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << (*item).giTag) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*(*as_ent).item).giType == IT_HOLDABLE {
-            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << (*(*as_ent).item).giTag)
-                != 0
-            {
+        } else if (*item).giType == IT_HOLDABLE {
+            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << (*item).giTag) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*(*as_ent).item).giType == IT_POWERUP {
-            if (*bs).cur_ps.powerups[(*(*as_ent).item).giTag as usize] != 0 {
+        } else if (*item).giType == IT_POWERUP {
+            if (*bs).cur_ps.powerups[(*item).giTag as usize] != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*(*as_ent).item).giType == IT_AMMO {
-            if (*bs).cur_ps.ammo[(*(*as_ent).item).giTag as usize] > 10 {
+        } else if (*item).giType == IT_AMMO {
+            if (*bs).cur_ps.ammo[(*item).giTag as usize] > 10 {
                 // hack
                 return 1;
             }
@@ -4669,7 +4678,6 @@ pub fn CommanderBotAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
 /// Source: `oracle/codemp/game/ai_main.c:4269-4351`
 pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
         let mut usethisvec: vec3_t = [0.0; 3];
         let mut downvec: vec3_t = [0.0; 3];
         let mut midorg: vec3_t = [0.0; 3];
@@ -4685,12 +4693,16 @@ pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if (*bs).currentEnemy.is_none() {
             return;
         }
-        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+        // `currentEnemy` is the enemy entity handle; its `client` pointer (Copy,
+        // a pool client for NPC enemies) is fetched via a momentary arena borrow
+        // and dereffed raw.
+        let currentEnemy = (*bs).currentEnemy.unwrap();
+        let ce_client = ctx.world.entity(currentEnemy).client;
 
-        if !(*currentEnemy).client.is_null() {
-            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
+        if !ce_client.is_null() {
+            _VectorCopy((*ce_client).ps.origin, &mut usethisvec);
         } else {
-            _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+            _VectorCopy(ctx.world.entity(currentEnemy).s.origin, &mut usethisvec);
         }
 
         if (*bs).meleeStrafeTime < ctx.world.level.time as f32 {
@@ -4771,7 +4783,6 @@ pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
 /// Source: `oracle/codemp/game/ai_main.c:4354-4566`
 pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
         let mut usethisvec: vec3_t = [0.0; 3];
         let mut downvec: vec3_t = [0.0; 3];
         let mut midorg: vec3_t = [0.0; 3];
@@ -4787,12 +4798,17 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if (*bs).currentEnemy.is_none() {
             return;
         }
-        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+        // `currentEnemy` is the enemy entity handle; its `client` pointer (Copy,
+        // a pool client for NPC enemies) is fetched via momentary arena borrows at
+        // each use site (the borrow can't span the RNG/trace calls below) and
+        // dereffed raw.
+        let currentEnemy = (*bs).currentEnemy.unwrap();
+        let ce_client = ctx.world.entity(currentEnemy).client;
 
-        if !(*currentEnemy).client.is_null() {
-            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
+        if !ce_client.is_null() {
+            _VectorCopy((*ce_client).ps.origin, &mut usethisvec);
         } else {
-            _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+            _VectorCopy(ctx.world.entity(currentEnemy).s.origin, &mut usethisvec);
         }
 
         if (*bs).meleeStrafeTime < ctx.world.level.time as f32 {
@@ -4872,8 +4888,8 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
         if me_down == en_down && en_down == mid_down {
             if usethisvec[2] > ((*bs).origin[2] + 32.0)
-                && !(*currentEnemy).client.is_null()
-                && (*((*currentEnemy).client)).ps.groundEntityNum == ENTITYNUM_NONE
+                && !ctx.world.entity(currentEnemy).client.is_null()
+                && (*ctx.world.entity(currentEnemy).client).ps.groundEntityNum == ENTITYNUM_NONE
             {
                 (*bs).jumpTime = (ctx.world.level.time + 100) as f32;
             }
@@ -4903,8 +4919,8 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
                 _VectorCopy(usethisvec, &mut (*bs).goalPosition);
             }
 
-            if !currentEnemy.is_null() && !(*currentEnemy).client.is_null() {
-                let cecl = (*currentEnemy).client;
+            let cecl = ctx.world.entity(currentEnemy).client;
+            if !cecl.is_null() {
                 if BG_SaberInSpecial((*cecl).ps.saberMove) == 0
                     && (*bs).frame_Enemy_Len > 90.0
                     && (*bs).saberBFTime > ctx.world.level.time

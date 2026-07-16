@@ -418,32 +418,33 @@ pub fn BotDoChat(
             {
                 inc_1 += 1;
 
-                let mut cobject: *mut gentity_t = core::ptr::null_mut();
+                // Raven: `%s`/`%a` select chatObject/chatAltObject; a null
+                // handle mirrors Raven's null `cobject`, skipping the block.
+                let cobject_id: Option<EntityId> = if *chatgroup_b.offset(inc_1) == b's' as u8 {
+                    bs_ref.chatObject
+                } else if *chatgroup_b.offset(inc_1) == b'a' as u8 {
+                    bs_ref.chatAltObject
+                } else {
+                    None
+                };
 
-                if *chatgroup_b.offset(inc_1) == b's' as u8 && !bs_ref.chatObject.is_none() {
-                    cobject = bs_ref
-                        .chatObject
-                        .map(|id| &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t)
-                        .unwrap_or(core::ptr::null_mut());
-                } else if *chatgroup_b.offset(inc_1) == b'a' as u8
-                    && !bs_ref.chatAltObject.is_none()
-                {
-                    cobject = bs_ref
-                        .chatAltObject
-                        .map(|id| &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t)
-                        .unwrap_or(core::ptr::null_mut());
-                }
+                // Raven derefs `cobject->client->pers.netname`. chatObject can be
+                // an NPC (lastHurt = any attacker), whose client is pool-allocated,
+                // NOT level.clients[entnum] — so the netname read must go through
+                // the entity's client pointer (gclient deref regime, task #7).
+                if let Some(id) = cobject_id {
+                    let client = ctx.world.entity(id).client;
+                    if !client.is_null() {
+                        let netname = unsafe { (*client).pers.netname };
+                        let mut inc_n = 0isize;
 
-                if !cobject.is_null() && !(*cobject).client.is_null() {
-                    let pers = &(*((*cobject).client)).pers;
-                    let mut inc_n = 0isize;
-
-                    while pers.netname[inc_n as usize] != 0 {
-                        *currentChat_b.offset(inc_2) = pers.netname[inc_n as usize] as u8;
-                        inc_2 += 1;
-                        inc_n += 1;
+                        while netname[inc_n as usize] != 0 {
+                            *currentChat_b.offset(inc_2) = netname[inc_n as usize] as u8;
+                            inc_2 += 1;
+                            inc_n += 1;
+                        }
+                        inc_2 -= 1; // to make up for the auto-increment below
                     }
-                    inc_2 -= 1; // to make up for the auto-increment below
                 }
             } else {
                 *currentChat_b.offset(inc_2) = *chatgroup_b.offset(inc_1);

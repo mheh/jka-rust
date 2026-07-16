@@ -492,20 +492,17 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:386-443`
 pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
-    // Raw pointer (not a tracked borrow) so `ctx` stays free for the `G_Printf`
-    // calls inside the loop below — mirrors the Stage-1 `ctx.world_raw()`
-    // idiom (see `g_object.rs`).
-
     for e in 1..(ctx.world.level.num_entities as usize) {
-        let check = unsafe { &(*ctx.world.g_entities.as_ptr().add(e)) };
+        let id = EntityId(e as u32);
 
-        if check.inuse == qfalse {
+        if ctx.world.entity(id).inuse == qfalse {
             continue;
         }
 
         G_Printf(ctx, cstr(&format!("{:3}:", e as c_int)).as_ptr());
 
-        let type_str = match check.s.eType {
+        let eType = ctx.world.entity(id).s.eType;
+        let type_str = match eType {
             0 => "ET_GENERAL          ",
             1 => "ET_PLAYER           ",
             2 => "ET_ITEM             ",
@@ -523,7 +520,7 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
             _ => {
                 G_Printf(
                     ctx,
-                    cstr(&format!("{:3}                 ", check.s.eType as c_int)).as_ptr(),
+                    cstr(&format!("{:3}                 ", eType as c_int)).as_ptr(),
                 );
                 ""
             }
@@ -533,8 +530,9 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
             G_Printf(ctx, cstr(type_str).as_ptr());
         }
 
-        if !check.classname.is_null() {
-            G_Printf(ctx, check.classname);
+        let classname = ctx.world.entity(id).classname;
+        if !classname.is_null() {
+            G_Printf(ctx, classname);
         }
 
         G_Printf(ctx, c"\n".as_ptr());
@@ -557,10 +555,8 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
             return std::ptr::null_mut();
         }
 
-        let cl = unsafe { &(*ctx.world.level.clients.add(idnum as usize)) };
-
         // Check connection status constant (CON_DISCONNECTED = 0)
-        if cl.pers.connected == 0 {
+        if ctx.world.client(idnum as usize).pers.connected == 0 {
             G_Printf(
                 ctx,
                 cstr(&format!("Client {} is not connected\n", idnum)).as_ptr(),
@@ -573,7 +569,7 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
 
     // Check for a name match
     for i in 0..(ctx.world.level.maxclients as usize) {
-        let cl = unsafe { &(*ctx.world.level.clients.add(i)) };
+        let cl = ctx.world.client(i);
         if cl.pers.connected == 0 {
             continue;
         }
@@ -602,9 +598,6 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
 /// Source: `oracle/codemp/game/g_svcmds.c:489-503`
 pub fn Svcmd_ForceTeam_f(ctx: &mut GameContext) {
     let mut str = [0 as c_char; 128];
-    // Raw pointer (not a tracked borrow) so `ctx` stays free for the
-    // `ClientForString`/`SetTeam` calls below — mirrors the Stage-1
-    // `ctx.world_raw()` idiom (see `g_object.rs`).
 
     // Get the player identifier
     trap::Argv(ctx.engine, GArgvArgs::new(1, str.as_mut_ptr(), 128));
@@ -616,12 +609,12 @@ pub fn Svcmd_ForceTeam_f(ctx: &mut GameContext) {
     // Get the team string
     trap::Argv(ctx.engine, GArgvArgs::new(2, str.as_mut_ptr(), 128));
 
-    // Calculate the entity index from the client pointer
+    // Calculate the entity index from the client pointer (`cl - level.clients`);
+    // the client slot is its entity number, so it doubles as the `EntityId`.
     let cl_idx =
         { (cl as usize - ctx.world.level.clients as usize) / std::mem::size_of::<gclient_t>() };
 
-    let ent = unsafe { ctx.world.g_entities.as_ptr().add(cl_idx) as *mut gentity_t };
-    crate::g_cmds::SetTeam(ctx, ctx.entity_id_of(ent).unwrap(), str.as_mut_ptr());
+    crate::g_cmds::SetTeam(ctx, EntityId(cl_idx as u32), str.as_mut_ptr());
 }
 
 /// Raven `ConsoleCommand`.

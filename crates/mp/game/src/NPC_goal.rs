@@ -32,11 +32,13 @@ unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:10-24`
 pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
+    // SAFETY: `NPCInfo` is Raven's ambient AI global (`gNPC_t *`); its raw deref is
+    // the still-open ambient-globals seam (2c task #7), not an entity deref. The
+    // Stage-1 `ent_id_opt(base, ent_ptr(goal))` round-trip is the identity on
+    // `Option<EntityId>`, so the goal handle assigns directly.
     unsafe {
         let npc_info = &mut *ctx.world.globals.NPCInfo;
-        npc_info.goalEntity = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), goal);
+        npc_info.goalEntity = goal;
         npc_info.goalTime = ctx.world.level.time;
     }
 }
@@ -45,22 +47,20 @@ pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:31-58`
 pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
+    // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
+    // reached through the safe `ctx.world.entity` accessor.
     unsafe {
         let npc_info = &mut *ctx.world.globals.NPCInfo;
-        let entity_base = ctx.world.g_entities.as_mut_ptr();
-        let goal_id = ent_id_opt(entity_base, goal);
 
-        if goal_id == npc_info.goalEntity {
+        if goal == npc_info.goalEntity {
             return;
         }
 
-        if goal.is_null() {
+        let Some(goal_id) = goal else {
             return;
-        }
+        };
 
-        if !(*goal).client.is_null() {
+        if !ctx.world.entity(goal_id).client.is_null() {
             return;
         }
 
@@ -68,7 +68,7 @@ pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
             npc_info.lastGoalEntity = npc_info.goalEntity;
         }
 
-        SetGoal(ctx, ctx.entity_id_of(goal), rating);
+        SetGoal(ctx, goal, rating);
     }
 }
 
@@ -76,11 +76,13 @@ pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:65-86`
 pub fn NPC_ClearGoal(ctx: &mut GameContext) {
+    // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
+    // reached through the safe `ctx.world.entity` accessor.
     unsafe {
         let npc_info = &mut *ctx.world.globals.NPCInfo;
 
         if npc_info.lastGoalEntity.is_none() {
-            SetGoal(ctx, ctx.entity_id_of(core::ptr::null_mut()), 0.0);
+            SetGoal(ctx, None, 0.0);
             return;
         }
 
@@ -88,16 +90,15 @@ pub fn NPC_ClearGoal(ctx: &mut GameContext) {
         npc_info.lastGoalEntity = None;
 
         if let Some(goal_id) = last_goal_id {
-            let entity_base = ctx.world.g_entities.as_mut_ptr();
-            let goal = entity_base.add(goal_id.0 as usize);
+            let goal = ctx.world.entity(goal_id);
 
-            if (*goal).inuse != 0 && ((*goal).s.eFlags & EF_NODRAW) == 0 {
-                SetGoal(ctx, ctx.entity_id_of(goal), 0.0);
+            if goal.inuse != 0 && (goal.s.eFlags & EF_NODRAW) == 0 {
+                SetGoal(ctx, Some(goal_id), 0.0);
                 return;
             }
         }
 
-        SetGoal(ctx, ctx.entity_id_of(core::ptr::null_mut()), 0.0);
+        SetGoal(ctx, None, 0.0);
     }
 }
 
@@ -198,6 +199,9 @@ pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_goal.c:243-267`
 pub fn UpdateGoal(ctx: &mut GameContext) -> *mut gentity_t {
+    // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
+    // reached through the safe accessor, then re-derived as a raw pointer at the
+    // return boundary for the still-raw caller.
     unsafe {
         let npc_info = &*ctx.world.globals.NPCInfo;
 
@@ -206,19 +210,17 @@ pub fn UpdateGoal(ctx: &mut GameContext) -> *mut gentity_t {
         }
 
         let goal_id = npc_info.goalEntity.unwrap();
-        let entity_base = ctx.world.g_entities.as_mut_ptr();
-        let goal = entity_base.add(goal_id.0 as usize);
 
-        if (*goal).inuse == 0 {
+        if ctx.world.entity(goal_id).inuse == 0 {
             NPC_ClearGoal(ctx);
             return core::ptr::null_mut();
         }
 
-        if ReachedGoal(ctx, ctx.entity_id_of(goal)) != 0 {
+        if ReachedGoal(ctx, Some(goal_id)) != 0 {
             NPC_ReachedGoal(ctx);
             return core::ptr::null_mut();
         }
 
-        goal
+        &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t
     }
 }

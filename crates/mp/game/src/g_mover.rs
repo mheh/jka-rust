@@ -1,17 +1,30 @@
 // PORT-COMPLETE: g_mover.c 22/50
 //! FAITHFUL port of `oracle/codemp/game/g_mover.c`.
 //!
-//! Safe-state migration **Stage 1**. Entity params crossing this file's ABI
+//! Safe-state migration (campaign 2c). Entity params crossing this file's ABI
 //! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
-//! `gentity_t*`; the pilot is `crate::g_object`. These bodies are saturated
-//! with still-raw seam derefs (gclient walks, `teamchain` chases via
-//! `crate::ent_id::resolve`, the `pushed[]` save-stack, direct `ctx.world`
-//! access), so per the landed-shard "mega-fn" precedent they convert at the
-//! **signature only**: each fn re-derives its raw `*mut gentity_t` at the top
-//! of the body (`let ent: *mut gentity_t = ctx.entity_mut(id);`) and leaves the
-//! referee-verified body verbatim. The remaining raw bodies are Stage-2 debt.
-//! Behavior is byte-identical to the pre-migration port — a mechanical reshape,
-//! referee-verified. Unconverted callers bridge their raw pointer at the
+//! `gentity_t*`; the pilot is `crate::g_object`. The single-entity spawn/think
+//! setters (`SP_func_*`, `InitMover`/`InitBBrush`, `SetMoverState`,
+//! `ReturnToPos1`, the door-sound helpers, the `func_usable_*`/`func_static_use`
+//! use-paths, the `G_EntIs*` entityNum probes, …) are converted to the accessor
+//! regime: their bodies reach the entity through `ctx.entity(id)` /
+//! `ctx.entity_mut(id)` at the point of use, so the per-line `(*ent).…` raw
+//! derefs are gone; the only remaining `unsafe` is the seam (C-string reads of
+//! engine-owned name pointers, `trap::*` raw-pointer casts). Behavior is
+//! byte-identical to the pre-migration port — a mechanical reshape.
+//!
+//! The genuinely entangled bodies stay **Stage-1** (raw `*mut gentity_t`
+//! re-derived at the top of the body, verbatim referee-verified logic): the
+//! `G_MoverPush`/`G_TryPushingEntity`/`G_MoverTeam` push machinery (two
+//! simultaneous mutable entities + gclient walks + the `pushed[]` save-stack),
+//! the `teamchain`/`teammaster` pointer chases (`MatchTeam`,
+//! `CalcTeamDoorCenter`, `G_FindDoorTrigger`, `G_EntIsUnlockedDoor`,
+//! `Think_SpawnNewDoorTrigger`, `Think_SetupTrainTargets`, `Reached_Train`,
+//! `UnLockDoors`/`LockDoors`), the client-heavy touch/trigger paths
+//! (`Touch_Door*`, `Touch_Plat*`, `Touch_Button`, `Blocked_Door`,
+//! `Use_BinaryMover*`, `Reached_BinaryMover`), and the `G_TempEntity` scratch
+//! writers (`G_Chunks`, `G_MiscModelExplosion`, `Glass*`, `funcBBrush*`). These
+//! remain Stage-2 debt. Unconverted callers bridge their raw pointer at the
 //! boundary with `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -85,38 +98,37 @@ pub const BMS_END: c_int = 2;
 ///
 /// Source: `oracle/codemp/game/g_mover.c:45-60`
 pub fn G_PlayDoorLoopSound(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        if (*ent).soundSet.is_null() || *(*ent).soundSet == 0 {
-            return;
-        }
-
-        (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
-        (*ent).s.loopIsSoundset = qtrue;
-        (*ent).s.loopSound = BMS_MID;
+    let soundSet = ctx.entity(ent).soundSet;
+    // Raw C-string deref of the engine-owned soundSet path (seam).
+    if soundSet.is_null() || unsafe { *soundSet } == 0 {
+        return;
     }
+
+    let idx = G_SoundSetIndex(ctx, soundSet);
+    let e = ctx.entity_mut(ent);
+    e.s.soundSetIndex = idx;
+    e.s.loopIsSoundset = qtrue;
+    e.s.loopSound = BMS_MID;
 }
 
 /// Raven `G_PlayDoorSound`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:68-78`
 pub fn G_PlayDoorSound(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        if (*ent).soundSet.is_null() || *(*ent).soundSet == 0 {
-            return;
-        }
-
-        (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
-
-        G_AddEvent(
-            &mut *(ent),
-            entity_event_t::EV_PLAYDOORSOUND as c_int,
-            r#type,
-        );
+    let soundSet = ctx.entity(ent).soundSet;
+    // Raw C-string deref of the engine-owned soundSet path (seam).
+    if soundSet.is_null() || unsafe { *soundSet } == 0 {
+        return;
     }
+
+    let idx = G_SoundSetIndex(ctx, soundSet);
+    ctx.entity_mut(ent).s.soundSetIndex = idx;
+
+    G_AddEvent(
+        ctx.entity_mut(ent),
+        entity_event_t::EV_PLAYDOORSOUND as c_int,
+        r#type,
+    );
 }
 
 /// Raven `G_TestEntityPosition`.
@@ -708,25 +720,21 @@ pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:479-493`
 pub fn G_RunMover(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        // if not a team captain, don't do anything, because the captain
-        // will handle everything
-        if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-            return;
-        }
-
-        // if stationary at one of the positions, don't move anything
-        if (*ent).s.pos.trType != trType_t::TR_STATIONARY
-            || (*ent).s.apos.trType != trType_t::TR_STATIONARY
-        {
-            G_MoverTeam(ctx, ctx.entity_id_of(ent).unwrap());
-        }
-
-        // check think function
-        crate::g_main::G_RunThink(ctx, ctx.entity_id_of(ent).unwrap());
+    // if not a team captain, don't do anything, because the captain
+    // will handle everything
+    if ctx.entity(ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+        return;
     }
+
+    // if stationary at one of the positions, don't move anything
+    if ctx.entity(ent).s.pos.trType != trType_t::TR_STATIONARY
+        || ctx.entity(ent).s.apos.trType != trType_t::TR_STATIONARY
+    {
+        G_MoverTeam(ctx, ent);
+    }
+
+    // check think function
+    crate::g_main::G_RunThink(ctx, ent);
 }
 
 // Reshape: Raven's `center` is written through (built up across the
@@ -764,74 +772,69 @@ pub fn CalcTeamDoorCenter(ctx: &mut GameContext, ent: EntityId, center: &mut vec
 ///
 /// Source: `oracle/codemp/game/g_mover.c:535-590`
 pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverState_t, time: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        (*ent).moverState = moverState;
-        (*ent).s.pos.trTime = time;
+    ctx.entity_mut(ent).moverState = moverState;
+    ctx.entity_mut(ent).s.pos.trTime = time;
 
-        if (*ent).s.pos.trDuration <= 0 {
-            // don't allow divide by zero!
-            (*ent).s.pos.trDuration = 1;
-        }
-
-        match moverState {
-            MOVER_POS1 => {
-                (*ent).s.pos.trBase = (*ent).pos1;
-                (*ent).s.pos.trType = trType_t::TR_STATIONARY;
-            }
-            MOVER_POS2 => {
-                (*ent).s.pos.trBase = (*ent).pos2;
-                (*ent).s.pos.trType = trType_t::TR_STATIONARY;
-            }
-            MOVER_1TO2 => {
-                (*ent).s.pos.trBase = (*ent).pos1;
-                let delta = [
-                    (*ent).pos2[0] - (*ent).pos1[0],
-                    (*ent).pos2[1] - (*ent).pos1[1],
-                    (*ent).pos2[2] - (*ent).pos1[2],
-                ];
-                // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
-                // an int, computed in f64, narrowed once at the float store.
-                // Source: `oracle/codemp/game/g_mover.c:560`
-                let f = (1000.0f64 / (*ent).s.pos.trDuration as f64) as f32;
-                (*ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
-                (*ent).s.pos.trType = if (*ent).alt_fire != 0 {
-                    trType_t::TR_LINEAR_STOP
-                } else {
-                    trType_t::TR_NONLINEAR_STOP
-                };
-            }
-            MOVER_2TO1 => {
-                (*ent).s.pos.trBase = (*ent).pos2;
-                let delta = [
-                    (*ent).pos1[0] - (*ent).pos2[0],
-                    (*ent).pos1[1] - (*ent).pos2[1],
-                    (*ent).pos1[2] - (*ent).pos2[2],
-                ];
-                // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
-                // an int, computed in f64, narrowed once at the float store.
-                // Source: `oracle/codemp/game/g_mover.c:575`
-                let f = (1000.0f64 / (*ent).s.pos.trDuration as f64) as f32;
-                (*ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
-                (*ent).s.pos.trType = if (*ent).alt_fire != 0 {
-                    trType_t::TR_LINEAR_STOP
-                } else {
-                    trType_t::TR_NONLINEAR_STOP
-                };
-            }
-            _ => {}
-        }
-        let time = ctx.world.level.time;
-        let mut cur_origin = (*ent).r.currentOrigin;
-        crate::bg_misc::BG_EvaluateTrajectory(
-            &(*ent).s.pos as *const trajectory_t,
-            time,
-            &mut cur_origin,
-        );
-        (*ent).r.currentOrigin = cur_origin;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
+    if ctx.entity(ent).s.pos.trDuration <= 0 {
+        // don't allow divide by zero!
+        ctx.entity_mut(ent).s.pos.trDuration = 1;
     }
+
+    match moverState {
+        MOVER_POS1 => {
+            let pos1 = ctx.entity(ent).pos1;
+            ctx.entity_mut(ent).s.pos.trBase = pos1;
+            ctx.entity_mut(ent).s.pos.trType = trType_t::TR_STATIONARY;
+        }
+        MOVER_POS2 => {
+            let pos2 = ctx.entity(ent).pos2;
+            ctx.entity_mut(ent).s.pos.trBase = pos2;
+            ctx.entity_mut(ent).s.pos.trType = trType_t::TR_STATIONARY;
+        }
+        MOVER_1TO2 => {
+            let pos1 = ctx.entity(ent).pos1;
+            let pos2 = ctx.entity(ent).pos2;
+            ctx.entity_mut(ent).s.pos.trBase = pos1;
+            let delta = [pos2[0] - pos1[0], pos2[1] - pos1[1], pos2[2] - pos1[2]];
+            // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
+            // an int, computed in f64, narrowed once at the float store.
+            // Source: `oracle/codemp/game/g_mover.c:560`
+            let f = (1000.0f64 / ctx.entity(ent).s.pos.trDuration as f64) as f32;
+            ctx.entity_mut(ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
+            ctx.entity_mut(ent).s.pos.trType = if ctx.entity(ent).alt_fire != 0 {
+                trType_t::TR_LINEAR_STOP
+            } else {
+                trType_t::TR_NONLINEAR_STOP
+            };
+        }
+        MOVER_2TO1 => {
+            let pos1 = ctx.entity(ent).pos1;
+            let pos2 = ctx.entity(ent).pos2;
+            ctx.entity_mut(ent).s.pos.trBase = pos2;
+            let delta = [pos1[0] - pos2[0], pos1[1] - pos2[1], pos1[2] - pos2[2]];
+            // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
+            // an int, computed in f64, narrowed once at the float store.
+            // Source: `oracle/codemp/game/g_mover.c:575`
+            let f = (1000.0f64 / ctx.entity(ent).s.pos.trDuration as f64) as f32;
+            ctx.entity_mut(ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
+            ctx.entity_mut(ent).s.pos.trType = if ctx.entity(ent).alt_fire != 0 {
+                trType_t::TR_LINEAR_STOP
+            } else {
+                trType_t::TR_NONLINEAR_STOP
+            };
+        }
+        _ => {}
+    }
+    let time = ctx.world.level.time;
+    let mut cur_origin = ctx.entity(ent).r.currentOrigin;
+    crate::bg_misc::BG_EvaluateTrajectory(
+        core::ptr::from_ref(&ctx.entity(ent).s.pos),
+        time,
+        &mut cur_origin,
+    );
+    ctx.entity_mut(ent).r.currentOrigin = cur_origin;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 }
 
 /// Raven `MatchTeam`.
@@ -860,21 +863,16 @@ pub fn MatchTeam(ctx: &mut GameContext, teamLeader: EntityId, moverState: c_int,
 ///
 /// Source: `oracle/codemp/game/g_mover.c:615-625`
 pub fn ReturnToPos1(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        (*ent).think = FnId::NONE;
-        (*ent).nextthink = 0;
-        (*ent).s.time = ctx.world.level.time;
+    ctx.entity_mut(ent).think = FnId::NONE;
+    ctx.entity_mut(ent).nextthink = 0;
+    let level_time = ctx.world.level.time;
+    ctx.entity_mut(ent).s.time = level_time;
 
-        let ent_eid = ctx.entity_id_of(ent).unwrap();
-        let level_time = ctx.world.level.time;
-        MatchTeam(ctx, ent_eid, MOVER_2TO1, level_time);
+    MatchTeam(ctx, ent, MOVER_2TO1, level_time);
 
-        // starting sound
-        G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
-        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START); // ??
-    }
+    // starting sound
+    G_PlayDoorLoopSound(ctx, ent);
+    G_PlayDoorSound(ctx, ent, BMS_START); // ??
 }
 
 /// Raven `Reached_BinaryMover`.
@@ -1236,78 +1234,78 @@ pub fn InitMoverTrData(ent: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:936-999`
 pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        // if the "model2" key is set, use a seperate model
-        // for drawing, but clip against the brushes
-        if !(*ent).model2.is_null() && *(*ent).model2 != 0 {
-            // Raven `strstr(ent->model2, ".glm")` — use Rust string contains check
-            if std::ffi::CStr::from_ptr((*ent).model2)
-                .to_string_lossy()
-                .contains(".glm")
-            {
-                // for now, not supported in MP.
-                (*ent).s.modelindex2 = 0;
-            } else {
-                (*ent).s.modelindex2 = G_ModelIndex((*ent).model2);
-            }
+    // if the "model2" key is set, use a seperate model
+    // for drawing, but clip against the brushes
+    let model2 = ctx.entity(ent).model2;
+    // Raw C-string derefs of the engine-owned model2 path (seam).
+    if !model2.is_null() && unsafe { *model2 } != 0 {
+        // Raven `strstr(ent->model2, ".glm")` — use Rust string contains check
+        if unsafe { std::ffi::CStr::from_ptr(model2) }
+            .to_string_lossy()
+            .contains(".glm")
+        {
+            // for now, not supported in MP.
+            ctx.entity_mut(ent).s.modelindex2 = 0;
+        } else {
+            ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(model2);
         }
-
-        // if the "color" or "light" keys are set, setup constantLight
-        let mut light = 0.0f32;
-        let mut color: vec3_t = [0.0; 3];
-        let light_set = G_SpawnFloat(
-            ctx,
-            c"light".as_ptr(),
-            c"100".as_ptr(),
-            &mut light as *mut f32,
-        );
-        let color_set = G_SpawnVector(
-            ctx,
-            c"color".as_ptr(),
-            c"1 1 1".as_ptr(),
-            color.as_mut_ptr(),
-        );
-        if light_set != 0 || color_set != 0 {
-            let mut r = (color[0] * 255.0) as c_int;
-            if r > 255 {
-                r = 255;
-            }
-            let mut g = (color[1] * 255.0) as c_int;
-            if g > 255 {
-                g = 255;
-            }
-            let mut b = (color[2] * 255.0) as c_int;
-            if b > 255 {
-                b = 255;
-            }
-            let mut i = (light / 4.0) as c_int;
-            if i > 255 {
-                i = 255;
-            }
-            (*ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
-        }
-
-        (*ent).use_ = Some(EntUse::Use_BinaryMover).into();
-        (*ent).reached = Some(EntReached::Reached_BinaryMover).into();
-
-        (*ent).moverState = MOVER_POS1;
-        (*ent).r.svFlags = SVF_USE_CURRENT_ORIGIN;
-        if (*ent).spawnflags & MOVER_INACTIVE != 0 {
-            // Make it inactive
-            (*ent).flags |= crate::entity::flags::FL_INACTIVE;
-        }
-        if (*ent).spawnflags & MOVER_PLAYER_USE != 0 {
-            // Can be used by the player's BUTTON_USE
-            (*ent).r.svFlags |= SVF_PLAYER_USABLE;
-        }
-        (*ent).s.eType = entityType_t::ET_MOVER as c_int;
-        crate::q_math::_VectorCopy((*ent).pos1, &mut (*ent).r.currentOrigin);
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
-
-        InitMoverTrData(&mut *ent);
     }
+
+    // if the "color" or "light" keys are set, setup constantLight
+    let mut light = 0.0f32;
+    let mut color: vec3_t = [0.0; 3];
+    let light_set = G_SpawnFloat(
+        ctx,
+        c"light".as_ptr(),
+        c"100".as_ptr(),
+        &mut light as *mut f32,
+    );
+    let color_set = G_SpawnVector(
+        ctx,
+        c"color".as_ptr(),
+        c"1 1 1".as_ptr(),
+        color.as_mut_ptr(),
+    );
+    if light_set != 0 || color_set != 0 {
+        let mut r = (color[0] * 255.0) as c_int;
+        if r > 255 {
+            r = 255;
+        }
+        let mut g = (color[1] * 255.0) as c_int;
+        if g > 255 {
+            g = 255;
+        }
+        let mut b = (color[2] * 255.0) as c_int;
+        if b > 255 {
+            b = 255;
+        }
+        let mut i = (light / 4.0) as c_int;
+        if i > 255 {
+            i = 255;
+        }
+        ctx.entity_mut(ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
+    }
+
+    ctx.entity_mut(ent).use_ = Some(EntUse::Use_BinaryMover).into();
+    ctx.entity_mut(ent).reached = Some(EntReached::Reached_BinaryMover).into();
+
+    ctx.entity_mut(ent).moverState = MOVER_POS1;
+    ctx.entity_mut(ent).r.svFlags = SVF_USE_CURRENT_ORIGIN;
+    if ctx.entity(ent).spawnflags & MOVER_INACTIVE != 0 {
+        // Make it inactive
+        ctx.entity_mut(ent).flags |= crate::entity::flags::FL_INACTIVE;
+    }
+    if ctx.entity(ent).spawnflags & MOVER_PLAYER_USE != 0 {
+        // Can be used by the player's BUTTON_USE
+        ctx.entity_mut(ent).r.svFlags |= SVF_PLAYER_USABLE;
+    }
+    ctx.entity_mut(ent).s.eType = entityType_t::ET_MOVER as c_int;
+    let pos1 = ctx.entity(ent).pos1;
+    crate::q_math::_VectorCopy(pos1, &mut ctx.entity_mut(ent).r.currentOrigin);
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
+
+    InitMoverTrData(ctx.entity_mut(ent));
 }
 
 /// Raven `Blocked_Door`.
@@ -1587,31 +1585,25 @@ pub fn Think_SpawnNewDoorTrigger(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1217-1220`
 pub fn Think_MatchTeam(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let ent_eid = ctx.entity_id_of(ent).unwrap();
-        let level_time = ctx.world.level.time;
-        MatchTeam(ctx, ent_eid, (*ent).moverState, level_time);
-    }
+    let moverState = ctx.entity(ent).moverState;
+    let level_time = ctx.world.level.time;
+    MatchTeam(ctx, ent, moverState, level_time);
 }
 
 /// Raven `G_EntIsDoor`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1222-1237`
 pub fn G_EntIsDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
-    unsafe {
-        if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
-            return qfalse;
-        }
-
-        let ent = &mut ctx.world.g_entities[entityNum as usize] as *mut gentity_t;
-        if crate::q_shared::Q_stricmp((*ent).classname, c"func_door".as_ptr()) == 0 {
-            // blocked by a door
-            return qtrue;
-        }
-        qfalse
+    if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
+        return qfalse;
     }
+
+    let classname = ctx.world.g_entities[entityNum as usize].classname;
+    if crate::q_shared::Q_stricmp(classname, c"func_door".as_ptr()) == 0 {
+        // blocked by a door
+        return qtrue;
+    }
+    qfalse
 }
 
 /// Raven `G_FindDoorTrigger`.
@@ -1772,127 +1764,136 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1380-1472`
 pub fn SP_func_door(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
+    let mut genericValue14 = 0;
+    G_SpawnInt(
+        ctx,
+        c"vehopen".as_ptr(),
+        c"0".as_ptr(),
+        &mut genericValue14 as *mut c_int,
+    );
+    ctx.entity_mut(ent).genericValue14 = genericValue14;
+
+    ctx.entity_mut(ent).blocked = Some(EntBlocked::Blocked_Door).into();
+
+    // default speed of 400
+    if ctx.entity(ent).speed == 0.0 {
+        ctx.entity_mut(ent).speed = 400.0;
+    }
+
+    // default wait of 2 seconds
+    if ctx.entity(ent).wait == 0.0 {
+        ctx.entity_mut(ent).wait = 2.0;
+    }
+    let wait = ctx.entity(ent).wait;
+    ctx.entity_mut(ent).wait = wait * 1000.0;
+
+    let delay = ctx.entity(ent).delay;
+    ctx.entity_mut(ent).delay = delay * 1000;
+
+    // default lip of 8 units
+    let mut lip = 0.0f32;
+    G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
+
+    // default damage of 2 points
+    let mut damage = 0;
+    G_SpawnInt(
+        ctx,
+        c"dmg".as_ptr(),
+        c"2".as_ptr(),
+        &mut damage as *mut c_int,
+    );
+    ctx.entity_mut(ent).damage = damage;
+    if ctx.entity(ent).damage < 0 {
+        ctx.entity_mut(ent).damage = 0;
+    }
+
+    let mut alliedTeam = 0;
+    G_SpawnInt(
+        ctx,
+        c"teamallow".as_ptr(),
+        c"0".as_ptr(),
+        &mut alliedTeam as *mut c_int,
+    );
+    ctx.entity_mut(ent).alliedTeam = alliedTeam;
+
+    // first position at start
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).pos1 = origin;
+
+    // calculate second position
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
+    // G_SetMovedir reads angles, writes movedir, then clears angles.
+    let mut angles = ctx.entity(ent).s.angles;
+    let mut movedir = ctx.entity(ent).movedir;
+    G_SetMovedir(&mut angles, &mut movedir);
+    ctx.entity_mut(ent).s.angles = angles;
+    ctx.entity_mut(ent).movedir = movedir;
+    let abs_movedir = [movedir[0].abs(), movedir[1].abs(), movedir[2].abs()];
+    let mins = ctx.entity(ent).r.mins;
+    let maxs = ctx.entity(ent).r.maxs;
+    let size = [maxs[0] - mins[0], maxs[1] - mins[1], maxs[2] - mins[2]];
+    let distance =
+        (abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2]) - lip;
+    let pos1 = ctx.entity(ent).pos1;
+    for i in 0..3 {
+        ctx.entity_mut(ent).pos2[i] = pos1[i] + distance * movedir[i];
+    }
+
+    // if "start_open", reverse position 1 and 2
+    if ctx.entity(ent).spawnflags & 1 != 0 {
+        let temp = ctx.entity(ent).pos2;
+        let origin = ctx.entity(ent).s.origin;
+        ctx.entity_mut(ent).pos2 = origin;
+        ctx.entity_mut(ent).pos1 = temp;
+    }
+
+    if ctx.entity(ent).spawnflags & MOVER_LOCKED != 0 {
+        //a locked door, set up as locked until used directly
+        ctx.entity_mut(ent).s.eFlags |= EF_SHADER_ANIM; // use frame-controlled shader anim
+        ctx.entity_mut(ent).s.frame = 0; // first stage of anim
+    }
+    InitMover(ctx, ent);
+
+    let level_time = ctx.world.level.time;
+    ctx.entity_mut(ent).nextthink = level_time + FRAMETIME;
+
+    if ctx.entity(ent).flags & crate::entity::flags::FL_TEAMSLAVE == 0 {
+        let mut health = 0;
         G_SpawnInt(
             ctx,
-            c"vehopen".as_ptr(),
+            c"health".as_ptr(),
             c"0".as_ptr(),
-            &mut (*ent).genericValue14 as *mut c_int,
+            &mut health as *mut c_int,
         );
 
-        (*ent).blocked = Some(EntBlocked::Blocked_Door).into();
-
-        // default speed of 400
-        if (*ent).speed == 0.0 {
-            (*ent).speed = 400.0;
+        if health != 0 {
+            ctx.entity_mut(ent).takedamage = qtrue;
         }
 
-        // default wait of 2 seconds
-        if (*ent).wait == 0.0 {
-            (*ent).wait = 2.0;
-        }
-        (*ent).wait *= 1000.0;
+        if ctx.entity(ent).spawnflags & MOVER_LOCKED == 0
+            && (!ctx.entity(ent).targetname.is_null()
+                || health != 0
+                || ctx.entity(ent).spawnflags & MOVER_PLAYER_USE != 0
+                || ctx.entity(ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
+        {
+            // non touch/shoot doors
+            ctx.entity_mut(ent).think = Some(EntThink::Think_MatchTeam).into();
 
-        (*ent).delay *= 1000;
-
-        // default lip of 8 units
-        let mut lip = 0.0f32;
-        G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
-
-        // default damage of 2 points
-        G_SpawnInt(
-            ctx,
-            c"dmg".as_ptr(),
-            c"2".as_ptr(),
-            &mut (*ent).damage as *mut c_int,
-        );
-        if (*ent).damage < 0 {
-            (*ent).damage = 0;
-        }
-
-        G_SpawnInt(
-            ctx,
-            c"teamallow".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*ent).alliedTeam as *mut c_int,
-        );
-
-        // first position at start
-        (*ent).pos1 = (*ent).s.origin;
-
-        // calculate second position
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
-        G_SetMovedir(&mut (*ent).s.angles, &mut (*ent).movedir);
-        let abs_movedir = [
-            (*ent).movedir[0].abs(),
-            (*ent).movedir[1].abs(),
-            (*ent).movedir[2].abs(),
-        ];
-        let size = [
-            (*ent).r.maxs[0] - (*ent).r.mins[0],
-            (*ent).r.maxs[1] - (*ent).r.mins[1],
-            (*ent).r.maxs[2] - (*ent).r.mins[2],
-        ];
-        let distance =
-            (abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2]) - lip;
-        for i in 0..3 {
-            (*ent).pos2[i] = (*ent).pos1[i] + distance * (*ent).movedir[i];
-        }
-
-        // if "start_open", reverse position 1 and 2
-        if (*ent).spawnflags & 1 != 0 {
-            let temp = (*ent).pos2;
-            (*ent).pos2 = (*ent).s.origin;
-            (*ent).pos1 = temp;
-        }
-
-        if (*ent).spawnflags & MOVER_LOCKED != 0 {
-            //a locked door, set up as locked until used directly
-            (*ent).s.eFlags |= EF_SHADER_ANIM; // use frame-controlled shader anim
-            (*ent).s.frame = 0; // first stage of anim
-        }
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
-
-        (*ent).nextthink = ctx.world.level.time + FRAMETIME;
-
-        if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE == 0 {
-            let mut health = 0;
-            G_SpawnInt(
-                ctx,
-                c"health".as_ptr(),
-                c"0".as_ptr(),
-                &mut health as *mut c_int,
-            );
-
-            if health != 0 {
-                (*ent).takedamage = qtrue;
+            if ctx.entity(ent).spawnflags & MOVER_FORCE_ACTIVATE != 0 {
+                // so we know it's push/pullable on the client
+                ctx.entity_mut(ent).s.bolt1 = 1;
             }
-
-            if (*ent).spawnflags & MOVER_LOCKED == 0
-                && (!(*ent).targetname.is_null()
-                    || health != 0
-                    || (*ent).spawnflags & MOVER_PLAYER_USE != 0
-                    || (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
-            {
-                // non touch/shoot doors
-                (*ent).think = Some(EntThink::Think_MatchTeam).into();
-
-                if (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0 {
-                    // so we know it's push/pullable on the client
-                    (*ent).s.bolt1 = 1;
-                }
-            } else {
-                // locked doors still spawn a trigger
-                (*ent).think = Some(EntThink::Think_SpawnNewDoorTrigger).into();
-            }
+        } else {
+            // locked doors still spawn a trigger
+            ctx.entity_mut(ent).think = Some(EntThink::Think_SpawnNewDoorTrigger).into();
         }
     }
 }
@@ -2006,73 +2007,76 @@ pub fn SpawnPlatTrigger(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1576-1617`
 pub fn SP_func_plat(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        (*ent).s.angles = [0.0; 3];
+    ctx.entity_mut(ent).s.angles = [0.0; 3];
 
-        G_SpawnFloat(
-            ctx,
-            c"speed".as_ptr(),
-            c"200".as_ptr(),
-            &mut (*ent).speed as *mut f32,
-        );
-        G_SpawnInt(
-            ctx,
-            c"dmg".as_ptr(),
-            c"2".as_ptr(),
-            &mut (*ent).damage as *mut c_int,
-        );
-        G_SpawnFloat(
-            ctx,
-            c"wait".as_ptr(),
-            c"1".as_ptr(),
-            &mut (*ent).wait as *mut f32,
-        );
-        let mut lip = 0.0f32;
-        G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
+    let mut speed = 0.0f32;
+    G_SpawnFloat(
+        ctx,
+        c"speed".as_ptr(),
+        c"200".as_ptr(),
+        &mut speed as *mut f32,
+    );
+    ctx.entity_mut(ent).speed = speed;
+    let mut damage = 0;
+    G_SpawnInt(
+        ctx,
+        c"dmg".as_ptr(),
+        c"2".as_ptr(),
+        &mut damage as *mut c_int,
+    );
+    ctx.entity_mut(ent).damage = damage;
+    let mut wait = 0.0f32;
+    G_SpawnFloat(ctx, c"wait".as_ptr(), c"1".as_ptr(), &mut wait as *mut f32);
+    ctx.entity_mut(ent).wait = wait;
+    let mut lip = 0.0f32;
+    G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
 
-        (*ent).wait = 1000.0;
+    ctx.entity_mut(ent).wait = 1000.0;
 
-        // create second position
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
+    // create second position
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
 
-        let mut height = 0.0f32;
-        if G_SpawnFloat(
-            ctx,
-            c"height".as_ptr(),
-            c"0".as_ptr(),
-            &mut height as *mut f32,
-        ) == 0
-        {
-            height = ((*ent).r.maxs[2] - (*ent).r.mins[2]) - lip;
-        }
+    let mut height = 0.0f32;
+    if G_SpawnFloat(
+        ctx,
+        c"height".as_ptr(),
+        c"0".as_ptr(),
+        &mut height as *mut f32,
+    ) == 0
+    {
+        let maxs = ctx.entity(ent).r.maxs;
+        let mins = ctx.entity(ent).r.mins;
+        height = (maxs[2] - mins[2]) - lip;
+    }
 
-        // pos1 is the rest (bottom) position, pos2 is the top
-        (*ent).pos2 = (*ent).s.origin;
-        (*ent).pos1 = (*ent).pos2;
-        (*ent).pos1[2] -= height;
+    // pos1 is the rest (bottom) position, pos2 is the top
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).pos2 = origin;
+    let pos2 = ctx.entity(ent).pos2;
+    ctx.entity_mut(ent).pos1 = pos2;
+    ctx.entity_mut(ent).pos1[2] -= height;
 
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
+    InitMover(ctx, ent);
 
-        // touch function keeps the plat from returning while a live player
-        // is standing on it
-        (*ent).touch = Some(EntTouch::Touch_Plat).into();
+    // touch function keeps the plat from returning while a live player
+    // is standing on it
+    ctx.entity_mut(ent).touch = Some(EntTouch::Touch_Plat).into();
 
-        (*ent).blocked = Some(EntBlocked::Blocked_Door).into();
+    ctx.entity_mut(ent).blocked = Some(EntBlocked::Blocked_Door).into();
 
-        (*ent).parent = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), ent); // so it can be treated as a door
+    ctx.entity_mut(ent).parent = Some(ent); // so it can be treated as a door
 
-        // spawn the trigger if one hasn't been custom made
-        if (*ent).targetname.is_null() {
-            SpawnPlatTrigger(ctx, ctx.entity_id_of(ent).unwrap());
-        }
+    // spawn the trigger if one hasn't been custom made
+    if ctx.entity(ent).targetname.is_null() {
+        SpawnPlatTrigger(ctx, ent);
     }
 }
 
@@ -2109,74 +2113,71 @@ pub fn Touch_Button(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1660-1702`
 pub fn SP_func_button(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        if (*ent).speed == 0.0 {
-            (*ent).speed = 40.0;
-        }
-
-        if (*ent).wait == 0.0 {
-            (*ent).wait = 1.0;
-        }
-        (*ent).wait *= 1000.0;
-
-        // first position
-        (*ent).pos1 = (*ent).s.origin;
-
-        // calculate second position
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
-
-        let mut lip = 0.0f32;
-        G_SpawnFloat(ctx, c"lip".as_ptr(), c"4".as_ptr(), &mut lip as *mut f32);
-
-        G_SetMovedir(&mut (*ent).s.angles, &mut (*ent).movedir);
-        let abs_movedir = [
-            (*ent).movedir[0].abs(),
-            (*ent).movedir[1].abs(),
-            (*ent).movedir[2].abs(),
-        ];
-        let size = [
-            (*ent).r.maxs[0] - (*ent).r.mins[0],
-            (*ent).r.maxs[1] - (*ent).r.mins[1],
-            (*ent).r.maxs[2] - (*ent).r.mins[2],
-        ];
-        let distance =
-            abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2] - lip;
-        for i in 0..3 {
-            (*ent).pos2[i] = (*ent).pos1[i] + distance * (*ent).movedir[i];
-        }
-
-        if (*ent).health != 0 {
-            // shootable button
-            (*ent).takedamage = qtrue;
-        } else {
-            // touchable button
-            (*ent).touch = Some(EntTouch::Touch_Button).into();
-        }
-
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
+    if ctx.entity(ent).speed == 0.0 {
+        ctx.entity_mut(ent).speed = 40.0;
     }
+
+    if ctx.entity(ent).wait == 0.0 {
+        ctx.entity_mut(ent).wait = 1.0;
+    }
+    let wait = ctx.entity(ent).wait;
+    ctx.entity_mut(ent).wait = wait * 1000.0;
+
+    // first position
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).pos1 = origin;
+
+    // calculate second position
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
+
+    let mut lip = 0.0f32;
+    G_SpawnFloat(ctx, c"lip".as_ptr(), c"4".as_ptr(), &mut lip as *mut f32);
+
+    // G_SetMovedir reads angles, writes movedir, then clears angles.
+    let mut angles = ctx.entity(ent).s.angles;
+    let mut movedir = ctx.entity(ent).movedir;
+    G_SetMovedir(&mut angles, &mut movedir);
+    ctx.entity_mut(ent).s.angles = angles;
+    ctx.entity_mut(ent).movedir = movedir;
+    let abs_movedir = [movedir[0].abs(), movedir[1].abs(), movedir[2].abs()];
+    let mins = ctx.entity(ent).r.mins;
+    let maxs = ctx.entity(ent).r.maxs;
+    let size = [maxs[0] - mins[0], maxs[1] - mins[1], maxs[2] - mins[2]];
+    let distance =
+        abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2] - lip;
+    let pos1 = ctx.entity(ent).pos1;
+    for i in 0..3 {
+        ctx.entity_mut(ent).pos2[i] = pos1[i] + distance * movedir[i];
+    }
+
+    if ctx.entity(ent).health != 0 {
+        // shootable button
+        ctx.entity_mut(ent).takedamage = qtrue;
+    } else {
+        // touchable button
+        ctx.entity_mut(ent).touch = Some(EntTouch::Touch_Button).into();
+    }
+
+    InitMover(ctx, ent);
 }
 
 /// Raven `Think_BeginMoving`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1727-1732`
 pub fn Think_BeginMoving(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        G_PlayDoorSound(ctx, ctx.entity_id_of(ent).unwrap(), BMS_START);
-        G_PlayDoorLoopSound(ctx, ctx.entity_id_of(ent).unwrap());
-        (*ent).s.pos.trTime = ctx.world.level.time;
-        (*ent).s.pos.trType = trType_t::TR_LINEAR_STOP;
-    }
+    G_PlayDoorSound(ctx, ent, BMS_START);
+    G_PlayDoorLoopSound(ctx, ent);
+    let level_time = ctx.world.level.time;
+    ctx.entity_mut(ent).s.pos.trTime = level_time;
+    ctx.entity_mut(ent).s.pos.trType = trType_t::TR_LINEAR_STOP;
 }
 
 /// Raven `Reached_Train`.
@@ -2340,144 +2341,145 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1873-1880`
 pub fn SP_path_corner(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        if (*self_).targetname.is_null() {
-            G_Printf(ctx, c"path_corner with no targetname at %s\n".as_ptr());
-            let _ = vtos(ctx, (*self_).s.origin);
-            G_FreeEntity(ctx, ctx.entity_id_of(self_));
-            return;
-        }
-        // path corners don't need to be linked in
+    if ctx.entity(self_).targetname.is_null() {
+        G_Printf(ctx, c"path_corner with no targetname at %s\n".as_ptr());
+        let origin = ctx.entity(self_).s.origin;
+        let _ = vtos(ctx, origin);
+        G_FreeEntity(ctx, Some(self_));
+        return;
     }
+    // path corners don't need to be linked in
 }
 
 /// Raven `SP_func_train`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1897-1927`
 pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        (*self_).s.angles = [0.0; 3];
+    ctx.entity_mut(self_).s.angles = [0.0; 3];
 
-        // Raven `TRAIN_BLOCK_STOPS` spawnflag (`g_mover.c:1900`); not yet a
-        // named const anywhere in the crate graph — transcribed as its
-        // literal bit here (single call site, no cross-file reuse to justify
-        // a shared const yet).
-        pub const TRAIN_BLOCK_STOPS: c_int = 1;
-        if (*self_).spawnflags & TRAIN_BLOCK_STOPS != 0 {
-            (*self_).damage = 0;
-        } else if (*self_).damage == 0 {
-            (*self_).damage = 2;
-        }
-
-        if (*self_).speed == 0.0 {
-            (*self_).speed = 100.0;
-        }
-
-        if (*self_).target.is_null() {
-            let _ = vtos(ctx, (*self_).r.absmin);
-            G_Printf(ctx, c"func_train without a target at %s\n".as_ptr());
-            G_FreeEntity(ctx, ctx.entity_id_of(self_));
-            return;
-        }
-
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                self_.cast(),
-                std::ffi::CStr::from_ptr((*self_).model).to_owned(),
-            ),
-        );
-        InitMover(ctx, ctx.entity_id_of(self_).unwrap());
-
-        (*self_).reached = Some(EntReached::Reached_Train).into();
-
-        // start trains on the second frame, to make sure their targets have
-        // had a chance to spawn
-        (*self_).nextthink = ctx.world.level.time + FRAMETIME;
-        (*self_).think = Some(EntThink::Think_SetupTrainTargets).into();
+    // Raven `TRAIN_BLOCK_STOPS` spawnflag (`g_mover.c:1900`); not yet a
+    // named const anywhere in the crate graph — transcribed as its
+    // literal bit here (single call site, no cross-file reuse to justify
+    // a shared const yet).
+    pub const TRAIN_BLOCK_STOPS: c_int = 1;
+    if ctx.entity(self_).spawnflags & TRAIN_BLOCK_STOPS != 0 {
+        ctx.entity_mut(self_).damage = 0;
+    } else if ctx.entity(self_).damage == 0 {
+        ctx.entity_mut(self_).damage = 2;
     }
+
+    if ctx.entity(self_).speed == 0.0 {
+        ctx.entity_mut(self_).speed = 100.0;
+    }
+
+    if ctx.entity(self_).target.is_null() {
+        let absmin = ctx.entity(self_).r.absmin;
+        let _ = vtos(ctx, absmin);
+        G_Printf(ctx, c"func_train without a target at %s\n".as_ptr());
+        G_FreeEntity(ctx, Some(self_));
+        return;
+    }
+
+    let model = ctx.entity(self_).model;
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            self_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
+    InitMover(ctx, self_);
+
+    ctx.entity_mut(self_).reached = Some(EntReached::Reached_Train).into();
+
+    // start trains on the second frame, to make sure their targets have
+    // had a chance to spawn
+    let level_time = ctx.world.level.time;
+    ctx.entity_mut(self_).nextthink = level_time + FRAMETIME;
+    ctx.entity_mut(self_).think = Some(EntThink::Think_SetupTrainTargets).into();
 }
 
 /// Raven `SP_func_static`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1956-2019`
 pub fn SP_func_static(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
 
-        (*ent).pos1 = (*ent).s.origin;
-        (*ent).pos2 = (*ent).s.origin;
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).pos1 = origin;
+    ctx.entity_mut(ent).pos2 = origin;
 
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
+    InitMover(ctx, ent);
 
-        (*ent).use_ = Some(EntUse::func_static_use).into();
-        (*ent).reached = FnId::NONE;
+    ctx.entity_mut(ent).use_ = Some(EntUse::func_static_use).into();
+    ctx.entity_mut(ent).reached = FnId::NONE;
 
-        G_SetOrigin(&mut *(ent), (*ent).s.origin);
-        G_SetAngles(&mut *(ent), (*ent).s.angles);
+    let origin = ctx.entity(ent).s.origin;
+    G_SetOrigin(ctx.entity_mut(ent), origin);
+    let angles = ctx.entity(ent).s.angles;
+    G_SetAngles(ctx.entity_mut(ent), angles);
 
-        if (*ent).spawnflags & 2048 != 0 {
-            // yes this is very very evil, but for now (pre-alpha) it's a
-            // solution — I need to rotate something that is huge and it's
-            // touching too many area portals...
-            (*ent).r.svFlags |= SVF_BROADCAST;
-        }
+    if ctx.entity(ent).spawnflags & 2048 != 0 {
+        // yes this is very very evil, but for now (pre-alpha) it's a
+        // solution — I need to rotate something that is huge and it's
+        // touching too many area portals...
+        ctx.entity_mut(ent).r.svFlags |= SVF_BROADCAST;
+    }
 
-        if (*ent).spawnflags & 4 != 0 {
-            // SWITCH_SHADER
-            (*ent).s.eFlags |= EF_SHADER_ANIM; // use frame-controlled shader anim
-            (*ent).s.frame = 0; // first stage of anim
-        }
+    if ctx.entity(ent).spawnflags & 4 != 0 {
+        // SWITCH_SHADER
+        ctx.entity_mut(ent).s.eFlags |= EF_SHADER_ANIM; // use frame-controlled shader anim
+        ctx.entity_mut(ent).s.frame = 0; // first stage of anim
+    }
 
-        if (*ent).spawnflags & 1 != 0 || (*ent).spawnflags & 2 != 0 {
-            // so we know it's push/pullable on the client
-            (*ent).s.bolt1 = 1;
-        }
+    if ctx.entity(ent).spawnflags & 1 != 0 || ctx.entity(ent).spawnflags & 2 != 0 {
+        // so we know it's push/pullable on the client
+        ctx.entity_mut(ent).s.bolt1 = 1;
+    }
 
-        G_SpawnInt(
-            ctx,
-            c"model2scale".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*ent).s.iModelScale as *mut c_int,
-        );
-        if (*ent).s.iModelScale < 0 {
-            // NOTE: -1 scale is x -100% (so -3 is 300%)
-            (*ent).s.legsFlip = qtrue;
-            (*ent).s.iModelScale = -(*ent).s.iModelScale;
-        } else if (*ent).s.iModelScale > 1023 {
-            (*ent).s.iModelScale = 1023;
-        }
+    let mut iModelScale = 0;
+    G_SpawnInt(
+        ctx,
+        c"model2scale".as_ptr(),
+        c"0".as_ptr(),
+        &mut iModelScale as *mut c_int,
+    );
+    ctx.entity_mut(ent).s.iModelScale = iModelScale;
+    if iModelScale < 0 {
+        // NOTE: -1 scale is x -100% (so -3 is 300%)
+        ctx.entity_mut(ent).s.legsFlip = qtrue;
+        ctx.entity_mut(ent).s.iModelScale = -iModelScale;
+    } else if iModelScale > 1023 {
+        ctx.entity_mut(ent).s.iModelScale = 1023;
+    }
 
-        let mut test = 0;
-        G_SpawnInt(
-            ctx,
-            c"hyperspace".as_ptr(),
-            c"0".as_ptr(),
-            &mut test as *mut c_int,
-        );
-        if test != 0 {
-            (*ent).r.svFlags |= SVF_BROADCAST;
-            (*ent).s.eFlags2 |= EF2_HYPERSPACE;
-        }
+    let mut test = 0;
+    G_SpawnInt(
+        ctx,
+        c"hyperspace".as_ptr(),
+        c"0".as_ptr(),
+        &mut test as *mut c_int,
+    );
+    if test != 0 {
+        ctx.entity_mut(ent).r.svFlags |= SVF_BROADCAST;
+        ctx.entity_mut(ent).s.eFlags2 |= EF2_HYPERSPACE;
+    }
 
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 
-        if ctx.world.level.mBSPInstanceDepth != 0 {
-            // this means that this guy will never be updated, moved, changed, etc.
-            (*ent).s.eFlags = EF_PERMANENT;
-        }
+    if ctx.world.level.mBSPInstanceDepth != 0 {
+        // this means that this guy will never be updated, moved, changed, etc.
+        ctx.entity_mut(ent).s.eFlags = EF_PERMANENT;
     }
 }
 
@@ -2490,20 +2492,16 @@ pub fn func_static_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let other: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
-    let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
-    unsafe {
-        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
+    // `other` unused by Raven; `activator` threads straight to `G_UseTargets`
+    // (the resolve→entity_id_of round-trip is the identity).
+    let _ = other;
+    G_ActivateBehavior(ctx, Some(self_), bSet_t::BSET_USE as c_int);
 
-        if (*self_).spawnflags & 4 /* SWITCH_SHADER */ != 0 {
-            (*self_).s.frame = if (*self_).s.frame != 0 { 0 } else { 1 }; // toggle frame
-        }
-        G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(activator));
+    if ctx.entity(self_).spawnflags & 4 /* SWITCH_SHADER */ != 0 {
+        let frame = ctx.entity(self_).s.frame;
+        ctx.entity_mut(self_).s.frame = if frame != 0 { 0 } else { 1 }; // toggle frame
     }
+    G_UseTargets(ctx, Some(self_), activator);
 }
 
 /// Raven `func_rotating_use`.
@@ -2515,37 +2513,36 @@ pub fn func_rotating_use(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params (other/activator unused by Raven here);
-    // raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        if (*self_).s.apos.trType == trType_t::TR_LINEAR {
-            (*self_).s.apos.trType = trType_t::TR_STATIONARY;
-            // stop the sound if it stops moving
-            (*self_).s.loopSound = 0;
-            (*self_).s.loopIsSoundset = qfalse;
-            // play stop sound too?
-            if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
-                G_AddEvent(
-                    &mut *(self_),
-                    entity_event_t::EV_BMODEL_SOUND as c_int,
-                    BMS_END,
-                );
-            }
-        } else {
-            if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
-                G_AddEvent(
-                    &mut *(self_),
-                    entity_event_t::EV_BMODEL_SOUND as c_int,
-                    BMS_START,
-                );
-                (*self_).s.loopSound = BMS_MID;
-                (*self_).s.loopIsSoundset = qtrue;
-            }
-            (*self_).s.apos.trType = trType_t::TR_LINEAR;
+    if ctx.entity(self_).s.apos.trType == trType_t::TR_LINEAR {
+        ctx.entity_mut(self_).s.apos.trType = trType_t::TR_STATIONARY;
+        // stop the sound if it stops moving
+        ctx.entity_mut(self_).s.loopSound = 0;
+        ctx.entity_mut(self_).s.loopIsSoundset = qfalse;
+        // play stop sound too?
+        let soundSet = ctx.entity(self_).soundSet;
+        if !soundSet.is_null() && unsafe { *soundSet } != 0 {
+            let idx = G_SoundSetIndex(ctx, soundSet);
+            ctx.entity_mut(self_).s.soundSetIndex = idx;
+            G_AddEvent(
+                ctx.entity_mut(self_),
+                entity_event_t::EV_BMODEL_SOUND as c_int,
+                BMS_END,
+            );
         }
+    } else {
+        let soundSet = ctx.entity(self_).soundSet;
+        if !soundSet.is_null() && unsafe { *soundSet } != 0 {
+            let idx = G_SoundSetIndex(ctx, soundSet);
+            ctx.entity_mut(self_).s.soundSetIndex = idx;
+            G_AddEvent(
+                ctx.entity_mut(self_),
+                entity_event_t::EV_BMODEL_SOUND as c_int,
+                BMS_START,
+            );
+            ctx.entity_mut(self_).s.loopSound = BMS_MID;
+            ctx.entity_mut(self_).s.loopIsSoundset = qtrue;
+        }
+        ctx.entity_mut(self_).s.apos.trType = trType_t::TR_LINEAR;
     }
 }
 
@@ -2553,87 +2550,96 @@ pub fn func_rotating_use(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2133-2209`
 pub fn SP_func_rotating(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut spinangles: vec3_t = [0.0; 3];
-        if (*ent).health != 0 {
-            let sav_spawnflags = (*ent).spawnflags;
-            (*ent).spawnflags = 0;
-            SP_func_breakable(ctx, ctx.entity_id_of(ent).unwrap());
-            (*ent).spawnflags = sav_spawnflags;
-        } else {
-            trap::SetBrushModel(
-                ctx.engine,
-                GSetBrushModelArgs::new(
-                    ent.cast(),
-                    std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-                ),
-            );
-            InitMover(ctx, ctx.entity_id_of(ent).unwrap());
-
-            (*ent).s.pos.trBase = (*ent).s.origin;
-            (*ent).r.currentOrigin = (*ent).s.pos.trBase;
-            (*ent).r.currentAngles = (*ent).s.apos.trBase;
-
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
-        }
-
-        G_SpawnInt(
-            ctx,
-            c"model2scale".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*ent).s.iModelScale as *mut c_int,
+    let mut spinangles: vec3_t = [0.0; 3];
+    if ctx.entity(ent).health != 0 {
+        let sav_spawnflags = ctx.entity(ent).spawnflags;
+        ctx.entity_mut(ent).spawnflags = 0;
+        SP_func_breakable(ctx, ent);
+        ctx.entity_mut(ent).spawnflags = sav_spawnflags;
+    } else {
+        let model = ctx.entity(ent).model;
+        let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(
+                ent_ptr.cast(),
+                unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+            ),
         );
-        if (*ent).s.iModelScale < 0 {
-            (*ent).s.legsFlip = qtrue;
-            (*ent).s.iModelScale = -(*ent).s.iModelScale;
-        } else if (*ent).s.iModelScale > 1023 {
-            (*ent).s.iModelScale = 1023;
-        }
+        InitMover(ctx, ent);
 
-        if G_SpawnVector(
-            ctx,
-            c"spinangles".as_ptr(),
-            c"0 0 0".as_ptr(),
-            spinangles.as_mut_ptr(),
-        ) != 0
-        {
-            (*ent).speed = (spinangles[0] * spinangles[0]
-                + spinangles[1] * spinangles[1]
-                + spinangles[2] * spinangles[2])
-                .sqrt();
-            // set the axis of rotation
-            (*ent).s.apos.trDelta = spinangles;
+        let origin = ctx.entity(ent).s.origin;
+        ctx.entity_mut(ent).s.pos.trBase = origin;
+        let trBase = ctx.entity(ent).s.pos.trBase;
+        ctx.entity_mut(ent).r.currentOrigin = trBase;
+        let apos_trBase = ctx.entity(ent).s.apos.trBase;
+        ctx.entity_mut(ent).r.currentAngles = apos_trBase;
+
+        let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
+    }
+
+    let mut iModelScale = 0;
+    G_SpawnInt(
+        ctx,
+        c"model2scale".as_ptr(),
+        c"0".as_ptr(),
+        &mut iModelScale as *mut c_int,
+    );
+    ctx.entity_mut(ent).s.iModelScale = iModelScale;
+    if iModelScale < 0 {
+        ctx.entity_mut(ent).s.legsFlip = qtrue;
+        ctx.entity_mut(ent).s.iModelScale = -iModelScale;
+    } else if iModelScale > 1023 {
+        ctx.entity_mut(ent).s.iModelScale = 1023;
+    }
+
+    if G_SpawnVector(
+        ctx,
+        c"spinangles".as_ptr(),
+        c"0 0 0".as_ptr(),
+        spinangles.as_mut_ptr(),
+    ) != 0
+    {
+        ctx.entity_mut(ent).speed = (spinangles[0] * spinangles[0]
+            + spinangles[1] * spinangles[1]
+            + spinangles[2] * spinangles[2])
+            .sqrt();
+        // set the axis of rotation
+        ctx.entity_mut(ent).s.apos.trDelta = spinangles;
+    } else {
+        if ctx.entity(ent).speed == 0.0 {
+            ctx.entity_mut(ent).speed = 100.0;
+        }
+        // set the axis of rotation
+        if ctx.entity(ent).spawnflags & 4 != 0 {
+            let speed = ctx.entity(ent).speed;
+            ctx.entity_mut(ent).s.apos.trDelta[2] = speed;
+        } else if ctx.entity(ent).spawnflags & 8 != 0 {
+            let speed = ctx.entity(ent).speed;
+            ctx.entity_mut(ent).s.apos.trDelta[0] = speed;
         } else {
-            if (*ent).speed == 0.0 {
-                (*ent).speed = 100.0;
-            }
-            // set the axis of rotation
-            if (*ent).spawnflags & 4 != 0 {
-                (*ent).s.apos.trDelta[2] = (*ent).speed;
-            } else if (*ent).spawnflags & 8 != 0 {
-                (*ent).s.apos.trDelta[0] = (*ent).speed;
-            } else {
-                (*ent).s.apos.trDelta[1] = (*ent).speed;
-            }
+            let speed = ctx.entity(ent).speed;
+            ctx.entity_mut(ent).s.apos.trDelta[1] = speed;
         }
-        (*ent).s.apos.trType = trType_t::TR_LINEAR;
+    }
+    ctx.entity_mut(ent).s.apos.trType = trType_t::TR_LINEAR;
 
-        if (*ent).damage == 0 {
-            if (*ent).spawnflags & 16 != 0 {
-                // IMPACT
-                (*ent).damage = 10000;
-            } else {
-                (*ent).damage = 2;
-            }
+    if ctx.entity(ent).damage == 0 {
+        if ctx.entity(ent).spawnflags & 16 != 0 {
+            // IMPACT
+            ctx.entity_mut(ent).damage = 10000;
+        } else {
+            ctx.entity_mut(ent).damage = 2;
         }
-        if (*ent).spawnflags & 2 != 0 {
-            // RADAR: show up on Radar at close range and play impact sound
-            // when close...? Range based on my size
-            (*ent).s.speed = Distance((*ent).r.absmin, (*ent).r.absmax) * 0.5;
-            (*ent).s.eFlags |= EF_RADAROBJECT;
-        }
+    }
+    if ctx.entity(ent).spawnflags & 2 != 0 {
+        // RADAR: show up on Radar at close range and play impact sound
+        // when close...? Range based on my size
+        let absmin = ctx.entity(ent).r.absmin;
+        let absmax = ctx.entity(ent).r.absmax;
+        ctx.entity_mut(ent).s.speed = Distance(absmin, absmax) * 0.5;
+        ctx.entity_mut(ent).s.eFlags |= EF_RADAROBJECT;
     }
 }
 
@@ -2641,61 +2647,66 @@ pub fn SP_func_rotating(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2231-2258`
 pub fn SP_func_bobbing(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut height = 0.0f32;
-        let mut phase = 0.0f32;
+    let mut height = 0.0f32;
+    let mut phase = 0.0f32;
 
-        G_SpawnFloat(
-            ctx,
-            c"speed".as_ptr(),
-            c"4".as_ptr(),
-            &mut (*ent).speed as *mut f32,
-        );
-        G_SpawnFloat(
-            ctx,
-            c"height".as_ptr(),
-            c"32".as_ptr(),
-            &mut height as *mut f32,
-        );
-        G_SpawnInt(
-            ctx,
-            c"dmg".as_ptr(),
-            c"2".as_ptr(),
-            &mut (*ent).damage as *mut c_int,
-        );
-        G_SpawnFloat(
-            ctx,
-            c"phase".as_ptr(),
-            c"0".as_ptr(),
-            &mut phase as *mut f32,
-        );
+    let mut speed = 0.0f32;
+    G_SpawnFloat(
+        ctx,
+        c"speed".as_ptr(),
+        c"4".as_ptr(),
+        &mut speed as *mut f32,
+    );
+    ctx.entity_mut(ent).speed = speed;
+    G_SpawnFloat(
+        ctx,
+        c"height".as_ptr(),
+        c"32".as_ptr(),
+        &mut height as *mut f32,
+    );
+    let mut damage = 0;
+    G_SpawnInt(
+        ctx,
+        c"dmg".as_ptr(),
+        c"2".as_ptr(),
+        &mut damage as *mut c_int,
+    );
+    ctx.entity_mut(ent).damage = damage;
+    G_SpawnFloat(
+        ctx,
+        c"phase".as_ptr(),
+        c"0".as_ptr(),
+        &mut phase as *mut f32,
+    );
 
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
+    InitMover(ctx, ent);
 
-        (*ent).s.pos.trBase = (*ent).s.origin;
-        (*ent).r.currentOrigin = (*ent).s.origin;
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).s.pos.trBase = origin;
+    ctx.entity_mut(ent).r.currentOrigin = origin;
 
-        (*ent).s.pos.trDuration = ((*ent).speed * 1000.0) as c_int;
-        (*ent).s.pos.trTime = ((*ent).s.pos.trDuration as f32 * phase) as c_int;
-        (*ent).s.pos.trType = trType_t::TR_SINE;
+    let speed = ctx.entity(ent).speed;
+    ctx.entity_mut(ent).s.pos.trDuration = (speed * 1000.0) as c_int;
+    let trDuration = ctx.entity(ent).s.pos.trDuration;
+    ctx.entity_mut(ent).s.pos.trTime = (trDuration as f32 * phase) as c_int;
+    ctx.entity_mut(ent).s.pos.trType = trType_t::TR_SINE;
 
-        // set the axis of bobbing
-        if (*ent).spawnflags & 1 != 0 {
-            (*ent).s.pos.trDelta[0] = height;
-        } else if (*ent).spawnflags & 2 != 0 {
-            (*ent).s.pos.trDelta[1] = height;
-        } else {
-            (*ent).s.pos.trDelta[2] = height;
-        }
+    // set the axis of bobbing
+    if ctx.entity(ent).spawnflags & 1 != 0 {
+        ctx.entity_mut(ent).s.pos.trDelta[0] = height;
+    } else if ctx.entity(ent).spawnflags & 2 != 0 {
+        ctx.entity_mut(ent).s.pos.trDelta[1] = height;
+    } else {
+        ctx.entity_mut(ent).s.pos.trDelta[2] = height;
     }
 }
 
@@ -2703,65 +2714,68 @@ pub fn SP_func_bobbing(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2280-2313`
 pub fn SP_func_pendulum(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut speed = 0.0f32;
-        let mut phase = 0.0f32;
+    let mut speed = 0.0f32;
+    let mut phase = 0.0f32;
 
-        G_SpawnFloat(
-            ctx,
-            c"speed".as_ptr(),
-            c"30".as_ptr(),
-            &mut speed as *mut f32,
-        );
-        G_SpawnInt(
-            ctx,
-            c"dmg".as_ptr(),
-            c"2".as_ptr(),
-            &mut (*ent).damage as *mut c_int,
-        );
-        G_SpawnFloat(
-            ctx,
-            c"phase".as_ptr(),
-            c"0".as_ptr(),
-            &mut phase as *mut f32,
-        );
+    G_SpawnFloat(
+        ctx,
+        c"speed".as_ptr(),
+        c"30".as_ptr(),
+        &mut speed as *mut f32,
+    );
+    let mut damage = 0;
+    G_SpawnInt(
+        ctx,
+        c"dmg".as_ptr(),
+        c"2".as_ptr(),
+        &mut damage as *mut c_int,
+    );
+    ctx.entity_mut(ent).damage = damage;
+    G_SpawnFloat(
+        ctx,
+        c"phase".as_ptr(),
+        c"0".as_ptr(),
+        &mut phase as *mut f32,
+    );
 
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
 
-        // find pendulum length
-        let mut length = (*ent).r.mins[2].abs();
-        if length < 8.0 {
-            length = 8.0;
-        }
-
-        // Raven: `1 / ( M_PI * 2 ) * sqrt( g_gravity.value / ( 3 * length ) )`. The ratio
-        // is a float divide, but sqrt is the double libm call and 1/(M_PI*2) is double;
-        // the product narrows to float.
-        let ratio = ctx.world.cvars.g_gravity.value / (3.0 * length);
-        let freq = (1.0f64 / (core::f64::consts::PI * 2.0) * (ratio as f64).sqrt()) as f32;
-
-        (*ent).s.pos.trDuration = (1000.0 / freq) as c_int;
-
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
-
-        (*ent).s.pos.trBase = (*ent).s.origin;
-        (*ent).r.currentOrigin = (*ent).s.origin;
-
-        (*ent).s.apos.trBase = (*ent).s.angles;
-
-        (*ent).s.apos.trDuration = (1000.0 / freq) as c_int;
-        (*ent).s.apos.trTime = ((*ent).s.apos.trDuration as f32 * phase) as c_int;
-        (*ent).s.apos.trType = trType_t::TR_SINE;
-        (*ent).s.apos.trDelta[2] = speed;
+    // find pendulum length
+    let mut length = ctx.entity(ent).r.mins[2].abs();
+    if length < 8.0 {
+        length = 8.0;
     }
+
+    // Raven: `1 / ( M_PI * 2 ) * sqrt( g_gravity.value / ( 3 * length ) )`. The ratio
+    // is a float divide, but sqrt is the double libm call and 1/(M_PI*2) is double;
+    // the product narrows to float.
+    let ratio = ctx.world.cvars.g_gravity.value / (3.0 * length);
+    let freq = (1.0f64 / (core::f64::consts::PI * 2.0) * (ratio as f64).sqrt()) as f32;
+
+    ctx.entity_mut(ent).s.pos.trDuration = (1000.0 / freq) as c_int;
+
+    InitMover(ctx, ent);
+
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).s.pos.trBase = origin;
+    ctx.entity_mut(ent).r.currentOrigin = origin;
+
+    let angles = ctx.entity(ent).s.angles;
+    ctx.entity_mut(ent).s.apos.trBase = angles;
+
+    ctx.entity_mut(ent).s.apos.trDuration = (1000.0 / freq) as c_int;
+    let apos_trDuration = ctx.entity(ent).s.apos.trDuration;
+    ctx.entity_mut(ent).s.apos.trTime = (apos_trDuration as f32 * phase) as c_int;
+    ctx.entity_mut(ent).s.apos.trType = trType_t::TR_SINE;
+    ctx.entity_mut(ent).s.apos.trDelta[2] = speed;
 }
 
 /// Raven `CacheChunkEffects`.
@@ -3202,74 +3216,76 @@ pub fn funcBBrushPain(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2599-2661`
 pub fn InitBBrush(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        (*ent).pos1 = (*ent).s.origin;
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).pos1 = origin;
 
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
 
-        (*ent).die = Some(EntDie::funcBBrushDie).into();
-        (*ent).flags |= crate::entity::flags::FL_BBRUSH;
+    ctx.entity_mut(ent).die = Some(EntDie::funcBBrushDie).into();
+    ctx.entity_mut(ent).flags |= crate::entity::flags::FL_BBRUSH;
 
-        // if the "model2" key is set, use a separate model for drawing, but
-        // clip against the brushes
-        if !(*ent).model2.is_null() && *(*ent).model2 != 0 {
-            (*ent).s.modelindex2 = G_ModelIndex((*ent).model2);
-        }
-
-        // if the "color" or "light" keys are set, setup constantLight
-        let mut light = 0.0f32;
-        let mut color: vec3_t = [0.0; 3];
-        let light_set = G_SpawnFloat(
-            ctx,
-            c"light".as_ptr(),
-            c"100".as_ptr(),
-            &mut light as *mut f32,
-        );
-        let color_set = G_SpawnVector(
-            ctx,
-            c"color".as_ptr(),
-            c"1 1 1".as_ptr(),
-            color.as_mut_ptr(),
-        );
-        if light_set != 0 || color_set != 0 {
-            let mut r = (color[0] * 255.0) as c_int;
-            if r > 255 {
-                r = 255;
-            }
-            let mut g = (color[1] * 255.0) as c_int;
-            if g > 255 {
-                g = 255;
-            }
-            let mut b = (color[2] * 255.0) as c_int;
-            if b > 255 {
-                b = 255;
-            }
-            let mut i = (light / 4.0) as c_int;
-            if i > 255 {
-                i = 255;
-            }
-            (*ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
-        }
-
-        if (*ent).spawnflags & 128 != 0 {
-            // can be used by the player's BUTTON_USE
-            (*ent).r.svFlags |= SVF_PLAYER_USABLE;
-        }
-
-        (*ent).s.eType = entityType_t::ET_MOVER as c_int;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
-
-        (*ent).s.pos.trType = trType_t::TR_STATIONARY;
-        (*ent).s.pos.trBase = (*ent).pos1;
+    // if the "model2" key is set, use a separate model for drawing, but
+    // clip against the brushes
+    let model2 = ctx.entity(ent).model2;
+    if !model2.is_null() && unsafe { *model2 } != 0 {
+        ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(model2);
     }
+
+    // if the "color" or "light" keys are set, setup constantLight
+    let mut light = 0.0f32;
+    let mut color: vec3_t = [0.0; 3];
+    let light_set = G_SpawnFloat(
+        ctx,
+        c"light".as_ptr(),
+        c"100".as_ptr(),
+        &mut light as *mut f32,
+    );
+    let color_set = G_SpawnVector(
+        ctx,
+        c"color".as_ptr(),
+        c"1 1 1".as_ptr(),
+        color.as_mut_ptr(),
+    );
+    if light_set != 0 || color_set != 0 {
+        let mut r = (color[0] * 255.0) as c_int;
+        if r > 255 {
+            r = 255;
+        }
+        let mut g = (color[1] * 255.0) as c_int;
+        if g > 255 {
+            g = 255;
+        }
+        let mut b = (color[2] * 255.0) as c_int;
+        if b > 255 {
+            b = 255;
+        }
+        let mut i = (light / 4.0) as c_int;
+        if i > 255 {
+            i = 255;
+        }
+        ctx.entity_mut(ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
+    }
+
+    if ctx.entity(ent).spawnflags & 128 != 0 {
+        // can be used by the player's BUTTON_USE
+        ctx.entity_mut(ent).r.svFlags |= SVF_PLAYER_USABLE;
+    }
+
+    ctx.entity_mut(ent).s.eType = entityType_t::ET_MOVER as c_int;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
+
+    ctx.entity_mut(ent).s.pos.trType = trType_t::TR_STATIONARY;
+    let pos1 = ctx.entity(ent).pos1;
+    ctx.entity_mut(ent).s.pos.trBase = pos1;
 }
 
 /// Raven `funcBBrushTouch`.
@@ -3282,141 +3298,148 @@ pub fn funcBBrushTouch(ent: EntityId, other: Option<EntityId>, trace: *mut trace
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2731-2829`
 pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        let mut s: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(
-            ctx,
-            c"playfx".as_ptr(),
-            c"".as_ptr(),
-            &mut s as *mut *mut c_char,
-        );
+    let mut s: *mut c_char = core::ptr::null_mut();
+    G_SpawnString(
+        ctx,
+        c"playfx".as_ptr(),
+        c"".as_ptr(),
+        &mut s as *mut *mut c_char,
+    );
 
-        if !s.is_null() && *s != 0 {
-            // should we play a special death effect?
-            (*self_).genericValue15 = G_EffectIndex(s);
-        } else {
-            (*self_).genericValue15 = 0;
-        }
-
-        if (*self_).spawnflags & 1 == 0 && (*self_).health == 0 {
-            (*self_).health = 10;
-        }
-
-        let mut t = 0;
-        G_SpawnInt(
-            ctx,
-            c"showhealth".as_ptr(),
-            c"0".as_ptr(),
-            &mut t as *mut c_int,
-        );
-        if t != 0 {
-            // a non-0 maxhealth value will mean we want to show the health
-            // on the hud
-            (*self_).maxHealth = (*self_).health;
-            G_ScaleNetHealth(&mut *(self_));
-        }
-
-        if (*self_).spawnflags & 16 != 0 {
-            // saber only
-            (*self_).flags |= crate::entity::flags::FL_DMG_BY_SABER_ONLY;
-        } else if (*self_).spawnflags & 32 != 0 {
-            // heavy weap
-            (*self_).flags |= crate::entity::flags::FL_DMG_BY_HEAVY_WEAP_ONLY;
-        }
-
-        if (*self_).health != 0 {
-            (*self_).takedamage = qtrue;
-        }
-
-        G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr()); // precaching
-        G_SpawnFloat(
-            ctx,
-            c"radius".as_ptr(),
-            c"1".as_ptr(),
-            &mut (*self_).radius as *mut f32,
-        ); // used to scale chunk code if desired by a designer
-        G_SpawnInt(
-            ctx,
-            c"material".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*self_).material as *mut material_t,
-        );
-
-        G_SpawnInt(
-            ctx,
-            c"splashDamage".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*self_).splashDamage as *mut c_int,
-        );
-        G_SpawnInt(
-            ctx,
-            c"splashRadius".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*self_).splashRadius as *mut c_int,
-        );
-
-        CacheChunkEffects(ctx, (*self_).material);
-
-        (*self_).use_ = Some(EntUse::funcBBrushUse).into();
-
-        (*self_).pain = Some(EntPain::funcBBrushPain).into();
-        (*self_).touch = Some(EntTouch::funcBBrushTouch).into();
-
-        if !(*self_).team.is_null()
-            && *(*self_).team != 0
-            && ctx.world.cvars.g_gametype.integer == GT_SIEGE
-            && (*self_).teamnodmg == 0
-        {
-            (*self_).teamnodmg = atoi((*self_).team);
-        }
-        (*self_).team = core::ptr::null_mut();
-        if (*self_).model.is_null() {
-            G_Error(ctx, c"func_breakable with NULL model\n".as_ptr());
-        }
-        InitBBrush(ctx, ctx.entity_id_of(self_).unwrap());
-
-        if (*self_).radius == 0.0 {
-            // numchunks multiplier
-            (*self_).radius = 1.0;
-        }
-        if (*self_).mass == 0.0 {
-            // chunksize multiplier
-            (*self_).mass = 1.0;
-        }
-        (*self_).genericValue4 = 1; // so damage sys knows it's a bbrush
+    // Raw C-string deref of the engine-owned playfx name (seam).
+    if !s.is_null() && unsafe { *s } != 0 {
+        // should we play a special death effect?
+        ctx.entity_mut(self_).genericValue15 = G_EffectIndex(s);
+    } else {
+        ctx.entity_mut(self_).genericValue15 = 0;
     }
+
+    if ctx.entity(self_).spawnflags & 1 == 0 && ctx.entity(self_).health == 0 {
+        ctx.entity_mut(self_).health = 10;
+    }
+
+    let mut t = 0;
+    G_SpawnInt(
+        ctx,
+        c"showhealth".as_ptr(),
+        c"0".as_ptr(),
+        &mut t as *mut c_int,
+    );
+    if t != 0 {
+        // a non-0 maxhealth value will mean we want to show the health
+        // on the hud
+        let health = ctx.entity(self_).health;
+        ctx.entity_mut(self_).maxHealth = health;
+        G_ScaleNetHealth(ctx.entity_mut(self_));
+    }
+
+    if ctx.entity(self_).spawnflags & 16 != 0 {
+        // saber only
+        ctx.entity_mut(self_).flags |= crate::entity::flags::FL_DMG_BY_SABER_ONLY;
+    } else if ctx.entity(self_).spawnflags & 32 != 0 {
+        // heavy weap
+        ctx.entity_mut(self_).flags |= crate::entity::flags::FL_DMG_BY_HEAVY_WEAP_ONLY;
+    }
+
+    if ctx.entity(self_).health != 0 {
+        ctx.entity_mut(self_).takedamage = qtrue;
+    }
+
+    G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr()); // precaching
+    let mut radius = 0.0f32;
+    G_SpawnFloat(
+        ctx,
+        c"radius".as_ptr(),
+        c"1".as_ptr(),
+        &mut radius as *mut f32,
+    ); // used to scale chunk code if desired by a designer
+    ctx.entity_mut(self_).radius = radius;
+    let mut material = 0;
+    G_SpawnInt(
+        ctx,
+        c"material".as_ptr(),
+        c"0".as_ptr(),
+        &mut material as *mut material_t,
+    );
+    ctx.entity_mut(self_).material = material;
+
+    let mut splashDamage = 0;
+    G_SpawnInt(
+        ctx,
+        c"splashDamage".as_ptr(),
+        c"0".as_ptr(),
+        &mut splashDamage as *mut c_int,
+    );
+    ctx.entity_mut(self_).splashDamage = splashDamage;
+    let mut splashRadius = 0;
+    G_SpawnInt(
+        ctx,
+        c"splashRadius".as_ptr(),
+        c"0".as_ptr(),
+        &mut splashRadius as *mut c_int,
+    );
+    ctx.entity_mut(self_).splashRadius = splashRadius;
+
+    CacheChunkEffects(ctx, material);
+
+    ctx.entity_mut(self_).use_ = Some(EntUse::funcBBrushUse).into();
+
+    ctx.entity_mut(self_).pain = Some(EntPain::funcBBrushPain).into();
+    ctx.entity_mut(self_).touch = Some(EntTouch::funcBBrushTouch).into();
+
+    let team = ctx.entity(self_).team;
+    if !team.is_null()
+        && unsafe { *team } != 0
+        && ctx.world.cvars.g_gametype.integer == GT_SIEGE
+        && ctx.entity(self_).teamnodmg == 0
+    {
+        ctx.entity_mut(self_).teamnodmg = atoi(team);
+    }
+    ctx.entity_mut(self_).team = core::ptr::null_mut();
+    if ctx.entity(self_).model.is_null() {
+        G_Error(ctx, c"func_breakable with NULL model\n".as_ptr());
+    }
+    InitBBrush(ctx, self_);
+
+    if ctx.entity(self_).radius == 0.0 {
+        // numchunks multiplier
+        ctx.entity_mut(self_).radius = 1.0;
+    }
+    if ctx.entity(self_).mass == 0.0 {
+        // chunksize multiplier
+        ctx.entity_mut(self_).mass = 1.0;
+    }
+    ctx.entity_mut(self_).genericValue4 = 1; // so damage sys knows it's a bbrush
 }
 
 /// Raven `G_EntIsBreakable`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2831-2866`
 pub fn G_EntIsBreakable(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
-    unsafe {
-        if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
-            return qfalse;
-        }
-
-        let ent = &mut ctx.world.g_entities[entityNum as usize] as *mut gentity_t;
-
-        if (*ent).r.svFlags & SVF_GLASS_BRUSH != 0 {
-            return qtrue;
-        }
-
-        if crate::q_shared::Q_stricmp((*ent).classname, c"func_breakable".as_ptr()) == 0 {
-            return qtrue;
-        }
-
-        if crate::q_shared::Q_stricmp((*ent).classname, c"misc_model_breakable".as_ptr()) == 0 {
-            return qtrue;
-        }
-        if crate::q_shared::Q_stricmp((*ent).classname, c"misc_maglock".as_ptr()) == 0 {
-            return qtrue;
-        }
-
-        qfalse
+    if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
+        return qfalse;
     }
+
+    let ent = &ctx.world.g_entities[entityNum as usize];
+    let svFlags = ent.r.svFlags;
+    let classname = ent.classname;
+
+    if svFlags & SVF_GLASS_BRUSH != 0 {
+        return qtrue;
+    }
+
+    if crate::q_shared::Q_stricmp(classname, c"func_breakable".as_ptr()) == 0 {
+        return qtrue;
+    }
+
+    if crate::q_shared::Q_stricmp(classname, c"misc_model_breakable".as_ptr()) == 0 {
+        return qtrue;
+    }
+    if crate::q_shared::Q_stricmp(classname, c"misc_maglock".as_ptr()) == 0 {
+        return qtrue;
+    }
+
+    qfalse
 }
 
 /// Raven `GlassDie`.
@@ -3569,87 +3592,86 @@ pub fn GlassUse(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2957-2990`
 pub fn SP_func_glass(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
+    InitMover(ctx, ent);
 
-        (*ent).r.svFlags = SVF_GLASS_BRUSH;
+    ctx.entity_mut(ent).r.svFlags = SVF_GLASS_BRUSH;
 
-        (*ent).s.pos.trBase = (*ent).s.origin;
-        (*ent).r.currentOrigin = (*ent).s.origin;
-        if (*ent).health == 0 {
-            (*ent).health = 1;
-        }
-
-        G_SpawnInt(
-            ctx,
-            c"maxshards".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*ent).genericValue3 as *mut c_int,
-        );
-
-        (*ent).genericValue1 = 0;
-        (*ent).genericValue4 = 1;
-        (*ent).moverState = MOVER_POS1;
-
-        if (*ent).spawnflags & 1 != 0 {
-            (*ent).takedamage = qfalse;
-        } else {
-            (*ent).takedamage = qtrue;
-        }
-
-        (*ent).die = Some(EntDie::GlassDie).into();
-        (*ent).use_ = Some(EntUse::GlassUse).into();
-        (*ent).pain = Some(EntPain::GlassPain).into();
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).s.pos.trBase = origin;
+    ctx.entity_mut(ent).r.currentOrigin = origin;
+    if ctx.entity(ent).health == 0 {
+        ctx.entity_mut(ent).health = 1;
     }
+
+    let mut genericValue3 = 0;
+    G_SpawnInt(
+        ctx,
+        c"maxshards".as_ptr(),
+        c"0".as_ptr(),
+        &mut genericValue3 as *mut c_int,
+    );
+    ctx.entity_mut(ent).genericValue3 = genericValue3;
+
+    ctx.entity_mut(ent).genericValue1 = 0;
+    ctx.entity_mut(ent).genericValue4 = 1;
+    ctx.entity_mut(ent).moverState = MOVER_POS1;
+
+    if ctx.entity(ent).spawnflags & 1 != 0 {
+        ctx.entity_mut(ent).takedamage = qfalse;
+    } else {
+        ctx.entity_mut(ent).takedamage = qtrue;
+    }
+
+    ctx.entity_mut(ent).die = Some(EntDie::GlassDie).into();
+    ctx.entity_mut(ent).use_ = Some(EntUse::GlassUse).into();
+    ctx.entity_mut(ent).pain = Some(EntPain::GlassPain).into();
 }
 
 /// Raven `func_wait_return_solid`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2995-3025`
 pub fn func_wait_return_solid(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        // once a frame, see if it's clear
-        (*self_).clipmask = CONTENTS_BODY;
-        if (*self_).spawnflags & 16 == 0
-            || G_TestEntityPosition(ctx, ctx.entity_id_of(self_).unwrap()).is_null()
-        {
-            trap::SetBrushModel(
-                ctx.engine,
-                GSetBrushModelArgs::new(
-                    self_.cast(),
-                    std::ffi::CStr::from_ptr((*self_).model).to_owned(),
-                ),
-            );
-            InitMover(ctx, ctx.entity_id_of(self_).unwrap());
-            (*self_).s.pos.trBase = (*self_).s.origin;
-            (*self_).r.currentOrigin = (*self_).s.origin;
-            (*self_).r.svFlags &= !SVF_NOCLIENT;
-            (*self_).s.eFlags &= !EF_NODRAW;
-            (*self_).use_ = Some(EntUse::func_usable_use).into();
-            (*self_).clipmask = 0;
-            if !(*self_).target2.is_null() && *(*self_).target2 != 0 {
-                let self_eid = ctx.entity_id_of(self_);
-                let activator_ptr =
-                    crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*self_).activator);
-                let activator_eid = ctx.entity_id_of(activator_ptr);
-                G_UseTargets2(ctx, self_eid, activator_eid, (*self_).target2);
-            }
-        } else {
-            (*self_).clipmask = 0;
-            (*self_).think = Some(EntThink::func_wait_return_solid).into();
-            (*self_).nextthink = ctx.world.level.time + FRAMETIME;
+    // once a frame, see if it's clear
+    ctx.entity_mut(self_).clipmask = CONTENTS_BODY;
+    if ctx.entity(self_).spawnflags & 16 == 0 || G_TestEntityPosition(ctx, self_).is_null() {
+        let model = ctx.entity(self_).model;
+        let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(
+                self_ptr.cast(),
+                unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+            ),
+        );
+        InitMover(ctx, self_);
+        let origin = ctx.entity(self_).s.origin;
+        ctx.entity_mut(self_).s.pos.trBase = origin;
+        ctx.entity_mut(self_).r.currentOrigin = origin;
+        ctx.entity_mut(self_).r.svFlags &= !SVF_NOCLIENT;
+        ctx.entity_mut(self_).s.eFlags &= !EF_NODRAW;
+        ctx.entity_mut(self_).use_ = Some(EntUse::func_usable_use).into();
+        ctx.entity_mut(self_).clipmask = 0;
+        let target2 = ctx.entity(self_).target2;
+        // Raw C-string deref of the engine-owned target2 name (seam).
+        if !target2.is_null() && unsafe { *target2 } != 0 {
+            // `ent_id::resolve` then `entity_id_of` round-trips `activator` to itself.
+            let activator_eid = ctx.entity(self_).activator;
+            G_UseTargets2(ctx, Some(self_), activator_eid, target2);
         }
+    } else {
+        ctx.entity_mut(self_).clipmask = 0;
+        ctx.entity_mut(self_).think = Some(EntThink::func_wait_return_solid).into();
+        let level_time = ctx.world.level.time;
+        ctx.entity_mut(self_).nextthink = level_time + FRAMETIME;
     }
 }
 
@@ -3668,21 +3690,18 @@ pub fn func_usable_think(self_: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3037-3048`
 pub fn G_EntIsRemovableUsable(ctx: &mut GameContext, entNum: c_int) -> qboolean {
-    unsafe {
-        let ent = &mut ctx.world.g_entities[entNum as usize] as *mut gentity_t;
-        if !(*ent).classname.is_null()
-            && crate::q_shared::Q_stricmp((*ent).classname, c"func_usable".as_ptr()) == 0
-        {
-            if ((*ent).s.eFlags & EF_SHADER_ANIM) == 0
-                && ((*ent).spawnflags & 8) == 0
-                && !(*ent).targetname.is_null()
-            {
-                // not just a shader-animator and not ALWAYS_ON, so it must be removable somehow
-                return qtrue;
-            }
+    let ent = &ctx.world.g_entities[entNum as usize];
+    let classname = ent.classname;
+    let eFlags = ent.s.eFlags;
+    let spawnflags = ent.spawnflags;
+    let targetname = ent.targetname;
+    if !classname.is_null() && crate::q_shared::Q_stricmp(classname, c"func_usable".as_ptr()) == 0 {
+        if (eFlags & EF_SHADER_ANIM) == 0 && (spawnflags & 8) == 0 && !targetname.is_null() {
+            // not just a shader-animator and not ALWAYS_ON, so it must be removable somehow
+            return qtrue;
         }
-        qfalse
     }
+    qfalse
 }
 
 /// Raven `func_usable_use`.
@@ -3694,58 +3713,59 @@ pub fn func_usable_use(
     _other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let activator: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
-    unsafe {
-        // Toggle on and off
-        G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
-        if (*self_).s.eFlags & EF_SHADER_ANIM != 0 {
-            // animate shader when used
-            (*self_).s.frame += 1; // inc frame
-            if (*self_).s.frame > (*self_).genericValue5 {
-                // wrap around
-                (*self_).s.frame = 0;
-            }
-            if !(*self_).target.is_null() && *(*self_).target != 0 {
-                G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(activator));
-            }
-        } else if (*self_).spawnflags & 8 != 0 {
-            // ALWAYS_ON
-            // Remove the ability to use the entity directly
-            (*self_).r.svFlags &= !SVF_PLAYER_USABLE;
-            // also remove ability to call any use func at all!
-            (*self_).use_ = FnId::NONE;
-
-            if !(*self_).target.is_null() && *(*self_).target != 0 {
-                G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(activator));
-            }
-
-            if (*self_).wait != 0.0 {
-                (*self_).think = Some(EntThink::func_usable_think).into();
-                (*self_).nextthink = ctx.world.level.time + ((*self_).wait * 1000.0) as c_int;
-            }
-
-            return;
-        } else if (*self_).count == 0 {
-            // become solid again
-            (*self_).count = 1;
-            func_wait_return_solid(ctx, ctx.entity_id_of(self_).unwrap());
-        } else {
-            (*self_).s.solid = 0;
-            (*self_).r.contents = 0;
-            (*self_).clipmask = 0;
-            (*self_).r.svFlags |= SVF_NOCLIENT;
-            (*self_).s.eFlags |= EF_NODRAW;
-            (*self_).count = 0;
-
-            if !(*self_).target.is_null() && *(*self_).target != 0 {
-                G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(activator));
-            }
-            (*self_).think = FnId::NONE;
-            (*self_).nextthink = -1;
+    // `activator` threads straight through (resolve→entity_id_of is identity).
+    // Toggle on and off
+    G_ActivateBehavior(ctx, Some(self_), bSet_t::BSET_USE as c_int);
+    if ctx.entity(self_).s.eFlags & EF_SHADER_ANIM != 0 {
+        // animate shader when used
+        ctx.entity_mut(self_).s.frame += 1; // inc frame
+        if ctx.entity(self_).s.frame > ctx.entity(self_).genericValue5 {
+            // wrap around
+            ctx.entity_mut(self_).s.frame = 0;
         }
+        let target = ctx.entity(self_).target;
+        // Raw C-string deref of the engine-owned target name (seam).
+        if !target.is_null() && unsafe { *target } != 0 {
+            G_UseTargets(ctx, Some(self_), activator);
+        }
+    } else if ctx.entity(self_).spawnflags & 8 != 0 {
+        // ALWAYS_ON
+        // Remove the ability to use the entity directly
+        ctx.entity_mut(self_).r.svFlags &= !SVF_PLAYER_USABLE;
+        // also remove ability to call any use func at all!
+        ctx.entity_mut(self_).use_ = FnId::NONE;
+
+        let target = ctx.entity(self_).target;
+        if !target.is_null() && unsafe { *target } != 0 {
+            G_UseTargets(ctx, Some(self_), activator);
+        }
+
+        if ctx.entity(self_).wait != 0.0 {
+            ctx.entity_mut(self_).think = Some(EntThink::func_usable_think).into();
+            let wait = ctx.entity(self_).wait;
+            let level_time = ctx.world.level.time;
+            ctx.entity_mut(self_).nextthink = level_time + (wait * 1000.0) as c_int;
+        }
+
+        return;
+    } else if ctx.entity(self_).count == 0 {
+        // become solid again
+        ctx.entity_mut(self_).count = 1;
+        func_wait_return_solid(ctx, self_);
+    } else {
+        ctx.entity_mut(self_).s.solid = 0;
+        ctx.entity_mut(self_).r.contents = 0;
+        ctx.entity_mut(self_).clipmask = 0;
+        ctx.entity_mut(self_).r.svFlags |= SVF_NOCLIENT;
+        ctx.entity_mut(self_).s.eFlags |= EF_NODRAW;
+        ctx.entity_mut(self_).count = 0;
+
+        let target = ctx.entity(self_).target;
+        if !target.is_null() && unsafe { *target } != 0 {
+            G_UseTargets(ctx, Some(self_), activator);
+        }
+        ctx.entity_mut(self_).think = FnId::NONE;
+        ctx.entity_mut(self_).nextthink = -1;
     }
 }
 
@@ -3758,18 +3778,8 @@ pub fn func_usable_pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
-    unsafe {
-        GlobalUse(
-            ctx,
-            ctx.entity_id_of(self_),
-            ctx.entity_id_of(attacker),
-            ctx.entity_id_of(attacker),
-        );
-    }
+    // `attacker` threads straight through (resolve→entity_id_of is identity).
+    GlobalUse(ctx, Some(self_), attacker, attacker);
 }
 
 /// Raven `func_usable_die`.
@@ -3783,90 +3793,83 @@ pub fn func_usable_die(
     damage: c_int,
     r#mod: c_int,
 ) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let inflictor: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), inflictor) };
-    let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
-    unsafe {
-        (*self_).takedamage = qfalse;
-        GlobalUse(
-            ctx,
-            ctx.entity_id_of(self_),
-            ctx.entity_id_of(inflictor),
-            ctx.entity_id_of(attacker),
-        );
-    }
+    // `inflictor`/`attacker` thread straight through (resolve→entity_id_of is identity).
+    ctx.entity_mut(self_).takedamage = qfalse;
+    GlobalUse(ctx, Some(self_), inflictor, attacker);
 }
 
 /// Raven `SP_func_usable`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3140-3203`
 pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                self_.cast(),
-                std::ffi::CStr::from_ptr((*self_).model).to_owned(),
-            ),
-        );
-        InitMover(ctx, ctx.entity_id_of(self_).unwrap());
-        (*self_).s.pos.trBase = (*self_).s.origin;
-        (*self_).r.currentOrigin = (*self_).s.origin;
-        (*self_).pos1 = (*self_).s.origin;
+    let model = ctx.entity(self_).model;
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            self_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
+    InitMover(ctx, self_);
+    let origin = ctx.entity(self_).s.origin;
+    ctx.entity_mut(self_).s.pos.trBase = origin;
+    ctx.entity_mut(self_).r.currentOrigin = origin;
+    ctx.entity_mut(self_).pos1 = origin;
 
-        G_SpawnInt(
-            ctx,
-            c"endframe".as_ptr(),
-            c"0".as_ptr(),
-            &mut (*self_).genericValue5 as *mut c_int,
-        );
+    let mut genericValue5 = 0;
+    G_SpawnInt(
+        ctx,
+        c"endframe".as_ptr(),
+        c"0".as_ptr(),
+        &mut genericValue5 as *mut c_int,
+    );
+    ctx.entity_mut(self_).genericValue5 = genericValue5;
 
-        if !(*self_).model2.is_null() && *(*self_).model2 != 0 {
-            // Raven `strstr(self->model2, ".glm")` — no ported `strstr`
-            // binding in this crate; `CStr::contains` is the equivalent
-            // substring check.
-            if std::ffi::CStr::from_ptr((*self_).model2)
-                .to_string_lossy()
-                .contains(".glm")
-            {
-                // for now, not supported in MP.
-                (*self_).s.modelindex2 = 0;
-            } else {
-                (*self_).s.modelindex2 = G_ModelIndex((*self_).model2);
-            }
+    let model2 = ctx.entity(self_).model2;
+    // Raw C-string derefs of the engine-owned model2 path (seam).
+    if !model2.is_null() && unsafe { *model2 } != 0 {
+        // Raven `strstr(self->model2, ".glm")` — no ported `strstr`
+        // binding in this crate; `CStr::contains` is the equivalent
+        // substring check.
+        if unsafe { std::ffi::CStr::from_ptr(model2) }
+            .to_string_lossy()
+            .contains(".glm")
+        {
+            // for now, not supported in MP.
+            ctx.entity_mut(self_).s.modelindex2 = 0;
+        } else {
+            ctx.entity_mut(self_).s.modelindex2 = G_ModelIndex(model2);
         }
-
-        (*self_).count = 1;
-        if (*self_).spawnflags & 1 != 0 {
-            (*self_).s.solid = 0;
-            (*self_).r.contents = 0;
-            (*self_).clipmask = 0;
-            (*self_).r.svFlags |= SVF_NOCLIENT;
-            (*self_).s.eFlags |= EF_NODRAW;
-            (*self_).count = 0;
-        }
-
-        (*self_).use_ = Some(EntUse::func_usable_use).into();
-
-        if (*self_).health != 0 {
-            (*self_).takedamage = qtrue;
-            (*self_).die = Some(EntDie::func_usable_die).into();
-            (*self_).pain = Some(EntPain::func_usable_pain).into();
-        }
-
-        if (*self_).genericValue5 > 0 {
-            (*self_).s.frame = 0;
-            (*self_).s.eFlags |= EF_SHADER_ANIM;
-            (*self_).s.time = (*self_).genericValue5 + 1;
-        }
-
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_.cast()));
     }
+
+    ctx.entity_mut(self_).count = 1;
+    if ctx.entity(self_).spawnflags & 1 != 0 {
+        ctx.entity_mut(self_).s.solid = 0;
+        ctx.entity_mut(self_).r.contents = 0;
+        ctx.entity_mut(self_).clipmask = 0;
+        ctx.entity_mut(self_).r.svFlags |= SVF_NOCLIENT;
+        ctx.entity_mut(self_).s.eFlags |= EF_NODRAW;
+        ctx.entity_mut(self_).count = 0;
+    }
+
+    ctx.entity_mut(self_).use_ = Some(EntUse::func_usable_use).into();
+
+    if ctx.entity(self_).health != 0 {
+        ctx.entity_mut(self_).takedamage = qtrue;
+        ctx.entity_mut(self_).die = Some(EntDie::func_usable_die).into();
+        ctx.entity_mut(self_).pain = Some(EntPain::func_usable_pain).into();
+    }
+
+    if ctx.entity(self_).genericValue5 > 0 {
+        ctx.entity_mut(self_).s.frame = 0;
+        ctx.entity_mut(self_).s.eFlags |= EF_SHADER_ANIM;
+        let gv5 = ctx.entity(self_).genericValue5;
+        ctx.entity_mut(self_).s.time = gv5 + 1;
+    }
+
+    let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_ptr.cast()));
 }
 
 /// Raven `use_wall`.
@@ -3878,36 +3881,33 @@ pub fn use_wall(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    // STAGE-1: EntityId/Option params (other/activator unused by Raven here);
-    // raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        G_ActivateBehavior(ctx, ctx.entity_id_of(ent), bSet_t::BSET_USE as c_int);
+    G_ActivateBehavior(ctx, Some(ent), bSet_t::BSET_USE as c_int);
 
-        // not there so make it there
-        if (*ent).r.contents & CONTENTS_SOLID == 0 {
-            (*ent).r.svFlags &= !SVF_NOCLIENT;
-            (*ent).s.eFlags &= !EF_NODRAW;
-            (*ent).r.contents = CONTENTS_SOLID;
-            if (*ent).spawnflags & 1 == 0 {
-                // START_OFF doesn't affect area portals
-                trap::AdjustAreaPortalState(
-                    ctx.engine,
-                    GAdjustAreaPortalStateArgs::new(ent.cast(), qfalse),
-                );
-            }
-        } else {
-            // make it go away
-            (*ent).r.contents = 0;
-            (*ent).r.svFlags |= SVF_NOCLIENT;
-            (*ent).s.eFlags |= EF_NODRAW;
-            if (*ent).spawnflags & 1 == 0 {
-                // START_OFF doesn't affect area portals
-                trap::AdjustAreaPortalState(
-                    ctx.engine,
-                    GAdjustAreaPortalStateArgs::new(ent.cast(), qtrue),
-                );
-            }
+    // not there so make it there
+    if ctx.entity(ent).r.contents & CONTENTS_SOLID == 0 {
+        ctx.entity_mut(ent).r.svFlags &= !SVF_NOCLIENT;
+        ctx.entity_mut(ent).s.eFlags &= !EF_NODRAW;
+        ctx.entity_mut(ent).r.contents = CONTENTS_SOLID;
+        if ctx.entity(ent).spawnflags & 1 == 0 {
+            // START_OFF doesn't affect area portals
+            let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+            trap::AdjustAreaPortalState(
+                ctx.engine,
+                GAdjustAreaPortalStateArgs::new(ent_ptr.cast(), qfalse),
+            );
+        }
+    } else {
+        // make it go away
+        ctx.entity_mut(ent).r.contents = 0;
+        ctx.entity_mut(ent).r.svFlags |= SVF_NOCLIENT;
+        ctx.entity_mut(ent).s.eFlags |= EF_NODRAW;
+        if ctx.entity(ent).spawnflags & 1 == 0 {
+            // START_OFF doesn't affect area portals
+            let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+            trap::AdjustAreaPortalState(
+                ctx.engine,
+                GAdjustAreaPortalStateArgs::new(ent_ptr.cast(), qtrue),
+            );
         }
     }
 }
@@ -3916,33 +3916,34 @@ pub fn use_wall(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3256-3279`
 pub fn SP_func_wall(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent.cast(),
-                std::ffi::CStr::from_ptr((*ent).model).to_owned(),
-            ),
-        );
+    let model = ctx.entity(ent).model;
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::SetBrushModel(
+        ctx.engine,
+        GSetBrushModelArgs::new(
+            ent_ptr.cast(),
+            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
+        ),
+    );
 
-        (*ent).pos1 = (*ent).s.origin;
-        (*ent).pos2 = (*ent).s.origin;
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).pos1 = origin;
+    ctx.entity_mut(ent).pos2 = origin;
 
-        InitMover(ctx, ctx.entity_id_of(ent).unwrap());
-        (*ent).s.pos.trBase = (*ent).s.origin;
-        (*ent).r.currentOrigin = (*ent).s.origin;
+    InitMover(ctx, ent);
+    let origin = ctx.entity(ent).s.origin;
+    ctx.entity_mut(ent).s.pos.trBase = origin;
+    ctx.entity_mut(ent).r.currentOrigin = origin;
 
-        // it must be START_OFF
-        if (*ent).spawnflags & FUNC_WALL_OFF != 0 {
-            (*ent).r.contents = 0;
-            (*ent).r.svFlags |= SVF_NOCLIENT;
-            (*ent).s.eFlags |= EF_NODRAW;
-        }
-
-        (*ent).use_ = Some(EntUse::use_wall).into();
-
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
+    // it must be START_OFF
+    if ctx.entity(ent).spawnflags & FUNC_WALL_OFF != 0 {
+        ctx.entity_mut(ent).r.contents = 0;
+        ctx.entity_mut(ent).r.svFlags |= SVF_NOCLIENT;
+        ctx.entity_mut(ent).s.eFlags |= EF_NODRAW;
     }
+
+    ctx.entity_mut(ent).use_ = Some(EntUse::use_wall).into();
+
+    let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 }

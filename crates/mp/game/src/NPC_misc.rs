@@ -78,8 +78,6 @@ pub fn Debug_NPCPrintf(
     // PORT-NOTE(varargs): C varargs cannot be captured in safe Rust functions.
     // In actual Rust call sites, this is called with pre-formatted strings.
 
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let printNPC: *mut gentity_t = ctx.entity_mut(printNPC);
     unsafe {
         // Check if cvar value is less than debug level; if so, don't print
         if (*cv).value < debugLevel as f32 {
@@ -98,7 +96,7 @@ pub fn Debug_NPCPrintf(
 
         let time = ctx.world.level.time;
         let msg: String = cstr_to_str(fmt);
-        let npc_targetname: String = cstr_to_str((*printNPC).targetname);
+        let npc_targetname: String = cstr_to_str(ctx.entity(printNPC).targetname);
 
         // Format: Q_COLOR_ESCAPE ('^') + color char + time + NPC name + message
         let output = format!("^{}{:5} ({}) {}", color, time, npc_targetname, msg);

@@ -241,15 +241,13 @@ pub fn SP_item_botroam(ent: &mut gentity_t) {}
 /// Raven `SP_gametype_item`.
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:372-431`
-pub fn SP_gametype_item(ctx: &mut GameContext, ent: EntityId) {
+pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
     unsafe {
-        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
-        // pointer (Stage-2 body debt).
-        let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let mut value: *mut c_char = std::ptr::null_mut();
         G_SpawnString(ctx, c"teamfilter".as_ptr(), c"".as_ptr(), &mut value);
 
-        G_SetOrigin(&mut *(ent), (*ent).s.origin);
+        let origin = ctx.entity(id).s.origin;
+        G_SetOrigin(ctx.entity_mut(id), origin);
 
         // If a team filter is set then override any team settings for the spawns
         let mut team: c_int = -1;
@@ -263,8 +261,9 @@ pub fn SP_gametype_item(ctx: &mut GameContext, ent: EntityId) {
         }
 
         let mut item: *mut gitem_t = std::ptr::null_mut();
-        if !(*ent).targetname.is_null() && *(*ent).targetname != 0 {
-            let targetname = CStr::from_ptr((*ent).targetname).to_string_lossy();
+        let targetname_ptr = ctx.entity(id).targetname;
+        if !targetname_ptr.is_null() && *targetname_ptr != 0 {
+            let targetname = CStr::from_ptr(targetname_ptr).to_string_lossy();
             if team != -1 {
                 if targetname.contains("flag") {
                     item = if team == TEAM_RED {
@@ -283,9 +282,9 @@ pub fn SP_gametype_item(ctx: &mut GameContext, ent: EntityId) {
             }
 
             if !item.is_null() {
-                (*ent).targetname = std::ptr::null_mut();
-                (*ent).classname = (*item).classname;
-                G_SpawnItem(ctx, ctx.entity_id_of(ent).unwrap(), item);
+                ctx.entity_mut(id).targetname = std::ptr::null_mut();
+                ctx.entity_mut(id).classname = (*item).classname;
+                G_SpawnItem(ctx, id, item);
             }
         }
     }
@@ -298,12 +297,9 @@ pub fn SP_gametype_item(ctx: &mut GameContext, ent: EntityId) {
 /// normal spawn functions (from `spawns[]` table).
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:683-714`
-pub fn G_CallSpawn(ctx: &mut GameContext, ent: EntityId) -> qboolean {
+pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
     unsafe {
-        // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
-        // pointer (Stage-2 body debt).
-        let ent = ctx.entity_mut(ent) as *mut gentity_t;
-        if (*ent).classname.is_null() {
+        if ctx.entity(id).classname.is_null() {
             G_Printf(ctx, c"G_CallSpawn: NULL classname\n".as_ptr());
             return qfalse;
         }
@@ -312,24 +308,26 @@ pub fn G_CallSpawn(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         let mut item = (bg_itemlist.as_ptr() as *mut gitem_t).add(1);
         while !(*item).classname.is_null() {
             // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
-            if CStr::from_ptr((*item).classname) == CStr::from_ptr((*ent).classname) {
-                G_SpawnItem(ctx, ctx.entity_id_of(ent).unwrap(), item);
+            if CStr::from_ptr((*item).classname) == CStr::from_ptr(ctx.entity(id).classname) {
+                G_SpawnItem(ctx, id, item);
                 return qtrue;
             }
             item = item.add(1);
         }
 
         // check normal spawn functions
-        let classname = std::ffi::CStr::from_ptr((*ent).classname).to_string_lossy();
+        let classname = std::ffi::CStr::from_ptr(ctx.entity(id).classname).to_string_lossy();
         if let Some(sp) = crate::ent_fn_enums::spawn_for_classname(&classname) {
-            if !(*ent).healingsound.is_null() && *(*ent).healingsound != 0 {
+            let healingsound = ctx.entity(id).healingsound;
+            if !healingsound.is_null() && *healingsound != 0 {
                 //yeah...this can be used for anything, so.. precache it if it's there
-                G_SoundIndex((*ent).healingsound);
+                G_SoundIndex(healingsound);
             }
-            crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent);
+            let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
+            crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent_ptr);
             return qtrue;
         }
-        let classname_disp = CStr::from_ptr((*ent).classname).to_string_lossy();
+        let classname_disp = CStr::from_ptr(ctx.entity(id).classname).to_string_lossy();
         G_Printf(
             ctx,
             cstr(&format!(
@@ -858,22 +856,28 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         }
 
         // move editor origin to pos
-        (*ent).s.pos.trBase = (*ent).s.origin;
-        (*ent).r.currentOrigin = (*ent).s.origin;
+        let id = ctx.entity_id_of(ent).unwrap();
+        {
+            let e = ctx.world.entity_mut(id);
+            let origin = e.s.origin;
+            e.s.pos.trBase = origin;
+            e.r.currentOrigin = origin;
+        }
 
         // if we didn't get a classname, don't bother spawning anything
-        if G_CallSpawn(ctx, ctx.entity_id_of(ent).unwrap()) == qfalse {
-            G_FreeEntity(ctx, ctx.entity_id_of(ent));
+        if G_CallSpawn(ctx, id) == qfalse {
+            G_FreeEntity(ctx, Some(id));
         }
 
         // Tag on the ICARUS scripting information only to valid recipients
         if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(ent.cast())) != qfalse {
             trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(ent.cast()));
 
-            if !(*ent).classname.is_null() && *(*ent).classname != 0 {
-                if Q_strncmp(c"NPC_".as_ptr(), (*ent).classname, 4) != 0 {
+            let classname = ctx.entity(id).classname;
+            if !classname.is_null() && *classname != 0 {
+                if Q_strncmp(c"NPC_".as_ptr(), classname, 4) != 0 {
                     // Not an NPC_spawner (rww - probably don't even care for MP, but whatever)
-                    G_ActivateBehavior(ctx, ctx.entity_id_of(ent), BSET_SPAWN);
+                    G_ActivateBehavior(ctx, Some(id), BSET_SPAWN);
                 }
             }
         }
@@ -1467,15 +1471,16 @@ pub fn G_PrecacheSoundsets(ctx: &mut GameContext) {
         let mut counted_sets: c_int = 0;
 
         for i in 0..(mp_qshared::shared::MAX_GENTITIES as usize) {
-            let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
+            let soundSet = ctx.world.g_entities[i].soundSet;
 
-            if (*ent).inuse != qfalse && !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
+            if ctx.world.g_entities[i].inuse != qfalse && !soundSet.is_null() && *soundSet != 0 {
                 if counted_sets >= MAX_AMBIENT_SETS {
                     panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n");
                     // Com_Error(ERR_DROP, ...) -> panic
                 }
 
-                (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
+                let idx = G_SoundSetIndex(ctx, soundSet);
+                ctx.world.g_entities[i].s.soundSetIndex = idx;
                 counted_sets += 1;
             }
         }
@@ -1521,13 +1526,19 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
             // so make a scriptrunner and start it going.
             let script_runner = G_Spawn(ctx);
             if !script_runner.is_null() {
-                (*script_runner).behaviorSet[1] =
+                let id = ctx.entity_id_of(script_runner).unwrap();
+                let world_bset =
                     ctx.world.g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize];
-                (*script_runner).count = 1;
-                (*script_runner).think = Some(EntThink::scriptrunner_run).into();
-                (*script_runner).nextthink = ctx.world.level.time + 100;
+                let next_think = ctx.world.level.time + 100;
+                {
+                    let e = ctx.world.entity_mut(id);
+                    e.behaviorSet[1] = world_bset;
+                    e.count = 1;
+                    e.think = Some(EntThink::scriptrunner_run).into();
+                    e.nextthink = next_think;
+                }
 
-                if (*script_runner).inuse != qfalse {
+                if ctx.world.entity(id).inuse != qfalse {
                     trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(script_runner.cast()));
                 }
             }

@@ -4,6 +4,12 @@
 //! Filled by the jampgame mega-pass; functions reach file-scope game state
 //! (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
+//!
+//! Safe-state campaign 2c: entity (`gentity_t`) derefs of the ambient `NPC`
+//! (and the `self_` handle) reads/writes route through the `GameWorld`/`GameContext`
+//! accessors (`ctx.world.entity()`/`entity_mut()`) instead of raw pointers. The
+//! `NPCInfo` (`gNPC_t`) and `.client` (`gclient_t`) derefs stay raw — those two
+//! regimes are task #7 territory and remain in isolated `unsafe` blocks.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::cstr_util::cstr;
@@ -21,17 +27,6 @@ use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
 use crate::NPC_utils::{NPC_SetBoneAngles, NPC_UpdateAngles};
 use std::ffi::CStr;
-
-// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
-// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
-// precedent.
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 /// Local state enums.
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:10-17`
@@ -55,35 +50,33 @@ const TURN_OFF: c_int = 0x00000100;
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:24-46`
 pub fn R2D2_PartsMove(ctx: &mut GameContext) {
     // PORT-NOTE(globals-access): NPC accessed as ctx.world.globals.NPC per threading digest
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        if npc.is_null() {
-            return;
-        }
+    let npc = ctx.world.globals.NPC;
+    if npc.is_null() {
+        return;
+    }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if TIMER_Done(
+    if TIMER_Done(ctx, Some(npc_id), b"eyeDelay\0".as_ptr() as *const c_char) != 0 {
+        let normalized = AngleNormalize360(ctx.world.entity(npc_id).pos1[1]);
+        ctx.world.entity_mut(npc_id).pos1[1] = normalized;
+
+        let r0 = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
+        ctx.world.entity_mut(npc_id).pos1[0] += r0;
+        let r1 = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
+        ctx.world.entity_mut(npc_id).pos1[1] = r1;
+        let r2 = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
+        ctx.world.entity_mut(npc_id).pos1[2] = r2;
+
+        let pos1 = ctx.world.entity(npc_id).pos1;
+        NPC_SetBoneAngles(ctx, npc_id, b"f_eye\0".as_ptr() as *mut c_char, pos1);
+
+        let delay = ctx.world.bg_state.rng.Q_irand(100, 1000);
+        TIMER_Set(
             ctx,
-            ctx.entity_id_of(npc),
+            Some(npc_id),
             b"eyeDelay\0".as_ptr() as *const c_char,
-        ) != 0
-        {
-            (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
-
-            (*npc).pos1[0] += ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
-            (*npc).pos1[1] = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
-            (*npc).pos1[2] = ctx.world.bg_state.rng.Q_irand(-20, 20) as f32;
-
-            NPC_SetBoneAngles(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                b"f_eye\0".as_ptr() as *mut c_char,
-                (*npc).pos1,
-            );
-
-            let npc_id = ctx.entity_id_of(npc);
-            let delay = ctx.world.bg_state.rng.Q_irand(100, 1000);
-            TIMER_Set(ctx, npc_id, b"eyeDelay\0".as_ptr() as *const c_char, delay);
-        }
+            delay,
+        );
     }
 }
 
@@ -98,52 +91,58 @@ pub fn Droid_Idle() {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:65-95`
 pub fn R2D2_TurnAnims(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        if npc.is_null() || npc_info.is_null() {
-            return;
-        }
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    if npc.is_null() || npc_info.is_null() {
+        return;
+    }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        let turndelta = AngleDelta((*npc).r.currentAngles[1], (*npc_info).desiredYaw); // YAW = 1
-        let anim: c_int;
+    let current_yaw = ctx.world.entity(npc_id).r.currentAngles[1];
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    let desired_yaw = unsafe { (*npc_info).desiredYaw };
+    let turndelta = AngleDelta(current_yaw, desired_yaw); // YAW = 1
+    let anim: c_int;
 
-        if (turndelta.abs() > 20.0)
-            && (((*((*npc).client)).NPC_class == class_t::CLASS_R2D2)
-                || ((*((*npc).client)).NPC_class == class_t::CLASS_R5D2))
-        {
-            // CLASS_R2D2 = 2, CLASS_R5D2 = 3 (or check from globals)
-            anim = (*((*npc).client)).ps.legsAnim;
-            if turndelta < 0.0 {
-                if anim != BOTH_TURN_LEFT1 as c_int {
-                    NPC_SetAnim(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        SETANIM_BOTH,
-                        BOTH_TURN_LEFT1 as c_int,
-                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                    );
-                }
-            } else {
-                if anim != BOTH_TURN_RIGHT1 as c_int {
-                    NPC_SetAnim(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        SETANIM_BOTH,
-                        BOTH_TURN_RIGHT1 as c_int,
-                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                    );
-                }
+    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    let client = ctx.world.entity(npc_id).client;
+    let npc_class = unsafe { (*client).NPC_class };
+
+    if (turndelta.abs() > 20.0)
+        && (npc_class == class_t::CLASS_R2D2 || npc_class == class_t::CLASS_R5D2)
+    {
+        // CLASS_R2D2 = 2, CLASS_R5D2 = 3 (or check from globals)
+        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        anim = unsafe { (*client).ps.legsAnim };
+        if turndelta < 0.0 {
+            if anim != BOTH_TURN_LEFT1 as c_int {
+                NPC_SetAnim(
+                    ctx,
+                    npc_id,
+                    SETANIM_BOTH,
+                    BOTH_TURN_LEFT1 as c_int,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                );
             }
         } else {
-            NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                SETANIM_BOTH,
-                BOTH_RUN1 as c_int,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
+            if anim != BOTH_TURN_RIGHT1 as c_int {
+                NPC_SetAnim(
+                    ctx,
+                    npc_id,
+                    SETANIM_BOTH,
+                    BOTH_TURN_RIGHT1 as c_int,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                );
+            }
         }
+    } else {
+        NPC_SetAnim(
+            ctx,
+            npc_id,
+            SETANIM_BOTH,
+            BOTH_RUN1 as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
     }
 }
 
@@ -151,252 +150,278 @@ pub fn R2D2_TurnAnims(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:102-168`
 pub fn Droid_Patrol(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        if npc.is_null() || npc_info.is_null() {
-            return;
-        }
-
-        (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
-
-        if !(*npc).client.is_null() && (*((*npc).client)).NPC_class != class_t::CLASS_GONK {
-            // CLASS_GONK
-            if (*((*npc).client)).NPC_class != class_t::CLASS_R5D2 {
-                // CLASS_R5D2
-                R2D2_PartsMove(ctx);
-            }
-            R2D2_TurnAnims(ctx);
-        }
-
-        if !UpdateGoal(ctx).is_null() {
-            ctx.world.globals.ucmd.buttons |= 1; // BUTTON_WALKING
-            NPC_MoveToGoal(ctx, 1 as qboolean); // qtrue
-
-            if !(*npc).client.is_null() && (*((*npc).client)).NPC_class == class_t::CLASS_MOUSE {
-                // CLASS_MOUSE
-                // `.5` is a double literal and `sin` is the double libm: the whole
-                // term is evaluated in f64 and narrowed only on store to the float.
-                (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
-                    + (ctx.world.level.time as f64 * 0.5).sin() * 25.0)
-                    as f32;
-
-                if TIMER_Done(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    b"patrolNoise\0".as_ptr() as *const c_char,
-                ) != 0
-                {
-                    let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                    let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
-                    let npc_id = ctx.entity_id_of(npc).unwrap();
-                    G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
-                    let npc_timer_id = ctx.entity_id_of(npc);
-                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-
-                    TIMER_Set(
-                        ctx,
-                        npc_timer_id,
-                        b"patrolNoise\0".as_ptr() as *const c_char,
-                        delay,
-                    );
-                }
-            } else if !(*npc).client.is_null()
-                && (*((*npc).client)).NPC_class == class_t::CLASS_R2D2
-            {
-                // CLASS_R2D2
-                if TIMER_Done(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    b"patrolNoise\0".as_ptr() as *const c_char,
-                ) != 0
-                {
-                    let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                    let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
-                    G_SoundOnEnt(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        0,
-                        cstr(&sound_path).as_ptr(),
-                    );
-
-                    let npc_id = ctx.entity_id_of(npc);
-                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-                    TIMER_Set(
-                        ctx,
-                        npc_id,
-                        b"patrolNoise\0".as_ptr() as *const c_char,
-                        delay,
-                    );
-                }
-            } else if !(*npc).client.is_null()
-                && (*((*npc).client)).NPC_class == class_t::CLASS_R5D2
-            {
-                // CLASS_R5D2
-                if TIMER_Done(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    b"patrolNoise\0".as_ptr() as *const c_char,
-                ) != 0
-                {
-                    let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
-                    let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
-                    G_SoundOnEnt(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        0,
-                        cstr(&sound_path).as_ptr(),
-                    );
-
-                    let npc_id = ctx.entity_id_of(npc);
-                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-                    TIMER_Set(
-                        ctx,
-                        npc_id,
-                        b"patrolNoise\0".as_ptr() as *const c_char,
-                        delay,
-                    );
-                }
-            }
-            if !(*npc).client.is_null() && (*((*npc).client)).NPC_class == class_t::CLASS_GONK {
-                // CLASS_GONK
-                if TIMER_Done(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    b"patrolNoise\0".as_ptr() as *const c_char,
-                ) != 0
-                {
-                    let idx = ctx.world.bg_state.rng.Q_irand(1, 2);
-                    let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
-                    G_SoundOnEnt(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        0,
-                        cstr(&sound_path).as_ptr(),
-                    );
-
-                    let npc_id = ctx.entity_id_of(npc);
-                    let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-                    TIMER_Set(
-                        ctx,
-                        npc_id,
-                        b"patrolNoise\0".as_ptr() as *const c_char,
-                        delay,
-                    );
-                }
-            }
-        }
-
-        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    if npc.is_null() || npc_info.is_null() {
+        return;
     }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+
+    let normalized = AngleNormalize360(ctx.world.entity(npc_id).pos1[1]);
+    ctx.world.entity_mut(npc_id).pos1[1] = normalized;
+
+    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    let client = ctx.world.entity(npc_id).client;
+    if !client.is_null() && unsafe { (*client).NPC_class } != class_t::CLASS_GONK {
+        // CLASS_GONK
+        if unsafe { (*client).NPC_class } != class_t::CLASS_R5D2 {
+            // CLASS_R5D2
+            R2D2_PartsMove(ctx);
+        }
+        R2D2_TurnAnims(ctx);
+    }
+
+    if !UpdateGoal(ctx).is_null() {
+        ctx.world.globals.ucmd.buttons |= 1; // BUTTON_WALKING
+        NPC_MoveToGoal(ctx, 1 as qboolean); // qtrue
+
+        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        let client = ctx.world.entity(npc_id).client;
+        if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_MOUSE {
+            // CLASS_MOUSE
+            // `.5` is a double literal and `sin` is the double libm: the whole
+            // term is evaluated in f64 and narrowed only on store to the float.
+            let time = ctx.world.level.time;
+            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            unsafe {
+                (*npc_info).desiredYaw =
+                    ((*npc_info).desiredYaw as f64 + (time as f64 * 0.5).sin() * 25.0) as f32;
+            }
+
+            if TIMER_Done(
+                ctx,
+                Some(npc_id),
+                b"patrolNoise\0".as_ptr() as *const c_char,
+            ) != 0
+            {
+                let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
+                let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
+                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
+                let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                    delay,
+                );
+            }
+        } else if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_R2D2 {
+            // CLASS_R2D2
+            if TIMER_Done(
+                ctx,
+                Some(npc_id),
+                b"patrolNoise\0".as_ptr() as *const c_char,
+            ) != 0
+            {
+                let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
+                let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
+                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr());
+
+                let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                    delay,
+                );
+            }
+        } else if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_R5D2 {
+            // CLASS_R5D2
+            if TIMER_Done(
+                ctx,
+                Some(npc_id),
+                b"patrolNoise\0".as_ptr() as *const c_char,
+            ) != 0
+            {
+                let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
+                let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
+                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr());
+
+                let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                    delay,
+                );
+            }
+        }
+        if !client.is_null() && unsafe { (*client).NPC_class } == class_t::CLASS_GONK {
+            // CLASS_GONK
+            if TIMER_Done(
+                ctx,
+                Some(npc_id),
+                b"patrolNoise\0".as_ptr() as *const c_char,
+            ) != 0
+            {
+                let idx = ctx.world.bg_state.rng.Q_irand(1, 2);
+                let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
+                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr());
+
+                let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                    delay,
+                );
+            }
+        }
+    }
+
+    NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
 }
 
 /// Raven `Droid_Run`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:175-200`
 pub fn Droid_Run(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        if npc.is_null() || npc_info.is_null() {
-            return;
-        }
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    if npc.is_null() || npc_info.is_null() {
+        return;
+    }
 
-        R2D2_PartsMove(ctx);
+    R2D2_PartsMove(ctx);
 
-        if (*npc_info).localState == LSTATE_BACKINGUP {
-            ctx.world.globals.ucmd.forwardmove = -127;
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    if unsafe { (*npc_info).localState } == LSTATE_BACKINGUP {
+        ctx.world.globals.ucmd.forwardmove = -127;
+        // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+        unsafe {
             (*npc_info).desiredYaw += 5.0;
-
             (*npc_info).localState = LSTATE_NONE;
-        } else {
-            ctx.world.globals.ucmd.forwardmove = 64;
-            if !UpdateGoal(ctx).is_null() {
-                if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 {
-                    // qfalse
-                    // `.5` is a double literal and `sin` is the double libm: the whole
-                    // term is evaluated in f64 and narrowed only on store to the float.
-                    (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
-                        + (ctx.world.level.time as f64 * 0.5).sin() * 5.0)
-                        as f32;
+        }
+    } else {
+        ctx.world.globals.ucmd.forwardmove = 64;
+        if !UpdateGoal(ctx).is_null() {
+            if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 {
+                // qfalse
+                // `.5` is a double literal and `sin` is the double libm: the whole
+                // term is evaluated in f64 and narrowed only on store to the float.
+                let time = ctx.world.level.time;
+                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                unsafe {
+                    (*npc_info).desiredYaw =
+                        ((*npc_info).desiredYaw as f64 + (time as f64 * 0.5).sin() * 5.0) as f32;
                 }
             }
         }
-
-        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
     }
+
+    NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
 }
 
 /// Raven `Droid_Spin`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:207-266`
 pub fn Droid_Spin(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        if npc.is_null() || npc_info.is_null() {
-            return;
-        }
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    if npc.is_null() || npc_info.is_null() {
+        return;
+    }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        let mut dir = [0.0f32, 0.0f32, 1.0f32];
+    let dir = [0.0f32, 0.0f32, 1.0f32];
 
-        R2D2_TurnAnims(ctx);
+    R2D2_TurnAnims(ctx);
 
-        if (*((*npc).client)).NPC_class == class_t::CLASS_R5D2
-            || (*((*npc).client)).NPC_class == class_t::CLASS_R2D2
+    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    let client = ctx.world.entity(npc_id).client;
+    let npc_class = unsafe { (*client).NPC_class };
+
+    if npc_class == class_t::CLASS_R5D2 || npc_class == class_t::CLASS_R2D2 {
+        // CLASS_R5D2, CLASS_R2D2
+        // No head?
+        let ghoul2 = ctx.world.entity(npc_id).ghoul2;
+        if trap::G2API_GetSurfaceRenderStatus(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
+                ghoul2,
+                0,
+                c"head".to_owned(),
+            ),
+        ) > 0
         {
-            // CLASS_R5D2, CLASS_R2D2
-            // No head?
-            if trap::G2API_GetSurfaceRenderStatus(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                    (*npc).ghoul2,
-                    0,
-                    c"head".to_owned(),
-                ),
-            ) > 0 {
-                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"smoke\0".as_ptr() as *const c_char) != 0 && TIMER_Done(ctx, ctx.entity_id_of(npc), b"droidsmoketotal\0".as_ptr() as *const c_char) == 0 {
-                    TIMER_Set(ctx, ctx.entity_id_of(npc), b"smoke\0".as_ptr() as *const c_char, 100);
-                    G_PlayEffectID(G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
-                }
+            if TIMER_Done(ctx, Some(npc_id), b"smoke\0".as_ptr() as *const c_char) != 0
+                && TIMER_Done(
+                    ctx,
+                    Some(npc_id),
+                    b"droidsmoketotal\0".as_ptr() as *const c_char,
+                ) == 0
+            {
+                TIMER_Set(ctx, Some(npc_id), b"smoke\0".as_ptr() as *const c_char, 100);
+                let origin = ctx.world.entity(npc_id).r.currentOrigin;
+                G_PlayEffectID(
+                    G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char),
+                    origin,
+                    dir,
+                );
+            }
 
-                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"droidspark\0".as_ptr() as *const c_char) != 0 {
-                    let npc_id = ctx.entity_id_of(npc);
-                    let delay = ctx.world.bg_state.rng.Q_irand(100, 500);
-                    TIMER_Set(ctx, npc_id, b"droidspark\0".as_ptr() as *const c_char, delay);
-                    G_PlayEffectID(G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
-                }
+            if TIMER_Done(ctx, Some(npc_id), b"droidspark\0".as_ptr() as *const c_char) != 0 {
+                let delay = ctx.world.bg_state.rng.Q_irand(100, 500);
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"droidspark\0".as_ptr() as *const c_char,
+                    delay,
+                );
+                let origin = ctx.world.entity(npc_id).r.currentOrigin;
+                G_PlayEffectID(
+                    G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char),
+                    origin,
+                    dir,
+                );
+            }
 
-                ctx.world.globals.ucmd.forwardmove = ctx.world.bg_state.rng.Q_irand(-64, 64) as c_int as i8;
+            ctx.world.globals.ucmd.forwardmove =
+                ctx.world.bg_state.rng.Q_irand(-64, 64) as c_int as i8;
 
-                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char) != 0 {
-                    let npc_id = ctx.entity_id_of(npc);
-                    let delay = ctx.world.bg_state.rng.Q_irand(250, 1000);
-                    TIMER_Set(ctx, npc_id, b"roam\0".as_ptr() as *const c_char, delay);
-                    (*npc_info).desiredYaw = ctx.world.bg_state.rng.Q_irand(0, 360) as f32;
-                }
-            } else {
-                if TIMER_Done(ctx, ctx.entity_id_of(npc), b"roam\0".as_ptr() as *const c_char) != 0 {
-                    (*npc_info).localState = LSTATE_NONE;
-                } else {
-                    (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
+            if TIMER_Done(ctx, Some(npc_id), b"roam\0".as_ptr() as *const c_char) != 0 {
+                let delay = ctx.world.bg_state.rng.Q_irand(250, 1000);
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"roam\0".as_ptr() as *const c_char,
+                    delay,
+                );
+                let dy = ctx.world.bg_state.rng.Q_irand(0, 360) as f32;
+                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                unsafe {
+                    (*npc_info).desiredYaw = dy;
                 }
             }
         } else {
-            if TIMER_Done(
-                ctx,
-                ctx.entity_id_of(npc),
-                b"roam\0".as_ptr() as *const c_char,
-            ) != 0
-            {
-                (*npc_info).localState = LSTATE_NONE;
+            if TIMER_Done(ctx, Some(npc_id), b"roam\0".as_ptr() as *const c_char) != 0 {
+                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                unsafe {
+                    (*npc_info).localState = LSTATE_NONE;
+                }
             } else {
+                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                unsafe {
+                    (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
+                }
+            }
+        }
+    } else {
+        if TIMER_Done(ctx, Some(npc_id), b"roam\0".as_ptr() as *const c_char) != 0 {
+            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            unsafe {
+                (*npc_info).localState = LSTATE_NONE;
+            }
+        } else {
+            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            unsafe {
                 (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
             }
         }
-
-        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
     }
+
+    NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
 }
 
 /// Raven `NPC_Droid_Pain`.
@@ -408,210 +433,294 @@ pub fn NPC_Droid_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
-    unsafe {
-        let mod_: c_int = ctx.world.globals.gPainMOD;
-        let mut pain_chance: f32;
+    let mod_: c_int = ctx.world.globals.gPainMOD;
+    let mut pain_chance: f32;
 
-        // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-        crate::q_math::_VectorCopy((*((*self_).NPC)).lastPathAngles, &mut (*self_).s.angles);
+    // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    let npc_ptr = ctx.world.entity(self_).NPC;
+    let last_path_angles = unsafe { (*npc_ptr).lastPathAngles };
+    crate::q_math::_VectorCopy(last_path_angles, &mut ctx.world.entity_mut(self_).s.angles);
 
-        if (*((*self_).client)).NPC_class == class_t::CLASS_R5D2 {
-            // CLASS_R5D2
-            pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
+    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    let client = ctx.world.entity(self_).client;
+    let npc_class = unsafe { (*client).NPC_class };
 
-            if mod_ == MOD_DEMP2 as c_int
-                || mod_ == MOD_DEMP2_ALT as c_int
-                || ctx.world.bg_state.rng.random() < pain_chance
-            {
-                if (*self_).s.m_iVehicleNum == 0
-                    && ((*self_).health < 30
-                        || mod_ == MOD_DEMP2 as c_int
-                        || mod_ == MOD_DEMP2_ALT as c_int)
-                {
-                    if ((*self_).spawnflags & 2) == 0 {
-                        if ((*((*self_).NPC)).localState != LSTATE_SPINNING) &&
-                           (trap::G2API_GetSurfaceRenderStatus(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                    (*self_).ghoul2,
-                                    0,
-                                    c"head".to_owned(),
-                                ),
-                            ) == 0) {
-                            NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), b"head\0".as_ptr() as *const c_char, TURN_OFF);
+    if npc_class == class_t::CLASS_R5D2 {
+        // CLASS_R5D2
+        pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
-                            if (*((*self_).client)).ps.m_iVehicleNum != 0 {
-                                let mut up = [0.0f32; 3];
-                                AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
-                                G_PlayEffectID(G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, up);
-                            } else {
-                                G_PlayEffectID(G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
-                                G_PlayEffectID(G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
-                            }
-
-                            (*((*self_).client)).ps.electrifyTime = ctx.world.level.time + 3000;
-
-                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
-                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
-                            (*((*self_).NPC)).localState = LSTATE_SPINNING;
-                        }
-                    }
-                } else {
-                    let anim = (*((*self_).client)).ps.legsAnim;
-
-                    if anim == BOTH_STAND2 as c_int {
-                        NPC_SetAnim(
-                            ctx,
-                            ctx.entity_id_of(self_).unwrap(),
-                            SETANIM_BOTH,
-                            BOTH_PAIN1 as c_int,
-                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                        );
-                    } else {
-                        NPC_SetAnim(
-                            ctx,
-                            ctx.entity_id_of(self_).unwrap(),
-                            SETANIM_BOTH,
-                            BOTH_PAIN2 as c_int,
-                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                        );
-                    }
-
-                    (*((*self_).NPC)).localState = LSTATE_SPINNING;
-                    let self_id = ctx.entity_id_of(self_);
-                    let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
-                    TIMER_Set(ctx, self_id, b"roam\0".as_ptr() as *const c_char, delay);
-                }
-            }
-        } else if (*((*self_).client)).NPC_class == class_t::CLASS_MOUSE {
-            // CLASS_MOUSE
-            if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
-                (*((*self_).NPC)).localState = LSTATE_SPINNING;
-                (*((*self_).client)).ps.electrifyTime = ctx.world.level.time + 3000;
-            } else {
-                (*((*self_).NPC)).localState = LSTATE_BACKINGUP;
-            }
-
-            (*((*self_).NPC)).scriptFlags &= !SCF_LOOK_FOR_ENEMIES;
-        } else if (*((*self_).client)).NPC_class == class_t::CLASS_R2D2 {
-            // CLASS_R2D2
-            pain_chance = NPC_GetPainChance(ctx, ctx.entity_id_of(self_).unwrap(), damage);
-
-            if mod_ == MOD_DEMP2 as c_int
-                || mod_ == MOD_DEMP2_ALT as c_int
-                || ctx.world.bg_state.rng.random() < pain_chance
-            {
-                if (*self_).s.m_iVehicleNum == 0
-                    && ((*self_).health < 30
-                        || mod_ == MOD_DEMP2 as c_int
-                        || mod_ == MOD_DEMP2_ALT as c_int)
-                {
-                    if ((*self_).spawnflags & 2) == 0 {
-                        if ((*((*self_).NPC)).localState != LSTATE_SPINNING) &&
-                           (trap::G2API_GetSurfaceRenderStatus(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                    (*self_).ghoul2,
-                                    0,
-                                    c"head".to_owned(),
-                                ),
-                            ) == 0) {
-                            NPC_SetSurfaceOnOff(ctx, ctx.entity_id_of(self_).unwrap(), b"head\0".as_ptr() as *const c_char, TURN_OFF);
-
-                            if (*((*self_).client)).ps.m_iVehicleNum != 0 {
-                                let mut up = [0.0f32; 3];
-                                AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
-                                G_PlayEffectID(G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, up);
-                            } else {
-                                G_PlayEffectID(G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
-                                G_PlayEffectID(G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
-                            }
-
-                            (*((*self_).client)).ps.electrifyTime = ctx.world.level.time + 3000;
-
-                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
-                            TIMER_Set(ctx, ctx.entity_id_of(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
-                            (*((*self_).NPC)).localState = LSTATE_SPINNING;
-                        }
-                    }
-                } else {
-                    let anim = (*((*self_).client)).ps.legsAnim;
-
-                    if anim == BOTH_STAND2 as c_int {
-                        NPC_SetAnim(
-                            ctx,
-                            ctx.entity_id_of(self_).unwrap(),
-                            SETANIM_BOTH,
-                            BOTH_PAIN1 as c_int,
-                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                        );
-                    } else {
-                        NPC_SetAnim(
-                            ctx,
-                            ctx.entity_id_of(self_).unwrap(),
-                            SETANIM_BOTH,
-                            BOTH_PAIN2 as c_int,
-                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                        );
-                    }
-
-                    (*((*self_).NPC)).localState = LSTATE_SPINNING;
-                    let self_id = ctx.entity_id_of(self_);
-                    let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
-                    TIMER_Set(ctx, self_id, b"roam\0".as_ptr() as *const c_char, delay);
-                }
-            }
-        } else if (*((*self_).client)).NPC_class == class_t::CLASS_INTERROGATOR
-            && (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
-            && !attacker.is_null()
+        if mod_ == MOD_DEMP2 as c_int
+            || mod_ == MOD_DEMP2_ALT as c_int
+            || ctx.world.bg_state.rng.random() < pain_chance
         {
-            // CLASS_INTERROGATOR
-            let mut dir = [0.0f32; 3];
-            crate::q_math::_VectorSubtract(
-                (*self_).r.currentOrigin,
-                (*attacker).r.currentOrigin,
-                &mut dir,
-            );
-            VectorNormalize(&mut dir);
+            let vehicle_num = ctx.world.entity(self_).s.m_iVehicleNum;
+            let health = ctx.world.entity(self_).health;
+            if vehicle_num == 0
+                && (health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
+            {
+                if (ctx.world.entity(self_).spawnflags & 2) == 0 {
+                    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                    let local_state = unsafe { (*npc_ptr).localState };
+                    let ghoul2 = ctx.world.entity(self_).ghoul2;
+                    if (local_state != LSTATE_SPINNING)
+                        && (trap::G2API_GetSurfaceRenderStatus(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
+                                ghoul2,
+                                0,
+                                c"head".to_owned(),
+                            ),
+                        ) == 0)
+                    {
+                        NPC_SetSurfaceOnOff(
+                            ctx,
+                            self_,
+                            b"head\0".as_ptr() as *const c_char,
+                            TURN_OFF,
+                        );
 
-            crate::q_math::_VectorMA(
-                (*((*self_).client)).ps.velocity,
-                550.0,
-                dir,
-                &mut (*((*self_).client)).ps.velocity,
-            );
-            (*((*self_).client)).ps.velocity[2] -= 127.0;
+                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        let veh = unsafe { (*client).ps.m_iVehicleNum };
+                        if veh != 0 {
+                            let mut up = [0.0f32; 3];
+                            let current_angles = ctx.world.entity(self_).r.currentAngles;
+                            AngleVectors(current_angles, None, None, Some(&mut up));
+                            let origin = ctx.world.entity(self_).r.currentOrigin;
+                            G_PlayEffectID(
+                                G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char),
+                                origin,
+                                up,
+                            );
+                        } else {
+                            let origin = ctx.world.entity(self_).r.currentOrigin;
+                            G_PlayEffectID(
+                                G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char),
+                                origin,
+                                [0.0, 0.0, 0.0],
+                            );
+                            G_PlayEffectID(
+                                G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char),
+                                origin,
+                                [0.0, 0.0, 0.0],
+                            );
+                        }
+
+                        let time = ctx.world.level.time;
+                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        unsafe {
+                            (*client).ps.electrifyTime = time + 3000;
+                        }
+
+                        TIMER_Set(
+                            ctx,
+                            Some(self_),
+                            b"droidsmoketotal\0".as_ptr() as *const c_char,
+                            5000,
+                        );
+                        TIMER_Set(ctx, Some(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
+                        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                        unsafe {
+                            (*npc_ptr).localState = LSTATE_SPINNING;
+                        }
+                    }
+                }
+            } else {
+                // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                let anim = unsafe { (*client).ps.legsAnim };
+
+                if anim == BOTH_STAND2 as c_int {
+                    NPC_SetAnim(
+                        ctx,
+                        self_,
+                        SETANIM_BOTH,
+                        BOTH_PAIN1 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
+                } else {
+                    NPC_SetAnim(
+                        ctx,
+                        self_,
+                        SETANIM_BOTH,
+                        BOTH_PAIN2 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
+                }
+
+                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                unsafe {
+                    (*npc_ptr).localState = LSTATE_SPINNING;
+                }
+                let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
+                TIMER_Set(ctx, Some(self_), b"roam\0".as_ptr() as *const c_char, delay);
+            }
+        }
+    } else if npc_class == class_t::CLASS_MOUSE {
+        // CLASS_MOUSE
+        if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
+            let time = ctx.world.level.time;
+            // gNPC_t + gclient derefs stay raw (task #7 regimes) — FLAG.
+            unsafe {
+                (*npc_ptr).localState = LSTATE_SPINNING;
+                (*client).ps.electrifyTime = time + 3000;
+            }
+        } else {
+            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            unsafe {
+                (*npc_ptr).localState = LSTATE_BACKINGUP;
+            }
         }
 
-        NPC_Pain(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(attacker),
-            damage,
-        );
+        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        unsafe {
+            (*npc_ptr).scriptFlags &= !SCF_LOOK_FOR_ENEMIES;
+        }
+    } else if npc_class == class_t::CLASS_R2D2 {
+        // CLASS_R2D2
+        pain_chance = NPC_GetPainChance(ctx, self_, damage);
+
+        if mod_ == MOD_DEMP2 as c_int
+            || mod_ == MOD_DEMP2_ALT as c_int
+            || ctx.world.bg_state.rng.random() < pain_chance
+        {
+            let vehicle_num = ctx.world.entity(self_).s.m_iVehicleNum;
+            let health = ctx.world.entity(self_).health;
+            if vehicle_num == 0
+                && (health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
+            {
+                if (ctx.world.entity(self_).spawnflags & 2) == 0 {
+                    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                    let local_state = unsafe { (*npc_ptr).localState };
+                    let ghoul2 = ctx.world.entity(self_).ghoul2;
+                    if (local_state != LSTATE_SPINNING)
+                        && (trap::G2API_GetSurfaceRenderStatus(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
+                                ghoul2,
+                                0,
+                                c"head".to_owned(),
+                            ),
+                        ) == 0)
+                    {
+                        NPC_SetSurfaceOnOff(
+                            ctx,
+                            self_,
+                            b"head\0".as_ptr() as *const c_char,
+                            TURN_OFF,
+                        );
+
+                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        let veh = unsafe { (*client).ps.m_iVehicleNum };
+                        if veh != 0 {
+                            let mut up = [0.0f32; 3];
+                            let current_angles = ctx.world.entity(self_).r.currentAngles;
+                            AngleVectors(current_angles, None, None, Some(&mut up));
+                            let origin = ctx.world.entity(self_).r.currentOrigin;
+                            G_PlayEffectID(
+                                G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char),
+                                origin,
+                                up,
+                            );
+                        } else {
+                            let origin = ctx.world.entity(self_).r.currentOrigin;
+                            G_PlayEffectID(
+                                G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char),
+                                origin,
+                                [0.0, 0.0, 0.0],
+                            );
+                            G_PlayEffectID(
+                                G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char),
+                                origin,
+                                [0.0, 0.0, 0.0],
+                            );
+                        }
+
+                        let time = ctx.world.level.time;
+                        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                        unsafe {
+                            (*client).ps.electrifyTime = time + 3000;
+                        }
+
+                        TIMER_Set(
+                            ctx,
+                            Some(self_),
+                            b"droidsmoketotal\0".as_ptr() as *const c_char,
+                            5000,
+                        );
+                        TIMER_Set(ctx, Some(self_), b"droidspark\0".as_ptr() as *const c_char, 100);
+                        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                        unsafe {
+                            (*npc_ptr).localState = LSTATE_SPINNING;
+                        }
+                    }
+                }
+            } else {
+                // gclient deref stays raw (client deref regime, task #7) — FLAG.
+                let anim = unsafe { (*client).ps.legsAnim };
+
+                if anim == BOTH_STAND2 as c_int {
+                    NPC_SetAnim(
+                        ctx,
+                        self_,
+                        SETANIM_BOTH,
+                        BOTH_PAIN1 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
+                } else {
+                    NPC_SetAnim(
+                        ctx,
+                        self_,
+                        SETANIM_BOTH,
+                        BOTH_PAIN2 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
+                }
+
+                // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+                unsafe {
+                    (*npc_ptr).localState = LSTATE_SPINNING;
+                }
+                let delay = ctx.world.bg_state.rng.Q_irand(1000, 2000);
+                TIMER_Set(ctx, Some(self_), b"roam\0".as_ptr() as *const c_char, delay);
+            }
+        }
+    } else if npc_class == class_t::CLASS_INTERROGATOR
+        && (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
+        && attacker.is_some()
+    {
+        // CLASS_INTERROGATOR
+        let attacker_id = attacker.unwrap();
+        let mut dir = [0.0f32; 3];
+        let self_origin = ctx.world.entity(self_).r.currentOrigin;
+        let attacker_origin = ctx.world.entity(attacker_id).r.currentOrigin;
+        crate::q_math::_VectorSubtract(self_origin, attacker_origin, &mut dir);
+        VectorNormalize(&mut dir);
+
+        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        unsafe {
+            let velocity = (*client).ps.velocity;
+            crate::q_math::_VectorMA(velocity, 550.0, dir, &mut (*client).ps.velocity);
+            (*client).ps.velocity[2] -= 127.0;
+        }
     }
+
+    NPC_Pain(ctx, self_, attacker, damage);
 }
 
 /// Raven `Droid_Pain`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:442-448`
 pub fn Droid_Pain(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        if npc.is_null() || npc_info.is_null() {
-            return;
-        }
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    if npc.is_null() || npc_info.is_null() {
+        return;
+    }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if TIMER_Done(
-            ctx,
-            ctx.entity_id_of(npc),
-            b"droidpain\0".as_ptr() as *const c_char,
-        ) != 0
-        {
+    if TIMER_Done(ctx, Some(npc_id), b"droidpain\0".as_ptr() as *const c_char) != 0 {
+        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        unsafe {
             (*npc_info).localState = LSTATE_NONE;
         }
     }
@@ -695,24 +804,24 @@ pub fn NPC_Protocol_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:597-621`
 pub fn NPC_BSDroid_Default(ctx: &mut GameContext) {
-    unsafe {
-        let npc_info = ctx.world.globals.NPCInfo;
-        if npc_info.is_null() {
-            return;
-        }
+    let npc_info = ctx.world.globals.NPCInfo;
+    if npc_info.is_null() {
+        return;
+    }
 
-        if (*npc_info).localState == LSTATE_SPINNING {
-            Droid_Spin(ctx);
-        } else if (*npc_info).localState == LSTATE_PAIN {
-            Droid_Pain(ctx);
-        } else if (*npc_info).localState == LSTATE_DROP {
-            NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
-            ctx.world.globals.ucmd.upmove =
-                (ctx.world.bg_state.rng.crandom() * 64.0) as c_int as i8;
-        } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-            Droid_Patrol(ctx);
-        } else {
-            Droid_Run(ctx);
-        }
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    let local_state = unsafe { (*npc_info).localState };
+    if local_state == LSTATE_SPINNING {
+        Droid_Spin(ctx);
+    } else if local_state == LSTATE_PAIN {
+        Droid_Pain(ctx);
+    } else if local_state == LSTATE_DROP {
+        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
+        ctx.world.globals.ucmd.upmove = (ctx.world.bg_state.rng.crandom() * 64.0) as c_int as i8;
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
+        Droid_Patrol(ctx);
+    } else {
+        Droid_Run(ctx);
     }
 }

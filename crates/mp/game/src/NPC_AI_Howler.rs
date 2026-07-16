@@ -22,17 +22,6 @@ use crate::prelude::*;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::set_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
-// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
-// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
-// precedent.
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 // Raven `#define LSTATE_*` — file-scope local state for Howler NPC
 // (stored in `gNPC_t::localState`).
 // Source: `oracle/codemp/game/NPC_AI_Howler.c:10-11`
@@ -70,44 +59,42 @@ pub fn Howler_Idle() {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:38-71`
 pub fn Howler_Patrol(ctx: &mut GameContext) {
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+    let npc_info = ctx.world.globals.NPCInfo;
+
     unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
         (*npc_info).localState = LSTATE_CLEAR;
+    }
 
-        // If we have somewhere to go, then do that
-        if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
-            ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
-            crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
-        } else {
-            if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"patrolTime".as_ptr()) != 0 {
-                let npc_id = ctx.entity_id_of(npc);
-                let delay = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
-                crate::g_timer::TIMER_Set(ctx, npc_id, c"patrolTime".as_ptr(), delay);
-            }
+    // If we have somewhere to go, then do that
+    if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
+        ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
+        crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+    } else {
+        if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"patrolTime".as_ptr()) != 0 {
+            let delay = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+            crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"patrolTime".as_ptr(), delay);
         }
+    }
 
-        // rwwFIXMEFIXME: Care about all clients, not just client 0
-        let mut dif: vec3_t = [0.0; 3];
-        crate::q_math::_VectorSubtract(
-            ctx.world.g_entities[0].r.currentOrigin,
-            (*npc).r.currentOrigin,
-            &mut dif,
-        );
+    // rwwFIXMEFIXME: Care about all clients, not just client 0
+    let mut dif: vec3_t = [0.0; 3];
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    crate::q_math::_VectorSubtract(
+        ctx.world.g_entities[0].r.currentOrigin,
+        npc_origin,
+        &mut dif,
+    );
 
-        if crate::q_math::VectorLengthSquared(dif) < 256.0 * 256.0 {
-            crate::NPC_combat::G_SetEnemy(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                EntityId::from_num(0),
-            );
-        }
+    if crate::q_math::VectorLengthSquared(dif) < 256.0 * 256.0 {
+        crate::NPC_combat::G_SetEnemy(ctx, npc_id, EntityId::from_num(0));
+    }
 
-        if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue) == qfalse {
-            Howler_Idle();
-            return;
-        }
+    if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue) == qfalse {
+        Howler_Idle();
+        return;
     }
 }
 
@@ -115,12 +102,14 @@ pub fn Howler_Patrol(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:78-86`
 pub fn Howler_Move(ctx: &mut GameContext, visible: qboolean) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; derefs stay raw.
+    let npc_info = ctx.world.globals.NPCInfo;
 
+    unsafe {
         if (*npc_info).localState != LSTATE_WAITING {
-            (*npc_info).goalEntity = (*npc).enemy;
+            (*npc_info).goalEntity = ctx.world.entity(npc_id).enemy;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
             (*npc_info).goalRadius = MAX_DISTANCE;
         }
@@ -131,49 +120,54 @@ pub fn Howler_Move(ctx: &mut GameContext, visible: qboolean) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:89-109`
 pub fn Howler_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let enemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, enemy) };
-    unsafe {
-        let npc = ctx.world.globals.NPC;
+    if enemy.is_none() {
+        return;
+    }
 
-        if enemy.is_null() {
-            return;
-        }
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        let mut end: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
-        let mut tr: trace_t = std::mem::zeroed();
+    let mut end: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+    let mut tr: trace_t = unsafe { std::mem::zeroed() };
 
-        crate::q_math::AngleVectors((*((*npc).client)).ps.viewangles, Some(&mut dir), None, None);
-        crate::q_math::_VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
+    // FLAG (task #7): NPC pool `gclient_t` (`gClPtrs`, g_utils.c:430) — not a
+    // `level.clients` slot; the pointer is read via the entity borrow and
+    // dereffed raw exactly as Raven does.
+    let client = ctx.world.entity(npc_id).client;
+    let viewangles = unsafe { (*client).ps.viewangles };
+    crate::q_math::AngleVectors(viewangles, Some(&mut dir), None, None);
 
-        // Should probably trace from the mouth, but, ah well.
-        crate::trap::Trace(
-            ctx.engine,
-            GTraceArgs::new(
-                &mut tr as *mut trace_t,
-                &(*npc).r.currentOrigin as *const vec3_t,
-                &vec3_origin as *const vec3_t,
-                &vec3_origin as *const vec3_t,
-                &end as *const vec3_t,
-                (*npc).s.number,
-                MASK_SHOT,
-            ),
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    crate::q_math::_VectorMA(npc_origin, MIN_DISTANCE as f32, dir, &mut end);
+
+    // Should probably trace from the mouth, but, ah well.
+    let npc_number = ctx.world.entity(npc_id).s.number;
+    crate::trap::Trace(
+        ctx.engine,
+        GTraceArgs::new(
+            &mut tr as *mut trace_t,
+            &npc_origin as *const vec3_t,
+            &vec3_origin as *const vec3_t,
+            &vec3_origin as *const vec3_t,
+            &end as *const vec3_t,
+            npc_number,
+            MASK_SHOT,
+        ),
+    );
+
+    if tr.entityNum != ENTITYNUM_WORLD as c_short {
+        crate::g_combat::G_Damage(
+            ctx,
+            EntityId::from_num(tr.entityNum as c_int),
+            Some(npc_id),
+            Some(npc_id),
+            Some(&mut dir),
+            tr.endpos,
+            damage,
+            DAMAGE_NO_KNOCKBACK,
+            MOD_MELEE as c_int,
         );
-
-        if tr.entityNum != ENTITYNUM_WORLD as c_short {
-            crate::g_combat::G_Damage(
-                ctx,
-                EntityId::from_num(tr.entityNum as c_int),
-                ctx.entity_id_of(npc),
-                ctx.entity_id_of(npc),
-                Some(&mut dir),
-                tr.endpos,
-                damage,
-                DAMAGE_NO_KNOCKBACK,
-                MOD_MELEE as c_int,
-            );
-        }
     }
 }
 
@@ -181,89 +175,85 @@ pub fn Howler_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: 
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:112-131`
 pub fn Howler_Attack(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == qfalse
-        {
-            let npc_id = ctx.entity_id_of(npc);
-            let delay = (1700.0 + (ctx.world.bg_state.rng.random() as f32 * 200.0)) as c_int;
-            // Going to do ATTACK1
-            crate::g_timer::TIMER_Set(ctx, npc_id, c"attacking".as_ptr(), delay);
-            crate::npc_c::NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                SETANIM_BOTH,
-                BOTH_ATTACK1 as c_int,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
+    if crate::g_timer::TIMER_Exists(ctx, Some(npc_id), c"attacking".as_ptr()) == qfalse {
+        let delay = (1700.0 + (ctx.world.bg_state.rng.random() as f32 * 200.0)) as c_int;
+        // Going to do ATTACK1
+        crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"attacking".as_ptr(), delay);
+        crate::npc_c::NPC_SetAnim(
+            ctx,
+            npc_id,
+            SETANIM_BOTH,
+            BOTH_ATTACK1 as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
 
-            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 200);
-        }
-
-        // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
-        if crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), qtrue)
-            != 0
-        {
-            Howler_TryDamage(ctx, (*npc).enemy, 5);
-        }
-
-        // Just using this to remove the attacking flag at the right time
-        crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr(), qtrue);
+        crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"attack_dmg".as_ptr(), 200);
     }
+
+    // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
+    if crate::g_timer::TIMER_Done2(ctx, Some(npc_id), c"attack_dmg".as_ptr(), qtrue) != 0 {
+        let enemy = ctx.world.entity(npc_id).enemy;
+        Howler_TryDamage(ctx, enemy, 5);
+    }
+
+    // Just using this to remove the attacking flag at the right time
+    crate::g_timer::TIMER_Done2(ctx, Some(npc_id), c"attacking".as_ptr(), qtrue);
 }
 
 /// Raven `Howler_Combat`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:134-171`
 pub fn Howler_Combat(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; derefs stay raw.
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        let distance: f32;
-        let advance: qboolean;
+    let distance: f32;
+    let advance: qboolean;
 
-        // If we cannot see our target or we have somewhere to go, then do that
-        let enemy_ptr = crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*npc).enemy);
-        if crate::NPC_utils::NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) == qfalse
-            || !crate::NPC_goal::UpdateGoal(ctx).is_null()
-        {
+    // If we cannot see our target or we have somewhere to go, then do that
+    let enemy = ctx.world.entity(npc_id).enemy;
+    if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy) == qfalse
+        || !crate::NPC_goal::UpdateGoal(ctx).is_null()
+    {
+        unsafe {
             (*npc_info).combatMove = qtrue;
-            (*npc_info).goalEntity = (*npc).enemy;
+            (*npc_info).goalEntity = ctx.world.entity(npc_id).enemy;
             (*npc_info).goalRadius = MAX_DISTANCE; // just get us within combat range
-
-            crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
-            return;
         }
 
-        // Sometimes I have problems with facing the enemy I'm attacking, so force the issue so I don't look dumb
-        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
+        crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+        return;
+    }
 
-        distance = crate::q_math::DistanceHorizontalSquared(
-            (*npc).r.currentOrigin,
-            (*enemy_ptr).r.currentOrigin,
-        );
-        advance = (distance > MIN_DISTANCE_SQR as f32) as qboolean;
+    // Sometimes I have problems with facing the enemy I'm attacking, so force the issue so I don't look dumb
+    crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
-        if (advance != 0 || (*npc_info).localState == LSTATE_WAITING)
-            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) != 0
-        {
-            // waiting monsters can't attack
-            if crate::g_timer::TIMER_Done2(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"takingPain".as_ptr(),
-                qtrue,
-            ) != 0
-            {
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    // Raven derefs `enemy_ptr` (from `NPC->enemy`); the caller
+    // (`NPC_BSHowler_Default`) only enters combat with a live enemy, so unwrap
+    // here (a null enemy would be a null deref in Raven).
+    let enemy_origin = ctx.world.entity(enemy.unwrap()).r.currentOrigin;
+    distance = crate::q_math::DistanceHorizontalSquared(npc_origin, enemy_origin);
+    advance = (distance > MIN_DISTANCE_SQR as f32) as qboolean;
+
+    if (advance != 0 || unsafe { (*npc_info).localState } == LSTATE_WAITING)
+        && crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"attacking".as_ptr()) != 0
+    {
+        // waiting monsters can't attack
+        if crate::g_timer::TIMER_Done2(ctx, Some(npc_id), c"takingPain".as_ptr(), qtrue) != 0 {
+            unsafe {
                 (*npc_info).localState = LSTATE_CLEAR;
-            } else {
-                Howler_Move(ctx, 1 as qboolean);
             }
         } else {
-            Howler_Attack(ctx);
+            Howler_Move(ctx, 1 as qboolean);
         }
+    } else {
+        Howler_Attack(ctx);
     }
 }
 
@@ -278,30 +268,32 @@ pub fn NPC_Howler_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
-    unsafe {
-        if damage >= 10 {
-            crate::g_timer::TIMER_Remove(ctx, ctx.entity_id_of(self_), c"attacking".as_ptr());
-            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr(), 2900);
+    // STAGE-1 removed: `self_` stays `EntityId`; `attacker` is unused in the body
+    // (as in Raven).
+    if damage >= 10 {
+        crate::g_timer::TIMER_Remove(ctx, Some(self_), c"attacking".as_ptr());
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"takingPain".as_ptr(), 2900);
 
-            let npc = (*self_).NPC;
-            if !npc.is_null() {
-                crate::q_math::_VectorCopy((*npc).lastPathAngles, &mut (*self_).s.angles);
-            }
+        // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+        let npc = ctx.world.entity(self_).NPC;
+        if !npc.is_null() {
+            let last_path_angles = unsafe { (*npc).lastPathAngles };
+            crate::q_math::_VectorCopy(last_path_angles, &mut ctx.world.entity_mut(self_).s.angles);
+        }
 
-            crate::npc_c::NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                SETANIM_BOTH,
-                BOTH_PAIN1 as c_int,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
+        crate::npc_c::NPC_SetAnim(
+            ctx,
+            self_,
+            SETANIM_BOTH,
+            BOTH_PAIN1 as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
 
-            if !(*self_).NPC.is_null() {
-                let npc_mut = (*self_).NPC;
-                (*npc_mut).localState = LSTATE_WAITING;
+        // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+        let npc = ctx.world.entity(self_).NPC;
+        if !npc.is_null() {
+            unsafe {
+                (*npc).localState = LSTATE_WAITING;
             }
         }
     }
@@ -313,18 +305,18 @@ pub fn NPC_Howler_Pain(
 /// Howler has an enemy target or is in patrol/idle mode.
 /// Source: `oracle/codemp/game/NPC_AI_Howler.c:202-218`
 pub fn NPC_BSHowler_Default(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG (task #7): NPCInfo (gNPC_t) has no safe accessor; deref stays raw.
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        if (*npc).enemy.is_some() {
-            Howler_Combat(ctx);
-        } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-            Howler_Patrol(ctx);
-        } else {
-            Howler_Idle();
-        }
-
-        crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+    if ctx.world.entity(npc_id).enemy.is_some() {
+        Howler_Combat(ctx);
+    } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
+        Howler_Patrol(ctx);
+    } else {
+        Howler_Idle();
     }
+
+    crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
 }
