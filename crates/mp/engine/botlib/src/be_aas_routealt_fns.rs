@@ -151,13 +151,8 @@ pub fn AAS_AlternativeRouteGoals(
             }
             // travel time from the area to the goal area
             // Raven passes NULL for `origin` here; the callee branches on it.
-            let goaltime = AAS_AreaTravelTimeToGoalArea(
-                bot,
-                i,
-                core::ptr::null(),
-                goalareanum,
-                travelflags,
-            );
+            let goaltime =
+                AAS_AreaTravelTimeToGoalArea(bot, i, core::ptr::null(), goalareanum, travelflags);
             if goaltime == 0 {
                 continue;
             }

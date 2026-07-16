@@ -2240,7 +2240,8 @@ pub fn func_timer_think(ctx: &mut GameContext, self_: EntityId) {
         (*self_).nextthink = (ctx.world.level.time as f64
             + 1000.0
                 * ((*self_).wait as f64
-                    + ctx.world.bg_state.rng.crandom() * (*self_).random as f64)) as c_int;
+                    + ctx.world.bg_state.rng.crandom() * (*self_).random as f64))
+            as c_int;
     }
 }
 

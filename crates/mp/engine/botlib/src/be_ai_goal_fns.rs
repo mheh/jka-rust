@@ -1333,8 +1333,12 @@ pub fn BotInitLevelItems(bot: &mut BotLib) {
                 }
                 //get the origin of the item
                 let mut origin: vec3_t = [0.0; 3];
-                if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin)
-                    == 0
+                if AAS_VectorForBSPEpairKey(
+                    bot,
+                    ent,
+                    c"origin".as_ptr() as *mut c_char,
+                    &mut origin,
+                ) == 0
                 {
                     bot.botimport.Print.unwrap()(
                         PRT_ERROR,

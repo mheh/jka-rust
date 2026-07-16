@@ -10,7 +10,7 @@
 use crate::g_nav::NPC_SetMoveGoal;
 use crate::g_nav::{FlyingCreature, NAV_HitNavGoal};
 use crate::g_timer::{TIMER_Done, TIMER_Get, TIMER_Set};
-use crate::g_utils::{GetAnglesForDirection, G_SoundOnEnt};
+use crate::g_utils::{G_SoundOnEnt, GetAnglesForDirection};
 use crate::g_weapon::CalcMuzzlePoint;
 use crate::npc::g_npc_t::{ENEMY_POS_LAG_INTERVAL, MAX_ENEMY_POS_LAG};
 use crate::prelude::*;

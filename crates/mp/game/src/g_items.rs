@@ -3825,9 +3825,8 @@ pub fn Touch_Item(
         if (*ent).random != 0.0 {
             // C `respawn += crandom() * ent->random`: `crandom()` is `double`, so
             // the sum is computed in `double` and truncated once into `int respawn`.
-            respawn = (respawn as f64
-                + ctx.world.bg_state.rng.crandom() * (*ent).random as f64)
-                as c_int;
+            respawn =
+                (respawn as f64 + ctx.world.bg_state.rng.crandom() * (*ent).random as f64) as c_int;
             if respawn < 1 {
                 respawn = 1;
             }

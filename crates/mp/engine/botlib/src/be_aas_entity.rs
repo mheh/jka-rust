@@ -28,7 +28,6 @@ use mp_qshared::common::mp::botlib::solid_t::solid_t;
 use mp_qshared::shared::limits::ENTITYNUM_WORLD;
 use mp_qshared::shared::vec3_t;
 
-
 use crate::aasfile::presence_type::PRESENCE_NORMAL;
 use crate::be_aas_def::bsp_entdata_s::bsp_entdata_t;
 use crate::BotLib;
@@ -128,7 +127,11 @@ pub fn AAS_EntityModelNum(bot: &mut BotLib, entnum: c_int) -> c_int {
 /// Raven `AAS_OriginOfMoverWithModelNum`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_entity.cpp:244-262`
-pub fn AAS_OriginOfMoverWithModelNum(bot: &mut BotLib, modelnum: c_int, origin: *mut vec3_t) -> c_int {
+pub fn AAS_OriginOfMoverWithModelNum(
+    bot: &mut BotLib,
+    modelnum: c_int,
+    origin: *mut vec3_t,
+) -> c_int {
     unsafe {
         for i in 0..bot.aasworld.maxentities {
             let ent = &*bot.aasworld.entities.add(i as usize);

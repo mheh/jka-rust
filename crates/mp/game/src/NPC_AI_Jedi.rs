@@ -4684,9 +4684,9 @@ pub fn Jedi_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) {
                 if missileSpeed != 0.0 {
                     let mut eDist = crate::q_math::Distance(eyes, enemy_eyes);
                     eDist /= missileSpeed; //How many seconds it will take to get to the enemy
-                    // VectorMA is the live `#if 1` macro (q_shared.h:1365): the
-                    // flrand-bearing scale substitutes per component — three draws.
-                    // Source: `oracle/codemp/game/NPC_AI_Jedi.c:3838`
+                                           // VectorMA is the live `#if 1` macro (q_shared.h:1365): the
+                                           // flrand-bearing scale substitutes per component — three draws.
+                                           // Source: `oracle/codemp/game/NPC_AI_Jedi.c:3838`
                     for i in 0..3 {
                         enemy_eyes[i] += (*enemy_client).ps.velocity[i]
                             * (eDist * ctx.world.bg_state.rng.flrand(0.95f32, 1.25f32));

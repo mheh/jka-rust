@@ -620,7 +620,8 @@ pub static FIELDS: &[BG_field_t] = &[
     // rww - icarus stuff:
     field(
         c"spawnscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + BSET_SPAWN as usize * core::mem::size_of::<*mut c_char>(),
+        core::mem::offset_of!(gentity_t, behaviorSet)
+            + BSET_SPAWN as usize * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(

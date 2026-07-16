@@ -1378,11 +1378,8 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
         // Shifting Sounds
         if (*pVeh).m_iTurboTime < curTime
             && (*pVeh).m_iSoundDebounceTimer < curTime
-            && ((nextSpeed > prevSpeed
-                && nextSpeed > halfMaxSpeed
-                && prevSpeed < halfMaxSpeed)
-                || (nextSpeed > halfMaxSpeed
-                    && ctx.world.bg_state.rng.Q_irand(0, 1000) == 0))
+            && ((nextSpeed > prevSpeed && nextSpeed > halfMaxSpeed && prevSpeed < halfMaxSpeed)
+                || (nextSpeed > halfMaxSpeed && ctx.world.bg_state.rng.Q_irand(0, 1000) == 0))
         {
             let mut shiftSound = ctx.world.bg_state.rng.Q_irand(1, 4);
             shiftSound = match shiftSound {

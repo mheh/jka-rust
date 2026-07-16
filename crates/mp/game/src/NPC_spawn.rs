@@ -273,9 +273,8 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                     // ST_ClearTimers runs for WP_BLASTER and any weapon not in the
                     // explicit no-op case set. Source: oracle/codemp/game/NPC_spawn.c:412-458
                     match (*((*ent).client as *mut gclient_t)).ps.weapon {
-                        WP_BRYAR_PISTOL | WP_DISRUPTOR | WP_BOWCASTER | WP_REPEATER
-                        | WP_DEMP2 | WP_FLECHETTE | WP_ROCKET_LAUNCHER | WP_THERMAL
-                        | WP_STUN_BATON => {}
+                        WP_BRYAR_PISTOL | WP_DISRUPTOR | WP_BOWCASTER | WP_REPEATER | WP_DEMP2
+                        | WP_FLECHETTE | WP_ROCKET_LAUNCHER | WP_THERMAL | WP_STUN_BATON => {}
                         _ => {
                             crate::NPC_AI_Stormtrooper::ST_ClearTimers(
                                 ctx,

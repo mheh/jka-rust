@@ -32,12 +32,12 @@ use mp_bg::public::saber_move_name::{
     LS_REFLECT_LR, LS_REFLECT_UL, LS_REFLECT_UP, LS_REFLECT_UR,
 };
 use mp_bg::public::weaponstate::weaponstate_t;
-use mp_qshared::probe;
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
+use mp_qshared::probe;
 use mp_qshared::shared::saber_blocked_type::saberBlockedType_t;
 use mp_qshared::shared::CHAN_WEAPON;
 
@@ -660,7 +660,10 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                 (*saberent).r.mins = [0.0; 3];
                 (*saberent).r.maxs = [0.0; 3];
                 if ctx.world.cvars.g_saberDebugPrint.integer > 1 {
-                    let s = format!("Client {} in broken parry, saber box 0\n", (*owner).s.number);
+                    let s = format!(
+                        "Client {} in broken parry, saber box 0\n",
+                        (*owner).s.number
+                    );
                     crate::g_main::Com_Printf(cstr(&s).as_ptr());
                 }
                 return;
@@ -2914,10 +2917,18 @@ fn g6t(
     probe!(
         "SAB_TRACE",
         "{} t={} a={:08x},{:08x},{:08x} b={:08x},{:08x},{:08x} mn={:08x} mx={:08x} fr={:08x} en={}",
-        tag, t,
-        a[0].to_bits(), a[1].to_bits(), a[2].to_bits(),
-        b[0].to_bits(), b[1].to_bits(), b[2].to_bits(),
-        mn[0].to_bits(), mx[0].to_bits(), fr.to_bits(), en
+        tag,
+        t,
+        a[0].to_bits(),
+        a[1].to_bits(),
+        a[2].to_bits(),
+        b[0].to_bits(),
+        b[1].to_bits(),
+        b[2].to_bits(),
+        mn[0].to_bits(),
+        mx[0].to_bits(),
+        fr.to_bits(),
+        en
     );
 }
 

@@ -153,13 +153,7 @@ pub fn AAS_BSPModelMinsMaxsOrigin(
 ) {
     unsafe {
         let mut angles = angles;
-        (bot.botimport.BSPModelMinsMaxsOrigin.unwrap())(
-            modelnum,
-            &mut angles,
-            mins,
-            maxs,
-            origin,
-        );
+        (bot.botimport.BSPModelMinsMaxsOrigin.unwrap())(modelnum, &mut angles, mins, maxs, origin);
     }
 }
 

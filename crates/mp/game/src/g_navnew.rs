@@ -396,8 +396,8 @@ pub fn NAVNEW_SidestepBlocker(
         let avoidRadius = ((((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
             + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]) as f64)
             .sqrt()
-            + (((*self_).r.maxs[0] * (*self_).r.maxs[0]
-                + (*self_).r.maxs[1] * (*self_).r.maxs[1]) as f64)
+            + (((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1])
+                as f64)
                 .sqrt()) as f32;
 
         //See if we're inside our avoidance radius

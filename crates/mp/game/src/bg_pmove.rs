@@ -413,8 +413,8 @@ impl PmoveContext<'_> {
                     let mut tempVAngles: vec3_t = [0.0; 3];
 
                     // modulate the speed by a sine wave
-                    speed = (speed as f64 * ((150.0 + self.pml.frametime) as f64 * 0.003).sin())
-                        as f32;
+                    speed =
+                        (speed as f64 * ((150.0 + self.pml.frametime) as f64 * 0.003).sin()) as f32;
 
                     if speed > 60.0 {
                         speed = 60.0;

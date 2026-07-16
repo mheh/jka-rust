@@ -12,7 +12,6 @@ use core::ffi::{c_char, c_int, c_ulong, c_void};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
-use mp_qshared::probe;
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
 use mp_qshared::common::mp::qcommon::failedEdge_t;
 use mp_qshared::common::mp::qcommon::parms::parms_t;
@@ -20,6 +19,7 @@ use mp_qshared::common::mp::qcommon::player_state::playerState_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
+use mp_qshared::probe;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::pc_token_t;
 use mp_qshared::shared::q_math::{
@@ -1104,7 +1104,12 @@ pub fn SV_GameSystemCalls(
                     PVS_TRUE.fetch_add(1, Ordering::Relaxed);
                 }
                 if n % 4096 == 0 {
-                    probe!("PVS_RATIO", "calls={} true={}", n, PVS_TRUE.load(Ordering::Relaxed));
+                    probe!(
+                        "PVS_RATIO",
+                        "calls={} true={}",
+                        n,
+                        PVS_TRUE.load(Ordering::Relaxed)
+                    );
                 }
             }
             return r as isize;

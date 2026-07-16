@@ -572,12 +572,12 @@ pub fn WP_FireBlaster(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
             // add some slop to the alt-fire direction
             // C: `crandom()` is `double`, so each `+=` runs in `double` and
             // narrows back to the `float` angle component.
-            angs[PITCH] =
-                (angs[PITCH] as f64 + ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD as f64)
-                    as f32;
-            angs[YAW] =
-                (angs[YAW] as f64 + ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD as f64)
-                    as f32;
+            angs[PITCH] = (angs[PITCH] as f64
+                + ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD as f64)
+                as f32;
+            angs[YAW] = (angs[YAW] as f64
+                + ctx.world.bg_state.rng.crandom() * BLASTER_SPREAD as f64)
+                as f32;
         }
 
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
@@ -1453,12 +1453,12 @@ pub fn WP_FireRepeater(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) 
         } else {
             // add some slop to the alt-fire direction
             // C: `crandom()` is `double`; each `+=` runs in `double`, narrows to float.
-            angs[PITCH] =
-                (angs[PITCH] as f64 + ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD as f64)
-                    as f32;
-            angs[YAW] =
-                (angs[YAW] as f64 + ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD as f64)
-                    as f32;
+            angs[PITCH] = (angs[PITCH] as f64
+                + ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD as f64)
+                as f32;
+            angs[YAW] = (angs[YAW] as f64
+                + ctx.world.bg_state.rng.crandom() * REPEATER_SPREAD as f64)
+                as f32;
 
             crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
@@ -2103,7 +2103,7 @@ pub fn WP_FlechetteAltFire(ctx: &mut GameContext, self_: EntityId) {
             dir = angs;
 
             dir[PITCH] -= ctx.world.bg_state.rng.random() * 4.0 + 8.0; // make it fly upwards
-            // C: `crandom() * 2` is `double`; narrows back to the `float` component.
+                                                                       // C: `crandom() * 2` is `double`; narrows back to the `float` component.
             dir[YAW] = (dir[YAW] as f64 + ctx.world.bg_state.rng.crandom() * 2.0) as f32;
             crate::q_math::AngleVectors(dir, Some(&mut fwd), None, None);
 
@@ -5165,8 +5165,8 @@ pub fn WP_GetVehicleCamPos(
             // promotes to double, the double product rounds once at the f32 `+=`.
             // Source: `oracle/codemp/game/g_weapon.c:3971`
             thirdPersonRange = (thirdPersonRange as f64
-                + (((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32
-                    / MAX_STRAFE_TIME) as f64)
+                + (((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32 / MAX_STRAFE_TIME)
+                    as f64)
                     .abs()
                     * 100.0) as f32;
         }

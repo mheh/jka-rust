@@ -1908,7 +1908,15 @@ pub fn BotFinishTravel_WalkOffLedge(
             _VectorCopy((*reach).end, &mut end);
         }
         //
-        if BotAirControl(bot, (*ms).origin, (*ms).velocity, end, &mut hordir, &mut speed) == 0 {
+        if BotAirControl(
+            bot,
+            (*ms).origin,
+            (*ms).velocity,
+            end,
+            &mut hordir,
+            &mut speed,
+        ) == 0
+        {
             //go straight to the reachability end
             _VectorCopy(dir, &mut hordir);
             hordir[2] = 0.0;

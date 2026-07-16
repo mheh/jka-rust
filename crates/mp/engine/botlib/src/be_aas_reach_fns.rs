@@ -155,7 +155,11 @@ pub fn AAS_FaceCenter(bot: &mut BotLib, facenum: c_int, center: *mut vec3_t) {
             i += 1;
         }
         let scale = 0.5 / (*face).numedges as f32;
-        *center = [(*center)[0] * scale, (*center)[1] * scale, (*center)[2] * scale];
+        *center = [
+            (*center)[0] * scale,
+            (*center)[1] * scale,
+            (*center)[2] * scale,
+        ];
     }
 }
 
@@ -1182,8 +1186,17 @@ pub fn AAS_FindFaceReachabilities(
                         let v3 = *facepoints.add(l as usize);
                         let v4 = *facepoints.add(((l + 1) % numpoints) as usize);
                         dist = AAS_ClosestEdgePoints(
-                            v1, v2, v3, v4, faceplane, plane, &mut beststart, &mut bestend, &mut beststart2,
-                            &mut bestend2, bestdist,
+                            v1,
+                            v2,
+                            v3,
+                            v4,
+                            faceplane,
+                            plane,
+                            &mut beststart,
+                            &mut bestend,
+                            &mut beststart2,
+                            &mut bestend2,
+                            bestdist,
                         );
                         if dist < bestdist {
                             bestfacenum = facenum;
@@ -1470,7 +1483,12 @@ pub fn AAS_GetJumpPadInfo(
             );
             return qfalse;
         }
-        AAS_VectorForBSPEpairKey(bot, ent2, c"origin".as_ptr() as *mut c_char, &mut ent2origin);
+        AAS_VectorForBSPEpairKey(
+            bot,
+            ent2,
+            c"origin".as_ptr() as *mut c_char,
+            &mut ent2origin,
+        );
         //
         let height = ent2origin[2] - origin[2];
         let gravity = bot.aassettings.phys_gravity;
@@ -1633,8 +1651,12 @@ pub fn AAS_SetWeaponJumpAreaFlags(bot: &mut BotLib) {
                 || strcmp(classname.as_ptr(), c"weapon_flechette".as_ptr()) == 0
                 || strcmp(classname.as_ptr(), c"weapon_rocket_launcher".as_ptr()) == 0
             {
-                if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin)
-                    != 0
+                if AAS_VectorForBSPEpairKey(
+                    bot,
+                    ent,
+                    c"origin".as_ptr() as *mut c_char,
+                    &mut origin,
+                ) != 0
                 {
                     spawnflags = 0;
                     AAS_IntForBSPEpairKey(
@@ -2772,7 +2794,14 @@ pub fn AAS_Reachability_Elevator(bot: &mut BotLib) {
                     continue;
                 }
                 //get the mins, maxs and origin of the model
-                AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut origin);
+                AAS_BSPModelMinsMaxsOrigin(
+                    bot,
+                    modelnum,
+                    angles,
+                    &mut mins,
+                    &mut maxs,
+                    &mut origin,
+                );
                 //
                 AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin);
                 //pos1 is the top position, pos2 is the bottom
@@ -3100,11 +3129,20 @@ pub fn AAS_Reachability_FuncBobbing(bot: &mut BotLib) {
                 continue;
             }
             //if the entity has an origin set then use it
-            if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin) == 0 {
+            if AAS_VectorForBSPEpairKey(bot, ent, c"origin".as_ptr() as *mut c_char, &mut origin)
+                == 0
+            {
                 origin = [0.0, 0.0, 0.0];
             }
             //
-            AAS_BSPModelMinsMaxsOrigin(bot, modelnum, angles, &mut mins, &mut maxs, &mut [0.0, 0.0, 0.0]);
+            AAS_BSPModelMinsMaxsOrigin(
+                bot,
+                modelnum,
+                angles,
+                &mut mins,
+                &mut maxs,
+                &mut [0.0, 0.0, 0.0],
+            );
             //
             mins = [
                 mins[0] + origin[0],
@@ -3963,8 +4001,14 @@ pub fn AAS_BestReachableFromJumpPadArea(
                 continue;
             }
             //
-            if AAS_GetJumpPadInfo(bot, ent, &mut areastart, &mut absmins, &mut absmaxs, &mut velocity)
-                == 0
+            if AAS_GetJumpPadInfo(
+                bot,
+                ent,
+                &mut areastart,
+                &mut absmins,
+                &mut absmaxs,
+                &mut velocity,
+            ) == 0
             {
                 ent = AAS_NextBSPEntity(bot, ent);
                 continue;
@@ -4161,8 +4205,17 @@ pub fn AAS_Reachability_Jump(bot: &mut BotLib, area1num: c_int, area2num: c_int)
                             bot.aasworld.planes.add((*face2).planenum as usize);
                         //
                         bestdist = AAS_ClosestEdgePoints(
-                            v1, v2, v3, v4, plane1, plane2, &mut beststart, &mut bestend, &mut beststart2,
-                            &mut bestend2, bestdist,
+                            v1,
+                            v2,
+                            v3,
+                            v4,
+                            plane1,
+                            plane2,
+                            &mut beststart,
+                            &mut bestend,
+                            &mut beststart2,
+                            &mut bestend2,
+                            bestdist,
                         );
                         l += 1;
                     }
@@ -4646,8 +4699,12 @@ pub fn AAS_Reachability_Teleport(bot: &mut BotLib) {
                 ent = AAS_NextBSPEntity(bot, ent);
                 continue;
             }
-            if AAS_VectorForBSPEpairKey(bot, dest, c"origin".as_ptr() as *mut c_char, &mut destorigin)
-                == 0
+            if AAS_VectorForBSPEpairKey(
+                bot,
+                dest,
+                c"origin".as_ptr() as *mut c_char,
+                &mut destorigin,
+            ) == 0
             {
                 bot.botimport.Print.unwrap()(
                     PRT_ERROR,
@@ -5000,8 +5057,14 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
                 continue;
             }
             //
-            if AAS_GetJumpPadInfo(bot, ent, &mut areastart, &mut absmins, &mut absmaxs, &mut velocity)
-                == 0
+            if AAS_GetJumpPadInfo(
+                bot,
+                ent,
+                &mut areastart,
+                &mut absmins,
+                &mut absmaxs,
+                &mut velocity,
+            ) == 0
             {
                 ent = AAS_NextBSPEntity(bot, ent);
                 continue;

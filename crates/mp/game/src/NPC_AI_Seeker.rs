@@ -337,8 +337,8 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
             // float-scale signature (dead `#else` branch, q_shared.h:1381).
             // Source: oracle/codemp/game/NPC_AI_Seeker.c:207
             for i in 0..3 {
-                end[i] =
-                    (end[i] as f64 + ctx.world.bg_state.rng.crandom() * 25.0 * dir[i] as f64) as f32;
+                end[i] = (end[i] as f64 + ctx.world.bg_state.rng.crandom() * 25.0 * dir[i] as f64)
+                    as f32;
             }
 
             crate::trap::Trace(

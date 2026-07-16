@@ -717,7 +717,13 @@ pub fn AAS_ClientMovementPrediction(
                     wishspeed = maxvel;
                 }
                 VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
-                AAS_Accelerate(&mut frame_test_vel, frametime, wishdir, wishspeed, accelerate);
+                AAS_Accelerate(
+                    &mut frame_test_vel,
+                    frametime,
+                    wishdir,
+                    wishspeed,
+                    accelerate,
+                );
                 VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
             }
             if crouch != 0 {

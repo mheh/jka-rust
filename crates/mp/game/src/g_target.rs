@@ -162,8 +162,7 @@ pub fn Use_Target_Delay(
     let e = ctx.entity_mut(ent);
     // C computes the whole RHS in `double` (`crand` is `double`) and truncates
     // once into the `int` nextthink.
-    e.nextthink =
-        (level_time as f64 + (e.wait as f64 + e.random as f64 * crand) * 1000.0) as c_int;
+    e.nextthink = (level_time as f64 + (e.wait as f64 + e.random as f64 * crand) * 1000.0) as c_int;
     e.think = Some(EntThink::Think_Target_Delay).into();
     // C stored the raw `activator` pointer (NULL stays NULL and
     // Think_Target_Delay's G_UseTargets tolerates a NULL activator); the
@@ -256,7 +255,10 @@ pub fn Use_Target_Print(
     // null and inuse was checked above), so only the else-if activator arm fires.
     // Source: `oracle/codemp/game/g_target.c:149-181`
     if activator.is_none() || ctx.entity(activator.unwrap()).inuse == 0 {
-        Com_Error(ERR_DROP as c_int, c"Bad activator in Use_Target_Print".as_ptr());
+        Com_Error(
+            ERR_DROP as c_int,
+            c"Bad activator in Use_Target_Print".as_ptr(),
+        );
     }
 
     if ctx.entity(ent).genericValue15 > level_time {
@@ -266,8 +268,11 @@ pub fn Use_Target_Print(
                 let classname = ctx.entity(activator).classname;
                 if !classname.is_null() && *classname != 0 {
                     Com_Printf(
-                        cstr(&format!("activator classname: {}\n", cstr_to_str(classname)))
-                            .as_ptr(),
+                        cstr(&format!(
+                            "activator classname: {}\n",
+                            cstr_to_str(classname)
+                        ))
+                        .as_ptr(),
                     );
                 }
                 let target = ctx.entity(activator).target;
@@ -279,15 +284,22 @@ pub fn Use_Target_Print(
                 let targetname = ctx.entity(activator).targetname;
                 if !targetname.is_null() && *targetname != 0 {
                     Com_Printf(
-                        cstr(&format!("activator targetname: {}\n", cstr_to_str(targetname)))
-                            .as_ptr(),
+                        cstr(&format!(
+                            "activator targetname: {}\n",
+                            cstr_to_str(targetname)
+                        ))
+                        .as_ptr(),
                     );
                 }
             }
             let ent_targetname = ctx.entity(ent).targetname;
             if !ent_targetname.is_null() && *ent_targetname != 0 {
                 Com_Printf(
-                    cstr(&format!("print targetname: {}\n", cstr_to_str(ent_targetname))).as_ptr(),
+                    cstr(&format!(
+                        "print targetname: {}\n",
+                        cstr_to_str(ent_targetname)
+                    ))
+                    .as_ptr(),
                 );
             }
         }
