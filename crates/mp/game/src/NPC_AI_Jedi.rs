@@ -78,65 +78,52 @@ pub fn NPC_ShadowTrooper_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:110-135`
 pub fn Jedi_ClearTimers(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"roamTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"chatter".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"strafeLeft".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"strafeRight".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noStrafe".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"walking".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"taunting".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"parryTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"parryReCalcTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"forceJumpChasing".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"jumpChaseDebounce".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveforward".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveback".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"movenone".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveright".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"moveleft".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"movecenter".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(
-        ctx,
-        ctx.entity_id_of(ent),
-        c"saberLevelDebounce".as_ptr(),
-        0,
-    );
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noRetreat".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"holdLightning".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"gripping".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"draining".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(ent), c"noturn".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"roamTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"chatter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"strafeLeft".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"strafeRight".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"noStrafe".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"walking".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"taunting".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"parryTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"parryReCalcTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"forceJumpChasing".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"jumpChaseDebounce".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"moveforward".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"moveback".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"movenone".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"moveright".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"moveleft".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"movecenter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"saberLevelDebounce".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"noRetreat".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"holdLightning".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"gripping".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"draining".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(ent), c"noturn".as_ptr(), 0);
 }
 
 /// Raven `Jedi_PlayBlockedPushSound`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:137-148`
 pub fn Jedi_PlayBlockedPushSound(ctx: &mut GameContext, self_: EntityId) {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let level_time = ctx.world.level.time;
-        if (*self_).s.number == 0 {
+    let level_time = ctx.world.level.time;
+    if ctx.world.entity(self_).s.number == 0 {
+        crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, entity_event_t::EV_PUSHFAIL as c_int, 3000);
+    } else {
+        // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
+        if ctx.world.entity(self_).health > 0
+            && !npc.is_null()
+            && unsafe { (*npc).blockedSpeechDebounceTime } < level_time
+        {
             crate::NPC_sounds::G_AddVoiceEvent(
                 ctx,
-                ctx.entity_id_of(self_).unwrap(),
+                self_,
                 entity_event_t::EV_PUSHFAIL as c_int,
                 3000,
             );
-        } else {
-            let npc = (*self_).NPC;
-            if (*self_).health > 0
-                && !npc.is_null()
-                && (*npc).blockedSpeechDebounceTime < level_time
-            {
-                crate::NPC_sounds::G_AddVoiceEvent(
-                    ctx,
-                    ctx.entity_id_of(self_).unwrap(),
-                    entity_event_t::EV_PUSHFAIL as c_int,
-                    3000,
-                );
+            unsafe {
                 (*npc).blockedSpeechDebounceTime = level_time + 3000;
             }
         }
@@ -147,29 +134,28 @@ pub fn Jedi_PlayBlockedPushSound(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:150-161`
 pub fn Jedi_PlayDeflectSound(ctx: &mut GameContext, self_: EntityId) {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        // Q_irand is drawn inside each emitting branch (as in Raven) so the LCG
-        // sequence matches: no draw occurs when nothing is emitted.
-        let level_time = ctx.world.level.time;
-        if (*self_).s.number == 0 {
+    // Q_irand is drawn inside each emitting branch (as in Raven) so the LCG
+    // sequence matches: no draw occurs when nothing is emitted.
+    let level_time = ctx.world.level.time;
+    if ctx.world.entity(self_).s.number == 0 {
+        let ev = ctx.world.bg_state.rng.Q_irand(
+            entity_event_t::EV_DEFLECT1 as c_int,
+            entity_event_t::EV_DEFLECT3 as c_int,
+        );
+        crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
+    } else {
+        // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
+        if ctx.world.entity(self_).health > 0
+            && !npc.is_null()
+            && unsafe { (*npc).blockedSpeechDebounceTime } < level_time
+        {
             let ev = ctx.world.bg_state.rng.Q_irand(
                 entity_event_t::EV_DEFLECT1 as c_int,
                 entity_event_t::EV_DEFLECT3 as c_int,
             );
-            crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 3000);
-        } else {
-            let npc = (*self_).NPC;
-            if (*self_).health > 0
-                && !npc.is_null()
-                && (*npc).blockedSpeechDebounceTime < level_time
-            {
-                let ev = ctx.world.bg_state.rng.Q_irand(
-                    entity_event_t::EV_DEFLECT1 as c_int,
-                    entity_event_t::EV_DEFLECT3 as c_int,
-                );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 3000);
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
+            unsafe {
                 (*npc).blockedSpeechDebounceTime = level_time + 3000;
             }
         }
@@ -180,32 +166,33 @@ pub fn Jedi_PlayDeflectSound(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:163-180`
 pub fn NPC_Jedi_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        if (*self_).health > 0 {
-            let client = (*self_).client;
-            if !client.is_null()
-                && ((*client).NPC_class == CLASS_TAVION || (*client).NPC_class == CLASS_DESANN)
-            {
-                let ev = ctx.world.bg_state.rng.Q_irand(
-                    entity_event_t::EV_CONFUSE1 as c_int,
-                    entity_event_t::EV_CONFUSE3 as c_int,
-                );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 2000);
-            } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-                let ev = ctx.world.bg_state.rng.Q_irand(
-                    entity_event_t::EV_TAUNT1 as c_int,
-                    entity_event_t::EV_TAUNT3 as c_int,
-                );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 2000);
-            } else {
-                let ev = ctx.world.bg_state.rng.Q_irand(
-                    entity_event_t::EV_GLOAT1 as c_int,
-                    entity_event_t::EV_GLOAT3 as c_int,
-                );
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), ev, 2000);
-            }
+    if ctx.world.entity(self_).health > 0 {
+        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
+        // raw via the safe entity borrow, per trap 2b.
+        let client = ctx.world.entity(self_).client;
+        let class = if client.is_null() {
+            None
+        } else {
+            Some(unsafe { (*client).NPC_class })
+        };
+        if class == Some(CLASS_TAVION) || class == Some(CLASS_DESANN) {
+            let ev = ctx.world.bg_state.rng.Q_irand(
+                entity_event_t::EV_CONFUSE1 as c_int,
+                entity_event_t::EV_CONFUSE3 as c_int,
+            );
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+        } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+            let ev = ctx.world.bg_state.rng.Q_irand(
+                entity_event_t::EV_TAUNT1 as c_int,
+                entity_event_t::EV_TAUNT3 as c_int,
+            );
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+        } else {
+            let ev = ctx.world.bg_state.rng.Q_irand(
+                entity_event_t::EV_GLOAT1 as c_int,
+                entity_event_t::EV_GLOAT3 as c_int,
+            );
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
         }
     }
 }
@@ -225,18 +212,18 @@ pub fn Boba_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:193-201`
 pub fn Boba_ChangeWeapon(ctx: &mut GameContext, wp: c_int) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        if (*npc).s.weapon == wp {
-            return;
-        }
-        crate::NPC_combat::NPC_ChangeWeapon(wp);
-        crate::g_utils::G_AddEvent(
-            &mut *(npc),
-            entity_event_t::EV_GENERAL_SOUND as c_int,
-            crate::g_utils::G_SoundIndex(c"sound/weapons/change.wav".as_ptr()),
-        );
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    if ctx.world.entity(npc_id).s.weapon == wp {
+        return;
     }
+    crate::NPC_combat::NPC_ChangeWeapon(wp);
+    let snd = crate::g_utils::G_SoundIndex(c"sound/weapons/change.wav".as_ptr());
+    crate::g_utils::G_AddEvent(
+        ctx.world.entity_mut(npc_id),
+        entity_event_t::EV_GENERAL_SOUND as c_int,
+        snd,
+    );
 }
 
 /// Raven `WP_ResistForcePush`.
@@ -455,34 +442,37 @@ pub fn Boba_StopKnockdown(
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:345-365`
 pub fn Boba_FlyStart(ctx: &mut GameContext, self_: EntityId) {
     //switch to seeker AI for a while
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"jetRecharge".as_ptr())
-            != qfalse
-        {
-            let client = (*self_).client;
+    if crate::g_timer::TIMER_Done(ctx, Some(self_), c"jetRecharge".as_ptr()) != qfalse {
+        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
+        // raw via the safe entity borrow, per trap 2b.
+        let client = ctx.world.entity(self_).client;
+        unsafe {
             (*client).ps.gravity = 0;
-            if !(*self_).NPC.is_null() {
-                let snpc = (*self_).NPC;
+        }
+        // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+        let snpc = ctx.world.entity(self_).NPC;
+        if !snpc.is_null() {
+            unsafe {
                 (*snpc).aiFlags |= NPCAI_CUSTOM_GRAVITY;
             }
+        }
+        let jet_pack_time = ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
+        unsafe {
             (*client).ps.eFlags2 |= EF2_FLYING; //moveType = MT_FLYSWIM;
-            (*client).jetPackTime =
-                ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
-            //take-off sound
-            crate::g_utils::G_SoundOnEnt(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                CHAN_ITEM as c_int,
-                c"sound/boba/jeton.wav".as_ptr(),
-            );
-            //jet loop sound
-            (*self_).s.loopSound =
-                crate::g_utils::G_SoundIndex(c"sound/boba/jethover.wav".as_ptr());
-            if !(*self_).NPC.is_null() {
-                (*self_).count = Q3_INFINITE; // SEEKER shot ammo count
-            }
+            (*client).jetPackTime = jet_pack_time;
+        }
+        //take-off sound
+        crate::g_utils::G_SoundOnEnt(
+            ctx,
+            self_,
+            CHAN_ITEM as c_int,
+            c"sound/boba/jeton.wav".as_ptr(),
+        );
+        //jet loop sound
+        let loop_sound = crate::g_utils::G_SoundIndex(c"sound/boba/jethover.wav".as_ptr());
+        ctx.world.entity_mut(self_).s.loopSound = loop_sound;
+        if !ctx.world.entity(self_).NPC.is_null() {
+            ctx.world.entity_mut(self_).count = Q3_INFINITE; // SEEKER shot ammo count
         }
     }
 }
@@ -491,36 +481,37 @@ pub fn Boba_FlyStart(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:367-384`
 pub fn Boba_FlyStop(ctx: &mut GameContext, self_: EntityId) {
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    let gravity = ctx.world.cvars.g_gravity.value as c_int;
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let client = (*self_).client;
-        (*client).ps.gravity = ctx.world.cvars.g_gravity.value as c_int;
-        if !(*self_).NPC.is_null() {
-            let snpc = (*self_).NPC;
+        (*client).ps.gravity = gravity;
+    }
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = ctx.world.entity(self_).NPC;
+    if !snpc.is_null() {
+        unsafe {
             (*snpc).aiFlags &= !NPCAI_CUSTOM_GRAVITY;
         }
+    }
+    unsafe {
         (*client).ps.eFlags2 &= !EF2_FLYING;
         (*client).jetPackTime = 0;
-        //stop jet loop sound
-        (*self_).s.loopSound = 0;
-        if !(*self_).NPC.is_null() {
-            (*self_).count = 0; // SEEKER shot ammo count
-            let jet_recharge_time = ctx.world.bg_state.rng.Q_irand(1000, 5000);
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(self_),
-                c"jetRecharge".as_ptr(),
-                jet_recharge_time,
-            );
-            let jump_chase_debounce_time = ctx.world.bg_state.rng.Q_irand(500, 2000);
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(self_),
-                c"jumpChaseDebounce".as_ptr(),
-                jump_chase_debounce_time,
-            );
-        }
+    }
+    //stop jet loop sound
+    ctx.world.entity_mut(self_).s.loopSound = 0;
+    if !ctx.world.entity(self_).NPC.is_null() {
+        ctx.world.entity_mut(self_).count = 0; // SEEKER shot ammo count
+        let jet_recharge_time = ctx.world.bg_state.rng.Q_irand(1000, 5000);
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"jetRecharge".as_ptr(), jet_recharge_time);
+        let jump_chase_debounce_time = ctx.world.bg_state.rng.Q_irand(500, 2000);
+        crate::g_timer::TIMER_Set(
+            ctx,
+            Some(self_),
+            c"jumpChaseDebounce".as_ptr(),
+            jump_chase_debounce_time,
+        );
     }
 }
 
@@ -528,13 +519,13 @@ pub fn Boba_FlyStop(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:386-389`
 pub fn Boba_Flying(self_: &gentity_t) -> qboolean {
-    unsafe {
-        let client = (*self_).client;
-        if ((*client).ps.eFlags2 & EF2_FLYING) != 0 {
-            qtrue
-        } else {
-            qfalse
-        }
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the entity's client field, per trap 2b.
+    let client = self_.client;
+    if (unsafe { (*client).ps.eFlags2 } & EF2_FLYING) != 0 {
+        qtrue
+    } else {
+        qfalse
     }
 }
 
@@ -542,60 +533,67 @@ pub fn Boba_Flying(self_: &gentity_t) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:391-416`
 pub fn Boba_FireFlameThrower(ctx: &mut GameContext, self_: EntityId) {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*self_).client;
-        let damage = ctx.world.bg_state.rng.Q_irand(20, 30);
-        let mut tr: trace_t = core::mem::zeroed();
-        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
-        let mut start: vec3_t = [0.0; 3];
-        let mut end: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
-        let traceMins: vec3_t = [-4.0, -4.0, -4.0];
-        let traceMaxs: vec3_t = [4.0, 4.0, 4.0];
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    let damage = ctx.world.bg_state.rng.Q_irand(20, 30);
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+    let mut start: vec3_t = [0.0; 3];
+    let mut end: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+    let traceMins: vec3_t = [-4.0, -4.0, -4.0];
+    let traceMaxs: vec3_t = [4.0, 4.0, 4.0];
 
-        crate::trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                (*self_).ghoul2,
-                0,
-                (*client).renderInfo.handLBolt,
-                &mut boltMatrix as *mut mdxaBone_t,
-                &(*self_).r.currentAngles as *const vec3_t,
-                &(*self_).r.currentOrigin as *const vec3_t,
-                ctx.world.level.time,
-                core::ptr::null_mut(),
-                &(*self_).modelScale as *const vec3_t,
-            ),
-        );
+    let ghoul2 = ctx.world.entity(self_).ghoul2;
+    let hand_l_bolt = unsafe { (*client).renderInfo.handLBolt };
+    let current_angles = ctx.world.entity(self_).r.currentAngles;
+    let current_origin = ctx.world.entity(self_).r.currentOrigin;
+    let model_scale = ctx.world.entity(self_).modelScale;
+    let level_time = ctx.world.level.time;
+    let self_number = ctx.world.entity(self_).s.number;
 
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut start);
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
-        //G_PlayEffect( "boba/fthrw", start, dir );
-        crate::q_math::_VectorMA(start, 128.0, dir, &mut end);
+    crate::trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+            ghoul2,
+            0,
+            hand_l_bolt,
+            &mut boltMatrix as *mut mdxaBone_t,
+            &current_angles as *const vec3_t,
+            &current_origin as *const vec3_t,
+            level_time,
+            core::ptr::null_mut(),
+            &model_scale as *const vec3_t,
+        ),
+    );
 
-        crate::trap::Trace(
-            ctx.engine,
-            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut tr as *mut trace_t,
-                &start as *const vec3_t,
-                &traceMins as *const vec3_t,
-                &traceMaxs as *const vec3_t,
-                &end as *const vec3_t,
-                (*self_).s.number,
-                MASK_SHOT,
-            ),
-        );
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut start);
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
+    //G_PlayEffect( "boba/fthrw", start, dir );
+    crate::q_math::_VectorMA(start, 128.0, dir, &mut end);
 
-        let traceEnt = ge.add(tr.entityNum as usize);
-        if (tr.entityNum as c_int) < ENTITYNUM_WORLD && (*traceEnt).takedamage != qfalse {
+    crate::trap::Trace(
+        ctx.engine,
+        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+            &mut tr as *mut trace_t,
+            &start as *const vec3_t,
+            &traceMins as *const vec3_t,
+            &traceMaxs as *const vec3_t,
+            &end as *const vec3_t,
+            self_number,
+            MASK_SHOT,
+        ),
+    );
+
+    if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
+        let trace_ent_id = EntityId(tr.entityNum as u32);
+        if ctx.world.entity(trace_ent_id).takedamage != qfalse {
             crate::g_combat::G_Damage(
                 ctx,
-                ctx.entity_id_of(traceEnt),
-                ctx.entity_id_of(self_),
-                ctx.entity_id_of(self_),
+                Some(trace_ent_id),
+                Some(self_),
+                Some(self_),
                 Some(&mut dir),
                 tr.endpos,
                 damage,
@@ -610,86 +608,82 @@ pub fn Boba_FireFlameThrower(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:419-469`
 pub fn Boba_StartFlameThrower(ctx: &mut GameContext, self_: EntityId) {
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    let flameTime = 4000; //Q_irand( 1000, 3000 );
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+    let mut org: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let npc = ctx.world.globals.NPC;
-        let client = (*self_).client;
-        let flameTime = 4000; //Q_irand( 1000, 3000 );
-        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
-        let mut org: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
-
         (*client).ps.torsoTimer = flameTime; //+1000;
-        if !(*self_).NPC.is_null() {
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(self_),
-                c"nextAttackDelay".as_ptr(),
-                flameTime,
-            );
-            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"walking".as_ptr(), 0);
-        }
-        crate::g_timer::TIMER_Set(
-            ctx,
-            ctx.entity_id_of(self_),
-            c"flameTime".as_ptr(),
-            flameTime,
-        );
-        crate::g_utils::G_SoundOnEnt(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            CHAN_WEAPON as c_int,
-            c"sound/effects/combustfire.mp3".as_ptr(),
-        );
-
-        let npc_client = (*npc).client;
-        crate::trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                (*npc).ghoul2,
-                0,
-                (*npc_client).renderInfo.handRBolt,
-                &mut boltMatrix as *mut mdxaBone_t,
-                &(*npc).r.currentAngles as *const vec3_t,
-                &(*npc).r.currentOrigin as *const vec3_t,
-                ctx.world.level.time,
-                core::ptr::null_mut(),
-                &(*npc).modelScale as *const vec3_t,
-            ),
-        );
-
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
-
-        crate::g_utils::G_PlayEffectID(
-            crate::g_utils::G_EffectIndex(c"boba/fthrw".as_ptr()),
-            org,
-            dir,
-        );
     }
+    if !ctx.world.entity(self_).NPC.is_null() {
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"nextAttackDelay".as_ptr(), flameTime);
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"walking".as_ptr(), 0);
+    }
+    crate::g_timer::TIMER_Set(ctx, Some(self_), c"flameTime".as_ptr(), flameTime);
+    crate::g_utils::G_SoundOnEnt(
+        ctx,
+        self_,
+        CHAN_WEAPON as c_int,
+        c"sound/effects/combustfire.mp3".as_ptr(),
+    );
+
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let npc_client = ctx.world.entity(npc_id).client;
+    let ghoul2 = ctx.world.entity(npc_id).ghoul2;
+    let hand_r_bolt = unsafe { (*npc_client).renderInfo.handRBolt };
+    let current_angles = ctx.world.entity(npc_id).r.currentAngles;
+    let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let model_scale = ctx.world.entity(npc_id).modelScale;
+    let level_time = ctx.world.level.time;
+    crate::trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+            ghoul2,
+            0,
+            hand_r_bolt,
+            &mut boltMatrix as *mut mdxaBone_t,
+            &current_angles as *const vec3_t,
+            &current_origin as *const vec3_t,
+            level_time,
+            core::ptr::null_mut(),
+            &model_scale as *const vec3_t,
+        ),
+    );
+
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
+
+    crate::g_utils::G_PlayEffectID(
+        crate::g_utils::G_EffectIndex(c"boba/fthrw".as_ptr()),
+        org,
+        dir,
+    );
 }
 
 /// Raven `Boba_DoFlameThrower`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:471-479`
 pub fn Boba_DoFlameThrower(ctx: &mut GameContext, self_: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
     crate::npc_c::NPC_SetAnim(
         ctx,
-        ctx.entity_id_of(self_).unwrap(),
+        self_,
         SETANIM_TORSO,
         animNumber_t::BOTH_FORCELIGHTNING_HOLD as c_int,
         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
     );
-    if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"nextAttackDelay".as_ptr())
-        != qfalse
-        && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"flameTime".as_ptr()) != qfalse
+    if crate::g_timer::TIMER_Done(ctx, Some(self_), c"nextAttackDelay".as_ptr()) != qfalse
+        && crate::g_timer::TIMER_Done(ctx, Some(self_), c"flameTime".as_ptr()) != qfalse
     {
-        Boba_StartFlameThrower(ctx, ctx.entity_id_of(self_).unwrap());
+        Boba_StartFlameThrower(ctx, self_);
     }
-    Boba_FireFlameThrower(ctx, ctx.entity_id_of(self_).unwrap());
+    Boba_FireFlameThrower(ctx, self_);
 }
 
 /// Raven `Boba_FireDecide`.
@@ -1064,26 +1058,21 @@ pub fn Boba_FireDecide(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:799-816`
 pub fn Jedi_Cloak(ctx: &mut GameContext, self_: Option<EntityId>) {
-    unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        if !self_.is_null() {
-            (*self_).flags |= FL_NOTARGET;
-            if !(*self_).client.is_null() {
-                let client = (*self_).client;
-                if (*client).ps.powerups[PW_CLOAKED as usize] == 0 {
-                    //cloak
+    if let Some(self_) = self_ {
+        ctx.world.entity_mut(self_).flags |= FL_NOTARGET;
+        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
+        // raw via the safe entity borrow, per trap 2b.
+        let client = ctx.world.entity(self_).client;
+        if !client.is_null() {
+            if unsafe { (*client).ps.powerups[PW_CLOAKED as usize] } == 0 {
+                //cloak
+                unsafe {
                     (*client).ps.powerups[PW_CLOAKED as usize] = Q3_INFINITE;
-
-                    crate::g_utils::G_Sound(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        CHAN_ITEM as c_int,
-                        crate::g_utils::G_SoundIndex(
-                            c"sound/chars/shadowtrooper/cloak.wav".as_ptr(),
-                        ),
-                    );
                 }
+
+                let snd =
+                    crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/cloak.wav".as_ptr());
+                crate::g_utils::G_Sound(ctx, Some(self_), CHAN_ITEM as c_int, snd);
             }
         }
     }
@@ -1093,26 +1082,21 @@ pub fn Jedi_Cloak(ctx: &mut GameContext, self_: Option<EntityId>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:818-833`
 pub fn Jedi_Decloak(ctx: &mut GameContext, self_: Option<EntityId>) {
-    unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        if !self_.is_null() {
-            (*self_).flags &= !FL_NOTARGET;
-            let client = (*self_).client;
-            if !client.is_null() {
-                if (*client).ps.powerups[PW_CLOAKED as usize] != 0 {
-                    //Uncloak
+    if let Some(self_) = self_ {
+        ctx.world.entity_mut(self_).flags &= !FL_NOTARGET;
+        // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref
+        // raw via the safe entity borrow, per trap 2b.
+        let client = ctx.world.entity(self_).client;
+        if !client.is_null() {
+            if unsafe { (*client).ps.powerups[PW_CLOAKED as usize] } != 0 {
+                //Uncloak
+                unsafe {
                     (*client).ps.powerups[PW_CLOAKED as usize] = 0;
-
-                    crate::g_utils::G_Sound(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        CHAN_ITEM as c_int,
-                        crate::g_utils::G_SoundIndex(
-                            c"sound/chars/shadowtrooper/decloak.wav".as_ptr(),
-                        ),
-                    );
                 }
+
+                let snd =
+                    crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/decloak.wav".as_ptr());
+                crate::g_utils::G_Sound(ctx, Some(self_), CHAN_ITEM as c_int, snd);
             }
         }
     }
@@ -1122,27 +1106,27 @@ pub fn Jedi_Decloak(ctx: &mut GameContext, self_: Option<EntityId>) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:835-857`
 pub fn Jedi_CheckCloak(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        if npc.is_null() {
-            return;
-        }
-        let client = (*npc).client;
-        if !(*npc).client.is_null() && (*client).NPC_class == CLASS_SHADOWTROOPER {
-            if (*client).ps.saberHolstered == 0
-                || (*npc).health <= 0
-                || (*client).ps.saberInFlight != qfalse
-                || (*npc).painDebounceTime > ctx.world.level.time
-            {
-                //can't be cloaked if saber is on, or dead or saber in flight or taking pain or being gripped
-                Jedi_Decloak(ctx, ctx.entity_id_of(npc));
-            } else if (*npc).health > 0
-                && (*client).ps.saberInFlight == qfalse
-                && (*npc).painDebounceTime < ctx.world.level.time
-            {
-                //still alive, have saber in hand, not taking pain and not being gripped
-                Jedi_Cloak(ctx, ctx.entity_id_of(npc));
-            }
+    let npc = ctx.world.globals.NPC;
+    let Some(npc_id) = ctx.entity_id_of(npc) else {
+        return;
+    };
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    if !client.is_null() && unsafe { (*client).NPC_class } == CLASS_SHADOWTROOPER {
+        if unsafe { (*client).ps.saberHolstered } == 0
+            || ctx.world.entity(npc_id).health <= 0
+            || unsafe { (*client).ps.saberInFlight } != qfalse
+            || ctx.world.entity(npc_id).painDebounceTime > ctx.world.level.time
+        {
+            //can't be cloaked if saber is on, or dead or saber in flight or taking pain or being gripped
+            Jedi_Decloak(ctx, Some(npc_id));
+        } else if ctx.world.entity(npc_id).health > 0
+            && unsafe { (*client).ps.saberInFlight } == qfalse
+            && ctx.world.entity(npc_id).painDebounceTime < ctx.world.level.time
+        {
+            //still alive, have saber in hand, not taking pain and not being gripped
+            Jedi_Cloak(ctx, Some(npc_id));
         }
     }
 }
@@ -1151,12 +1135,15 @@ pub fn Jedi_CheckCloak(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:863-898`
 pub fn Jedi_Aggression(self_: &gentity_t, change: c_int) {
-    unsafe {
-        let upper_threshold: c_int;
-        let lower_threshold: c_int;
-        let snpc = (*self_).NPC;
-        let client = (*self_).client;
+    let upper_threshold: c_int;
+    let lower_threshold: c_int;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = self_.NPC;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the entity's client field, per trap 2b.
+    let client = self_.client;
 
+    unsafe {
         (*snpc).stats.aggression += change;
 
         //FIXME: base this on initial NPC stats
@@ -1187,23 +1174,26 @@ pub fn Jedi_Aggression(self_: &gentity_t, change: c_int) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:900-912`
 pub fn Jedi_AggressionErosion(ctx: &mut GameContext, amt: c_int) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*npc).client;
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"roamTime".as_ptr()) != qfalse {
-            //the longer we're not alerted and have no enemy, the more our aggression goes down
-            let roam_time = ctx.world.bg_state.rng.Q_irand(2000, 5000);
-            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"roamTime".as_ptr(), roam_time);
-            Jedi_Aggression(&*npc, amt);
-        }
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"roamTime".as_ptr()) != qfalse {
+        //the longer we're not alerted and have no enemy, the more our aggression goes down
+        let roam_time = ctx.world.bg_state.rng.Q_irand(2000, 5000);
+        crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"roamTime".as_ptr(), roam_time);
+        Jedi_Aggression(ctx.world.entity(npc_id), amt);
+    }
 
-        if (*npc_info).stats.aggression < 4
-            || ((*npc_info).stats.aggression < 6 && (*client).NPC_class == CLASS_DESANN)
-        {
-            //turn off the saber
-            crate::w_saber::WP_DeactivateSaber(ctx, ctx.entity_id_of(npc), qfalse);
-        }
+    if unsafe { (*npc_info).stats.aggression } < 4
+        || (unsafe { (*npc_info).stats.aggression } < 6
+            && unsafe { (*client).NPC_class } == CLASS_DESANN)
+    {
+        //turn off the saber
+        crate::w_saber::WP_DeactivateSaber(ctx, Some(npc_id), qfalse);
     }
 }
 
@@ -1215,86 +1205,77 @@ pub fn NPC_Jedi_RateNewEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Opti
     let weaponAggression: f32;
     let newAggression: c_int;
 
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let enemy: *mut gentity_t = ent_ptr(ctx, enemy);
-        match (*enemy).s.weapon {
-            w if w == WP_SABER as c_int => {
-                healthAggression = (*self_).health as f32 / 200.0 * 6.0;
-                weaponAggression = 7.0; //go after him
-            }
-            w if w == WP_BLASTER as c_int => {
-                // DistanceSquared( self->r.currentOrigin, enemy->r.currentOrigin )
-                let s = (*self_).r.currentOrigin;
-                let e = (*enemy).r.currentOrigin;
-                let v0 = e[0] - s[0];
-                let v1 = e[1] - s[1];
-                let v2 = e[2] - s[2];
-                if v0 * v0 + v1 * v1 + v2 * v2 < 65536.0
-                //256 squared
-                {
-                    healthAggression = (*self_).health as f32 / 200.0 * 8.0;
-                    weaponAggression = 8.0; //go after him
-                } else {
-                    healthAggression = 8.0 - ((*self_).health as f32 / 200.0 * 8.0);
-                    weaponAggression = 2.0; //hang back for a second
-                }
-            }
-            _ => {
-                healthAggression = (*self_).health as f32 / 200.0 * 8.0;
-                weaponAggression = 6.0; //approach
+    let enemy_id = enemy.unwrap();
+    match ctx.world.entity(enemy_id).s.weapon {
+        w if w == WP_SABER as c_int => {
+            healthAggression = ctx.world.entity(self_).health as f32 / 200.0 * 6.0;
+            weaponAggression = 7.0; //go after him
+        }
+        w if w == WP_BLASTER as c_int => {
+            // DistanceSquared( self->r.currentOrigin, enemy->r.currentOrigin )
+            let s = ctx.world.entity(self_).r.currentOrigin;
+            let e = ctx.world.entity(enemy_id).r.currentOrigin;
+            let v0 = e[0] - s[0];
+            let v1 = e[1] - s[1];
+            let v2 = e[2] - s[2];
+            if v0 * v0 + v1 * v1 + v2 * v2 < 65536.0
+            //256 squared
+            {
+                healthAggression = ctx.world.entity(self_).health as f32 / 200.0 * 8.0;
+                weaponAggression = 8.0; //go after him
+            } else {
+                healthAggression = 8.0 - (ctx.world.entity(self_).health as f32 / 200.0 * 8.0);
+                weaponAggression = 2.0; //hang back for a second
             }
         }
-        //Average these with current aggression
-        newAggression =
-            ((healthAggression + weaponAggression + (*((*self_).NPC)).stats.aggression as f32)
-                / 3.0)
-                .ceil() as c_int;
-        Jedi_Aggression(&*self_, newAggression - (*((*self_).NPC)).stats.aggression);
-
-        let self_id = ctx.entity_id_of(self_);
-        let chatter = ctx.world.bg_state.rng.Q_irand(4000, 7000);
-        //don't taunt right away
-        crate::g_timer::TIMER_Set(ctx, self_id, c"chatter".as_ptr(), chatter);
+        _ => {
+            healthAggression = ctx.world.entity(self_).health as f32 / 200.0 * 8.0;
+            weaponAggression = 6.0; //approach
+        }
     }
+    //Average these with current aggression
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = ctx.world.entity(self_).NPC;
+    let aggression = unsafe { (*snpc).stats.aggression };
+    newAggression =
+        ((healthAggression + weaponAggression + aggression as f32) / 3.0).ceil() as c_int;
+    Jedi_Aggression(ctx.world.entity(self_), newAggression - aggression);
+
+    let chatter = ctx.world.bg_state.rng.Q_irand(4000, 7000);
+    //don't taunt right away
+    crate::g_timer::TIMER_Set(ctx, Some(self_), c"chatter".as_ptr(), chatter);
 }
 
 /// Raven `Jedi_Rage`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:952-964`
 pub fn Jedi_Rage(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        Jedi_Aggression(
-            &*npc,
-            10 - (*npc_info).stats.aggression + ctx.world.bg_state.rng.Q_irand(-2, 2),
-        );
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"roamTime".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"walking".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"taunting".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"jumpChaseDebounce".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"movenone".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"movecenter".as_ptr(), 0);
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"noturn".as_ptr(), 0);
-        crate::w_force::ForceRage(ctx, ctx.entity_id_of(npc).unwrap());
-    }
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let agg = 10 - unsafe { (*npc_info).stats.aggression } + ctx.world.bg_state.rng.Q_irand(-2, 2);
+    Jedi_Aggression(ctx.world.entity(npc_id), agg);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"roamTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"chatter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"walking".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"taunting".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"jumpChaseDebounce".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"movenone".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"movecenter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"noturn".as_ptr(), 0);
+    crate::w_force::ForceRage(ctx, npc_id);
 }
 
 /// Raven `Jedi_RageStop`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:966-973`
 pub fn Jedi_RageStop(ctx: &mut GameContext, self_: EntityId) {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        if !(*self_).NPC.is_null() {
-            //calm down and back off
-            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"roamTime".as_ptr(), 0);
-            Jedi_Aggression(&*self_, ctx.world.bg_state.rng.Q_irand(-5, 0));
-        }
+    if !ctx.world.entity(self_).NPC.is_null() {
+        //calm down and back off
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"roamTime".as_ptr(), 0);
+        let agg = ctx.world.bg_state.rng.Q_irand(-5, 0);
+        Jedi_Aggression(ctx.world.entity(self_), agg);
     }
 }
 
@@ -1302,164 +1283,156 @@ pub fn Jedi_RageStop(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:980-1013`
 pub fn Jedi_BattleTaunt(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*npc).client;
-        // PORT-NOTE(jediSpeechDebounceTime): field is a `()` placeholder in
-        // game_globals.rs; needs porting to `[c_int; TEAM_NUM_TEAMS]`.
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"chatter".as_ptr()) != qfalse
-            && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
-            && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
-            && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
-                < ctx.world.level.time
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    // PORT-NOTE(jediSpeechDebounceTime): field is a `()` placeholder in
+    // game_globals.rs; needs porting to `[c_int; TEAM_NUM_TEAMS]`.
+    if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"chatter".as_ptr()) != qfalse
+        && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
+        && unsafe { (*npc_info).blockedSpeechDebounceTime } < ctx.world.level.time
+        && ctx.world.globals.jediSpeechDebounceTime[unsafe { (*client).playerTeam } as usize]
+            < ctx.world.level.time
+    {
+        let mut event: c_int = -1;
+        let enemy_id = ctx.world.entity(npc_id).enemy;
+        // FLAG: enemy may be an NPC pool client; deref raw, per trap 2b.
+        let enemy_client = match enemy_id {
+            Some(eid) => ctx.world.entity(eid).client,
+            None => core::ptr::null_mut(),
+        };
+        if unsafe { (*client).playerTeam } == NPCTEAM_PLAYER as c_int
+            && enemy_id.is_some()
+            && !enemy_client.is_null()
+            && unsafe { (*enemy_client).NPC_class } == CLASS_JEDI
         {
-            let mut event: c_int = -1;
-            let enemy_opt = (*npc).enemy;
-            let enemy: *mut gentity_t = match enemy_opt {
-                Some(id) => ge.add(id.0 as usize),
-                None => core::ptr::null_mut(),
-            };
-            let enemy_client = if enemy.is_null() {
-                core::ptr::null_mut()
-            } else {
-                (*enemy).client
-            };
-            if (*client).playerTeam == NPCTEAM_PLAYER as c_int
-                && !enemy.is_null()
-                && !(*enemy).client.is_null()
-                && (*enemy_client).NPC_class == CLASS_JEDI
+            //a jedi fighting a jedi - training
+            if unsafe { (*client).NPC_class } == CLASS_JEDI
+                && unsafe { (*npc_info).rank } as c_int == RANK_COMMANDER as c_int
             {
-                //a jedi fighting a jedi - training
-                if (*client).NPC_class == CLASS_JEDI
-                    && (*npc_info).rank as c_int == RANK_COMMANDER as c_int
-                {
-                    //only trainer taunts
-                    event = entity_event_t::EV_TAUNT1 as c_int;
-                }
-            } else {
-                //reborn or a jedi fighting an enemy
-                event = ctx.world.bg_state.rng.Q_irand(
-                    entity_event_t::EV_TAUNT1 as c_int,
-                    entity_event_t::EV_TAUNT3 as c_int,
-                );
+                //only trainer taunts
+                event = entity_event_t::EV_TAUNT1 as c_int;
             }
-            if event != -1 {
-                crate::NPC_sounds::G_AddVoiceEvent(
-                    ctx,
-                    ctx.entity_id_of(npc).unwrap(),
-                    event,
-                    3000,
-                );
-                (*npc_info).blockedSpeechDebounceTime = ctx.world.level.time + 6000;
-                ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize] =
-                    ctx.world.level.time + 6000;
-                let chatter_time = ctx.world.bg_state.rng.Q_irand(5000, 10000);
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"chatter".as_ptr(),
-                    chatter_time,
-                );
-                return qtrue;
-            }
+        } else {
+            //reborn or a jedi fighting an enemy
+            event = ctx.world.bg_state.rng.Q_irand(
+                entity_event_t::EV_TAUNT1 as c_int,
+                entity_event_t::EV_TAUNT3 as c_int,
+            );
         }
-        qfalse
+        if event != -1 {
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, npc_id, event, 3000);
+            let deb = ctx.world.level.time + 6000;
+            unsafe {
+                (*npc_info).blockedSpeechDebounceTime = deb;
+            }
+            let team = unsafe { (*client).playerTeam } as usize;
+            let deb2 = ctx.world.level.time + 6000;
+            ctx.world.globals.jediSpeechDebounceTime[team] = deb2;
+            let chatter_time = ctx.world.bg_state.rng.Q_irand(5000, 10000);
+            crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"chatter".as_ptr(), chatter_time);
+            return qtrue;
+        }
     }
+    qfalse
 }
 
 /// Raven `Jedi_ClearPathToSpot`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1020-1077`
 pub fn Jedi_ClearPathToSpot(ctx: &mut GameContext, dest: vec3_t, impactEntNum: c_int) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let mut trace: trace_t = core::mem::zeroed();
-        let mut start: vec3_t = [0.0; 3];
-        let mut end: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
-        let dist: f32;
-        let drop: f32;
-        let mut i: f32;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    let mut trace: trace_t = unsafe { core::mem::zeroed() };
+    let mut start: vec3_t = [0.0; 3];
+    let mut end: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+    let dist: f32;
+    let drop: f32;
+    let mut i: f32;
 
-        //Offset the step height
-        let mins: vec3_t = [
-            (*npc).r.mins[0],
-            (*npc).r.mins[1],
-            (*npc).r.mins[2] + STEPSIZE,
-        ];
+    let npc_mins = ctx.world.entity(npc_id).r.mins;
+    let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let npc_number = ctx.world.entity(npc_id).s.number;
+    let npc_clipmask = ctx.world.entity(npc_id).clipmask;
 
+    //Offset the step height
+    let mins: vec3_t = [npc_mins[0], npc_mins[1], npc_mins[2] + STEPSIZE];
+
+    crate::trap::Trace(
+        ctx.engine,
+        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+            &mut trace as *mut trace_t,
+            &npc_origin as *const vec3_t,
+            &mins as *const vec3_t,
+            &npc_maxs as *const vec3_t,
+            &dest as *const vec3_t,
+            npc_number,
+            npc_clipmask,
+        ),
+    );
+
+    //Do a simple check
+    if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
+        //inside solid
+        return qfalse;
+    }
+
+    if trace.fraction < 1.0f32 {
+        //hit something
+        if impactEntNum != ENTITYNUM_NONE && trace.entityNum == (impactEntNum) as i16 {
+            //hit what we're going after
+            return qtrue;
+        } else {
+            return qfalse;
+        }
+    }
+
+    //otherwise, clear path in a straight line.
+    crate::q_math::_VectorSubtract(dest, npc_origin, &mut dir);
+    dist = crate::q_math::VectorNormalize(&mut dir);
+    if dest[2] > npc_origin[2] {
+        //going up, check for steps
+        drop = STEPSIZE;
+    } else {
+        //going down or level, check for moderate drops
+        drop = 64.0;
+    }
+    i = npc_maxs[0] * 2.0;
+    while i < dist {
+        crate::q_math::_VectorMA(npc_origin, i, dir, &mut start);
+        crate::q_math::_VectorCopy(start, &mut end);
+        end[2] -= drop;
         crate::trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                 &mut trace as *mut trace_t,
-                &(*npc).r.currentOrigin as *const vec3_t,
+                &start as *const vec3_t,
                 &mins as *const vec3_t,
-                &(*npc).r.maxs as *const vec3_t,
-                &dest as *const vec3_t,
-                (*npc).s.number,
-                (*npc).clipmask,
+                &npc_maxs as *const vec3_t,
+                &end as *const vec3_t,
+                npc_number,
+                npc_clipmask,
             ),
         );
-
-        //Do a simple check
-        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
-            //inside solid
-            return qfalse;
+        if trace.fraction < 1.0f32
+            || trace.allsolid != (qfalse) as u8
+            || trace.startsolid != (qfalse) as u8
+        {
+            //good to go
+            i += npc_maxs[0] * 2.0;
+            continue;
         }
-
-        if trace.fraction < 1.0f32 {
-            //hit something
-            if impactEntNum != ENTITYNUM_NONE && trace.entityNum == (impactEntNum) as i16 {
-                //hit what we're going after
-                return qtrue;
-            } else {
-                return qfalse;
-            }
-        }
-
-        //otherwise, clear path in a straight line.
-        crate::q_math::_VectorSubtract(dest, (*npc).r.currentOrigin, &mut dir);
-        dist = crate::q_math::VectorNormalize(&mut dir);
-        if dest[2] > (*npc).r.currentOrigin[2] {
-            //going up, check for steps
-            drop = STEPSIZE;
-        } else {
-            //going down or level, check for moderate drops
-            drop = 64.0;
-        }
-        i = (*npc).r.maxs[0] * 2.0;
-        while i < dist {
-            crate::q_math::_VectorMA((*npc).r.currentOrigin, i, dir, &mut start);
-            crate::q_math::_VectorCopy(start, &mut end);
-            end[2] -= drop;
-            crate::trap::Trace(
-                ctx.engine,
-                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                    &mut trace as *mut trace_t,
-                    &start as *const vec3_t,
-                    &mins as *const vec3_t,
-                    &(*npc).r.maxs as *const vec3_t,
-                    &end as *const vec3_t,
-                    (*npc).s.number,
-                    (*npc).clipmask,
-                ),
-            );
-            if trace.fraction < 1.0f32
-                || trace.allsolid != (qfalse) as u8
-                || trace.startsolid != (qfalse) as u8
-            {
-                //good to go
-                i += (*npc).r.maxs[0] * 2.0;
-                continue;
-            }
-            //no floor here! (or a long drop?)
-            return qfalse;
-        }
-        //we made it!
-        qtrue
+        //no floor here! (or a long drop?)
+        return qfalse;
     }
+    //we made it!
+    qtrue
 }
 
 /// Raven `NPC_MoveDirClear`.
@@ -1471,145 +1444,154 @@ pub fn NPC_MoveDirClear(
     rightmove: c_int,
     reset: qboolean,
 ) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*npc).client;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
 
-        let mut forward: vec3_t = [0.0; 3];
-        let mut right: vec3_t = [0.0; 3];
-        let mut testPos: vec3_t = [0.0; 3];
-        let mut angles: vec3_t = [0.0; 3];
-        let mut trace: trace_t = core::mem::zeroed();
-        let fwdDist: f32;
-        let rtDist: f32;
-        let mut bottom_max: f32 = -STEPSIZE * 4.0 - 1.0;
+    let npc_mins = ctx.world.entity(npc_id).r.mins;
+    let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let npc_number = ctx.world.entity(npc_id).s.number;
+    let npc_clipmask = ctx.world.entity(npc_id).clipmask;
 
-        if forwardmove == 0 && rightmove == 0 {
-            //not even moving
+    let mut forward: vec3_t = [0.0; 3];
+    let mut right: vec3_t = [0.0; 3];
+    let mut testPos: vec3_t = [0.0; 3];
+    let mut angles: vec3_t = [0.0; 3];
+    let mut trace: trace_t = unsafe { core::mem::zeroed() };
+    let fwdDist: f32;
+    let rtDist: f32;
+    let mut bottom_max: f32 = -STEPSIZE * 4.0 - 1.0;
+
+    if forwardmove == 0 && rightmove == 0 {
+        //not even moving
+        return qtrue;
+    }
+
+    if ctx.world.globals.ucmd.upmove > 0 || unsafe { (*client).ps.fd.forceJumpCharge } != 0.0 {
+        //Going to jump
+        return qtrue;
+    }
+
+    if unsafe { (*client).ps.groundEntityNum } == ENTITYNUM_NONE {
+        //in the air
+        return qtrue;
+    }
+
+    let mut mins: vec3_t = [0.0; 3];
+    crate::q_math::_VectorCopy(npc_mins, &mut mins);
+    mins[2] += STEPSIZE;
+    angles[PITCH as usize] = 0.0;
+    angles[ROLL as usize] = 0.0;
+    angles[YAW as usize] = unsafe { (*client).ps.viewangles[YAW as usize] };
+    crate::q_math::AngleVectors(angles, Some(&mut forward), Some(&mut right), None);
+    fwdDist = (forwardmove as f32) / 2.0f32;
+    rtDist = (rightmove as f32) / 2.0f32;
+    crate::q_math::_VectorMA(npc_origin, fwdDist, forward, &mut testPos);
+    let testPos_in = testPos;
+    crate::q_math::_VectorMA(testPos_in, rtDist, right, &mut testPos);
+    crate::trap::Trace(
+        ctx.engine,
+        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+            &mut trace as *mut trace_t,
+            &npc_origin as *const vec3_t,
+            &mins as *const vec3_t,
+            &npc_maxs as *const vec3_t,
+            &testPos as *const vec3_t,
+            npc_number,
+            npc_clipmask | CONTENTS_BOTCLIP,
+        ),
+    );
+    if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
+        //hmm, trace started inside this brush
+        if reset != qfalse {
+            trace.fraction = 1.0f32;
+        }
+        crate::q_math::_VectorCopy(testPos, &mut trace.endpos);
+    }
+    if trace.fraction < 0.6 {
+        //Going to bump into something very close, don't move, just turn
+        let enemy_id = ctx.world.entity(npc_id).enemy;
+        let goal_id = unsafe { (*npc_info).goalEntity };
+        if (enemy_id.is_some()
+            && trace.entityNum == (ctx.world.entity(enemy_id.unwrap()).s.number) as i16)
+            || (goal_id.is_some()
+                && trace.entityNum == (ctx.world.entity(goal_id.unwrap()).s.number) as i16)
+        {
+            //okay to bump into enemy or goal
             return qtrue;
-        }
-
-        if ctx.world.globals.ucmd.upmove > 0 || (*client).ps.fd.forceJumpCharge != 0.0 {
-            //Going to jump
-            return qtrue;
-        }
-
-        if (*client).ps.groundEntityNum == ENTITYNUM_NONE {
-            //in the air
-            return qtrue;
-        }
-
-        let mut mins: vec3_t = [0.0; 3];
-        crate::q_math::_VectorCopy((*npc).r.mins, &mut mins);
-        mins[2] += STEPSIZE;
-        angles[PITCH as usize] = 0.0;
-        angles[ROLL as usize] = 0.0;
-        angles[YAW as usize] = (*client).ps.viewangles[YAW as usize];
-        crate::q_math::AngleVectors(angles, Some(&mut forward), Some(&mut right), None);
-        fwdDist = (forwardmove as f32) / 2.0f32;
-        rtDist = (rightmove as f32) / 2.0f32;
-        crate::q_math::_VectorMA((*npc).r.currentOrigin, fwdDist, forward, &mut testPos);
-        let testPos_in = testPos;
-        crate::q_math::_VectorMA(testPos_in, rtDist, right, &mut testPos);
-        crate::trap::Trace(
-            ctx.engine,
-            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut trace as *mut trace_t,
-                &(*npc).r.currentOrigin as *const vec3_t,
-                &mins as *const vec3_t,
-                &(*npc).r.maxs as *const vec3_t,
-                &testPos as *const vec3_t,
-                (*npc).s.number,
-                (*npc).clipmask | CONTENTS_BOTCLIP,
-            ),
-        );
-        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
-            //hmm, trace started inside this brush
-            if reset != qfalse {
-                trace.fraction = 1.0f32;
-            }
-            crate::q_math::_VectorCopy(testPos, &mut trace.endpos);
-        }
-        if trace.fraction < 0.6 {
-            //Going to bump into something very close, don't move, just turn
-            let enemy: *mut gentity_t = match (*npc).enemy {
-                Some(id) => ge.add(id.0 as usize),
-                None => core::ptr::null_mut(),
-            };
-            let goal: *mut gentity_t = match (*npc_info).goalEntity {
-                Some(id) => ge.add(id.0 as usize),
-                None => core::ptr::null_mut(),
-            };
-            if (!enemy.is_null() && trace.entityNum == ((*enemy).s.number) as i16)
-                || (!goal.is_null() && trace.entityNum == ((*goal).s.number) as i16)
-            {
-                //okay to bump into enemy or goal
-                return qtrue;
-            } else if reset != qfalse {
-                //actually want to screw with the ucmd
-                ctx.world.globals.ucmd.forwardmove = 0;
-                ctx.world.globals.ucmd.rightmove = 0;
+        } else if reset != qfalse {
+            //actually want to screw with the ucmd
+            ctx.world.globals.ucmd.forwardmove = 0;
+            ctx.world.globals.ucmd.rightmove = 0;
+            unsafe {
                 (*client).ps.moveDir = [0.0, 0.0, 0.0];
             }
-            return qfalse;
         }
+        return qfalse;
+    }
 
-        if (*npc_info).goalEntity.is_some() {
-            let goal: *mut gentity_t = ge.add((*npc_info).goalEntity.unwrap().0 as usize);
-            if (*goal).r.currentOrigin[2] < (*npc).r.currentOrigin[2] {
-                //goal is below me, okay to step off at least that far plus stepheight
-                bottom_max += (*goal).r.currentOrigin[2] - (*npc).r.currentOrigin[2];
-            }
+    let goal_id = unsafe { (*npc_info).goalEntity };
+    if let Some(goal_id) = goal_id {
+        let goal_z = ctx.world.entity(goal_id).r.currentOrigin[2];
+        if goal_z < npc_origin[2] {
+            //goal is below me, okay to step off at least that far plus stepheight
+            bottom_max += goal_z - npc_origin[2];
         }
-        crate::q_math::_VectorCopy(trace.endpos, &mut testPos);
-        testPos[2] += bottom_max;
+    }
+    crate::q_math::_VectorCopy(trace.endpos, &mut testPos);
+    testPos[2] += bottom_max;
 
-        let trace_endpos = trace.endpos;
-        crate::trap::Trace(
-            ctx.engine,
-            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut trace as *mut trace_t,
-                &trace_endpos as *const vec3_t,
-                &mins as *const vec3_t,
-                &(*npc).r.maxs as *const vec3_t,
-                &testPos as *const vec3_t,
-                (*npc).s.number,
-                (*npc).clipmask,
-            ),
-        );
+    let trace_endpos = trace.endpos;
+    crate::trap::Trace(
+        ctx.engine,
+        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+            &mut trace as *mut trace_t,
+            &trace_endpos as *const vec3_t,
+            &mins as *const vec3_t,
+            &npc_maxs as *const vec3_t,
+            &testPos as *const vec3_t,
+            npc_number,
+            npc_clipmask,
+        ),
+    );
 
-        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
-            //Not going off a cliff
-            return qtrue;
-        }
+    if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
+        //Not going off a cliff
+        return qtrue;
+    }
 
-        if trace.fraction < 1.0 {
-            //Not going off a cliff
-            return qtrue;
-        }
+    if trace.fraction < 1.0 {
+        //Not going off a cliff
+        return qtrue;
+    }
 
-        //going to fall at least bottom_max, don't move, just turn
-        if reset != qfalse {
-            //actually want to screw with the ucmd
-            ctx.world.globals.ucmd.forwardmove =
-                (ctx.world.globals.ucmd.forwardmove as f32 * -1.0) as c_schar;
-            ctx.world.globals.ucmd.rightmove =
-                (ctx.world.globals.ucmd.rightmove as f32 * -1.0) as c_schar;
+    //going to fall at least bottom_max, don't move, just turn
+    if reset != qfalse {
+        //actually want to screw with the ucmd
+        ctx.world.globals.ucmd.forwardmove =
+            (ctx.world.globals.ucmd.forwardmove as f32 * -1.0) as c_schar;
+        ctx.world.globals.ucmd.rightmove =
+            (ctx.world.globals.ucmd.rightmove as f32 * -1.0) as c_schar;
+        unsafe {
             let md = (*client).ps.moveDir;
             crate::q_math::_VectorScale(md, -1.0, &mut (*client).ps.moveDir);
         }
-        qfalse
     }
+    qfalse
 }
 
 /// Raven `Jedi_HoldPosition`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1200-1211`
 pub fn Jedi_HoldPosition(ctx: &mut GameContext) {
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_info = ctx.world.globals.NPCInfo;
         (*npc_info).goalEntity = None;
     }
 }
@@ -1618,47 +1600,47 @@ pub fn Jedi_HoldPosition(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1219-1251`
 pub fn Jedi_Move(ctx: &mut GameContext, goal: Option<EntityId>, retreat: qboolean) {
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    let moved: qboolean;
+    let mut info: navInfo_t = unsafe { core::mem::zeroed() };
+
     unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let goal: *mut gentity_t = ent_ptr(ctx, goal);
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*npc).client;
-        let moved: qboolean;
-        let mut info: navInfo_t = core::mem::zeroed();
-
         (*npc_info).combatMove = qtrue;
-        (*npc_info).goalEntity = ent_id_opt(ge, goal);
+        (*npc_info).goalEntity = goal;
+    }
 
-        moved = crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+    moved = crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
 
-        //FIXME: temp retreat behavior
-        if retreat != qfalse {
-            ctx.world.globals.ucmd.forwardmove =
-                (ctx.world.globals.ucmd.forwardmove as i32 * -1) as c_schar;
-            ctx.world.globals.ucmd.rightmove =
-                (ctx.world.globals.ucmd.rightmove as i32 * -1) as c_schar;
+    //FIXME: temp retreat behavior
+    if retreat != qfalse {
+        ctx.world.globals.ucmd.forwardmove =
+            (ctx.world.globals.ucmd.forwardmove as i32 * -1) as c_schar;
+        ctx.world.globals.ucmd.rightmove =
+            (ctx.world.globals.ucmd.rightmove as i32 * -1) as c_schar;
+        unsafe {
             let md = (*client).ps.moveDir;
             crate::q_math::_VectorScale(md, -1.0, &mut (*client).ps.moveDir);
         }
+    }
 
-        //Get the move info
-        crate::NPC_move::NAV_GetLastMove(ctx, &mut info);
+    //Get the move info
+    crate::NPC_move::NAV_GetLastMove(ctx, &mut info);
 
-        //If we hit our target, then stop and fire!
-        let enemy: *mut gentity_t = match (*npc).enemy {
-            Some(id) => ge.add(id.0 as usize),
-            None => core::ptr::null_mut(),
-        };
-        if (info.flags & NIF_COLLISION) != 0 && info.blocker == enemy {
-            Jedi_HoldPosition(ctx);
-        }
+    //If we hit our target, then stop and fire!
+    let enemy_id = ctx.world.entity(npc_id).enemy;
+    if (info.flags & NIF_COLLISION) != 0 && ctx.entity_id_of(info.blocker) == enemy_id {
+        Jedi_HoldPosition(ctx);
+    }
 
-        //If our move failed, then reset
-        if moved == qfalse {
-            Jedi_HoldPosition(ctx);
-        }
+    //If our move failed, then reset
+    if moved == qfalse {
+        Jedi_HoldPosition(ctx);
     }
 }
 
@@ -1666,81 +1648,82 @@ pub fn Jedi_Move(ctx: &mut GameContext, goal: Option<EntityId>, retreat: qboolea
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1253-1280`
 pub fn Jedi_Hunt(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        //if we're at all interested in fighting, go after him
-        if (*npc_info).stats.aggression > 1 {
-            //approach enemy
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    //if we're at all interested in fighting, go after him
+    if unsafe { (*npc_info).stats.aggression } > 1 {
+        //approach enemy
+        unsafe {
             (*npc_info).combatMove = qtrue;
-            if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) == 0 {
-                crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
-                return qtrue;
-            } else {
-                if (*npc_info).goalEntity.is_none() {
-                    //hunt
-                    (*npc_info).goalEntity = (*npc).enemy;
-                }
-                if crate::NPC_move::NPC_MoveToGoal(ctx, qfalse) != qfalse {
-                    crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
-                    return qtrue;
+        }
+        if (unsafe { (*npc_info).scriptFlags } & SCF_CHASE_ENEMIES) == 0 {
+            crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+            return qtrue;
+        } else {
+            if unsafe { (*npc_info).goalEntity }.is_none() {
+                //hunt
+                let enemy = ctx.world.entity(npc_id).enemy;
+                unsafe {
+                    (*npc_info).goalEntity = enemy;
                 }
             }
+            if crate::NPC_move::NPC_MoveToGoal(ctx, qfalse) != qfalse {
+                crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+                return qtrue;
+            }
         }
-        qfalse
     }
+    qfalse
 }
 
 /// Raven `Jedi_Retreat`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1300-1310`
 pub fn Jedi_Retreat(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"noRetreat".as_ptr()) == qfalse {
-            //don't actually move
-            return;
-        }
-        let enemy: *mut gentity_t = match (*npc).enemy {
-            Some(id) => ge.add(id.0 as usize),
-            None => core::ptr::null_mut(),
-        };
-        Jedi_Move(ctx, ctx.entity_id_of(enemy), qtrue);
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"noRetreat".as_ptr()) == qfalse {
+        //don't actually move
+        return;
     }
+    let enemy_id = ctx.world.entity(npc_id).enemy;
+    Jedi_Move(ctx, enemy_id, qtrue);
 }
 
 /// Raven `Jedi_Advance`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1312-1325`
 pub fn Jedi_Advance(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*npc).client;
-        if (*client).ps.saberInFlight == qfalse {
-            crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(npc));
-        }
-        let enemy: *mut gentity_t = match (*npc).enemy {
-            Some(id) => ge.add(id.0 as usize),
-            None => core::ptr::null_mut(),
-        };
-        Jedi_Move(ctx, ctx.entity_id_of(enemy), qfalse);
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    if unsafe { (*client).ps.saberInFlight } == qfalse {
+        crate::w_saber::WP_ActivateSaber(ctx, Some(npc_id));
     }
+    let enemy_id = ctx.world.entity(npc_id).enemy;
+    Jedi_Move(ctx, enemy_id, qfalse);
 }
 
 /// Raven `Jedi_AdjustSaberAnimLevel`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1327-1394`
 pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>, newLevel: c_int) {
+    let Some(self_) = self_ else {
+        return;
+    };
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    if client.is_null() {
+        return;
+    }
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = ctx.world.entity(self_).NPC;
     unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        if self_.is_null() || (*self_).client.is_null() {
-            return;
-        }
-        let client = (*self_).client;
-        let snpc = (*self_).NPC;
         if (*client).NPC_class == CLASS_TAVION {
             //special attacks
             (*client).ps.fd.saberAnimLevel = FORCE_LEVEL_5;
@@ -1779,7 +1762,7 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>,
         }
 
         if ctx.world.cvars.d_JediAI.integer != 0 {
-            let ty = cstr_to_str((*self_).NPC_type);
+            let ty = cstr_to_str(ctx.world.entity(self_).NPC_type);
             if (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_1 {
                 crate::g_main::Com_Printf(
                     cstr(&format!("^2{} Saber Attack Set: fast\n", ty)).as_ptr(),
@@ -1801,39 +1784,36 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>,
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:1396-1411`
 pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let client = (*npc).client;
-        if (*client).ps.weaponTime == 0
-            && (ctx.world.globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) == 0
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    if unsafe { (*client).ps.weaponTime } == 0
+        && (ctx.world.globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) == 0
+    {
+        //not attacking
+        if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"saberLevelDebounce".as_ptr()) != qfalse
+            && ctx.world.bg_state.rng.Q_irand(0, 10) == 0
         {
-            //not attacking
-            if crate::g_timer::TIMER_Done(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"saberLevelDebounce".as_ptr(),
-            ) != qfalse
-                && ctx.world.bg_state.rng.Q_irand(0, 10) == 0
-            {
-                let saber_level = ctx.world.bg_state.rng.Q_irand(FORCE_LEVEL_1, FORCE_LEVEL_3);
-                Jedi_AdjustSaberAnimLevel(ctx, ctx.entity_id_of(npc), saber_level);
-                let saber_level_debounce_time = ctx.world.bg_state.rng.Q_irand(3000, 10000);
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"saberLevelDebounce".as_ptr(),
-                    saber_level_debounce_time,
-                );
-            }
-        } else {
-            let saber_level_debounce_time = ctx.world.bg_state.rng.Q_irand(1000, 5000);
+            let saber_level = ctx.world.bg_state.rng.Q_irand(FORCE_LEVEL_1, FORCE_LEVEL_3);
+            Jedi_AdjustSaberAnimLevel(ctx, Some(npc_id), saber_level);
+            let saber_level_debounce_time = ctx.world.bg_state.rng.Q_irand(3000, 10000);
             crate::g_timer::TIMER_Set(
                 ctx,
-                ctx.entity_id_of(npc),
+                Some(npc_id),
                 c"saberLevelDebounce".as_ptr(),
                 saber_level_debounce_time,
             );
         }
+    } else {
+        let saber_level_debounce_time = ctx.world.bg_state.rng.Q_irand(1000, 5000);
+        crate::g_timer::TIMER_Set(
+            ctx,
+            Some(npc_id),
+            c"saberLevelDebounce".as_ptr(),
+            saber_level_debounce_time,
+        );
     }
 }
 
@@ -2969,19 +2949,20 @@ pub fn Jedi_ReCalcParryTime(
     self_: EntityId,
     evasionType: evasionType_t,
 ) -> c_int {
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = ctx.world.entity(self_).NPC;
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let client = (*self_).client;
-        let snpc = (*self_).NPC;
-        if (*self_).client.is_null() {
+        if client.is_null() {
             return 0;
         }
-        if (*self_).s.number == 0 {
+        if ctx.world.entity(self_).s.number == 0 {
             //player
             return bg_parryDebounce
                 [(*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] as usize];
-        } else if !(*self_).NPC.is_null() {
+        } else if !ctx.world.entity(self_).NPC.is_null() {
             if ctx.world.cvars.g_saberRealisticCombat.integer == 0
                 && (ctx.world.cvars.g_spskill.integer == 2
                     || (ctx.world.cvars.g_spskill.integer == 1
@@ -3069,31 +3050,32 @@ pub fn Jedi_ReCalcParryTime(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2443-2453`
 pub fn Jedi_QuickReactions(ctx: &mut GameContext, self_: EntityId) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*self_).client;
-        if ((*client).NPC_class == CLASS_JEDI
-            && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
-            || (*client).NPC_class == CLASS_TAVION
-            || ((*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] > FORCE_LEVEL_1
-                && ctx.world.cvars.g_spskill.integer > 1)
-            || ((*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] > FORCE_LEVEL_2
-                && ctx.world.cvars.g_spskill.integer > 0)
-        {
-            return qtrue;
-        }
-        qfalse
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    if (unsafe { (*client).NPC_class } == CLASS_JEDI
+        && unsafe { (*npc_info).rank } as c_int == RANK_COMMANDER as c_int)
+        || unsafe { (*client).NPC_class } == CLASS_TAVION
+        || (unsafe { (*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] } > FORCE_LEVEL_1
+            && ctx.world.cvars.g_spskill.integer > 1)
+        || (unsafe { (*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] } > FORCE_LEVEL_2
+            && ctx.world.cvars.g_spskill.integer > 0)
+    {
+        return qtrue;
     }
+    qfalse
 }
 
 /// Raven `Jedi_SaberBusy`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:2455-2470`
 pub fn Jedi_SaberBusy(self_: &gentity_t) -> qboolean {
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the entity's client field, per trap 2b.
+    let client = self_.client;
     unsafe {
-        let client = (*self_).client;
         if (*client).ps.torsoTimer > 300
             && ((crate::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) != qfalse
                 && (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_3)
@@ -5783,31 +5765,24 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4867-4914`
 pub fn Jedi_Jumping(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
-    unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let goal: *mut gentity_t = ent_ptr(ctx, goal);
-        let npc = ctx.world.globals.NPC;
-        let client = (*npc).client;
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"forceJumpChasing".as_ptr())
-            == qfalse
-            && !goal.is_null()
-        {
-            //force-jumping at the enemy
-            if (*client).ps.groundEntityNum != ENTITYNUM_NONE {
-                //landed
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    c"forceJumpChasing".as_ptr(),
-                    0,
-                );
-            } else {
-                crate::NPC_utils::NPC_FaceEntity(ctx, ctx.entity_id_of(goal), qtrue);
-                return qtrue;
-            }
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"forceJumpChasing".as_ptr()) == qfalse
+        && goal.is_some()
+    {
+        //force-jumping at the enemy
+        if unsafe { (*client).ps.groundEntityNum } != ENTITYNUM_NONE {
+            //landed
+            crate::g_timer::TIMER_Set(ctx, Some(npc_id), c"forceJumpChasing".as_ptr(), 0);
+        } else {
+            crate::NPC_utils::NPC_FaceEntity(ctx, goal, qtrue);
+            return qtrue;
         }
-        qfalse
     }
+    qfalse
 }
 
 /// Raven `Jedi_CheckEnemyMovement`.
@@ -6443,130 +6418,130 @@ pub fn NPC_Jedi_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
-        let client = (*self_).client;
-        let snpc = (*self_).NPC;
-        let d_jedi = ctx.world.cvars.d_JediAI.integer != 0;
-        let other = attacker;
-        let mut point: vec3_t = [0.0; 3];
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = ctx.world.entity(self_).NPC;
+    let d_jedi = ctx.world.cvars.d_JediAI.integer != 0;
+    let other_id = attacker.unwrap();
+    let mut point: vec3_t = [0.0; 3];
 
-        crate::q_math::_VectorCopy(ctx.world.globals.gPainPoint, &mut point);
+    crate::q_math::_VectorCopy(ctx.world.globals.gPainPoint, &mut point);
 
-        if (*other).s.weapon == WP_SABER as c_int {
-            //back off
-            crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"parryTime".as_ptr(), -1);
-            if (*client).NPC_class == CLASS_DESANN
-                || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*self_).NPC_type) == 0
-            {
-                //less for Desann
+    if ctx.world.entity(other_id).s.weapon == WP_SABER as c_int {
+        //back off
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"parryTime".as_ptr(), -1);
+        if unsafe { (*client).NPC_class } == CLASS_DESANN
+            || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), ctx.world.entity(self_).NPC_type) == 0
+        {
+            //less for Desann
+            unsafe {
                 (*client).ps.fd.forcePowerDebounce[FP_SABER_DEFENSE as usize] =
                     ctx.world.level.time + (3 - ctx.world.cvars.g_spskill.integer) * 50;
-            } else if (*snpc).rank as c_int >= RANK_LT_JG as c_int {
+            }
+        } else if unsafe { (*snpc).rank } as c_int >= RANK_LT_JG as c_int {
+            unsafe {
                 (*client).ps.fd.forcePowerDebounce[FP_SABER_DEFENSE as usize] =
                     ctx.world.level.time + (3 - ctx.world.cvars.g_spskill.integer) * 100;
-            } else {
+            }
+        } else {
+            unsafe {
                 (*client).ps.fd.forcePowerDebounce[FP_SABER_DEFENSE as usize] =
                     ctx.world.level.time + (3 - ctx.world.cvars.g_spskill.integer) * 200;
             }
-            if ctx.world.bg_state.rng.Q_irand(0, 3) == 0 {
-                //ouch... maybe switch up which saber power level we're using
-                let saber_level = ctx.world.bg_state.rng.Q_irand(FORCE_LEVEL_1, FORCE_LEVEL_3);
-                Jedi_AdjustSaberAnimLevel(ctx, ctx.entity_id_of(self_), saber_level);
-            }
-            if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-                Jedi_Aggression(&*self_, -1);
-            }
-            if d_jedi {
-                crate::g_main::Com_Printf(
-                    cstr(&format!(
-                        "({}) PAIN: agg {}, no parry until {}\n",
-                        ctx.world.level.time,
-                        (*snpc).stats.aggression,
-                        ctx.world.level.time + 500
-                    ))
-                    .as_ptr(),
-                );
-            }
-            if d_jedi {
-                let mut diff: vec3_t = [0.0; 3];
-                let mut fwdangles: vec3_t = [0.0; 3];
-                let mut right: vec3_t = [0.0; 3];
-                let rightdot: f32;
-                let zdiff: f32;
-
-                crate::q_math::_VectorSubtract(point, (*client).renderInfo.eyePoint, &mut diff);
-                diff[2] = 0.0;
-                fwdangles[1] = (*client).ps.viewangles[1];
-                crate::q_math::AngleVectors(fwdangles, None, Some(&mut right), None);
-                rightdot = crate::q_math::_DotProduct(right, diff);
-                zdiff = point[2] - (*client).renderInfo.eyePoint[2];
-
-                crate::g_main::Com_Printf(
-                    cstr(&format!(
-                        "({}) saber hit at height {:.2}, zdiff: {:.2}, rightdot: {:.2}\n",
-                        ctx.world.level.time,
-                        point[2] - (*self_).r.absmin[2],
-                        zdiff,
-                        rightdot
-                    ))
-                    .as_ptr(),
-                );
-            }
-        } else {
-            //attack
-            Jedi_Aggression(&*self_, 1);
         }
+        if ctx.world.bg_state.rng.Q_irand(0, 3) == 0 {
+            //ouch... maybe switch up which saber power level we're using
+            let saber_level = ctx.world.bg_state.rng.Q_irand(FORCE_LEVEL_1, FORCE_LEVEL_3);
+            Jedi_AdjustSaberAnimLevel(ctx, Some(self_), saber_level);
+        }
+        if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
+            Jedi_Aggression(ctx.world.entity(self_), -1);
+        }
+        if d_jedi {
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "({}) PAIN: agg {}, no parry until {}\n",
+                    ctx.world.level.time,
+                    unsafe { (*snpc).stats.aggression },
+                    ctx.world.level.time + 500
+                ))
+                .as_ptr(),
+            );
+        }
+        if d_jedi {
+            let mut diff: vec3_t = [0.0; 3];
+            let mut fwdangles: vec3_t = [0.0; 3];
+            let mut right: vec3_t = [0.0; 3];
+            let rightdot: f32;
+            let zdiff: f32;
 
+            let eye_point = unsafe { (*client).renderInfo.eyePoint };
+            crate::q_math::_VectorSubtract(point, eye_point, &mut diff);
+            diff[2] = 0.0;
+            fwdangles[1] = unsafe { (*client).ps.viewangles[1] };
+            crate::q_math::AngleVectors(fwdangles, None, Some(&mut right), None);
+            rightdot = crate::q_math::_DotProduct(right, diff);
+            zdiff = point[2] - eye_point[2];
+
+            let absmin_z = ctx.world.entity(self_).r.absmin[2];
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "({}) saber hit at height {:.2}, zdiff: {:.2}, rightdot: {:.2}\n",
+                    ctx.world.level.time,
+                    point[2] - absmin_z,
+                    zdiff,
+                    rightdot
+                ))
+                .as_ptr(),
+            );
+        }
+    } else {
+        //attack
+        Jedi_Aggression(ctx.world.entity(self_), 1);
+    }
+
+    unsafe {
         (*snpc).enemyCheckDebounceTime = 0;
+    }
 
-        crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_GRIP);
+    crate::w_force::WP_ForcePowerStop(ctx, self_, FP_GRIP);
 
-        crate::NPC_reactions::NPC_Pain(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(attacker),
-            damage,
+    crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+
+    if damage == 0 && ctx.world.entity(self_).health > 0 {
+        //FIXME: better way to know I was pushed
+        let voice_event = ctx.world.bg_state.rng.Q_irand(
+            entity_event_t::EV_PUSHED1 as c_int,
+            entity_event_t::EV_PUSHED3 as c_int,
         );
+        crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, voice_event, 2000);
+    }
 
-        if damage == 0 && (*self_).health > 0 {
-            //FIXME: better way to know I was pushed
-            let voice_event = ctx.world.bg_state.rng.Q_irand(
-                entity_event_t::EV_PUSHED1 as c_int,
-                entity_event_t::EV_PUSHED3 as c_int,
-            );
-            crate::NPC_sounds::G_AddVoiceEvent(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                voice_event,
-                2000,
-            );
-        }
-
-        //drop me from the ceiling if I'm on it
-        if Jedi_WaitingAmbush(&*self_) != qfalse {
+    //drop me from the ceiling if I'm on it
+    if Jedi_WaitingAmbush(ctx.world.entity(self_)) != qfalse {
+        unsafe {
             (*client).noclip = qfalse;
         }
-        if (*client).ps.legsAnim == BOTH_CEILING_CLING as c_int {
-            crate::npc_c::NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                SETANIM_LEGS,
-                BOTH_CEILING_DROP as c_int,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
-        }
-        if (*client).ps.torsoAnim == BOTH_CEILING_CLING as c_int {
-            crate::npc_c::NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                SETANIM_TORSO,
-                BOTH_CEILING_DROP as c_int,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
-        }
+    }
+    if unsafe { (*client).ps.legsAnim } == BOTH_CEILING_CLING as c_int {
+        crate::npc_c::NPC_SetAnim(
+            ctx,
+            self_,
+            SETANIM_LEGS,
+            BOTH_CEILING_DROP as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
+    }
+    if unsafe { (*client).ps.torsoAnim } == BOTH_CEILING_CLING as c_int {
+        crate::npc_c::NPC_SetAnim(
+            ctx,
+            self_,
+            SETANIM_TORSO,
+            BOTH_CEILING_DROP as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
     }
 }
 
@@ -6574,57 +6549,54 @@ pub fn NPC_Jedi_Pain(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5446-5463`
 pub fn Jedi_CheckDanger(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*npc).client;
-        let alertEvent = crate::NPC_senses::NPC_CheckAlertEvents(
-            ctx,
-            qtrue,
-            qtrue,
-            -1,
-            qfalse,
-            AEL_MINOR as c_int,
-        );
-        // §19: oracle indexes level.alertEvents[-1] (UB, near-always qfalse) when
-        // NPC_CheckAlertEvents returns -1; guard the panic on `as usize`.
-        // Source: oracle/codemp/game/NPC_AI_Jedi.c:5449
-        if alertEvent == -1 {
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    let alertEvent =
+        crate::NPC_senses::NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, AEL_MINOR as c_int);
+    // §19: oracle indexes level.alertEvents[-1] (UB, near-always qfalse) when
+    // NPC_CheckAlertEvents returns -1; guard the panic on `as usize`.
+    // Source: oracle/codemp/game/NPC_AI_Jedi.c:5449
+    if alertEvent == -1 {
+        return qfalse;
+    }
+    let ae_level = ctx.world.level.alertEvents[alertEvent as usize].level;
+    let owner = ctx.world.level.alertEvents[alertEvent as usize].owner;
+    if ae_level as c_int >= AEL_DANGER as c_int {
+        //run away!
+        let owner_id = ctx.entity_id_of(owner);
+        // FLAG: alert owner may be an NPC pool client; deref raw, per trap 2b.
+        let owner_client = match owner_id {
+            Some(oid) => ctx.world.entity(oid).client,
+            None => core::ptr::null_mut(),
+        };
+        if owner_id.is_none()
+            || owner_client.is_null()
+            || (owner_id != Some(npc_id)
+                && unsafe { (*owner_client).playerTeam } != unsafe { (*client).playerTeam })
+        {
+            //no owner
             return qfalse;
         }
-        let ae = &ctx.world.level.alertEvents[alertEvent as usize];
-        if ae.level as c_int >= AEL_DANGER as c_int {
-            //run away!
-            let owner = ae.owner;
-            let owner_client = if owner.is_null() {
-                core::ptr::null_mut()
-            } else {
-                (*owner).client
-            };
-            if owner.is_null()
-                || (*owner).client.is_null()
-                || (owner != npc && (*owner_client).playerTeam != (*client).playerTeam)
-            {
-                //no owner
-                return qfalse;
-            }
-            crate::NPC_combat::G_SetEnemy(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                ctx.entity_id_of(owner),
-            );
-            (*npc_info).enemyLastSeenTime = ctx.world.level.time;
-            let attack_delay_time = ctx.world.bg_state.rng.Q_irand(500, 2500);
-            crate::g_timer::TIMER_Set(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"attackDelay".as_ptr(),
-                attack_delay_time,
-            );
-            return qtrue;
+        crate::NPC_combat::G_SetEnemy(ctx, npc_id, owner_id);
+        let level_time = ctx.world.level.time;
+        unsafe {
+            (*npc_info).enemyLastSeenTime = level_time;
         }
-        qfalse
+        let attack_delay_time = ctx.world.bg_state.rng.Q_irand(500, 2500);
+        crate::g_timer::TIMER_Set(
+            ctx,
+            Some(npc_id),
+            c"attackDelay".as_ptr(),
+            attack_delay_time,
+        );
+        return qtrue;
     }
+    qfalse
 }
 
 /// Raven `Jedi_CheckAmbushPlayer`.
@@ -6756,47 +6728,44 @@ pub fn Jedi_CheckAmbushPlayer(ctx: &mut GameContext) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5547-5559`
 pub fn Jedi_Ambush(ctx: &mut GameContext, self_: EntityId) {
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let client = (*self_).client;
         (*client).noclip = qfalse;
-        crate::npc_c::NPC_SetAnim(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            SETANIM_BOTH,
-            BOTH_CEILING_DROP as c_int,
-            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-        );
-        (*client).ps.weaponTime = (*client).ps.torsoTimer;
-        if (*client).NPC_class != CLASS_BOBAFETT {
-            crate::w_saber::WP_ActivateSaber(ctx, ctx.entity_id_of(self_));
-        }
-        Jedi_Decloak(ctx, ctx.entity_id_of(self_));
-        let voice_event = ctx.world.bg_state.rng.Q_irand(
-            entity_event_t::EV_ANGER1 as c_int,
-            entity_event_t::EV_ANGER3 as c_int,
-        );
-        crate::NPC_sounds::G_AddVoiceEvent(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            voice_event,
-            1000,
-        );
     }
+    crate::npc_c::NPC_SetAnim(
+        ctx,
+        self_,
+        SETANIM_BOTH,
+        BOTH_CEILING_DROP as c_int,
+        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+    );
+    unsafe {
+        (*client).ps.weaponTime = (*client).ps.torsoTimer;
+    }
+    if unsafe { (*client).NPC_class } != CLASS_BOBAFETT {
+        crate::w_saber::WP_ActivateSaber(ctx, Some(self_));
+    }
+    Jedi_Decloak(ctx, Some(self_));
+    let voice_event = ctx.world.bg_state.rng.Q_irand(
+        entity_event_t::EV_ANGER1 as c_int,
+        entity_event_t::EV_ANGER3 as c_int,
+    );
+    crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, voice_event, 1000);
 }
 
 /// Raven `Jedi_WaitingAmbush`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5561-5568`
 pub fn Jedi_WaitingAmbush(self_: &gentity_t) -> qboolean {
-    unsafe {
-        let client = (*self_).client;
-        if ((*self_).spawnflags & JSF_AMBUSH) != 0 && (*client).noclip != qfalse {
-            return qtrue;
-        }
-        qfalse
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the entity's client field, per trap 2b.
+    let client = self_.client;
+    if (self_.spawnflags & JSF_AMBUSH) != 0 && unsafe { (*client).noclip } != qfalse {
+        return qtrue;
     }
+    qfalse
 }
 
 /// Raven `Jedi_Patrol`.
@@ -7058,32 +7027,29 @@ pub fn Jedi_Patrol(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:5730-5752`
 pub fn Jedi_CanPullBackSaber(ctx: &mut GameContext, self_: EntityId) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let client = (*self_).client;
-        if (*client).ps.saberBlocked == BLOCKED_PARRY_BROKEN as c_int
-            && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"parryTime".as_ptr())
-                == qfalse
-        {
-            return qfalse;
-        }
-
-        if (*client).NPC_class == CLASS_SHADOWTROOPER
-            || (*client).NPC_class == CLASS_TAVION
-            || (*client).NPC_class == CLASS_LUKE
-            || (*client).NPC_class == CLASS_DESANN
-            || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*self_).NPC_type) == 0
-        {
-            return qtrue;
-        }
-
-        if (*self_).painDebounceTime > ctx.world.level.time {
-            return qfalse;
-        }
-
-        qtrue
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    if unsafe { (*client).ps.saberBlocked } == BLOCKED_PARRY_BROKEN as c_int
+        && crate::g_timer::TIMER_Done(ctx, Some(self_), c"parryTime".as_ptr()) == qfalse
+    {
+        return qfalse;
     }
+
+    if unsafe { (*client).NPC_class } == CLASS_SHADOWTROOPER
+        || unsafe { (*client).NPC_class } == CLASS_TAVION
+        || unsafe { (*client).NPC_class } == CLASS_LUKE
+        || unsafe { (*client).NPC_class } == CLASS_DESANN
+        || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), ctx.world.entity(self_).NPC_type) == 0
+    {
+        return qtrue;
+    }
+
+    if ctx.world.entity(self_).painDebounceTime > ctx.world.level.time {
+        return qfalse;
+    }
+
+    qtrue
 }
 
 /// Raven `NPC_BSJedi_FollowLeader`.
