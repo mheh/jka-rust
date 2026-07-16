@@ -29,17 +29,6 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
 use mp_qshared::shared::surface_flags::MASK_SHOT;
 
-// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
-// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
-// precedent.
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 // `PITCH`/`YAW` resolve via the crate prelude glob (`crate::q_math`); the
 // shadowing local copies were removed by the placeholder-const sweep.
 
@@ -57,8 +46,6 @@ pub fn VEH_TurretCheckFire(
     turretNum: c_int,
     curMuzzle: c_int,
 ) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let parent: *mut gentity_t = ctx.entity_mut(parent);
     unsafe {
         // if it's time to fire and we have an enemy, then gun 'em down!  pushDebounce time controls next fire time
         if (*pVeh).m_iMuzzleTag[curMuzzle as usize] == -1 {
@@ -80,12 +67,12 @@ pub fn VEH_TurretCheckFire(
         let mut nextMuzzle: c_int = 0;
         let muzzlesFired: c_int = 1 << curMuzzle;
         let missile: *mut gentity_t;
-        WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
+        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
 
         // FIXME: some variation in fire dir
         missile = WP_FireVehicleWeapon(
             ctx,
-            ctx.entity_id_of(parent).unwrap(),
+            parent,
             (*pVeh).m_vMuzzlePos[curMuzzle as usize],
             (*pVeh).m_vMuzzleDir[curMuzzle as usize],
             vehWeapon,
@@ -94,12 +81,7 @@ pub fn VEH_TurretCheckFire(
         );
 
         // play the weapon's muzzle effect if we have one
-        G_VehMuzzleFireFX(
-            ctx,
-            ctx.entity_id_of(parent).unwrap(),
-            ctx.entity_id_of(missile),
-            muzzlesFired,
-        );
+        G_VehMuzzleFireFX(ctx, parent, ctx.entity_id_of(missile), muzzlesFired);
 
         // take the ammo away
         (*pVeh).turretStatus[turretNum as usize].ammo -= (*vehWeapon).iAmmoPerShot;
@@ -132,23 +114,23 @@ pub fn VEH_TurretAnglesToEnemy(
     bAILead: qboolean,
     desiredAngles: &mut vec3_t,
 ) {
-    // STAGE-1: ctx-free leaf takes `&gentity_t`; re-derive the raw pointer the
-    // verbatim body still expects.
-    let turretEnemy: *const gentity_t = turretEnemy;
     unsafe {
         let mut enemyDir = [0f32; 3];
         let mut org = [0f32; 3];
-        _VectorCopy((*turretEnemy).r.currentOrigin, &mut org);
+        _VectorCopy(turretEnemy.r.currentOrigin, &mut org);
         if bAILead != qfalse {
             //we want to lead them a bit
             let mut diff = [0f32; 3];
             let mut velocity = [0f32; 3];
             _VectorSubtract(org, (*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut diff);
             let dist = VectorNormalize(&mut diff);
-            if !(*turretEnemy).client.is_null() {
-                _VectorCopy((*((*turretEnemy).client)).ps.velocity, &mut velocity);
+            if !turretEnemy.client.is_null() {
+                // FLAG: turretEnemy may be an NPC/vehicle carrying a BG_Alloc'd pool
+                // client (trap 2b); deref the client pointer raw, as Raven does.
+                let tec = turretEnemy.client;
+                _VectorCopy((*tec).ps.velocity, &mut velocity);
             } else {
-                _VectorCopy((*turretEnemy).s.pos.trDelta, &mut velocity);
+                _VectorCopy(turretEnemy.s.pos.trDelta, &mut velocity);
             }
             _VectorMA(org, dist / fSpeed, velocity, &mut org);
         }
@@ -174,9 +156,6 @@ pub fn VEH_TurretAim(
     curMuzzle: c_int,
     desiredAngles: &mut vec3_t,
 ) -> qboolean {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let parent: *mut gentity_t = ctx.entity_mut(parent);
-    let turretEnemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, turretEnemy) };
     unsafe {
         let mut curAngles = [0f32; 3];
         let mut addAngles = [0f32; 3];
@@ -185,7 +164,7 @@ pub fn VEH_TurretAim(
         let mut pitchAngles = [0f32; 3];
         let mut aimCorrect: qboolean = qfalse;
 
-        WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
+        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
         // get the current absolute angles of the turret right now
         vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
         // subtract out the vehicle's angles to get the relative alignment
@@ -195,7 +174,7 @@ pub fn VEH_TurretAim(
             &mut curAngles,
         );
 
-        if !turretEnemy.is_null() {
+        if turretEnemy.is_some() {
             aimCorrect = qtrue;
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
@@ -203,7 +182,7 @@ pub fn VEH_TurretAim(
                 pVeh,
                 curMuzzle,
                 (*vehWeapon).fSpeed,
-                &*turretEnemy,
+                ctx.world.entity(turretEnemy.unwrap()),
                 (*turretStats).bAILead,
                 desiredAngles,
             );
@@ -280,12 +259,7 @@ pub fn VEH_TurretAim(
             yawAngles[1] = 0.0;
             yawAngles[2] = 0.0;
             yawAngles[(*turretStats).yawAxis as usize] = newAngles[YAW];
-            NPC_SetBoneAngles(
-                ctx,
-                ctx.entity_id_of(parent).unwrap(),
-                (*turretStats).yawBone,
-                yawAngles,
-            );
+            NPC_SetBoneAngles(ctx, parent, (*turretStats).yawBone, yawAngles);
         }
         // set pitch
         if (*turretStats).pitchBone != core::ptr::null_mut() {
@@ -294,12 +268,7 @@ pub fn VEH_TurretAim(
             pitchAngles[1] = 0.0;
             pitchAngles[2] = 0.0;
             pitchAngles[(*turretStats).pitchAxis as usize] = newAngles[PITCH];
-            NPC_SetBoneAngles(
-                ctx,
-                ctx.entity_id_of(parent).unwrap(),
-                (*turretStats).pitchBone,
-                pitchAngles,
-            );
+            NPC_SetBoneAngles(ctx, parent, (*turretStats).pitchBone, pitchAngles);
         }
         // force muzzle to recalc next check
         (*pVeh).m_iMuzzleTime[curMuzzle as usize] = 0;
@@ -319,8 +288,6 @@ pub fn VEH_TurretFindEnemies(
     turretNum: c_int,
     curMuzzle: c_int,
 ) -> qboolean {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let parent: *mut gentity_t = ctx.entity_mut(parent);
     unsafe {
         let mut found: qboolean = qfalse;
         let mut i: c_int;
@@ -333,17 +300,21 @@ pub fn VEH_TurretFindEnemies(
         let mut foundClient: qboolean = qfalse;
         let mut entity_list: [*mut gentity_t; MAX_GENTITIES] =
             [core::ptr::null_mut(); MAX_GENTITIES];
-        let mut target: *mut gentity_t;
-        let mut bestTarget: *mut gentity_t = core::ptr::null_mut();
+        let mut best_id: Option<EntityId> = None;
 
-        WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
+        // FLAG: parent is a vehicle carrying a BG_Alloc'd pool client (trap 2b);
+        // its `client` pointer is deref'd raw below, so read the (stable) pointer
+        // value once and keep it, exactly as Raven's `parent->client` does.
+        let parent_client = ctx.world.entity(parent).client;
+
+        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
         _VectorCopy((*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut org2);
 
         count = G_RadiusList(
             ctx,
             org2,
             (*turretStats).fAIRange,
-            ctx.entity_id_of(parent),
+            Some(parent),
             qtrue,
             entity_list.as_mut_ptr(),
         );
@@ -351,31 +322,35 @@ pub fn VEH_TurretFindEnemies(
         i = 0;
         while i < count {
             let mut tr: trace_t = core::mem::zeroed();
-            target = entity_list[i as usize];
+            let target = entity_list[i as usize];
+            let target_id = ctx.entity_id_of(target).unwrap();
 
-            if target == parent
-                || (*target).takedamage == qfalse
-                || (*target).health <= 0
-                || ((*target).flags & FL_NOTARGET) != 0
+            if target_id == parent
+                || ctx.world.entity(target_id).takedamage == qfalse
+                || ctx.world.entity(target_id).health <= 0
+                || (ctx.world.entity(target_id).flags & FL_NOTARGET) != 0
             {
                 i += 1;
                 continue;
             }
-            if (*target).client.is_null() {
+            if ctx.world.entity(target_id).client.is_null() {
                 // only attack clients
-                if ((*target).flags & FL_BBRUSH) == 0
+                if (ctx.world.entity(target_id).flags & FL_BBRUSH) == 0
                     // not a breakable brush
-                    || (*target).takedamage == qfalse
+                    || ctx.world.entity(target_id).takedamage == qfalse
                     // is a bbrush, but invincible
-                    || (!(*target).NPC_targetname.is_null()
-                        && !(*parent).targetname.is_null()
-                        && Q_stricmp((*target).NPC_targetname, (*parent).targetname) != 0)
+                    || (!ctx.world.entity(target_id).NPC_targetname.is_null()
+                        && !ctx.world.entity(parent).targetname.is_null()
+                        && Q_stricmp(
+                            ctx.world.entity(target_id).NPC_targetname,
+                            ctx.world.entity(parent).targetname,
+                        ) != 0)
                 {
                     // not in invicible bbrush, but can only be broken by an NPC that is not me
                     let s = cstr("misc_turret");
-                    if (*target).s.weapon == WP_TURRET
-                        && !(*target).classname.is_null()
-                        && Q_strncmp((*target).classname, s.as_ptr(), 11) == 0
+                    if ctx.world.entity(target_id).s.weapon == WP_TURRET
+                        && !ctx.world.entity(target_id).classname.is_null()
+                        && Q_strncmp(ctx.world.entity(target_id).classname, s.as_ptr(), 11) == 0
                     {
                         // these guys we want to shoot at
                     } else {
@@ -384,29 +359,34 @@ pub fn VEH_TurretFindEnemies(
                     }
                 }
                 // else: we will shoot at bbrushes!
-            } else if !(*target).client.is_null()
-                && (*((*target).client)).sess.sessionTeam == TEAM_SPECTATOR
-            {
-                i += 1;
-                continue;
+            } else {
+                // client is non-null here
+                // FLAG: target may be an NPC carrying a pool client (trap 2b);
+                // deref the client pointer raw, as Raven does.
+                let tc = ctx.world.entity(target_id).client;
+                if !tc.is_null() && (*tc).sess.sessionTeam == TEAM_SPECTATOR {
+                    i += 1;
+                    continue;
+                }
             }
             if target == (*pVeh).m_pPilot as *mut gentity_t
-                || (*target).r.ownerNum == (*parent).s.number
+                || ctx.world.entity(target_id).r.ownerNum == ctx.world.entity(parent).s.number
             {
                 // don't get angry at my pilot or passengers?
                 i += 1;
                 continue;
             }
-            if !(*parent).client.is_null() && (*((*parent).client)).sess.sessionTeam != 0 {
-                if !(*target).client.is_null() {
-                    if (*((*target).client)).sess.sessionTeam
-                        == (*((*parent).client)).sess.sessionTeam
-                    {
+            if !parent_client.is_null() && (*parent_client).sess.sessionTeam != 0 {
+                // FLAG: parent/target pool clients (trap 2b); deref raw.
+                let tc = ctx.world.entity(target_id).client;
+                if !tc.is_null() {
+                    if (*tc).sess.sessionTeam == (*parent_client).sess.sessionTeam {
                         // A bot/client/NPC we don't want to shoot
                         i += 1;
                         continue;
                     }
-                } else if (*target).teamnodmg == (*((*parent).client)).sess.sessionTeam {
+                } else if ctx.world.entity(target_id).teamnodmg == (*parent_client).sess.sessionTeam
+                {
                     // some other entity that's allied with us
                     i += 1;
                     continue;
@@ -416,7 +396,7 @@ pub fn VEH_TurretFindEnemies(
                 ctx.engine,
                 mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
                     &org2 as *const vec3_t,
-                    &(*target).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(target_id).r.currentOrigin as *const vec3_t,
                 ),
             ) == qfalse
             {
@@ -424,7 +404,7 @@ pub fn VEH_TurretFindEnemies(
                 continue;
             }
 
-            _VectorCopy((*target).r.currentOrigin, &mut org);
+            _VectorCopy(ctx.world.entity(target_id).r.currentOrigin, &mut org);
 
             trap::Trace(
                 ctx.engine,
@@ -434,24 +414,30 @@ pub fn VEH_TurretFindEnemies(
                     core::ptr::null(),
                     core::ptr::null(),
                     &org as *const vec3_t,
-                    (*parent).s.number,
+                    ctx.world.entity(parent).s.number,
                     MASK_SHOT,
                 ),
             );
 
-            if tr.entityNum as c_int == (*target).s.number
+            if tr.entityNum as c_int == ctx.world.entity(target_id).s.number
                 || (tr.allsolid == 0 && tr.startsolid == 0 && tr.fraction == 1.0f32)
             {
                 // Only acquire if have a clear shot, Is it in range and closer than our best?
-                _VectorSubtract((*target).r.currentOrigin, org2, &mut enemyDir);
+                _VectorSubtract(
+                    ctx.world.entity(target_id).r.currentOrigin,
+                    org2,
+                    &mut enemyDir,
+                );
                 enemyDist = VectorLengthSquared(enemyDir);
 
-                if enemyDist < bestDist || (!(*target).client.is_null() && foundClient == qfalse) {
+                if enemyDist < bestDist
+                    || (!ctx.world.entity(target_id).client.is_null() && foundClient == qfalse)
+                {
                     // all things equal, keep current
-                    bestTarget = target;
+                    best_id = Some(target_id);
                     bestDist = enemyDist;
                     found = qtrue;
-                    if !(*target).client.is_null() {
+                    if !ctx.world.entity(target_id).client.is_null() {
                         // prefer clients over non-clients
                         foundClient = qtrue;
                     }
@@ -461,7 +447,8 @@ pub fn VEH_TurretFindEnemies(
         }
 
         if found != qfalse {
-            (*pVeh).turretStatus[turretNum as usize].enemyEntNum = (*bestTarget).s.number;
+            let n = ctx.world.entity(best_id.unwrap()).s.number;
+            (*pVeh).turretStatus[turretNum as usize].enemyEntNum = n;
         }
 
         return found;
@@ -477,46 +464,49 @@ pub fn VEH_TurretObeyPassengerControl(
     parent: EntityId,
     turretNum: c_int,
 ) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let parent: *mut gentity_t = ctx.entity_mut(parent);
     unsafe {
         let turretStats: *mut turretStats_t =
             &mut (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize];
         let passenger: *mut gentity_t =
             (*pVeh).m_ppPassengers[((*turretStats).passengerNum - 1) as usize] as *mut gentity_t;
 
-        if !passenger.is_null() && !(*passenger).client.is_null() && (*passenger).health > 0 {
-            // a valid, living passenger client
-            let vehWeapon: *mut vehWeaponInfo_t =
-                &mut (&mut ctx.world.bg_state.g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
-            let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
-            let mut aimAngles = [0f32; 3];
-            _VectorCopy((*((*passenger).client)).ps.viewangles, &mut aimAngles);
+        if !passenger.is_null() {
+            let passenger_id = ctx.entity_id_of(passenger).unwrap();
+            // FLAG: passenger may be an NPC carrying a pool client (trap 2b); read
+            // the (stable) client pointer once and deref it raw, as Raven does.
+            let passenger_client = ctx.world.entity(passenger_id).client;
+            if !passenger_client.is_null() && ctx.world.entity(passenger_id).health > 0 {
+                // a valid, living passenger client
+                let vehWeapon: *mut vehWeaponInfo_t =
+                    &mut (&mut ctx.world.bg_state.g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
+                let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
+                let mut aimAngles = [0f32; 3];
+                _VectorCopy((*passenger_client).ps.viewangles, &mut aimAngles);
 
-            VEH_TurretAim(
-                ctx,
-                pVeh,
-                ctx.entity_id_of(parent).unwrap(),
-                None,
-                turretStats,
-                vehWeapon,
-                turretNum,
-                curMuzzle,
-                &mut aimAngles,
-            );
-            if ((*((*passenger).client)).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK))
-                != 0
-            {
-                // he's pressing an attack button, so fire!
-                VEH_TurretCheckFire(
+                VEH_TurretAim(
                     ctx,
                     pVeh,
-                    ctx.entity_id_of(parent).unwrap(),
+                    parent,
+                    None,
                     turretStats,
                     vehWeapon,
                     turretNum,
                     curMuzzle,
+                    &mut aimAngles,
                 );
+                if ((*passenger_client).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) != 0
+                {
+                    // he's pressing an attack button, so fire!
+                    VEH_TurretCheckFire(
+                        ctx,
+                        pVeh,
+                        parent,
+                        turretStats,
+                        vehWeapon,
+                        turretNum,
+                        curMuzzle,
+                    );
+                }
             }
         }
     }
@@ -531,8 +521,6 @@ pub fn VEH_TurretThink(
     parent: EntityId,
     turretNum: c_int,
 ) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let parent: *mut gentity_t = ctx.entity_mut(parent);
     unsafe {
         let mut doAim: qboolean = qfalse;
         let mut enemyDist: f32;
@@ -541,7 +529,7 @@ pub fn VEH_TurretThink(
         let turretStats: *mut turretStats_t =
             &mut (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize];
         let mut vehWeapon: *mut vehWeaponInfo_t = core::ptr::null_mut();
-        let mut turretEnemy: *mut gentity_t = core::ptr::null_mut();
+        let mut turretEnemy: Option<EntityId> = None;
         let mut curMuzzle: c_int = 0; // ?
 
         if turretStats.is_null() || (*turretStats).iAmmoMax == 0 {
@@ -553,7 +541,7 @@ pub fn VEH_TurretThink(
             && (*pVeh).m_iNumPassengers >= (*turretStats).passengerNum
         {
             // the passenger that has control of this turret is on the ship
-            VEH_TurretObeyPassengerControl(ctx, pVeh, ctx.entity_id_of(parent).unwrap(), turretNum);
+            VEH_TurretObeyPassengerControl(ctx, pVeh, parent, turretNum);
             return;
         } else if (*turretStats).bAI == qfalse {
             // try AI
@@ -570,63 +558,50 @@ pub fn VEH_TurretThink(
         curMuzzle = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
 
         if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < ENTITYNUM_WORLD {
-            turretEnemy = &mut (*ctx
-                .world
-                .g_entities
-                .as_mut_ptr()
-                .add((*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize));
-            if (*turretEnemy).health < 0
-                || (*turretEnemy).inuse == qfalse
-                || turretEnemy == (*pVeh).m_pPilot as *mut gentity_t
+            let te_id = EntityId((*pVeh).turretStatus[turretNum as usize].enemyEntNum as u32);
+            turretEnemy = Some(te_id);
+            if ctx.world.entity(te_id).health < 0
+                || ctx.world.entity(te_id).inuse == qfalse
+                || ctx.entity_id_of((*pVeh).m_pPilot as *mut gentity_t) == Some(te_id)
                 // enemy became my pilot///?
-                || turretEnemy == parent
-                || (*turretEnemy).r.ownerNum == (*parent).s.number // a passenger?
-                || (!(*turretEnemy).client.is_null()
-                    && (*((*turretEnemy).client)).sess.sessionTeam == TEAM_SPECTATOR)
+                || te_id == parent
+                || ctx.world.entity(te_id).r.ownerNum == ctx.world.entity(parent).s.number // a passenger?
+                || {
+                    // FLAG: te may be an NPC carrying a pool client (trap 2b); deref raw.
+                    let tec = ctx.world.entity(te_id).client;
+                    !tec.is_null() && (*tec).sess.sessionTeam == TEAM_SPECTATOR
+                }
             {
                 // don't keep going after spectators, pilot, self, dead people, etc.
-                turretEnemy = core::ptr::null_mut();
+                turretEnemy = None;
                 (*pVeh).turretStatus[turretNum as usize].enemyEntNum = ENTITYNUM_NONE;
             }
         }
 
         if (*pVeh).turretStatus[turretNum as usize].enemyHoldTime < ctx.world.level.time {
-            if VEH_TurretFindEnemies(
-                ctx,
-                pVeh,
-                ctx.entity_id_of(parent).unwrap(),
-                turretStats,
-                turretNum,
-                curMuzzle,
-            ) != qfalse
+            if VEH_TurretFindEnemies(ctx, pVeh, parent, turretStats, turretNum, curMuzzle) != qfalse
             {
-                turretEnemy = &mut (*ctx
-                    .world
-                    .g_entities
-                    .as_mut_ptr()
-                    .add((*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize));
+                turretEnemy = Some(EntityId(
+                    (*pVeh).turretStatus[turretNum as usize].enemyEntNum as u32,
+                ));
                 doAim = qtrue;
-            } else if !(*parent).enemy.is_none() {
-                if let Some(enemy_id) = (*parent).enemy {
-                    let enemy_ptr = ctx.world.g_entities.as_mut_ptr().add(enemy_id.0 as usize);
-                    if (*enemy_ptr).s.number < ENTITYNUM_WORLD {
+            } else {
+                let parent_enemy = ctx.world.entity(parent).enemy;
+                if let Some(enemy_id) = parent_enemy {
+                    if ctx.world.entity(enemy_id).s.number < ENTITYNUM_WORLD {
                         if ctx.world.cvars.g_gametype.integer < GT_TEAM
-                            || OnSameTeam(
-                                ctx,
-                                ctx.entity_id_of(enemy_ptr),
-                                ctx.entity_id_of(parent),
-                            ) == qfalse
+                            || OnSameTeam(ctx, Some(enemy_id), Some(parent)) == qfalse
                         {
                             // either not in a team game or the enemy isn't on the same team
-                            turretEnemy = enemy_ptr;
+                            turretEnemy = Some(enemy_id);
                             doAim = qtrue;
                         }
                     }
                 }
             }
-            if !turretEnemy.is_null() {
+            if let Some(te_id) = turretEnemy {
                 // found one
-                if !(*turretEnemy).client.is_null() {
+                if !ctx.world.entity(te_id).client.is_null() {
                     // hold on to clients for a min of 3 seconds
                     (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
                         ctx.world.level.time + 3000;
@@ -637,12 +612,12 @@ pub fn VEH_TurretThink(
                 }
             }
         }
-        if !turretEnemy.is_null() {
-            if (*turretEnemy).health > 0 {
+        if let Some(te_id) = turretEnemy {
+            if ctx.world.entity(te_id).health > 0 {
                 // enemy is alive
-                WP_CalcVehMuzzle(ctx, ctx.entity_id_of(parent).unwrap(), curMuzzle);
+                WP_CalcVehMuzzle(ctx, parent, curMuzzle);
                 _VectorSubtract(
-                    (*turretEnemy).r.currentOrigin,
+                    ctx.world.entity(te_id).r.currentOrigin,
                     (*pVeh).m_vMuzzlePos[curMuzzle as usize],
                     &mut enemyDir,
                 );
@@ -654,7 +629,7 @@ pub fn VEH_TurretThink(
                         ctx.engine,
                         mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
                             &(*pVeh).m_vMuzzlePos[curMuzzle as usize] as *const vec3_t,
-                            &(*turretEnemy).r.currentOrigin as *const vec3_t,
+                            &ctx.world.entity(te_id).r.currentOrigin as *const vec3_t,
                         ),
                     ) != qfalse
                     {
@@ -664,7 +639,7 @@ pub fn VEH_TurretThink(
                         let mut end = [0f32; 3];
                         _VectorCopy((*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut start);
 
-                        _VectorCopy((*turretEnemy).r.currentOrigin, &mut end);
+                        _VectorCopy(ctx.world.entity(te_id).r.currentOrigin, &mut end);
                         trap::Trace(
                             ctx.engine,
                             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
@@ -673,12 +648,12 @@ pub fn VEH_TurretThink(
                                 core::ptr::null(),
                                 core::ptr::null(),
                                 &end as *const vec3_t,
-                                (*parent).s.number,
+                                ctx.world.entity(parent).s.number,
                                 MASK_SHOT,
                             ),
                         );
 
-                        if tr.entityNum as c_int == (*turretEnemy).s.number
+                        if tr.entityNum as c_int == ctx.world.entity(te_id).s.number
                             || (tr.allsolid == 0 && tr.startsolid == 0)
                         {
                             doAim = qtrue; // Can see our enemy
@@ -693,8 +668,8 @@ pub fn VEH_TurretThink(
             if VEH_TurretAim(
                 ctx,
                 pVeh,
-                ctx.entity_id_of(parent).unwrap(),
-                ctx.entity_id_of(turretEnemy),
+                parent,
+                turretEnemy,
                 turretStats,
                 vehWeapon,
                 turretNum,
@@ -705,7 +680,7 @@ pub fn VEH_TurretThink(
                 VEH_TurretCheckFire(
                     ctx,
                     pVeh,
-                    ctx.entity_id_of(parent).unwrap(),
+                    parent,
                     turretStats,
                     vehWeapon,
                     turretNum,
