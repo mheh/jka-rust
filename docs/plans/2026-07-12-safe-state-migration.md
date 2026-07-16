@@ -122,6 +122,27 @@ Raven gameplay functions.
     (roadmap Stage-2 API) stay out of scope — 2c establishes safe typed
     access to the unchanged C-shaped data.
 
+**Stage-5 execution rulings (user, 2026-07-16):** Com_Printf/Com_Error in bg
+files (71 sites, re-verified) route uniformly through new
+`BgTraps::com_printf`/`com_error` over trap_Print/trap_Error — no panic!
+substitutions. S5-1 (the playerState overlay retypes) lands as its own
+commit with adversarial gate-2 + per-site oracle line-cite review.
+**S5-5 re-scoped by the twin-equivalence audit (BLOCKED as planned):** of
+bg's q_math/q_shared symbol set, 24 twins are IDENTICAL/EQUIVALENT (incl.
+the 2026-07 float-width hardening, mirrored in both) and retarget as-is;
+19 symbols have NO twin and are added to the mp_qshared twins verbatim
+from the audited game copies; the twin COM_Parse family is the
+pre-Stage-3 `static mut` version and is NOT a retarget target — the
+hardened `QSharedScratch`-threaded family + the `QSharedScratch` type
+move down to `mp_qshared` as canonical (user ruling: mp_qshared over
+mp_bg, so the engine island can later migrate off its static-mut twins),
+with `mp_game::q_shared` becoming a re-export shim (~44 game importers
+unchanged). Legacy static-mut twin parse fns stay for engine callers,
+marked for a future engine-migration task. File ownership: Stage 5 owns
+the 11 bg files (82 of the 2,440 casts die by severing); 4D sweeps the
+2,358 non-bg sites; `game_impl.rs` serializes S5-2 (wave 1) → 4D-S2
+sweep (wave 2).
+
 **Tail execution ruling (user, 2026-07-12):** after the hub shards, Stage-1
 runs 2-wide — two worktree-isolated agents per wave with mutually-exclusive
 file lists (cross-bridges into the partner's files are reported, not edited,
