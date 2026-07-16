@@ -26,6 +26,7 @@ use crate::bg_lib::qsort;
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
 use crate::com_boundary::{com_error_sink, com_print_sink};
+use crate::ent_fn_enums::dispatch_think;
 use crate::g_active::{ClientEndFrame, G_CheckClientTimeouts, G_RunClient};
 use crate::g_cmds::{DeathmatchScoreboardMessage, SetTeam, StopFollowing};
 use crate::g_items::{G_RunItem, Jetpack_Off};
@@ -354,90 +355,77 @@ fn resolve_cvar_flags(expr: &str) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_main.c:803-845`
 pub fn G_RegisterCvars(ctx: &mut GameContext) {
-    unsafe {
-        let mut remapped = qfalse;
+    let mut remapped = qfalse;
 
-        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++) {
-        // trap_Cvar_Register(cv->vmCvar, cv->cvarName, cv->defaultString,
-        // cv->cvarFlags); if (cv->vmCvar) cv->modificationCount =
-        // cv->vmCvar->modificationCount; if (cv->teamShader) remapped = qtrue;
-        // }` (g_main.c:808-816). `cv->modificationCount` lives in
-        // `GameGlobals::gameCvarModCounts`, indexed the same as
-        // `GAME_CVAR_TABLE` (Raven stores it inline on the row).
-        for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
-            let cvar_ptr: *mut vmCvar_t = match entry.field {
-                Some(name) => ctx.world.cvars.field_mut(name) as *mut vmCvar_t,
-                None => std::ptr::null_mut(),
-            };
-            trap::Cvar_Register(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
-                    cvar_ptr,
-                    cstr(entry.name),
-                    cstr(entry.default),
-                    resolve_cvar_flags(entry.flags),
-                ),
-            );
+    // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++) {
+    // trap_Cvar_Register(cv->vmCvar, cv->cvarName, cv->defaultString,
+    // cv->cvarFlags); if (cv->vmCvar) cv->modificationCount =
+    // cv->vmCvar->modificationCount; if (cv->teamShader) remapped = qtrue;
+    // }` (g_main.c:808-816). `cv->modificationCount` lives in
+    // `GameGlobals::gameCvarModCounts`, indexed the same as
+    // `GAME_CVAR_TABLE` (Raven stores it inline on the row).
+    for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
+        let cvar_ptr: *mut vmCvar_t = match entry.field {
+            Some(name) => ctx.world.cvars.field_mut(name) as *mut vmCvar_t,
+            None => std::ptr::null_mut(),
+        };
+        trap::Cvar_Register(
+            ctx.engine,
+            mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
+                cvar_ptr,
+                cstr(entry.name),
+                cstr(entry.default),
+                resolve_cvar_flags(entry.flags),
+            ),
+        );
 
-            if !cvar_ptr.is_null() {
-                ctx.world.globals.gameCvarModCounts.0[i] = (*cvar_ptr).modificationCount;
-            }
-
-            if entry.team_shader {
-                remapped = qtrue;
-            }
+        if let Some(name) = entry.field {
+            let mc = ctx.world.cvars.field_mut(name).modificationCount;
+            ctx.world.globals.gameCvarModCounts.0[i] = mc;
         }
 
-        // bg-tier cvar mirror: bg code reads this from BgState (Raven read the
-        // vmCvar_t global directly).
-        ctx.world.bg_state.bg_fighterAltControl = ctx.world.cvars.bg_fighterAltControl.integer;
-
-        if remapped != qfalse {
-            G_RemapTeamShaders();
+        if entry.team_shader {
+            remapped = qtrue;
         }
-
-        let gt = ctx.world.cvars.g_gametype.integer;
-        if gt < 0 || gt >= GT_MAX_GAME_TYPE {
-            let msg = format!("g_gametype {} is out of range, defaulting to 0\n", gt);
-            G_Printf(ctx, cstr(&msg).as_ptr());
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_gametype"),
-                    cstr("0"),
-                ),
-            );
-        } else if gt == GT_HOLOCRON {
-            G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_gametype"),
-                    cstr("0"),
-                ),
-            );
-        } else if gt == GT_JEDIMASTER {
-            G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_gametype"),
-                    cstr("0"),
-                ),
-            );
-        } else if gt == GT_CTY {
-            G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_gametype"),
-                    cstr("0"),
-                ),
-            );
-        }
-
-        ctx.world.level.warmupModificationCount = ctx.world.cvars.g_warmup.modificationCount;
     }
+
+    // bg-tier cvar mirror: bg code reads this from BgState (Raven read the
+    // vmCvar_t global directly).
+    ctx.world.bg_state.bg_fighterAltControl = ctx.world.cvars.bg_fighterAltControl.integer;
+
+    if remapped != qfalse {
+        G_RemapTeamShaders();
+    }
+
+    let gt = ctx.world.cvars.g_gametype.integer;
+    if gt < 0 || gt >= GT_MAX_GAME_TYPE {
+        let msg = format!("g_gametype {} is out of range, defaulting to 0\n", gt);
+        G_Printf(ctx, cstr(&msg).as_ptr());
+        trap::Cvar_Set(
+            ctx.engine,
+            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
+        );
+    } else if gt == GT_HOLOCRON {
+        G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
+        trap::Cvar_Set(
+            ctx.engine,
+            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
+        );
+    } else if gt == GT_JEDIMASTER {
+        G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
+        trap::Cvar_Set(
+            ctx.engine,
+            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
+        );
+    } else if gt == GT_CTY {
+        G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
+        trap::Cvar_Set(
+            ctx.engine,
+            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
+        );
+    }
+
+    ctx.world.level.warmupModificationCount = ctx.world.cvars.g_warmup.modificationCount;
 }
 
 /// Raven `G_UpdateCvars`.
@@ -456,19 +444,22 @@ pub fn G_UpdateCvars(ctx: &mut GameContext) {
         // (cv->teamShader) remapped = qtrue; } } }` (g_main.c:857-872).
         for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
             if let Some(name) = entry.field {
+                // The raw `*mut vmCvar_t` still crosses the seam to `Cvar_Update`
+                // (the engine writes the fresh value in place); the readback then
+                // reads it through the safe `field_mut` accessor.
                 let cvar_ptr: *mut vmCvar_t = ctx.world.cvars.field_mut(name) as *mut vmCvar_t;
                 trap::Cvar_Update(
                     ctx.engine,
                     mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs::new(cvar_ptr),
                 );
 
-                let new_mod_count = (*cvar_ptr).modificationCount;
-                let cached = &mut ctx.world.globals.gameCvarModCounts.0[i];
-                if *cached != new_mod_count {
-                    *cached = new_mod_count;
+                let new_mod_count = ctx.world.cvars.field_mut(name).modificationCount;
+                if ctx.world.globals.gameCvarModCounts.0[i] != new_mod_count {
+                    ctx.world.globals.gameCvarModCounts.0[i] = new_mod_count;
 
                     if entry.track_change {
-                        let value = cstr_to_str((*cvar_ptr).string.as_ptr());
+                        let sptr = ctx.world.cvars.field_mut(name).string.as_ptr();
+                        let value = cstr_to_str(sptr);
                         trap::SendServerCommand(
                             ctx.engine,
                             mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
@@ -549,88 +540,81 @@ pub fn Com_Printf(
 ///
 /// Source: `oracle/codemp/game/g_main.c:1248-1295`
 pub fn AddTournamentPlayer(ctx: &mut GameContext) {
-    unsafe {
-        if ctx.world.level.numPlayingClients >= 2 {
-            return;
-        }
-
-        let mut next_in_line: *mut gclient_t = std::ptr::null_mut();
-        let maxclients = ctx.world.level.maxclients;
-        let clients = ctx.world.clients.as_mut_ptr();
-        let mut i: c_int = 0;
-        while i < maxclients {
-            let client = clients.add(i as usize);
-            if (*client).pers.connected != CON_CONNECTED {
-                i += 1;
-                continue;
-            }
-            if ctx.world.cvars.g_allowHighPingDuelist.integer == 0 && (*client).ps.ping >= 999 {
-                // don't add people who are lagging out if cvar is not set to allow it.
-                i += 1;
-                continue;
-            }
-            if (*client).sess.sessionTeam != TEAM_SPECTATOR {
-                i += 1;
-                continue;
-            }
-            // never select the dedicated follow or scoreboard clients
-            if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD
-                || (*client).sess.spectatorClient < 0
-            {
-                i += 1;
-                continue;
-            }
-
-            if next_in_line.is_null()
-                || (*client).sess.spectatorTime < (*next_in_line).sess.spectatorTime
-            {
-                next_in_line = client;
-            }
-            i += 1;
-        }
-
-        if next_in_line.is_null() {
-            return;
-        }
-
-        ctx.world.level.warmupTime = -1;
-
-        // set them to free-for-all team
-        let idx = next_in_line.offset_from(clients) as usize;
-        let ent = ctx.world.g_entities.as_mut_ptr().add(idx);
-        let s = CString::new("f").unwrap();
-        SetTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            s.as_ptr() as *mut c_char,
-        );
+    if ctx.world.level.numPlayingClients >= 2 {
+        return;
     }
+
+    // Raven tracks `next_in_line` as a `gclient_t*` into `level.clients`; the
+    // client index is the only thing read back (`offset_from`), so carry the
+    // index directly.
+    let mut next_in_line: Option<usize> = None;
+    let maxclients = ctx.world.level.maxclients;
+    let mut i: c_int = 0;
+    while i < maxclients {
+        if ctx.world.clients[i as usize].pers.connected != CON_CONNECTED {
+            i += 1;
+            continue;
+        }
+        if ctx.world.cvars.g_allowHighPingDuelist.integer == 0
+            && ctx.world.clients[i as usize].ps.ping >= 999
+        {
+            // don't add people who are lagging out if cvar is not set to allow it.
+            i += 1;
+            continue;
+        }
+        if ctx.world.clients[i as usize].sess.sessionTeam != TEAM_SPECTATOR {
+            i += 1;
+            continue;
+        }
+        // never select the dedicated follow or scoreboard clients
+        if ctx.world.clients[i as usize].sess.spectatorState == SPECTATOR_SCOREBOARD
+            || ctx.world.clients[i as usize].sess.spectatorClient < 0
+        {
+            i += 1;
+            continue;
+        }
+
+        let is_better = match next_in_line {
+            None => true,
+            Some(nil) => {
+                ctx.world.clients[i as usize].sess.spectatorTime
+                    < ctx.world.clients[nil].sess.spectatorTime
+            }
+        };
+        if is_better {
+            next_in_line = Some(i as usize);
+        }
+        i += 1;
+    }
+
+    let Some(idx) = next_in_line else {
+        return;
+    };
+
+    ctx.world.level.warmupTime = -1;
+
+    // set them to free-for-all team
+    let s = CString::new("f").unwrap();
+    SetTeam(ctx, EntityId(idx as u32), s.as_ptr() as *mut c_char);
 }
 
 /// Raven `RemoveTournamentLoser`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1304-1319`
 pub fn RemoveTournamentLoser(ctx: &mut GameContext) {
-    unsafe {
-        if ctx.world.level.numPlayingClients != 2 {
-            return;
-        }
-
-        let clientNum = ctx.world.level.sortedClients[1];
-
-        if ctx.world.clients[clientNum as usize].pers.connected != CON_CONNECTED {
-            return;
-        }
-
-        // make them a spectator
-        let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
-        let s = CString::new("s").unwrap();
-        SetTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            s.as_ptr() as *mut c_char,
-        );
+    if ctx.world.level.numPlayingClients != 2 {
+        return;
     }
+
+    let clientNum = ctx.world.level.sortedClients[1];
+
+    if ctx.world.clients[clientNum as usize].pers.connected != CON_CONNECTED {
+        return;
+    }
+
+    // make them a spectator
+    let s = CString::new("s").unwrap();
+    SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
 }
 
 /// Raven `G_PowerDuelCount`.
@@ -642,24 +626,29 @@ pub fn G_PowerDuelCount(
     doubles: *mut c_int,
     countSpec: qboolean,
 ) {
-    unsafe {
-        let mut i: c_int = 0;
-        while (i as usize) < MAX_CLIENTS {
-            let ent = ctx.world.g_entities.as_mut_ptr().add(i as usize);
-            let cl = (*ent).client;
+    // Entity slots `0..MAX_CLIENTS` are the player entities, whose `client`
+    // points at `level.clients[i]` (Raven `g_entities[i].client = clients + i`),
+    // so the `(*ent).client` deref of Raven reads `clients[i]` — indexed safely.
+    // `loners`/`doubles` stay raw out-pointers (the signature has an out-of-file
+    // caller in `g_bot.rs`); their writes are the only remaining unsafe here.
+    let mut i: c_int = 0;
+    while (i as usize) < MAX_CLIENTS {
+        let ent = ctx.world.entity(EntityId(i as u32));
+        let inuse = ent.inuse;
+        let has_client = !ent.client.is_null();
 
-            if (*ent).inuse != qfalse
-                && !cl.is_null()
-                && (countSpec != qfalse || (*cl).sess.sessionTeam != TEAM_SPECTATOR)
-            {
-                if (*cl).sess.duelTeam == DUELTEAM_LONE as c_int {
-                    *loners += 1;
-                } else if (*cl).sess.duelTeam == DUELTEAM_DOUBLE as c_int {
-                    *doubles += 1;
-                }
+        if inuse != qfalse
+            && has_client
+            && (countSpec != qfalse
+                || ctx.world.clients[i as usize].sess.sessionTeam != TEAM_SPECTATOR)
+        {
+            if ctx.world.clients[i as usize].sess.duelTeam == DUELTEAM_LONE as c_int {
+                unsafe { *loners += 1 };
+            } else if ctx.world.clients[i as usize].sess.duelTeam == DUELTEAM_DOUBLE as c_int {
+                unsafe { *doubles += 1 };
             }
-            i += 1;
         }
+        i += 1;
     }
 }
 
@@ -667,205 +656,178 @@ pub fn G_PowerDuelCount(
 ///
 /// Source: `oracle/codemp/game/g_main.c:1346-1425`
 pub fn AddPowerDuelPlayers(ctx: &mut GameContext) {
-    unsafe {
-        if ctx.world.level.numPlayingClients >= 3 {
-            return;
-        }
-
-        let mut next_in_line: *mut gclient_t = std::ptr::null_mut();
-
-        let mut nonspec_loners: c_int = 0;
-        let mut nonspec_doubles: c_int = 0;
-        G_PowerDuelCount(ctx, &mut nonspec_loners, &mut nonspec_doubles, qfalse);
-        if nonspec_loners >= 1 && nonspec_doubles >= 2 {
-            // we have enough people, stop
-            return;
-        }
-
-        // Could be written faster, but it's not enough to care I suppose.
-        let mut loners: c_int = 0;
-        let mut doubles: c_int = 0;
-        G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
-
-        if loners < 1 || doubles < 2 {
-            // don't bother trying to spawn anyone yet if the balance is not
-            // even set up between spectators
-            return;
-        }
-
-        // Count again, with only in-game clients in mind.
-        loners = nonspec_loners;
-        doubles = nonspec_doubles;
-
-        let maxclients = ctx.world.level.maxclients;
-        let clients = ctx.world.clients.as_mut_ptr();
-        let mut i: c_int = 0;
-        while i < maxclients {
-            let client = clients.add(i as usize);
-            if (*client).pers.connected != CON_CONNECTED {
-                i += 1;
-                continue;
-            }
-            if (*client).sess.sessionTeam != TEAM_SPECTATOR {
-                i += 1;
-                continue;
-            }
-            if (*client).sess.duelTeam == DUELTEAM_FREE as c_int {
-                i += 1;
-                continue;
-            }
-            if (*client).sess.duelTeam == DUELTEAM_LONE as c_int && loners >= 1 {
-                i += 1;
-                continue;
-            }
-            if (*client).sess.duelTeam == DUELTEAM_DOUBLE as c_int && doubles >= 2 {
-                i += 1;
-                continue;
-            }
-
-            // never select the dedicated follow or scoreboard clients
-            if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD
-                || (*client).sess.spectatorClient < 0
-            {
-                i += 1;
-                continue;
-            }
-
-            if next_in_line.is_null()
-                || (*client).sess.spectatorTime < (*next_in_line).sess.spectatorTime
-            {
-                next_in_line = client;
-            }
-            i += 1;
-        }
-
-        if next_in_line.is_null() {
-            return;
-        }
-
-        ctx.world.level.warmupTime = -1;
-
-        // set them to free-for-all team
-        let idx = next_in_line.offset_from(clients) as usize;
-        let ent = ctx.world.g_entities.as_mut_ptr().add(idx);
-        let s = CString::new("f").unwrap();
-        SetTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            s.as_ptr() as *mut c_char,
-        );
-
-        // Call recursively until everyone is in
-        AddPowerDuelPlayers(ctx);
+    if ctx.world.level.numPlayingClients >= 3 {
+        return;
     }
+
+    // `next_in_line` carries the winning client index (see AddTournamentPlayer).
+    let mut next_in_line: Option<usize> = None;
+
+    let mut nonspec_loners: c_int = 0;
+    let mut nonspec_doubles: c_int = 0;
+    G_PowerDuelCount(ctx, &mut nonspec_loners, &mut nonspec_doubles, qfalse);
+    if nonspec_loners >= 1 && nonspec_doubles >= 2 {
+        // we have enough people, stop
+        return;
+    }
+
+    // Could be written faster, but it's not enough to care I suppose.
+    let mut loners: c_int = 0;
+    let mut doubles: c_int = 0;
+    G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
+
+    if loners < 1 || doubles < 2 {
+        // don't bother trying to spawn anyone yet if the balance is not
+        // even set up between spectators
+        return;
+    }
+
+    // Count again, with only in-game clients in mind.
+    loners = nonspec_loners;
+    doubles = nonspec_doubles;
+
+    let maxclients = ctx.world.level.maxclients;
+    let mut i: c_int = 0;
+    while i < maxclients {
+        if ctx.world.clients[i as usize].pers.connected != CON_CONNECTED {
+            i += 1;
+            continue;
+        }
+        if ctx.world.clients[i as usize].sess.sessionTeam != TEAM_SPECTATOR {
+            i += 1;
+            continue;
+        }
+        if ctx.world.clients[i as usize].sess.duelTeam == DUELTEAM_FREE as c_int {
+            i += 1;
+            continue;
+        }
+        if ctx.world.clients[i as usize].sess.duelTeam == DUELTEAM_LONE as c_int && loners >= 1 {
+            i += 1;
+            continue;
+        }
+        if ctx.world.clients[i as usize].sess.duelTeam == DUELTEAM_DOUBLE as c_int && doubles >= 2 {
+            i += 1;
+            continue;
+        }
+
+        // never select the dedicated follow or scoreboard clients
+        if ctx.world.clients[i as usize].sess.spectatorState == SPECTATOR_SCOREBOARD
+            || ctx.world.clients[i as usize].sess.spectatorClient < 0
+        {
+            i += 1;
+            continue;
+        }
+
+        let is_better = match next_in_line {
+            None => true,
+            Some(nil) => {
+                ctx.world.clients[i as usize].sess.spectatorTime
+                    < ctx.world.clients[nil].sess.spectatorTime
+            }
+        };
+        if is_better {
+            next_in_line = Some(i as usize);
+        }
+        i += 1;
+    }
+
+    let Some(idx) = next_in_line else {
+        return;
+    };
+
+    ctx.world.level.warmupTime = -1;
+
+    // set them to free-for-all team
+    let s = CString::new("f").unwrap();
+    SetTeam(ctx, EntityId(idx as u32), s.as_ptr() as *mut c_char);
+
+    // Call recursively until everyone is in
+    AddPowerDuelPlayers(ctx);
 }
 
 /// Raven `RemovePowerDuelLosers`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1429-1471`
 pub fn RemovePowerDuelLosers(ctx: &mut GameContext) {
-    unsafe {
-        let mut remClients: [c_int; 3] = [0; 3];
-        let mut remNum: usize = 0;
-        let mut i: usize = 0;
-        let clients = ctx.world.clients.as_mut_ptr();
+    let mut remClients: [c_int; 3] = [0; 3];
+    let mut remNum: usize = 0;
+    let mut i: usize = 0;
 
-        while i < MAX_CLIENTS && remNum < 3 {
-            let cl = clients.add(i);
+    while i < MAX_CLIENTS && remNum < 3 {
+        let cl = &ctx.world.clients[i];
 
-            if (*cl).pers.connected == CON_CONNECTED
-                && ((*cl).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0
-                    || (*cl).iAmALoser != qfalse)
-                && ((*cl).sess.sessionTeam != TEAM_SPECTATOR || (*cl).iAmALoser != qfalse)
-            {
-                // he was dead or he was spectating as a loser
-                remClients[remNum] = (*cl).ps.clientNum;
-                remNum += 1;
-            }
-
-            i += 1;
-        }
-
-        if remNum == 0 {
-            // Time ran out or something? Oh well, just remove the main guy.
-            remClients[remNum] = ctx.world.level.sortedClients[0];
+        if cl.pers.connected == CON_CONNECTED
+            && (cl.ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0 || cl.iAmALoser != qfalse)
+            && (cl.sess.sessionTeam != TEAM_SPECTATOR || cl.iAmALoser != qfalse)
+        {
+            // he was dead or he was spectating as a loser
+            remClients[remNum] = cl.ps.clientNum;
             remNum += 1;
         }
 
-        let mut j = 0;
-        while j < remNum {
-            // set them all to spectator
-            let ent = ctx
-                .world
-                .g_entities
-                .as_mut_ptr()
-                .add(remClients[j] as usize);
-            let s = CString::new("s").unwrap();
-            SetTeam(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                s.as_ptr() as *mut c_char,
-            );
-            j += 1;
-        }
-
-        ctx.world.globals.g_dontFrickinCheck = qfalse;
-
-        // recalculate stuff now that we have reset teams.
-        CalculateRanks(ctx);
+        i += 1;
     }
+
+    if remNum == 0 {
+        // Time ran out or something? Oh well, just remove the main guy.
+        remClients[remNum] = ctx.world.level.sortedClients[0];
+        remNum += 1;
+    }
+
+    let mut j = 0;
+    while j < remNum {
+        // set them all to spectator
+        let s = CString::new("s").unwrap();
+        SetTeam(
+            ctx,
+            EntityId(remClients[j] as u32),
+            s.as_ptr() as *mut c_char,
+        );
+        j += 1;
+    }
+
+    ctx.world.globals.g_dontFrickinCheck = qfalse;
+
+    // recalculate stuff now that we have reset teams.
+    CalculateRanks(ctx);
 }
 
 /// Raven `RemoveDuelDrawLoser`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1473-1512`
 pub fn RemoveDuelDrawLoser(ctx: &mut GameContext) {
-    unsafe {
-        let sorted0 = ctx.world.level.sortedClients[0];
-        let sorted1 = ctx.world.level.sortedClients[1];
+    let sorted0 = ctx.world.level.sortedClients[0];
+    let sorted1 = ctx.world.level.sortedClients[1];
 
-        if ctx.world.clients[sorted0 as usize].pers.connected != CON_CONNECTED {
-            return;
-        }
-        if ctx.world.clients[sorted1 as usize].pers.connected != CON_CONNECTED {
-            return;
-        }
+    if ctx.world.clients[sorted0 as usize].pers.connected != CON_CONNECTED {
+        return;
+    }
+    if ctx.world.clients[sorted1 as usize].pers.connected != CON_CONNECTED {
+        return;
+    }
 
-        let cl_first = ctx.world.clients[sorted0 as usize].ps.stats
-            [statIndex_t::STAT_HEALTH as usize]
-            + ctx.world.clients[sorted0 as usize].ps.stats[statIndex_t::STAT_ARMOR as usize];
-        let cl_sec = ctx.world.clients[sorted1 as usize].ps.stats
-            [statIndex_t::STAT_HEALTH as usize]
-            + ctx.world.clients[sorted1 as usize].ps.stats[statIndex_t::STAT_ARMOR as usize];
+    let cl_first = ctx.world.clients[sorted0 as usize].ps.stats[statIndex_t::STAT_HEALTH as usize]
+        + ctx.world.clients[sorted0 as usize].ps.stats[statIndex_t::STAT_ARMOR as usize];
+    let cl_sec = ctx.world.clients[sorted1 as usize].ps.stats[statIndex_t::STAT_HEALTH as usize]
+        + ctx.world.clients[sorted1 as usize].ps.stats[statIndex_t::STAT_ARMOR as usize];
 
-        let cl_failure: c_int;
-        if cl_first > cl_sec {
-            cl_failure = 1;
-        } else if cl_sec > cl_first {
-            cl_failure = 0;
-        } else {
-            cl_failure = 2;
-        }
+    let cl_failure: c_int;
+    if cl_first > cl_sec {
+        cl_failure = 1;
+    } else if cl_sec > cl_first {
+        cl_failure = 0;
+    } else {
+        cl_failure = 2;
+    }
 
-        let s = CString::new("s").unwrap();
-        if cl_failure != 2 {
-            let clientNum = ctx.world.level.sortedClients[cl_failure as usize];
-            let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
-            SetTeam(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                s.as_ptr() as *mut c_char,
-            );
-        } else {
-            // we could be more elegant about this, but oh well.
-            let clientNum = ctx.world.level.sortedClients[1];
-            let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
-            SetTeam(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                s.as_ptr() as *mut c_char,
-            );
-        }
+    let s = CString::new("s").unwrap();
+    if cl_failure != 2 {
+        let clientNum = ctx.world.level.sortedClients[cl_failure as usize];
+        SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
+    } else {
+        // we could be more elegant about this, but oh well.
+        let clientNum = ctx.world.level.sortedClients[1];
+        SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
     }
 }
 
@@ -873,26 +835,19 @@ pub fn RemoveDuelDrawLoser(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_main.c:1519-1534`
 pub fn RemoveTournamentWinner(ctx: &mut GameContext) {
-    unsafe {
-        if ctx.world.level.numPlayingClients != 2 {
-            return;
-        }
-
-        let clientNum = ctx.world.level.sortedClients[0];
-
-        if ctx.world.clients[clientNum as usize].pers.connected != CON_CONNECTED {
-            return;
-        }
-
-        // make them a spectator
-        let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
-        let s = CString::new("s").unwrap();
-        SetTeam(
-            ctx,
-            ctx.entity_id_of(ent).unwrap(),
-            s.as_ptr() as *mut c_char,
-        );
+    if ctx.world.level.numPlayingClients != 2 {
+        return;
     }
+
+    let clientNum = ctx.world.level.sortedClients[0];
+
+    if ctx.world.clients[clientNum as usize].pers.connected != CON_CONNECTED {
+        return;
+    }
+
+    // make them a spectator
+    let s = CString::new("s").unwrap();
+    SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
 }
 
 // PORT-NOTE(unported-dep): calls `ClientUserinfoChanged` (no ported
@@ -1126,27 +1081,27 @@ extern "C" fn SortRanks(a: *const c_void, b: *const c_void) -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_main.c:1695-1715`
 pub fn G_CanResetDuelists(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let mut i: usize = 0;
-        while i < 3 {
-            // precheck to make sure they are all respawnable
-            let clientNum = ctx.world.level.sortedClients[i];
-            let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
-            let cl = (*ent).client;
+    let mut i: usize = 0;
+    while i < 3 {
+        // precheck to make sure they are all respawnable
+        let clientNum = ctx.world.level.sortedClients[i];
+        let ent = ctx.world.entity(EntityId(clientNum as u32));
+        let inuse = ent.inuse;
+        let health = ent.health;
+        let has_client = !ent.client.is_null();
 
-            if (*ent).inuse == qfalse
-                || cl.is_null()
-                || (*ent).health <= 0
-                || (*cl).sess.sessionTeam == TEAM_SPECTATOR
-                || (*cl).sess.duelTeam <= DUELTEAM_FREE as c_int
-            {
-                return qfalse;
-            }
-            i += 1;
+        if inuse == qfalse
+            || !has_client
+            || health <= 0
+            || ctx.world.clients[clientNum as usize].sess.sessionTeam == TEAM_SPECTATOR
+            || ctx.world.clients[clientNum as usize].sess.duelTeam <= DUELTEAM_FREE as c_int
+        {
+            return qfalse;
         }
-
-        qtrue
+        i += 1;
     }
+
+    qtrue
 }
 
 // PORT-NOTE(unported-dep): `ClientSpawn` has no ported definition
@@ -1156,34 +1111,28 @@ pub fn G_CanResetDuelists(ctx: &mut GameContext) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_main.c:1718-1740`
 pub fn G_ResetDuelists(ctx: &mut GameContext) {
-    unsafe {
-        let mut i = 0;
-        while i < 3 {
-            let clientNum = ctx.world.level.sortedClients[i];
-            let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
+    let mut i = 0;
+    while i < 3 {
+        let clientNum = ctx.world.level.sortedClients[i];
+        let id = EntityId(clientNum as u32);
 
-            ctx.world.globals.g_noPDuelCheck = qtrue;
-            crate::g_combat::player_die(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                ctx.entity_id_of(ent),
-                ctx.entity_id_of(ent),
-                999,
-                MOD_SUICIDE as c_int,
-            );
-            ctx.world.globals.g_noPDuelCheck = qfalse;
-            trap::UnlinkEntity(
-                ctx.engine,
-                mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent.cast()),
-            );
-            ClientSpawn(ctx, ctx.entity_id_of(ent).unwrap());
+        ctx.world.globals.g_noPDuelCheck = qtrue;
+        crate::g_combat::player_die(ctx, id, Some(id), Some(id), 999, MOD_SUICIDE as c_int);
+        ctx.world.globals.g_noPDuelCheck = qfalse;
+        let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
+        trap::UnlinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent_ptr.cast()),
+        );
+        ClientSpawn(ctx, id);
 
-            // add a teleportation effect
-            let origin = (*((*ent).client)).ps.origin;
-            let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
-            (*tent).s.clientNum = (*ent).s.clientNum;
-            i += 1;
-        }
+        // add a teleportation effect
+        let origin = ctx.world.clients[clientNum as usize].ps.origin;
+        let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
+        let tid = ctx.entity_id_of(tent).unwrap();
+        let cn = ctx.world.entity(id).s.clientNum;
+        ctx.entity_mut(tid).s.clientNum = cn;
+        i += 1;
     }
 }
 
@@ -1450,38 +1399,37 @@ pub fn CalculateRanks(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_main.c:1925-1933`
 pub fn SendScoreboardMessageToAllClients(ctx: &mut GameContext) {
-    unsafe {
-        let maxclients = ctx.world.level.maxclients;
-        let clients = ctx.world.clients.as_mut_ptr();
-        let entities = ctx.world.g_entities.as_mut_ptr();
-        let mut i: c_int = 0;
-        while i < maxclients {
-            if (*clients.add(i as usize)).pers.connected == CON_CONNECTED {
-                DeathmatchScoreboardMessage(ctx, EntityId(i as u32));
-            }
-            i += 1;
+    let maxclients = ctx.world.level.maxclients;
+    let mut i: c_int = 0;
+    while i < maxclients {
+        if ctx.world.clients[i as usize].pers.connected == CON_CONNECTED {
+            DeathmatchScoreboardMessage(ctx, EntityId(i as u32));
         }
+        i += 1;
     }
 }
 
 /// Raven `MoveClientToIntermission`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1943-1967`
-pub fn MoveClientToIntermission(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+pub fn MoveClientToIntermission(ctx: &mut GameContext, id: EntityId) {
+    // FLAG(pool-client): `client` is the entity's `gclient_t*` — a real player
+    // client for the intermission callers, but pool-allocated for NPC entities;
+    // read the pointer value through the safe entity borrow and deref it raw,
+    // exactly as Raven does (recipe 2b — never indexed as `clients[id]`).
+    let client: *mut gclient_t = ctx.world.entity(id).client;
+
+    // take out of follow mode if needed
+    if unsafe { (*client).sess.spectatorState } == SPECTATOR_FOLLOW {
+        StopFollowing(ctx, id);
+    }
+
+    // move to the spot
+    let intermission_origin = ctx.world.level.intermission_origin;
+    let intermission_angle = ctx.world.level.intermission_angle;
+    ctx.entity_mut(id).s.origin = intermission_origin;
+    // FLAG(pool-client): raw writes through the copied `gclient_t*` (see above).
     unsafe {
-        let client = (*ent).client;
-
-        // take out of follow mode if needed
-        if (*client).sess.spectatorState == SPECTATOR_FOLLOW {
-            StopFollowing(ctx, ctx.entity_id_of(ent).unwrap());
-        }
-
-        // move to the spot
-        let intermission_origin = ctx.world.level.intermission_origin;
-        let intermission_angle = ctx.world.level.intermission_angle;
-        (*ent).s.origin = intermission_origin;
         (*client).ps.origin = intermission_origin;
         (*client).ps.viewangles = intermission_angle;
         (*client).ps.pm_type = pmtype_t::PM_INTERMISSION as c_int;
@@ -1490,14 +1438,16 @@ pub fn MoveClientToIntermission(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.powerups = [0; mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS];
 
         (*client).ps.eFlags = 0;
-        (*ent).s.eFlags = 0;
-        (*ent).s.eType = entityType_t::ET_GENERAL as c_int;
-        (*ent).s.modelindex = 0;
-        (*ent).s.loopSound = 0;
-        (*ent).s.loopIsSoundset = qfalse;
-        (*ent).s.event = 0;
-        (*ent).r.contents = 0;
     }
+
+    let e = ctx.entity_mut(id);
+    e.s.eFlags = 0;
+    e.s.eType = entityType_t::ET_GENERAL as c_int;
+    e.s.modelindex = 0;
+    e.s.loopSound = 0;
+    e.s.loopIsSoundset = qfalse;
+    e.s.event = 0;
+    e.r.contents = 0;
 }
 
 // PORT-NOTE(unported-dep): `SelectSpawnPoint` has no ported definition
@@ -1627,22 +1577,26 @@ pub fn BeginIntermission(ctx: &mut GameContext) {
         // move all clients to the intermission point
         let mut i: c_int = 0;
         while i < ctx.world.level.maxclients {
-            let client = ctx.world.g_entities.as_mut_ptr().add(i as usize);
-            if (*client).inuse == qfalse {
+            let id = EntityId(i as u32);
+            if ctx.world.entity(id).inuse == qfalse {
                 i += 1;
                 continue;
             }
             // respawn if dead
-            if (*client).health <= 0 {
+            if ctx.world.entity(id).health <= 0 {
+                // FLAG(pool-client): `client_ptr` is the entity's `gclient_t*`;
+                // deref it raw, gated by the null check exactly as Raven does
+                // (recipe 2b — never indexed as `clients[i]`).
+                let client_ptr = ctx.world.entity(id).client;
                 if ctx.world.cvars.g_gametype.integer != GT_POWERDUEL
-                    || (*client).client.is_null()
-                    || (*((*client).client)).sess.sessionTeam != TEAM_SPECTATOR
+                    || client_ptr.is_null()
+                    || (*client_ptr).sess.sessionTeam != TEAM_SPECTATOR
                 {
                     // don't respawn spectators in powerduel or it will mess the line order all up
-                    respawn(ctx, ctx.entity_id_of(client).unwrap());
+                    respawn(ctx, id);
                 }
             }
-            MoveClientToIntermission(ctx, ctx.entity_id_of(client).unwrap());
+            MoveClientToIntermission(ctx, id);
             i += 1;
         }
 
@@ -1655,48 +1609,40 @@ pub fn BeginIntermission(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_main.c:2094-2112`
 pub fn DuelLimitHit(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let maxclients = ctx.world.cvars.g_maxclients.integer;
-        let clients = ctx.world.clients.as_mut_ptr();
-        let mut i: c_int = 0;
-        while i < maxclients {
-            let cl = clients.add(i as usize);
-            if (*cl).pers.connected != CON_CONNECTED {
-                i += 1;
-                continue;
-            }
-
-            if ctx.world.cvars.g_duel_fraglimit.integer != 0
-                && (*cl).sess.wins >= ctx.world.cvars.g_duel_fraglimit.integer
-            {
-                return qtrue;
-            }
+    let maxclients = ctx.world.cvars.g_maxclients.integer;
+    let mut i: c_int = 0;
+    while i < maxclients {
+        if ctx.world.clients[i as usize].pers.connected != CON_CONNECTED {
             i += 1;
+            continue;
         }
 
-        qfalse
+        if ctx.world.cvars.g_duel_fraglimit.integer != 0
+            && ctx.world.clients[i as usize].sess.wins >= ctx.world.cvars.g_duel_fraglimit.integer
+        {
+            return qtrue;
+        }
+        i += 1;
     }
+
+    qfalse
 }
 
 /// Raven `DuelResetWinsLosses`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2114-2128`
 pub fn DuelResetWinsLosses(ctx: &mut GameContext) {
-    unsafe {
-        let maxclients = ctx.world.cvars.g_maxclients.integer;
-        let clients = ctx.world.clients.as_mut_ptr();
-        let mut i: c_int = 0;
-        while i < maxclients {
-            let cl = clients.add(i as usize);
-            if (*cl).pers.connected != CON_CONNECTED {
-                i += 1;
-                continue;
-            }
-
-            (*cl).sess.wins = 0;
-            (*cl).sess.losses = 0;
+    let maxclients = ctx.world.cvars.g_maxclients.integer;
+    let mut i: c_int = 0;
+    while i < maxclients {
+        if ctx.world.clients[i as usize].pers.connected != CON_CONNECTED {
             i += 1;
+            continue;
         }
+
+        ctx.world.clients[i as usize].sess.wins = 0;
+        ctx.world.clients[i as usize].sess.losses = 0;
+        i += 1;
     }
 }
 
@@ -1872,30 +1818,29 @@ pub fn LogExit(ctx: &mut GameContext, string: *const c_char) {
         let mut i: c_int = 0;
         while i < num_sorted {
             let clientNum = ctx.world.level.sortedClients[i as usize];
-            // STAGE-2b: irreducible — `cl` is held across `G_LogPrintf(ctx, …)`; the
-            // raw client deref keeps it disjoint from that `ctx` borrow.
-            let cl = &mut *ctx.world.clients.as_mut_ptr().add(clientNum as usize);
-
-            if cl.sess.sessionTeam == TEAM_SPECTATOR {
+            // `clientNum` is a sorted (real) client index; read fresh through
+            // `ctx.world.clients[..]` at each use so nothing is borrowed across
+            // the `G_LogPrintf(ctx, …)` call.
+            if ctx.world.clients[clientNum as usize].sess.sessionTeam == TEAM_SPECTATOR {
                 i += 1;
                 continue;
             }
-            if cl.pers.connected == CON_CONNECTING {
+            if ctx.world.clients[clientNum as usize].pers.connected == CON_CONNECTING {
                 i += 1;
                 continue;
             }
 
-            let ping = if cl.ps.ping < 999 { cl.ps.ping } else { 999 };
+            let raw_ping = ctx.world.clients[clientNum as usize].ps.ping;
+            let ping = if raw_ping < 999 { raw_ping } else { 999 };
 
-            let netname = cstr_to_str(cl.pers.netname.as_ptr());
+            let netname = cstr_to_str(ctx.world.clients[clientNum as usize].pers.netname.as_ptr());
+            let score = ctx.world.clients[clientNum as usize].ps.persistant
+                [persEnum_t::PERS_SCORE as usize];
             G_LogPrintf(
                 ctx,
                 cstr(&format!(
                     "score: {}  ping: {}  client: {} {}\n",
-                    cl.ps.persistant[persEnum_t::PERS_SCORE as usize],
-                    ping,
-                    clientNum,
-                    netname
+                    score, ping, clientNum, netname
                 ))
                 .as_ptr(),
             );
@@ -2305,9 +2250,16 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
             let mut num_live_clients: c_int = 0;
             while (i as usize) < MAX_CLIENTS {
                 let ent = &ctx.world.g_entities[i as usize];
-                if ent.inuse != qfalse && !ent.client.is_null() && ent.health > 0 {
-                    let cl = &*(ent.client);
-                    if cl.sess.sessionTeam != TEAM_SPECTATOR && cl.ps.pm_flags & PMF_FOLLOW == 0 {
+                let inuse = ent.inuse;
+                let health = ent.health;
+                let client_ptr = ent.client;
+                if inuse != qfalse && !client_ptr.is_null() && health > 0 {
+                    // FLAG(pool-client): deref the entity's `gclient_t*` raw
+                    // through the copied pointer value (recipe 2b), rather than
+                    // laundering a `&*` reference out of it (recipe 2d).
+                    if (*client_ptr).sess.sessionTeam != TEAM_SPECTATOR
+                        && (*client_ptr).ps.pm_flags & PMF_FOLLOW == 0
+                    {
                         num_live_clients += 1;
                     }
                 }
@@ -2453,14 +2405,14 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
 
             let mut i: c_int = 0;
             while i < ctx.world.cvars.g_maxclients.integer {
-                // STAGE-2b: irreducible — `cl` is held across `LogExit`/`SendServerCommand`
-                // (ctx) calls; the raw client deref keeps it disjoint from those borrows.
-                let cl = &mut *ctx.world.clients.as_mut_ptr().add(i as usize);
-                if cl.pers.connected != CON_CONNECTED {
+                // Read fresh through `ctx.world.clients[i]` at each use — `i` is a
+                // real client index (`i < g_maxclients`) — so nothing is borrowed
+                // across the `LogExit`/`SendServerCommand`/`Com_Printf` calls.
+                if ctx.world.clients[i as usize].pers.connected != CON_CONNECTED {
                     i += 1;
                     continue;
                 }
-                if cl.sess.sessionTeam != TEAM_FREE {
+                if ctx.world.clients[i as usize].sess.sessionTeam != TEAM_FREE {
                     i += 1;
                     continue;
                 }
@@ -2468,14 +2420,15 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                 if (ctx.world.cvars.g_gametype.integer == GT_DUEL
                     || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL)
                     && ctx.world.cvars.g_duel_fraglimit.integer != 0
-                    && cl.sess.wins >= ctx.world.cvars.g_duel_fraglimit.integer
+                    && ctx.world.clients[i as usize].sess.wins
+                        >= ctx.world.cvars.g_duel_fraglimit.integer
                 {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
                         Com_Printf(cstr("POWERDUEL WIN CONDITION: Duel limit hit (1)\n").as_ptr());
                     }
                     LogExit(ctx, cstr("Duel limit hit.").as_ptr());
                     ctx.world.globals.gDuelExit = qtrue;
-                    let netname = cstr_to_str(cl.pers.netname.as_ptr());
+                    let netname = cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
                     trap::SendServerCommand(
                         ctx.engine,
                         mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
@@ -2486,7 +2439,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     return;
                 }
 
-                if cl.ps.persistant[persEnum_t::PERS_SCORE as usize]
+                if ctx.world.clients[i as usize].ps.persistant[persEnum_t::PERS_SCORE as usize]
                     >= ctx.world.cvars.g_fraglimit.integer
                 {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
@@ -2495,7 +2448,8 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     LogExit(ctx, cstr(s_kill_limit).as_ptr());
                     ctx.world.globals.gDuelExit = qfalse;
                     if print_limit != qfalse {
-                        let netname = cstr_to_str(cl.pers.netname.as_ptr());
+                        let netname =
+                            cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
                         let hit_limit = cstr_to_str(G_GetStringEdString(
                             ctx,
                             cstr("MP_SVGAME").as_ptr() as *mut c_char,
@@ -2587,27 +2541,22 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_main.c:2923-2938`
 pub fn G_RemoveDuelist(ctx: &mut GameContext, team: c_int) {
-    unsafe {
-        let mut i: usize = 0;
-        let entities = ctx.world.g_entities.as_mut_ptr();
-        while i < MAX_CLIENTS {
-            let ent = entities.add(i);
-            let cl = (*ent).client;
+    // Slots `0..MAX_CLIENTS` are player entities whose `client` is `clients[i]`.
+    let mut i: usize = 0;
+    while i < MAX_CLIENTS {
+        let ent = ctx.world.entity(EntityId(i as u32));
+        let inuse = ent.inuse;
+        let has_client = !ent.client.is_null();
 
-            if (*ent).inuse != qfalse
-                && !cl.is_null()
-                && (*cl).sess.sessionTeam != TEAM_SPECTATOR
-                && (*cl).sess.duelTeam == team
-            {
-                let s = CString::new("s").unwrap();
-                SetTeam(
-                    ctx,
-                    ctx.entity_id_of(ent).unwrap(),
-                    s.as_ptr() as *mut c_char,
-                );
-            }
-            i += 1;
+        if inuse != qfalse
+            && has_client
+            && ctx.world.clients[i].sess.sessionTeam != TEAM_SPECTATOR
+            && ctx.world.clients[i].sess.duelTeam == team
+        {
+            let s = CString::new("s").unwrap();
+            SetTeam(ctx, EntityId(i as u32), s.as_ptr() as *mut c_char);
         }
+        i += 1;
     }
 }
 
@@ -2726,11 +2675,16 @@ pub fn CheckTournament(ctx: &mut GameContext) {
 
                 if ctx.world.level.numPlayingClients >= 3 && G_CanResetDuelists(ctx) != qfalse {
                     let te = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
-                    (*te).r.svFlags |= SVF_BROADCAST;
+                    let te_id = ctx.entity_id_of(te).unwrap();
+                    let s0 = ctx.world.level.sortedClients[0];
+                    let s1 = ctx.world.level.sortedClients[1];
+                    let s2 = ctx.world.level.sortedClients[2];
+                    let e = ctx.entity_mut(te_id);
+                    e.r.svFlags |= SVF_BROADCAST;
                     // this is really pretty nasty, but..
-                    (*te).s.otherEntityNum = ctx.world.level.sortedClients[0];
-                    (*te).s.otherEntityNum2 = ctx.world.level.sortedClients[1];
-                    (*te).s.groundEntityNum = ctx.world.level.sortedClients[2];
+                    e.s.otherEntityNum = s0;
+                    e.s.otherEntityNum2 = s1;
+                    e.s.groundEntityNum = s2;
 
                     trap::SetConfigstring(
                         ctx.engine,
@@ -2788,10 +2742,15 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                     // pulled in a needed person
                     if G_CanResetDuelists(ctx) != qfalse {
                         let te = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
-                        (*te).r.svFlags |= SVF_BROADCAST;
-                        (*te).s.otherEntityNum = ctx.world.level.sortedClients[0];
-                        (*te).s.otherEntityNum2 = ctx.world.level.sortedClients[1];
-                        (*te).s.groundEntityNum = ctx.world.level.sortedClients[2];
+                        let te_id = ctx.entity_id_of(te).unwrap();
+                        let s0 = ctx.world.level.sortedClients[0];
+                        let s1 = ctx.world.level.sortedClients[1];
+                        let s2 = ctx.world.level.sortedClients[2];
+                        let e = ctx.entity_mut(te_id);
+                        e.r.svFlags |= SVF_BROADCAST;
+                        e.s.otherEntityNum = s0;
+                        e.s.otherEntityNum2 = s1;
+                        e.s.groundEntityNum = s2;
 
                         trap::SetConfigstring(
                             ctx.engine,
@@ -3397,38 +3356,35 @@ pub fn CheckCvars(ctx: &mut GameContext) {
 /// Raven `G_RunThink`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3489-3512`
-pub fn G_RunThink(ctx: &mut GameContext, ent: EntityId) {
-    use crate::ent_fn_enums::dispatch_think;
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        // Raven casts `nextthink` to float and compares against `level.time` as
-        // float; the int comparison here only diverges past f32's exact-integer
-        // range (~16.7M ms), so the cast is elided.
-        let thinktime = (*ent).nextthink;
-        'runicarus: {
-            if thinktime <= 0 {
-                break 'runicarus;
-            }
-            if thinktime > ctx.world.level.time {
-                break 'runicarus;
-            }
-
-            (*ent).nextthink = 0;
-            if let Some(think_fn) = (*ent).think.get() {
-                dispatch_think(ctx, think_fn, ent);
-            } else {
-                // G_Error("NULL ent->think") — commented out in oracle.
-                break 'runicarus;
-            }
+pub fn G_RunThink(ctx: &mut GameContext, id: EntityId) {
+    // Raven casts `nextthink` to float and compares against `level.time` as
+    // float; the int comparison here only diverges past f32's exact-integer
+    // range (~16.7M ms), so the cast is elided.
+    let thinktime = ctx.entity(id).nextthink;
+    'runicarus: {
+        if thinktime <= 0 {
+            break 'runicarus;
+        }
+        if thinktime > ctx.world.level.time {
+            break 'runicarus;
         }
 
-        if (*ent).inuse != qfalse {
-            trap::ICARUS_MaintainTaskManager(
-                ctx.engine,
-                mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number),
-            );
+        ctx.entity_mut(id).nextthink = 0;
+        if let Some(think_fn) = ctx.entity(id).think.get() {
+            let self_ptr = ctx.entity_mut(id) as *mut gentity_t;
+            dispatch_think(ctx, think_fn, self_ptr);
+        } else {
+            // G_Error("NULL ent->think") — commented out in oracle.
+            break 'runicarus;
         }
+    }
+
+    if ctx.entity(id).inuse != qfalse {
+        let number = ctx.entity(id).s.number;
+        trap::ICARUS_MaintainTaskManager(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new(number),
+        );
     }
 }
 
@@ -3538,14 +3494,19 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
             // check for a respawn wave
             let mut i: c_int = 0;
             while (i as usize) < MAX_CLIENTS {
-                let cl_ent = ctx.world.g_entities.as_mut_ptr().add(i as usize);
-                if (*cl_ent).inuse != qfalse
-                    && !(*cl_ent).client.is_null()
-                    && (*((*cl_ent).client)).tempSpectate > ctx.world.level.time
-                    && (*((*cl_ent).client)).sess.sessionTeam != TEAM_SPECTATOR
+                let id = EntityId(i as u32);
+                let inuse = ctx.world.entity(id).inuse;
+                // FLAG(pool-client): read the entity's `gclient_t*` value and
+                // deref it raw (recipe 2b); `client_ptr` is a copied pointer held
+                // across `respawn(ctx, …)`, the sanctioned pool-client pattern.
+                let client_ptr = ctx.world.entity(id).client;
+                if inuse != qfalse
+                    && !client_ptr.is_null()
+                    && (*client_ptr).tempSpectate > ctx.world.level.time
+                    && (*client_ptr).sess.sessionTeam != TEAM_SPECTATOR
                 {
-                    respawn(ctx, ctx.entity_id_of(cl_ent).unwrap());
-                    (*((*cl_ent).client)).tempSpectate = 0;
+                    respawn(ctx, id);
+                    (*client_ptr).tempSpectate = 0;
                 }
                 i += 1;
             }
@@ -3660,21 +3621,24 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
             // remember last waypoint, clear current one
             let mut i: c_int = 0;
             while i < ctx.world.level.num_entities {
-                let ent = ctx.world.g_entities.as_mut_ptr().add(i as usize);
-                if (*ent).inuse == qfalse {
+                let id = EntityId(i as u32);
+                if ctx.world.entity(id).inuse == qfalse {
                     i += 1;
                     continue;
                 }
 
-                if (*ent).waypoint != WAYPOINT_NONE && (*ent).noWaypointTime < ctx.world.level.time
+                if ctx.world.entity(id).waypoint != WAYPOINT_NONE
+                    && ctx.world.entity(id).noWaypointTime < ctx.world.level.time
                 {
-                    (*ent).lastWaypoint = (*ent).waypoint;
-                    (*ent).waypoint = WAYPOINT_NONE;
+                    let wp = ctx.world.entity(id).waypoint;
+                    ctx.world.entity_mut(id).lastWaypoint = wp;
+                    ctx.world.entity_mut(id).waypoint = WAYPOINT_NONE;
                 }
                 if ctx.world.cvars.d_altRoutes.integer != 0 {
+                    let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
                     trap::Nav_CheckFailedNodes(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_NAV_CHECKFAILEDNODES::GNavCheckfailednodesArgs::new(ent.cast()),
+                        mp_abi::game::syscalls::G_NAV_CHECKFAILEDNODES::GNavCheckfailednodesArgs::new(ent_ptr.cast()),
                     );
                 }
                 i += 1;
@@ -3693,6 +3657,13 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
         //
         // go through all allocated objects
         //
+        // FLAG(2c-defer): this `MAX_GENTITIES`-wide dispatch loop walks arbitrary
+        // entities (i >= MAX_CLIENTS are NPCs carrying BG_Alloc'd POOL clients,
+        // not `clients[i]` — recipe 2b), holds the raw `ent`/`client` across
+        // dozens of interleaved `ctx` subsystem calls (G_RunMissile/G_Damage/
+        // G_SetAnim/WP_*), and mutates entity + pool-client state in lockstep.
+        // Left on the Stage-1 raw-pointer body for a dedicated referee-gated
+        // shard; the surrounding G_RunFrame sub-loops are converted above/below.
         let mut i: c_int = 0;
         while i < ctx.world.level.num_entities {
             let ent = ctx.world.g_entities.as_mut_ptr().add(i as usize);
@@ -3999,9 +3970,9 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
         // perform final fixups on the players
         let mut i: c_int = 0;
         while i < ctx.world.level.maxclients {
-            let ent = ctx.world.g_entities.as_mut_ptr().add(i as usize);
-            if (*ent).inuse != qfalse {
-                ClientEndFrame(ctx, ctx.entity_id_of(ent).unwrap());
+            let id = EntityId(i as u32);
+            if ctx.world.entity(id).inuse != qfalse {
+                ClientEndFrame(ctx, id);
             }
             i += 1;
         }
