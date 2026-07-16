@@ -223,15 +223,98 @@ RNG-coupled paths verified stream-faithful: CTF/Siege spawn selection
 (`rand() % count`), SiegeItemThink Q_irand velocities, HolocronPopOut /
 misc_faller draw orders, G_RunObject flrand order.
 
-### Wave-6 queue
+## Wave 6 (2026-07-15) — nav/ICARUS, ai tails, NPC spine + full NPC surface
 
-- Remaining g_* files: g_nav/g_navnew, g_ICARUScb, g_init_game/
-  g_shutdown_game, w_force follow-ups; then NPC_* (20+ files) and the
-  ai_wpnav/CTF/Siege/chat tails from wave 3.
+### CLEAN in full
+
+Bot-AI trio now 100% line-audited (wave 3 spine + wave 6 tails):
+BotInputToUserCommand wire path double-verified, BotDoChat RNG exact,
+ai_wpnav editor/save infra faithful (two %f-format riders fixed).
+g_ICARUScb SET_*/GET_* dispatch mechanically diffed COMPLETE (208/208,
+109/109, 61/61). NPC spine (combat/move/senses/reactions/goal) —
+float+RNG spine clean, §19 notes only. NPC_stats 116-key parse table
+complete row-by-row; NPC_utils/misc/sounds clean; WalkerNPC,
+g_vehicleTurret-style clean list continues (Atst, Droid, Howler, Mark2,
+MineMonster, Sentry, ImperialProbe, Interrogator, GalakMech).
+
+### Round-1 findings (fixed: `89fa85db`)
+
+**movedir out-param threading** (g_nav + g_navnew AvoidCollision→
+Resolve→Bypass chains ported by value — NPC collision sidestepping
+silently dropped; same class as the 25-fn botlib catch fddd3eca);
+NAVNEW_MoveToGoal 7 goto-failed sites dropped the failed-label
+trap_Nav_GetNodePosition (syscall-trace parity); PushBlocker *1.2 /
+3× avoidRadius sqrt sums / Q3_SetParm += atof flattened to f32; NAV
+fatal-print args dropped; NPC pain-anim [-1] §19 + null-guard cluster;
+.wnt %f fields; personality-filename lossy round-trip.
+
+### Round-2 findings (fix batch in flight)
+
+| Area | Headline findings |
+|---|---|
+| NPC_spawn (live `npc` cmd) | **`npc kill <team>` null-TeamTable crash**; ground-snap traces mask `1` vs MASK_SOLID (terrain tunneling); `npc score` G_Find fieldofs 0; default-falls-into-WP_BLASTER switch collapsed (ST_ClearTimers skipped); tempGoal-fail returns null vs oracle's goto-finish newent; FRAMETIME 50 vs 100. |
+| RNG hoists (5× PRIORITY) | ST_CheckMoveState (dead draw + **missing return** — reached-goal path runs keep-going tail); Rancor_Attack + Wampa_Pain (draw hoisted above NPC_SetAnim, reads stale legsTimer); Mark1_dying, Grenadier_CheckMoveState (dead/reordered draws). One shape: RNG `let`-hoist above branch-local draws. |
+| npc_c | G_DroidSounds `_ => return` skips the fall-through Q_irand+TIMER_Set C runs for unmatched classes (1/21 per-frame stream desync, live); NPC_HandleAIFlags nested-Q_irand arg eval order (empirical g++ check in batch). |
+| NPC_behavior | NPC_BSWander tail statements mis-nested inside the numEdges check — no-edge NPCs stall (live-branch). |
+| NPC_AI_Jedi | Jedi_CheckDanger missing `alertEvent == -1` guard — oracle reads alertEvents[-1] (silent UB), Rust **panics** (§19 guard added). Saber/evasion/force RNG spine otherwise exceptionally faithful. |
+| **NPC_AI_Sniper** | **Knowingly 2/13 ported, 11 marker-less silent stub bodies** (zeroed muzzle vectors, `if true` trace guards, dropped G_SetEnemy/aim math) — the saber-whiff class at file scale. Dedicated transcription agent completing the file. |
+| Vehicle NPCs | FighterNPC dropped live G_DamageFromKiller (damaged fighters land without dying); **AnimalNPC #ifndef _JK2MP polarity** (SP-only auto-aim ported live — second METROID_JUMP-class catch); SpeederNPC electrify wobble parked-but-portable; sin(serverTime*0.001) f64 ×6. |
+| Misc latents | Remote idealDist double compares; Seeker VectorMA f32-scale truncation; NPC_FacePosition += f64; Mark1 gPainHitLoc read order. |
+
+Wave-6 round-2 fix batch landed: `76d974c1` (all findings above + the
+completed NPC_AI_Sniper 15/15 port). **NEW TRAP RATIFIED THIS BATCH —
+VectorMA/VectorScale/DotProduct are the live `#if 1` MACROS
+(q_shared.h:1352); the `_Vector*` float-scale prototypes are the dead
+`#else`. An RNG call (or any side-effecting/double-typed expression) in
+the scale substitutes PER COMPONENT — three draws, per-component values.**
+Three sites fixed (Sniper miss-loop ×4 calls, Jedi aim-lead); one wrong
+"fix" built on the dead signature reverted (Seeker — auditor false
+premise, caught in gate-1 diff review). Sweep of _VectorMA/_VectorScale/
+VectorAdvance with RNG in scale: no further sites. NPC_HandleAIFlags
+arg-eval order verified empirically on g++-16 arm64 (left-to-right) —
+re-verify if the referee-oracle compiler/arch ever changes.
+
+Parked-class additions (record only): NPC_SetBlocked/NPC_Blocked/
+Q3_Lerp2Angles/NPC_BSPatrol vigilance/species nextthink sites — all
+`(float)level.time + X` single-truncation. Validator observation:
+g_nav.rs:2240 `Com_Error(3 /* ERR_DROP */)` — the literal is inert (the
+port's Com_Error drops `level`, matching Raven's G_Error("%s")), but the
+comment mislabels 3 as ERR_DROP (enum value 1).
+
+### Wave-7 queue (PAUSED here at user request)
+
 - Port-wide F3 sweep using the sharp criterion (only round-direction-
   matching literals can diverge — much smaller site set than the naive grep).
 - bg_* remainder: bg_panimate, bg_saberLoad, bg_saga, bg_vehicleLoad,
   bg_g2_utils, q_math (vs oracle q_math.c), bg_lib divergence check.
+- Small g_* stragglers: g_init_game/g_shutdown_game, w_force wave-3 #2
+  (ForceThrow forward persistence), veh_dispatch, tri_coll_test,
+  g_exphysics follow-ups if any.
+- Cross-cutting: hoisted-RNG-draw grep results (round-2 batch item 12),
+  remaining lossy-UTF-8 print instances, single-truncation parity
+  decision (one ruling closes ~15 recorded sites).
+- **Scenario burn-down (user-requested 2026-07-15): convert referee-blind
+  surface to gated tapes** — CTF (flags → CS_FLAGSTATUS class), team FFA,
+  vehicle map (gear-shift/Fighter/Animal fixes), Siege (gSiegeBeginTime
+  warmup), NPC-spawn (`npc` command path), map_restart + full map-change
+  tape (GAME_INIT/module-load state). Prereq check: does the input tap
+  record server-console/rcon commands as tape events? Plus gcov on the
+  oracle build over the tape set to measure exercised coverage, and
+  randomized-usercmd fuzz tapes for boundary-value volume.
+- **Engine/game-specific verification tracks (user-ratified 2026-07-15
+  as required work, not optional):** (a) expression-level differential
+  harness for the ~30 audit-batch float-width sites (§F golden pattern:
+  compile touched oracle fns standalone, drive boundary+random inputs,
+  compare bits — retro-validates every `as f64` decision mechanically);
+  (b) **dual-host referee** for the engine side of the ABI seam: same
+  oracle module dylib under our engine AND a reference engine built from
+  oracle source (throwaway patches per build.sh discipline), seam-recorder
+  proxy logs vmMain+syscall traffic both directions, taped clock/packets
+  for determinism — any log divergence is an engine bug by construction;
+  (c) syscall-granularity goldens for stateful arms (world-snapshot +
+  fuzzed SV_Trace/EntitiesInBox/etc. against compiled oracle) and a
+  wire-level diff (same taped client packets → both servers, compare
+  outbound UDP) as cheaper partial steps.
 
 ### NEW SWEEP ITEM — F3: unsuffixed-double THRESHOLD COMPARES in f32
 
