@@ -63,17 +63,11 @@ impl PmoveContext<'_> {
                 core::ptr::null_mut()
             };
 
-            // PORT-NOTE(bg-tier-gap): Raven's `hitEnt` here is a full
-            // `gentity_t*` (inuse/r.ownerNum/client/…), which the bg tier's
-            // `bgEntity_t` overlay does not expose. Fields below
-            // that only exist on `gentity_t` are referenced literally and
-            // reported as missing symbols; a fixer must widen the bg-visible
-            // surface (new `BgTraps`/`GameCallbacks` accessors) to close them.
             if hitEnt.is_null()
                 || (!pSelfVeh.is_null()
                     && !(*pSelfVeh).m_pPilot.is_null()
                     && (*hitEnt).s.eType == ET_MISSILE as c_int
-                    && (*hitEnt).inuse != 0
+                    && self.callbacks.entity_inuse((*hitEnt).s.number) != 0
                     && (*hitEnt).r.ownerNum == (*(*pSelfVeh).m_pPilot).s.number)
             {
                 // don't hit it
@@ -129,7 +123,7 @@ impl PmoveContext<'_> {
             if ((*trace).entityNum as c_int) < ENTITYNUM_WORLD as c_int
                 && (*hitEnt).s.eType == ET_MOVER as c_int
                 && (*hitEnt).s.apos.trType as c_int != trType_t::TR_STATIONARY as c_int
-                && ((*hitEnt).spawnflags & 16) != 0
+                && (self.callbacks.entity_spawnflags((*hitEnt).s.number) & 16) != 0
                 && Q_stricmp(
                     (*hitEnt).classname,
                     c"func_rotating".as_ptr() as *const c_char,
@@ -312,22 +306,17 @@ impl PmoveContext<'_> {
                                 );
                             }
 
-                            // PORT-NOTE(fn-ptr-skip): the `#ifdef QAGAME` block that
-                            // turns/pushes `hitEnt` (the other ship we hit) away too
-                            // needs the same gentity_t-only fields as above
-                            // (client/spawnflags/m_pVehicle). Transcribed literally
-                            // below; several field accesses are bg-tier gaps.
-                            // `client->ps.X` reads go through `(*playerState).X`
-                            // (identical memory, see the hitSpeed note above); the
-                            // `spawnflags` NOT-suspended test is a game-side read via
-                            // the `fighter_not_suspended` upcall.
+                            // The `#ifdef QAGAME` block that turns/pushes `hitEnt`
+                            // (the other ship we hit) away too. `client->ps.X` reads
+                            // go through `(*playerState).X` (identical memory, see the
+                            // hitSpeed note above); `m_pVehicle` is bg-visible. The two
+                            // game-tier reaches are upcalls: `FighterIsLanded` via
+                            // `fighter_is_landed` and the `spawnflags` NOT-suspended
+                            // test via `fighter_not_suspended`.
                             // Source: `oracle/codemp/game/bg_slidemove.c:313-398`
                             if turnHitEnt != 0
                                 && !(*hitEnt).playerState.is_null()
-                                && FighterIsLanded(
-                                    ((*hitEnt).m_pVehicle as *mut Vehicle_t),
-                                    (*hitEnt).playerState,
-                                ) == 0
+                                && self.callbacks.fighter_is_landed((*hitEnt).s.number) == 0
                                 && self.callbacks.fighter_not_suspended((*hitEnt).s.number) != 0
                             {
                                 let l = (*(*hitEnt).playerState).speed;
@@ -433,7 +422,7 @@ impl PmoveContext<'_> {
                     magnitude /= (*pSelfVehInfo).toughness * 50.0;
 
                     if (*hitEnt).s.eType != ET_TERRAIN as c_int
-                        || ((*hitEnt).spawnflags & 1) == 0
+                        || (self.callbacks.entity_spawnflags((*hitEnt).s.number) & 1) == 0
                         || (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int
                     {
                         // don't damage the vehicle from terrain that doesn't want to damage vehicles
@@ -446,7 +435,9 @@ impl PmoveContext<'_> {
                             if mult < 1.0 {
                                 mult = 1.0;
                             }
-                            if (*hitEnt).inuse != 0 && (*hitEnt).takedamage != 0 {
+                            if self.callbacks.entity_inuse((*hitEnt).s.number) != 0
+                                && self.callbacks.entity_takedamage((*hitEnt).s.number) != 0
+                            {
                                 if (*hitEnt).s.eType == ET_NPC as c_int
                                     && (*hitEnt).s.NPC_class == CLASS_VEHICLE as c_int
                                     && !((*hitEnt).m_pVehicle as *mut Vehicle_t).is_null()
@@ -508,7 +499,9 @@ impl PmoveContext<'_> {
                         (*pSelfVeh).m_ulFlags |= VEH_CRASHING as u64;
                     }
 
-                    if (*hitEnt).inuse != 0 && (*hitEnt).takedamage != 0 {
+                    if self.callbacks.entity_inuse((*hitEnt).s.number) != 0
+                        && self.callbacks.entity_takedamage((*hitEnt).s.number) != 0
+                    {
                         // damage this guy because we hit him
                         let mut pmult: f32 = 1.0;
                         if ((*hitEnt).s.eType == ET_PLAYER as c_int

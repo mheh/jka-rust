@@ -729,6 +729,18 @@ impl GameCallbacks for TestCallbacks {
     fn set_other_killer(&mut self, _e: c_int, _m: c_int, _v: c_int, _w: c_int) {
         unreachable!()
     }
+    fn entity_inuse(&self, _e: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn entity_spawnflags(&self, _e: c_int) -> c_int {
+        unreachable!()
+    }
+    fn entity_takedamage(&self, _e: c_int) -> qboolean {
+        unreachable!()
+    }
+    fn fighter_is_landed(&self, _e: c_int) -> qboolean {
+        unreachable!()
+    }
 }
 
 // ================================ ps baseline ================================

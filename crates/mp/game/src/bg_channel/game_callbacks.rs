@@ -245,4 +245,28 @@ pub trait GameCallbacks {
         veh_weapon: c_int,
         weapon_type: c_int,
     );
+
+    /// `PM_VehicleImpact` hit-entity `inuse` read — `gentity_t.inuse`, absent
+    /// from the bg-visible `bgEntity_t` overlay. Field accessor (read at three
+    /// impact-damage gates). Source: `oracle/codemp/game/bg_slidemove.c:49-557`
+    fn entity_inuse(&self, ent_num: c_int) -> qboolean;
+
+    /// `PM_VehicleImpact` hit-entity `spawnflags` read — `gentity_t.spawnflags`,
+    /// absent from the bg-visible `bgEntity_t` overlay. Field accessor (read at
+    /// the func_rotating and terrain gates).
+    /// Source: `oracle/codemp/game/bg_slidemove.c:49-557`
+    fn entity_spawnflags(&self, ent_num: c_int) -> c_int;
+
+    /// `PM_VehicleImpact` hit-entity `takedamage` read — `gentity_t.takedamage`,
+    /// absent from the bg-visible `bgEntity_t` overlay. Field accessor (read at
+    /// two impact-damage gates). Source: `oracle/codemp/game/bg_slidemove.c:49-557`
+    fn entity_takedamage(&self, ent_num: c_int) -> qboolean;
+
+    /// `PM_VehicleImpact` fighter-vs-fighter turn-away gate: the game-tier
+    /// `FighterIsLanded(hitEnt->m_pVehicle, hitEnt->playerState)`. The body lives
+    /// in the game tier (`FighterNPC.c`) and reaches `m_pVehicle`/`playerState`
+    /// off the hit entity, so bg reaches it here by entity number.
+    /// Source: `oracle/codemp/game/bg_slidemove.c:313-398`;
+    /// `oracle/codemp/game/FighterNPC.c:300-308`.
+    fn fighter_is_landed(&self, veh_ent_num: c_int) -> qboolean;
 }

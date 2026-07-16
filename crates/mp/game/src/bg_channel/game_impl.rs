@@ -966,4 +966,30 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             (*client).otherKillerWeaponType = weapon_type;
         }
     }
+    fn entity_inuse(&self, ent_num: c_int) -> qboolean {
+        // `PM_VehicleImpact` hit-entity `inuse` read.
+        // Source: `oracle/codemp/game/bg_slidemove.c:49-557`.
+        unsafe { (*self.world).g_entities[ent_num as usize].inuse }
+    }
+    fn entity_spawnflags(&self, ent_num: c_int) -> c_int {
+        // `PM_VehicleImpact` hit-entity `spawnflags` read.
+        // Source: `oracle/codemp/game/bg_slidemove.c:49-557`.
+        unsafe { (*self.world).g_entities[ent_num as usize].spawnflags }
+    }
+    fn entity_takedamage(&self, ent_num: c_int) -> qboolean {
+        // `PM_VehicleImpact` hit-entity `takedamage` read.
+        // Source: `oracle/codemp/game/bg_slidemove.c:49-557`.
+        unsafe { (*self.world).g_entities[ent_num as usize].takedamage }
+    }
+    fn fighter_is_landed(&self, veh_ent_num: c_int) -> qboolean {
+        // Reproduces the inline `FighterIsLanded(hitEnt->m_pVehicle,
+        // hitEnt->playerState)` over the game arena; the bg-side
+        // `!playerState.is_null()` gate short-circuits before this call.
+        // Source: `oracle/codemp/game/bg_slidemove.c:313-398`;
+        // `oracle/codemp/game/FighterNPC.c:300-308`.
+        unsafe {
+            let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
+            crate::FighterNPC::FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
+        }
+    }
 }
