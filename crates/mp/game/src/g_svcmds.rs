@@ -440,6 +440,9 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     }
     trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(fh));
 
+    // §19 DIVERGENCE: oracle passes the uninitialized `char banIPFile[MAX_QPATH]`
+    // to COM_BeginParseSession (UB); the name is only used in parse-error text, so
+    // we substitute "banip.txt". Source: `oracle/codemp/game/g_svcmds.c:339,352`.
     let banIPFile = cstr("banip.txt");
     crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, banIPFile.as_ptr());
 

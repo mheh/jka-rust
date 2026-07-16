@@ -11,6 +11,7 @@ use crate::world::GameWorld;
 
 use crate::entity::flags::FL_INACTIVE;
 use crate::g_combat::{AddScore, G_Damage};
+use crate::g_main::Com_Error;
 use crate::g_misc::TeleportPlayer;
 use crate::g_team::Team_ReturnFlag;
 use crate::g_utils::{
@@ -250,11 +251,50 @@ pub fn Use_Target_Print(
         ctx.entity_mut(ent).genericValue14 = (level_time as f32 + wait) as c_int;
     }
 
-    // Debug-only checks (FINAL_BUILD mode skips these)
+    // `#ifndef FINAL_BUILD` block — LIVE in the referee build (FINAL_BUILD is
+    // undefined). The `!ent || !ent->inuse` arm is dead (receiver handle is never
+    // null and inuse was checked above), so only the else-if activator arm fires.
+    // Source: `oracle/codemp/game/g_target.c:149-181`
+    if activator.is_none() || ctx.entity(activator.unwrap()).inuse == 0 {
+        Com_Error(ERR_DROP as c_int, c"Bad activator in Use_Target_Print".as_ptr());
+    }
+
     if ctx.entity(ent).genericValue15 > level_time {
-        // Com_Printf("TARGET PRINT ERRORS:\n");
-        // ... logging code ...
-        // Com_Error(ERR_DROP, "target_print used in quick succession, fix it! See the console for details.");
+        Com_Printf(c"TARGET PRINT ERRORS:\n".as_ptr());
+        unsafe {
+            if let Some(activator) = activator {
+                let classname = ctx.entity(activator).classname;
+                if !classname.is_null() && *classname != 0 {
+                    Com_Printf(
+                        cstr(&format!("activator classname: {}\n", cstr_to_str(classname)))
+                            .as_ptr(),
+                    );
+                }
+                let target = ctx.entity(activator).target;
+                if !target.is_null() && *target != 0 {
+                    Com_Printf(
+                        cstr(&format!("activator target: {}\n", cstr_to_str(target))).as_ptr(),
+                    );
+                }
+                let targetname = ctx.entity(activator).targetname;
+                if !targetname.is_null() && *targetname != 0 {
+                    Com_Printf(
+                        cstr(&format!("activator targetname: {}\n", cstr_to_str(targetname)))
+                            .as_ptr(),
+                    );
+                }
+            }
+            let ent_targetname = ctx.entity(ent).targetname;
+            if !ent_targetname.is_null() && *ent_targetname != 0 {
+                Com_Printf(
+                    cstr(&format!("print targetname: {}\n", cstr_to_str(ent_targetname))).as_ptr(),
+                );
+            }
+        }
+        Com_Error(
+            ERR_DROP as c_int,
+            c"target_print used in quick succession, fix it! See the console for details.".as_ptr(),
+        );
     }
     ctx.entity_mut(ent).genericValue15 = level_time + 5000;
 

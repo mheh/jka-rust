@@ -266,7 +266,7 @@ pub fn G_TryPushingEntity(
                 None,
                 [0.0, 0.0, 0.0],
                 (*pusher).damage,
-                0, // DAMAGE_NO_KNOCKBACK — not yet ported as a const; Raven passes it here.
+                DAMAGE_NO_KNOCKBACK,
                 meansOfDeath_t::MOD_CRUSH as c_int,
             );
             return qtrue;
@@ -791,7 +791,10 @@ pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverStat
                     (*ent).pos2[1] - (*ent).pos1[1],
                     (*ent).pos2[2] - (*ent).pos1[2],
                 ];
-                let f = 1000.0 / (*ent).s.pos.trDuration as f32;
+                // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
+                // an int, computed in f64, narrowed once at the float store.
+                // Source: `oracle/codemp/game/g_mover.c:560`
+                let f = (1000.0f64 / (*ent).s.pos.trDuration as f64) as f32;
                 (*ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
                 (*ent).s.pos.trType = if (*ent).alt_fire != 0 {
                     trType_t::TR_LINEAR_STOP
@@ -806,7 +809,10 @@ pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverStat
                     (*ent).pos1[1] - (*ent).pos2[1],
                     (*ent).pos1[2] - (*ent).pos2[2],
                 ];
-                let f = 1000.0 / (*ent).s.pos.trDuration as f32;
+                // Raven `f = 1000.0 / ent->s.pos.trDuration;` — double literal over
+                // an int, computed in f64, narrowed once at the float store.
+                // Source: `oracle/codemp/game/g_mover.c:575`
+                let f = (1000.0f64 / (*ent).s.pos.trDuration as f64) as f32;
                 (*ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
                 (*ent).s.pos.trType = if (*ent).alt_fire != 0 {
                     trType_t::TR_LINEAR_STOP

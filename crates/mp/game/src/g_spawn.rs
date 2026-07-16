@@ -620,57 +620,57 @@ pub static FIELDS: &[BG_field_t] = &[
     // rww - icarus stuff:
     field(
         c"spawnscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + BSET_SPAWN as usize * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + BSET_SPAWN as usize * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"usescript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 1 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 1 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"awakescript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 2 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 2 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"angerscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 3 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 3 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"attackscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 4 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 4 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"victoryscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 5 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 5 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"lostenemyscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 6 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 6 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"painscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 7 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 7 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"fleescript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 8 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 8 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"deathscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 9 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 9 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"delayscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 10 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 10 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
@@ -680,22 +680,22 @@ pub static FIELDS: &[BG_field_t] = &[
     ),
     field(
         c"blockedscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 11 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 11 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"ffirescript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 14 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 14 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"ffdeathscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 15 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 15 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
         c"mindtrickscript",
-        core::mem::offset_of!(gentity_t, behaviorSet) + 16 * 8,
+        core::mem::offset_of!(gentity_t, behaviorSet) + 16 * core::mem::size_of::<*mut c_char>(),
         fieldtype_t::F_LSTRING,
     ),
     field(
@@ -756,10 +756,11 @@ pub static FIELDS: &[BG_field_t] = &[
     },
 ];
 
-// `behaviorSet[i]` is a `[*mut c_char; NUM_BSETS]` array of pointer-sized (8
-// byte, host-64-bit) slots; the literal `+ i * 8` strides above mirror
-// Raven's `FOFS(behaviorSet[BSET_X])` without indexing through a non-const
-// array-index `offset_of!` (not yet stable for computed indices).
+// `behaviorSet[i]` is a `[*mut c_char; NUM_BSETS]` array of pointer-sized slots;
+// the `+ i * size_of::<*mut c_char>()` strides above mirror Raven's
+// `FOFS(behaviorSet[BSET_X])` at the target's pointer width (8 on LP64, 4 on
+// ILP32) without indexing through a non-const array-index `offset_of!` (not yet
+// stable for computed indices).
 const fn field(name: &'static CStr, ofs: usize, r#type: fieldtype_t) -> BG_field_t {
     BG_field_t {
         name: name.as_ptr() as *mut c_char,
@@ -942,10 +943,14 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
             sscanf_3f(value, &mut origin);
         }
 
-        // `DEG2RAD(a)` is `(a * M_PI) / 180.0F` in f32; `cos`/`sin` are the double
-        // libm functions and each `origin[k]*cos(...)` term evaluates in f64
-        // before narrowing to the f32 result.
-        let rotation = (ctx.world.level.mRotationAdjust * std::f32::consts::PI) / 180.0;
+        // `DEG2RAD(a)` is `(a * M_PI) / 180.0F`; M_PI resolves to glibc's double
+        // (math.h at q_shared.h:82 precedes the `#ifndef M_PI` float redefine at
+        // :547), so `float * double / float` evaluates entirely in f64 and
+        // narrows once at the f32 store. `cos`/`sin` are the double libm
+        // functions and each `origin[k]*cos(...)` term likewise evaluates in f64.
+        // Source: `oracle/codemp/game/q_shared.h:547-548,1174`
+        let rotation =
+            ((ctx.world.level.mRotationAdjust as f64 * std::f64::consts::PI) / 180.0f64) as f32;
         let cos_r = (rotation as f64).cos();
         let sin_r = (rotation as f64).sin();
         new_origin[0] = (origin[0] as f64 * cos_r - origin[1] as f64 * sin_r) as f32;
@@ -1118,10 +1123,12 @@ pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
         ctx.world.level.spawnVars[n as usize][0] = key_tok;
         ctx.world.level.spawnVars[n as usize][1] = val_tok;
         ctx.world.level.numSpawnVars += 1;
+    }
 
-        if inSubBSP != qfalse {
-            HandleEntityAdjustment(ctx);
-        }
+    // Oracle calls HandleEntityAdjustment exactly once, after the loop, gated on
+    // inSubBSP. Source: `oracle/codemp/game/g_spawn.c:1061-1064`
+    if inSubBSP != qfalse {
+        HandleEntityAdjustment(ctx);
     }
 
     qtrue

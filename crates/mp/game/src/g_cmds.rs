@@ -282,12 +282,15 @@ pub fn ConcatArgs(ctx: &mut GameContext, start: c_int) -> *mut c_char {
                     MAX_STRING_CHARS as c_int,
                 ),
             );
-            let s = cstr_to_str(arg.as_ptr());
-            let tlen = s.len();
+            // Raw-byte `strlen`/`memcpy`: routing through `cstr_to_str`
+            // (from_utf8_lossy) inflates 0x80-0xFF bytes to U+FFFD and shifts the
+            // `MAX_STRING_CHARS - 1` break point, so copy the argv bytes verbatim.
+            // Source: `oracle/codemp/game/g_cmds.c:137-146`
+            let tlen = arg.iter().position(|&b| b == 0).unwrap_or(MAX_STRING_CHARS);
             if len + tlen >= MAX_STRING_CHARS - 1 {
                 break;
             }
-            out.extend_from_slice(s.as_bytes());
+            out.extend(arg[..tlen].iter().map(|&b| b as u8));
             len += tlen;
             if i != c - 1 {
                 out.push(b' ');
@@ -818,11 +821,14 @@ pub fn Cmd_TeamTask_f(ctx: &mut GameContext, ent: EntityId) {
             c"teamtask".as_ptr(),
             cstr(&value).as_ptr(),
         );
+        // Pass the raw userinfo buffer through unchanged; C hands `trap_SetUserinfo`
+        // the buffer directly, so build the CString from the raw bytes rather than
+        // a lossy UTF-8 round-trip. Source: `oracle/codemp/game/g_cmds.c:520`
         trap::SetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
                 clientNum,
-                cstr(&cstr_to_str(userinfo.as_ptr())),
+                std::ffi::CStr::from_ptr(userinfo.as_ptr()).to_owned(),
             ),
         );
         crate::g_client::ClientUserinfoChanged(ctx, clientNum);
@@ -851,10 +857,10 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
             if cvars.g_autoBanTKSpammers.integer > 0
                 && (*client).sess.TKCount >= cvars.g_autoBanTKSpammers.integer
             {
-                if (*client).sess.IPstring[0] != 0 {
-                    // ban their IP
-                    crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
-                }
+                // Oracle guards with `if ( ent->client->sess.IPstring )`, but
+                // IPstring is a `char[32]` array whose address is never null, so
+                // this ban runs unconditionally. Preserve the always-true quirk.
+                crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
 
                 let m = crate::g_main::G_GetStringEdString(
                     ctx,
@@ -4718,6 +4724,9 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
             (*client).ps.saberMove = LS_MOVE_MAX - 1;
         }
 
+        // §19 DIVERGENCE: oracle clamps only the high end, so a negative arg
+        // reads `saberMoveData[negative]` OOB (UB); the Rust index panics instead
+        // (dev-only command, compiled out in FINAL_BUILD). Source: `g_cmds.c:3067-3072`.
         // PORT-NOTE(animTable/saberMoveData): file-scope tables now reached
         // via `animTable`/`ctx.world.bg_state.saberMoveData`.
         let animIdx = ctx.world.bg_state.saberMoveData[(*client).ps.saberMove as usize].animToUse;
