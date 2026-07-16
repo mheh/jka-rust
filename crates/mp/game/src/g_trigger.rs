@@ -356,14 +356,9 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                             }
 
                             // now that the item has been delivered, it can go away.
-                            crate::g_saga::SiegeItemRemoveOwner(
-                                &mut *obj_item,
-                                if activator.is_null() {
-                                    None
-                                } else {
-                                    Some(&mut *activator)
-                                },
-                            );
+                            let obj_item_id = ctx.entity_id_of(obj_item).unwrap();
+                            let carrier_id = ctx.entity_id_of(activator);
+                            crate::g_saga::SiegeItemRemoveOwner(ctx, obj_item_id, carrier_id);
                             (*obj_item).nextthink = 0;
                             (*obj_item).neverFree = qfalse;
                             G_FreeEntity(ctx, ctx.entity_id_of(obj_item));
