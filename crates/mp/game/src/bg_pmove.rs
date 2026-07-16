@@ -6270,7 +6270,10 @@ pub fn BG_VehTraceFromCamPos(
         // for `G_EstimateCamPos`); reached by entity number through the upcall.
         callbacks.wp_get_vehicle_cam_pos(
             (*bgEnt).s.number,
-            (*((*veh).m_pPilot as *mut gentity_t)).s.number,
+            // `m_pVehicle->m_pPilot` is already `*mut bgEntity_t`; the old
+            // `as *mut gentity_t` cast was spurious. `.s.number` is bg-visible.
+            // Source: `oracle/codemp/game/bg_pmove.c` (WP_GetVehicleCamPos call site)
+            (*(*veh).m_pPilot).s.number,
             &mut camPos as *mut vec3_t,
         );
 

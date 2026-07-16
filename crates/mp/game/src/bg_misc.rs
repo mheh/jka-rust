@@ -322,7 +322,10 @@ pub fn BG_ParseField(
                     | fieldtype_t::F_PARM15
                     | fieldtype_t::F_PARM16 => {
                         // QAGAME branch: Q3_SetParm(((gentity_t*)ent)->s.number, type - F_PARM1, value).
-                        let g = ent as *mut gentity_t;
+                        // `.s.number` is bg-visible, so read it through the `bgEntity_t`
+                        // overlay (identical head layout).
+                        // Source: `oracle/codemp/game/bg_misc.c` (BG_ParseField F_PARM branch)
+                        let g = ent as *mut bgEntity_t;
                         let parm_num = (*f).r#type as c_int - fieldtype_t::F_PARM1 as c_int;
                         Q3_SetParm(ctx, (*g).s.number, parm_num, value);
                     }

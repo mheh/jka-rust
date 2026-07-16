@@ -224,9 +224,19 @@ impl PmoveContext<'_> {
                                     pushDir[i] = bounceDir[i] * scale;
                                 }
                             } else {
-                                // hit another fighter
-                                let hitSpeed = if !((*hitEnt).client as *mut gclient_t).is_null() {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.speed
+                                // hit another fighter.
+                                // S5-1: `bgEntity_t.playerState` aliases `&client->ps` by the
+                                // established pm_entSelf overlay invariant, so these `client->ps.X`
+                                // reads retype to `(*playerState).X` and reach identical memory;
+                                // the `client`-null guard becomes a `playerState`-null guard. The
+                                // two are null together ONLY behind this function's earlier gates
+                                // (fighter-vehicle / ET_PLAYER / ET_NPC), which exclude the one
+                                // class that sets `client` without `playerState`
+                                // (`SP_misc_weapon_shooter`, `g_misc.c:3449`) — do not extend this
+                                // guard swap to unguarded sites.
+                                // Source: `oracle/codemp/game/bg_slidemove.c:218-229`
+                                let hitSpeed = if !(*hitEnt).playerState.is_null() {
+                                    (*(*hitEnt).playerState).speed
                                 } else {
                                     (*hitEnt).s.speed
                                 };
@@ -306,17 +316,19 @@ impl PmoveContext<'_> {
                             // needs the same gentity_t-only fields as above
                             // (client/spawnflags/m_pVehicle). Transcribed literally
                             // below; several field accesses are bg-tier gaps.
+                            // S5-1: `client->ps.X` reads retype to `(*playerState).X`
+                            // (identical memory, see the hitSpeed note above);
+                            // `.spawnflags` stays raw (S5-2 `fighter_not_suspended`
+                            // callback). Source: `oracle/codemp/game/bg_slidemove.c:313-398`
                             if turnHitEnt != 0
-                                && !((*hitEnt).client as *mut gclient_t).is_null()
+                                && !(*hitEnt).playerState.is_null()
                                 && FighterIsLanded(
                                     ((*hitEnt).m_pVehicle as *mut Vehicle_t),
-                                    core::ptr::addr_of_mut!(
-                                        (*((*hitEnt).client as *mut gclient_t)).ps
-                                    ),
+                                    (*hitEnt).playerState,
                                 ) == 0
                                 && ((*hitEnt).spawnflags & 2) == 0
                             {
-                                let l = (*((*hitEnt).client as *mut gclient_t)).ps.speed;
+                                let l = (*(*hitEnt).playerState).speed;
                                 for i in 0..3 {
                                     bounceDir[i] = -bounceDir[i];
                                 }
@@ -332,10 +344,7 @@ impl PmoveContext<'_> {
                                     pushDir2[i] *= scale2;
                                 }
                                 let mut moveDir2: vec3_t = [0.0; 3];
-                                VectorNormalize2(
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity,
-                                    &mut moveDir2,
-                                );
+                                VectorNormalize2((*(*hitEnt).playerState).velocity, &mut moveDir2);
                                 let mut bounceDot2 = -(moveDir2[0] * bounceDir[0]
                                     + moveDir2[1] * bounceDir[1]
                                     + moveDir2[2] * bounceDir[2]);
@@ -346,8 +355,7 @@ impl PmoveContext<'_> {
                                     pushDir2[i] *= bounceDot2;
                                 }
                                 for i in 0..3 {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] +=
-                                        pushDir2[i];
+                                    (*(*hitEnt).playerState).velocity[i] += pushDir2[i];
                                 }
                                 let mut turnDivider2 = (*hitVehInfo).mass as f32 / 400.0;
                                 if turnHitEnt != 0 {
@@ -513,43 +521,42 @@ impl PmoveContext<'_> {
                                 pmult = 40.0;
                             }
 
-                            if !((*hitEnt).client as *mut gclient_t).is_null()
-                                && BG_KnockDownable(core::ptr::addr_of_mut!(
-                                    (*((*hitEnt).client as *mut gclient_t)).ps
-                                )) != 0
+                            // S5-1: `client->ps.X` retype to `(*playerState).X` (identical
+                            // memory); the three `client->otherKiller*` writes below are
+                            // gclient-only (not on ps) and stay raw for the S5-2
+                            // `set_other_killer` callback.
+                            // Source: `oracle/codemp/game/bg_slidemove.c:402-542`
+                            if !(*hitEnt).playerState.is_null()
+                                && BG_KnockDownable((*hitEnt).playerState) != 0
                                 && self
                                     .callbacks
                                     .can_be_enemy((*pEnt).s.number, (*hitEnt).s.number)
                                     != 0
                             {
                                 // smash!
-                                if (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend
+                                if (*(*hitEnt).playerState).forceHandExtend
                                     != HANDEXTEND_KNOCKDOWN as c_int
                                 {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend =
+                                    (*(*hitEnt).playerState).forceHandExtend =
                                         HANDEXTEND_KNOCKDOWN as c_int;
-                                    (*((*hitEnt).client as *mut gclient_t))
-                                        .ps
-                                        .forceHandExtendTime = (*self.pm).cmd.serverTime + 1100;
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
+                                    (*(*hitEnt).playerState).forceHandExtendTime =
+                                        (*self.pm).cmd.serverTime + 1100;
+                                    (*(*hitEnt).playerState).forceDodgeAnim = 0;
                                 }
-                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKiller =
-                                    (*pEnt).s.number;
-                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKillerTime =
+                                (*(*hitEnt).playerState).otherKiller = (*pEnt).s.number;
+                                (*(*hitEnt).playerState).otherKillerTime =
                                     (*self.pm).cmd.serverTime + 5000;
-                                (*((*hitEnt).client as *mut gclient_t))
-                                    .ps
-                                    .otherKillerDebounceTime = (*self.pm).cmd.serverTime + 100;
+                                (*(*hitEnt).playerState).otherKillerDebounceTime =
+                                    (*self.pm).cmd.serverTime + 100;
                                 (*((*hitEnt).client as *mut gclient_t)).otherKillerMOD =
                                     MOD_COLLISION as c_int;
                                 (*((*hitEnt).client as *mut gclient_t)).otherKillerVehWeapon = 0;
                                 (*((*hitEnt).client as *mut gclient_t)).otherKillerWeaponType =
                                     WP_NONE as c_int;
                                 for i in 0..3 {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] +=
-                                        (*ps).velocity[i];
+                                    (*(*hitEnt).playerState).velocity[i] += (*ps).velocity[i];
                                 }
-                                (*((*hitEnt).client as *mut gclient_t)).ps.velocity[2] += 200.0;
+                                (*(*hitEnt).playerState).velocity[2] += 200.0;
                             }
                         }
 
