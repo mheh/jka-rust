@@ -235,25 +235,29 @@ pub fn WP_ResistForcePush(
     pusher: Option<EntityId>,
     noPenalty: qboolean,
 ) {
-    unsafe {
-        // STAGE-1: Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        let pusher: *mut gentity_t = ent_ptr(ctx, pusher);
-        let parts: c_int;
-        let mut runningResist: qboolean = qfalse;
+    let parts: c_int;
+    let mut runningResist: qboolean = qfalse;
 
-        if self_.is_null()
-            || (*self_).health <= 0
-            || (*self_).client.is_null()
-            || pusher.is_null()
-            || (*pusher).client.is_null()
-        {
-            return;
-        }
-        let client = (*self_).client;
-        if ((*self_).s.number == 0
+    let Some(self_id) = self_ else {
+        return;
+    };
+    // FLAG: client may be a real player (s.number==0) or an NPC pool client;
+    // deref raw via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_id).client;
+    if ctx.world.entity(self_id).health <= 0 || client.is_null() {
+        return;
+    }
+    let Some(pusher_id) = pusher else {
+        return;
+    };
+    if ctx.world.entity(pusher_id).client.is_null() {
+        return;
+    }
+    unsafe {
+        if (ctx.world.entity(self_id).s.number == 0
             || (*client).NPC_class == CLASS_DESANN
-            || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*self_).NPC_type) == 0
+            || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), ctx.world.entity(self_id).NPC_type)
+                == 0
             || (*client).NPC_class == CLASS_LUKE)
             && (crate::q_math::VectorLengthSquared((*client).ps.velocity) > 10000.0
                 || (*client).ps.fd.forcePowerLevel[FP_PUSH as usize] >= FORCE_LEVEL_3
@@ -277,7 +281,7 @@ pub fn WP_ResistForcePush(
         }
         crate::npc_c::NPC_SetAnim(
             ctx,
-            ctx.entity_id_of(self_).unwrap(),
+            self_id,
             parts,
             animNumber_t::BOTH_RESISTPUSH as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -319,7 +323,7 @@ pub fn WP_ResistForcePush(
         (*client).ps.powerups[PW_DISINT_4 as usize] =
             ctx.world.level.time + (*client).ps.torsoTimer + 500;
         (*client).ps.powerups[PW_PULL as usize] = 0;
-        Jedi_PlayBlockedPushSound(ctx, ctx.entity_id_of(self_).unwrap());
+        Jedi_PlayBlockedPushSound(ctx, self_id);
     }
 }
 
@@ -335,11 +339,10 @@ pub fn Boba_StopKnockdown(
     pushDir: vec3_t,
     forceKnockdown: qboolean,
 ) -> qboolean {
+    // FLAG: NPC (Boba) carries a BG_Alloc'd pool client (not level.clients);
+    // deref raw via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let pusher: *mut gentity_t = ent_ptr(ctx, pusher);
-        let client = (*self_).client;
         if (*client).NPC_class != CLASS_BOBAFETT {
             return qfalse;
         }
@@ -349,7 +352,7 @@ pub fn Boba_StopKnockdown(
             return qtrue;
         }
 
-        let ang: vec3_t = [0.0, (*self_).r.currentAngles[YAW], 0.0];
+        let ang: vec3_t = [0.0, ctx.world.entity(self_).r.currentAngles[YAW], 0.0];
         let strafeTime = ctx.world.bg_state.rng.Q_irand(1000, 2000);
 
         let mut fwd: vec3_t = [0.0; 3];
@@ -367,67 +370,36 @@ pub fn Boba_StopKnockdown(
             let mut tempCmd: usercmd_t = core::mem::zeroed();
             if fDot >= 0.4 {
                 tempCmd.forwardmove = 127;
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"moveforward".as_ptr(),
-                    strafeTime,
-                );
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"moveforward".as_ptr(), strafeTime);
             } else if fDot <= -0.4 {
                 tempCmd.forwardmove = -127;
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"moveback".as_ptr(),
-                    strafeTime,
-                );
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"moveback".as_ptr(), strafeTime);
             } else if rDot > 0.0 {
                 tempCmd.rightmove = 127;
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"strafeRight".as_ptr(),
-                    strafeTime,
-                );
-                crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"strafeLeft".as_ptr(), -1);
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeRight".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeLeft".as_ptr(), -1);
             } else {
                 tempCmd.rightmove = -127;
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"strafeLeft".as_ptr(),
-                    strafeTime,
-                );
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"strafeRight".as_ptr(),
-                    -1,
-                );
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeLeft".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeRight".as_ptr(), -1);
             }
-            crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
+            crate::g_utils::G_AddEvent(
+                ctx.world.entity_mut(self_),
+                entity_event_t::EV_JUMP as c_int,
+                0,
+            );
             if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                 //flip
                 (*client).ps.fd.forceJumpCharge = 280.0; //FIXME: calc this intelligently?
-                crate::w_force::ForceJump(ctx, ctx.entity_id_of(self_).unwrap(), &mut tempCmd);
+                crate::w_force::ForceJump(ctx, self_, &mut tempCmd);
             } else {
                 //roll
-                crate::g_timer::TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"duck".as_ptr(),
-                    strafeTime,
-                );
+                crate::g_timer::TIMER_Set(ctx, Some(self_), c"duck".as_ptr(), strafeTime);
             }
-            (*self_).painDebounceTime = 0; //so we do something
+            ctx.world.entity_mut(self_).painDebounceTime = 0; //so we do something
         } else if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 && forceKnockdown != qfalse {
             //resist
-            WP_ResistForcePush(
-                ctx,
-                ctx.entity_id_of(self_),
-                ctx.entity_id_of(pusher),
-                qtrue,
-            );
+            WP_ResistForcePush(ctx, Some(self_), pusher, qtrue);
         } else {
             //fall down
             return qfalse;
@@ -2549,17 +2521,17 @@ pub fn Jedi_CheckFlipEvasions(
     rightdot: f32,
     zdiff: f32,
 ) -> evasionType_t {
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let snpc = ctx.world.entity(self_).NPC;
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*self_).client;
-        let snpc = (*self_).NPC;
-
-        if !(*self_).NPC.is_null() && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) != 0 {
+        if !ctx.world.entity(self_).NPC.is_null() && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) != 0
+        {
             return evasionType_t::EVASION_NONE;
         }
-        if !(*self_).client.is_null()
+        if !ctx.world.entity(self_).client.is_null()
             && ((*client).ps.fd.forceRageRecoveryTime > ctx.world.level.time
                 || ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) != 0)
         {
@@ -2581,7 +2553,7 @@ pub fn Jedi_CheckFlipEvasions(
             // a reference to the BgState from GameWorld.
             animLength = crate::bg_panimate::BG_AnimLength(
                 &ctx.world.bg_state,
-                (*self_).localAnimIndex,
+                ctx.world.entity(self_).localAnimIndex,
                 (*client).ps.legsAnim as c_int,
             ) as f32;
             if (*client).ps.legsAnim == BOTH_WALL_RUN_LEFT as c_int && rightdot < 0.0 {
@@ -2618,12 +2590,16 @@ pub fn Jedi_CheckFlipEvasions(
                 }
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(self_).unwrap(),
+                    self_,
                     parts,
                     anim,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
+                crate::g_utils::G_AddEvent(
+                    ctx.world.entity_mut(self_),
+                    entity_event_t::EV_JUMP as c_int,
+                    0,
+                );
                 return evasionType_t::EVASION_OTHER;
             }
         } else if (*client).NPC_class != CLASS_DESANN
@@ -2666,8 +2642,16 @@ pub fn Jedi_CheckFlipEvasions(
                 }
             }
 
-            let mins: vec3_t = [(*self_).r.mins[0], (*self_).r.mins[1], 0.0];
-            let maxs: vec3_t = [(*self_).r.maxs[0], (*self_).r.maxs[1], 24.0];
+            let mins: vec3_t = [
+                ctx.world.entity(self_).r.mins[0],
+                ctx.world.entity(self_).r.mins[1],
+                0.0,
+            ];
+            let maxs: vec3_t = [
+                ctx.world.entity(self_).r.maxs[0],
+                ctx.world.entity(self_).r.maxs[1],
+                24.0,
+            ];
             let fwdAngles: vec3_t = [0.0, (*client).ps.viewangles[YAW as usize], 0.0];
 
             crate::q_math::AngleVectors(fwdAngles, Some(&mut fwd), Some(&mut right), None);
@@ -2697,16 +2681,21 @@ pub fn Jedi_CheckFlipEvasions(
                 speed = 200.0;
             }
             //trace in the dir that we want to go
-            crate::q_math::_VectorMA((*self_).r.currentOrigin, checkDist, right, &mut traceto);
+            crate::q_math::_VectorMA(
+                ctx.world.entity(self_).r.currentOrigin,
+                checkDist,
+                right,
+                &mut traceto,
+            );
             crate::trap::Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                     &mut trace as *mut trace_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(self_).r.currentOrigin as *const vec3_t,
                     &mins as *const vec3_t,
                     &maxs as *const vec3_t,
                     &traceto as *const vec3_t,
-                    (*self_).s.number,
+                    ctx.world.entity(self_).s.number,
                     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
                 ),
             );
@@ -2717,7 +2706,7 @@ pub fn Jedi_CheckFlipEvasions(
 
                 crate::npc_c::NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(self_).unwrap(),
+                    self_,
                     parts,
                     anim,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -2730,13 +2719,17 @@ pub fn Jedi_CheckFlipEvasions(
                 crate::q_math::_VectorScale(jumpRt, speed, &mut (*client).ps.velocity);
                 (*client).ps.fd.forceJumpCharge = 0.0;
                 (*client).ps.velocity[2] = 200.0;
-                (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
+                (*client).ps.fd.forceJumpZStart = ctx.world.entity(self_).r.currentOrigin[2];
                 if (*client).NPC_class == CLASS_BOBAFETT {
-                    crate::g_utils::G_AddEvent(&mut *(self_), entity_event_t::EV_JUMP as c_int, 0);
+                    crate::g_utils::G_AddEvent(
+                        ctx.world.entity_mut(self_),
+                        entity_event_t::EV_JUMP as c_int,
+                        0,
+                    );
                 } else {
                     crate::g_utils::G_SoundOnEnt(
                         ctx,
-                        ctx.entity_id_of(self_).unwrap(),
+                        self_,
                         CHAN_BODY as c_int,
                         c"sound/weapons/force/jump.wav".as_ptr(),
                     );
@@ -2746,12 +2739,18 @@ pub fn Jedi_CheckFlipEvasions(
                 //hit a wall, not a do-not-enter brush
                 let mut idealNormal: vec3_t = [0.0; 3];
 
-                crate::q_math::_VectorSubtract((*self_).r.currentOrigin, traceto, &mut idealNormal);
+                crate::q_math::_VectorSubtract(
+                    ctx.world.entity(self_).r.currentOrigin,
+                    traceto,
+                    &mut idealNormal,
+                );
                 crate::q_math::VectorNormalize(&mut idealNormal);
-                let traceEnt = ge.add(trace.entityNum as usize);
+                // Raven's `!traceEnt.is_null()` is always true (`ge.add` never
+                // yields NULL); dropped. The `< ENTITYNUM_WORLD` guard keeps the
+                // index in range before the entity borrow.
+                let trace_ent_id = EntityId(trace.entityNum as u32);
                 if (trace.entityNum < (ENTITYNUM_WORLD) as i16
-                    && !traceEnt.is_null()
-                    && (*traceEnt).s.solid != SOLID_BMODEL)
+                    && ctx.world.entity(trace_ent_id).s.solid != SOLID_BMODEL)
                     || crate::q_math::_DotProduct(trace.plane.normal, idealNormal) > 0.7f32
                 {
                     //it's a ent of some sort or it's a wall roughly facing us
@@ -2764,7 +2763,7 @@ pub fn Jedi_CheckFlipEvasions(
                             bestCheckDist = checkDist;
                             checkDist *= -1.0f32;
                             crate::q_math::_VectorMA(
-                                (*self_).r.currentOrigin,
+                                ctx.world.entity(self_).r.currentOrigin,
                                 checkDist,
                                 right,
                                 &mut traceto,
@@ -2773,11 +2772,11 @@ pub fn Jedi_CheckFlipEvasions(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                                     &mut trace as *mut trace_t,
-                                    &(*self_).r.currentOrigin as *const vec3_t,
+                                    &ctx.world.entity(self_).r.currentOrigin as *const vec3_t,
                                     &mins as *const vec3_t,
                                     &maxs as *const vec3_t,
                                     &traceto as *const vec3_t,
-                                    (*self_).s.number,
+                                    ctx.world.entity(self_).s.number,
                                     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
                                 ),
                             );
@@ -2818,22 +2817,23 @@ pub fn Jedi_CheckFlipEvasions(
                                     };
                                     crate::npc_c::NPC_SetAnim(
                                         ctx,
-                                        ctx.entity_id_of(self_).unwrap(),
+                                        self_,
                                         parts2,
                                         anim,
                                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                                     );
-                                    (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
+                                    (*client).ps.fd.forceJumpZStart =
+                                        ctx.world.entity(self_).r.currentOrigin[2];
                                     if (*client).NPC_class == CLASS_BOBAFETT {
                                         crate::g_utils::G_AddEvent(
-                                            &mut *(self_),
+                                            ctx.world.entity_mut(self_),
                                             entity_event_t::EV_JUMP as c_int,
                                             0,
                                         );
                                     } else {
                                         crate::g_utils::G_SoundOnEnt(
                                             ctx,
-                                            ctx.entity_id_of(self_).unwrap(),
+                                            self_,
                                             CHAN_BODY as c_int,
                                             c"sound/weapons/force/jump.wav".as_ptr(),
                                         );
@@ -2856,7 +2856,7 @@ pub fn Jedi_CheckFlipEvasions(
                             //too far from that wall to flip or run off it, check other side
                             checkDist *= -1.0f32;
                             crate::q_math::_VectorMA(
-                                (*self_).r.currentOrigin,
+                                ctx.world.entity(self_).r.currentOrigin,
                                 checkDist,
                                 right,
                                 &mut traceto,
@@ -2865,11 +2865,11 @@ pub fn Jedi_CheckFlipEvasions(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                                     &mut trace as *mut trace_t,
-                                    &(*self_).r.currentOrigin as *const vec3_t,
+                                    &ctx.world.entity(self_).r.currentOrigin as *const vec3_t,
                                     &mins as *const vec3_t,
                                     &maxs as *const vec3_t,
                                     &traceto as *const vec3_t,
-                                    (*self_).s.number,
+                                    ctx.world.entity(self_).s.number,
                                     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
                                 ),
                             );
@@ -2911,22 +2911,23 @@ pub fn Jedi_CheckFlipEvasions(
                             };
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
-                                ctx.entity_id_of(self_).unwrap(),
+                                self_,
                                 parts2,
                                 anim,
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                             );
-                            (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
+                            (*client).ps.fd.forceJumpZStart =
+                                ctx.world.entity(self_).r.currentOrigin[2];
                             if (*client).NPC_class == CLASS_BOBAFETT {
                                 crate::g_utils::G_AddEvent(
-                                    &mut *(self_),
+                                    ctx.world.entity_mut(self_),
                                     entity_event_t::EV_JUMP as c_int,
                                     0,
                                 );
                             } else {
                                 crate::g_utils::G_SoundOnEnt(
                                     ctx,
-                                    ctx.entity_id_of(self_).unwrap(),
+                                    self_,
                                     CHAN_BODY as c_int,
                                     c"sound/weapons/force/jump.wav".as_ptr(),
                                 );
@@ -3104,14 +3105,13 @@ pub fn Jedi_SaberBlockGo(
     incoming: Option<EntityId>,
     dist: f32,
 ) -> evasionType_t {
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc);
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(self_).client;
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2
-        // debt). `cmd: *mut usercmd_t` is not an entity pointer and stays raw.
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let incoming: *mut gentity_t = ent_ptr(ctx, incoming);
-        let npc = ctx.world.globals.NPC;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*self_).client;
+        // `cmd: *mut usercmd_t` is not an entity pointer and stays raw.
 
         let mut hitloc: vec3_t = [0.0; 3];
         let mut hitdir: vec3_t = [0.0; 3];
@@ -3128,22 +3128,28 @@ pub fn Jedi_SaberBlockGo(
         let mut evasionType: evasionType_t = evasionType_t::EVASION_NONE;
         let d_jedi = ctx.world.cvars.d_JediAI.integer != 0;
 
-        if incoming.is_null() {
+        if incoming.is_none() {
             crate::q_math::_VectorCopy(pHitloc, &mut hitloc);
             crate::q_math::_VectorCopy(phitDir, &mut hitdir);
             if (*client).ps.saberInFlight != qfalse {
                 //DOH!  do non-saber evasion!
                 saberBusy = qtrue;
-            } else if Jedi_QuickReactions(ctx, ctx.entity_id_of(self_).unwrap()) != qfalse {
+            } else if Jedi_QuickReactions(ctx, self_) != qfalse {
                 //trainer/tavion faster at parrying
             } else {
-                saberBusy = Jedi_SaberBusy(&*self_);
+                saberBusy = Jedi_SaberBusy(ctx.world.entity(self_));
             }
         } else {
-            crate::q_math::_VectorCopy((*incoming).r.currentOrigin, &mut hitloc);
-            crate::q_math::VectorNormalize2((*incoming).s.pos.trDelta, &mut hitdir);
+            crate::q_math::_VectorCopy(
+                ctx.world.entity(incoming.unwrap()).r.currentOrigin,
+                &mut hitloc,
+            );
+            crate::q_math::VectorNormalize2(
+                ctx.world.entity(incoming.unwrap()).s.pos.trDelta,
+                &mut hitdir,
+            );
         }
-        if !(*self_).client.is_null() && (*client).NPC_class == CLASS_BOBAFETT {
+        if !ctx.world.entity(self_).client.is_null() && (*client).NPC_class == CLASS_BOBAFETT {
             saberBusy = qtrue;
         }
 
@@ -3161,16 +3167,15 @@ pub fn Jedi_SaberBlockGo(
             || crate::bg_pmove::BG_SabersOff(&mut (*client).ps) != qfalse
             || (*client).NPC_class == CLASS_BOBAFETT
         {
-            let snpc = (*self_).NPC;
-            if !(*self_).NPC.is_null()
+            let snpc = ctx.world.entity(self_).NPC;
+            if !ctx.world.entity(self_).NPC.is_null()
                 && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
                     || (*snpc).rank as c_int >= RANK_LT_JG as c_int)
             {
                 if (*client).ps.groundEntityNum != ENTITYNUM_NONE
                     && ((*client).ps.pm_flags & PMF_DUCKED) == 0
                     && (*cmd).upmove >= 0
-                    && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"duck".as_ptr())
-                        != qfalse
+                    && crate::g_timer::TIMER_Done(ctx, Some(self_), c"duck".as_ptr()) != qfalse
                     && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
                         == qfalse
                     && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
@@ -3193,7 +3198,7 @@ pub fn Jedi_SaberBlockGo(
                 cstr(&format!(
                     "({}) evading attack from height {:.2}, zdiff: {:.2}, rightdot: {:.2}\n",
                     ctx.world.level.time,
-                    hitloc[2] - (*self_).r.absmin[2],
+                    hitloc[2] - ctx.world.entity(self_).r.absmin[2],
                     zdiff,
                     rightdot
                 ))
@@ -3202,10 +3207,10 @@ pub fn Jedi_SaberBlockGo(
         }
 
         if zdiff >= -5.0 {
-            if !incoming.is_null() || saberBusy == qfalse {
+            if incoming.is_some() || saberBusy == qfalse {
                 if rightdot > 12.0
                     || (rightdot > 3.0 && zdiff < 5.0)
-                    || (incoming.is_null() && hitdir[2].abs() < 0.25f32)
+                    || (incoming.is_none() && hitdir[2].abs() < 0.25f32)
                 {
                     //coming from right
                     if doDodge != qfalse {
@@ -3216,23 +3221,18 @@ pub fn Jedi_SaberBlockGo(
                             let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                ctx.entity_id_of(self_),
+                                Some(self_),
                                 c"duck".as_ptr(),
                                 duck_time,
                             );
                             let strafe_left_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                ctx.entity_id_of(self_),
+                                Some(self_),
                                 c"strafeLeft".as_ptr(),
                                 strafe_left_time,
                             );
-                            crate::g_timer::TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(self_),
-                                c"strafeRight".as_ptr(),
-                                0,
-                            );
+                            crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeRight".as_ptr(), 0);
                             evasionType = evasionType_t::EVASION_DUCK;
                             evaded = qtrue;
                         } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
@@ -3248,7 +3248,7 @@ pub fn Jedi_SaberBlockGo(
                                 let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    ctx.entity_id_of(self_),
+                                    Some(self_),
                                     c"duck".as_ptr(),
                                     duck_time,
                                 );
@@ -3267,7 +3267,7 @@ pub fn Jedi_SaberBlockGo(
                     }
                 } else if rightdot < -12.0
                     || (rightdot < -3.0 && zdiff < 5.0)
-                    || (incoming.is_null() && hitdir[2].abs() < 0.25f32)
+                    || (incoming.is_none() && hitdir[2].abs() < 0.25f32)
                 {
                     //coming from left
                     if doDodge != qfalse {
@@ -3278,23 +3278,18 @@ pub fn Jedi_SaberBlockGo(
                             let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                ctx.entity_id_of(self_),
+                                Some(self_),
                                 c"duck".as_ptr(),
                                 duck_time,
                             );
                             let strafe_right_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                ctx.entity_id_of(self_),
+                                Some(self_),
                                 c"strafeRight".as_ptr(),
                                 strafe_right_time,
                             );
-                            crate::g_timer::TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(self_),
-                                c"strafeLeft".as_ptr(),
-                                0,
-                            );
+                            crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeLeft".as_ptr(), 0);
                             evasionType = evasionType_t::EVASION_DUCK;
                             evaded = qtrue;
                         } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
@@ -3310,7 +3305,7 @@ pub fn Jedi_SaberBlockGo(
                                 let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    ctx.entity_id_of(self_),
+                                    Some(self_),
                                     c"duck".as_ptr(),
                                     duck_time,
                                 );
@@ -3341,12 +3336,7 @@ pub fn Jedi_SaberBlockGo(
             } else {
                 if (*client).ps.groundEntityNum != ENTITYNUM_NONE {
                     let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
-                    crate::g_timer::TIMER_Start(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        c"duck".as_ptr(),
-                        duck_time,
-                    );
+                    crate::g_timer::TIMER_Start(ctx, Some(self_), c"duck".as_ptr(), duck_time);
                     evasionType = evasionType_t::EVASION_DUCK;
                     evaded = qtrue;
                     if d_jedi {
@@ -3358,19 +3348,14 @@ pub fn Jedi_SaberBlockGo(
             //hmm, pretty low, need to duck
             if (*client).ps.groundEntityNum != ENTITYNUM_NONE {
                 let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
-                crate::g_timer::TIMER_Start(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"duck".as_ptr(),
-                    duck_time,
-                );
+                crate::g_timer::TIMER_Start(ctx, Some(self_), c"duck".as_ptr(), duck_time);
                 evasionType = evasionType_t::EVASION_DUCK;
                 evaded = qtrue;
                 if d_jedi {
                     crate::g_main::Com_Printf(cstr("duck ").as_ptr());
                 }
             }
-            if !incoming.is_null() || saberBusy == qfalse {
+            if incoming.is_some() || saberBusy == qfalse {
                 if rightdot > 8.0 || (rightdot > 3.0 && zdiff < -11.0) {
                     if doDodge != qfalse {
                         if (*client).NPC_class == CLASS_BOBAFETT
@@ -3379,16 +3364,11 @@ pub fn Jedi_SaberBlockGo(
                             let strafe_left_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                ctx.entity_id_of(self_),
+                                Some(self_),
                                 c"strafeLeft".as_ptr(),
                                 strafe_left_time,
                             );
-                            crate::g_timer::TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(self_),
-                                c"strafeRight".as_ptr(),
-                                0,
-                            );
+                            crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeRight".as_ptr(), 0);
                         } else {
                             dodgeAnim = BOTH_DODGE_L as c_int;
                         }
@@ -3411,16 +3391,11 @@ pub fn Jedi_SaberBlockGo(
                             let strafe_left_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                             crate::g_timer::TIMER_Start(
                                 ctx,
-                                ctx.entity_id_of(self_),
+                                Some(self_),
                                 c"strafeLeft".as_ptr(),
                                 strafe_left_time,
                             );
-                            crate::g_timer::TIMER_Set(
-                                ctx,
-                                ctx.entity_id_of(self_),
-                                c"strafeRight".as_ptr(),
-                                0,
-                            );
+                            crate::g_timer::TIMER_Set(ctx, Some(self_), c"strafeRight".as_ptr(), 0);
                         } else {
                             dodgeAnim = BOTH_DODGE_R as c_int;
                         }
@@ -3452,22 +3427,17 @@ pub fn Jedi_SaberBlockGo(
             || (zdiff < -36.0 && (zdiff < -44.0 || ctx.world.bg_state.rng.Q_irand(0, 2) == 0))
         {
             //jump!
-            let snpc = (*self_).NPC;
+            let snpc = ctx.world.entity(self_).NPC;
             if (*client).ps.groundEntityNum == ENTITYNUM_NONE {
                 //already in air, duck to pull up legs
                 let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
-                crate::g_timer::TIMER_Start(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    c"duck".as_ptr(),
-                    duck_time,
-                );
+                crate::g_timer::TIMER_Start(ctx, Some(self_), c"duck".as_ptr(), duck_time);
                 evasionType = evasionType_t::EVASION_DUCK;
                 evaded = qtrue;
                 if d_jedi {
                     crate::g_main::Com_Printf(cstr("legs up\n").as_ptr());
                 }
-                if !incoming.is_null() || saberBusy == qfalse {
+                if incoming.is_some() || saberBusy == qfalse {
                     if rightdot >= 0.0 {
                         (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT as c_int;
                         evasionType = evasionType_t::EVASION_DUCK_PARRY;
@@ -3485,7 +3455,7 @@ pub fn Jedi_SaberBlockGo(
                 }
             } else {
                 //gotta jump!
-                if !(*self_).NPC.is_null()
+                if !ctx.world.entity(self_).NPC.is_null()
                     && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
                         || (*snpc).rank as c_int > RANK_LT_JG as c_int)
                     && (ctx.world.bg_state.rng.Q_irand(0, 10) == 0
@@ -3493,7 +3463,7 @@ pub fn Jedi_SaberBlockGo(
                             && ((*cmd).forwardmove != 0 || (*cmd).rightmove != 0)))
                 {
                     //superjump
-                    if !(*self_).NPC.is_null()
+                    if !ctx.world.entity(self_).NPC.is_null()
                         && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) == 0
                         && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
                         && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
@@ -3508,7 +3478,7 @@ pub fn Jedi_SaberBlockGo(
                     }
                 } else {
                     //normal jump
-                    if !(*self_).NPC.is_null()
+                    if !ctx.world.entity(self_).NPC.is_null()
                         && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) == 0
                         && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
                         && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
@@ -3521,45 +3491,35 @@ pub fn Jedi_SaberBlockGo(
                                 let strafe_left_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    ctx.entity_id_of(self_),
+                                    Some(self_),
                                     c"strafeLeft".as_ptr(),
                                     strafe_left_time,
                                 );
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    ctx.entity_id_of(self_),
+                                    Some(self_),
                                     c"strafeRight".as_ptr(),
                                     0,
                                 );
-                                crate::g_timer::TIMER_Set(
-                                    ctx,
-                                    ctx.entity_id_of(self_),
-                                    c"walking".as_ptr(),
-                                    0,
-                                );
+                                crate::g_timer::TIMER_Set(ctx, Some(self_), c"walking".as_ptr(), 0);
                             } else {
                                 let strafe_right_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
                                 crate::g_timer::TIMER_Start(
                                     ctx,
-                                    ctx.entity_id_of(self_),
+                                    Some(self_),
                                     c"strafeRight".as_ptr(),
                                     strafe_right_time,
                                 );
                                 crate::g_timer::TIMER_Set(
                                     ctx,
-                                    ctx.entity_id_of(self_),
+                                    Some(self_),
                                     c"strafeLeft".as_ptr(),
                                     0,
                                 );
-                                crate::g_timer::TIMER_Set(
-                                    ctx,
-                                    ctx.entity_id_of(self_),
-                                    c"walking".as_ptr(),
-                                    0,
-                                );
+                                crate::g_timer::TIMER_Set(ctx, Some(self_), c"walking".as_ptr(), 0);
                             }
                         } else {
-                            if self_ == npc {
+                            if Some(self_) == npc_id {
                                 (*cmd).upmove = 127;
                             } else {
                                 (*client).ps.velocity[2] = JUMP_VELOCITY;
@@ -3572,7 +3532,7 @@ pub fn Jedi_SaberBlockGo(
                         }
                     }
                     if (*client).NPC_class == CLASS_TAVION {
-                        if incoming.is_null()
+                        if incoming.is_none()
                             && (*client).ps.groundEntityNum < ENTITYNUM_NONE
                             && ctx.world.bg_state.rng.Q_irand(0, 2) == 0
                         {
@@ -3598,23 +3558,24 @@ pub fn Jedi_SaberBlockGo(
                                 evasionType = evasionType_t::EVASION_CARTWHEEL;
                                 crate::npc_c::NPC_SetAnim(
                                     ctx,
-                                    ctx.entity_id_of(self_).unwrap(),
+                                    self_,
                                     SETANIM_BOTH,
                                     butterflyAnim,
                                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                                 );
                                 (*client).ps.velocity[2] = 225.0;
-                                (*client).ps.fd.forceJumpZStart = (*self_).r.currentOrigin[2];
+                                (*client).ps.fd.forceJumpZStart =
+                                    ctx.world.entity(self_).r.currentOrigin[2];
                                 if (*client).NPC_class == CLASS_BOBAFETT {
                                     crate::g_utils::G_AddEvent(
-                                        &mut *(self_),
+                                        ctx.world.entity_mut(self_),
                                         entity_event_t::EV_JUMP as c_int,
                                         0,
                                     );
                                 } else {
                                     crate::g_utils::G_Sound(
                                         ctx,
-                                        ctx.entity_id_of(self_),
+                                        Some(self_),
                                         CHAN_BODY as c_int,
                                         crate::g_utils::G_SoundIndex(
                                             c"sound/weapons/force/jump.wav".as_ptr(),
@@ -3628,22 +3589,18 @@ pub fn Jedi_SaberBlockGo(
                         }
                     }
                 }
-                evasionType =
-                    Jedi_CheckFlipEvasions(ctx, ctx.entity_id_of(self_).unwrap(), rightdot, zdiff);
+                evasionType = Jedi_CheckFlipEvasions(ctx, self_, rightdot, zdiff);
                 if evasionType != evasionType_t::EVASION_NONE {
-                    let enemy: *mut gentity_t = match (*self_).enemy {
-                        Some(id) => ge.add(id.0 as usize),
-                        None => core::ptr::null_mut(),
-                    };
+                    let enemy = ctx.world.entity(self_).enemy;
                     if ctx.world.cvars.d_slowmodeath.integer > 5
-                        && !enemy.is_null()
-                        && (*enemy).s.number == 0
+                        && enemy.is_some()
+                        && ctx.world.entity(enemy.unwrap()).s.number == 0
                     {
-                        G_StartMatrixEffect(&*self_);
+                        G_StartMatrixEffect(ctx.world.entity(self_));
                     }
                     saberBusy = qtrue;
                     evaded = qtrue;
-                } else if !incoming.is_null() || saberBusy == qfalse {
+                } else if incoming.is_some() || saberBusy == qfalse {
                     if rightdot >= 0.0 {
                         (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT as c_int;
                         if evasionType == evasionType_t::EVASION_JUMP {
@@ -3669,8 +3626,8 @@ pub fn Jedi_SaberBlockGo(
                 }
             }
         } else {
-            if !incoming.is_null() || saberBusy == qfalse {
-                let snpc = (*self_).NPC;
+            if incoming.is_some() || saberBusy == qfalse {
+                let snpc = ctx.world.entity(self_).NPC;
                 if rightdot >= 0.0 {
                     (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT as c_int;
                     evasionType = evasionType_t::EVASION_PARRY;
@@ -3684,9 +3641,11 @@ pub fn Jedi_SaberBlockGo(
                         crate::g_main::Com_Printf(cstr("LL block\n").as_ptr());
                     }
                 }
-                if !incoming.is_null() && (*incoming).s.weapon == WP_SABER as c_int {
+                if incoming.is_some()
+                    && ctx.world.entity(incoming.unwrap()).s.weapon == WP_SABER as c_int
+                {
                     //thrown saber!
-                    if !(*self_).NPC.is_null()
+                    if !ctx.world.entity(self_).NPC.is_null()
                         && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
                             || (*snpc).rank as c_int > RANK_LT_JG as c_int)
                         && (ctx.world.bg_state.rng.Q_irand(0, 10) == 0
@@ -3694,7 +3653,7 @@ pub fn Jedi_SaberBlockGo(
                                 && ((*cmd).forwardmove != 0 || (*cmd).rightmove != 0)))
                     {
                         //superjump
-                        if !(*self_).NPC.is_null()
+                        if !ctx.world.entity(self_).NPC.is_null()
                             && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) == 0
                             && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
                             && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
@@ -3708,12 +3667,12 @@ pub fn Jedi_SaberBlockGo(
                         }
                     } else {
                         //normal jump
-                        if !(*self_).NPC.is_null()
+                        if !ctx.world.entity(self_).NPC.is_null()
                             && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) == 0
                             && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
                             && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
                         {
-                            if self_ == npc {
+                            if Some(self_) == npc_id {
                                 (*cmd).upmove = 127;
                             } else {
                                 (*client).ps.velocity[2] = JUMP_VELOCITY;
@@ -3733,30 +3692,30 @@ pub fn Jedi_SaberBlockGo(
             return evasionType_t::EVASION_NONE;
         }
         //stop taunting
-        crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"taunting".as_ptr(), 0);
+        crate::g_timer::TIMER_Set(ctx, Some(self_), c"taunting".as_ptr(), 0);
         //stop gripping
         crate::g_timer::TIMER_Set(
             ctx,
-            ctx.entity_id_of(self_),
+            Some(self_),
             c"gripping".as_ptr(),
             -ctx.world.level.time,
         );
-        crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_GRIP);
+        crate::w_force::WP_ForcePowerStop(ctx, self_, FP_GRIP);
         //stop draining
         crate::g_timer::TIMER_Set(
             ctx,
-            ctx.entity_id_of(self_),
+            Some(self_),
             c"draining".as_ptr(),
             -ctx.world.level.time,
         );
-        crate::w_force::WP_ForcePowerStop(ctx, ctx.entity_id_of(self_).unwrap(), FP_DRAIN);
+        crate::w_force::WP_ForcePowerStop(ctx, self_, FP_DRAIN);
 
         if dodgeAnim != -1 {
             //dodged
             evasionType = evasionType_t::EVASION_DODGE;
             crate::npc_c::NPC_SetAnim(
                 ctx,
-                ctx.entity_id_of(self_).unwrap(),
+                self_,
                 SETANIM_BOTH,
                 dodgeAnim,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
@@ -3764,26 +3723,18 @@ pub fn Jedi_SaberBlockGo(
             (*client).ps.weaponTime = (*client).ps.torsoTimer;
             (*client).ps.pm_time = (*client).ps.torsoTimer;
             (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
-            let enemy: *mut gentity_t = match (*self_).enemy {
-                Some(id) => ge.add(id.0 as usize),
-                None => core::ptr::null_mut(),
-            };
+            let enemy = ctx.world.entity(self_).enemy;
             if ctx.world.cvars.d_slowmodeath.integer > 5
-                && !enemy.is_null()
-                && (*enemy).s.number == 0
+                && enemy.is_some()
+                && ctx.world.entity(enemy.unwrap()).s.number == 0
             {
-                G_StartMatrixEffect(&*self_);
+                G_StartMatrixEffect(ctx.world.entity(self_));
             }
         } else {
             if duckChance != 0 {
                 if ctx.world.bg_state.rng.Q_irand(0, duckChance) == 0 {
                     let duck_time = ctx.world.bg_state.rng.Q_irand(500, 1500);
-                    crate::g_timer::TIMER_Start(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        c"duck".as_ptr(),
-                        duck_time,
-                    );
+                    crate::g_timer::TIMER_Start(ctx, Some(self_), c"duck".as_ptr(), duck_time);
                     if evasionType == evasionType_t::EVASION_PARRY {
                         evasionType = evasionType_t::EVASION_DUCK_PARRY;
                     } else {
@@ -3792,14 +3743,13 @@ pub fn Jedi_SaberBlockGo(
                 }
             }
 
-            if !incoming.is_null() {
+            if incoming.is_some() {
                 (*client).ps.saberBlocked =
                     crate::w_saber::WP_MissileBlockForBlock((*client).ps.saberBlocked);
             }
         }
         {
-            let parryReCalcTime =
-                Jedi_ReCalcParryTime(ctx, ctx.entity_id_of(self_).unwrap(), evasionType);
+            let parryReCalcTime = Jedi_ReCalcParryTime(ctx, self_, evasionType);
             if (*client).ps.fd.forcePowerDebounce[FP_SABER_DEFENSE as usize]
                 < ctx.world.level.time + parryReCalcTime
             {
@@ -4422,37 +4372,33 @@ pub fn Jedi_FindEnemyInCone(
     fallback: Option<EntityId>,
     minDot: f32,
 ) -> *mut gentity_t {
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let self_client = ctx.world.entity(self_).client;
+
+    let mut forward: vec3_t = [0.0; 3];
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+    let mut dist: f32;
+    let mut bestDist: f32 = Q3_INFINITE as f32;
+    let mut enemy: Option<EntityId> = fallback;
+    let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
+    let mut e: c_int;
+    let numListedEntities: c_int;
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+
+    if self_client.is_null() {
+        return unsafe { ent_ptr(ctx, enemy) };
+    }
+
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2
-        // debt). The `*mut gentity_t` return stays raw (returns out of scope).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let fallback: *mut gentity_t = ent_ptr(ctx, fallback);
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let self_client = (*self_).client;
-
-        let mut forward: vec3_t = [0.0; 3];
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
-        let mut dist: f32;
-        let mut bestDist: f32 = Q3_INFINITE as f32;
-        let mut enemy: *mut gentity_t = fallback;
-        let mut check: *mut gentity_t;
-        let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
-        let mut e: c_int;
-        let numListedEntities: c_int;
-        let mut tr: trace_t = core::mem::zeroed();
-
-        if (*self_).client.is_null() {
-            return enemy;
-        }
-
         crate::q_math::AngleVectors((*self_client).ps.viewangles, Some(&mut forward), None, None);
 
         e = 0;
         while e < 3 {
-            mins[e as usize] = (*self_).r.currentOrigin[e as usize] - 1024.0;
-            maxs[e as usize] = (*self_).r.currentOrigin[e as usize] + 1024.0;
+            mins[e as usize] = ctx.world.entity(self_).r.currentOrigin[e as usize] - 1024.0;
+            maxs[e as usize] = ctx.world.entity(self_).r.currentOrigin[e as usize] + 1024.0;
             e += 1;
         }
         numListedEntities = crate::trap::EntitiesInBox(
@@ -4467,17 +4413,19 @@ pub fn Jedi_FindEnemyInCone(
 
         e = 0;
         while e < numListedEntities {
-            check = ge.add(entityList[e as usize] as usize);
-            let check_client = (*check).client;
-            if check == self_ {
+            let check_id = EntityId(entityList[e as usize] as u32);
+            // FLAG: arbitrary in-box entity — client may be a real player or NPC
+            // pool client; deref raw via the safe entity borrow, per trap 2b.
+            let check_client = ctx.world.entity(check_id).client;
+            if check_id == self_ {
                 e += 1;
                 continue;
             }
-            if (*check).inuse == qfalse {
+            if ctx.world.entity(check_id).inuse == qfalse {
                 e += 1;
                 continue;
             }
-            if (*check).client.is_null() {
+            if ctx.world.entity(check_id).client.is_null() {
                 e += 1;
                 continue;
             }
@@ -4485,7 +4433,7 @@ pub fn Jedi_FindEnemyInCone(
                 e += 1;
                 continue;
             }
-            if (*check).health <= 0 {
+            if ctx.world.entity(check_id).health <= 0 {
                 e += 1;
                 continue;
             }
@@ -4493,8 +4441,8 @@ pub fn Jedi_FindEnemyInCone(
             if crate::trap::InPVS(
                 ctx.engine,
                 mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                    &(*check).r.currentOrigin as *const vec3_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(check_id).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(self_).r.currentOrigin as *const vec3_t,
                 ),
             ) == 0
             {
@@ -4503,8 +4451,8 @@ pub fn Jedi_FindEnemyInCone(
             }
 
             crate::q_math::_VectorSubtract(
-                (*check).r.currentOrigin,
-                (*self_).r.currentOrigin,
+                ctx.world.entity(check_id).r.currentOrigin,
+                ctx.world.entity(self_).r.currentOrigin,
                 &mut dir,
             );
             dist = crate::q_math::VectorNormalize(&mut dir);
@@ -4518,27 +4466,28 @@ pub fn Jedi_FindEnemyInCone(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                     &mut tr as *mut trace_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(self_).r.currentOrigin as *const vec3_t,
                     &vec3_origin as *const vec3_t,
                     &vec3_origin as *const vec3_t,
-                    &(*check).r.currentOrigin as *const vec3_t,
-                    (*self_).s.number,
+                    &ctx.world.entity(check_id).r.currentOrigin as *const vec3_t,
+                    ctx.world.entity(self_).s.number,
                     MASK_SHOT,
                 ),
             );
-            if tr.fraction < 1.0f32 && tr.entityNum != ((*check).s.number) as i16 {
+            if tr.fraction < 1.0f32 && tr.entityNum != (ctx.world.entity(check_id).s.number) as i16
+            {
                 e += 1;
                 continue;
             }
 
             if dist < bestDist {
                 dist = bestDist;
-                enemy = check;
+                enemy = Some(check_id);
             }
             let _ = dist;
             e += 1;
         }
-        enemy
+        ent_ptr(ctx, enemy)
     }
 }
 
@@ -5583,26 +5532,27 @@ pub fn Jedi_Jump(ctx: &mut GameContext, dest: vec3_t, goalEntNum: c_int) -> qboo
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:4719-4865`
 pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) has no accessor; deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
+    // via the safe entity borrow, per trap 2b.
+    let client = ctx.world.entity(npc_id).client;
+    // Raven derefs `goal->client` unconditionally at the top; `goal` is always
+    // a live entity here.
+    let goal_id = goal.unwrap();
+    // FLAG: goal's client may be a real player or NPC pool client; deref raw, trap 2b.
+    let goal_client = ctx.world.entity(goal_id).client;
+    let enemy = ctx.world.entity(npc_id).enemy;
     unsafe {
-        // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
-        let goal: *mut gentity_t = ent_ptr(ctx, goal);
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let ge = ctx.world.g_entities.as_mut_ptr();
-        let client = (*npc).client;
-        let goal_client = (*goal).client;
-        let enemy: *mut gentity_t = match (*npc).enemy {
-            Some(id) => ge.add(id.0 as usize),
-            None => core::ptr::null_mut(),
-        };
-
         if ((*npc_info).scriptFlags & SCF_NO_ACROBATICS) != 0 {
             return qfalse;
         }
-        if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"jumpChaseDebounce".as_ptr())
-            != qfalse
-        {
-            if (*goal).client.is_null() || (*goal_client).ps.groundEntityNum != ENTITYNUM_NONE {
+        if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"jumpChaseDebounce".as_ptr()) != qfalse {
+            if ctx.world.entity(goal_id).client.is_null()
+                || (*goal_client).ps.groundEntityNum != ENTITYNUM_NONE
+            {
                 if crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
                     && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
                         == qfalse
@@ -5612,8 +5562,8 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                     let goal_z_diff: f32;
                     let goal_xy_dist: f32;
                     crate::q_math::_VectorSubtract(
-                        (*goal).r.currentOrigin,
-                        (*npc).r.currentOrigin,
+                        ctx.world.entity(goal_id).r.currentOrigin,
+                        ctx.world.entity(npc_id).r.currentOrigin,
                         &mut goal_diff,
                     );
                     goal_z_diff = goal_diff[2];
@@ -5621,8 +5571,9 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                     goal_xy_dist = crate::q_math::VectorNormalize(&mut goal_diff);
                     if goal_xy_dist < 550.0 && goal_z_diff > -400.0 {
                         let mut debounce: qboolean = qfalse;
-                        if (*npc).health < 150
-                            && (((*npc).health < 30 && goal_z_diff < 0.0) || goal_z_diff < -128.0)
+                        if ctx.world.entity(npc_id).health < 150
+                            && ((ctx.world.entity(npc_id).health < 30 && goal_z_diff < 0.0)
+                                || goal_z_diff < -128.0)
                         {
                             //don't jump, just walk off
                             debounce = qtrue;
@@ -5634,22 +5585,25 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                             if goal_z_diff > 0.0 || goal_xy_dist > 128.0 {
                                 //Fake a force-jump
                                 let mut dest: vec3_t = [0.0; 3];
-                                crate::q_math::_VectorCopy((*goal).r.currentOrigin, &mut dest);
-                                if goal == enemy {
+                                crate::q_math::_VectorCopy(
+                                    ctx.world.entity(goal_id).r.currentOrigin,
+                                    &mut dest,
+                                );
+                                if Some(goal_id) == enemy {
                                     let mut sideTry = 0;
                                     while sideTry < 10 {
                                         let mut trace: trace_t = core::mem::zeroed();
                                         let mut bottom: vec3_t = [0.0; 3];
 
                                         if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-                                            dest[0] += (*enemy).r.maxs[0] * 1.25;
+                                            dest[0] += ctx.world.entity(goal_id).r.maxs[0] * 1.25;
                                         } else {
-                                            dest[0] += (*enemy).r.mins[0] * 1.25;
+                                            dest[0] += ctx.world.entity(goal_id).r.mins[0] * 1.25;
                                         }
                                         if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-                                            dest[1] += (*enemy).r.maxs[1] * 1.25;
+                                            dest[1] += ctx.world.entity(goal_id).r.maxs[1] * 1.25;
                                         } else {
-                                            dest[1] += (*enemy).r.mins[1] * 1.25;
+                                            dest[1] += ctx.world.entity(goal_id).r.mins[1] * 1.25;
                                         }
                                         crate::q_math::_VectorCopy(dest, &mut bottom);
                                         bottom[2] -= 128.0;
@@ -5658,11 +5612,11 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                                                 &mut trace as *mut trace_t,
                                                 &dest as *const vec3_t,
-                                                &(*npc).r.mins as *const vec3_t,
-                                                &(*npc).r.maxs as *const vec3_t,
+                                                &ctx.world.entity(npc_id).r.mins as *const vec3_t,
+                                                &ctx.world.entity(npc_id).r.maxs as *const vec3_t,
                                                 &bottom as *const vec3_t,
-                                                (*goal).s.number,
-                                                (*npc).clipmask,
+                                                ctx.world.entity(goal_id).s.number,
+                                                ctx.world.entity(npc_id).clipmask,
                                             ),
                                         );
                                         if trace.fraction < 1.0f32 {
@@ -5674,12 +5628,13 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                     if sideTry >= 10 {
                                         //screw it, just jump right at him?
                                         crate::q_math::_VectorCopy(
-                                            (*goal).r.currentOrigin,
+                                            ctx.world.entity(goal_id).r.currentOrigin,
                                             &mut dest,
                                         );
                                     }
                                 }
-                                if Jedi_Jump(ctx, dest, (*goal).s.number) != qfalse {
+                                let goal_num = ctx.world.entity(goal_id).s.number;
+                                if Jedi_Jump(ctx, dest, goal_num) != qfalse {
                                     {
                                         let jumpAnim: c_int;
                                         if (*client).NPC_class == CLASS_BOBAFETT
@@ -5693,21 +5648,22 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                         }
                                         crate::npc_c::NPC_SetAnim(
                                             ctx,
-                                            ctx.entity_id_of(npc).unwrap(),
+                                            npc_id,
                                             SETANIM_BOTH,
                                             jumpAnim,
                                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                                         );
                                     }
 
-                                    (*client).ps.fd.forceJumpZStart = (*npc).r.currentOrigin[2];
+                                    (*client).ps.fd.forceJumpZStart =
+                                        ctx.world.entity(npc_id).r.currentOrigin[2];
 
                                     (*client).ps.weaponTime = (*client).ps.torsoTimer;
                                     (*client).ps.fd.forcePowersActive |= 1 << FP_LEVITATION;
                                     if (*client).NPC_class == CLASS_BOBAFETT {
                                         crate::g_utils::G_SoundOnEnt(
                                             ctx,
-                                            ctx.entity_id_of(npc).unwrap(),
+                                            npc_id,
                                             CHAN_ITEM as c_int,
                                             c"sound/boba/jeton.wav".as_ptr(),
                                         );
@@ -5716,7 +5672,7 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                     } else {
                                         crate::g_utils::G_SoundOnEnt(
                                             ctx,
-                                            ctx.entity_id_of(npc).unwrap(),
+                                            npc_id,
                                             CHAN_BODY as c_int,
                                             c"sound/weapons/force/jump.wav".as_ptr(),
                                         );
@@ -5726,7 +5682,7 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                         ctx.world.bg_state.rng.Q_irand(2000, 3000);
                                     crate::g_timer::TIMER_Set(
                                         ctx,
-                                        ctx.entity_id_of(npc),
+                                        Some(npc_id),
                                         c"forceJumpChasing".as_ptr(),
                                         force_jump_chasing_time,
                                     );
@@ -5739,7 +5695,7 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                 ctx.world.bg_state.rng.Q_irand(2000, 5000);
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                ctx.entity_id_of(npc),
+                                Some(npc_id),
                                 c"jumpChaseDebounce".as_ptr(),
                                 jump_chase_debounce_time,
                             );
@@ -5747,7 +5703,7 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                             (*client).ps.moveDir = [0.0, 0.0, 0.0];
                             crate::g_timer::TIMER_Set(
                                 ctx,
-                                ctx.entity_id_of(npc),
+                                Some(npc_id),
                                 c"duck".as_ptr(),
                                 -ctx.world.level.time,
                             );
