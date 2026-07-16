@@ -18,17 +18,6 @@ use crate::trap;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
 
-// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
-// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
-// precedent.
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 /// Raven ammo pod health.
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:4-5`
 const AMMO_POD_HEALTH: c_int = 1;
@@ -53,7 +42,6 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:27-43`
 pub fn NPC_Mark2_Precache(ctx: &mut GameContext) {
-    // SAFETY: G_SoundIndex, G_EffectIndex, RegisterItem accessed through game context.
     G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
     G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char);
     G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char);
@@ -74,46 +62,49 @@ pub fn NPC_Mark2_Precache(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:50-72`
 pub fn NPC_Mark2_Part_Explode(ctx: &mut GameContext, self_: EntityId, bolt: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    unsafe {
-        if bolt >= 0 {
-            let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
-            let mut org: vec3_t = [0.0; 3];
-            let mut dir: vec3_t = [0.0; 3];
+    if bolt >= 0 {
+        // mdxaBone_t POD zero-init (not part of the entity deref regime).
+        let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+        let mut org: vec3_t = [0.0; 3];
+        let mut dir: vec3_t = [0.0; 3];
 
-            trap::G2API_GetBoltMatrix(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                    (*self_).ghoul2,
-                    0,
-                    bolt,
-                    &mut boltMatrix as *mut mdxaBone_t,
-                    &(*self_).r.currentAngles as *const vec3_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
-                    ctx.world.level.time,
-                    core::ptr::null_mut(),
-                    &(*self_).modelScale as *const vec3_t,
-                ),
-            );
+        let ghoul2 = ctx.world.entity(self_).ghoul2;
+        let angles = ctx.world.entity(self_).r.currentAngles;
+        let origin = ctx.world.entity(self_).r.currentOrigin;
+        let scale = ctx.world.entity(self_).modelScale;
+        let time = ctx.world.level.time;
 
-            BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
-            BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                ghoul2,
+                0,
+                bolt,
+                &mut boltMatrix as *mut mdxaBone_t,
+                &angles as *const vec3_t,
+                &origin as *const vec3_t,
+                time,
+                core::ptr::null_mut(),
+                &scale as *const vec3_t,
+            ),
+        );
 
-            G_PlayEffectID(
-                G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char),
-                org,
-                dir,
-            );
-            G_PlayEffectID(
-                G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char),
-                org,
-                dir,
-            );
-        }
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
 
-        (*self_).count += 1;
+        G_PlayEffectID(
+            G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char),
+            org,
+            dir,
+        );
+        G_PlayEffectID(
+            G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char),
+            org,
+            dir,
+        );
     }
+
+    ctx.world.entity_mut(self_).count += 1;
 }
 
 /// Raven `NPC_Mark2_Pain`.
@@ -125,67 +116,54 @@ pub fn NPC_Mark2_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
-    unsafe {
-        let hit_loc = ctx.world.globals.gPainHitLoc;
+    let hit_loc = ctx.world.globals.gPainHitLoc;
 
-        NPC_Pain(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(attacker),
-            damage,
-        );
+    NPC_Pain(ctx, self_, attacker, damage);
 
-        for i in 0..3 {
-            if hit_loc == HL_GENERIC1 + i
-                && (*self_).locationDamage[(HL_GENERIC1 + i) as usize] > AMMO_POD_HEALTH
-            {
-                if (*self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
-                    let surface_name = cstr(&format!("torso_canister{}", (i + 1) as c_int));
-                    let new_bolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            surface_name.clone(),
-                        ),
-                    );
-                    if new_bolt != -1 {
-                        NPC_Mark2_Part_Explode(ctx, ctx.entity_id_of(self_).unwrap(), new_bolt);
-                    }
-                    NPC_SetSurfaceOnOff(
-                        ctx,
-                        ctx.entity_id_of(self_).unwrap(),
-                        surface_name.as_ptr(),
-                        TURN_OFF,
-                    );
-                    break;
+    for i in 0..3 {
+        if hit_loc == HL_GENERIC1 + i
+            && ctx.world.entity(self_).locationDamage[(HL_GENERIC1 + i) as usize] > AMMO_POD_HEALTH
+        {
+            if ctx.world.entity(self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
+                let surface_name = cstr(&format!("torso_canister{}", (i + 1) as c_int));
+                let ghoul2 = ctx.world.entity(self_).ghoul2;
+                let new_bolt = trap::G2API_AddBolt(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                        ghoul2,
+                        0,
+                        surface_name.clone(),
+                    ),
+                );
+                if new_bolt != -1 {
+                    NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
                 }
+                NPC_SetSurfaceOnOff(ctx, self_, surface_name.as_ptr(), TURN_OFF);
+                break;
             }
         }
+    }
 
-        G_Sound(
+    G_Sound(
+        ctx,
+        Some(self_),
+        CHAN_AUTO,
+        G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
+    );
+
+    if ctx.world.entity(self_).count > 0 {
+        let health = ctx.world.entity(self_).health;
+        G_Damage(
             ctx,
-            ctx.entity_id_of(self_),
-            CHAN_AUTO,
-            G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
+            Some(self_),
+            None,
+            None,
+            None,
+            [0.0; 3],
+            health,
+            crate::level::damage_flags::DAMAGE_NO_PROTECTION,
+            MOD_UNKNOWN as c_int,
         );
-
-        if (*self_).count > 0 {
-            G_Damage(
-                ctx,
-                ctx.entity_id_of(self_),
-                ctx.entity_id_of(core::ptr::null_mut()),
-                ctx.entity_id_of(core::ptr::null_mut()),
-                None,
-                [0.0; 3],
-                (*self_).health,
-                crate::level::damage_flags::DAMAGE_NO_PROTECTION,
-                MOD_UNKNOWN as c_int,
-            );
-        }
     }
 }
 
@@ -193,163 +171,159 @@ pub fn NPC_Mark2_Pain(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:118-130`
 pub fn Mark2_Hunt(ctx: &mut GameContext) {
-    unsafe {
-        let npc_ptr = ctx.world.globals.NPC;
-        let npc_info_ptr = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if (*npc_info_ptr).goalEntity.is_none() {
-            (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
+    // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+    let goal = unsafe { (*npc_info).goalEntity };
+    if goal.is_none() {
+        let enemy = ctx.world.entity(npc_id).enemy;
+        unsafe {
+            (*npc_info).goalEntity = enemy;
         }
-
-        NPC_FaceEnemy(ctx, qtrue);
-
-        (*npc_info_ptr).combatMove = qtrue;
-        NPC_MoveToGoal(ctx, qtrue);
     }
+
+    NPC_FaceEnemy(ctx, qtrue);
+
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    unsafe {
+        (*npc_info).combatMove = qtrue;
+    }
+    NPC_MoveToGoal(ctx, qtrue);
 }
 
 /// Raven `Mark2_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:137-179`
 pub fn Mark2_FireBlaster(ctx: &mut GameContext, advance: qboolean) {
-    unsafe {
-        let mut muzzle1: vec3_t = [0.0; 3];
-        let mut enemy_org1: vec3_t = [0.0; 3];
-        let mut delta1: vec3_t = [0.0; 3];
-        let mut angleToEnemy1: vec3_t = [0.0; 3];
-        let mut forward: vec3_t = [0.0; 3];
-        let mut vright: vec3_t = [0.0; 3];
-        let mut up: vec3_t = [0.0; 3];
+    let mut muzzle1: vec3_t = [0.0; 3];
+    let mut enemy_org1: vec3_t = [0.0; 3];
+    let mut delta1: vec3_t = [0.0; 3];
+    let mut angleToEnemy1: vec3_t = [0.0; 3];
+    let mut forward: vec3_t = [0.0; 3];
+    let mut vright: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
 
-        let npc_ptr = ctx.world.globals.NPC;
-        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // mdxaBone_t POD zero-init (not part of the entity deref regime).
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
 
-        let bolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                (*npc_ptr).ghoul2,
-                0,
-                c"*flash".to_owned(),
-            ),
-        );
+    let ghoul2 = ctx.world.entity(npc_id).ghoul2;
+    let bolt = trap::G2API_AddBolt(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash".to_owned()),
+    );
 
-        trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                (*npc_ptr).ghoul2,
-                0,
-                bolt,
-                &mut boltMatrix as *mut mdxaBone_t,
-                &(*npc_ptr).r.currentAngles as *const vec3_t,
-                &(*npc_ptr).r.currentOrigin as *const vec3_t,
-                ctx.world.level.time,
-                core::ptr::null_mut(),
-                &(*npc_ptr).modelScale as *const vec3_t,
-            ),
-        );
+    let angles = ctx.world.entity(npc_id).r.currentAngles;
+    let origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let scale = ctx.world.entity(npc_id).modelScale;
+    let time = ctx.world.level.time;
+    trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+            ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix as *mut mdxaBone_t,
+            &angles as *const vec3_t,
+            &origin as *const vec3_t,
+            time,
+            core::ptr::null_mut(),
+            &scale as *const vec3_t,
+        ),
+    );
 
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
 
-        if (*npc_ptr).health != 0 {
-            let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
-                &ctx.world.g_entities[eid.0 as usize] as *const gentity_t
-            } else {
-                core::ptr::null()
-            };
-            CalcEntitySpot(
-                ctx,
-                ctx.entity_id_of(enemy_ptr),
-                crate::npc::spot_t::spot_t::SPOT_HEAD,
-                &mut enemy_org1,
-            );
-            crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
-            vectoangles(delta1, &mut angleToEnemy1);
-            AngleVectors(
-                angleToEnemy1,
-                Some(&mut forward),
-                Some(&mut vright),
-                Some(&mut up),
-            );
-        } else {
-            AngleVectors(
-                (*npc_ptr).r.currentAngles,
-                Some(&mut forward),
-                Some(&mut vright),
-                Some(&mut up),
-            );
-        }
-
-        G_PlayEffectID(
-            G_EffectIndex(b"bryar/muzzle_flash\0".as_ptr() as *const c_char),
-            muzzle1,
-            forward,
-        );
-
-        G_Sound(
+    if ctx.world.entity(npc_id).health != 0 {
+        let enemy = ctx.world.entity(npc_id).enemy;
+        CalcEntitySpot(
             ctx,
-            ctx.entity_id_of(npc_ptr),
-            CHAN_AUTO,
-            G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
+            enemy,
+            crate::npc::spot_t::spot_t::SPOT_HEAD,
+            &mut enemy_org1,
         );
-
-        let missile = crate::g_missile::CreateMissile(
-            ctx,
-            muzzle1,
-            forward,
-            1600.0,
-            10000,
-            ctx.entity_id_of(npc_ptr).unwrap(),
-            qfalse,
+        crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
+        vectoangles(delta1, &mut angleToEnemy1);
+        AngleVectors(
+            angleToEnemy1,
+            Some(&mut forward),
+            Some(&mut vright),
+            Some(&mut up),
         );
-
-        (*missile).classname = b"bryar_proj\0".as_ptr() as *mut c_char;
-        (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
-
-        (*missile).damage = 1;
-        (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
-        (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
-        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+    } else {
+        let cur_angles = ctx.world.entity(npc_id).r.currentAngles;
+        AngleVectors(
+            cur_angles,
+            Some(&mut forward),
+            Some(&mut vright),
+            Some(&mut up),
+        );
     }
+
+    G_PlayEffectID(
+        G_EffectIndex(b"bryar/muzzle_flash\0".as_ptr() as *const c_char),
+        muzzle1,
+        forward,
+    );
+
+    G_Sound(
+        ctx,
+        Some(npc_id),
+        CHAN_AUTO,
+        G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
+    );
+
+    let missile =
+        crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, qfalse);
+    let missile_id = ctx.entity_id_of(missile).unwrap();
+    let m = ctx.world.entity_mut(missile_id);
+    m.classname = b"bryar_proj\0".as_ptr() as *mut c_char;
+    m.s.weapon = WP_BRYAR_PISTOL as c_int;
+    m.damage = 1;
+    m.dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
+    m.methodOfDeath = MOD_BRYAR_PISTOL as c_int;
+    m.clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 }
 
 /// Raven `Mark2_BlasterAttack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:186-205`
 pub fn Mark2_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
-    unsafe {
-        let npc_ptr = ctx.world.globals.NPC;
-        let npc_info_ptr = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if TIMER_Done(
-            ctx,
-            ctx.entity_id_of(npc_ptr),
-            b"attackDelay\0".as_ptr() as *const c_char,
-        ) == qtrue
-        {
-            if (*npc_info_ptr).localState == LSTATE_NONE {
-                let npc_id = ctx.entity_id_of(npc_ptr);
-                let delay = ctx.world.bg_state.rng.Q_irand(500, 2000);
-                TIMER_Set(
-                    ctx,
-                    npc_id,
-                    b"attackDelay\0".as_ptr() as *const c_char,
-                    delay,
-                );
-            } else {
-                let npc_id = ctx.entity_id_of(npc_ptr);
-                let delay = ctx.world.bg_state.rng.Q_irand(100, 500);
-                TIMER_Set(
-                    ctx,
-                    npc_id,
-                    b"attackDelay\0".as_ptr() as *const c_char,
-                    delay,
-                );
-            }
-            Mark2_FireBlaster(ctx, advance);
-            return;
-        } else if advance == qtrue {
-            Mark2_Hunt(ctx);
+    if TIMER_Done(
+        ctx,
+        Some(npc_id),
+        b"attackDelay\0".as_ptr() as *const c_char,
+    ) == qtrue
+    {
+        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        if unsafe { (*npc_info).localState } == LSTATE_NONE {
+            let delay = ctx.world.bg_state.rng.Q_irand(500, 2000);
+            TIMER_Set(
+                ctx,
+                Some(npc_id),
+                b"attackDelay\0".as_ptr() as *const c_char,
+                delay,
+            );
+        } else {
+            let delay = ctx.world.bg_state.rng.Q_irand(100, 500);
+            TIMER_Set(
+                ctx,
+                Some(npc_id),
+                b"attackDelay\0".as_ptr() as *const c_char,
+                delay,
+            );
         }
+        Mark2_FireBlaster(ctx, advance);
+        return;
+    } else if advance == qtrue {
+        Mark2_Hunt(ctx);
     }
 }
 
@@ -357,129 +331,137 @@ pub fn Mark2_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:212-295`
 pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
-    unsafe {
-        let npc_ptr = ctx.world.globals.NPC;
-        let npc_info_ptr = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        NPC_FaceEnemy(ctx, qtrue);
+    NPC_FaceEnemy(ctx, qtrue);
 
-        let distance = {
-            let d = crate::q_math::DistanceHorizontalSquared(
-                (*npc_ptr).r.currentOrigin,
-                (*npc_ptr)
-                    .enemy
-                    .map(|eid| ctx.world.g_entities[eid.0 as usize].r.currentOrigin)
-                    .unwrap_or([0.0; 3]),
-            );
-            d as c_int
-        } as i64;
-        let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
-            &mut ctx.world.g_entities[eid.0 as usize] as *mut gentity_t
-        } else {
-            core::ptr::null_mut()
-        };
-        let visible = NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr));
-        let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    let npc_enemy = ctx.world.entity(npc_id).enemy;
+    let enemy_origin = npc_enemy
+        .map(|eid| ctx.world.entity(eid).r.currentOrigin)
+        .unwrap_or([0.0; 3]);
+    let distance =
+        crate::q_math::DistanceHorizontalSquared(npc_origin, enemy_origin) as c_int as i64;
+    let visible = NPC_ClearLOS4(ctx, npc_enemy);
+    let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
 
-        if (*npc_info_ptr).localState == LSTATE_RISINGUP {
-            (*npc_ptr).flags &= !FL_SHIELDED;
-            NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(npc_ptr).unwrap(),
-                SETANIM_BOTH,
-                BOTH_RUN1START as c_int,
-                SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
-            );
-            if (*((*npc_ptr).client)).ps.legsTimer <= 0
-                && (*((*npc_ptr).client)).ps.torsoAnim == BOTH_RUN1START as c_int
-            {
-                (*npc_info_ptr).localState = LSTATE_NONE;
-            }
-            return;
-        }
-
-        if visible == qfalse || NPC_FaceEnemy(ctx, qtrue) == qfalse {
-            if (*npc_info_ptr).localState == LSTATE_DOWN
-                || (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN
-            {
-                if TIMER_Done(
-                    ctx,
-                    ctx.entity_id_of(npc_ptr),
-                    b"downTime\0".as_ptr() as *const c_char,
-                ) == qtrue
-                {
-                    (*npc_info_ptr).localState = LSTATE_RISINGUP;
-                    NPC_SetAnim(
-                        ctx,
-                        ctx.entity_id_of(npc_ptr).unwrap(),
-                        SETANIM_BOTH,
-                        BOTH_RUN1STOP as c_int,
-                        SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
-                    );
-                    let npc_id = ctx.entity_id_of(npc_ptr);
-                    let delay = ctx.world.bg_state.rng.Q_irand(3000, 8000);
-                    TIMER_Set(ctx, npc_id, b"runTime\0".as_ptr() as *const c_char, delay);
-                }
-            } else {
-                Mark2_Hunt(ctx);
-            }
-            return;
-        }
-
-        if advance == qtrue
-            && TIMER_Done(
-                ctx,
-                ctx.entity_id_of(npc_ptr),
-                b"downTime\0".as_ptr() as *const c_char,
-            ) == qtrue
-            && (*npc_info_ptr).localState == LSTATE_DOWN
-        {
-            (*npc_info_ptr).localState = LSTATE_RISINGUP;
-            NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(npc_ptr).unwrap(),
-                SETANIM_BOTH,
-                BOTH_RUN1STOP as c_int,
-                SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
-            );
-            let npc_id = ctx.entity_id_of(npc_ptr);
-            let delay = ctx.world.bg_state.rng.Q_irand(3000, 8000);
-            TIMER_Set(ctx, npc_id, b"runTime\0".as_ptr() as *const c_char, delay);
-        }
-
-        NPC_FaceEnemy(ctx, qtrue);
-
-        if (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
-            NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(npc_ptr).unwrap(),
-                SETANIM_BOTH,
-                BOTH_RUN1STOP as c_int,
-                SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
-            );
-            let npc_id = ctx.entity_id_of(npc_ptr);
-            let delay = ctx.world.bg_state.rng.Q_irand(3000, 9000);
-            TIMER_Set(ctx, npc_id, b"downTime\0".as_ptr() as *const c_char, delay);
-
-            if (*((*npc_ptr).client)).ps.legsTimer <= 0
-                && (*((*npc_ptr).client)).ps.torsoAnim == BOTH_RUN1STOP as c_int
-            {
-                (*npc_ptr).flags |= FL_SHIELDED;
-                (*npc_info_ptr).localState = LSTATE_DOWN;
-            }
-        } else if (*npc_info_ptr).localState == LSTATE_DOWN {
-            (*npc_ptr).flags |= FL_SHIELDED;
-            Mark2_BlasterAttack(ctx, qfalse);
-        } else if TIMER_Done(
+    // He's been ordered to get up.
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    if unsafe { (*npc_info).localState } == LSTATE_RISINGUP {
+        ctx.world.entity_mut(npc_id).flags &= !FL_SHIELDED;
+        NPC_SetAnim(
             ctx,
-            ctx.entity_id_of(npc_ptr),
-            b"runTime\0".as_ptr() as *const c_char,
-        ) == qtrue
-        {
-            (*npc_info_ptr).localState = LSTATE_DROPPINGDOWN;
-        } else if advance == qtrue {
-            Mark2_BlasterAttack(ctx, advance);
+            npc_id,
+            SETANIM_BOTH,
+            BOTH_RUN1START as c_int,
+            SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+        );
+        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        let client = ctx.world.entity(npc_id).client;
+        let (legs_timer, torso_anim) = unsafe { ((*client).ps.legsTimer, (*client).ps.torsoAnim) };
+        if legs_timer <= 0 && torso_anim == BOTH_RUN1START as c_int {
+            unsafe {
+                (*npc_info).localState = LSTATE_NONE;
+            }
         }
+        return;
+    }
+
+    // If we cannot see our target, move to see it.
+    if visible == qfalse || NPC_FaceEnemy(ctx, qtrue) == qfalse {
+        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        let local_state = unsafe { (*npc_info).localState };
+        if local_state == LSTATE_DOWN || local_state == LSTATE_DROPPINGDOWN {
+            if TIMER_Done(ctx, Some(npc_id), b"downTime\0".as_ptr() as *const c_char) == qtrue {
+                unsafe {
+                    (*npc_info).localState = LSTATE_RISINGUP;
+                }
+                NPC_SetAnim(
+                    ctx,
+                    npc_id,
+                    SETANIM_BOTH,
+                    BOTH_RUN1STOP as c_int,
+                    SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+                );
+                let delay = ctx.world.bg_state.rng.Q_irand(3000, 8000);
+                TIMER_Set(
+                    ctx,
+                    Some(npc_id),
+                    b"runTime\0".as_ptr() as *const c_char,
+                    delay,
+                );
+            }
+        } else {
+            Mark2_Hunt(ctx);
+        }
+        return;
+    }
+
+    // He's down but he could advance if he wants to.
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    if advance == qtrue
+        && TIMER_Done(ctx, Some(npc_id), b"downTime\0".as_ptr() as *const c_char) == qtrue
+        && unsafe { (*npc_info).localState } == LSTATE_DOWN
+    {
+        unsafe {
+            (*npc_info).localState = LSTATE_RISINGUP;
+        }
+        NPC_SetAnim(
+            ctx,
+            npc_id,
+            SETANIM_BOTH,
+            BOTH_RUN1STOP as c_int,
+            SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+        );
+        let delay = ctx.world.bg_state.rng.Q_irand(3000, 8000);
+        TIMER_Set(
+            ctx,
+            Some(npc_id),
+            b"runTime\0".as_ptr() as *const c_char,
+            delay,
+        );
+    }
+
+    NPC_FaceEnemy(ctx, qtrue);
+
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    let local_state = unsafe { (*npc_info).localState };
+    if local_state == LSTATE_DROPPINGDOWN {
+        NPC_SetAnim(
+            ctx,
+            npc_id,
+            SETANIM_BOTH,
+            BOTH_RUN1STOP as c_int,
+            SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+        );
+        let delay = ctx.world.bg_state.rng.Q_irand(3000, 9000);
+        TIMER_Set(
+            ctx,
+            Some(npc_id),
+            b"downTime\0".as_ptr() as *const c_char,
+            delay,
+        );
+
+        // gclient deref stays raw (client deref regime, task #7) — FLAG.
+        let client = ctx.world.entity(npc_id).client;
+        let (legs_timer, torso_anim) = unsafe { ((*client).ps.legsTimer, (*client).ps.torsoAnim) };
+        if legs_timer <= 0 && torso_anim == BOTH_RUN1STOP as c_int {
+            ctx.world.entity_mut(npc_id).flags |= FL_SHIELDED;
+            unsafe {
+                (*npc_info).localState = LSTATE_DOWN;
+            }
+        }
+    } else if local_state == LSTATE_DOWN {
+        ctx.world.entity_mut(npc_id).flags |= FL_SHIELDED;
+        Mark2_BlasterAttack(ctx, qfalse);
+    } else if TIMER_Done(ctx, Some(npc_id), b"runTime\0".as_ptr() as *const c_char) == qtrue {
+        unsafe {
+            (*npc_info).localState = LSTATE_DROPPINGDOWN;
+        }
+    } else if advance == qtrue {
+        Mark2_BlasterAttack(ctx, advance);
     }
 }
 
@@ -487,36 +469,34 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:303-330`
 pub fn Mark2_Patrol(ctx: &mut GameContext) {
-    unsafe {
-        let npc_ptr = ctx.world.globals.NPC;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if NPC_CheckPlayerTeamStealth(ctx) == qtrue {
+    if NPC_CheckPlayerTeamStealth(ctx) == qtrue {
+        NPC_UpdateAngles(ctx, qtrue, qtrue);
+        return;
+    }
+
+    if ctx.world.entity(npc_id).enemy.is_none() {
+        if UpdateGoal(ctx) != core::ptr::null_mut() {
+            ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
+            NPC_MoveToGoal(ctx, qtrue);
             NPC_UpdateAngles(ctx, qtrue, qtrue);
-            return;
         }
 
-        if (*npc_ptr).enemy.is_none() {
-            if UpdateGoal(ctx) != core::ptr::null_mut() {
-                ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
-                NPC_MoveToGoal(ctx, qtrue);
-                NPC_UpdateAngles(ctx, qtrue, qtrue);
-            }
-
-            if TIMER_Done(
+        if TIMER_Done(
+            ctx,
+            Some(npc_id),
+            b"patrolNoise\0".as_ptr() as *const c_char,
+        ) == qtrue
+        {
+            let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
+            TIMER_Set(
                 ctx,
-                ctx.entity_id_of(npc_ptr),
+                Some(npc_id),
                 b"patrolNoise\0".as_ptr() as *const c_char,
-            ) == qtrue
-            {
-                let npc_id = ctx.entity_id_of(npc_ptr);
-                let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
-                TIMER_Set(
-                    ctx,
-                    npc_id,
-                    b"patrolNoise\0".as_ptr() as *const c_char,
-                    delay,
-                );
-            }
+                delay,
+            );
         }
     }
 }
@@ -532,17 +512,21 @@ pub fn Mark2_Idle(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:347-362`
 pub fn NPC_BSMark2_Default(ctx: &mut GameContext) {
-    unsafe {
-        let npc_ptr = ctx.world.globals.NPC;
-        let npc_info_ptr = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if (*npc_ptr).enemy.is_some() {
-            (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
-            Mark2_AttackDecision(ctx);
-        } else if ((*npc_info_ptr).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-            Mark2_Patrol(ctx);
-        } else {
-            Mark2_Idle(ctx);
+    if ctx.world.entity(npc_id).enemy.is_some() {
+        let enemy = ctx.world.entity(npc_id).enemy;
+        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        unsafe {
+            (*npc_info).goalEntity = enemy;
         }
+        Mark2_AttackDecision(ctx);
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
+        Mark2_Patrol(ctx);
+    } else {
+        Mark2_Idle(ctx);
     }
 }
