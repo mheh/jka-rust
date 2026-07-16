@@ -146,28 +146,24 @@ fn fofs_classname() -> c_int {
 ///
 /// Source: `oracle/codemp/game/g_client.c:27-39`
 pub fn SP_info_player_duel(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut i: c_int = 0;
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nobots\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_BOTS;
-        }
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nohumans\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_HUMANS;
-        }
+    let mut i: c_int = 0;
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nobots\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_BOTS;
+    }
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nohumans\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_HUMANS;
     }
 }
 
@@ -175,28 +171,24 @@ pub fn SP_info_player_duel(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:47-59`
 pub fn SP_info_player_duel1(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut i: c_int = 0;
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nobots\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_BOTS;
-        }
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nohumans\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_HUMANS;
-        }
+    let mut i: c_int = 0;
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nobots\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_BOTS;
+    }
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nohumans\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_HUMANS;
     }
 }
 
@@ -204,28 +196,24 @@ pub fn SP_info_player_duel1(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:67-79`
 pub fn SP_info_player_duel2(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut i: c_int = 0;
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nobots\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_BOTS;
-        }
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nohumans\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_HUMANS;
-        }
+    let mut i: c_int = 0;
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nobots\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_BOTS;
+    }
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nohumans\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_HUMANS;
     }
 }
 
@@ -233,28 +221,24 @@ pub fn SP_info_player_duel2(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:88-99`
 pub fn SP_info_player_deathmatch(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut i: c_int = 0;
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nobots\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_BOTS;
-        }
-        crate::g_spawn::G_SpawnInt(
-            ctx,
-            b"nohumans\0".as_ptr() as *const c_char,
-            b"0\0".as_ptr() as *const c_char,
-            &mut i,
-        );
-        if i != 0 {
-            (*ent).flags |= FL_NO_HUMANS;
-        }
+    let mut i: c_int = 0;
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nobots\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_BOTS;
+    }
+    crate::g_spawn::G_SpawnInt(
+        ctx,
+        b"nohumans\0".as_ptr() as *const c_char,
+        b"0\0".as_ptr() as *const c_char,
+        &mut i,
+    );
+    if i != 0 {
+        ctx.world.entity_mut(ent).flags |= FL_NO_HUMANS;
     }
 }
 
@@ -262,12 +246,8 @@ pub fn SP_info_player_deathmatch(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:105-108`
 pub fn SP_info_player_start(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
-        SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
-    }
+    ctx.world.entity_mut(ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
+    SP_info_player_deathmatch(ctx, ent);
 }
 
 /// Raven `SP_info_player_start_red` — Red Team DM start.
@@ -288,16 +268,11 @@ pub fn SP_info_player_start_blue(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:140-151`
 pub fn SiegePointUse(self_: &mut gentity_t, other: Option<EntityId>, activator: Option<EntityId>) {
-    // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; `other`/`activator`
-    // are unused handler params kept as Option<EntityId>; raw re-derived (Stage-2 debt).
-    let self_: *mut gentity_t = self_;
-    unsafe {
-        // Toggle the point on/off
-        if (*self_).genericValue1 != 0 {
-            (*self_).genericValue1 = 0;
-        } else {
-            (*self_).genericValue1 = 1;
-        }
+    // Toggle the point on/off
+    if self_.genericValue1 != 0 {
+        self_.genericValue1 = 0;
+    } else {
+        self_.genericValue1 = 1;
     }
 }
 
@@ -310,33 +285,29 @@ pub fn SiegePointUse(self_: &mut gentity_t, other: Option<EntityId>, activator: 
 // fn-ID enum dispatch (ruling 2) is wired into the struct layout. Also reads
 // `g_gametype`.
 pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut soff: c_int = 0;
-        if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
-            // turn into a DM spawn if not in siege game mode
-            (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
-            SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
-            return;
-        }
-
-        G_SpawnInt(
-            ctx,
-            c"startoff".as_ptr(),
-            c"0".as_ptr(),
-            &mut soff as *mut c_int,
-        );
-
-        if soff != 0 {
-            // start disabled
-            (*ent).genericValue1 = 0;
-        } else {
-            (*ent).genericValue1 = 1;
-        }
-
-        (*ent).use_ = Some(EntUse::SiegePointUse).into();
+    let mut soff: c_int = 0;
+    if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
+        // turn into a DM spawn if not in siege game mode
+        ctx.world.entity_mut(ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
+        SP_info_player_deathmatch(ctx, ent);
+        return;
     }
+
+    G_SpawnInt(
+        ctx,
+        c"startoff".as_ptr(),
+        c"0".as_ptr(),
+        &mut soff as *mut c_int,
+    );
+
+    if soff != 0 {
+        // start disabled
+        ctx.world.entity_mut(ent).genericValue1 = 0;
+    } else {
+        ctx.world.entity_mut(ent).genericValue1 = 1;
+    }
+
+    ctx.world.entity_mut(ent).use_ = Some(EntUse::SiegePointUse).into();
 }
 
 /// Raven `SP_info_player_siegeteam2` — siege start point, team2.
@@ -346,33 +317,29 @@ pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
 // into the still-raw `gentity_t.use_` fn pointer (see siegeteam1). Also reads
 // `g_gametype`.
 pub fn SP_info_player_siegeteam2(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
-    unsafe {
-        let mut soff: c_int = 0;
-        if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
-            // turn into a DM spawn if not in siege game mode
-            (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
-            SP_info_player_deathmatch(ctx, ctx.entity_id_of(ent).unwrap());
-            return;
-        }
-
-        G_SpawnInt(
-            ctx,
-            c"startoff".as_ptr(),
-            c"0".as_ptr(),
-            &mut soff as *mut c_int,
-        );
-
-        if soff != 0 {
-            // start disabled
-            (*ent).genericValue1 = 0;
-        } else {
-            (*ent).genericValue1 = 1;
-        }
-
-        (*ent).use_ = Some(EntUse::SiegePointUse).into();
+    let mut soff: c_int = 0;
+    if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
+        // turn into a DM spawn if not in siege game mode
+        ctx.world.entity_mut(ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
+        SP_info_player_deathmatch(ctx, ent);
+        return;
     }
+
+    G_SpawnInt(
+        ctx,
+        c"startoff".as_ptr(),
+        c"0".as_ptr(),
+        &mut soff as *mut c_int,
+    );
+
+    if soff != 0 {
+        // start disabled
+        ctx.world.entity_mut(ent).genericValue1 = 0;
+    } else {
+        ctx.world.entity_mut(ent).genericValue1 = 1;
+    }
+
+    ctx.world.entity_mut(ent).use_ = Some(EntUse::SiegePointUse).into();
 }
 
 /// Raven `SP_info_player_intermission` — the intermission view point (no-op
@@ -707,83 +674,80 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:532-552`
 pub fn SpotWouldTelefrag(ctx: &mut GameContext, spot: EntityId) -> qboolean {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let spot: *mut gentity_t = ctx.entity_mut(spot);
-    unsafe {
-        let mut touch: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
+    let mut touch: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
 
-        for k in 0..3 {
-            mins[k] = (*spot).s.origin[k] + playerMins[k];
-            maxs[k] = (*spot).s.origin[k] + playerMaxs[k];
-        }
-        let num = trap::EntitiesInBox(
-            ctx.engine,
-            GEntitiesInBoxArgs::new(
-                &mins as *const vec3_t,
-                &maxs as *const vec3_t,
-                touch.as_mut_ptr(),
-                MAX_GENTITIES as c_int,
-            ),
-        );
-
-        let mut i = 0;
-        while i < num {
-            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
-            // if ( hit->client && hit->client->ps.stats[STAT_HEALTH] > 0 ) — the
-            // health test is commented out in Raven; any client presence telefrags.
-            if !(*hit).client.is_null() {
-                return qtrue;
-            }
-            i += 1;
-        }
-
-        qfalse
+    let origin = ctx.world.entity(spot).s.origin;
+    for k in 0..3 {
+        mins[k] = origin[k] + playerMins[k];
+        maxs[k] = origin[k] + playerMaxs[k];
     }
+    let num = trap::EntitiesInBox(
+        ctx.engine,
+        GEntitiesInBoxArgs::new(
+            &mins as *const vec3_t,
+            &maxs as *const vec3_t,
+            touch.as_mut_ptr(),
+            MAX_GENTITIES as c_int,
+        ),
+    );
+
+    let mut i = 0;
+    while i < num {
+        // if ( hit->client && hit->client->ps.stats[STAT_HEALTH] > 0 ) — the
+        // health test is commented out in Raven; any client presence telefrags.
+        // Reading the `client` pointer value (null test) needs no deref.
+        if !ctx.world.g_entities[touch[i as usize] as usize]
+            .client
+            .is_null()
+        {
+            return qtrue;
+        }
+        i += 1;
+    }
+
+    qfalse
 }
 
 /// Raven `SpotWouldTelefrag2` — would `mover` moved to `dest` overlap a solid?
 ///
 /// Source: `oracle/codemp/game/g_client.c:554-580`
 pub fn SpotWouldTelefrag2(ctx: &mut GameContext, mover: EntityId, dest: vec3_t) -> qboolean {
-    // STAGE-1: EntityId param (Raven unconditionally derefs `mover`), raw body
-    // re-derived verbatim (Stage-2 debt).
-    let mover: *mut gentity_t = ctx.entity_mut(mover);
-    unsafe {
-        let mut touch: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
+    let mut touch: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
 
-        for k in 0..3 {
-            mins[k] = dest[k] + (*mover).r.mins[k];
-            maxs[k] = dest[k] + (*mover).r.maxs[k];
-        }
-        let num = trap::EntitiesInBox(
-            ctx.engine,
-            GEntitiesInBoxArgs::new(
-                &mins as *const vec3_t,
-                &maxs as *const vec3_t,
-                touch.as_mut_ptr(),
-                MAX_GENTITIES as c_int,
-            ),
-        );
-
-        let mut i = 0;
-        while i < num {
-            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
-            if hit == mover {
-                i += 1;
-                continue;
-            }
-            if (*hit).r.contents & (*mover).r.contents != 0 {
-                return qtrue;
-            }
-            i += 1;
-        }
-
-        qfalse
+    let r_mins = ctx.world.entity(mover).r.mins;
+    let r_maxs = ctx.world.entity(mover).r.maxs;
+    for k in 0..3 {
+        mins[k] = dest[k] + r_mins[k];
+        maxs[k] = dest[k] + r_maxs[k];
     }
+    let num = trap::EntitiesInBox(
+        ctx.engine,
+        GEntitiesInBoxArgs::new(
+            &mins as *const vec3_t,
+            &maxs as *const vec3_t,
+            touch.as_mut_ptr(),
+            MAX_GENTITIES as c_int,
+        ),
+    );
+
+    let mut i = 0;
+    while i < num {
+        let hit_idx = touch[i as usize] as usize;
+        if hit_idx == mover.index() {
+            i += 1;
+            continue;
+        }
+        if ctx.world.g_entities[hit_idx].r.contents & ctx.world.entity(mover).r.contents != 0 {
+            return qtrue;
+        }
+        i += 1;
+    }
+
+    qfalse
 }
 
 /// Raven `SelectNearestDeathmatchSpawnPoint` — find the spot we DON'T want.
@@ -1493,53 +1457,50 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:1237-1259`
 pub fn TeamCount(ctx: &mut GameContext, ignoreClientNum: c_int, team: c_int) -> team_t {
-    unsafe {
-        let mut count: c_int = 0;
-        let mut i: c_int = 0;
-        while i < ctx.world.level.maxclients {
-            if i == ignoreClientNum {
-                i += 1;
-                continue;
-            }
-            let cl = ctx.world.level.clients.add(i as usize);
-            if (*cl).pers.connected == CON_DISCONNECTED {
-                i += 1;
-                continue;
-            }
-            if (*cl).sess.sessionTeam == team {
-                count += 1;
-            } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
-                && (*cl).sess.siegeDesiredTeam == team
-            {
-                count += 1;
-            }
+    let mut count: c_int = 0;
+    let mut i: c_int = 0;
+    while i < ctx.world.level.maxclients {
+        if i == ignoreClientNum {
             i += 1;
+            continue;
         }
-        count
+        // i < maxclients: a real client slot, so the owned clients arena aliases
+        // `level.clients[i]` byte-for-byte (recipe 2b).
+        if ctx.world.client(i as usize).pers.connected == CON_DISCONNECTED {
+            i += 1;
+            continue;
+        }
+        if ctx.world.client(i as usize).sess.sessionTeam == team {
+            count += 1;
+        } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE
+            && ctx.world.client(i as usize).sess.siegeDesiredTeam == team
+        {
+            count += 1;
+        }
+        i += 1;
     }
+    count
 }
 
 /// Raven `TeamLeader` — find a team's leader client number.
 ///
 /// Source: `oracle/codemp/game/g_client.c:1268-1282`
 pub fn TeamLeader(ctx: &mut GameContext, team: c_int) -> c_int {
-    unsafe {
-        let mut i: c_int = 0;
-        while i < ctx.world.level.maxclients {
-            let cl = ctx.world.level.clients.add(i as usize);
-            if (*cl).pers.connected == CON_DISCONNECTED {
-                i += 1;
-                continue;
-            }
-            if (*cl).sess.sessionTeam == team {
-                if (*cl).sess.teamLeader != 0 {
-                    return i;
-                }
-            }
+    let mut i: c_int = 0;
+    while i < ctx.world.level.maxclients {
+        // i < maxclients: a real client slot (recipe 2b).
+        if ctx.world.client(i as usize).pers.connected == CON_DISCONNECTED {
             i += 1;
+            continue;
         }
-        -1
+        if ctx.world.client(i as usize).sess.sessionTeam == team {
+            if ctx.world.client(i as usize).sess.teamLeader != 0 {
+                return i;
+            }
+        }
+        i += 1;
     }
+    -1
 }
 
 /// Raven `PickTeam` — pick the emptier team.
