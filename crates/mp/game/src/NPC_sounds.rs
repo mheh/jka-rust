@@ -35,13 +35,11 @@ pub fn G_AddVoiceEvent(
             return;
         }
 
-        if (*self_).client.is_null()
-            || (*((*self_).client as *mut gclient_t)).ps.pm_type >= PM_DEAD as c_int
-        {
+        if (*self_).client.is_null() || (*((*self_).client)).ps.pm_type >= PM_DEAD as c_int {
             return;
         }
 
-        if (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime > ctx.world.level.time {
+        if (*((*self_).NPC)).blockedSpeechDebounceTime > ctx.world.level.time {
             return;
         }
 
@@ -56,14 +54,14 @@ pub fn G_AddVoiceEvent(
             return;
         }
 
-        if ((*((*self_).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_COMBAT_TALK) != 0
+        if ((*((*self_).NPC)).scriptFlags & SCF_NO_COMBAT_TALK) != 0
             && ((event >= EV_ANGER1 as c_int && event <= EV_VICTORY3 as c_int)
                 || (event >= EV_CHASE1 as c_int && event <= EV_SUSPICIOUS5 as c_int))
         {
             return;
         }
 
-        if ((*((*self_).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_ALERT_TALK) != 0
+        if ((*((*self_).NPC)).scriptFlags & SCF_NO_ALERT_TALK) != 0
             && (event >= EV_GIVEUP1 as c_int && event <= EV_SUSPICIOUS5 as c_int)
         {
             return;
@@ -77,7 +75,7 @@ pub fn G_AddVoiceEvent(
             } else {
                 speakDebounceTime
             };
-        (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = new_time;
+        (*((*self_).NPC)).blockedSpeechDebounceTime = new_time;
     }
 }
 
@@ -95,9 +93,9 @@ pub fn NPC_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
                     ctx.entity_id_of(self_),
                     cstr("enemyLastVisible").as_ptr(),
                 ) == qfalse
-                || (*((*self_).client as *mut gclient_t)).renderInfo.lookTarget == 0
+                || (*((*self_).client)).renderInfo.lookTarget == 0
             {
-                (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
+                (*((*self_).NPC)).blockedSpeechDebounceTime = 0;
                 let self_id = ctx.entity_id_of(self_).unwrap();
                 let event = ctx
                     .world
@@ -106,11 +104,10 @@ pub fn NPC_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
                     .Q_irand(EV_CONFUSE2 as c_int, EV_CONFUSE3 as c_int);
                 G_AddVoiceEvent(ctx, self_id, event, 2000);
             } else if !(*self_).NPC.is_null()
-                && (*((*self_).NPC as *mut gNPC_t)).investigateDebounceTime
-                    + (*((*self_).NPC as *mut gNPC_t)).pauseTime
+                && (*((*self_).NPC)).investigateDebounceTime + (*((*self_).NPC)).pauseTime
                     > ctx.world.level.time
             {
-                (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
+                (*((*self_).NPC)).blockedSpeechDebounceTime = 0;
                 G_AddVoiceEvent(
                     ctx,
                     ctx.entity_id_of(self_).unwrap(),
@@ -126,10 +123,10 @@ pub fn NPC_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
             cstr("enemyLastVisible").as_ptr(),
             0,
         );
-        (*((*self_).NPC as *mut gNPC_t)).tempBehavior = BS_DEFAULT;
+        (*((*self_).NPC)).tempBehavior = BS_DEFAULT;
 
         G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap());
 
-        (*((*self_).NPC as *mut gNPC_t)).investigateCount = 0;
+        (*((*self_).NPC)).investigateCount = 0;
     }
 }

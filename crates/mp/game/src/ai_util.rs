@@ -435,7 +435,7 @@ pub fn BotDoChat(
                 }
 
                 if !cobject.is_null() && !(*cobject).client.is_null() {
-                    let pers = &(*((*cobject).client as *mut gclient_t)).pers;
+                    let pers = &(*((*cobject).client)).pers;
                     let mut inc_n = 0isize;
 
                     while pers.netname[inc_n as usize] != 0 {

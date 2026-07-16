@@ -362,7 +362,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
             while i < ctx.world.globals.gWPNum {
                 let p = ctx.world.globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
-                    let vo = (*((*viewent).client as *mut gclient_t)).ps.origin;
+                    let vo = (*((*viewent).client)).ps.origin;
                     let a = [
                         vo[0] - (*p).origin[0],
                         vo[1] - (*p).origin[1],
@@ -829,7 +829,7 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
             return;
         }
 
-        let cl = (*pl).client as *mut gclient_t;
+        let cl = (*pl).client;
         (*cl).ps.origin = (*ctx.world.globals.gWPArray.0[foundindex as usize]).origin;
     }
 }
@@ -3283,7 +3283,7 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
                     || Q_stricmp((*spawn).classname, c"info_player_deathmatch".as_ptr()) == 0)
             {
-                let eo = (*((*ent).client as *mut gclient_t)).ps.origin;
+                let eo = (*((*ent).client)).ps.origin;
                 let so = (*spawn).r.currentOrigin;
                 let check_dist = VectorLength([eo[0] - so[0], eo[1] - so[1], eo[2] - so[2]]);
 
@@ -3401,14 +3401,9 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             }
 
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
-                CreateNewWP_InTrail(
-                    ctx,
-                    (*((*pl).client as *mut gclient_t)).ps.origin,
-                    0,
-                    optional_argument,
-                );
+                CreateNewWP_InTrail(ctx, (*((*pl).client)).ps.origin, 0, optional_argument);
             } else {
-                CreateNewWP(ctx, (*((*pl).client as *mut gclient_t)).ps.origin, 0);
+                CreateNewWP(ctx, (*((*pl).client)).ps.origin, 0);
             }
             return 1;
         }
@@ -3462,7 +3457,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             closest_spawn = GetNextSpawnInIndex(ctx, ctx.entity_id_of(closest_spawn).unwrap());
 
             if !closest_spawn.is_null() {
-                (*((*pl).client as *mut gclient_t)).ps.origin = (*closest_spawn).r.currentOrigin;
+                (*((*pl).client)).ps.origin = (*closest_spawn).r.currentOrigin;
             }
             return 1;
         }
@@ -3513,16 +3508,12 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
                 CreateNewWP_InTrail(
                     ctx,
-                    (*((*pl).client as *mut gclient_t)).ps.origin,
+                    (*((*pl).client)).ps.origin,
                     flags_from_argument,
                     optional_argument,
                 );
             } else {
-                CreateNewWP(
-                    ctx,
-                    (*((*pl).client as *mut gclient_t)).ps.origin,
-                    flags_from_argument,
-                );
+                CreateNewWP(ctx, (*((*pl).client)).ps.origin, flags_from_argument);
             }
             return 1;
         }

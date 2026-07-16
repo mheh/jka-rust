@@ -68,7 +68,7 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
         // §19: oracle derefs `self->client` (NPC_class, ps, respawnTime, …)
         // unconditionally throughout; the `!client.is_null()` guards below are
         // defensive. Source: oracle/codemp/game/NPC.c:54-103
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
             let self_id = ctx.entity_id_of(self_).unwrap();
             crate::NPC_AI_GalakMech::GM_Dying(ctx, self_id);
@@ -153,7 +153,7 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
         // §19: oracle derefs `self->NPC` and `self->client` unconditionally
         // throughout; the `!npc.is_null()`/`!client.is_null()` guards below are
         // defensive. Source: oracle/codemp/game/NPC.c:115-223
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if !npc.is_null() && (*npc).nextBStateThink <= ctx.world.level.time {
             trap::ICARUS_MaintainTaskManager(
                 ctx.engine,
@@ -169,7 +169,7 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
             return;
         }
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
 
         // I don't consider this a hack, it's creative coding . . .
         // I agree, very creative... need something like this for ATST and GALAKMECH too!
@@ -201,7 +201,7 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
                 let activator_client = if activator.is_null() {
                     core::ptr::null_mut()
                 } else {
-                    (*activator).client as *mut gclient_t
+                    (*activator).client
                 };
                 if activator.is_null()
                     || activator_client.is_null()
@@ -261,7 +261,7 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
                     let activator_client = if activator.is_null() {
                         core::ptr::null_mut()
                     } else {
-                        (*activator).client as *mut gclient_t
+                        (*activator).client
                     };
                     if activator.is_null()
                         || activator_client.is_null()
@@ -296,7 +296,7 @@ pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
     // Ctx-free leaf takes `&gentity_t`; the `ent.is_null()` guard is vacuous
     // behind a reference (dropped); the `client` null guard is preserved.
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         if client.is_null() {
             return 0;
         }
@@ -330,7 +330,7 @@ pub fn NPC_RemoveBodyEffect(ctx: &mut GameContext) {
         if npc.is_null() {
             return;
         }
-        let client = (*npc).client as *mut gclient_t;
+        let client = (*npc).client;
         if client.is_null() || ((*npc).s.eFlags & EF_NODRAW) != 0 {
             return;
         }
@@ -451,7 +451,7 @@ pub fn pitch_roll_for_slope(
 
         let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
 
-        let client = (*forwhom).client as *mut gclient_t;
+        let client = (*forwhom).client;
         if !client.is_null() {
             (*client).ps.viewangles[PITCH] = dot * pitch;
             (*client).ps.viewangles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * mod_;
@@ -494,7 +494,7 @@ pub fn DeadThink(ctx: &mut GameContext) {
     unsafe {
         let npc_ent = ctx.world.globals.NPC;
         let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*npc_ent).client as *mut gclient_t;
+        let client = (*npc_ent).client;
 
         //HACKHACKHACKHACKHACK
         //We should really have a seperate G2 bounding box (seperate from the physics bbox) for G2 collisions only
@@ -661,8 +661,8 @@ pub fn SetNPCGlobals(ctx: &mut GameContext, ent: EntityId) {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
         ctx.world.globals.NPC = ent;
-        ctx.world.globals.NPCInfo = (*ent).NPC as *mut gNPC_t;
-        ctx.world.globals.client = (*ent).client as *mut gclient_t;
+        ctx.world.globals.NPCInfo = (*ent).NPC;
+        ctx.world.globals.client = (*ent).client;
         ctx.world.globals.ucmd = usercmd_t::default();
     }
 }
@@ -1276,7 +1276,7 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
     unsafe {
         let npc_ent = ctx.world.globals.NPC;
         let npc_info = ctx.world.globals.NPCInfo;
-        let client = (*npc_ent).client as *mut gclient_t;
+        let client = (*npc_ent).client;
 
         if (*npc_ent).s.NPC_class == class_t::CLASS_VEHICLE as c_int
             && !(*npc_ent).m_pVehicle.is_null()
@@ -1513,7 +1513,7 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
                 ctx.world.globals.ucmd.buttons &= !BUTTON_ATTACK;
                 ctx.world.globals.ucmd.buttons &= !BUTTON_ALT_ATTACK;
             } else if (*client).playerTeam != crate::teams::npcteam::NPCTEAM_ENEMY {
-                let enemy_npc = (*enemy).NPC as *mut gNPC_t;
+                let enemy_npc = (*enemy).NPC;
                 if !enemy_npc.is_null()
                     && ((*enemy_npc).surrenderTime > ctx.world.level.time
                         || ((*enemy_npc).scriptFlags & 0x00010000) != 0)
@@ -1655,7 +1655,7 @@ pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if client.is_null() {
             return;
         }
@@ -1739,7 +1739,7 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
         // null check below (`self->client` is always valid by the time
         // `NPC_Think` is wired as an entity think — matching the oracle's
         // implicit non-null assumption here).
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         let oldMoveDir = (*client).ps.moveDir;
         if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int {
             //YOU ARE BREAKING MY PREDICTION. Bad clear.
@@ -1750,7 +1750,7 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
             return;
         }
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
 
         // dead NPCs have a special think, don't run scripts (for now)
         //FIXME: this breaks deathscripts
@@ -1786,8 +1786,8 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
             let player = ctx.world.g_entities.as_mut_ptr().add(i as usize);
             if (*player).inuse != 0
                 && !(*player).client.is_null()
-                && (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
-                && (((*((*player).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW) == 0)
+                && (*((*player).client)).sess.sessionTeam != TEAM_SPECTATOR
+                && (((*((*player).client)).ps.pm_flags & PMF_FOLLOW) == 0)
             {
                 // Raven `if (0) //rwwFIXMEFIXME: Allow controlling ents` — this
                 // whole arm is dead in the shipped oracle (condition always
@@ -1814,7 +1814,7 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
                 // §19: oracle derefs `self->m_pVehicle->m_ucmd` unconditionally.
                 // Source: oracle/codemp/game/NPC.c:1914
                 if !(*self_).m_pVehicle.is_null() {
-                    (*((*self_).m_pVehicle as *mut Vehicle_t)).m_ucmd = (*client).pers.cmd;
+                    (*((*self_).m_pVehicle)).m_ucmd = (*client).pers.cmd;
                 }
             }
         } else if (*self_).s.m_iVehicleNum != 0 {

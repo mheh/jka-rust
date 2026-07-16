@@ -141,10 +141,10 @@ pub fn NPC_GalakMech_Init(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
         let behavior_state = *((&(*npc).behaviorState) as *const bState_t as *const c_int);
         if behavior_state != BS_CINEMATIC as c_int {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             (*client).ps.stats[statIndex_t::STAT_ARMOR as usize] = GALAK_SHIELD_HEALTH;
             (*npc).investigateCount = 0;
             (*npc).investigateDebounceTime = 0;
@@ -311,7 +311,7 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
             // FIXME: need a real effect
             // self->s.powerups |= ( 1 << PW_SHOCKED );
             // self->client->ps.powerups[PW_SHOCKED] = level.time + 1000;
-            let client = (*self_).client as *mut gclient_t;
+            let client = (*self_).client;
             (*client).ps.electrifyTime = level_time + 1000;
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"dyingExplosion".as_ptr())
                 != 0
@@ -477,7 +477,7 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
                         GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), newBolt, 0);
                     }
                     9 | 10 => {
-                        let head_bolt = (*(*self_).client.cast::<gclient_t>()).renderInfo.headBolt;
+                        let head_bolt = (*(*self_).client).renderInfo.headBolt;
                         GM_CreateExplosion(ctx, ctx.entity_id_of(self_).unwrap(), head_bolt, 0);
                     }
                     11 => {
@@ -568,9 +568,9 @@ pub fn NPC_GM_Pain(
         let r#mod = ctx.world.globals.gPainMOD;
         let level_time = ctx.world.level.time;
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
 
-        if (*self_).lockCount == 0 && (*(*self_).client.cast::<gclient_t>()).ps.torsoTimer <= 0 {
+        if (*self_).lockCount == 0 && (*(*self_).client).ps.torsoTimer <= 0 {
             // don't interrupt laser sweep attack or other special attacks/moves
             if (*self_).count < 4 && (*self_).health > 100 && hitLoc != HL_GENERIC1 {
                 if (*self_).delay < level_time {
@@ -604,7 +604,7 @@ pub fn NPC_GM_Pain(
             crate::NPC_reactions::NPC_SetPainEvent(ctx, ctx.entity_id_of(self_).unwrap());
             // self->s.powerups |= ( 1 << PW_SHOCKED );
             // self->client->ps.powerups[PW_SHOCKED] = level.time + ctx.world.bg_state.rng.Q_irand( 500, 2500 );
-            (*(*self_).client.cast::<gclient_t>()).ps.electrifyTime =
+            (*(*self_).client).ps.electrifyTime =
                 level_time + ctx.world.bg_state.rng.Q_irand(500, 2500);
         }
 
@@ -612,7 +612,7 @@ pub fn NPC_GM_Pain(
             && (*inflictor).lastEnemy == ent_id_opt(ctx.world.g_entities.as_ptr(), self_)
         {
             // He force-pushed my own lobfires back at me
-            let npc = (*self_).NPC as *mut gNPC_t;
+            let npc = (*self_).NPC;
             if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int
                 && ctx.world.bg_state.rng.Q_irand(0, 2) == 0
             {
@@ -830,7 +830,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
             return;
         }
 
-        let client = (*npc_ent).client as *mut gclient_t;
+        let client = (*npc_ent).client;
         if VectorCompare((*client).ps.velocity, vec3_origin) == qfalse {
             // if moving at all, don't do this
             return;
@@ -939,7 +939,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
 pub fn NPC_GM_StartLaser(ctx: &mut GameContext) {
     unsafe {
         let npc_ent = ctx.world.globals.NPC;
-        let npc = (*npc_ent).NPC as *mut gNPC_t;
+        let npc = (*npc_ent).NPC;
         if (*npc_ent).lockCount == 0 {
             // haven't already started a laser attack
             // warm up for the beam attack
@@ -947,7 +947,7 @@ pub fn NPC_GM_StartLaser(ctx: &mut GameContext) {
             {
                 // NPC_SetAnim( NPC, SETANIM_TORSO, TORSO_RAISEWEAP2, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD );
             }
-            let client = (*npc_ent).client as *mut gclient_t;
+            let client = (*npc_ent).client;
             let torso_timer = (*client).ps.torsoTimer;
             crate::g_timer::TIMER_Set(
                 ctx,
@@ -1024,7 +1024,7 @@ pub fn GM_StartGloat(ctx: &mut GameContext) {
             animNumber_t::BOTH_STAND2TO1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
-        let client = (*npc_ent).client as *mut gclient_t;
+        let client = (*npc_ent).client;
         (*client).ps.legsTimer += 500;
         (*client).ps.torsoTimer += 500;
     }
@@ -1039,7 +1039,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
         let npc_info = ctx.world.globals.NPCInfo;
         let level_time = ctx.world.level.time;
         let g_entities_base = ctx.world.g_entities.as_mut_ptr();
-        let client = (*npc_ent).client as *mut gclient_t;
+        let client = (*npc_ent).client;
 
         // Don't do anything if we're hurt
         if (*npc_ent).painDebounceTime > level_time {
@@ -1359,8 +1359,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                     if hit == (*enemy_ent).s.number as c_int
                         || (!hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
-                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam
-                                == (*client).enemyTeam)
+                            && (*((*hit_ent).client)).playerTeam == (*client).enemyTeam)
                         || (!hit_ent.is_null() && (*hit_ent).takedamage != 0)
                     {
                         // can hit enemy or will hit glass or other breakable, so shoot anyway
@@ -1375,8 +1374,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                         crate::NPC_combat::NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
                         if !hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
-                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam
-                                == (*client).playerTeam
+                            && (*((*hit_ent).client)).playerTeam == (*client).playerTeam
                         {
                             // would hit an ally, don't fire!!!
                             ctx.world.globals.hitAlly4 = qtrue;
@@ -1440,7 +1438,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
             if hit == (*enemy_ent).s.number as c_int
                 || (!hit_ent.is_null()
                     && (*hit_ent).client != core::ptr::null_mut()
-                    && (*((*hit_ent).client as *mut gclient_t)).playerTeam == (*client).enemyTeam)
+                    && (*((*hit_ent).client)).playerTeam == (*client).enemyTeam)
                 || (!hit_ent.is_null() && (*hit_ent).takedamage != 0)
             {
                 // can hit enemy or will hit glass or other breakable, so shoot anyway
@@ -1730,7 +1728,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                 );
                 crate::g_utils::G_Throw(ctx, ctx.entity_id_of(enemy_ent).unwrap(), smackDir, 100.0);
                 if (*enemy_ent).client != core::ptr::null_mut() {
-                    (*((*enemy_ent).client as *mut gclient_t)).ps.electrifyTime = level_time + 1000;
+                    (*((*enemy_ent).client)).ps.electrifyTime = level_time + 1000;
                 }
                 ctx.world.globals.ucmd.buttons = 0;
             }
@@ -1789,7 +1787,7 @@ pub fn NPC_BSGM_Default(ctx: &mut GameContext) {
             crate::NPC_combat::WeaponThink(ctx, qtrue);
         }
 
-        let client = (*npc_ent).client as *mut gclient_t;
+        let client = (*npc_ent).client;
         if (*client).ps.stats[statIndex_t::STAT_ARMOR as usize] <= 0 {
             // armor gone
             // if ( !NPCInfo->investigateDebounceTime )

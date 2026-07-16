@@ -330,7 +330,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             .map(|v| v.speedMax)
             .unwrap_or(100.0);
         let f_speed_perc_to_max = if !(*parent).client.is_null() {
-            (*((*parent).client as *mut gclient_t)).ps.speed / speed_max
+            (*((*parent).client)).ps.speed / speed_max
         } else {
             0.0
         };
@@ -362,9 +362,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 i_blend = 600;
 
                 // Check if vehicle is inhabited
-                if !(*parent).client.is_null()
-                    && (*((*parent).client as *mut gclient_t)).ps.m_iVehicleNum != 0
-                {
+                if !(*parent).client.is_null() && (*((*parent).client)).ps.m_iVehicleNum != 0 {
                     anim = BOTH_STAND1;
                 } else {
                     anim = BOTH_STAND2;

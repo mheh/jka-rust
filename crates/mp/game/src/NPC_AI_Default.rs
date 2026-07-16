@@ -79,10 +79,7 @@ pub fn NPC_StandTrackAndShoot(ctx: &mut GameContext, NPC: EntityId, canDuck: qbo
                 if !enemy.client.is_null() {
                     if let Some(enemy_enemy) = (*enemy).enemy {
                         if enemy_enemy.0 == npc.s.number as u32 {
-                            if (unsafe { &*(enemy.client as *mut gclient_t) }.buttons
-                                & BUTTON_ATTACK as i32)
-                                != 0
-                            {
+                            if (unsafe { &*(enemy.client) }.buttons & BUTTON_ATTACK as i32) != 0 {
                                 if NPC_CheckDefend(ctx, 1.0) != 0 {
                                     duck_ok = true;
                                 }
@@ -600,9 +597,7 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
                     if !alert_entry.owner.is_null() {
                         let alert_owner = unsafe { &*alert_entry.owner };
                         if !alert_owner.client.is_null() && alert_owner.health >= 0 {
-                            if unsafe { &*(alert_owner.client as *mut gclient_t) }.playerTeam
-                                == client.enemyTeam
-                            {
+                            if unsafe { &*(alert_owner.client) }.playerTeam == client.enemyTeam {
                                 let self_id = ctx.entity_id_of(ctx.world.globals.NPC).unwrap();
                                 let owner_id = ctx.entity_id_of(alert_entry.owner);
                                 G_SetEnemy(ctx, self_id, owner_id);

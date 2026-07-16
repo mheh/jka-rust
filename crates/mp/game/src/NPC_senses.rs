@@ -277,7 +277,7 @@ pub fn InFOV2(
 
     if unsafe { !(*from).client.is_null() } {
         _VectorCopy(
-            unsafe { (*((*from).client as *mut gclient_t)).ps.viewangles },
+            unsafe { (*((*from).client)).ps.viewangles },
             &mut fromAngles,
         );
     } else {
@@ -313,17 +313,17 @@ pub fn InFOV(
     if unsafe { !(*from).client.is_null() } {
         // Check if renderInfo.eyeAngles is not zero
         if !vector_compare(
-            unsafe { (*((*from).client as *mut gclient_t)).renderInfo.eyeAngles },
+            unsafe { (*((*from).client)).renderInfo.eyeAngles },
             vec3_origin,
         ) {
             // Actual facing of tag_head!
             _VectorCopy(
-                unsafe { (*((*from).client as *mut gclient_t)).renderInfo.eyeAngles },
+                unsafe { (*((*from).client)).renderInfo.eyeAngles },
                 &mut fromAngles,
             );
         } else {
             _VectorCopy(
-                unsafe { (*((*from).client as *mut gclient_t)).ps.viewangles },
+                unsafe { (*((*from).client)).ps.viewangles },
                 &mut fromAngles,
             );
         }
@@ -718,8 +718,8 @@ pub fn G_CheckAlertEvents(
         bestSightEvent = G_CheckSightEvents(
             ctx,
             self_id2,
-            unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.hfov },
-            unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.vfov },
+            unsafe { (*((*self_).NPC)).stats.hfov },
+            unsafe { (*((*self_).NPC)).stats.vfov },
             maxSeeDist,
             ignoreAlert,
             mustHaveOwner,
@@ -812,7 +812,7 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
         // run away!
         let owner = ctx.world.level.alertEvents[alertEvent as usize].owner;
         let owner_team = if !owner.is_null() && !unsafe { (*owner).client.is_null() } {
-            Some(unsafe { (*((*owner).client as *mut gclient_t)).playerTeam })
+            Some(unsafe { (*((*owner).client)).playerTeam })
         } else {
             None
         };
@@ -823,7 +823,7 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
             !owner.is_null()
                 && owner != self_
                 && unsafe { (*self_).client.is_null() } == false
-                && team != unsafe { (*((*self_).client as *mut gclient_t)).playerTeam }
+                && team != unsafe { (*((*self_).client)).playerTeam }
         } else {
             // Reaching here means `!owner || !owner->client`, either of which makes
             // the C `if` condition true.
@@ -832,7 +832,7 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
 
         if should_flee {
             if unsafe { !(*self_).NPC.is_null() } {
-                if (unsafe { (*((*self_).NPC as *mut gNPC_t)).scriptFlags } & SCF_DONT_FLEE) != 0 {
+                if (unsafe { (*((*self_).NPC)).scriptFlags } & SCF_DONT_FLEE) != 0 {
                     // can't flee
                     return 0;
                 } else {

@@ -207,7 +207,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         // set client fields on player ents
         for i in 0..(ctx.world.level.maxclients as usize) {
-            ctx.world.g_entities[i].client = ctx.world.clients.as_mut_ptr().add(i) as *mut c_void;
+            ctx.world.g_entities[i].client = ctx.world.clients.as_mut_ptr().add(i);
         }
 
         // always leave room for the max number of clients,

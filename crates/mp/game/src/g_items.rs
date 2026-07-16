@@ -687,13 +687,13 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
 
         // can we place this in front of us?
         AngleVectors(
-            (*((*playerent).client as *mut gclient_t)).ps.viewangles,
+            (*((*playerent).client)).ps.viewangles,
             Some(&mut fwd),
             None,
             None,
         );
         fwd[2] = 0.0;
-        dest = (*((*playerent).client as *mut gclient_t)).ps.origin;
+        dest = (*((*playerent).client)).ps.origin;
         for i in 0..3 {
             dest[i] += SHIELD_PLACEDIST * fwd[i];
         }
@@ -701,7 +701,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
             ctx.engine,
             GTraceArgs::new(
                 &mut tr as *mut trace_t,
-                &(*((*playerent).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                &(*((*playerent).client)).ps.origin as *const vec3_t,
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 &dest as *const vec3_t,
@@ -743,8 +743,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
                 (*shield).parent = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), playerent);
 
                 // Set team number.
-                (*shield).s.otherEntityNum2 =
-                    (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
+                (*shield).s.otherEntityNum2 = (*((*playerent).client)).sess.sessionTeam;
 
                 (*shield).s.eType = ET_SPECIAL as c_int;
                 (*shield).s.modelindex = HI_SHIELD as c_int; // this'll be used in CG_Useable() for rendering.
@@ -769,8 +768,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
                 (*shield).s.owner = (*playerent).s.number;
                 (*shield).s.shouldtarget = qtrue;
                 if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
-                    (*shield).s.teamowner =
-                        (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
+                    (*shield).s.teamowner = (*((*playerent).client)).sess.sessionTeam;
                 } else {
                     (*shield).s.teamowner = 16;
                 }
@@ -804,19 +802,19 @@ pub fn ItemUse_Binoculars(ctx: &mut GameContext, ent: Option<EntityId>) {
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.weaponstate != WEAPON_READY as c_int {
+        if (*((*ent).client)).ps.weaponstate != WEAPON_READY as c_int {
             // So we can't fool it and reactivate while switching to the saber or something.
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.zoomMode == 0 {
+        if (*((*ent).client)).ps.zoomMode == 0 {
             // not zoomed or currently zoomed with the disruptor
-            (*((*ent).client as *mut gclient_t)).ps.zoomMode = 2;
-            (*((*ent).client as *mut gclient_t)).ps.zoomLocked = qfalse;
-            (*((*ent).client as *mut gclient_t)).ps.zoomFov = 40.0;
-        } else if (*((*ent).client as *mut gclient_t)).ps.zoomMode == 2 {
-            (*((*ent).client as *mut gclient_t)).ps.zoomMode = 0;
-            (*((*ent).client as *mut gclient_t)).ps.zoomTime = ctx.world.level.time;
+            (*((*ent).client)).ps.zoomMode = 2;
+            (*((*ent).client)).ps.zoomLocked = qfalse;
+            (*((*ent).client)).ps.zoomFov = 40.0;
+        } else if (*((*ent).client)).ps.zoomMode == 2 {
+            (*((*ent).client)).ps.zoomMode = 0;
+            (*((*ent).client)).ps.zoomTime = ctx.world.level.time;
         }
     }
 }
@@ -851,7 +849,7 @@ pub fn pas_fire(ctx: &mut GameContext, ent: EntityId) {
         // Raven derefs `ent->enemy` unconditionally; callers only invoke
         // `pas_fire` when `ent->enemy` is non-null (see `pas_think`).
         let enemy = &mut ctx.world.g_entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
-        let mut enOrg = (*((*enemy).client as *mut gclient_t)).ps.origin;
+        let mut enOrg = (*((*enemy).client)).ps.origin;
         enOrg[2] += 24.0;
 
         let mut fwd = [
@@ -938,7 +936,7 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                 continue;
             }
             if (*self_).alliedTeam != 0
-                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*self_).alliedTeam
+                && (*((*target).client)).sess.sessionTeam == (*self_).alliedTeam
             {
                 continue;
             }
@@ -964,7 +962,7 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             }
 
             let org = if !(*target).client.is_null() {
-                (*((*target).client as *mut gclient_t)).ps.origin
+                (*((*target).client)).ps.origin
             } else {
                 (*target).r.currentOrigin
             };
@@ -1050,7 +1048,7 @@ pub fn pas_adjust_enemy(ctx: &mut GameContext, ent: EntityId) {
         } else {
             let org2 = (*ent).s.pos.trBase;
             let org = if !(*enemy).client.is_null() {
-                let mut o = (*((*enemy).client as *mut gclient_t)).ps.origin;
+                let mut o = (*((*enemy).client)).ps.origin;
                 o[2] -= 15.0;
                 o
             } else {
@@ -1203,10 +1201,7 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
         let ownerIdx = (*ent).genericValue3 as usize;
         if ctx.world.g_entities[ownerIdx].inuse == 0
             || ctx.world.g_entities[ownerIdx].client.is_null()
-            || (*(ctx.world.g_entities[ownerIdx].client as *mut gclient_t))
-                .sess
-                .sessionTeam
-                != (*ent).genericValue2
+            || (*(ctx.world.g_entities[ownerIdx].client)).sess.sessionTeam != (*ent).genericValue2
         {
             (*ent).think = Some(EntThink::G_FreeEntity).into();
             (*ent).nextthink = ctx.world.level.time;
@@ -1276,7 +1271,7 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
             // Aim at enemy
             let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             let org = if !(*enemy).client.is_null() {
-                (*((*enemy).client as *mut gclient_t)).ps.origin
+                (*((*enemy).client)).ps.origin
             } else {
                 (*enemy).r.currentOrigin
             };
@@ -1416,7 +1411,7 @@ pub fn turret_die(
             MOD_UNKNOWN as c_int,
         );
 
-        (*((*owner).client as *mut gclient_t)).ps.fd.sentryDeployed = qfalse;
+        (*((*owner).client)).ps.fd.sentryDeployed = qfalse;
 
         //ExplodeDeath( self );
         G_FreeEntity(ctx, ctx.entity_id_of(self_));
@@ -1492,13 +1487,13 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
         let mut yawonly: vec3_t = [0.0; 3];
         yawonly[ROLL] = 0.0;
         yawonly[PITCH] = 0.0;
-        yawonly[YAW] = (*((*ent).client as *mut gclient_t)).ps.viewangles[YAW];
+        yawonly[YAW] = (*((*ent).client)).ps.viewangles[YAW];
 
         let mut fwd: vec3_t = [0.0; 3];
         AngleVectors(yawonly, Some(&mut fwd), None, None);
 
         let mut fwdorg: vec3_t = [0.0; 3];
-        let origin = (*((*ent).client as *mut gclient_t)).ps.origin;
+        let origin = (*((*ent).client)).ps.origin;
         fwdorg[0] = origin[0] + fwd[0] * 64.0;
         fwdorg[1] = origin[1] + fwd[1] * 64.0;
         fwdorg[2] = origin[2] + fwd[2] * 64.0;
@@ -1519,7 +1514,7 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
         (*sentry).r.mins = mins;
         (*sentry).r.maxs = maxs;
         (*sentry).genericValue3 = (*ent).s.number;
-        (*sentry).genericValue2 = (*((*ent).client as *mut gclient_t)).sess.sessionTeam; // so we can remove ourself if our owner changes teams
+        (*sentry).genericValue2 = (*((*ent).client)).sess.sessionTeam; // so we can remove ourself if our owner changes teams
         (*sentry).r.absmin[0] = (*sentry).s.pos.trBase[0] + (*sentry).r.mins[0];
         (*sentry).r.absmin[1] = (*sentry).s.pos.trBase[1] + (*sentry).r.mins[1];
         (*sentry).r.absmin[2] = (*sentry).s.pos.trBase[2] + (*sentry).r.mins[2];
@@ -1537,16 +1532,16 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         (*sentry).genericValue8 = ctx.world.level.time;
 
-        (*sentry).alliedTeam = (*((*ent).client as *mut gclient_t)).sess.sessionTeam;
+        (*sentry).alliedTeam = (*((*ent).client)).sess.sessionTeam;
 
-        (*((*ent).client as *mut gclient_t)).ps.fd.sentryDeployed = qtrue;
+        (*((*ent).client)).ps.fd.sentryDeployed = qtrue;
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(sentry.cast()));
 
         (*sentry).s.owner = (*ent).s.number;
         (*sentry).s.shouldtarget = qtrue;
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
-            (*sentry).s.teamowner = (*((*ent).client as *mut gclient_t)).sess.sessionTeam;
+            (*sentry).s.teamowner = (*((*ent).client)).sess.sessionTeam;
         } else {
             (*sentry).s.teamowner = 16;
         }
@@ -1581,20 +1576,18 @@ pub fn ItemUse_Seeker(ctx: &mut GameContext, ent: EntityId) {
                 (*remote).r.ownerNum = (*ent).s.number;
                 (*remote).s.owner = (*ent).s.number;
                 (*remote).activator = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), ent);
-                if (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_BLUE {
-                    (*((*remote).client as *mut gclient_t)).playerTeam = NPCTEAM_PLAYER;
-                } else if (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_RED {
-                    (*((*remote).client as *mut gclient_t)).playerTeam = NPCTEAM_ENEMY;
+                if (*((*ent).client)).sess.sessionTeam == TEAM_BLUE {
+                    (*((*remote).client)).playerTeam = NPCTEAM_PLAYER;
+                } else if (*((*ent).client)).sess.sessionTeam == TEAM_RED {
+                    (*((*remote).client)).playerTeam = NPCTEAM_ENEMY;
                 } else {
-                    (*((*remote).client as *mut gclient_t)).playerTeam = NPCTEAM_NEUTRAL;
+                    (*((*remote).client)).playerTeam = NPCTEAM_NEUTRAL;
                 }
             }
         } else {
-            (*((*ent).client as *mut gclient_t)).ps.eFlags |= EF_SEEKERDRONE;
-            (*((*ent).client as *mut gclient_t)).ps.droneExistTime =
-                (ctx.world.level.time + 30000) as f32;
-            (*((*ent).client as *mut gclient_t)).ps.droneFireTime =
-                (ctx.world.level.time + 1500) as f32;
+            (*((*ent).client)).ps.eFlags |= EF_SEEKERDRONE;
+            (*((*ent).client)).ps.droneExistTime = (ctx.world.level.time + 30000) as f32;
+            (*((*ent).client)).ps.droneFireTime = (ctx.world.level.time + 1500) as f32;
         }
     }
 }
@@ -1612,7 +1605,7 @@ pub fn MedPackGive(ent: &mut gentity_t, amount: c_int) {
             return;
         }
 
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         if (*ent).health <= 0
             || (*cl).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0
             || ((*cl).ps.eFlags & EF_DEAD) != 0
@@ -1656,12 +1649,12 @@ pub fn Jetpack_Off(ent: &mut gentity_t) {
         let ent: *mut gentity_t = ent;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
-        if (*((*ent).client as *mut gclient_t)).jetPackOn == qfalse {
+        if (*((*ent).client)).jetPackOn == qfalse {
             // already off
             return;
         }
 
-        (*((*ent).client as *mut gclient_t)).jetPackOn = qfalse;
+        (*((*ent).client)).jetPackOn = qfalse;
     }
 }
 
@@ -1677,22 +1670,17 @@ pub fn Jetpack_On(ctx: &mut GameContext, ent: EntityId) {
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
-        if (*((*ent).client as *mut gclient_t)).jetPackOn != qfalse {
+        if (*((*ent).client)).jetPackOn != qfalse {
             // aready on
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t))
-            .ps
-            .fd
-            .forceGripBeingGripped
-            >= ctx.world.level.time as f32
-        {
+        if (*((*ent).client)).ps.fd.forceGripBeingGripped >= ctx.world.level.time as f32 {
             // can't turn on during grip interval
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.fallingToDeath != qfalse {
+        if (*((*ent).client)).ps.fallingToDeath != qfalse {
             // too late!
             return;
         }
@@ -1704,7 +1692,7 @@ pub fn Jetpack_On(ctx: &mut GameContext, ent: EntityId) {
             G_SoundIndex(c"sound/boba/JETON".as_ptr()),
         );
 
-        (*((*ent).client as *mut gclient_t)).jetPackOn = qtrue;
+        (*((*ent).client)).jetPackOn = qtrue;
     }
 }
 
@@ -1723,34 +1711,31 @@ pub fn ItemUse_Jetpack(ctx: &mut GameContext, ent: EntityId) {
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
-        if (*((*ent).client as *mut gclient_t)).jetPackToggleTime >= ctx.world.level.time {
+        if (*((*ent).client)).jetPackToggleTime >= ctx.world.level.time {
             return;
         }
 
         if (*ent).health <= 0
-            || (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] <= 0
-            || ((*((*ent).client as *mut gclient_t)).ps.eFlags & EF_DEAD) != 0
-            || (*((*ent).client as *mut gclient_t)).ps.pm_type == PM_DEAD as c_int
+            || (*((*ent).client)).ps.stats[STAT_HEALTH as usize] <= 0
+            || ((*((*ent).client)).ps.eFlags & EF_DEAD) != 0
+            || (*((*ent).client)).ps.pm_type == PM_DEAD as c_int
         {
             // can't use it when dead under any circumstances.
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).jetPackOn == qfalse
-            && (*((*ent).client as *mut gclient_t)).ps.jetpackFuel < 5
-        {
+        if (*((*ent).client)).jetPackOn == qfalse && (*((*ent).client)).ps.jetpackFuel < 5 {
             // too low on fuel to start it up
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).jetPackOn != qfalse {
+        if (*((*ent).client)).jetPackOn != qfalse {
             Jetpack_Off(&mut *ent);
         } else {
             Jetpack_On(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
-        (*((*ent).client as *mut gclient_t)).jetPackToggleTime =
-            ctx.world.level.time + JETPACK_TOGGLE_TIME;
+        (*((*ent).client)).jetPackToggleTime = ctx.world.level.time + JETPACK_TOGGLE_TIME;
     }
 }
 
@@ -1769,27 +1754,27 @@ pub fn ItemUse_UseCloak(ctx: &mut GameContext, ent: EntityId) {
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
-        if (*((*ent).client as *mut gclient_t)).cloakToggleTime >= ctx.world.level.time {
+        if (*((*ent).client)).cloakToggleTime >= ctx.world.level.time {
             return;
         }
 
         if (*ent).health <= 0
-            || (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] <= 0
-            || ((*((*ent).client as *mut gclient_t)).ps.eFlags & EF_DEAD) != 0
-            || (*((*ent).client as *mut gclient_t)).ps.pm_type == PM_DEAD as c_int
+            || (*((*ent).client)).ps.stats[STAT_HEALTH as usize] <= 0
+            || ((*((*ent).client)).ps.eFlags & EF_DEAD) != 0
+            || (*((*ent).client)).ps.pm_type == PM_DEAD as c_int
         {
             // can't use it when dead under any circumstances.
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] == 0
-            && (*((*ent).client as *mut gclient_t)).ps.cloakFuel < 5
+        if (*((*ent).client)).ps.powerups[PW_CLOAKED as usize] == 0
+            && (*((*ent).client)).ps.cloakFuel < 5
         {
             // too low on fuel to start it up
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
+        if (*((*ent).client)).ps.powerups[PW_CLOAKED as usize] != 0 {
             // decloak
             Jedi_Decloak(ctx, ctx.entity_id_of(ent));
         } else {
@@ -1797,8 +1782,7 @@ pub fn ItemUse_UseCloak(ctx: &mut GameContext, ent: EntityId) {
             Jedi_Cloak(ctx, ctx.entity_id_of(ent));
         }
 
-        (*((*ent).client as *mut gclient_t)).cloakToggleTime =
-            ctx.world.level.time + CLOAK_TOGGLE_TIME;
+        (*((*ent).client)).cloakToggleTime = ctx.world.level.time + CLOAK_TOGGLE_TIME;
     }
 }
 
@@ -1923,22 +1907,20 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
         // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
         // pointer (Stage-2 body debt).
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
-        if (*ent).client.is_null()
-            || (*((*ent).client as *mut gclient_t)).tossableItemDebounce > ctx.world.level.time
+        if (*ent).client.is_null() || (*((*ent).client)).tossableItemDebounce > ctx.world.level.time
         {
             // can't use it again yet
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
-            || (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE as c_int
+        if (*((*ent).client)).ps.weaponTime > 0
+            || (*((*ent).client)).ps.forceHandExtend != HANDEXTEND_NONE as c_int
         {
             // busy doing something else
             return;
         }
 
-        (*((*ent).client as *mut gclient_t)).tossableItemDebounce =
-            ctx.world.level.time + TOSS_DEBOUNCE_TIME;
+        (*((*ent).client)).tossableItemDebounce = ctx.world.level.time + TOSS_DEBOUNCE_TIME;
 
         let item = if r#type == HI_HEALTHDISP as c_int {
             BG_FindItem(c"item_medpak_instant".as_ptr())
@@ -1951,8 +1933,8 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
             (*eItem).r.ownerNum = (*ent).s.number;
             (*eItem).classname = (*item).classname;
 
-            let mut pos = (*((*ent).client as *mut gclient_t)).ps.origin;
-            pos[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32;
+            let mut pos = (*((*ent).client)).ps.origin;
+            pos[2] += (*((*ent).client)).ps.viewheight as f32;
 
             G_SetOrigin(&mut *(eItem), pos);
             (*eItem).s.origin = (*eItem).r.currentOrigin;
@@ -1961,12 +1943,7 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
             G_SpecialSpawnItem(ctx, ctx.entity_id_of(eItem).unwrap(), item);
 
             let mut fwd: vec3_t = [0.0; 3];
-            AngleVectors(
-                (*((*ent).client as *mut gclient_t)).ps.viewangles,
-                Some(&mut fwd),
-                None,
-                None,
-            );
+            AngleVectors((*((*ent).client)).ps.viewangles, Some(&mut fwd), None, None);
             (*eItem).epVelocity = [fwd[0] * 128.0, fwd[1] * 128.0, fwd[2] * 128.0];
             (*eItem).epVelocity[2] = 16.0;
 
@@ -1974,12 +1951,12 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
 
             let te = G_TempEntity(
                 ctx,
-                (*((*ent).client as *mut gclient_t)).ps.origin,
+                (*((*ent).client)).ps.origin,
                 entity_event_t::EV_LOCALTIMER as c_int,
             );
             (*te).s.time = ctx.world.level.time;
             (*te).s.time2 = TOSS_DEBOUNCE_TIME;
-            (*te).s.owner = (*((*ent).client as *mut gclient_t)).ps.clientNum;
+            (*te).s.owner = (*((*ent).client)).ps.clientNum;
         }
     }
 }
@@ -1995,13 +1972,12 @@ pub fn EWebDisattach(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
         // pointers (Stage-2 body debt).
         let owner = ctx.entity_mut(owner) as *mut gentity_t;
         let eweb = ctx.entity_mut(eweb) as *mut gentity_t;
-        (*((*owner).client as *mut gclient_t)).ewebIndex = 0;
-        (*((*owner).client as *mut gclient_t)).ps.emplacedIndex = 0;
+        (*((*owner).client)).ewebIndex = 0;
+        (*((*owner).client)).ps.emplacedIndex = 0;
         if (*owner).health > 0 {
-            (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] =
-                (*eweb).genericValue11;
+            (*((*owner).client)).ps.stats[STAT_WEAPONS as usize] = (*eweb).genericValue11;
         } else {
-            (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 0;
+            (*((*owner).client)).ps.stats[STAT_WEAPONS as usize] = 0;
         }
         (*eweb).think = Some(EntThink::G_FreeEntity).into();
         (*eweb).nextthink = ctx.world.level.time;
@@ -2069,29 +2045,24 @@ pub fn EWebDie(
                 );
 
                 // make sure it resets next time we spawn one in case we someone obtain one before death
-                (*((*owner).client as *mut gclient_t)).ewebHealth = -1;
+                (*((*owner).client)).ewebHealth = -1;
 
                 // take it away from him, it is gone forever.
-                (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
-                    !(1 << HI_EWEB);
+                (*((*owner).client)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_EWEB);
 
-                if (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize] > 0
-                    && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
-                        [STAT_HOLDABLE_ITEM as usize] as usize]
+                if (*((*owner).client)).ps.stats[STAT_HOLDABLE_ITEM as usize] > 0
+                    && bg_itemlist
+                        [(*((*owner).client)).ps.stats[STAT_HOLDABLE_ITEM as usize] as usize]
                         .giType
                         == IT_HOLDABLE
-                    && bg_itemlist[(*((*owner).client as *mut gclient_t)).ps.stats
-                        [STAT_HOLDABLE_ITEM as usize] as usize]
+                    && bg_itemlist
+                        [(*((*owner).client)).ps.stats[STAT_HOLDABLE_ITEM as usize] as usize]
                         .giTag
                         == HI_EWEB
                 {
                     //he has it selected so deselect it and select the first thing available
-                    (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEM as usize] =
-                        0;
-                    BG_CycleInven(
-                        &mut (*((*owner).client as *mut gclient_t)).ps as *mut playerState_t,
-                        1,
-                    );
+                    (*((*owner).client)).ps.stats[STAT_HOLDABLE_ITEM as usize] = 0;
+                    BG_CycleInven(&mut (*((*owner).client)).ps as *mut playerState_t, 1);
                 }
             }
         }
@@ -2114,7 +2085,7 @@ pub fn EWebPain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
             let owner = &mut ctx.world.g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0 && !(*owner).client.is_null() {
-                (*((*owner).client as *mut gclient_t)).ewebHealth = (*self_).health;
+                (*((*owner).client)).ewebHealth = (*self_).health;
             }
         }
     }
@@ -2397,7 +2368,7 @@ pub fn EWebPositionUser(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) 
             ctx.engine,
             GTraceArgs::new(
                 &mut tr as *mut trace_t,
-                &(*((*owner).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                &(*((*owner).client)).ps.origin as *const vec3_t,
                 &(*owner).r.mins as *const vec3_t,
                 &(*owner).r.maxs as *const vec3_t,
                 &p as *const vec3_t,
@@ -2425,9 +2396,9 @@ pub fn EWebPositionUser(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) 
 
             if tr.startsolid == 0 && tr.allsolid == 0 {
                 let d2 = [
-                    (*((*owner).client as *mut gclient_t)).ps.origin[0] - tr.endpos[0],
-                    (*((*owner).client as *mut gclient_t)).ps.origin[1] - tr.endpos[1],
-                    (*((*owner).client as *mut gclient_t)).ps.origin[2] - tr.endpos[2],
+                    (*((*owner).client)).ps.origin[0] - tr.endpos[0],
+                    (*((*owner).client)).ps.origin[1] - tr.endpos[1],
+                    (*((*owner).client)).ps.origin[2] - tr.endpos[2],
                 ];
                 if VectorLength(d2) > 1.0 {
                     // we moved, do some animating
@@ -2435,54 +2406,45 @@ pub fn EWebPositionUser(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) 
                     let mut aFlags = SETANIM_FLAG_HOLD as c_int;
 
                     vectoangles(d2, &mut dAng);
-                    dAng[YAW] = AngleSubtract(
-                        (*((*owner).client as *mut gclient_t)).ps.viewangles[YAW],
-                        dAng[YAW],
-                    );
+                    dAng[YAW] = AngleSubtract((*((*owner).client)).ps.viewangles[YAW], dAng[YAW]);
                     if dAng[YAW] > 0.0 {
-                        if (*((*owner).client as *mut gclient_t)).ps.legsAnim
-                            == BOTH_STRAFE_RIGHT1 as c_int
-                        {
+                        if (*((*owner).client)).ps.legsAnim == BOTH_STRAFE_RIGHT1 as c_int {
                             // reset to change direction
                             aFlags |= SETANIM_FLAG_OVERRIDE as c_int;
                         }
                         G_SetAnim(
                             ctx,
                             ctx.entity_id_of(owner).unwrap(),
-                            &mut (*((*owner).client as *mut gclient_t)).pers.cmd,
+                            &mut (*((*owner).client)).pers.cmd,
                             SETANIM_LEGS as c_int,
                             BOTH_STRAFE_LEFT1 as c_int,
                             aFlags,
                             0,
                         );
                     } else {
-                        if (*((*owner).client as *mut gclient_t)).ps.legsAnim
-                            == BOTH_STRAFE_LEFT1 as c_int
-                        {
+                        if (*((*owner).client)).ps.legsAnim == BOTH_STRAFE_LEFT1 as c_int {
                             // reset to change direction
                             aFlags |= SETANIM_FLAG_OVERRIDE as c_int;
                         }
                         G_SetAnim(
                             ctx,
                             ctx.entity_id_of(owner).unwrap(),
-                            &mut (*((*owner).client as *mut gclient_t)).pers.cmd,
+                            &mut (*((*owner).client)).pers.cmd,
                             SETANIM_LEGS as c_int,
                             BOTH_STRAFE_RIGHT1 as c_int,
                             aFlags,
                             0,
                         );
                     }
-                } else if (*((*owner).client as *mut gclient_t)).ps.legsAnim
-                    == BOTH_STRAFE_RIGHT1 as c_int
-                    || (*((*owner).client as *mut gclient_t)).ps.legsAnim
-                        == BOTH_STRAFE_LEFT1 as c_int
+                } else if (*((*owner).client)).ps.legsAnim == BOTH_STRAFE_RIGHT1 as c_int
+                    || (*((*owner).client)).ps.legsAnim == BOTH_STRAFE_LEFT1 as c_int
                 {
                     // don't keep animating in place
-                    (*((*owner).client as *mut gclient_t)).ps.legsTimer = 0;
+                    (*((*owner).client)).ps.legsTimer = 0;
                 }
 
                 G_SetOrigin(&mut *(owner), tr.endpos);
-                (*((*owner).client as *mut gclient_t)).ps.origin = tr.endpos;
+                (*((*owner).client)).ps.origin = tr.endpos;
             }
         } else {
             // can't move here.. stop using the thing I guess
@@ -2508,7 +2470,7 @@ pub fn EWebUpdateBoneAngles(ctx: &mut GameContext, owner: EntityId, eweb: Entity
 
         let mut yAng: vec3_t = [0.0, 0.0, 0.0];
         let ideal = AngleSubtract(
-            (*((*owner).client as *mut gclient_t)).ps.viewangles[YAW],
+            (*((*owner).client)).ps.viewangles[YAW],
             (*eweb).s.angles[YAW],
         );
         let mut incr = AngleSubtract(ideal, (*eweb).angle);
@@ -2534,14 +2496,14 @@ pub fn EWebUpdateBoneAngles(ctx: &mut GameContext, owner: EntityId, eweb: Entity
             ctx.entity_id_of(owner).unwrap(),
             ctx.entity_id_of(eweb).unwrap(),
         );
-        if (*((*owner).client as *mut gclient_t)).ewebIndex == 0 {
+        if (*((*owner).client)).ewebIndex == 0 {
             // was removed during position function
             return;
         }
 
         let mut yAng2: vec3_t = [0.0, 0.0, 0.0];
         yAng2[2] = AngleSubtract(
-            (*((*owner).client as *mut gclient_t)).ps.viewangles[PITCH],
+            (*((*owner).client)).ps.viewangles[PITCH],
             (*eweb).s.angles[PITCH],
         ) * 0.8;
         EWeb_SetBoneAngles(
@@ -2576,12 +2538,12 @@ pub fn EWebThink(ctx: &mut GameContext, self_: EntityId) {
 
             if (*owner).inuse == 0
                 || (*owner).client.is_null()
-                || (*((*owner).client as *mut gclient_t)).pers.connected != CON_CONNECTED as c_int
-                || (*((*owner).client as *mut gclient_t)).ewebIndex != (*self_).s.number
+                || (*((*owner).client)).pers.connected != CON_CONNECTED as c_int
+                || (*((*owner).client)).ewebIndex != (*self_).s.number
                 || (*owner).health < 1
             {
                 killMe = qtrue;
-            } else if (*((*owner).client as *mut gclient_t)).ps.emplacedIndex != (*self_).s.number {
+            } else if (*((*owner).client)).ps.emplacedIndex != (*self_).s.number {
                 // just go back to the inventory then
                 EWebDisattach(
                     ctx,
@@ -2595,17 +2557,16 @@ pub fn EWebThink(ctx: &mut GameContext, self_: EntityId) {
                 let mut yaw: f32 = 0.0;
 
                 if BG_EmplacedView(
-                    (*((*owner).client as *mut gclient_t)).ps.viewangles,
+                    (*((*owner).client)).ps.viewangles,
                     (*self_).s.angles,
                     &mut yaw as *mut f32,
                     (*self_).s.origin2[0],
                 ) != 0
                 {
-                    (*((*owner).client as *mut gclient_t)).ps.viewangles[YAW] = yaw;
+                    (*((*owner).client)).ps.viewangles[YAW] = yaw;
                 }
-                (*((*owner).client as *mut gclient_t)).ps.weapon = WP_EMPLACED_GUN as c_int;
-                (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] =
-                    WP_EMPLACED_GUN as c_int;
+                (*((*owner).client)).ps.weapon = WP_EMPLACED_GUN as c_int;
+                (*((*owner).client)).ps.stats[STAT_WEAPONS as usize] = WP_EMPLACED_GUN as c_int;
 
                 if (*self_).genericValue8 < ctx.world.level.time {
                     // make sure the anim timer is done
@@ -2614,14 +2575,12 @@ pub fn EWebThink(ctx: &mut GameContext, self_: EntityId) {
                         ctx.entity_id_of(owner).unwrap(),
                         ctx.entity_id_of(self_).unwrap(),
                     );
-                    if (*((*owner).client as *mut gclient_t)).ewebIndex == 0 {
+                    if (*((*owner).client)).ewebIndex == 0 {
                         // was removed during position function
                         return;
                     }
 
-                    if ((*((*owner).client as *mut gclient_t)).pers.cmd.buttons & BUTTON_ATTACK)
-                        != 0
-                    {
+                    if ((*((*owner).client)).pers.cmd.buttons & BUTTON_ATTACK) != 0 {
                         if (*self_).genericValue5 < ctx.world.level.time {
                             // we can fire another shot off
                             EWebFire(
@@ -2698,15 +2657,11 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         let mins: vec3_t = [-32.0, -32.0, -24.0];
         let maxs: vec3_t = [32.0, 32.0, 24.0];
 
-        let fAng: vec3_t = [
-            0.0,
-            (*((*spawner).client as *mut gclient_t)).ps.viewangles[1],
-            0.0,
-        ];
+        let fAng: vec3_t = [0.0, (*((*spawner).client)).ps.viewangles[1], 0.0];
         let mut fwd: vec3_t = [0.0; 3];
         AngleVectors(fAng, Some(&mut fwd), None, None);
 
-        let mut s = (*((*spawner).client as *mut gclient_t)).ps.origin;
+        let mut s = (*((*spawner).client)).ps.origin;
         // allow some fudge
         s[2] += 12.0;
 
@@ -2780,18 +2735,18 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         (*ent).r.currentAngles = fAng;
 
         (*ent).s.owner = (*spawner).s.number;
-        (*ent).s.teamowner = (*((*spawner).client as *mut gclient_t)).sess.sessionTeam;
+        (*ent).s.teamowner = (*((*spawner).client)).sess.sessionTeam;
 
         (*ent).takedamage = qtrue;
 
-        if (*((*spawner).client as *mut gclient_t)).ewebHealth <= 0 {
+        if (*((*spawner).client)).ewebHealth <= 0 {
             // refresh the owner's e-web health if its last e-web did not exist or was killed
-            (*((*spawner).client as *mut gclient_t)).ewebHealth = EWEB_HEALTH;
+            (*((*spawner).client)).ewebHealth = EWEB_HEALTH;
         }
 
         // resume health of last deployment
         (*ent).maxHealth = EWEB_HEALTH;
-        (*ent).health = (*((*spawner).client as *mut gclient_t)).ewebHealth;
+        (*ent).health = (*((*spawner).client)).ewebHealth;
         G_ScaleNetHealth(&mut *(ent));
 
         (*ent).die = Some(EntDie::EWebDie).into();
@@ -2868,8 +2823,7 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
         // store off the owner's current weapons, we will be forcing him to use the "emplaced" weapon
-        (*ent).genericValue11 =
-            (*((*spawner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize];
+        (*ent).genericValue11 = (*((*spawner).client)).ps.stats[STAT_WEAPONS as usize];
 
         // start the "unfolding" anim
         EWeb_SetBoneAnim(ctx, ctx.entity_id_of(ent).unwrap(), 4, 20);
@@ -2896,30 +2850,27 @@ pub fn ItemUse_UseEWeb(ctx: &mut GameContext, ent: EntityId) {
         // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
         // pointer (Stage-2 body debt).
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
-        if (*((*ent).client as *mut gclient_t)).ewebTime > ctx.world.level.time {
+        if (*((*ent).client)).ewebTime > ctx.world.level.time {
             // can't use again yet
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
-            || (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE as c_int
+        if (*((*ent).client)).ps.weaponTime > 0
+            || (*((*ent).client)).ps.forceHandExtend != HANDEXTEND_NONE as c_int
         {
             // busy doing something else
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.emplacedIndex != 0
-            && (*((*ent).client as *mut gclient_t)).ewebIndex == 0
-        {
+        if (*((*ent).client)).ps.emplacedIndex != 0 && (*((*ent).client)).ewebIndex == 0 {
             // using an emplaced gun already that isn't our own e-web
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ewebIndex != 0 {
+        if (*((*ent).client)).ewebIndex != 0 {
             // put it away
-            let eweb = &mut ctx.world.g_entities
-                [(*((*ent).client as *mut gclient_t)).ewebIndex as usize]
-                as *mut gentity_t;
+            let eweb =
+                &mut ctx.world.g_entities[(*((*ent).client)).ewebIndex as usize] as *mut gentity_t;
             EWebDisattach(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),
@@ -2931,12 +2882,12 @@ pub fn ItemUse_UseEWeb(ctx: &mut GameContext, ent: EntityId) {
 
             if !eweb.is_null() {
                 // if it's null the thing couldn't spawn (probably no room)
-                (*((*ent).client as *mut gclient_t)).ewebIndex = (*eweb).s.number;
-                (*((*ent).client as *mut gclient_t)).ps.emplacedIndex = (*eweb).s.number;
+                (*((*ent).client)).ewebIndex = (*eweb).s.number;
+                (*((*ent).client)).ps.emplacedIndex = (*eweb).s.number;
             }
         }
 
-        (*((*ent).client as *mut gclient_t)).ewebTime = ctx.world.level.time + EWEB_USE_DEBOUNCE;
+        (*((*ent).client)).ewebTime = ctx.world.level.time + EWEB_USE_DEBOUNCE;
     }
 }
 
@@ -2958,10 +2909,10 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let other = ctx.entity_mut(other) as *mut gentity_t;
         let giTag = (*(*ent).item).giTag;
-        if (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] == 0 {
+        if (*((*other).client)).ps.powerups[giTag as usize] == 0 {
             // round timing to seconds to make multiple powerup timers
             // count in sync
-            (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] =
+            (*((*other).client)).ps.powerups[giTag as usize] =
                 ctx.world.level.time - (ctx.world.level.time % 1000);
 
             G_LogWeaponPowerup(ctx, (*other).s.number, giTag);
@@ -2973,20 +2924,18 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
             (*(*ent).item).quantity
         };
 
-        (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] += quantity * 1000;
+        (*((*other).client)).ps.powerups[giTag as usize] += quantity * 1000;
 
         if giTag == PW_YSALAMIRI as c_int {
-            (*((*other).client as *mut gclient_t)).ps.powerups
-                [PW_FORCE_ENLIGHTENED_LIGHT as usize] = 0;
-            (*((*other).client as *mut gclient_t)).ps.powerups
-                [PW_FORCE_ENLIGHTENED_DARK as usize] = 0;
-            (*((*other).client as *mut gclient_t)).ps.powerups[PW_FORCE_BOON as usize] = 0;
+            (*((*other).client)).ps.powerups[PW_FORCE_ENLIGHTENED_LIGHT as usize] = 0;
+            (*((*other).client)).ps.powerups[PW_FORCE_ENLIGHTENED_DARK as usize] = 0;
+            (*((*other).client)).ps.powerups[PW_FORCE_BOON as usize] = 0;
         }
 
         // give any nearby players a "denied" anti-reward
         for i in 0..ctx.world.level.maxclients {
             let client = &mut ctx.world.clients[i as usize] as *mut gclient_t;
-            if client == (*other).client as *mut gclient_t {
+            if client == (*other).client {
                 continue;
             }
             if (*client).pers.connected == CON_DISCONNECTED {
@@ -2999,8 +2948,7 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
             // if same team in team game, no sound
             // cannot use OnSameTeam as it expects to g_entities, not clients
             if ctx.world.cvars.g_gametype.integer >= GT_TEAM
-                && (*((*other).client as *mut gclient_t)).sess.sessionTeam
-                    == (*client).sess.sessionTeam
+                && (*((*other).client)).sess.sessionTeam == (*client).sess.sessionTeam
             {
                 continue;
             }
@@ -3060,11 +3008,11 @@ pub fn Pickup_Holdable(ctx: &mut GameContext, ent: EntityId, other: EntityId) ->
         // pointers (Stage-2 body debt).
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let other = ctx.entity_mut(other) as *mut gentity_t;
-        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
+        (*((*other).client)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
             (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int;
 
-        (*((*other).client as *mut gclient_t)).ps.stats
-            [statIndex_t::STAT_HOLDABLE_ITEMS as usize] |= 1 << (*(*ent).item).giTag;
+        (*((*other).client)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] |=
+            1 << (*(*ent).item).giTag;
 
         G_LogWeaponItem(ctx, (*other).s.number, (*(*ent).item).giTag);
 
@@ -3090,15 +3038,10 @@ pub fn Add_Ammo(ctx: &mut GameContext, ent: EntityId, weapon: c_int, count: c_in
         // Stage-1: `EntityId` signature; body kept verbatim via a re-derived raw
         // pointer (Stage-2 body debt).
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
-        if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize]
-            < ammoData[weapon as usize].max
-        {
-            (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] += count;
-            if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize]
-                > ammoData[weapon as usize].max
-            {
-                (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] =
-                    ammoData[weapon as usize].max;
+        if (*((*ent).client)).ps.ammo[weapon as usize] < ammoData[weapon as usize].max {
+            (*((*ent).client)).ps.ammo[weapon as usize] += count;
+            if (*((*ent).client)).ps.ammo[weapon as usize] > ammoData[weapon as usize].max {
+                (*((*ent).client)).ps.ammo[weapon as usize] = ammoData[weapon as usize].max;
             }
         }
     }
@@ -3153,7 +3096,7 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
                     AMMO_ROCKETS as c_int,
                     5,
                 );
-                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                if ((*((*other).client)).ps.stats[STAT_WEAPONS as usize]
                     & (1 << WP_DET_PACK as c_int))
                     != 0
                 {
@@ -3164,7 +3107,7 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
                         2,
                     );
                 }
-                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                if ((*((*other).client)).ps.stats[STAT_WEAPONS as usize]
                     & (1 << WP_THERMAL as c_int))
                     != 0
                 {
@@ -3175,7 +3118,7 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
                         2,
                     );
                 }
-                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                if ((*((*other).client)).ps.stats[STAT_WEAPONS as usize]
                     & (1 << WP_TRIP_MINE as c_int))
                     != 0
                 {
@@ -3262,12 +3205,10 @@ pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
                 // New method:  If the player has less than half the minimum, give them the minimum, else add 1/2 the min.
 
                 // drop the quantity if the already have over the minimum
-                if ((*((*other).client as *mut gclient_t)).ps.ammo[(*(*ent).item).giTag as usize]
-                    as f32)
+                if ((*((*other).client)).ps.ammo[(*(*ent).item).giTag as usize] as f32)
                     < quantity as f32 * 0.5
                 {
-                    quantity -= (*((*other).client as *mut gclient_t)).ps.ammo
-                        [(*(*ent).item).giTag as usize];
+                    quantity -= (*((*other).client)).ps.ammo[(*(*ent).item).giTag as usize];
                 } else {
                     quantity = (quantity as f32 * 0.5) as c_int; // only add half the value.
                 }
@@ -3275,8 +3216,7 @@ pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
         }
 
         // add the weapon
-        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
-            1 << (*(*ent).item).giTag;
+        (*((*other).client)).ps.stats[STAT_WEAPONS as usize] |= 1 << (*(*ent).item).giTag;
 
         Add_Ammo(
             ctx,
@@ -3327,10 +3267,9 @@ pub fn Pickup_Health(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
 
         // small and mega healths will go over the max
         let max = if (*item).quantity != 5 && (*item).quantity != 100 {
-            (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
+            (*((*other).client)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
         } else {
-            (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
-                * 2
+            (*((*other).client)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * 2
         };
 
         let quantity = if (*ent).count != 0 {
@@ -3344,8 +3283,7 @@ pub fn Pickup_Health(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
         if (*other).health > max {
             (*other).health = max;
         }
-        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize] =
-            (*other).health;
+        (*((*other).client)).ps.stats[statIndex_t::STAT_HEALTH as usize] = (*other).health;
 
         if (*item).quantity == 100 {
             // mega health respawns slow
@@ -3369,7 +3307,7 @@ pub fn Pickup_Armor(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_
         let ent = ctx.entity_mut(ent) as *mut gentity_t;
         let other = ctx.entity_mut(other) as *mut gentity_t;
         let item = (*ent).item;
-        let cl = (*other).client as *mut gclient_t;
+        let cl = (*other).client;
 
         (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] += (*item).quantity;
         let cap = (*cl).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * (*item).giTag;
@@ -3484,7 +3422,7 @@ pub fn CheckItemCanBePickedUpByNPC(
         // `gitem_t`); body kept verbatim via re-derived raw pointers.
         let item = ctx.entity_mut(item) as *mut gentity_t;
         let pickerupper = ctx.entity_mut(pickerupper) as *mut gentity_t;
-        let npc = (*pickerupper).NPC as *mut gNPC_t;
+        let npc = (*pickerupper).NPC;
         if ((*item).flags & FL_DROPPED_ITEM) != 0
             && crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*item).activator) != &mut ctx.world.g_entities[0] as *mut gentity_t
             && (*pickerupper).s.number != 0
@@ -3560,14 +3498,10 @@ pub fn Touch_Item(
                 || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int)
         {
             if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int {
-                if (*((*other).client as *mut gclient_t)).ps.fd.forceSide
-                    != FORCE_LIGHTSIDE as c_int
-                {
+                if (*((*other).client)).ps.fd.forceSide != FORCE_LIGHTSIDE as c_int {
                     return;
                 }
-            } else if (*((*other).client as *mut gclient_t)).ps.fd.forceSide
-                != FORCE_DARKSIDE as c_int
-            {
+            } else if (*((*other).client)).ps.fd.forceSide != FORCE_DARKSIDE as c_int {
                 return;
             }
         }
@@ -3576,13 +3510,13 @@ pub fn Touch_Item(
         if BG_CanItemBeGrabbed(
             ctx.world.cvars.g_gametype.integer,
             &(*ent).s as *const entityState_t,
-            &(*((*other).client as *mut gclient_t)).ps as *const playerState_t,
+            &(*((*other).client)).ps as *const playerState_t,
         ) == 0
         {
             return;
         }
 
-        let npc_class = (*((*other).client as *mut gclient_t)).NPC_class;
+        let npc_class = (*((*other).client)).NPC_class;
         if npc_class == CLASS_ATST
             || npc_class == CLASS_GONK
             || npc_class == CLASS_MARK1
@@ -3611,7 +3545,7 @@ pub fn Touch_Item(
             ctx.entity_id_of(other).unwrap(),
         ) != 0
         {
-            let npc = (*other).NPC as *mut gNPC_t;
+            let npc = (*other).NPC;
             if !npc.is_null() {
                 if let Some(goal_id) = (*npc).goalEntity {
                     let goal = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
@@ -3635,8 +3569,7 @@ pub fn Touch_Item(
                     && (*(*ent).item).giTag == -1
                     && (*other).s.NPC_class == CLASS_VEHICLE as c_int
                     && !(*other).m_pVehicle.is_null()
-                    && (*(*((*other).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type
-                        == VH_WALKER
+                    && (*(*((*other).m_pVehicle)).m_pVehicleInfo).r#type == VH_WALKER
                 {
                     // yeah, uh, atst gets healed by these things
                     if (*other).maxHealth != 0 && (*other).health < (*other).maxHealth {
@@ -3662,9 +3595,7 @@ pub fn Touch_Item(
         );
         G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
 
-        let mut predict = (*((*other).client as *mut gclient_t))
-            .pers
-            .predictItemPickup;
+        let mut predict = (*((*other).client)).pers.predictItemPickup;
 
         // call the item-specific pickup function
         let mut respawn: c_int;
@@ -3699,12 +3630,11 @@ pub fn Touch_Item(
 
                     if !other.is_null()
                         && !(*other).client.is_null()
-                        && (*((*other).client as *mut gclient_t)).ps.ammo
+                        && (*((*other).client)).ps.ammo
                             [weaponData[weapForAmmo as usize].ammoIndex as usize]
                             > 0
                     {
-                        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
-                            1 << weapForAmmo;
+                        (*((*other).client)).ps.stats[STAT_WEAPONS as usize] |= 1 << weapForAmmo;
                     }
                 }
                 predict = qtrue;
@@ -3760,7 +3690,7 @@ pub fn Touch_Item(
                 BG_AddPredictableEventToPlayerstate(
                     entity_event_t::EV_ITEM_PICKUP as c_int,
                     (*ent).s.number,
-                    &mut (*((*other).client as *mut gclient_t)).ps as *mut playerState_t,
+                    &mut (*((*other).client)).ps as *mut playerState_t,
                 );
             } else {
                 G_AddPredictableEvent(

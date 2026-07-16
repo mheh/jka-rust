@@ -1025,7 +1025,7 @@ pub fn G_AddBot(
         );
 
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
-            let cl = (*bot).client as *mut gclient_t;
+            let cl = (*bot).client;
             if Q_stricmp(cstr(&team_owned).as_ptr(), cstr("red").as_ptr()) == 0 {
                 (*cl).sess.sessionTeam = TEAM_RED;
             } else if Q_stricmp(cstr(&team_owned).as_ptr(), cstr("blue").as_ptr()) == 0 {
@@ -1036,12 +1036,12 @@ pub fn G_AddBot(
         }
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-            let cl = (*bot).client as *mut gclient_t;
+            let cl = (*bot).client;
             (*cl).sess.siegeDesiredTeam = (*cl).sess.sessionTeam;
             (*cl).sess.sessionTeam = TEAM_SPECTATOR;
         }
 
-        let cl = (*bot).client as *mut gclient_t;
+        let cl = (*bot).client;
         let preTeam = (*cl).sess.sessionTeam;
 
         // have it connect to the game as a normal client

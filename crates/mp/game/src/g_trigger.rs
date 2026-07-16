@@ -288,7 +288,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             && !activator.is_null()
             && !(*activator).client.is_null()
             && (*ent).alliedTeam != 0
-            && (*((*activator).client as *mut gclient_t)).sess.sessionTeam != (*ent).alliedTeam
+            && (*((*activator).client)).sess.sessionTeam != (*ent).alliedTeam
         {
             // this team can't activate this trigger.
             return;
@@ -301,14 +301,14 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             // only certain classes can activate it
             if activator.is_null()
                 || (*activator).client.is_null()
-                || (*((*activator).client as *mut gclient_t)).siegeClass < 0
+                || (*((*activator).client)).siegeClass < 0
             {
                 // no class
                 return;
             }
 
             let siege_class_name = (&ctx.world.bg_state.bgSiegeClasses)
-                [(*((*activator).client as *mut gclient_t)).siegeClass as usize]
+                [(*((*activator).client)).siegeClass as usize]
                 .name
                 .as_ptr();
             if G_NameInTriggerClassList(siege_class_name as *mut c_char, (*ent).idealclass) == 0 {
@@ -322,12 +322,12 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
 
             if !activator.is_null()
                 && !(*activator).client.is_null()
-                && (*((*activator).client as *mut gclient_t)).holdingObjectiveItem != 0
+                && (*((*activator).client)).holdingObjectiveItem != 0
                 && !(*ent).targetname.is_null()
                 && *(*ent).targetname != 0
             {
                 let obj_item = &mut ctx.world.g_entities
-                    [(*((*activator).client as *mut gclient_t)).holdingObjectiveItem as usize]
+                    [(*((*activator).client)).holdingObjectiveItem as usize]
                     as *mut gentity_t;
 
                 if !obj_item.is_null() && (*obj_item).inuse != 0 {
@@ -335,9 +335,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                         && *(*obj_item).goaltarget != 0
                         && Q_stricmp((*ent).targetname, (*obj_item).goaltarget) == 0
                     {
-                        if (*obj_item).genericValue7
-                            != (*((*activator).client as *mut gclient_t)).sess.sessionTeam
-                        {
+                        if (*obj_item).genericValue7 != (*((*activator).client)).sess.sessionTeam {
                             // The carrier of the item is not on the team which
                             // disallows objective scoring for it
                             if !(*obj_item).target3.is_null() && *(*obj_item).target3 != 0 {
@@ -393,9 +391,8 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             // §19: Raven derefs activator->client unguarded; guard the null activator too.
             if activator.is_null()
                 || (*activator).client.is_null()
-                || ((*((*activator).client as *mut gclient_t)).sess.sessionTeam != SIEGETEAM_TEAM1
-                    && (*((*activator).client as *mut gclient_t)).sess.sessionTeam
-                        != SIEGETEAM_TEAM2)
+                || ((*((*activator).client)).sess.sessionTeam != SIEGETEAM_TEAM1
+                    && (*((*activator).client)).sess.sessionTeam != SIEGETEAM_TEAM2)
             {
                 // activator must be a valid client to begin with
                 return;
@@ -422,14 +419,13 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                     // the client is valid
                     if (*cl).inuse != 0
                         && !(*cl).client.is_null()
-                        && ((*((*cl).client as *mut gclient_t)).sess.sessionTeam == SIEGETEAM_TEAM1
-                            || (*((*cl).client as *mut gclient_t)).sess.sessionTeam
-                                == SIEGETEAM_TEAM2)
+                        && ((*((*cl).client)).sess.sessionTeam == SIEGETEAM_TEAM1
+                            || (*((*cl).client)).sess.sessionTeam == SIEGETEAM_TEAM2)
                         && (*cl).health > 0
-                        && ((*((*cl).client as *mut gclient_t)).ps.eFlags & EF_DEAD) == 0
+                        && ((*((*cl).client)).ps.eFlags & EF_DEAD) == 0
                     {
                         // See which team he's on
-                        if (*((*cl).client as *mut gclient_t)).sess.sessionTeam == SIEGETEAM_TEAM1 {
+                        if (*((*cl).client)).sess.sessionTeam == SIEGETEAM_TEAM1 {
                             team1_cl_num += 1;
                         } else {
                             team2_cl_num += 1;
@@ -546,7 +542,7 @@ pub fn Touch_Multi(
             return;
         }
 
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
 
         if (*self_).alliedTeam != 0 {
             if (*other_client).sess.sessionTeam != (*self_).alliedTeam {
@@ -1137,7 +1133,7 @@ pub fn trigger_push_touch(
                 return;
             }
             BG_TouchJumpPad(
-                &mut (*((*other).client as *mut gclient_t)).ps as *mut playerState_t,
+                &mut (*((*other).client)).ps as *mut playerState_t,
                 &mut (*self_).s as *mut entityState_t,
             );
             return;
@@ -1176,7 +1172,7 @@ pub fn trigger_push_touch(
             return;
         }
 
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
 
         if (*other_client).ps.pm_type != PM_NORMAL as c_int
             && (*other_client).ps.pm_type != PM_DEAD as c_int
@@ -1369,7 +1365,7 @@ pub fn Use_target_push(
             return;
         }
 
-        let client = (*activator).client as *mut gclient_t;
+        let client = (*activator).client;
         if (*client).ps.pm_type != PM_NORMAL as c_int && (*client).ps.pm_type != PM_FLOAT as c_int {
             return;
         }
@@ -1450,13 +1446,11 @@ pub fn trigger_teleporter_touch(
         if (*other).client.is_null() {
             return;
         }
-        if (*((*other).client as *mut gclient_t)).ps.pm_type == pmtype_t::PM_DEAD as c_int {
+        if (*((*other).client)).ps.pm_type == pmtype_t::PM_DEAD as c_int {
             return;
         }
         // Spectators only?
-        if (*self_).spawnflags & 1 != 0
-            && (*((*other).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
-        {
+        if (*self_).spawnflags & 1 != 0 && (*((*other).client)).sess.sessionTeam != TEAM_SPECTATOR {
             return;
         }
 
@@ -1561,7 +1555,7 @@ pub fn hurt_touch(
             if (*other).inuse != 0
                 && (*other).s.number < MAX_CLIENTS as c_int
                 && !(*other).client.is_null()
-                && (*((*other).client as *mut gclient_t)).sess.sessionTeam != team
+                && (*((*other).client)).sess.sessionTeam != team
             {
                 // real client don't hurt
                 return;
@@ -1594,7 +1588,7 @@ pub fn hurt_touch(
             && !(*other).client.is_null()
             && (*other).health < 1
         {
-            (*((*other).client as *mut gclient_t)).ps.fallingToDeath = 0;
+            (*((*other).client)).ps.fallingToDeath = 0;
             respawn(ctx, ctx.entity_id_of(other).unwrap());
             return;
         }
@@ -1602,7 +1596,7 @@ pub fn hurt_touch(
         if (*self_).damage == -1
             && !other.is_null()
             && !(*other).client.is_null()
-            && (*((*other).client as *mut gclient_t)).ps.fallingToDeath != 0
+            && (*((*other).client)).ps.fallingToDeath != 0
         {
             return;
         }
@@ -1624,7 +1618,7 @@ pub fn hurt_touch(
         };
 
         if (*self_).damage == -1 && !other.is_null() && !(*other).client.is_null() {
-            let other_client = (*other).client as *mut gclient_t;
+            let other_client = (*other).client;
 
             if (*other_client).ps.otherKillerTime > ctx.world.level.time {
                 // we're as good as dead, so if someone pushed us into this
@@ -1764,7 +1758,7 @@ pub fn space_touch(
             return;
         }
 
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
 
         if (*other).s.number < MAX_CLIENTS as c_int // player
             && (*other_client).ps.m_iVehicleNum != 0 // in a vehicle
@@ -1775,7 +1769,7 @@ pub fn space_touch(
                 as *mut gentity_t;
 
             if (*veh).inuse != 0 && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
-                let p_veh = (*veh).m_pVehicle as *mut Vehicle_t;
+                let p_veh = (*veh).m_pVehicle;
                 // §19: Raven derefs m_pVehicleInfo unguarded; guard the null it would crash on.
                 if !(*p_veh).m_pVehicleInfo.is_null() && (*(*p_veh).m_pVehicleInfo).hideRider != 0 {
                     // if they are "inside" a vehicle, then let that protect
@@ -1848,7 +1842,7 @@ pub fn shipboundary_touch(
             return;
         }
 
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
 
         if (*other_client).ps.hyperSpaceTime != 0
             && ctx.world.level.time - (*other_client).ps.hyperSpaceTime < HYPERSPACE_TIME
@@ -1872,7 +1866,7 @@ pub fn shipboundary_touch(
             return;
         }
 
-        let veh = (*other).m_pVehicle as *mut Vehicle_t;
+        let veh = (*other).m_pVehicle;
         if (*other_client).ps.m_iVehicleNum == 0 || (*veh).m_iRemovedSurfaces != 0 {
             // if a vehicle touches a boundary without a pilot in it or with
             // parts missing, just blow the thing up
@@ -1933,12 +1927,12 @@ pub fn shipboundary_think(ctx: &mut GameContext, ent_id: EntityId) {
                 &mut ctx.world.g_entities[entity_list[i as usize] as usize] as *mut gentity_t;
             if (*listed_ent).inuse != 0
                 && !(*listed_ent).client.is_null()
-                && (*((*listed_ent).client as *mut gclient_t)).ps.m_iVehicleNum != 0
+                && (*((*listed_ent).client)).ps.m_iVehicleNum != 0
             {
                 if (*listed_ent).s.eType == entityType_t::ET_NPC as c_int
                     && (*listed_ent).s.NPC_class == CLASS_VEHICLE as c_int
                 {
-                    let p_veh = (*listed_ent).m_pVehicle as *mut Vehicle_t;
+                    let p_veh = (*listed_ent).m_pVehicle;
                     // §19: Raven derefs m_pVehicleInfo unguarded; guard the null it would crash on.
                     if !p_veh.is_null()
                         && !(*p_veh).m_pVehicleInfo.is_null()
@@ -2017,7 +2011,7 @@ pub fn hyperspace_touch(
             return;
         }
 
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
 
         if (*other_client).ps.hyperSpaceTime != 0
             && ctx.world.level.time - (*other_client).ps.hyperSpaceTime < HYPERSPACE_TIME
@@ -2114,18 +2108,13 @@ pub fn hyperspace_touch(
                         (*ent).s.angles,
                     );
                     if !(*other).m_pVehicle.is_null()
-                        && !(*((*other).m_pVehicle as *mut Vehicle_t))
-                            .m_pPilot
-                            .is_null()
+                        && !(*((*other).m_pVehicle)).m_pPilot.is_null()
                     {
                         // teleport the pilot, too
                         TeleportPlayer(
                             ctx,
-                            ctx.entity_id_of(
-                                (*((*other).m_pVehicle as *mut Vehicle_t)).m_pPilot
-                                    as *mut gentity_t,
-                            )
-                            .unwrap(),
+                            ctx.entity_id_of((*((*other).m_pVehicle)).m_pPilot as *mut gentity_t)
+                                .unwrap(),
                             new_org,
                             (*ent).s.angles,
                         );
@@ -2160,7 +2149,7 @@ pub fn hyperspace_touch(
             }
 
             if (*other_client).ps.m_iVehicleNum == 0
-                || (*((*other).m_pVehicle as *mut Vehicle_t)).m_iRemovedSurfaces != 0
+                || (*((*other).m_pVehicle)).m_iRemovedSurfaces != 0
             {
                 // if a vehicle touches a boundary without a pilot in it or
                 // with parts missing, just blow the thing up

@@ -66,7 +66,7 @@ pub fn UpdateTournamentInfo(ctx: &mut GameContext) {
             if (*player).client.is_null() {
                 return;
             }
-            let client = &mut *((*player).client as *mut gclient_t);
+            let client = &mut *((*player).client);
             if client.accuracy_shots != 0 {
                 accuracy = client.accuracy_hits * 100 / client.accuracy_shots;
             } else {

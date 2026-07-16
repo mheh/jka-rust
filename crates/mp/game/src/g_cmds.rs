@@ -463,7 +463,7 @@ pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
             ent = cmdent;
         }
 
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         let mut name = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
@@ -712,7 +712,7 @@ pub fn Cmd_Noclip_f(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let msg = if (*client).noclip != qfalse {
             "noclip OFF\n"
         } else {
@@ -789,7 +789,7 @@ pub fn Cmd_TeamTask_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::shared::limits::MAX_INFO_STRING;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let clientNum = client.offset_from(ctx.world.level.clients) as c_int;
 
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) != 2 {
@@ -849,7 +849,7 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let cvars = &ctx.world.cvars;
 
         if cvars.g_autoKickTKSpammers.integer > 0 || cvars.g_autoBanTKSpammers.integer > 0 {
@@ -969,7 +969,7 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let cvars = &ctx.world.cvars;
 
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
@@ -1119,7 +1119,7 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_cmds.c:645-661`
 pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     // STAGE-1: gclient param -> owning EntityId; raw client re-derived verbatim (Stage-2 debt).
-    let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
+    let client: *mut gclient_t = ctx.entity_mut(ent).client;
     unsafe {
         for i in 0..ctx.world.level.maxclients {
             let wCl = ctx.world.level.clients.add(i as usize);
@@ -1149,7 +1149,7 @@ pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 // engine handle reachable here.
 pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int) {
     // STAGE-1: gclient param -> owning EntityId; raw client re-derived verbatim (Stage-2 debt).
-    let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
+    let client: *mut gclient_t = ctx.entity_mut(ent).client;
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
@@ -1272,9 +1272,7 @@ pub fn G_PowerDuelCheckFail(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     const DUELTEAM_DOUBLE: c_int = 2;
 
     unsafe {
-        if (*ent).client.is_null()
-            || (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_FREE
-        {
+        if (*ent).client.is_null() || (*((*ent).client)).sess.duelTeam == DUELTEAM_FREE {
             return qtrue;
         }
 
@@ -1282,11 +1280,11 @@ pub fn G_PowerDuelCheckFail(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         let mut doubles: c_int = 0;
         crate::g_main::G_PowerDuelCount(ctx, &mut loners, &mut doubles, qfalse);
 
-        if (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_LONE && loners >= 1 {
+        if (*((*ent).client)).sess.duelTeam == DUELTEAM_LONE && loners >= 1 {
             return qtrue;
         }
 
-        if (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_DOUBLE && doubles >= 2 {
+        if (*((*ent).client)).sess.duelTeam == DUELTEAM_DOUBLE && doubles >= 2 {
             return qtrue;
         }
 
@@ -1310,7 +1308,7 @@ pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: *mut c_char) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let clientNum = client.offset_from(ctx.world.level.clients) as c_int;
         let mut specClient: c_int = 0;
         let mut specState = SPECTATOR_NOT;
@@ -1530,7 +1528,7 @@ pub fn StopFollowing(ctx: &mut GameContext, ent: EntityId) {
     use crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         (*client).ps.persistant[PERS_TEAM as usize] = TEAM_SPECTATOR;
         (*client).sess.sessionTeam = TEAM_SPECTATOR;
         (*client).sess.spectatorState = SPECTATOR_FREE;
@@ -1565,7 +1563,7 @@ pub fn Cmd_Team_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) != 2 {
             let oldTeam = (*client).sess.sessionTeam;
@@ -1670,7 +1668,7 @@ pub fn Cmd_DuelTeam_f(ctx: &mut GameContext, ent: EntityId) {
     const DUELTEAM_DOUBLE: c_int = 2;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if ctx.world.cvars.g_gametype.integer != GT_POWERDUEL {
             return;
@@ -1846,7 +1844,7 @@ pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if (*client).switchClassTime > ctx.world.level.time {
             let m = crate::g_main::G_GetStringEdString(
@@ -1971,7 +1969,7 @@ pub fn Cmd_ForceChanged_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         // Raven's `goto argCheck` is preserved here as the natural fall-through of
         // the if/else below (both arms reach the same trailing logic) — see §C10.
@@ -2042,7 +2040,7 @@ pub fn G_SetSaber(
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let mut truncSaberName = [0 as c_char; 64];
         let mut i: usize = 0;
 
@@ -2132,7 +2130,7 @@ pub fn Cmd_Follow_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) != 2 {
             if (*client).sess.spectatorState == SPECTATOR_FOLLOW {
@@ -2202,7 +2200,7 @@ pub fn Cmd_FollowCycle_f(ctx: &mut GameContext, ent: EntityId, dir: c_int) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if (ctx.world.cvars.g_gametype.integer == GT_DUEL
             || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL)
@@ -2298,7 +2296,7 @@ pub fn G_SayTo(
         if (*other).client.is_null() {
             return;
         }
-        let otherClient = (*other).client as *mut gclient_t;
+        let otherClient = (*other).client;
         if (*otherClient).pers.connected != CON_CONNECTED {
             return;
         }
@@ -2311,8 +2309,8 @@ pub fn G_SayTo(
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && !(*ent).client.is_null()
-            && ((*((*ent).client as *mut gclient_t)).tempSpectate >= ctx.world.level.time
-                || (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR)
+            && ((*((*ent).client)).tempSpectate >= ctx.world.level.time
+                || (*((*ent).client)).sess.sessionTeam == TEAM_SPECTATOR)
             && (*otherClient).sess.sessionTeam != TEAM_SPECTATOR
             && (*otherClient).tempSpectate < ctx.world.level.time
         {
@@ -2380,7 +2378,7 @@ pub fn G_Say(
     use mp_bg::public::gametype::GT_TEAM;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let mut mode = mode;
 
         if ctx.world.cvars.g_gametype.integer < GT_TEAM && mode == SAY_TEAM {
@@ -2417,7 +2415,7 @@ pub fn G_Say(
             }
             SAY_TELL => {
                 let targetClient = if !target.is_null() {
-                    (*target).client as *mut gclient_t
+                    (*target).client
                 } else {
                     std::ptr::null_mut()
                 };
@@ -2582,13 +2580,8 @@ pub fn Cmd_Tell_f(ctx: &mut GameContext, ent: EntityId) {
 
         let p = ConcatArgs(ctx, 2);
 
-        let netname_ent = cstr_to_str((*((*ent).client as *mut gclient_t)).pers.netname.as_ptr());
-        let netname_target = cstr_to_str(
-            (*((*target).client as *mut gclient_t))
-                .pers
-                .netname
-                .as_ptr(),
-        );
+        let netname_ent = cstr_to_str((*((*ent).client)).pers.netname.as_ptr());
+        let netname_target = cstr_to_str((*((*target).client)).pers.netname.as_ptr());
         let logmsg = format!(
             "tell: {} to {}: {}\n",
             netname_ent,
@@ -2639,7 +2632,7 @@ pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
     const MAX_CUSTOM_SIEGE_SOUNDS: usize = 30;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if ctx.world.cvars.g_gametype.integer < GT_TEAM {
             return;
@@ -2901,7 +2894,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
     use crate::client::client_persistant::MAX_VOTE_COUNT;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if ctx.world.cvars.g_allowVote.integer == 0 {
             let m = crate::g_main::G_GetStringEdString(
@@ -3136,7 +3129,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
                 return;
             }
 
-            let nclient = ctx.world.g_entities[n as usize].client as *mut gclient_t;
+            let nclient = ctx.world.g_entities[n as usize].client;
             if (*nclient).pers.connected == crate::client::client_connected::CON_DISCONNECTED {
                 let msg = format!(
                     "print \"there is no client with the client number {}.\n\"",
@@ -3184,7 +3177,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
                 &mut ctx.world.level.voteString,
                 &format!("clientkick {}", clientid),
             );
-            let ncl = ctx.world.g_entities[clientid as usize].client as *mut gclient_t;
+            let ncl = ctx.world.g_entities[clientid as usize].client;
             write_cstr_field(
                 &mut ctx.world.level.voteDisplayString,
                 &format!("kick {}", cstr_to_str((*ncl).pers.netname.as_ptr())),
@@ -3285,7 +3278,7 @@ pub fn Cmd_Vote_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if ctx.world.level.voteTime == 0 {
             let m = crate::g_main::G_GetStringEdString(
@@ -3404,7 +3397,7 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if ctx.world.cvars.g_gametype.integer < GT_TEAM {
             trap::SendServerCommand(
@@ -3739,7 +3732,7 @@ pub fn Cmd_TeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).sess.sessionTeam;
         let cs_offset: c_int = if team == TEAM_RED {
             0
@@ -4099,7 +4092,7 @@ pub fn Cmd_ToggleSaber_f(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let level_time = ctx.world.level.time;
 
         if (*client).ps.fd.forceGripCripple != 0 {
@@ -4203,7 +4196,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if (*client).saber[0].model[0] != 0 && (*client).saber[1].model[0] != 0 {
             // no cycling for akimbo
@@ -4393,7 +4386,7 @@ pub fn G_OtherPlayersDueling(ctx: &mut GameContext) -> qboolean {
     unsafe {
         for i in 0..MAX_CLIENTS {
             let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
 
             if (*ent).inuse != qfalse && !client.is_null() && (*client).ps.duelInProgress != qfalse
             {
@@ -4418,7 +4411,7 @@ pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if ctx.world.cvars.g_privateDuel.integer == 0 {
             return;
@@ -4543,7 +4536,7 @@ pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
             {
                 return;
             }
-            let challengedClient = (*challenged).client as *mut gclient_t;
+            let challengedClient = (*challenged).client;
             if (*challengedClient).ps.stats[STAT_HEALTH as usize] < 1
                 || (*challengedClient).ps.weapon != WP_SABER
                 || (*challengedClient).ps.duelInProgress != qfalse
@@ -4716,7 +4709,7 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
             return;
         }
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         (*client).ps.saberMove = atoi_str(&cstr_to_str(arg.as_ptr()));
         (*client).ps.saberBlocked = BLOCKED_BOUNCE_MOVE as c_int;
 
@@ -4824,7 +4817,7 @@ pub fn G_ClientNumFromNetname(ctx: &mut GameContext, name: *mut c_char) -> c_int
     unsafe {
         for i in 0..MAX_CLIENTS {
             let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
 
             if (*ent).inuse != qfalse
                 && !client.is_null()
@@ -4851,7 +4844,7 @@ pub fn TryGrapple(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     let kyle_grab: c_int = animNumber_t::BOTH_KYLE_GRAB as c_int;
 
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if (*client).ps.weaponTime > 0 {
             return qfalse;
@@ -5128,7 +5121,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 if entNum >= 0 && (entNum as usize) < MAX_GENTITIES {
                     let kEnt = &mut ctx.world.g_entities[entNum as usize] as *mut gentity_t;
                     if (*kEnt).inuse != qfalse && !(*kEnt).client.is_null() {
-                        let kClient = (*kEnt).client as *mut gclient_t;
+                        let kClient = (*kEnt).client;
                         (*kEnt).flags &= !FL_GODMODE;
                         (*kClient).ps.stats[STAT_HEALTH as usize] = -999;
                         (*kEnt).health = -999;
@@ -5158,8 +5151,8 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
             && CheatsOk(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse
             && !ent.is_null()
             && !(*ent).client.is_null()
-            && (*((*ent).client as *mut gclient_t)).ps.saberHolstered != 0
-            && (*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER
+            && (*((*ent).client)).ps.saberHolstered != 0
+            && (*((*ent).client)).ps.weapon == WP_SABER
         {
             Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(ent).unwrap());
         }
@@ -5268,7 +5261,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 crate::g_combat::DismembermentByNum(ctx, ctx.entity_id_of(ent).unwrap(), iArg);
             }
         } else if cmd_s.eq_ignore_ascii_case("debugDropSaber") {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if (*client).ps.weapon == WP_SABER
                 && (*client).ps.saberEntityNum != 0
                 && (*client).ps.saberInFlight == qfalse
@@ -5281,7 +5274,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 );
             }
         } else if cmd_s.eq_ignore_ascii_case("debugKnockMeDown") {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if crate::bg_pmove::BG_KnockDownable(&mut (*client).ps) != qfalse {
                 (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
                 (*client).ps.forceDodgeAnim = 0;
@@ -5347,7 +5340,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 && !(*targ).client.is_null()
                 && (*ent).s.number != (*targ).s.number
             {
-                let targClient = (*targ).client as *mut gclient_t;
+                let targClient = (*targ).client;
                 (*targClient).ps.heldByClient = (*ent).s.number + 1;
             }
         } else if cmd_s.eq_ignore_ascii_case("debugIKBeGrabbedBy") {
@@ -5378,7 +5371,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 && !(*targ).client.is_null()
                 && (*ent).s.number != (*targ).s.number
             {
-                let client = (*ent).client as *mut gclient_t;
+                let client = (*ent).client;
                 (*client).ps.heldByClient = (*targ).s.number + 1;
             }
         } else if cmd_s.eq_ignore_ascii_case("debugIKRelease") {
@@ -5405,11 +5398,11 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
             }
 
             if !targ.is_null() && (*targ).inuse != qfalse && !(*targ).client.is_null() {
-                let targClient = (*targ).client as *mut gclient_t;
+                let targClient = (*targ).client;
                 (*targClient).ps.heldByClient = 0;
             }
         } else if cmd_s.eq_ignore_ascii_case("debugThrow") {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             let mut tr: trace_t = core::mem::zeroed();
             let mut tTo: vec3_t = [0.0; 3];
             let mut fwd: vec3_t = [0.0; 3];
@@ -5442,7 +5435,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
 
             if tr.fraction != 1.0 {
                 let other = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-                let otherClient = (*other).client as *mut gclient_t;
+                let otherClient = (*other).client;
 
                 if (*other).inuse != qfalse
                     && !(*other).client.is_null()

@@ -126,7 +126,7 @@ pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: 
         // Check if we're a Jedi
         // §19: Raven derefs `NPC->client` unconditionally; the null guard is
         // defensive (NPCs always have a client here). Source: NPC_reactions.c:89.
-        let client = (*npc).client as *mut gclient_t;
+        let client = (*npc).client;
         if !client.is_null() && (*client).ps.weapon == WP_SABER {
             // I'm a jedi
             if r#mod == MOD_SABER {
@@ -166,12 +166,12 @@ pub fn NPC_SetPainEvent(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         // Raven: `!self->NPC || !(self->NPC->aiFlags&NPCAI_DIE_ON_IMPACT)`.
         // NPCAI_DIE_ON_IMPACT resolves through the prelude (crate::npc::ai_flags).
         // Source: oracle/codemp/game/b_public.h:23
         if npc.is_null() || ((*npc).aiFlags & NPCAI_DIE_ON_IMPACT) == 0 {
-            let client = (*self_).client as *mut gclient_t;
+            let client = (*self_).client;
             let pending = trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 GIcarusTaskidpendingArgs::new(self_.cast(), taskID_t::TID_CHAN_VOICE as c_int),
@@ -198,7 +198,7 @@ pub fn NPC_GetPainChance(ctx: &mut GameContext, self_: EntityId, damage: c_int) 
             return 1.0f32;
         }
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if client.is_null() {
             return 1.0f32;
         }
@@ -267,14 +267,14 @@ pub fn NPC_ChoosePainAnimation(
         }
 
         if (*self_).s.weapon == WP_THERMAL && (*self_).client.is_null() == false {
-            let client = (*self_).client as *mut gclient_t;
+            let client = (*self_).client;
             if (*client).ps.weaponTime > 0 {
                 // Don't interrupt thermal throwing anim
                 return;
             }
         }
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         let mut pain_chance = 0.5f32;
 
         if !client.is_null() && (*client).NPC_class == CLASS_GALAKMECH {
@@ -304,7 +304,7 @@ pub fn NPC_ChoosePainAnimation(
                 // Higher in rank (skill) we are, less likely we are to be fazed by a punch
                 // §19: Raven derefs `self->NPC->rank` unconditionally; the null
                 // guard is defensive and picks 1.0. Source: NPC_reactions.c:257.
-                let npc = (*self_).NPC as *mut gNPC_t;
+                let npc = (*self_).NPC;
                 if !npc.is_null() {
                     pain_chance = 1.0f32
                         - ((RANK_CAPTAIN as c_int - (*npc).rank as c_int) as f32
@@ -344,7 +344,7 @@ pub fn NPC_ChoosePainAnimation(
                         && crate::bg_panimate::PM_InCartwheel(legs_anim) == qfalse)
                 {
                     // Play an anim
-                    let npc = (*self_).NPC as *mut gNPC_t;
+                    let npc = (*self_).NPC;
                     let local_anim_index = (*self_).localAnimIndex;
 
                     if !client.is_null() && (*client).NPC_class == CLASS_GALAKMECH {
@@ -473,7 +473,7 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
         let mut point = [0.0f32; 3];
         crate::q_math::_VectorCopy(ctx.world.globals.gPainPoint, &mut point);
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if npc.is_null() {
             return;
         }
@@ -484,7 +484,7 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
 
         // §19: Raven derefs `self->client->ps.pm_type` unconditionally; the null
         // guard is defensive. Source: NPC_reactions.c:381.
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if !client.is_null() && (*client).ps.pm_type == PM_DEAD {
             return;
         }
@@ -494,7 +494,7 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
         }
 
         // Ignore damage from your own team for now
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
         if !other_client.is_null() {
             other_team = (*other_client).playerTeam;
         }
@@ -689,7 +689,7 @@ pub fn NPC_Touch(
         // MAX_CLIENTS_I32 (mp_qshared limits, == 32) and NPCAI_TOUCHED_GOAL
         // (crate::npc::ai_flags, == 0x8) resolve through the prelude.
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if npc.is_null() {
             return;
         }
@@ -700,13 +700,13 @@ pub fn NPC_Touch(
         // I am dead and carrying a key
         if !(*self_).message.is_null() && (*self_).health <= 0 {
             // Player touched me
-            let other_client = (*other).client as *mut gclient_t;
+            let other_client = (*other).client;
             if !other.is_null() && !other_client.is_null() && (*other).s.number < MAX_CLIENTS_I32 {
                 // Placeholder: would handle key pickup here (commented out in oracle)
             }
         }
 
-        let other_client = (*other).client as *mut gclient_t;
+        let other_client = (*other).client;
         if !other_client.is_null() {
             // Other has a client (is a player)
             if (*other).health > 0 {
@@ -729,7 +729,7 @@ pub fn NPC_Touch(
             // `!(other->flags & FL_NOTARGET)`; the SVF_IGNORE_ENEMIES clause is
             // commented out there, so it is not reintroduced here.
             if ((*other).flags & FL_NOTARGET) == 0 {
-                let client = (*self_).client as *mut gclient_t;
+                let client = (*self_).client;
                 if !client.is_null() && (*client).enemyTeam != 0 {
                     // See if we bumped into an enemy
                     if (*other_client).playerTeam == (*client).enemyTeam {
@@ -793,7 +793,7 @@ pub fn NPC_TempLookTarget(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if client.is_null() {
             return;
         }
@@ -872,13 +872,13 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
         }
 
         // Some last-minute hacked in responses
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if client.is_null() {
             return;
         }
 
         let npc_class = (*client).NPC_class;
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
 
         match npc_class {
             CLASS_JAN => {
@@ -1079,8 +1079,8 @@ pub fn NPC_UseResponse(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let user: *mut gentity_t = unsafe { ent_ptr(ctx, user) };
     unsafe {
-        let npc = (*self_).NPC as *mut gNPC_t;
-        let client = (*self_).client as *mut gclient_t;
+        let npc = (*self_).NPC;
+        let client = (*self_).client;
         if npc.is_null() || client.is_null() {
             return;
         }
@@ -1093,7 +1093,7 @@ pub fn NPC_UseResponse(
             return;
         }
 
-        let user_client = (*user).client as *mut gclient_t;
+        let user_client = (*user).client;
         if !user_client.is_null()
             && (*client).playerTeam != (*user_client).playerTeam
             && (*client).playerTeam != NPCTEAM_NEUTRAL
@@ -1141,7 +1141,7 @@ pub fn NPC_Use(
         const PM_DEAD: c_int = pmtype_t::PM_DEAD as c_int;
         const BSET_USE: c_int = bSet_t::BSET_USE as c_int;
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         if client.is_null() || (*client).ps.pm_type == PM_DEAD {
             return;
         }
@@ -1149,12 +1149,12 @@ pub fn NPC_Use(
         SaveNPCGlobals(ctx);
         SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if !client.is_null() && !npc.is_null() {
             // Check if this is a vehicle
             if (*client).NPC_class == CLASS_VEHICLE {
                 // If this is a vehicle, let the other guy board it.
-                let pVeh = (*self_).m_pVehicle as *mut Vehicle_t;
+                let pVeh = (*self_).m_pVehicle;
                 if !pVeh.is_null() && !(*pVeh).m_pVehicleInfo.is_null() {
                     //if I used myself, eject everyone on me
                     if other == self_ {

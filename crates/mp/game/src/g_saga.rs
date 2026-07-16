@@ -851,14 +851,12 @@ pub fn BroadcastObjectiveCompletion(
         // ported home yet; referenced verbatim (missing_symbols).
         if client != ENTITYNUM_NONE
             && !ctx.world.g_entities[client as usize].client.is_null()
-            && (*(ctx.world.g_entities[client as usize].client as *mut gclient_t))
+            && (*(ctx.world.g_entities[client as usize].client))
                 .sess
                 .sessionTeam
                 == team
         {
-            let client_origin = (*(ctx.world.g_entities[client as usize].client as *mut gclient_t))
-                .ps
-                .origin;
+            let client_origin = (*(ctx.world.g_entities[client as usize].client)).ps.origin;
             // guy who completed this objective gets points, providing he's on
             // the opposing team
             AddScore(
@@ -887,21 +885,19 @@ pub fn AddSiegeWinningTeamPoints(ctx: &mut GameContext, team: c_int, winner: c_i
         while i < (MAX_CLIENTS) as i32 {
             let ent = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
 
-            if !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == team
-            {
+            if !(*ent).client.is_null() && (*((*ent).client)).sess.sessionTeam == team {
                 if i == winner {
                     AddScore(
                         ctx,
                         ctx.entity_id_of(ent).unwrap(),
-                        (*((*ent).client as *mut gclient_t)).ps.origin,
+                        (*((*ent).client)).ps.origin,
                         SIEGE_POINTS_TEAMWONROUND + SIEGE_POINTS_FINALOBJECTIVECOMPLETED,
                     );
                 } else {
                     AddScore(
                         ctx,
                         ctx.entity_id_of(ent).unwrap(),
-                        (*((*ent).client as *mut gclient_t)).ps.origin,
+                        (*((*ent).client)).ps.origin,
                         SIEGE_POINTS_TEAMWONROUND,
                     );
                 }
@@ -946,10 +942,10 @@ pub fn SiegeDoTeamAssign(ctx: &mut GameContext) {
 
             if (*ent).inuse != 0
                 && !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).pers.connected == CON_CONNECTED
+                && (*((*ent).client)).pers.connected == CON_CONNECTED
             {
                 // a connected client, switch his frickin teams around
-                let cl = (*ent).client as *mut gclient_t;
+                let cl = (*ent).client;
                 if (*cl).sess.siegeDesiredTeam == SIEGETEAM_TEAM1 {
                     (*cl).sess.siegeDesiredTeam = SIEGETEAM_TEAM2;
                 } else if (*cl).sess.siegeDesiredTeam == SIEGETEAM_TEAM2 {
@@ -1022,7 +1018,7 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
             && !ctx.world.g_entities[winningclient as usize]
                 .client
                 .is_null()
-            && (*(ctx.world.g_entities[winningclient as usize].client as *mut gclient_t))
+            && (*(ctx.world.g_entities[winningclient as usize].client))
                 .sess
                 .sessionTeam
                 != winningteam
@@ -1138,7 +1134,7 @@ pub fn G_ValidateSiegeClassForTeam(ctx: &mut GameContext, ent: EntityId, team: c
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let mut newClassIndex: c_int = -1;
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         if (*cl).siegeClass == -1 {
             // uh.. sure.
             return;
@@ -1215,7 +1211,7 @@ pub fn SetTeamQuick(ctx: &mut GameContext, ent: EntityId, team: c_int, doBegin: 
             G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);
         }
 
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         (*cl).sess.sessionTeam = team;
 
         if team == TEAM_SPECTATOR {
@@ -1276,7 +1272,7 @@ pub fn SiegeRespawn(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if (*client).sess.sessionTeam != (*client).sess.siegeDesiredTeam {
             SetTeamQuick(
@@ -1320,7 +1316,7 @@ pub fn SiegeBeginRound(ctx: &mut GameContext, entNum: c_int) {
                 let ent = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
 
                 if (*ent).inuse != 0 && !(*ent).client.is_null() {
-                    let cl = (*ent).client as *mut gclient_t;
+                    let cl = (*ent).client;
                     if (*cl).sess.sessionTeam != TEAM_SPECTATOR
                         && (*cl).ps.pm_flags & PMF_FOLLOW == 0
                     {
@@ -1408,8 +1404,8 @@ pub fn SiegeCheckTimers(ctx: &mut GameContext) {
 
                 if !(*ent).client.is_null()
                     && (*ent).inuse != 0
-                    && (*((*ent).client as *mut gclient_t)).pers.connected == CON_CONNECTED
-                    && (*((*ent).client as *mut gclient_t)).sess.siegeDesiredTeam == SIEGETEAM_TEAM1
+                    && (*((*ent).client)).pers.connected == CON_CONNECTED
+                    && (*((*ent).client)).sess.siegeDesiredTeam == SIEGETEAM_TEAM1
                 {
                     numTeam1 += 1;
                 }
@@ -1423,8 +1419,8 @@ pub fn SiegeCheckTimers(ctx: &mut GameContext) {
 
                 if !(*ent).client.is_null()
                     && (*ent).inuse != 0
-                    && (*((*ent).client as *mut gclient_t)).pers.connected == CON_CONNECTED
-                    && (*((*ent).client as *mut gclient_t)).sess.siegeDesiredTeam == SIEGETEAM_TEAM2
+                    && (*((*ent).client)).pers.connected == CON_CONNECTED
+                    && (*((*ent).client)).sess.siegeDesiredTeam == SIEGETEAM_TEAM2
                 {
                     numTeam2 += 1;
                 }
@@ -1983,7 +1979,7 @@ pub fn SiegeItemRemoveOwner(ent: &mut gentity_t, carrier: Option<&mut gentity_t>
         (*ent).genericValue8 = ENTITYNUM_NONE; // Mark entity carrying us as none
 
         if !carrier.is_null() {
-            let cl = (*carrier).client as *mut gclient_t;
+            let cl = (*carrier).client;
             (*cl).holdingObjectiveItem = 0; // The carrier is no longer carrying us
             (*carrier).r.svFlags &= !SVF_BROADCAST;
         }
@@ -2086,7 +2082,7 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
             carrier = &mut ctx.world.g_entities[(*ent).genericValue8 as usize] as *mut gentity_t;
 
             if (*carrier).inuse != 0 && !(*carrier).client.is_null() {
-                let mut new_origin = (*((*carrier).client as *mut gclient_t)).ps.origin;
+                let mut new_origin = (*((*carrier).client)).ps.origin;
                 crate::q_math::_VectorCopy(new_origin, &mut (*ent).r.currentOrigin);
                 trap::LinkEntity(
                     ctx.engine,
@@ -2123,9 +2119,9 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
             // minimum respawn time is exceeded.
             if (*carrier).inuse == 0
                 || (*carrier).client.is_null()
-                || ((*((*carrier).client as *mut gclient_t)).sess.sessionTeam != SIEGETEAM_TEAM1
-                    && (*((*carrier).client as *mut gclient_t)).sess.sessionTeam != SIEGETEAM_TEAM2)
-                || ((*((*carrier).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW != 0)
+                || ((*((*carrier).client)).sess.sessionTeam != SIEGETEAM_TEAM1
+                    && (*((*carrier).client)).sess.sessionTeam != SIEGETEAM_TEAM2)
+                || ((*((*carrier).client)).ps.pm_flags & PMF_FOLLOW != 0)
             {
                 // respawn on the original spot; oracle passes NULL here (g_saga.c:1435)
                 SiegeItemRespawnOnOriginalSpot(ctx, ctx.entity_id_of(ent).unwrap(), None);
@@ -2140,7 +2136,7 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
                     );
                 }
 
-                let carrier_origin = (*((*carrier).client as *mut gclient_t)).ps.origin;
+                let carrier_origin = (*((*carrier).client)).ps.origin;
                 let contents = trap::PointContents(
                     ctx.engine,
                     mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
@@ -2227,7 +2223,7 @@ pub fn SiegeItemTouch(
             return;
         }
 
-        let ocl = (*other).client as *mut gclient_t;
+        let ocl = (*other).client;
 
         if (*ocl).holdingObjectiveItem != 0 {
             // this guy's already carrying a siege item
@@ -2718,13 +2714,12 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
                 && !(*ent).client.is_null()
                 && (*msgTarg).s.number != (*ent).s.number
                 && (*ent).s.eType == entityType_t::ET_PLAYER as c_int
-                && (*((*msgTarg).client as *mut gclient_t)).sess.sessionTeam
-                    == (*((*ent).client as *mut gclient_t)).sess.sessionTeam
+                && (*((*msgTarg).client)).sess.sessionTeam == (*((*ent).client)).sess.sessionTeam
                 && trap::InPVS(
                     ctx.engine,
                     mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
-                        &(*((*msgTarg).client as *mut gclient_t)).ps.origin as *const vec3_t,
-                        &(*((*ent).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                        &(*((*msgTarg).client)).ps.origin as *const vec3_t,
+                        &(*((*ent).client)).ps.origin as *const vec3_t,
                     ),
                 ) != 0
             {
@@ -2742,7 +2737,7 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
                 }
 
                 // append the stats
-                let cl = (*ent).client as *mut gclient_t;
+                let cl = (*ent).client;
                 write_cstr_field(
                     &mut scratch,
                     &format!(

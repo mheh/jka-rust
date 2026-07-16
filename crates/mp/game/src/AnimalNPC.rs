@@ -250,9 +250,9 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
         // If they're bucking, play the animation and leave...
         if (*parent).client.is_null() == false
-            && (*((*parent).client as *mut gclient_t)).ps.legsAnim == BOTH_VT_BUCK as c_int
+            && (*((*parent).client)).ps.legsAnim == BOTH_VT_BUCK as c_int
         {
-            if (*((*parent).client as *mut gclient_t)).ps.legsTimer <= 0 {
+            if (*((*parent).client)).ps.legsTimer <= 0 {
                 (*pVeh).m_ulFlags &= !(VEH_BUCKING as u64);
             } else {
                 return;
@@ -319,7 +319,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         }
 
         let fSpeedPercToMax = if !(*parent).client.is_null() {
-            (*((*parent).client as *mut gclient_t)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+            (*((*parent).client)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
             0.0f32
         };
@@ -391,7 +391,7 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         }
 
         let fSpeedPercToMax = if !(*parent).client.is_null() {
-            (*((*parent).client as *mut gclient_t)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+            (*((*parent).client)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
             0.0f32
         };

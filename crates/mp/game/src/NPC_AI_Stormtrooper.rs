@@ -152,10 +152,10 @@ pub const SPEECH_PUSHED: i32 = 13;
 /// Source: `oracle/codemp/game/NPC_AI_Stormtrooper.c:60-86`
 pub fn ST_AggressionAdjust(self_: &gentity_t, change: c_int) {
     unsafe {
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).stats.aggression += change;
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         let (upper_threshold, lower_threshold) = if (*client).playerTeam == NPCTEAM_PLAYER {
             (7, 1)
         } else {
@@ -277,8 +277,8 @@ pub fn ST_Speech(ctx: &mut GameContext, self_: EntityId, speechType: c_int, fail
             return;
         }
 
-        let npc = (*self_).NPC as *mut gNPC_t;
-        let client = (*self_).client as *mut gclient_t;
+        let npc = (*self_).NPC;
+        let client = (*self_).client;
 
         if failChance >= 0.0 {
             // a negative failChance makes it always talk
@@ -468,7 +468,7 @@ pub fn ST_MarkToCover(ctx: &mut GameContext, self_: Option<EntityId>) {
         if self_.is_null() || (*self_).NPC.is_null() {
             return;
         }
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).localState = LSTATE_UNDERFIRE;
         let self_id = ctx.entity_id_of(self_);
         let delay = ctx.world.bg_state.rng.Q_irand(500, 2500);
@@ -514,7 +514,7 @@ pub fn ST_StartFlee(
             minTime,
             maxTime,
         );
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if !(*npc).group.is_null() && (*(*npc).group).numGroup > 1 {
             // FIXME: flee sound? (Raven comment).
             ST_Speech(ctx, ctx.entity_id_of(self_).unwrap(), SPEECH_COVER, 0.0);
@@ -535,7 +535,7 @@ pub fn NPC_ST_Pain(
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let attacker: *mut gentity_t = ent_resolve_opt(ctx, attacker);
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).localState = LSTATE_UNDERFIRE;
 
         TIMER_Set(
@@ -629,7 +629,7 @@ pub fn NPC_ST_SayMovementSpeech(ctx: &mut GameContext) {
         if !group.is_null()
             && !(*group).commander.is_null()
             && !(*(*group).commander).client.is_null()
-            && (*((*(*group).commander).client as *mut gclient_t)).NPC_class == CLASS_IMPERIAL
+            && (*((*(*group).commander).client)).NPC_class == CLASS_IMPERIAL
             && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
         {
             // imperial (commander) gives the order
@@ -706,7 +706,7 @@ pub fn ST_Move(ctx: &mut GameContext) -> qboolean {
                 if !info.blocker.is_null()
                     && !(*info.blocker).NPC.is_null()
                     && !(*NPCInfo).group.is_null()
-                    && (*((*info.blocker).NPC as *mut gNPC_t)).group == (*NPCInfo).group
+                    && (*((*info.blocker).NPC)).group == (*NPCInfo).group
                 {
                     // dammit, something is in our way, see if it's one of ours
                     let group = (*NPCInfo).group;
@@ -839,7 +839,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             return qfalse;
         }
 
-        let tclient = (*target).client as *mut gclient_t;
+        let tclient = (*target).client;
         if (*tclient).ps.weapon == WP_SABER
             && (*tclient).ps.saberHolstered == 0
             && (*tclient).ps.saberInFlight == qfalse
@@ -917,14 +917,14 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             ];
             let mut hAngle_perc = NPC_GetHFOVPercentage(
                 targ_org,
-                (*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint,
-                (*((*NPC).client as *mut gclient_t)).renderInfo.eyeAngles,
+                (*((*NPC).client)).renderInfo.eyePoint,
+                (*((*NPC).client)).renderInfo.eyeAngles,
                 (*NPCInfo).stats.hfov as f32,
             );
             let mut vAngle_perc = NPC_GetVFOVPercentage(
                 targ_org,
-                (*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint,
-                (*((*NPC).client as *mut gclient_t)).renderInfo.eyeAngles,
+                (*((*NPC).client)).renderInfo.eyePoint,
+                (*((*NPC).client)).renderInfo.eyeAngles,
                 (*NPCInfo).stats.vfov as f32,
             );
 
@@ -994,13 +994,13 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
                 let myContents = trap::PointContents(
                     ctx.engine,
                     GPointContentsArgs::new(
-                        &(*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint as *const vec3_t,
+                        &(*((*NPC).client)).renderInfo.eyePoint as *const vec3_t,
                         (*NPC).s.number,
                     ),
                 );
                 if (myContents & CONTENTS_WATER) == 0 {
                     // I'm not in water
-                    if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_SWAMPTROOPER {
+                    if (*((*NPC).client)).NPC_class == CLASS_SWAMPTROOPER {
                         // these guys can see in in/through water pretty well
                         vis_rating = 0.10;
                     } else {
@@ -1008,7 +1008,7 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
                     }
                 } else {
                     // else, if we're both in water
-                    if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_SWAMPTROOPER {
+                    if (*((*NPC).client)).NPC_class == CLASS_SWAMPTROOPER {
                         // I can see him just fine
                     } else {
                         vis_rating = 0.15;
@@ -1031,13 +1031,12 @@ pub fn NPC_CheckEnemyStealth(ctx: &mut GameContext, target: EntityId) -> qboolea
             }
 
             // If he's violated the threshold, then realize him
-            let (realize, cautious) =
-                if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_SWAMPTROOPER {
-                    // swamptroopers can see much better
-                    (CAUTIOUS_THRESHOLD, CAUTIOUS_THRESHOLD * 0.75)
-                } else {
-                    (REALIZE_THRESHOLD, CAUTIOUS_THRESHOLD * 0.75)
-                };
+            let (realize, cautious) = if (*((*NPC).client)).NPC_class == CLASS_SWAMPTROOPER {
+                // swamptroopers can see much better
+                (CAUTIOUS_THRESHOLD, CAUTIOUS_THRESHOLD * 0.75)
+            } else {
+                (REALIZE_THRESHOLD, CAUTIOUS_THRESHOLD * 0.75)
+            };
 
             if target_rating > realize && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
                 let npc_id_2 = ctx.entity_id_of(NPC).unwrap();
@@ -1145,8 +1144,7 @@ pub fn NPC_CheckPlayerTeamStealth(ctx: &mut GameContext) -> qboolean {
             if !enemy.is_null()
                 && !(*enemy).client.is_null()
                 && NPC_ValidEnemy(ctx, ctx.entity_id_of(enemy)) != qfalse
-                && (*((*enemy).client as *mut gclient_t)).playerTeam
-                    == (*((*NPC).client as *mut gclient_t)).enemyTeam
+                && (*((*enemy).client)).playerTeam == (*((*NPC).client)).enemyTeam
             {
                 // Change this pointer to assess other entities
                 if NPC_CheckEnemyStealth(ctx, ctx.entity_id_of(enemy).unwrap()) != qfalse {
@@ -1180,8 +1178,7 @@ pub fn NPC_ST_InvestigateEvent(
                 if owner.is_null()
                     || (*owner).client.is_null()
                     || (*owner).health <= 0
-                    || (*((*owner).client as *mut gclient_t)).playerTeam
-                        != (*((*NPC).client as *mut gclient_t)).enemyTeam
+                    || (*((*owner).client)).playerTeam != (*((*NPC).client)).enemyTeam
                 {
                     // not an enemy
                     return qfalse;
@@ -1325,8 +1322,7 @@ pub fn NPC_ST_InvestigateEvent(
                 if !group.is_null()
                     && !(*group).commander.is_null()
                     && !(*(*group).commander).client.is_null()
-                    && (*((*(*group).commander).client as *mut gclient_t)).NPC_class
-                        == CLASS_IMPERIAL
+                    && (*((*(*group).commander).client)).NPC_class == CLASS_IMPERIAL
                     && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
                 {
                     let commander_id = ctx.entity_id_of((*group).commander).unwrap();
@@ -1551,7 +1547,7 @@ pub fn NPC_BSST_Patrol(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let client = (*NPC).client as *mut gclient_t;
+        let client = (*NPC).client;
 
         let npc_id = ctx.entity_id_of(NPC);
         // FIXME: pick up on bodies of dead buddies? (Raven comment).
@@ -1799,7 +1795,7 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
                 match (*NPCInfo).squadState {
                     x if x == SQUAD_RETREAT => {
                         // was running away — done fleeing, obviously
-                        let client = (*NPC).client as *mut gclient_t;
+                        let client = (*NPC).client;
                         let npc_id_2 = ctx.entity_id_of(NPC);
                         TIMER_Set(
                             ctx,
@@ -1909,7 +1905,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let client = (*NPC).client as *mut gclient_t;
+        let client = (*NPC).client;
 
         if ctx.world.globals.enemyCS != qfalse {
             // if have a clear shot, always try
@@ -2075,7 +2071,7 @@ pub fn ST_TrackEnemy(ctx: &mut GameContext, self_: EntityId, enemyPos: vec3_t) {
             + ctx.world.bg_state.rng.Q_irand(5000, 10000);
         TIMER_Set(ctx, self_id_4, c"scoutTime".as_ptr(), delay_3);
         // leave my combat point
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         NPC_FreeCombatPoint(ctx, (*npc).combatPoint, qfalse);
         // go after his last seen pos
         NPC_SetMoveGoal(
@@ -2112,7 +2108,7 @@ pub fn ST_ApproachEnemy(ctx: &mut GameContext, self_: EntityId) -> c_int {
             + ctx.world.bg_state.rng.Q_irand(5000, 10000);
         TIMER_Set(ctx, self_id_4, c"scoutTime".as_ptr(), delay_3);
         // leave my combat point
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         NPC_FreeCombatPoint(ctx, (*npc).combatPoint, qfalse);
         // return the relevant combat point flags
         CP_CLEAR | CP_CLOSEST
@@ -2146,7 +2142,7 @@ pub fn ST_HuntEnemy(ctx: &mut GameContext, self_: EntityId) {
         NPC_FreeCombatPoint(ctx, (*NPCInfo).combatPoint, qfalse);
         // go directly after the enemy
         if ((*NPCInfo).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
-            let self_npc = (*self_).NPC as *mut gNPC_t;
+            let self_npc = (*self_).NPC;
             (*self_npc).goalEntity = (*NPC).enemy;
         }
     }
@@ -2202,8 +2198,8 @@ pub fn ST_TransferMoveGoal(ctx: &mut GameContext, self_: EntityId, other: Entity
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let other: *mut gentity_t = ctx.entity_mut(other);
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let selfNpc = (*self_).NPC as *mut gNPC_t;
-        let otherNpc = (*other).NPC as *mut gNPC_t;
+        let selfNpc = (*self_).NPC;
+        let otherNpc = (*other).NPC;
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
@@ -2270,7 +2266,7 @@ pub fn ST_GetCPFlags(ctx: &mut GameContext) -> c_int {
 
         if !NPC.is_null() && !(*NPCInfo).group.is_null() {
             let group = (*NPCInfo).group;
-            let client = (*NPC).client as *mut gclient_t;
+            let client = (*NPC).client;
             if NPC == (*group).commander && (*client).NPC_class == CLASS_IMPERIAL {
                 // imperials hang back and give orders
                 if (*group).numGroup > 1
@@ -2529,9 +2525,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
 
             // see if this member should start running (only if have no officer...
             // FIXME: should always run from AEL_DANGER_GREAT? (Raven comment).
-            if (*group).commander.is_null()
-                || (*((*(*group).commander).NPC as *mut gNPC_t)).rank < RANK_ENSIGN
-            {
+            if (*group).commander.is_null() || (*((*(*group).commander).NPC)).rank < RANK_ENSIGN {
                 let alert =
                     NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qfalse, AEL_DANGER as c_int);
                 if NPC_CheckForDanger(ctx, alert) != qfalse {
@@ -2550,7 +2544,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
             // check the local state
             if (*NPCInfo).squadState != SQUAD_RETREAT {
                 // not already retreating
-                let client = (*NPC).client as *mut gclient_t;
+                let client = (*NPC).client;
                 if (*client).ps.weapon == WP_NONE {
                     // weaponless, should be hiding
                     let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
@@ -2597,13 +2591,13 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                     cpFlags |= CP_CLEAR | CP_COVER;
                 } else if (*NPCInfo).localState == LSTATE_UNDERFIRE {
                     // we've been shot
-                    let enemyClient = (*(*group).enemy).client as *mut gclient_t;
+                    let enemyClient = (*(*group).enemy).client;
                     match (*enemyClient).ps.weapon {
                         WP_SABER => {
                             if DistanceSquared((*(*group).enemy).r.currentOrigin, (*NPC).r.currentOrigin) < 65536.0 {
                                 cpFlags |= CP_AVOID_ENEMY | CP_COVER | CP_AVOID | CP_RETREAT;
                                 if (*group).commander.is_null()
-                                    || (*((*(*group).commander).NPC as *mut gNPC_t)).rank < RANK_ENSIGN
+                                    || (*((*(*group).commander).NPC)).rank < RANK_ENSIGN
                                 {
                                     squadState = SQUAD_RETREAT;
                                 }
@@ -2616,7 +2610,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                     }
                     if (*NPC).health <= 10 {
                         if (*group).commander.is_null()
-                            || (*((*(*group).commander).NPC as *mut gNPC_t)).rank < RANK_ENSIGN
+                            || (*((*(*group).commander).NPC)).rank < RANK_ENSIGN
                         {
                             cpFlags |= CP_FLEE | CP_AVOID | CP_RETREAT;
                             squadState = SQUAD_RETREAT;
@@ -2645,7 +2639,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                             cpFlags |= CP_AVOID_ENEMY | CP_CLEAR | CP_AVOID;
                             avoidDist = 256.0;
                         } else {
-                            let enemyClient = (*(*group).enemy).client as *mut gclient_t;
+                            let enemyClient = (*(*group).enemy).client;
                             if (*enemyClient).ps.weapon == WP_SABER {
                                 // if ( group->enemy->client->ps.SaberLength() > 0 ) (Raven, commented out).
                                 if (*enemyClient).ps.saberHolstered == 0 {
@@ -2918,7 +2912,7 @@ pub fn ST_Commander(ctx: &mut GameContext) {
                     cpFlags |= CP_AVOID;
                 }
                 */
-                let enemyClient = (*(*group).enemy).client as *mut gclient_t;
+                let enemyClient = (*(*group).enemy).client;
                 if (*enemyClient).ps.weapon == WP_SABER && (*enemyClient).ps.saberHolstered == 0 {
                     // we obviously want to avoid the enemy if he has a saber
                     cpFlags |= CP_AVOID_ENEMY;
@@ -3129,7 +3123,7 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let client = (*NPC).client as *mut gclient_t;
+        let client = (*NPC).client;
 
         // Don't do anything if we're hurt
         if (*NPC).painDebounceTime > ctx.world.level.time {
@@ -3257,7 +3251,7 @@ pub fn NPC_BSST_Attack(ctx: &mut GameContext) {
                     let hit = NPC_ShotEntity(ctx, enemy_id, Some(&mut impactPos));
                     ctx.world.globals.impactPos = impactPos;
                     let hitEnt = &mut ctx.world.g_entities[hit as usize] as *mut gentity_t;
-                    let hitClient = (*hitEnt).client as *mut gclient_t;
+                    let hitClient = (*hitEnt).client;
 
                     if hit == (*enemy).s.number
                         || (!hitEnt.is_null()

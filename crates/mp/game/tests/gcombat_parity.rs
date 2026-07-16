@@ -128,7 +128,7 @@ fn sec_hitloc(o: &mut String, ctx: &mut GameContext) {
         {
             let ent = ctx.entity_mut(id);
             *ent = unsafe { core::mem::zeroed() };
-            ent.client = &mut client as *mut gclient_t as *mut c_void;
+            ent.client = &mut client as *mut gclient_t;
             ent.r.currentAngles[YAW] = pf(tok[1]);
             ent.r.absmin = [pf(tok[2]), pf(tok[3]), pf(tok[4])];
             ent.r.absmax = [pf(tok[5]), pf(tok[6]), pf(tok[7])];
@@ -172,9 +172,9 @@ fn sec_armor(o: &mut String, ctx: &mut GameContext) {
         {
             let ent = ctx.entity_mut(id);
             *ent = unsafe { core::mem::zeroed() };
-            ent.client = &mut client as *mut gclient_t as *mut c_void;
+            ent.client = &mut client as *mut gclient_t;
             ent.m_pVehicle = if pi(tok[4]) != 0 {
-                &mut dummy_veh as *mut u8 as *mut c_void
+                &mut dummy_veh as *mut u8 as *mut Vehicle_t
             } else {
                 core::ptr::null_mut()
             };

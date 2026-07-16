@@ -116,8 +116,7 @@ pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
                     dif = if dif < 0.0 { -16.0 } else { 16.0 };
                 }
 
-                (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
-                    ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
+                (*((*npc).client)).ps.velocity[2] = ((*((*npc).client)).ps.velocity[2] + dif) / 2.0;
             }
         } else {
             let mut goal: Option<*mut gentity_t> = None;
@@ -138,38 +137,38 @@ pub fn ImperialProbe_MaintainHeight(ctx: &mut GameContext) {
                         4
                     };
                 } else {
-                    if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
-                        (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
+                    if (*((*npc).client)).ps.velocity[2] != 0.0 {
+                        (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                        if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
-                            (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
+                        if (*((*npc).client)).ps.velocity[2].abs() < 2.0 {
+                            (*((*npc).client)).ps.velocity[2] = 0.0;
                         }
                     }
                 }
-            } else if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
+            } else if (*((*npc).client)).ps.velocity[2] != 0.0 {
                 // Apply friction
-                (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
+                (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 1.0 {
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
+                if (*((*npc).client)).ps.velocity[2].abs() < 1.0 {
+                    (*((*npc).client)).ps.velocity[2] = 0.0;
                 }
             }
         }
 
         // Apply friction
-        if (*((*npc).client as *mut gclient_t)).ps.velocity[0] != 0.0 {
-            (*((*npc).client as *mut gclient_t)).ps.velocity[0] *= VELOCITY_DECAY;
+        if (*((*npc).client)).ps.velocity[0] != 0.0 {
+            (*((*npc).client)).ps.velocity[0] *= VELOCITY_DECAY;
 
-            if (*((*npc).client as *mut gclient_t)).ps.velocity[0].abs() < 1.0 {
-                (*((*npc).client as *mut gclient_t)).ps.velocity[0] = 0.0;
+            if (*((*npc).client)).ps.velocity[0].abs() < 1.0 {
+                (*((*npc).client)).ps.velocity[0] = 0.0;
             }
         }
 
-        if (*((*npc).client as *mut gclient_t)).ps.velocity[1] != 0.0 {
-            (*((*npc).client as *mut gclient_t)).ps.velocity[1] *= VELOCITY_DECAY;
+        if (*((*npc).client)).ps.velocity[1] != 0.0 {
+            (*((*npc).client)).ps.velocity[1] *= VELOCITY_DECAY;
 
-            if (*((*npc).client as *mut gclient_t)).ps.velocity[1].abs() < 1.0 {
-                (*((*npc).client as *mut gclient_t)).ps.velocity[1] = 0.0;
+            if (*((*npc).client)).ps.velocity[1].abs() < 1.0 {
+                (*((*npc).client)).ps.velocity[1] = 0.0;
             }
         }
     }
@@ -185,7 +184,7 @@ pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
 
         let mut right = [0.0; 3];
         AngleVectors(
-            (*((*npc).client as *mut gclient_t)).renderInfo.eyeAngles,
+            (*((*npc).client)).renderInfo.eyeAngles,
             None,
             Some(&mut right),
             None,
@@ -223,14 +222,14 @@ pub fn ImperialProbe_Strafe(ctx: &mut GameContext) {
         // Close enough
         if tr.fraction > 0.9 {
             _VectorMA(
-                (*((*npc).client as *mut gclient_t)).ps.velocity,
+                (*((*npc).client)).ps.velocity,
                 (HUNTER_STRAFE_VEL * dir) as f32,
                 right,
-                &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
+                &mut (*((*npc).client)).ps.velocity,
             );
 
             // Add a slight upward push
-            (*((*npc).client as *mut gclient_t)).ps.velocity[2] += HUNTER_UPWARD_PUSH as f32;
+            (*((*npc).client)).ps.velocity[2] += HUNTER_UPWARD_PUSH as f32;
 
             // Set the strafe start time so we can do a controlled roll
             (*npc_info).standTime =
@@ -298,10 +297,10 @@ pub fn ImperialProbe_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qbo
         let speed = HUNTER_FORWARD_BASE_SPEED as f32
             + HUNTER_FORWARD_MULTIPLIER as f32 * ctx.world.cvars.g_spskill.integer as f32;
         _VectorMA(
-            (*((*npc).client as *mut gclient_t)).ps.velocity,
+            (*((*npc).client)).ps.velocity,
             speed,
             forward,
-            &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
+            &mut (*((*npc).client)).ps.velocity,
         );
     }
 }
@@ -532,10 +531,7 @@ pub fn NPC_Probe_Pain(
         let mod_ = ctx.world.globals.gPainMOD;
 
         // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-        _VectorCopy(
-            (*((*self_).NPC as *mut gNPC_t)).lastPathAngles,
-            &mut (*self_).s.angles,
-        );
+        _VectorCopy((*((*self_).NPC)).lastPathAngles, &mut (*self_).s.angles);
 
         if (*self_).health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
             let mut end_pos = [
@@ -577,18 +573,17 @@ pub fn NPC_Probe_Pain(
                     VectorNormalize(&mut dir);
 
                     _VectorMA(
-                        (*((*self_).client as *mut gclient_t)).ps.velocity,
+                        (*((*self_).client)).ps.velocity,
                         550.0,
                         dir,
-                        &mut (*((*self_).client as *mut gclient_t)).ps.velocity,
+                        &mut (*((*self_).client)).ps.velocity,
                     );
-                    (*((*self_).client as *mut gclient_t)).ps.velocity[2] -= 127.0;
+                    (*((*self_).client)).ps.velocity[2] -= 127.0;
                 }
 
-                (*((*self_).client as *mut gclient_t)).ps.electrifyTime =
-                    ctx.world.level.time + 3000;
+                (*((*self_).client)).ps.electrifyTime = ctx.world.level.time + 3000;
 
-                (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_DROP;
+                (*((*self_).NPC)).localState = LSTATE_DROP;
             }
         } else {
             let self_id2 = ctx.entity_id_of(self_).unwrap();

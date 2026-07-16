@@ -134,7 +134,7 @@ pub fn G_TestEntityPosition(ctx: &mut GameContext, ent: EntityId) -> *mut gentit
 
         let mut tr = core::mem::zeroed::<trace_t>();
         if !(*ent).client.is_null() {
-            let client = (*ent).client as *mut crate::client::gclient::gclient_t;
+            let client = (*ent).client;
             let mut v_max = (*ent).r.maxs;
             if v_max[2] < 1.0 {
                 v_max[2] = 1.0;
@@ -280,7 +280,7 @@ pub fn G_TryPushingEntity(
             deltayaw: 0,
         };
         if !(*check).client.is_null() {
-            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            let client = (*check).client;
             entry.deltayaw = (*client).ps.delta_angles[YAW];
             entry.origin = (*client).ps.origin;
         }
@@ -295,7 +295,7 @@ pub fn G_TryPushingEntity(
         G_TransposeMatrix(transpose.as_mut_ptr(), matrix.as_mut_ptr());
 
         let mut org = if !(*check).client.is_null() {
-            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            let client = (*check).client;
             [
                 (*client).ps.origin[0] - (*pusher).r.currentOrigin[0],
                 (*client).ps.origin[1] - (*pusher).r.currentOrigin[1],
@@ -319,7 +319,7 @@ pub fn G_TryPushingEntity(
             (*check).s.pos.trBase[i] += move2[i];
         }
         if !(*check).client.is_null() {
-            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            let client = (*check).client;
             for i in 0..3 {
                 (*client).ps.origin[i] += r#move[i];
                 (*client).ps.origin[i] += move2[i];
@@ -339,7 +339,7 @@ pub fn G_TryPushingEntity(
         if block.is_null() {
             // pushed ok
             if !(*check).client.is_null() {
-                let client = (*check).client as *mut crate::client::gclient::gclient_t;
+                let client = (*check).client;
                 (*check).r.currentOrigin = (*client).ps.origin;
             } else {
                 (*check).r.currentOrigin = (*check).s.pos.trBase;
@@ -376,7 +376,7 @@ pub fn G_TryPushingEntity(
         let last = ctx.world.globals.pushed[ctx.world.globals.pushed_p - 1];
         (*check).s.pos.trBase = last.origin;
         if !(*check).client.is_null() {
-            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            let client = (*check).client;
             (*client).ps.origin = last.origin;
         }
         (*check).s.apos.trBase = last.angles;
@@ -581,7 +581,7 @@ pub fn G_MoverPush(
                 (*p.ent).s.pos.trBase = p.origin;
                 (*p.ent).s.apos.trBase = p.angles;
                 if !(*p.ent).client.is_null() {
-                    let client = (*p.ent).client as *mut crate::client::gclient::gclient_t;
+                    let client = (*p.ent).client;
                     (*client).ps.delta_angles[YAW] = p.deltayaw;
                     (*client).ps.origin = p.origin;
                 }
@@ -1441,9 +1441,7 @@ pub fn Touch_DoorTrigger(
             None => core::ptr::null_mut(),
         };
 
-        if !(*other).client.is_null()
-            && (*((*other).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
-        {
+        if !(*other).client.is_null() && (*((*other).client)).sess.sessionTeam == TEAM_SPECTATOR {
             // if the door is not open and not opening
             if (*parent).moverState != MOVER_1TO2 && (*parent).moverState != MOVER_POS2 {
                 Touch_DoorTriggerSpectator(
@@ -1469,7 +1467,7 @@ pub fn Touch_DoorTrigger(
 
             if !(*other).client.is_null()
                 && (*other).s.number < MAX_CLIENTS as c_int
-                && (*((*other).client as *mut gclient_t)).ps.m_iVehicleNum != 0
+                && (*((*other).client)).ps.m_iVehicleNum != 0
             {
                 // can't open a door while on a vehicle
                 return;
@@ -1484,7 +1482,7 @@ pub fn Touch_DoorTrigger(
             // don't even try to use the door if it's locked
             if (*parent).alliedTeam == 0
                 || (*other).client.is_null()
-                || (*((*other).client as *mut gclient_t)).sess.sessionTeam != (*parent).alliedTeam
+                || (*((*other).client)).sess.sessionTeam != (*parent).alliedTeam
             {
                 return;
             } else {
@@ -1915,8 +1913,7 @@ pub fn Touch_Plat(
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), other) };
     unsafe {
         if (*other).client.is_null()
-            || (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize]
-                <= 0
+            || (*((*other).client)).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0
         {
             return;
         }

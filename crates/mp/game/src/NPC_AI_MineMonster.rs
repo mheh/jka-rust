@@ -152,12 +152,7 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
         let origin = vec3_origin;
         let start = (*npc).r.currentOrigin;
 
-        AngleVectors(
-            (*((*npc).client as *mut gclient_t)).ps.viewangles,
-            Some(&mut dir),
-            None,
-            None,
-        );
+        AngleVectors((*((*npc).client)).ps.viewangles, Some(&mut dir), None, None);
         _VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
 
         trap::Trace(
@@ -386,8 +381,7 @@ pub fn NPC_MineMonster_Pain(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
-        let parm = ((((*self_).health as f32)
-            / ((*((*self_).client as *mut gclient_t)).pers.maxHealth as f32))
+        let parm = ((((*self_).health as f32) / ((*((*self_).client)).pers.maxHealth as f32))
             * 100.0)
             .floor() as c_int;
         G_AddEvent(&mut *(self_), EV_PAIN as c_int, parm);
@@ -411,10 +405,7 @@ pub fn NPC_MineMonster_Pain(
                 1350,
             );
 
-            _VectorCopy(
-                (*((*self_).NPC as *mut gNPC_t)).lastPathAngles,
-                &mut (*self_).s.angles,
-            );
+            _VectorCopy((*((*self_).NPC)).lastPathAngles, &mut (*self_).s.angles);
 
             NPC_SetAnim(
                 ctx,
@@ -425,7 +416,7 @@ pub fn NPC_MineMonster_Pain(
             );
 
             if !(*self_).NPC.is_null() {
-                (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;
+                (*((*self_).NPC)).localState = LSTATE_WAITING;
             }
         }
     }

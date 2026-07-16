@@ -162,7 +162,7 @@ pub fn Q3_GetAnimLower(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
             return std::ptr::null_mut();
         }
 
-        let anim: c_int = (*((*ent).client as *mut gclient_t)).ps.legsAnim;
+        let anim: c_int = (*((*ent).client)).ps.legsAnim;
 
         animTable[anim as usize].name
     }
@@ -186,7 +186,7 @@ pub fn Q3_GetAnimUpper(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
             return std::ptr::null_mut();
         }
 
-        let anim: c_int = (*((*ent).client as *mut gclient_t)).ps.torsoAnim;
+        let anim: c_int = (*((*ent).client)).ps.torsoAnim;
 
         animTable[anim as usize].name
     }
@@ -859,7 +859,7 @@ pub fn Q3_RemoveEnt(ctx: &mut GameContext, victim: EntityId) {
                 debug_assert!(false);
             } else {
                 // Remove the NPC.
-                let client = (*victim).client as *mut gclient_t;
+                let client = (*victim).client;
                 if (*client).NPC_class == CLASS_VEHICLE {
                     // Eject everyone out of a vehicle that's about to remove itself.
                     // PORT-NOTE(vehicle-eject): Vehicle_t/m_pVehicleInfo->EjectAll is
@@ -993,7 +993,7 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = (*((*ent).client as *mut gclient_t)).ps.velocity[0];
+                *value = (*((*ent).client)).ps.velocity[0];
             }
             _ if toGet == SET_YVELOCITY as i32 => {
                 if (*ent).client.is_null() {
@@ -1008,7 +1008,7 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = (*((*ent).client as *mut gclient_t)).ps.velocity[1];
+                *value = (*((*ent).client)).ps.velocity[1];
             }
             _ if toGet == SET_ZVELOCITY as i32 => {
                 if (*ent).client.is_null() {
@@ -1023,7 +1023,7 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = (*((*ent).client as *mut gclient_t)).ps.velocity[2];
+                *value = (*((*ent).client)).ps.velocity[2];
             }
             _ if toGet == SET_Z_OFFSET as i32 => {
                 *value = (*ent).r.currentOrigin[2] - (*ent).s.origin[2]
@@ -1067,7 +1067,7 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = (*((*ent).client as *mut gclient_t)).ps.legsTimer as f32;
+                *value = (*((*ent).client)).ps.legsTimer as f32;
             }
             _ if toGet == SET_ANIM_HOLDTIME_UPPER as i32 => {
                 if (*ent).client.is_null() {
@@ -1082,7 +1082,7 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = (*((*ent).client as *mut gclient_t)).ps.torsoTimer as f32;
+                *value = (*((*ent).client)).ps.torsoTimer as f32;
             }
             _ if toGet == SET_ANIM_HOLDTIME_BOTH as i32 => {
                 G_DebugPrint(
@@ -1106,7 +1106,7 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = (*((*ent).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize] as f32;
+                *value = (*((*ent).client)).ps.stats[STAT_ARMOR as usize] as f32;
             }
             _ if toGet == SET_WALKSPEED as i32
                 || toGet == SET_RUNSPEED as i32
@@ -1620,7 +1620,7 @@ pub fn Q3_SetOrigin(ctx: &mut GameContext, entID: c_int, origin: vec3_t) {
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
 
         if !(*ent).client.is_null() {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             (*client).ps.origin = origin;
             (*ent).r.currentOrigin = origin;
             (*client).ps.origin[2] += 1.0;
@@ -1680,7 +1680,7 @@ pub fn Q3_SetVelocity(ctx: &mut GameContext, entID: c_int, axis: c_int, speed: f
             return;
         }
 
-        let client = (*found).client as *mut gclient_t;
+        let client = (*found).client;
         (*client).ps.velocity[axis as usize] += speed;
 
         (*client).ps.pm_time = 500;
@@ -1875,7 +1875,7 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             );
             return;
         }
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
             || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
@@ -1934,7 +1934,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             );
             return qfalse;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
         if (*npc).tempGoal.is_none() {
             G_DebugPrint(
                 ctx,
@@ -2166,7 +2166,7 @@ pub fn Q3_SetHealth(ctx: &mut GameContext, entID: c_int, data: c_int) {
         if (*ent).client.is_null() {
             return;
         }
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         (*client).ps.stats[STAT_HEALTH as usize] = data;
 
@@ -2205,7 +2205,7 @@ pub fn Q3_SetArmor(ctx: &mut GameContext, entID: c_int, data: c_int) {
         if (*ent).client.is_null() {
             return;
         }
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         (*client).ps.stats[STAT_ARMOR as usize] = data;
         if (*client).ps.stats[STAT_ARMOR as usize] > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
@@ -2237,7 +2237,7 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
             );
             return qtrue;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
@@ -2290,9 +2290,9 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
         (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
 
         if bSID == (BS_NOCLIP) as i32 {
-            (*((*ent).client as *mut gclient_t)).noclip = qtrue;
+            (*((*ent).client)).noclip = qtrue;
         } else {
-            (*((*ent).client as *mut gclient_t)).noclip = qfalse;
+            (*((*ent).client)).noclip = qfalse;
         }
 
         if bSID == (BS_ADVANCE_FIGHT) as i32 {
@@ -2327,7 +2327,7 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
             );
             return qtrue;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
@@ -2358,7 +2358,7 @@ pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const 
             );
             return;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
@@ -2492,13 +2492,13 @@ pub fn Q3_SetInvisible(ctx: &mut GameContext, entID: c_int, invisible: qboolean)
         if invisible != 0 {
             (*self_).s.eFlags |= EF_NODRAW;
             if !(*self_).client.is_null() {
-                (*((*self_).client as *mut gclient_t)).ps.eFlags |= EF_NODRAW;
+                (*((*self_).client)).ps.eFlags |= EF_NODRAW;
             }
             (*self_).r.contents = 0;
         } else {
             (*self_).s.eFlags &= !EF_NODRAW;
             if !(*self_).client.is_null() {
-                (*((*self_).client as *mut gclient_t)).ps.eFlags &= !EF_NODRAW;
+                (*((*self_).client)).ps.eFlags &= !EF_NODRAW;
             }
         }
     }
@@ -2646,7 +2646,7 @@ pub fn Q3_SetWeapon(ctx: &mut GameContext, entID: c_int, wp_name: *const c_char)
         let ent = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
         let wp = GetIDForString(WPTable.as_ptr() as *mut stringID_table_t, wp_name);
 
-        (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << wp;
+        (*((*ent).client)).ps.stats[STAT_WEAPONS as usize] = 1 << wp;
         ChangeWeapon(ctx, ctx.entity_id_of(ent), wp);
     }
 }
@@ -2682,8 +2682,8 @@ pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
             );
             return;
         }
-        let npc = (*self_).NPC as *mut gNPC_t;
-        let client = (*self_).client as *mut gclient_t;
+        let npc = (*self_).NPC;
+        let client = (*self_).client;
 
         if int_data == 0 {
             (*npc).stats.walkSpeed = 1;
@@ -2714,8 +2714,8 @@ pub fn Q3_SetRunSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
             );
             return;
         }
-        let npc = (*self_).NPC as *mut gNPC_t;
-        let client = (*self_).client as *mut gclient_t;
+        let npc = (*self_).NPC;
+        let client = (*self_).client;
 
         if int_data == 0 {
             (*npc).stats.runSpeed = 1;
@@ -2807,10 +2807,10 @@ pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
             );
             return;
         }
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
 
         if !(*self_).NPC.is_null() {
-            let npc = (*self_).NPC as *mut gNPC_t;
+            let npc = (*self_).NPC;
             (*npc).aiFlags |= NPCAI_CUSTOM_GRAVITY;
         }
         (*client).ps.gravity = float_data as c_int;
@@ -2857,7 +2857,7 @@ pub fn Q3_SetScale(ctx: &mut GameContext, entID: c_int, float_data: f32) {
         let self_ = &mut ctx.world.g_entities[entID as usize] as *mut gentity_t;
 
         if !(*self_).client.is_null() {
-            let client = (*self_).client as *mut gclient_t;
+            let client = (*self_).client;
             if float_data < 0.0 {
                 (*client).ps.iModelScale = float_data as c_int;
             } else {
@@ -3260,7 +3260,7 @@ pub fn Q3_SetWalking(ctx: &mut GameContext, entID: c_int, add: qboolean) {
             );
             return;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         if add != 0 {
             (*npc).scriptFlags |= SCF_WALKING;
@@ -3511,7 +3511,7 @@ pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
             );
             return;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         if noAvoid != 0 {
             (*npc).aiFlags |= NPCAI_NO_COLL_AVOID;
@@ -4038,7 +4038,7 @@ pub fn Q3_SetSaberActive(ctx: &mut GameContext, entID: c_int, active: qboolean) 
         }
 
         //fixme: Take into account player being in state where saber won't toggle? For now we simply won't care.
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         if (*client).ps.saberHolstered == 0 && active != 0 {
             Cmd_ToggleSaber_f(ctx, ctx.entity_id_of(ent).unwrap());
         } else if BG_SabersOff(&mut (*client).ps as *mut playerState_t) != 0 && active == 0 {

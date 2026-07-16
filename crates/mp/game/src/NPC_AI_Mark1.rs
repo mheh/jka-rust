@@ -428,7 +428,7 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
             return;
         }
 
-        if (*((*self_).client as *mut gclient_t)).ps.torsoTimer > 0 {
+        if (*((*self_).client)).ps.torsoTimer > 0 {
             if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"dyingExplosion".as_ptr())
                 != 0
             {
@@ -860,7 +860,7 @@ pub fn Mark1_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
                 let npc_id = ctx.entity_id_of(npc);
                 let delay = ctx.world.bg_state.rng.Q_irand(1000, 3000);
                 crate::g_timer::TIMER_Set(ctx, npc_id, c"attackDelay".as_ptr(), delay);
-                (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
+                (*((*npc).client)).ps.torsoTimer = 0;
             } else {
                 if crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(npc), c"attackDelay2".as_ptr())
                     != 0
@@ -880,14 +880,14 @@ pub fn Mark1_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
                 return;
             }
         } else if advance != 0 {
-            if (*((*npc).client as *mut gclient_t)).ps.torsoAnim == BOTH_ATTACK1 as c_int {
-                (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
+            if (*((*npc).client)).ps.torsoAnim == BOTH_ATTACK1 as c_int {
+                (*((*npc).client)).ps.torsoTimer = 0;
             }
             Mark1_Hunt(ctx);
         } else {
             // Make sure he's not firing.
-            if (*((*npc).client as *mut gclient_t)).ps.torsoAnim == BOTH_ATTACK1 as c_int {
-                (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
+            if (*((*npc).client)).ps.torsoAnim == BOTH_ATTACK1 as c_int {
+                (*((*npc).client)).ps.torsoTimer = 0;
             }
         }
     }
@@ -1112,7 +1112,7 @@ pub fn Mark1_AttackDecision(ctx: &mut GameContext) {
             else {
                 // It should never get here, but just in case
                 (*npc).health = 0;
-                (*((*npc).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
+                (*((*npc).client)).ps.stats[STAT_HEALTH as usize] = 0;
                 if let Some(die_fn) = (*npc).die.get() {
                     crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }

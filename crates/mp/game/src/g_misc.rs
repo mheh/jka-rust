@@ -300,10 +300,10 @@ pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, a
 
         // use temp events at source and destination to prevent the effect
         // from getting dropped by a second player event
-        if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
+        if (*((*player).client)).sess.sessionTeam != TEAM_SPECTATOR {
             let tent = G_TempEntity(
                 ctx,
-                (*((*player).client as *mut gclient_t)).ps.origin,
+                (*((*player).client)).ps.origin,
                 EV_PLAYER_TELEPORT_OUT as c_int,
             );
             (*tent).s.clientNum = (*player).s.clientNum;
@@ -315,51 +315,40 @@ pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, a
         // unlink to make sure it can't possibly interfere with G_KillBox
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(player.cast()));
 
-        crate::q_math::_VectorCopy(
-            origin,
-            &mut (*((*player).client as *mut gclient_t)).ps.origin,
-        );
-        (*((*player).client as *mut gclient_t)).ps.origin[2] += 1.0;
+        crate::q_math::_VectorCopy(origin, &mut (*((*player).client)).ps.origin);
+        (*((*player).client)).ps.origin[2] += 1.0;
 
         // spit the player out
         let mut vel: vec3_t = [0.0, 0.0, 0.0];
         AngleVectors(angles, Some(&mut vel), None, None);
-        crate::q_math::_VectorScale(
-            vel,
-            400.0,
-            &mut (*((*player).client as *mut gclient_t)).ps.velocity,
-        );
-        (*((*player).client as *mut gclient_t)).ps.pm_time = 160; // hold time
-        (*((*player).client as *mut gclient_t)).ps.pm_flags |= PMF_TIME_KNOCKBACK;
+        crate::q_math::_VectorScale(vel, 400.0, &mut (*((*player).client)).ps.velocity);
+        (*((*player).client)).ps.pm_time = 160; // hold time
+        (*((*player).client)).ps.pm_flags |= PMF_TIME_KNOCKBACK;
 
         // toggle the teleport bit so the client knows to not lerp
-        (*((*player).client as *mut gclient_t)).ps.eFlags ^= EF_TELEPORT_BIT;
+        (*((*player).client)).ps.eFlags ^= EF_TELEPORT_BIT;
 
         // set angles
         SetClientViewAngle(&mut *player, angles);
 
         // kill anything at the destination
-        if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
+        if (*((*player).client)).sess.sessionTeam != TEAM_SPECTATOR {
             G_KillBox(ctx, ctx.entity_id_of(player).unwrap());
         }
 
         // save results of pmove
-        BG_PlayerStateToEntityState(
-            &mut (*((*player).client as *mut gclient_t)).ps,
-            &mut (*player).s,
-            qtrue,
-        );
+        BG_PlayerStateToEntityState(&mut (*((*player).client)).ps, &mut (*player).s, qtrue);
         if is_npc != qfalse {
             (*player).s.eType = entityType_t::ET_NPC as c_int;
         }
 
         // use the precise origin for linking
         crate::q_math::_VectorCopy(
-            (*((*player).client as *mut gclient_t)).ps.origin,
+            (*((*player).client)).ps.origin,
             &mut (*player).r.currentOrigin,
         );
 
-        if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
+        if (*((*player).client)).sess.sessionTeam != TEAM_SPECTATOR {
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(player.cast()));
         }
     }
@@ -1007,32 +996,25 @@ pub fn HolocronTouch(
             return;
         }
 
-        if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize]
-            != 0.0
-        {
+        if (*((*other).client)).ps.holocronsCarried[(*self_).count as usize] != 0.0 {
             return;
         }
 
-        if (*((*other).client as *mut gclient_t)).ps.holocronCantTouch == (*self_).s.number
-            && (*((*other).client as *mut gclient_t))
-                .ps
-                .holocronCantTouchTime
-                > ctx.world.level.time as f32
+        if (*((*other).client)).ps.holocronCantTouch == (*self_).s.number
+            && (*((*other).client)).ps.holocronCantTouchTime > ctx.world.level.time as f32
         {
             return;
         }
 
         while i < (NUM_FORCE_POWERS) as i32 {
-            if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize] != 0.0 {
+            if (*((*other).client)).ps.holocronsCarried[i as usize] != 0.0 {
                 othercarrying += 1;
 
                 if index_lowest == -1
-                    || (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize]
-                        < time_lowest
+                    || (*((*other).client)).ps.holocronsCarried[i as usize] < time_lowest
                 {
                     index_lowest = i;
-                    time_lowest =
-                        (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize];
+                    time_lowest = (*((*other).client)).ps.holocronsCarried[i as usize];
                 }
             } else if i != (*self_).count {
                 hasall = false;
@@ -1045,14 +1027,8 @@ pub fn HolocronTouch(
             //G_Printf("You deserve a pat on the back.\n");
         }
 
-        if (*((*other).client as *mut gclient_t))
-            .ps
-            .fd
-            .forcePowersActive
-            & (1 << (*((*other).client as *mut gclient_t))
-                .ps
-                .fd
-                .forcePowerSelected)
+        if (*((*other).client)).ps.fd.forcePowersActive
+            & (1 << (*((*other).client)).ps.fd.forcePowerSelected)
             == 0
         {
             // If the player isn't using his currently selected force power, select this one
@@ -1061,10 +1037,7 @@ pub fn HolocronTouch(
                 && (*self_).count != FP_SABERTHROW
                 && (*self_).count != FP_LEVITATION
             {
-                (*((*other).client as *mut gclient_t))
-                    .ps
-                    .fd
-                    .forcePowerSelected = (*self_).count;
+                (*((*other).client)).ps.fd.forcePowerSelected = (*self_).count;
             }
         }
 
@@ -1072,7 +1045,7 @@ pub fn HolocronTouch(
             && othercarrying >= ctx.world.cvars.g_MaxHolocronCarry.integer
         {
             // make the oldest holocron carried by the player pop out to make room for this one
-            (*((*other).client as *mut gclient_t)).ps.holocronsCarried[index_lowest as usize] = 0.0;
+            (*((*other).client)).ps.holocronsCarried[index_lowest as usize] = 0.0;
             //NOTE: No longer valid as we are now always giving a force level 1 saber attack level in holocron
         }
 
@@ -1083,7 +1056,7 @@ pub fn HolocronTouch(
             (*self_).s.number,
         );
 
-        (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] =
+        (*((*other).client)).ps.holocronsCarried[(*self_).count as usize] =
             ctx.world.level.time as f32;
         (*self_).s.modelindex = 0;
         (*self_).enemy = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), other));
@@ -1140,22 +1113,20 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                 if !(*enemy_ptr).client.is_null() {
                     HolocronRespawn(&mut *ent);
                     crate::q_math::_VectorCopy(
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        (*((*enemy_ptr).client)).ps.origin,
                         &mut (*ent).s.pos.trBase,
                     );
                     crate::q_math::_VectorCopy(
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        (*((*enemy_ptr).client)).ps.origin,
                         &mut (*ent).s.origin,
                     );
                     crate::q_math::_VectorCopy(
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        (*((*enemy_ptr).client)).ps.origin,
                         &mut (*ent).r.currentOrigin,
                     );
                     // copy to person carrying's origin before popping out of them
                     HolocronPopOut(ctx, ctx.entity_id_of(ent).unwrap());
-                    (*((*enemy_ptr).client as *mut gclient_t))
-                        .ps
-                        .holocronsCarried[(*ent).count as usize] = 0.0;
+                    (*((*enemy_ptr).client)).ps.holocronsCarried[(*ent).count as usize] = 0.0;
                     (*ent).enemy = None;
 
                     justthink(ent, ctx);
@@ -1173,29 +1144,22 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
         if let Some(e) = (*ent).enemy {
             let enemy_ptr = base.add(e.index());
             if !(*enemy_ptr).client.is_null() {
-                if (*((*enemy_ptr).client as *mut gclient_t))
-                    .ps
-                    .holocronsCarried[(*ent).count as usize]
-                    == 0.0
-                {
-                    (*((*enemy_ptr).client as *mut gclient_t))
-                        .ps
-                        .holocronCantTouch = (*ent).s.number;
-                    (*((*enemy_ptr).client as *mut gclient_t))
-                        .ps
-                        .holocronCantTouchTime = (ctx.world.level.time + 5000) as f32;
+                if (*((*enemy_ptr).client)).ps.holocronsCarried[(*ent).count as usize] == 0.0 {
+                    (*((*enemy_ptr).client)).ps.holocronCantTouch = (*ent).s.number;
+                    (*((*enemy_ptr).client)).ps.holocronCantTouchTime =
+                        (ctx.world.level.time + 5000) as f32;
 
                     HolocronRespawn(&mut *ent);
                     crate::q_math::_VectorCopy(
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        (*((*enemy_ptr).client)).ps.origin,
                         &mut (*ent).s.pos.trBase,
                     );
                     crate::q_math::_VectorCopy(
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        (*((*enemy_ptr).client)).ps.origin,
                         &mut (*ent).s.origin,
                     );
                     crate::q_math::_VectorCopy(
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        (*((*enemy_ptr).client)).ps.origin,
                         &mut (*ent).r.currentOrigin,
                     );
                     // copy to person carrying's origin before popping out of them
@@ -1206,15 +1170,10 @@ pub fn HolocronThink(ctx: &mut GameContext, ent: EntityId) {
                     return;
                 }
 
-                if (*enemy_ptr).inuse == 0
-                    || ((*((*enemy_ptr).client as *mut gclient_t)).ps.fallingToDeath != 0)
-                {
+                if (*enemy_ptr).inuse == 0 || ((*((*enemy_ptr).client)).ps.fallingToDeath != 0) {
                     if (*enemy_ptr).inuse != 0 && !(*enemy_ptr).client.is_null() {
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronBits &=
-                            !(1 << (*ent).count);
-                        (*((*enemy_ptr).client as *mut gclient_t))
-                            .ps
-                            .holocronsCarried[(*ent).count as usize] = 0.0;
+                        (*((*enemy_ptr).client)).ps.holocronBits &= !(1 << (*ent).count);
+                        (*((*enemy_ptr).client)).ps.holocronsCarried[(*ent).count as usize] = 0.0;
                     }
                     (*ent).enemy = None;
                     HolocronRespawn(&mut *ent);
@@ -1517,7 +1476,7 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
         let activator_cl = if activator.is_null() {
             core::ptr::null_mut()
         } else {
-            (*activator).client as *mut gclient_t
+            (*activator).client
         };
         if (*ent).fly_sound_debounce_time < ctx.world.level.time
             || activator.is_null()
@@ -1611,10 +1570,9 @@ pub fn shield_power_converter_use(
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && !other.is_null()
             && !(*other).client.is_null()
-            && (*((*other).client as *mut gclient_t)).siegeClass != 0
+            && (*((*other).client)).siegeClass != 0
         {
-            if (&ctx.world.bg_state.bgSiegeClasses)
-                [(*((*other).client as *mut gclient_t)).siegeClass as usize]
+            if (&ctx.world.bg_state.bgSiegeClasses)[(*((*other).client)).siegeClass as usize]
                 .maxarmor
                 == 0
             {
@@ -1640,17 +1598,15 @@ pub fn shield_power_converter_use(
             if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                 && !other.is_null()
                 && !(*other).client.is_null()
-                && (*((*other).client as *mut gclient_t)).siegeClass != -1
+                && (*((*other).client)).siegeClass != -1
             {
                 max_armor = (&ctx.world.bg_state.bgSiegeClasses)
-                    [(*((*other).client as *mut gclient_t)).siegeClass as usize]
+                    [(*((*other).client)).siegeClass as usize]
                     .maxarmor;
             } else {
-                max_armor =
-                    (*((*activator).client as *mut gclient_t)).ps.stats[STAT_MAX_HEALTH as usize];
+                max_armor = (*((*activator).client)).ps.stats[STAT_MAX_HEALTH as usize];
             }
-            dif = max_armor
-                - (*((*activator).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize];
+            dif = max_armor - (*((*activator).client)).ps.stats[STAT_ARMOR as usize];
 
             if dif > 0 {
                 // Already at full armor?
@@ -1675,7 +1631,7 @@ pub fn shield_power_converter_use(
                 (*self_).fly_sound_debounce_time = ctx.world.level.time + 500;
                 (*self_).activator = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), activator));
 
-                (*((*activator).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize] += add;
+                (*((*activator).client)).ps.stats[STAT_ARMOR as usize] += add;
             }
         }
 
@@ -1747,44 +1703,38 @@ pub fn ammo_generic_power_converter_use(
                 if add < 1 {
                     add = 1;
                 }
-                if ((*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO != 0
-                    && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
-                        < ammoData[i as usize].max * 2)
-                    || (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
-                        < ammoData[i as usize].max
+                if ((*((*activator).client)).ps.eFlags & EF_DOUBLE_AMMO != 0
+                    && (*((*activator).client)).ps.ammo[i as usize] < ammoData[i as usize].max * 2)
+                    || (*((*activator).client)).ps.ammo[i as usize] < ammoData[i as usize].max
                 {
                     gave_some = true;
                     if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                         && i == AMMO_ROCKETS as c_int
-                        && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= 10
+                        && (*((*activator).client)).ps.ammo[i as usize] >= 10
                     {
                         // this stuff is already a freaking mess, so..
                         gave_some = false;
                     }
-                    (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] += add;
+                    (*((*activator).client)).ps.ammo[i as usize] += add;
                     if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                         && i == AMMO_ROCKETS as c_int
-                        && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= 10
+                        && (*((*activator).client)).ps.ammo[i as usize] >= 10
                     {
                         // fixme - this should SERIOUSLY be externed.
-                        (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = 10;
-                    } else if (*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO
-                        != 0
-                    {
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                        (*((*activator).client)).ps.ammo[i as usize] = 10;
+                    } else if (*((*activator).client)).ps.eFlags & EF_DOUBLE_AMMO != 0 {
+                        if (*((*activator).client)).ps.ammo[i as usize]
                             >= ammoData[i as usize].max * 2
                         {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] =
+                            (*((*activator).client)).ps.ammo[i as usize] =
                                 ammoData[i as usize].max * 2;
                         } else {
                             stop = false;
                         }
                     } else {
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
-                            >= ammoData[i as usize].max
+                        if (*((*activator).client)).ps.ammo[i as usize] >= ammoData[i as usize].max
                         {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] =
-                                ammoData[i as usize].max;
+                            (*((*activator).client)).ps.ammo[i as usize] = ammoData[i as usize].max;
                         } else {
                             stop = false;
                         }
@@ -2170,15 +2120,10 @@ pub fn ammo_power_converter_use(
                     if add < 1 {
                         add = 1;
                     }
-                    if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
-                        < ammoData[i as usize].max
-                    {
-                        (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] += add;
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
-                            > ammoData[i as usize].max
-                        {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] =
-                                ammoData[i as usize].max;
+                    if (*((*activator).client)).ps.ammo[i as usize] < ammoData[i as usize].max {
+                        (*((*activator).client)).ps.ammo[i as usize] += add;
+                        if (*((*activator).client)).ps.ammo[i as usize] > ammoData[i as usize].max {
+                            (*((*activator).client)).ps.ammo[i as usize] = ammoData[i as usize].max;
                         }
                     }
                     i += 1;
@@ -2305,7 +2250,7 @@ pub fn health_power_converter_use(
             }
             (*self_).setTime = ctx.world.level.time + 100;
 
-            let cl = &mut *((*activator).client as *mut gclient_t);
+            let cl = &mut *((*activator).client);
             let dif = cl.ps.stats[STAT_MAX_HEALTH as usize] - (*activator).health;
 
             if dif > 0 {
@@ -2849,14 +2794,14 @@ pub fn Use_Target_Escapetrig(
                 if (*e).inuse != 0
                     && !(*e).client.is_null()
                     && (*e).health > 0
-                    && (*((*e).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
-                    && (*((*e).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW == 0
+                    && (*((*e).client)).sess.sessionTeam != TEAM_SPECTATOR
+                    && (*((*e).client)).ps.pm_flags & PMF_FOLLOW == 0
                 {
                     // all of the survivors get 100 points!
                     AddScore(
                         ctx,
                         ctx.entity_id_of(e).unwrap(),
-                        (*((*e).client as *mut gclient_t)).ps.origin,
+                        (*((*e).client)).ps.origin,
                         100,
                     );
                 }
@@ -2867,7 +2812,7 @@ pub fn Use_Target_Escapetrig(
                 AddScore(
                     ctx,
                     ctx.entity_id_of(activator).unwrap(),
-                    (*((*activator).client as *mut gclient_t)).ps.origin,
+                    (*((*activator).client)).ps.origin,
                     500,
                 );
             }
@@ -3810,14 +3755,8 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
                     &mut (*self_).pos1,
                 );
                 crate::q_math::_VectorCopy((*targ).r.currentOrigin, &mut (*self_).pos1);
-                vectoangles(
-                    (*self_).pos1,
-                    &mut (*((*self_).client as *mut gclient_t)).ps.viewangles,
-                );
-                SetClientViewAngle(
-                    &mut *self_,
-                    (*((*self_).client as *mut gclient_t)).ps.viewangles,
-                );
+                vectoangles((*self_).pos1, &mut (*((*self_).client)).ps.viewangles);
+                SetClientViewAngle(&mut *self_, (*((*self_).client)).ps.viewangles);
                 //FIXME: don't keep doing this unless target is a moving target?
                 (*self_).nextthink = ctx.world.level.time + FRAMETIME;
             } else {
@@ -3836,19 +3775,19 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
 
     unsafe {
         // alloc a client just for the weapon code to use
-        (*self_).client = G_ClientForShooter(ctx) as *mut c_void;
+        (*self_).client = G_ClientForShooter(ctx);
 
         let mut s: *mut c_char = core::ptr::null_mut();
         G_SpawnString(ctx, c"weapon".as_ptr(), c"".as_ptr(), &mut s);
 
         // set weapon
         (*self_).s.weapon = mp_bg::weapons::weapon_t::WP_BLASTER;
-        (*((*self_).client as *mut gclient_t)).ps.weapon = mp_bg::weapons::weapon_t::WP_BLASTER;
+        (*((*self_).client)).ps.weapon = mp_bg::weapons::weapon_t::WP_BLASTER;
         if !s.is_null() && *s != 0 {
             // use a different weapon
             let w = crate::q_shared::GetIDForString(WPTable.as_ptr() as *mut _, s);
             (*self_).s.weapon = w;
-            (*((*self_).client as *mut gclient_t)).ps.weapon = w;
+            (*((*self_).client)).ps.weapon = w;
         }
 
         crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon((*self_).s.weapon));
@@ -3856,9 +3795,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
         // set where our muzzle is
         crate::q_math::_VectorCopy(
             (*self_).s.origin,
-            &mut (*((*self_).client as *mut gclient_t))
-                .renderInfo
-                .muzzlePoint,
+            &mut (*((*self_).client)).renderInfo.muzzlePoint,
         );
         // permanently updated (don't need for MP)
         //self->client->renderInfo.mPCalcTime = Q3_INFINITE;
@@ -3869,10 +3806,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
             (*self_).nextthink = ctx.world.level.time + START_TIME_LINK_ENTS;
         } else {
             // just set aim angles
-            crate::q_math::_VectorCopy(
-                (*self_).s.angles,
-                &mut (*((*self_).client as *mut gclient_t)).ps.viewangles,
-            );
+            crate::q_math::_VectorCopy((*self_).s.angles, &mut (*((*self_).client)).ps.viewangles);
             AngleVectors((*self_).s.angles, Some(&mut (*self_).pos1), None, None);
         }
 

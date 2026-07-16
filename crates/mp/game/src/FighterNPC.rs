@@ -276,7 +276,7 @@ pub fn FighterIsInSpace(gParent: &gentity_t) -> qboolean {
         if !gParent.is_null() {
             let ent = &*gParent;
             if !ent.client.is_null() {
-                let client = &*(ent.client as *mut gclient_t);
+                let client = &*(ent.client);
                 if client.inSpaceIndex != 0 && client.inSpaceIndex < 2047 {
                     // ENTITYNUM_WORLD
                     return qtrue;
@@ -542,7 +542,7 @@ pub fn FighterDamageRoutine(
         // Source: oracle/codemp/game/FighterNPC.c:1021-1032
         if (*pVeh).m_LandTrace.fraction < 1.0f32 {
             let parent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-            let parent_origin = (*((*parent).client as *mut gclient_t)).ps.origin;
+            let parent_origin = (*((*parent).client)).ps.origin;
             G_DamageFromKiller(
                 ctx,
                 ctx.entity_id_of(parent),

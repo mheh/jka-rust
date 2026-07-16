@@ -80,7 +80,7 @@ pub fn TurretPain(
         }
 
         if !attacker.is_null() && !(*attacker).client.is_null() {
-            let client_ptr = (*attacker).client as *mut gclient_t;
+            let client_ptr = (*attacker).client;
             if (*client_ptr).ps.weapon == WP_DEMP2 {
                 let time = ctx.world.level.time;
                 let random_val = ctx.world.bg_state.rng.random();
@@ -474,7 +474,7 @@ pub fn turret_aim(ctx: &mut GameContext, self_: EntityId) {
                 && (*enemy).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                 && !(*enemy).m_pVehicle.is_null()
             {
-                let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;
+                let enemy_veh = (*enemy).m_pVehicle;
                 // C dereferences `m_pVehicleInfo` unconditionally here; the added
                 // null guard is a defined-behavior choice for the (always-holding)
                 // `m_pVehicle` non-null => `m_pVehicleInfo` non-null invariant.
@@ -668,15 +668,13 @@ pub fn turret_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                 continue;
             }
             if !(*target).client.is_null()
-                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+                && (*((*target).client)).sess.sessionTeam == TEAM_SPECTATOR
             {
                 continue;
             }
             if (*self_).alliedTeam != 0 {
                 if !(*target).client.is_null() {
-                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam
-                        == (*self_).alliedTeam
-                    {
+                    if (*((*target).client)).sess.sessionTeam == (*self_).alliedTeam {
                         continue;
                     }
                 } else if (*target).teamnodmg == (*self_).alliedTeam {
@@ -789,8 +787,7 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
         } else {
             let enemy =
                 &mut ctx.world.g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
-            if !(*enemy).client.is_null()
-                && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+            if !(*enemy).client.is_null() && (*((*enemy).client)).sess.sessionTeam == TEAM_SPECTATOR
             {
                 // Don't keep going after spectators
                 (*self_).enemy = None;
@@ -821,7 +818,7 @@ pub fn turret_base_think(ctx: &mut GameContext, self_: EntityId) {
                             let mut org2 = [0.0; 3];
 
                             if !(*enemy).client.is_null() {
-                                let enemy_client = (*enemy).client as *mut gclient_t;
+                                let enemy_client = (*enemy).client;
                                 org[0] = (*enemy_client).renderInfo.eyePoint[0];
                                 org[1] = (*enemy_client).renderInfo.eyePoint[1];
                                 org[2] = (*enemy_client).renderInfo.eyePoint[2];

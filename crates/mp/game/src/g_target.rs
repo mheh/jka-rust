@@ -106,7 +106,7 @@ pub fn Use_target_remove_powerups(
 ) {
     // Raven derefs `activator->client` unconditionally (no NULL guard).
     let activator = activator.expect("Use_target_remove_powerups: null activator");
-    let client = ctx.entity(activator).client as *mut gclient_t;
+    let client = ctx.entity(activator).client;
     if client.is_null() {
         return;
     }
@@ -789,17 +789,13 @@ pub fn target_relay_use(
     // chains, so it assumes activator is present there.
     if ctx.entity(self_).spawnflags & 1 != 0 {
         let a = ctx.entity(activator.expect("target_relay_use: null activator"));
-        if !a.client.is_null()
-            && unsafe { (*(a.client as *mut gclient_t)).sess.sessionTeam } != TEAM_RED
-        {
+        if !a.client.is_null() && unsafe { (*(a.client)).sess.sessionTeam } != TEAM_RED {
             return;
         }
     }
     if ctx.entity(self_).spawnflags & 2 != 0 {
         let a = ctx.entity(activator.expect("target_relay_use: null activator"));
-        if !a.client.is_null()
-            && unsafe { (*(a.client as *mut gclient_t)).sess.sessionTeam } != TEAM_BLUE
-        {
+        if !a.client.is_null() && unsafe { (*(a.client)).sess.sessionTeam } != TEAM_BLUE {
             return;
         }
     }

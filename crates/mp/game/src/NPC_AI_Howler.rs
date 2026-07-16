@@ -144,12 +144,7 @@ pub fn Howler_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: 
         let mut dir: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
 
-        crate::q_math::AngleVectors(
-            (*((*npc).client as *mut gclient_t)).ps.viewangles,
-            Some(&mut dir),
-            None,
-            None,
-        );
+        crate::q_math::AngleVectors((*((*npc).client)).ps.viewangles, Some(&mut dir), None, None);
         crate::q_math::_VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
 
         // Should probably trace from the mouth, but, ah well.
@@ -291,7 +286,7 @@ pub fn NPC_Howler_Pain(
             crate::g_timer::TIMER_Remove(ctx, ctx.entity_id_of(self_), c"attacking".as_ptr());
             crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr(), 2900);
 
-            let npc = (*self_).NPC as *mut gNPC_t;
+            let npc = (*self_).NPC;
             if !npc.is_null() {
                 crate::q_math::_VectorCopy((*npc).lastPathAngles, &mut (*self_).s.angles);
             }
@@ -305,7 +300,7 @@ pub fn NPC_Howler_Pain(
             );
 
             if !(*self_).NPC.is_null() {
-                let npc_mut = (*self_).NPC as *mut gNPC_t;
+                let npc_mut = (*self_).NPC;
                 (*npc_mut).localState = LSTATE_WAITING;
             }
         }

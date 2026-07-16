@@ -162,10 +162,10 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                         );
                         let mut traceEnt =
                             &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-                        let npc_client = (*NPC).client as *mut gclient_t;
+                        let npc_client = (*NPC).client;
                         let enemy_client_id = ent_id_opt(base, traceEnt);
                         let trace_is_enemy = enemy_client_id == Some(enemy_id);
-                        let trace_client = (*traceEnt).client as *mut gclient_t;
+                        let trace_client = (*traceEnt).client;
                         if !trace_is_enemy
                             && (traceEnt.is_null()
                                 || trace_client.is_null()
@@ -192,7 +192,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
 
                         _VectorCopy(tr.endpos, &mut hitspot);
 
-                        let trace_client = (*traceEnt).client as *mut gclient_t;
+                        let trace_client = (*traceEnt).client;
                         let trace_is_enemy = ent_id_opt(base, traceEnt) == Some(enemy_id);
                         if trace_is_enemy
                             || (!trace_client.is_null()
@@ -256,7 +256,7 @@ pub fn NPC_BSAdvanceFight(ctx: &mut GameContext) {
                 }
             }
         } else {
-            let client = (*NPC).client as *mut gclient_t;
+            let client = (*NPC).client;
             NPC_UpdateShootAngles(ctx, (*client).ps.viewangles, qtrue, qtrue);
         }
 
@@ -304,7 +304,7 @@ pub fn BeamOut(ctx: &mut GameContext, self_: EntityId) {
         // worktree, not `Option<EntThink>` — writing the enum assignment anyway
         // per the settled rule; see shape_mismatches in the port report).
         (*self_).think = Some(EntThink::Disappear).into();
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         (*client).squadname = core::ptr::null_mut();
         (*client).playerTeam = TEAM_FREE;
         (*self_).s.teamowner = TEAM_FREE as c_int;
@@ -434,8 +434,8 @@ pub fn NPC_CheckInvestigate(ctx: &mut GameContext, alertEventNum: c_int) -> qboo
             return qfalse;
         }
 
-        let owner_client = (*owner).client as *mut gclient_t;
-        let npc_client = (*NPC).client as *mut gclient_t;
+        let owner_client = (*owner).client;
+        let npc_client = (*NPC).client;
         if !owner_client.is_null()
             && (*owner_client).playerTeam != 0
             && (*npc_client).playerTeam != 0
@@ -496,7 +496,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
         let base = ctx.world.g_entities.as_ptr();
-        let npc_client = (*NPC).client as *mut gclient_t;
+        let npc_client = (*NPC).client;
 
         let leader_id = (*npc_client).leader;
         if leader_id.is_none() {
@@ -541,7 +541,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                         let ev_owner_client = if ev_owner.is_null() {
                             core::ptr::null_mut()
                         } else {
-                            (*ev_owner).client as *mut gclient_t
+                            (*ev_owner).client
                         };
                         if ev_owner.is_null()
                             || ev_owner_client.is_null()
@@ -565,14 +565,14 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
                 }
             }
             if (*NPC).enemy.is_none() {
-                let l_client = (*leader).client as *mut gclient_t;
+                let l_client = (*leader).client;
                 if !leader_id.is_none()
                     && (*leader).enemy.is_some()
                     && (*leader).enemy != ent_id_opt(base, NPC)
                 {
                     let l_enemy_id = (*leader).enemy.unwrap();
                     let l_enemy = &mut ctx.world.g_entities[l_enemy_id.index()] as *mut gentity_t;
-                    let l_enemy_client = (*l_enemy).client as *mut gclient_t;
+                    let l_enemy_client = (*l_enemy).client;
                     let allied_ok = !l_enemy_client.is_null()
                         && (*l_enemy_client).playerTeam == (*npc_client).enemyTeam;
                     if allied_ok && (*l_enemy).health > 0 {
@@ -765,7 +765,7 @@ pub fn NPC_BSJump(ctx: &mut GameContext) {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
         let base = ctx.world.g_entities.as_ptr();
-        let npc_client = (*NPC).client as *mut gclient_t;
+        let npc_client = (*NPC).client;
 
         let Some(goal_id) = (*NPCInfo).goalEntity else {
             return;
@@ -1206,7 +1206,7 @@ pub fn NPC_BSNoClip(ctx: &mut GameContext) {
             ctx.world.globals.ucmd.rightmove = rDot.floor() as i8;
             ctx.world.globals.ucmd.upmove = uDot.floor() as i8;
         } else {
-            let npc_client = (*NPC).client as *mut gclient_t;
+            let npc_client = (*NPC).client;
             (*npc_client).ps.velocity = [0.0; 3];
         }
 
@@ -1357,7 +1357,7 @@ pub fn NPC_Surrender(ctx: &mut GameContext) {
     unsafe {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let npc_client = (*NPC).client as *mut gclient_t;
+        let npc_client = (*NPC).client;
 
         if (*npc_client).ps.weaponTime != 0 || PM_InKnockDown(&mut (*npc_client).ps) != 0 {
             return;
@@ -1388,13 +1388,13 @@ pub fn NPC_Surrender(ctx: &mut GameContext) {
 pub fn NPC_CheckSurrender(ctx: &mut GameContext) -> qboolean {
     unsafe {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
-        let npc_client = (*NPC).client as *mut gclient_t;
+        let npc_client = (*NPC).client;
 
         let Some(enemy_id) = (*NPC).enemy else {
             return qfalse;
         };
         let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
-        let enemy_client = (*enemy).client as *mut gclient_t;
+        let enemy_client = (*enemy).client;
 
         if trap::ICARUS_TaskIDPending(
             ctx.engine,
@@ -1582,7 +1582,7 @@ pub fn NPC_StartFlee(
     unsafe {
         let NPC = ctx.world.globals.NPC as *mut gentity_t;
         let NPCInfo = ctx.world.globals.NPCInfo as *mut gNPC_t;
-        let npc_client = (*NPC).client as *mut gclient_t;
+        let npc_client = (*NPC).client;
         let mut cp: c_int = -1;
 
         let npc_id = ctx.entity_id_of(NPC);

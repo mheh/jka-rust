@@ -315,9 +315,7 @@ pub fn TurretG2Pain(
             }
         }
 
-        if !(*attacker).client.is_null()
-            && (*((*attacker).client as *mut gclient_t)).ps.weapon == WP_DEMP2 as c_int
-        {
+        if !(*attacker).client.is_null() && (*((*attacker).client)).ps.weapon == WP_DEMP2 as c_int {
             (*self_).attackDebounceTime =
                 ctx.world.level.time + 2000 + (ctx.world.bg_state.rng.random() * 500.0) as c_int;
             (*self_).painDebounceTime = (*self_).attackDebounceTime;
@@ -713,7 +711,7 @@ pub fn turretG2_aim(ctx: &mut GameContext, self_: EntityId) {
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
             if !(*enemy).client.is_null() {
-                org = (*((*enemy).client as *mut gclient_t)).renderInfo.eyePoint;
+                org = (*((*enemy).client)).renderInfo.eyePoint;
             } else {
                 org = (*enemy).r.currentOrigin;
             }
@@ -732,7 +730,7 @@ pub fn turretG2_aim(ctx: &mut GameContext, self_: EntityId) {
                 ];
                 let dist = VectorNormalize(&mut diff);
                 let velocity = if !(*enemy).client.is_null() {
-                    (*((*enemy).client as *mut gclient_t)).ps.velocity
+                    (*((*enemy).client)).ps.velocity
                 } else {
                     (*enemy).s.pos.trDelta
                 };
@@ -962,16 +960,13 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
                 continue;
             }
             if !(*target).client.is_null()
-                && (*((*target).client as *mut gclient_t)).sess.sessionTeam
-                    == TEAM_SPECTATOR as c_int
+                && (*((*target).client)).sess.sessionTeam == TEAM_SPECTATOR as c_int
             {
                 continue;
             }
             if (*self_).alliedTeam != 0 {
                 if !(*target).client.is_null() {
-                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam
-                        == (*self_).alliedTeam
-                    {
+                    if (*((*target).client)).sess.sessionTeam == (*self_).alliedTeam {
                         // A bot/client/NPC we don't want to shoot
                         continue;
                     }
@@ -992,7 +987,7 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
             }
 
             let mut org = if !(*target).client.is_null() {
-                (*((*target).client as *mut gclient_t)).renderInfo.eyePoint
+                (*((*target).client)).renderInfo.eyePoint
             } else {
                 (*target).r.currentOrigin
             };
@@ -1139,8 +1134,7 @@ pub fn turretG2_base_think(ctx: &mut GameContext, self_: EntityId) {
         if let Some(enemy_id) = (*self_).enemy {
             let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             if !(*enemy).client.is_null()
-                && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam
-                    == TEAM_SPECTATOR as c_int
+                && (*((*enemy).client)).sess.sessionTeam == TEAM_SPECTATOR as c_int
             {
                 // don't keep going after spectators
                 (*self_).enemy = None;
@@ -1168,7 +1162,7 @@ pub fn turretG2_base_think(ctx: &mut GameContext, self_: EntityId) {
                         let mut tr: trace_t = core::mem::zeroed();
 
                         let org = if !(*enemy).client.is_null() {
-                            (*((*enemy).client as *mut gclient_t)).renderInfo.eyePoint
+                            (*((*enemy).client)).renderInfo.eyePoint
                         } else {
                             (*enemy).r.currentOrigin
                         };

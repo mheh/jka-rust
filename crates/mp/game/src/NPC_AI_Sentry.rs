@@ -100,7 +100,7 @@ pub fn sentry_use(
             BOTH_POWERUP1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
-        (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_ACTIVE;
+        (*((*self_).NPC)).localState = LSTATE_ACTIVE;
     }
 }
 
@@ -124,7 +124,7 @@ pub fn NPC_Sentry_Pain(
         crate::NPC_reactions::NPC_Pain(ctx, self_id, attacker_id, damage);
 
         if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
-            (*((*self_).NPC as *mut gNPC_t)).burstCount = 0;
+            (*((*self_).NPC)).burstCount = 0;
             let self_id_opt = ctx.entity_id_of(self_);
             let atk_delay = ctx.world.bg_state.rng.Q_irand(9000, 12000);
             crate::g_timer::TIMER_Set(ctx, self_id_opt, cstr("attackDelay").as_ptr(), atk_delay);
@@ -143,7 +143,7 @@ pub fn NPC_Sentry_Pain(
                 crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_pain").as_ptr()),
             );
 
-            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_ACTIVE;
+            (*((*self_).NPC)).localState = LSTATE_ACTIVE;
         }
     }
 }
@@ -317,8 +317,7 @@ pub fn Sentry_MaintainHeight(ctx: &mut GameContext) {
                     dif = if dif < 0.0 { -24.0 } else { 24.0 };
                 }
 
-                (*((*NPC).client as *mut gclient_t)).ps.velocity[2] =
-                    ((*((*NPC).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
+                (*((*NPC).client)).ps.velocity[2] = ((*((*NPC).client)).ps.velocity[2] + dif) / 2.0;
             }
         } else {
             let goal: *mut gentity_t = if let Some(goal_id) = (*NPCInfo).goalEntity {
@@ -337,38 +336,37 @@ pub fn Sentry_MaintainHeight(ctx: &mut GameContext) {
                 if dif.abs() > SENTRY_HOVER_HEIGHT {
                     (*ucmd).upmove = if (*ucmd).upmove < 0 { -4 } else { 4 };
                 } else {
-                    if (*((*NPC).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
-                        (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *=
-                            SENTRY_VELOCITY_DECAY;
+                    if (*((*NPC).client)).ps.velocity[2] != 0.0 {
+                        (*((*NPC).client)).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
 
-                        if (*((*NPC).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
-                            (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = 0.0;
+                        if (*((*NPC).client)).ps.velocity[2].abs() < 2.0 {
+                            (*((*NPC).client)).ps.velocity[2] = 0.0;
                         }
                     }
                 }
-            } else if (*((*NPC).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
-                (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
+            } else if (*((*NPC).client)).ps.velocity[2] != 0.0 {
+                (*((*NPC).client)).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
 
-                if (*((*NPC).client as *mut gclient_t)).ps.velocity[2].abs() < 1.0 {
-                    (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = 0.0;
+                if (*((*NPC).client)).ps.velocity[2].abs() < 1.0 {
+                    (*((*NPC).client)).ps.velocity[2] = 0.0;
                 }
             }
         }
 
         // Apply friction
-        if (*((*NPC).client as *mut gclient_t)).ps.velocity[0] != 0.0 {
-            (*((*NPC).client as *mut gclient_t)).ps.velocity[0] *= SENTRY_VELOCITY_DECAY;
+        if (*((*NPC).client)).ps.velocity[0] != 0.0 {
+            (*((*NPC).client)).ps.velocity[0] *= SENTRY_VELOCITY_DECAY;
 
-            if (*((*NPC).client as *mut gclient_t)).ps.velocity[0].abs() < 1.0 {
-                (*((*NPC).client as *mut gclient_t)).ps.velocity[0] = 0.0;
+            if (*((*NPC).client)).ps.velocity[0].abs() < 1.0 {
+                (*((*NPC).client)).ps.velocity[0] = 0.0;
             }
         }
 
-        if (*((*NPC).client as *mut gclient_t)).ps.velocity[1] != 0.0 {
-            (*((*NPC).client as *mut gclient_t)).ps.velocity[1] *= SENTRY_VELOCITY_DECAY;
+        if (*((*NPC).client)).ps.velocity[1] != 0.0 {
+            (*((*NPC).client)).ps.velocity[1] *= SENTRY_VELOCITY_DECAY;
 
-            if (*((*NPC).client as *mut gclient_t)).ps.velocity[1].abs() < 1.0 {
-                (*((*NPC).client as *mut gclient_t)).ps.velocity[1] = 0.0;
+            if (*((*NPC).client)).ps.velocity[1].abs() < 1.0 {
+                (*((*NPC).client)).ps.velocity[1] = 0.0;
             }
         }
 
@@ -388,7 +386,7 @@ pub fn Sentry_Idle(ctx: &mut GameContext) {
 
         // Is he waking up?
         if (*NPCInfo).localState == LSTATE_WAKEUP {
-            if (*((*NPC).client as *mut gclient_t)).ps.torsoTimer <= 0 {
+            if (*((*NPC).client)).ps.torsoTimer <= 0 {
                 (*NPCInfo).scriptFlags |= SCF_LOOK_FOR_ENEMIES;
                 (*NPCInfo).burstCount = 0;
             }
@@ -420,7 +418,7 @@ pub fn Sentry_Strafe(ctx: &mut GameContext) {
         let mut tr: trace_t = core::mem::zeroed();
 
         crate::q_math::AngleVectors(
-            (*((*NPC).client as *mut gclient_t)).renderInfo.eyeAngles,
+            (*((*NPC).client)).renderInfo.eyeAngles,
             None,
             Some(&mut right),
             None,
@@ -456,14 +454,14 @@ pub fn Sentry_Strafe(ctx: &mut GameContext) {
         // Close enough
         if tr.fraction > 0.9f32 {
             crate::q_math::_VectorMA(
-                (*((*NPC).client as *mut gclient_t)).ps.velocity,
+                (*((*NPC).client)).ps.velocity,
                 (SENTRY_STRAFE_VEL * dir as f32),
                 right,
-                &mut (*((*NPC).client as *mut gclient_t)).ps.velocity,
+                &mut (*((*NPC).client)).ps.velocity,
             );
 
             // Add a slight upward push
-            (*((*NPC).client as *mut gclient_t)).ps.velocity[2] += SENTRY_UPWARD_PUSH;
+            (*((*NPC).client)).ps.velocity[2] += SENTRY_UPWARD_PUSH;
 
             // Set the strafe start time so we can do a controlled roll
             (*NPCInfo).standTime =
@@ -524,10 +522,10 @@ pub fn Sentry_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) 
         let speed = SENTRY_FORWARD_BASE_SPEED
             + (SENTRY_FORWARD_MULTIPLIER * ctx.world.cvars.g_spskill.integer as f32);
         crate::q_math::_VectorMA(
-            (*((*NPC).client as *mut gclient_t)).ps.velocity,
+            (*((*NPC).client)).ps.velocity,
             speed,
             forward,
-            &mut (*((*NPC).client as *mut gclient_t)).ps.velocity,
+            &mut (*((*NPC).client)).ps.velocity,
         );
     }
 }

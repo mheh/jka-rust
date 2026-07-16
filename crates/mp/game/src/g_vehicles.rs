@@ -138,7 +138,7 @@ pub fn Vehicle_SetAnim(
         let ent: *mut gentity_t = ctx.entity_mut(ent);
         // Raven: assert(ent->client);
         debug_assert!(!(*ent).client.is_null());
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         // MP `_JK2MP` path:
         //   BG_SetAnim(&client->ps, bgAllAnims[ent->localAnimIndex].anims,
         //              setAnimParts, anim, setAnimFlags, iBlend)
@@ -196,10 +196,10 @@ pub fn G_IsRidingVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>) -> *mut 
         let pEnt: *mut gentity_t = ent_ptr(ctx, pEnt);
         let ent = pEnt;
         if !ent.is_null() && !(*ent).client.is_null() {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if (*client).NPC_class != CLASS_VEHICLE && (*ent).s.m_iVehicleNum != 0 {
                 let vehNum = (*ent).s.m_iVehicleNum as usize;
-                return ctx.world.g_entities[vehNum].m_pVehicle as *mut Vehicle_t;
+                return ctx.world.g_entities[vehNum].m_pVehicle;
             }
         }
         core::ptr::null_mut()
@@ -238,10 +238,10 @@ pub fn G_VehicleSpawn(ctx: &mut GameContext, self_: EntityId) {
         }
 
         (*vehEnt).s.angles[YAW] = yaw;
-        let vp = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+        let vp = (*vehEnt).m_pVehicle;
         let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
         if (*vi).r#type != vehicleType_t::VH_ANIMAL {
-            let npc = (*vehEnt).NPC as *mut gNPC_t;
+            let npc = (*vehEnt).NPC;
             (*npc).behaviorState = bState_t::BS_CINEMATIC;
         }
 
@@ -293,8 +293,8 @@ pub fn G_AttachToVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>, ucmd: *m
 
         // Get the driver tag.
         let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
-        let vp = (*vehEnt).m_pVehicle as *mut Vehicle_t;
-        let entClient = (*ent).client as *mut gclient_t;
+        let vp = (*vehEnt).m_pVehicle;
+        let entClient = (*ent).client;
         trap::G2API_GetBoltMatrix(
             ctx.engine,
             GG2GetboltArgs::new(
@@ -365,7 +365,7 @@ pub fn ValidateBoard(
                 }
             } else if (*vi).r#type == vehicleType_t::VH_WALKER {
                 // can only steal an occupied AT-ST if you're on top (by the hatch)
-                let cl = (*ent).client as *mut gclient_t;
+                let cl = (*ent).client;
                 if (*ent).client.is_null() || (*cl).ps.groundEntityNum != (*parent).s.number {
                     return qfalse;
                 }
@@ -439,7 +439,7 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
         if ent.is_null() {
             return qfalse;
         }
-        let entClient = (*ent).client as *mut gclient_t;
+        let entClient = (*ent).client;
         // PORT-NOTE(m_vOrientation): Vehicle_t::m_vOrientation is transcribed as a
         // `vec3_t` value field (VectorClear/VectorCopy/VectorSet usage throughout
         // this TU treats it as a 3-float array). If the type port modeled it as a
@@ -516,7 +516,7 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
 
             // Set the looping sound only when there is a pilot (vehicle is "on").
             if (*vi).soundLoop != 0 {
-                let pc = (*parent).client as *mut gclient_t;
+                let pc = (*parent).client;
                 (*parent).s.loopSound = (*vi).soundLoop;
                 (*pc).ps.loopSound = (*vi).soundLoop;
             }
@@ -530,12 +530,12 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
 
                 // Set the looping sound only when there is a pilot.
                 if (*vi).soundLoop != 0 {
-                    let pc = (*parent).client as *mut gclient_t;
+                    let pc = (*parent).client;
                     (*parent).s.loopSound = (*vi).soundLoop;
                     (*pc).ps.loopSound = (*vi).soundLoop;
                 }
 
-                let pc = (*parent).client as *mut gclient_t;
+                let pc = (*parent).client;
                 (*pc).ps.speed = 0.0;
                 (*pVeh).m_ucmd = core::mem::zeroed();
             } else if (*pVeh).m_iNumPassengers < (*vi).maxPassengers {
@@ -565,7 +565,7 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
         (*ent).r.ownerNum = (*parent).s.number;
         (*ent).s.owner = (*ent).r.ownerNum; // for prediction
         if (*pVeh).m_pPilot == (ent as *mut mp_bg::public::bg_entity::bgEntity_t) {
-            let pc = (*parent).client as *mut gclient_t;
+            let pc = (*parent).client;
             // always gonna be under MAX_CLIENTS so no worries about 1 byte overflow
             (*pc).ps.m_iVehicleNum = (*ent).s.number + 1;
         }
@@ -713,7 +713,7 @@ pub fn G_EjectDroidUnit(ctx: &mut GameContext, pVeh: *mut Vehicle_t, kill: qbool
         (*droidEnt).flags &= !FL_UNDYING;
         (*droidEnt).r.ownerNum = ENTITYNUM_NONE;
         if !(*droidEnt).client.is_null() {
-            let dc = (*droidEnt).client as *mut gclient_t;
+            let dc = (*droidEnt).client;
             (*dc).ps.m_iVehicleNum = ENTITYNUM_NONE;
         }
         if kill != qfalse {
@@ -844,7 +844,7 @@ pub fn StartDeathDelay(ctx: &mut GameContext, pVeh: *mut Vehicle_t, iDelayTimeOv
 
         if (*vi).flammable != qfalse {
             let snd = G_SoundIndex(c"sound/vehicles/common/fire_lp.wav".as_ptr());
-            let client = (*parent).client as *mut gclient_t;
+            let client = (*parent).client;
             (*parent).s.loopSound = snd;
             (*client).ps.loopSound = snd;
         }
@@ -862,14 +862,14 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
         if parent.is_null() || (*parent).client.is_null() {
             return qfalse;
         }
-        let pc = (*parent).client as *mut gclient_t;
+        let pc = (*parent).client;
 
         (*pc).ps.m_iVehicleNum = 0; // MP
         (*parent).s.m_iVehicleNum = 0;
         {
             (*pVeh).m_iArmor = (*vi).armor;
             let hp = (*pVeh).m_iArmor;
-            let npc = (*parent).NPC as *mut gNPC_t;
+            let npc = (*parent).NPC;
             (*pc).ps.stats[STAT_HEALTH as usize] = hp;
             (*parent).health = hp;
             (*npc).stats.health = hp;
@@ -912,7 +912,7 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
         if (*vi).gravity != 0 && (*vi).gravity as f32 != ctx.world.cvars.g_gravity.value {
             // not normal gravity
             if !(*parent).NPC.is_null() {
-                let npc = (*parent).NPC as *mut gNPC_t;
+                let npc = (*parent).NPC;
                 (*npc).aiFlags |= NPCAI_CUSTOM_GRAVITY;
             }
             (*pc).ps.gravity = (*vi).gravity;
@@ -1004,7 +1004,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
-        let pclient = (*parent).client as *mut gclient_t;
+        let pclient = (*parent).client;
         // MP: parentPS = pVeh->m_pParentEntity->playerState (== &parent->client->ps)
         let parentPS = &mut (*pclient).ps as *mut playerState_t;
 
@@ -1132,7 +1132,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
                     .as_mut_ptr()
                     .add((*pVeh).m_iPilotLastIndex as usize);
                 let oldPilotConnected = !(*oldPilot).client.is_null()
-                    && (*((*oldPilot).client as *mut gclient_t)).pers.connected == CON_CONNECTED;
+                    && (*((*oldPilot).client)).pers.connected == CON_CONNECTED;
                 if (*oldPilot).inuse == qfalse || (*oldPilot).client.is_null() || !oldPilotConnected
                 {
                     // no longer in the game?
@@ -1148,7 +1148,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
                         MOD_SUICIDE as c_int,
                     );
                 } else {
-                    let oc = (*oldPilot).client as *mut gclient_t;
+                    let oc = (*oldPilot).client;
                     let mut v: vec3_t = [0.0; 3];
                     _VectorSubtract((*pclient).ps.origin, (*oc).ps.origin, &mut v);
                     if VectorLength(v) < (*parent).speed {
@@ -1178,7 +1178,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
         if (*pVeh).m_iBoarding != 0 {
             let pilotEnt = (*pVeh).m_pPilot as *mut gentity_t;
             if !pilotEnt.is_null() {
-                let pec = (*pilotEnt).client as *mut gclient_t;
+                let pec = (*pilotEnt).client;
                 if (*pilotEnt).inuse == qfalse
                     || (*pilotEnt).client.is_null()
                     || (*pilotEnt).health <= 0
@@ -1222,7 +1222,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
             // See if any of the riders are dead and if so kick em off.
             if !(*pVeh).m_pPilot.is_null() {
                 let pilotEnt = (*pVeh).m_pPilot as *mut gentity_t;
-                let pec = (*pilotEnt).client as *mut gclient_t;
+                let pec = (*pilotEnt).client;
                 if (*pilotEnt).inuse == qfalse
                     || (*pilotEnt).client.is_null()
                     || (*pilotEnt).health <= 0
@@ -1243,7 +1243,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
                     let psngr =
                         *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
                     if !psngr.is_null() {
-                        let sc = (*psngr).client as *mut gclient_t;
+                        let sc = (*psngr).client;
                         if (*psngr).inuse == qfalse
                             || (*psngr).client.is_null()
                             || (*psngr).health <= 0
@@ -1466,8 +1466,8 @@ pub fn UpdateRider(
 
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let rider = pRider as *mut gentity_t;
-        let pc = (*parent).client as *mut gclient_t;
-        let rc = (*rider).client as *mut gclient_t;
+        let pc = (*parent).client;
+        let rc = (*rider).client;
 
         // MP: so they know who we're locking onto with our rockets, if anyone
         if !rider.is_null()
@@ -1665,7 +1665,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             (*pilot).waypoint = (*parent).waypoint; // take the veh's waypoint as your own
 
             // assuming we updated him relative to the bolt in AttachRidersGeneric
-            let pcl = (*pilot).client as *mut gclient_t;
+            let pcl = (*pilot).client;
             crate::g_utils::G_SetOrigin(&mut *(pilot), (*pcl).ps.origin);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pilot.cast()));
         }
@@ -1675,7 +1675,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             let oldpilot = (*pVeh).m_pOldPilot as *mut gentity_t;
             (*oldpilot).waypoint = (*parent).waypoint;
 
-            let pcl = (*oldpilot).client as *mut gclient_t;
+            let pcl = (*oldpilot).client;
             crate::g_utils::G_SetOrigin(&mut *(oldpilot), (*pcl).ps.origin);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(oldpilot.cast()));
         }
@@ -1694,7 +1694,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 );
                 debug_assert!(!(*parent).client.is_null());
                 debug_assert!(!(*pilot).client.is_null());
-                let ppcl = (*parent).client as *mut gclient_t;
+                let ppcl = (*parent).client;
 
                 let yawOnlyAngles: vec3_t = [0.0, (*ppcl).ps.viewangles[YAW], 0.0];
 
@@ -1713,7 +1713,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                         &(*parent).modelScale as *const vec3_t,
                     ),
                 );
-                let ppc = (*pilot).client as *mut gclient_t;
+                let ppc = (*pilot).client;
                 BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
                     Eorientations::ORIGIN as c_int,
@@ -1736,8 +1736,8 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             debug_assert!(!(*parent).client.is_null());
 
             if !(*droid).client.is_null() {
-                let dcl = (*droid).client as *mut gclient_t;
-                let ppcl = (*parent).client as *mut gclient_t;
+                let dcl = (*droid).client;
+                let ppcl = (*parent).client;
                 let yawOnlyAngles: vec3_t = [0.0, (*ppcl).ps.viewangles[YAW], 0.0];
 
                 // Get the droid tag.
@@ -1804,7 +1804,7 @@ pub fn Ghost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
 
         (*ent).s.eFlags |= EF_NODRAW;
         if !(*ent).client.is_null() {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             (*client).ps.eFlags |= EF_NODRAW;
         }
         (*ent).r.contents = 0;
@@ -1826,7 +1826,7 @@ pub fn UnGhost(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_
 
         (*ent).s.eFlags &= !EF_NODRAW;
         if !(*ent).client.is_null() {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             (*client).ps.eFlags &= !EF_NODRAW;
         }
         (*ent).r.contents = CONTENTS_BODY;
@@ -1891,7 +1891,7 @@ pub fn G_VehicleDamageBoxSizing(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         _VectorMA(a, -hDist, up, &mut back);
 
         // trace and see if our new mins/maxs are safe
-        let pcl = (*parent).client as *mut gclient_t;
+        let pcl = (*parent).client;
         let mut trace: trace_t = core::mem::zeroed();
         trap::Trace(
             ctx.engine,
@@ -1938,11 +1938,11 @@ pub fn G_FlyVehicleImpactDir(ctx: &mut GameContext, veh: EntityId, trace: *mut t
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let veh: *mut gentity_t = ctx.entity_mut(veh);
-        let pVeh = (*veh).m_pVehicle as *mut Vehicle_t;
+        let pVeh = (*veh).m_pVehicle;
         if trace.is_null() || pVeh.is_null() || (*veh).client.is_null() {
             return -1;
         }
-        let vcl = (*veh).client as *mut gclient_t;
+        let vcl = (*veh).client;
 
         let mut fwd: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
@@ -2095,7 +2095,7 @@ pub fn G_SetVehDamageFlags(
     unsafe {
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let veh: *mut gentity_t = ctx.entity_mut(veh);
-        let vcl = (*veh).client as *mut gclient_t;
+        let vcl = (*veh).client;
         match damageLevel {
             3 => {
                 // destroyed — add both flags so cgame knows this surf is GONE
@@ -2108,7 +2108,7 @@ pub fn G_SetVehDamageFlags(
                 // check droid
                 if shipSurf == SHIPSURF_BACK {
                     // destroy the droid if we have one
-                    let vp = (*veh).m_pVehicle as *mut Vehicle_t;
+                    let vp = (*veh).m_pVehicle;
                     if !(*veh).m_pVehicle.is_null() && !(*vp).m_pDroidUnit.is_null() {
                         let droidEnt = (*vp).m_pDroidUnit as *mut gentity_t;
                         if !droidEnt.is_null()
@@ -2150,7 +2150,7 @@ pub fn G_SetVehDamageFlags(
                 (*veh).s.brokenLimbs = (*vcl).ps.brokenLimbs;
                 // check droid — make it vulnerable if we have one
                 if shipSurf == SHIPSURF_BACK {
-                    let vp = (*veh).m_pVehicle as *mut Vehicle_t;
+                    let vp = (*veh).m_pVehicle;
                     if !(*veh).m_pVehicle.is_null() && !(*vp).m_pDroidUnit.is_null() {
                         let droidEnt = (*vp).m_pDroidUnit as *mut gentity_t;
                         if !droidEnt.is_null() && ((*droidEnt).flags & FL_UNDYING) != 0 {
@@ -2197,7 +2197,7 @@ pub fn G_VehicleSetDamageLocFlags(
             return;
         }
         // Raven shadows the `deathPoint` parameter with a local of the same name.
-        let vp = (*veh).m_pVehicle as *mut Vehicle_t;
+        let vp = (*veh).m_pVehicle;
         let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
 
         let deathPoint: c_int;
@@ -2324,7 +2324,7 @@ pub fn G_FlyVehicleDestroySurface(
             );
         }
 
-        let vp = (*veh).m_pVehicle as *mut Vehicle_t;
+        let vp = (*veh).m_pVehicle;
         if (*vp).m_iRemovedSurfaces == 0 {
             // first time something got blown off
             if !(*vp).m_pPilot.is_null() {
@@ -2341,7 +2341,7 @@ pub fn G_FlyVehicleDestroySurface(
         (*vp).m_iRemovedSurfaces |= smashedBits;
 
         // do some explosive damage, but don't damage this ship with it
-        let vcl = (*veh).client as *mut gclient_t;
+        let vcl = (*veh).client;
         crate::g_combat::G_RadiusDamage(
             ctx,
             (*vcl).ps.origin,
@@ -2378,7 +2378,7 @@ pub fn G_FlyVehicleSurfaceDestruction(
             return;
         }
 
-        let vp = (*veh).m_pVehicle as *mut Vehicle_t;
+        let vp = (*veh).m_pVehicle;
         let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
 
         let mut impactDir = G_FlyVehicleImpactDir(ctx, ctx.entity_id_of(veh).unwrap(), trace);
@@ -2464,7 +2464,7 @@ pub fn G_VehUpdateShields(targ: &mut gentity_t) {
         if targ.is_null() || (*targ).client.is_null() || (*targ).m_pVehicle.is_null() {
             return;
         }
-        let vp = (*targ).m_pVehicle as *mut Vehicle_t;
+        let vp = (*targ).m_pVehicle;
         if (*vp).m_pVehicleInfo.is_null() {
             return;
         }
@@ -2473,7 +2473,7 @@ pub fn G_VehUpdateShields(targ: &mut gentity_t) {
             // doesn't have shields, so don't have to send it
             return;
         }
-        let client = (*targ).client as *mut gclient_t;
+        let client = (*targ).client;
         (*client).ps.activeForcePass =
             (((*vp).m_iShields as f32 / (*vi).shields as f32) * 10.0).floor() as c_int;
     }
@@ -2544,7 +2544,7 @@ pub fn Eject(
         if !ent.is_null() {
             if (*ent).inuse == qfalse
                 || (*ent).client.is_null()
-                || (*((*ent).client as *mut gclient_t)).pers.connected != CON_CONNECTED
+                || (*((*ent).client)).pers.connected != CON_CONNECTED
             {
                 // MP: if someone disconnects on us, we still have to clear our owner
                 // — jump straight to the ownership-cleanup section (`getItOutOfMe`).
@@ -2614,7 +2614,7 @@ pub fn Eject(
 
             // Move them to the exit position.
             G_SetOrigin(&mut *(ent), vExitPos);
-            (*((*ent).client as *mut gclient_t)).ps.origin = (*ent).r.currentOrigin;
+            (*((*ent).client)).ps.origin = (*ent).r.currentOrigin;
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent.cast()));
 
             // If it's the player, stop overrides. (MP: the override-clear body is
@@ -2626,7 +2626,7 @@ pub fn Eject(
 
         // If he's the pilot...
         if (*pVeh).m_pPilot == (ent as *mut mp_bg::public::bg_entity::bgEntity_t) {
-            let pc = (*parent).client as *mut gclient_t;
+            let pc = (*parent).client;
 
             (*pVeh).m_pPilot = core::ptr::null_mut();
             (*parent).r.ownerNum = ENTITYNUM_NONE;
@@ -2655,7 +2655,7 @@ pub fn Eject(
                     // rearrange the passenger slots now..
                     // QAGAME: server just needs to tell client he's not a passenger anymore
                     if !(*newPilot).client.is_null() {
-                        (*((*newPilot).client as *mut gclient_t)).ps.generic1 = 0;
+                        (*((*newPilot).client)).ps.generic1 = 0;
                     }
                     *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize) = core::ptr::null_mut();
                     while k < (*pVeh).m_iNumPassengers {
@@ -2669,7 +2669,7 @@ pub fn Eject(
                             let moved = *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize)
                                 as *mut gentity_t;
                             if !(*moved).client.is_null() {
-                                (*((*moved).client as *mut gclient_t)).ps.generic1 = k;
+                                (*((*moved).client)).ps.generic1 = k;
                             }
                         }
                         k += 1;
@@ -2691,7 +2691,7 @@ pub fn Eject(
                 if psngr == ent {
                     // QAGAME: server just needs to tell client he's not a passenger anymore
                     if !(*psngr).client.is_null() {
-                        (*((*psngr).client as *mut gclient_t)).ps.generic1 = 0;
+                        (*((*psngr).client)).ps.generic1 = 0;
                     }
                     *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) = core::ptr::null_mut();
                     (*pVeh).m_iNumPassengers -= 1;
@@ -2715,7 +2715,7 @@ pub fn Eject(
 
         // If the vehicle now has no pilot...
         if (*pVeh).m_pPilot.is_null() {
-            let pc = (*parent).client as *mut gclient_t;
+            let pc = (*parent).client;
             (*parent).s.loopSound = 0;
             (*pc).ps.loopSound = 0;
             // Completely empty vehicle...?
@@ -2731,7 +2731,7 @@ pub fn Eject(
         }
 
         // Client not in a vehicle. (MP)
-        let ec = (*ent).client as *mut gclient_t;
+        let ec = (*ent).client;
         (*ec).ps.m_iVehicleNum = 0;
         (*ent).r.ownerNum = ENTITYNUM_NONE;
         (*ent).s.owner = (*ent).r.ownerNum; // for prediction
@@ -2777,7 +2777,7 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 crate::veh_dispatch::eject_all(ctx, pVeh);
                 if crate::veh_dispatch::inhabited(ctx, pVeh) != qfalse {
                     // if we've still got people in us, just kill the bastards
-                    let pc = (*parent).client as *mut gclient_t;
+                    let pc = (*parent).client;
                     if !(*pVeh).m_pPilot.is_null() {
                         //FIXME: does this give proper credit to the enemy who shot you down?
                         crate::g_combat::G_Damage(

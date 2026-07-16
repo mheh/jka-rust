@@ -785,7 +785,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
-            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let pVeh = (*vehEnt).m_pVehicle;
             let pEnt =
                 &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t as *mut bgEntity_t;
             crate::veh_dispatch::board(&mut ctx, pVeh, pEnt)
@@ -800,7 +800,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
-            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let pVeh = (*vehEnt).m_pVehicle;
             crate::veh_dispatch::update(&mut ctx, pVeh, ucmd);
         }
     }
@@ -813,7 +813,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
-            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let pVeh = (*vehEnt).m_pVehicle;
             crate::veh_dispatch::animate(&mut ctx, pVeh);
         }
     }
@@ -827,13 +827,13 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
-            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let pVeh = (*vehEnt).m_pVehicle;
             let rider = &mut (*self.world).g_entities[riderEntNum as usize] as *mut gentity_t;
             let cmd = if ucmd.is_null() {
                 if (*rider).inuse == qfalse || (*rider).client.is_null() {
                     return;
                 }
-                &mut (*((*rider).client as *mut gclient_t)).pers.cmd as *mut usercmd_t
+                &mut (*((*rider).client)).pers.cmd as *mut usercmd_t
             } else {
                 ucmd
             };
@@ -849,7 +849,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 engine: self.engine,
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
-            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let pVeh = (*vehEnt).m_pVehicle;
             crate::veh_dispatch::attach_riders(&mut ctx, pVeh);
         }
     }
@@ -860,8 +860,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe {
             let ent = &(*self.world).g_entities[client_num as usize] as *const gentity_t;
             if (*ent).inuse != 0 && !(*ent).client.is_null() {
-                let saber = &mut (*((*ent).client as *mut gclient_t)).saber[saber_num as usize]
-                    as *mut saberInfo_t;
+                let saber = &mut (*((*ent).client)).saber[saber_num as usize] as *mut saberInfo_t;
                 if (*saber).model[0] == 0 {
                     return core::ptr::null_mut();
                 }
@@ -875,7 +874,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe {
             let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
             (!(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum == 0
+                && (*((*ent).client)).ps.m_iVehicleNum == 0
                 && (*ent).spawnflags & 2 != 0) as qboolean
         }
     }
@@ -890,12 +889,12 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `oracle/codemp/game/bg_pmove.c` (PM_CrashLand landed-vehicle board).
         unsafe {
             let trEnt = &(*self.world).g_entities[tr_ent_num as usize] as *const gentity_t;
-            let veh = (*trEnt).m_pVehicle as *mut Vehicle_t;
+            let veh = (*trEnt).m_pVehicle;
             if (*trEnt).inuse != 0
                 && !(*trEnt).client.is_null()
                 && (*trEnt).s.eType == entityType_t::ET_NPC as c_int
                 && (*trEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                && (*((*trEnt).client as *mut gclient_t)).ps.m_iVehicleNum == 0
+                && (*((*trEnt).client)).ps.m_iVehicleNum == 0
                 && !veh.is_null()
                 && (*(*veh).m_pVehicleInfo).r#type as c_int != vehicleType_t::VH_WALKER as c_int
                 && (*(*veh).m_pVehicleInfo).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
@@ -904,7 +903,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
                 if gametype < GT_TEAM as c_int
                     || (*trEnt).alliedTeam as c_int == 0
                     || (*trEnt).alliedTeam as c_int
-                        == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam as c_int
+                        == (*((*servEnt).client)).sess.sessionTeam as c_int
                 {
                     return qtrue;
                 }
@@ -918,7 +917,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let time = (*self.world).level.time;
             let ent = &(*self.world).g_entities[ent_num as usize] as *const gentity_t;
             if (*ent).inuse != 0 && !(*ent).client.is_null() {
-                (*((*ent).client as *mut gclient_t)).solidHack = time + 200;
+                (*((*ent).client)).solidHack = time + 200;
             }
         }
     }
@@ -945,7 +944,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `PM_VehicleImpact` knockdown: the three `gclient_t` killer-credit
         // fields (not on `ps`). Source: `oracle/codemp/game/bg_slidemove.c:402-542`.
         unsafe {
-            let client = (*self.world).g_entities[ent_num as usize].client as *mut gclient_t;
+            let client = (*self.world).g_entities[ent_num as usize].client;
             (*client).otherKillerMOD = mod_;
             (*client).otherKillerVehWeapon = veh_weapon;
             (*client).otherKillerWeaponType = weapon_type;

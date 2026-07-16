@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use mp_bg::vehicles::vehicle_s::Vehicle_t;
 use mp_qshared::common::mp::ent_fn_ids::{
     EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
 };
@@ -16,6 +17,9 @@ use mp_qshared::common::mp::gentity::{
 };
 use mp_qshared::common::mp::qcommon::{entityState_t, gitem_t, parms_t, playerState_t};
 use mp_qshared::shared::{entityShared_t, qboolean, vec3_t};
+
+use crate::client::gclient::gclient_t;
+use crate::npc::g_npc_t::gNPC_t;
 
 /// Raven MP `gentity_t`.
 ///
@@ -30,16 +34,9 @@ pub struct gentity_t {
     /// Ptr to playerstate if applicable (for bg ents).
     /// Raven field source: `oracle/codemp/game/g_local.h:136`
     pub playerState: *mut playerState_t,
-    //TODO: Port Vehicle_t
-    // Source: oracle/codemp/game/bg_vehicles.h:477 (used *mut only via g_local.h:137)
-    // `Vehicle_t` IS ported (`mp_bg::vehicles::vehicle_s::Vehicle_t`), but it
-    // cannot be named here: `gentity_t` lives in `mp_qshared` (the abi seam names
-    // `*mut gentity_t`) and `mp_qshared` sits below `mp_bg` in the tier graph
-    // (native < qshared < bg < game), so it may not depend on `mp_bg`. `*mut
-    // c_void` is ABI-identical to `*mut Vehicle_t` (pointer-sized). Restoring the
-    // real type needs the abi-seam refactor that moves `gentity_t` to a tier that
-    // can see `mp_bg` (same blocker as the `client: *mut c_void` field below).
-    pub m_pVehicle: *mut c_void,
+    /// Real type restored per DEC-26 (`gentity_t` now lives in `mp_game`).
+    /// Raven field source: `oracle/codemp/game/bg_vehicles.h:477` (via `g_local.h:137`)
+    pub m_pVehicle: *mut Vehicle_t,
     /// G2 instance.
     /// Raven field source: `oracle/codemp/game/g_local.h:138`
     pub ghoul2: *mut c_void,
@@ -95,20 +92,12 @@ pub struct gentity_t {
     pub next_roff_time: c_int,
     /// DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER EXPECTS THE FIELDS IN THAT ORDER.
     ///
-    // Raven: `struct gclient_s *client` (g_local.h:173). `gclient_s` IS ported
-    // (mp_game, 7344 B) — this is not a missing type. It stays `*mut c_void` by
-    // tiering: `gentity_t` lives in mp_qshared because the sub-game abi seam
-    // (mp_abi) names `*mut gentity_t` in ~18 syscalls, and mp_qshared cannot
-    // depend on the game tier where `gclient_s` lives. `*mut c_void` is
-    // ABI-identical to `*mut gclient_s` (both pointer-sized). A future abi-seam
-    // refactor could move `gentity_t` to mp_game and restore the real type.
-    // Source: oracle/codemp/game/g_local.h:173
-    pub client: *mut c_void,
-    //TODO: Port gNPC_t
-    // Source: oracle/codemp/game/b_public.h (used *mut only via g_local.h:175)
-    // pub NPC: *mut gNPC_t,
-    /// Placeholder for `gNPC_t *NPC` until `gNPC_t` is ported.
-    pub NPC: *mut c_void,
+    /// Real type restored per DEC-26 (`gentity_t` now lives in `mp_game`).
+    /// Raven field source: `oracle/codemp/game/g_local.h:173`
+    pub client: *mut gclient_t,
+    /// Real type restored per DEC-26 (`gentity_t` now lives in `mp_game`).
+    /// Raven field source: `oracle/codemp/game/g_local.h:175` (`b_public.h`)
+    pub NPC: *mut gNPC_t,
     /// Makes them look for another enemy on the same team if the one they're after can't be hit.
     /// Raven field source: `oracle/codemp/game/g_local.h:176`
     pub cantHitEnemyCounter: c_int,
@@ -411,9 +400,10 @@ pub struct gentity_t {
 
 // Layout parity contract. `gentity_t` carries pointers, so its layout is
 // arch-dependent; the literal offsets are pinned to the host-64-bit build (only
-// `offset_of(s) == 0` is arch-independent). The `*mut c_void` placeholders for
-// `m_pVehicle`/`client`/`NPC` occupy the same 8 bytes as their real pointee
-// pointers, so these offsets hold regardless of those types being ported.
+// `offset_of(s) == 0` is arch-independent). `m_pVehicle`/`client`/`NPC` carry
+// their real pointee types (`Vehicle_t`/`gclient_t`/`gNPC_t`, restored per
+// DEC-26); each is one pointer wide, so these offsets are unchanged from the
+// earlier `*mut c_void` form.
 // Source: `oracle/codemp/game/g_local.h:133-359`
 //
 // The 10 stored `gentity_t*` fields (`parent`..`teammaster`, all after

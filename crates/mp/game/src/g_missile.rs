@@ -573,11 +573,8 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 &mut ctx.world.g_entities[(*other).r.ownerNum as usize] as *mut gentity_t;
             if (*otherOwner).takedamage != 0
                 && !(*otherOwner).client.is_null()
-                && (*((*otherOwner).client as *mut gclient_t))
-                    .ps
-                    .duelInProgress
-                    != 0
-                && (*((*otherOwner).client as *mut gclient_t)).ps.duelIndex != (*ent).r.ownerNum
+                && (*((*otherOwner).client)).ps.duelInProgress != 0
+                && (*((*otherOwner).client)).ps.duelIndex != (*ent).r.ownerNum
             {
                 // Jump to killProj label
                 let mut dir: vec3_t = [0.0, 0.0, 1.0];
@@ -629,8 +626,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                                 .client
                                 .is_null()
                         {
-                            (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client
-                                as *mut gclient_t))
+                            (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client))
                                 .accuracy_hits += 1;
                         }
                     }
@@ -647,8 +643,8 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         } else if isKnockedSaber == 0 {
             if (*other).takedamage != 0
                 && !(*other).client.is_null()
-                && (*((*other).client as *mut gclient_t)).ps.duelInProgress != 0
-                && (*((*other).client as *mut gclient_t)).ps.duelIndex != (*ent).r.ownerNum
+                && (*((*other).client)).ps.duelInProgress != 0
+                && (*((*other).client)).ps.duelIndex != (*ent).r.ownerNum
             {
                 // Jump to killProj label
                 let mut dir: vec3_t = [0.0, 0.0, 1.0];
@@ -700,8 +696,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                                 .client
                                 .is_null()
                         {
-                            (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client
-                                as *mut gclient_t))
+                            (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client))
                                 .accuracy_hits += 1;
                         }
                     }
@@ -773,7 +768,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             let mut fwd: vec3_t = [0.0; 3];
             if !(*other).client.is_null() {
                 crate::q_math::AngleVectors(
-                    (*((*other).client as *mut gclient_t)).ps.viewangles,
+                    (*((*other).client)).ps.viewangles,
                     Some(&mut fwd),
                     None,
                     None,
@@ -799,7 +794,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int
             && (*ent).methodOfDeath != MOD_CONC as c_int
             && (*ent).methodOfDeath != MOD_CONC_ALT as c_int
-            && (*((*other).client as *mut gclient_t)).ps.saberBlockTime < ctx.world.level.time
+            && (*((*other).client)).ps.saberBlockTime < ctx.world.level.time
             && isKnockedSaber == 0
             && {
                 let other_eid = ctx.entity_id_of(other);
@@ -807,8 +802,8 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             } != 0
         {
             let mut fwd: vec3_t = [0.0; 3];
-            let otherDefLevel = (*((*other).client as *mut gclient_t)).ps.fd.forcePowerLevel
-                [FP_SABER_DEFENSE as usize];
+            let otherDefLevel =
+                (*((*other).client)).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
 
             let te = G_TempEntity(ctx, (*ent).r.currentOrigin, EV_SABER_BLOCK as c_int);
             crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*te).s.origin);
@@ -818,8 +813,8 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             (*te).s.legsAnim = 0;
 
             let mut adjusted_def_level = otherDefLevel;
-            if (*((*other).client as *mut gclient_t)).ps.velocity[2] > 0.0
-                || (*((*other).client as *mut gclient_t)).pers.cmd.forwardmove < 0
+            if (*((*other).client)).ps.velocity[2] > 0.0
+                || (*((*other).client)).pers.cmd.forwardmove < 0
             {
                 adjusted_def_level -= 1;
                 if adjusted_def_level < 0 {
@@ -828,7 +823,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             }
 
             crate::q_math::AngleVectors(
-                (*((*other).client as *mut gclient_t)).ps.viewangles,
+                (*((*other).client)).ps.viewangles,
                 Some(&mut fwd),
                 None,
                 None,
@@ -842,12 +837,12 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 let other_eid = ctx.entity_id_of(other).unwrap();
                 G_ReflectMissile(ctx, other_eid, ent_id, fwd);
             }
-            (*((*other).client as *mut gclient_t)).ps.saberBlockTime =
+            (*((*other).client)).ps.saberBlockTime =
                 ctx.world.level.time + (350 - (adjusted_def_level * 100));
-            (*((*other).client as *mut gclient_t)).ps.saberEventFlags |= SEF_DEFLECTED;
+            (*((*other).client)).ps.saberEventFlags |= SEF_DEFLECTED;
 
             if adjusted_def_level == FORCE_LEVEL_3 as c_int {
-                (*((*other).client as *mut gclient_t)).ps.saberBlockTime = 0;
+                (*((*other).client)).ps.saberBlockTime = 0;
             }
 
             if adjusted_def_level == FORCE_LEVEL_1 as c_int {
@@ -873,9 +868,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 let mut fwd: vec3_t = [0.0; 3];
                 // Deflect it even if we can't actually block it because it hit
                 // our saber — triggers the defender's saber-block animation.
-                if !(*otherOwner).client.is_null()
-                    && (*((*otherOwner).client as *mut gclient_t)).ps.weaponTime <= 0
-                {
+                if !(*otherOwner).client.is_null() && (*((*otherOwner).client)).ps.weaponTime <= 0 {
                     crate::w_saber::WP_SaberBlockNonRandom(
                         &*(otherOwner as *mut gentity_t),
                         (*ent).r.currentOrigin,
@@ -889,16 +882,10 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 (*te).s.weapon = 0;
                 (*te).s.legsAnim = 0;
 
-                let mut other_def_level = (*((*otherOwner).client as *mut gclient_t))
-                    .ps
-                    .fd
-                    .forcePowerLevel[FP_SABER_DEFENSE as usize];
-                if (*((*otherOwner).client as *mut gclient_t)).ps.velocity[2] > 0.0
-                    || (*((*otherOwner).client as *mut gclient_t))
-                        .pers
-                        .cmd
-                        .forwardmove
-                        < 0
+                let mut other_def_level =
+                    (*((*otherOwner).client)).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
+                if (*((*otherOwner).client)).ps.velocity[2] > 0.0
+                    || (*((*otherOwner).client)).pers.cmd.forwardmove < 0
                 {
                     other_def_level -= 1;
                     if other_def_level < 0 {
@@ -907,7 +894,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 }
 
                 crate::q_math::AngleVectors(
-                    (*((*otherOwner).client as *mut gclient_t)).ps.viewangles,
+                    (*((*otherOwner).client)).ps.viewangles,
                     Some(&mut fwd),
                     None,
                     None,
@@ -922,17 +909,12 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                     let otherowner_eid = ctx.entity_id_of(otherOwner).unwrap();
                     G_ReflectMissile(ctx, otherowner_eid, ent_id, fwd);
                 }
-                (*((*otherOwner).client as *mut gclient_t))
-                    .ps
-                    .saberBlockTime = ctx.world.level.time + (350 - (other_def_level * 100));
-                (*((*otherOwner).client as *mut gclient_t))
-                    .ps
-                    .saberEventFlags |= SEF_DEFLECTED;
+                (*((*otherOwner).client)).ps.saberBlockTime =
+                    ctx.world.level.time + (350 - (other_def_level * 100));
+                (*((*otherOwner).client)).ps.saberEventFlags |= SEF_DEFLECTED;
 
                 if other_def_level == FORCE_LEVEL_3 as c_int {
-                    (*((*otherOwner).client as *mut gclient_t))
-                        .ps
-                        .saberBlockTime = 0;
+                    (*((*otherOwner).client)).ps.saberBlockTime = 0;
                 }
 
                 if other_def_level == FORCE_LEVEL_1 as c_int {
@@ -966,9 +948,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 let other_eid = ctx.entity_id_of(other).unwrap();
                 let owner_eid = ctx.entity_id_of(owner_ent);
                 if LogAccuracyHit(ctx, other_eid, owner_eid) != 0 {
-                    (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client
-                        as *mut gclient_t))
-                        .accuracy_hits += 1;
+                    (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client)).accuracy_hits += 1;
                     hitClient = qtrue;
                 }
 
@@ -1027,7 +1007,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 }
 
                 if didDmg != 0 && !(*other).client.is_null() {
-                    let npc_class = (*((*other).client as *mut gclient_t)).NPC_class;
+                    let npc_class = (*((*other).client)).NPC_class;
                     if npc_class == CLASS_SEEKER
                         || npc_class == CLASS_PROBE
                         || npc_class == CLASS_MOUSE
@@ -1041,21 +1021,16 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                         || npc_class == CLASS_ATST
                         || npc_class == CLASS_SENTRY
                     {
-                        if (*((*other).client as *mut gclient_t)).ps.electrifyTime
-                            < ctx.world.level.time + 100
-                        {
-                            (*((*other).client as *mut gclient_t)).ps.electrifyTime =
-                                ctx.world.level.time + 450;
+                        if (*((*other).client)).ps.electrifyTime < ctx.world.level.time + 100 {
+                            (*((*other).client)).ps.electrifyTime = ctx.world.level.time + 450;
                         }
                     }
                 }
             }
 
             if (*ent).s.weapon == WP_DEMP2 {
-                if !(*other).client.is_null()
-                    && (*((*other).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE
-                {
-                    let other_vehicle = (*other).m_pVehicle as *mut Vehicle_t;
+                if !(*other).client.is_null() && (*((*other).client)).NPC_class == CLASS_VEHICLE {
+                    let other_vehicle = (*other).m_pVehicle;
                     if !other_vehicle.is_null()
                         && !(*other_vehicle).m_pVehicleInfo.is_null()
                         && ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_SPEEDER
@@ -1065,37 +1040,29 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                                     (*ent).classname,
                                     c"vehicle_proj".as_ptr() as *const c_char,
                                 ) == 0))
-                        && FighterIsLanded(
-                            other_vehicle,
-                            &mut (*((*other).client as *mut gclient_t)).ps,
-                        ) == 0
+                        && FighterIsLanded(other_vehicle, &mut (*((*other).client)).ps) == 0
                         && (((*other).spawnflags & 2) == 0)
                     {
-                        if (*((*other).client as *mut gclient_t)).ps.electrifyTime
-                            > ctx.world.level.time
-                        {
-                            (*((*other).client as *mut gclient_t)).ps.electrifyTime +=
+                        if (*((*other).client)).ps.electrifyTime > ctx.world.level.time {
+                            (*((*other).client)).ps.electrifyTime +=
                                 ctx.world.bg_state.rng.Q_irand(200, 500);
-                            if (*((*other).client as *mut gclient_t)).ps.electrifyTime
-                                > ctx.world.level.time + 4000
-                            {
-                                (*((*other).client as *mut gclient_t)).ps.electrifyTime =
-                                    ctx.world.level.time + 4000;
+                            if (*((*other).client)).ps.electrifyTime > ctx.world.level.time + 4000 {
+                                (*((*other).client)).ps.electrifyTime = ctx.world.level.time + 4000;
                             }
                         } else {
-                            (*((*other).client as *mut gclient_t)).ps.electrifyTime =
+                            (*((*other).client)).ps.electrifyTime =
                                 ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(200, 500);
                         }
                     }
                 } else if !(*other).client.is_null()
-                    && (*((*other).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0
+                    && (*((*other).client)).ps.powerups[PW_CLOAKED as usize] != 0
                 {
                     let other_eid = ctx.entity_id_of(other);
                     Jedi_Decloak(ctx, other_eid);
                     if (*ent).methodOfDeath == MOD_DEMP2_ALT as c_int {
-                        (*((*other).client as *mut gclient_t)).cloakToggleTime = Q3_INFINITE;
+                        (*((*other).client)).cloakToggleTime = Q3_INFINITE;
                     } else {
-                        (*((*other).client as *mut gclient_t)).cloakToggleTime =
+                        (*((*other).client)).cloakToggleTime =
                             ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
                     }
                 }
@@ -1156,9 +1123,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                         .client
                         .is_null()
                 {
-                    (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client
-                        as *mut gclient_t))
-                        .accuracy_hits += 1;
+                    (*(ctx.world.g_entities[(*ent).r.ownerNum as usize].client)).accuracy_hits += 1;
                 }
             }
         }
@@ -1237,9 +1202,8 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
             if tr.fraction != 1.0 && (tr.entityNum as usize) < ENTITYNUM_WORLD as usize {
                 let g2Hit = &mut ctx.world.g_entities[tr.entityNum as usize];
                 if (*g2Hit).inuse != 0 && !(*g2Hit).client.is_null() && !(*g2Hit).ghoul2.is_null() {
-                    (*((*g2Hit).client as *mut gclient_t)).g2LastSurfaceHit =
-                        tr.surfaceFlags as c_int;
-                    (*((*g2Hit).client as *mut gclient_t)).g2LastSurfaceTime = ctx.world.level.time;
+                    (*((*g2Hit).client)).g2LastSurfaceHit = tr.surfaceFlags as c_int;
+                    (*((*g2Hit).client)).g2LastSurfaceTime = ctx.world.level.time;
                 }
                 if !(*g2Hit).ghoul2.is_null() {
                     tr.surfaceFlags = 0;
@@ -1333,7 +1297,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
                     if let Some(parent_id) = (*ent).parent {
                         let parent_ptr = ent_resolve(ctx, parent_id);
                         if !(*parent_ptr).client.is_null() {
-                            let client_ptr = (*parent_ptr).client as *mut gclient_t;
+                            let client_ptr = (*parent_ptr).client;
                             if (*client_ptr).hook == Some(ent_id(ent_base(ctx), ent)) {
                                 (*client_ptr).hook = None;
                             }

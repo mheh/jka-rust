@@ -170,7 +170,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
 
         (*cl).ps.fd.saberAnimLevel = (*cl).sess.saberLevel;
 
@@ -578,7 +578,7 @@ pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
 
         (*cl).ps.saberAttackChainCount = 0;
 
@@ -687,7 +687,7 @@ pub fn ForcePowerUsableOn(
 
         if !other.is_null()
             && !(*other).client.is_null()
-            && BG_HasYsalamiri(gametype, &mut (*((*other).client as *mut gclient_t)).ps) != 0
+            && BG_HasYsalamiri(gametype, &mut (*((*other).client)).ps) != 0
         {
             return 0;
         }
@@ -696,7 +696,7 @@ pub fn ForcePowerUsableOn(
             && !(*attacker).client.is_null()
             && BG_CanUseFPNow(
                 gametype,
-                &mut (*((*attacker).client as *mut gclient_t)).ps,
+                &mut (*((*attacker).client)).ps,
                 level_time,
                 forcePower,
             ) == 0
@@ -707,14 +707,14 @@ pub fn ForcePowerUsableOn(
         //Dueling fighters cannot use force powers on others, with the exception of force push when locked with each other
         if !attacker.is_null()
             && !(*attacker).client.is_null()
-            && (*((*attacker).client as *mut gclient_t)).ps.duelInProgress != 0
+            && (*((*attacker).client)).ps.duelInProgress != 0
         {
             return 0;
         }
 
         if !other.is_null()
             && !(*other).client.is_null()
-            && (*((*other).client as *mut gclient_t)).ps.duelInProgress != 0
+            && (*((*other).client)).ps.duelInProgress != 0
         {
             return 0;
         }
@@ -722,30 +722,24 @@ pub fn ForcePowerUsableOn(
         if forcePower == FP_GRIP {
             if !other.is_null()
                 && !(*other).client.is_null()
-                && (*((*other).client as *mut gclient_t))
-                    .ps
-                    .fd
-                    .forcePowersActive
-                    & (1 << FP_ABSORB)
-                    != 0
+                && (*((*other).client)).ps.fd.forcePowersActive & (1 << FP_ABSORB) != 0
             {
                 //don't allow gripping to begin with if they are absorbing
                 //play sound indicating that attack was absorbed
-                if (*((*other).client as *mut gclient_t)).forcePowerSoundDebounce < level_time {
+                if (*((*other).client)).forcePowerSoundDebounce < level_time {
                     let abSound = G_PreDefSound(
                         ctx,
-                        (*((*other).client as *mut gclient_t)).ps.origin,
+                        (*((*other).client)).ps.origin,
                         PDSOUND_ABSORBHIT as c_int,
                     );
                     (*abSound).s.trickedentindex = (*other).s.number;
-                    (*((*other).client as *mut gclient_t)).forcePowerSoundDebounce =
-                        level_time + 400;
+                    (*((*other).client)).forcePowerSoundDebounce = level_time + 400;
                 }
                 return 0;
             } else if !other.is_null()
                 && !(*other).client.is_null()
-                && (*((*other).client as *mut gclient_t)).ps.weapon == WP_SABER
-                && BG_SaberInSpecial((*((*other).client as *mut gclient_t)).ps.saberMove) != 0
+                && (*((*other).client)).ps.weapon == WP_SABER
+                && BG_SaberInSpecial((*((*other).client)).ps.saberMove) != 0
             {
                 //don't grip person while they are in a special or some really bad things can happen.
                 return 0;
@@ -756,7 +750,7 @@ pub fn ForcePowerUsableOn(
             && !(*other).client.is_null()
             && (forcePower == FP_PUSH || forcePower == FP_PULL)
         {
-            if BG_InKnockDown((*((*other).client as *mut gclient_t)).ps.legsAnim) != 0 {
+            if BG_InKnockDown((*((*other).client)).ps.legsAnim) != 0 {
                 return 0;
             }
         }
@@ -800,7 +794,7 @@ pub fn WP_ForcePowerAvailable(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let drain = if overrideAmt != 0 {
             overrideAmt
         } else {
@@ -836,13 +830,7 @@ pub fn WP_ForcePowerInUse(self_: &gentity_t, forcePower: forcePowers_t) -> qbool
     // STAGE-1: ctx-free leaf borrow(s); raw re-derived verbatim (Stage-2 debt).
     let self_: *const gentity_t = self_;
     unsafe {
-        if (*((*self_).client as *mut gclient_t))
-            .ps
-            .fd
-            .forcePowersActive
-            & (1 << forcePower)
-            != 0
-        {
+        if (*((*self_).client)).ps.fd.forcePowersActive & (1 << forcePower) != 0 {
             //already using this power
             return qtrue;
         }
@@ -861,7 +849,7 @@ pub fn WP_ForcePowerUsable(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let gametype = ctx.world.cvars.g_gametype.integer;
         let level_time = ctx.world.level.time;
 
@@ -999,7 +987,7 @@ pub fn WP_AbsorbConversion(
             return -1;
         }
 
-        let atcl = (*attacked).client as *mut gclient_t;
+        let atcl = (*attacked).client;
         if (*atcl).ps.fd.forcePowersActive & (1 << FP_ABSORB) == 0 {
             //absorb is not active
             return -1;
@@ -1047,7 +1035,7 @@ pub fn WP_ForcePowerRegenerate(self_: &gentity_t, overrideAmt: c_int) {
         if (*self_).client.is_null() {
             return;
         }
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
 
         if overrideAmt != 0 {
             //custom regen amount
@@ -1076,7 +1064,7 @@ pub fn WP_ForcePowerStart(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let mut duration: c_int = 0;
         let mut hearable = qfalse;
@@ -1266,7 +1254,7 @@ pub fn ForceHeal(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
 
         if (*self_).health <= 0 {
             return;
@@ -1344,7 +1332,7 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut radius: f32 = 256.0;
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let mut numpl: usize = 0;
         let mut pl: [usize; MAX_CLIENTS as usize] = [0; MAX_CLIENTS as usize];
@@ -1376,9 +1364,9 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
             if !(*ent).client.is_null()
                 && self_ != ent
                 && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) != 0
-                && (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize]
-                    < (*((*ent).client as *mut gclient_t)).ps.stats[STAT_MAX_HEALTH as usize]
-                && (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] > 0
+                && (*((*ent).client)).ps.stats[STAT_HEALTH as usize]
+                    < (*((*ent).client)).ps.stats[STAT_MAX_HEALTH as usize]
+                && (*((*ent).client)).ps.stats[STAT_HEALTH as usize] > 0
                 && ForcePowerUsableOn(
                     ctx,
                     ctx.entity_id_of(self_),
@@ -1389,14 +1377,14 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
                     ctx.engine,
                     GInPvsArgs::new(
                         &(*cl).ps.origin as *const vec3_t,
-                        &(*((*ent).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                        &(*((*ent).client)).ps.origin as *const vec3_t,
                     ),
                 ) != 0
             {
                 let a: vec3_t = [
-                    (*cl).ps.origin[0] - (*((*ent).client as *mut gclient_t)).ps.origin[0],
-                    (*cl).ps.origin[1] - (*((*ent).client as *mut gclient_t)).ps.origin[1],
-                    (*cl).ps.origin[2] - (*((*ent).client as *mut gclient_t)).ps.origin[2],
+                    (*cl).ps.origin[0] - (*((*ent).client)).ps.origin[0],
+                    (*cl).ps.origin[1] - (*((*ent).client)).ps.origin[1],
+                    (*cl).ps.origin[2] - (*((*ent).client)).ps.origin[2],
                 ];
 
                 if VectorLength(a) <= radius {
@@ -1422,7 +1410,7 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
 
         for i in 0..numpl {
             let ent = &mut ctx.world.g_entities[pl[i]] as *mut gentity_t;
-            let ocl = (*ent).client as *mut gclient_t;
+            let ocl = (*ent).client;
             if (*ocl).ps.stats[STAT_HEALTH as usize] > 0 && (*ent).health > 0 {
                 (*ocl).ps.stats[STAT_HEALTH as usize] += healthadd;
                 if (*ocl).ps.stats[STAT_HEALTH as usize] > (*ocl).ps.stats[STAT_MAX_HEALTH as usize]
@@ -1464,7 +1452,7 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         let mut radius: f32 = 256.0;
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let mut numpl: usize = 0;
         let mut pl: [usize; MAX_CLIENTS as usize] = [0; MAX_CLIENTS as usize];
@@ -1496,7 +1484,7 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
             if !(*ent).client.is_null()
                 && self_ != ent
                 && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) != 0
-                && (*((*ent).client as *mut gclient_t)).ps.fd.forcePower < 100
+                && (*((*ent).client)).ps.fd.forcePower < 100
                 && ForcePowerUsableOn(
                     ctx,
                     ctx.entity_id_of(self_),
@@ -1507,14 +1495,14 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
                     ctx.engine,
                     GInPvsArgs::new(
                         &(*cl).ps.origin as *const vec3_t,
-                        &(*((*ent).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                        &(*((*ent).client)).ps.origin as *const vec3_t,
                     ),
                 ) != 0
             {
                 let a: vec3_t = [
-                    (*cl).ps.origin[0] - (*((*ent).client as *mut gclient_t)).ps.origin[0],
-                    (*cl).ps.origin[1] - (*((*ent).client as *mut gclient_t)).ps.origin[1],
-                    (*cl).ps.origin[2] - (*((*ent).client as *mut gclient_t)).ps.origin[2],
+                    (*cl).ps.origin[0] - (*((*ent).client)).ps.origin[0],
+                    (*cl).ps.origin[1] - (*((*ent).client)).ps.origin[1],
+                    (*cl).ps.origin[2] - (*((*ent).client)).ps.origin[2],
                 ];
 
                 if VectorLength(a) <= radius {
@@ -1546,7 +1534,7 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
 
         for i in 0..numpl {
             let ent = &mut ctx.world.g_entities[pl[i]] as *mut gentity_t;
-            let ocl = (*ent).client as *mut gclient_t;
+            let ocl = (*ent).client;
             (*ocl).ps.fd.forcePower += poweradd;
             if (*ocl).ps.fd.forcePower > 100 {
                 (*ocl).ps.fd.forcePower = 100;
@@ -1571,7 +1559,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -1621,12 +1609,12 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
         if tr.fraction != 1.0
             && tr.entityNum != (ENTITYNUM_NONE) as i16
             && !ctx.world.g_entities[tr.entityNum as usize].client.is_null()
-            && (*(ctx.world.g_entities[tr.entityNum as usize].client as *mut gclient_t))
+            && (*(ctx.world.g_entities[tr.entityNum as usize].client))
                 .ps
                 .fd
                 .forceGripCripple
                 == 0
-            && (*(ctx.world.g_entities[tr.entityNum as usize].client as *mut gclient_t))
+            && (*(ctx.world.g_entities[tr.entityNum as usize].client))
                 .ps
                 .fd
                 .forceGripBeingGripped
@@ -1646,7 +1634,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
         //don't grip someone who's still crippled
         {
             let target = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-            let tcl = (*target).client as *mut gclient_t;
+            let tcl = (*target).client;
 
             if (*target).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0 {
                 //a player on a vehicle
@@ -1656,7 +1644,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
                     && !(*vehEnt).client.is_null()
                     && !(*vehEnt).m_pVehicle.is_null()
                 {
-                    let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                    let pVeh = (*vehEnt).m_pVehicle;
                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                         || (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_ANIMAL
                     {
@@ -1685,7 +1673,7 @@ pub fn ForceSpeed(ctx: &mut GameContext, self_: EntityId, forceDuration: c_int) 
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -1745,7 +1733,7 @@ pub fn ForceSeeing(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -1791,7 +1779,7 @@ pub fn ForceProtect(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -1838,7 +1826,7 @@ pub fn ForceAbsorb(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -1885,7 +1873,7 @@ pub fn ForceRage(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -1947,7 +1935,7 @@ pub fn ForceLightning(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -2003,7 +1991,7 @@ pub fn ForceLightningDamage(
     let traceEnt: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), traceEnt) };
     unsafe {
-        let scl = (*self_).client as *mut gclient_t;
+        let scl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         (*scl).dangerTime = level_time;
@@ -2019,7 +2007,7 @@ pub fn ForceLightningDamage(
             }
             if !(*traceEnt).client.is_null() {
                 //an enemy or object
-                let tcl = (*traceEnt).client as *mut gclient_t;
+                let tcl = (*traceEnt).client;
                 if (*tcl).noLightningTime >= level_time {
                     //give them power and don't hurt them.
                     (*tcl).ps.fd.forcePower += 1;
@@ -2125,7 +2113,7 @@ pub fn ForceShootLightning(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let scl = (*self_).client as *mut gclient_t;
+        let scl = (*self_).client;
 
         if (*self_).health <= 0 {
             return;
@@ -2314,7 +2302,7 @@ pub fn ForceDrain(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*self_).health <= 0 {
@@ -2369,7 +2357,7 @@ pub fn ForceDrainDamage(
     let traceEnt: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), traceEnt) };
     unsafe {
-        let scl = (*self_).client as *mut gclient_t;
+        let scl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         (*scl).dangerTime = level_time;
@@ -2377,7 +2365,7 @@ pub fn ForceDrainDamage(
         (*scl).invulnerableTimer = 0;
 
         if !traceEnt.is_null() && (*traceEnt).takedamage != 0 {
-            let tcl = (*traceEnt).client as *mut gclient_t;
+            let tcl = (*traceEnt).client;
             if !(*traceEnt).client.is_null()
                 && (OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(traceEnt)) == 0
                     || ctx.world.cvars.g_friendlyFire.integer != 0)
@@ -2473,7 +2461,7 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let scl = (*self_).client as *mut gclient_t;
+        let scl = (*self_).client;
         let level_time = ctx.world.level.time;
         let mut gotOneOrMore = 0;
 
@@ -2527,7 +2515,7 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
                 if (*traceEnt).client.is_null() {
                     continue;
                 }
-                let tcl = (*traceEnt).client as *mut gclient_t;
+                let tcl = (*traceEnt).client;
                 if (*tcl).ps.fd.forcePower == 0 {
                     continue;
                 }
@@ -2673,7 +2661,7 @@ pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercm
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let forceJumpChargeInterval: f32 =
             forceJumpStrength[0] / (FORCE_JUMP_CHARGE_TIME as f32 / FRAMETIME as f32);
@@ -2770,7 +2758,7 @@ pub fn WP_GetVelocityForForceJump(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
 
         let mut pushFwd: f32 = 0.0;
         let mut pushRt: f32 = 0.0;
@@ -2850,7 +2838,7 @@ pub fn ForceJump(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*cl).ps.fd.forcePowerDuration[FP_LEVITATION as usize] > level_time {
@@ -2935,7 +2923,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let mut targetLive = qfalse;
         let mut mindTrickDone = qfalse;
         let radius: f32 = (MAX_TRICK_DISTANCE) as f32;
@@ -2974,14 +2962,12 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 
         let traceEnt = &mut ctx.world.g_entities[(*tr).entityNum as usize] as *mut gentity_t;
 
-        if !(*traceEnt).NPC.is_null()
-            && (*((*traceEnt).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_FORCE != 0
-        {
+        if !(*traceEnt).NPC.is_null() && (*((*traceEnt).NPC)).scriptFlags & SCF_NO_FORCE != 0 {
             return qfalse;
         }
 
         if !(*traceEnt).client.is_null() {
-            let tcl = (*traceEnt).client as *mut gclient_t;
+            let tcl = (*traceEnt).client;
             match (*tcl).NPC_class {
                 CLASS_GALAKMECH | CLASS_ATST | CLASS_PROBE | CLASS_GONK | CLASS_R2D2
                 | CLASS_R5D2 | CLASS_MARK1 | CLASS_MARK2 | CLASS_MOUSE | CLASS_SEEKER
@@ -2999,8 +2985,8 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
 
         if targetLive != 0 && !(*traceEnt).NPC.is_null() {
             //hit an organic non-player
-            let npc = (*traceEnt).NPC as *mut gNPC_t;
-            let tcl = (*traceEnt).client as *mut gclient_t;
+            let npc = (*traceEnt).NPC;
+            let tcl = (*traceEnt).client;
             let mut over_ride: c_int = 0;
 
             if G_ActivateBehavior(ctx, ctx.entity_id_of(traceEnt), (BSET_MINDTRICK) as i32) != 0 {
@@ -3170,7 +3156,7 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         let mut tr: trace_t = core::mem::zeroed();
@@ -3255,8 +3241,8 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
                 && tr.entityNum != (ENTITYNUM_NONE) as i16
                 && (*ent).inuse != 0
                 && !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).pers.connected != 0
-                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+                && (*((*ent).client)).pers.connected != 0
+                && (*((*ent).client)).sess.sessionTeam != TEAM_SPECTATOR
             {
                 WP_AddAsMindtricked(&mut (*cl).ps.fd, (tr.entityNum) as i32);
                 if tookPower == 0 {
@@ -3296,7 +3282,7 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
                 {
                     let mut thispush_org: vec3_t;
                     if !(*ent).client.is_null() {
-                        thispush_org = (*((*ent).client as *mut gclient_t)).ps.origin;
+                        thispush_org = (*((*ent).client)).ps.origin;
                     } else {
                         thispush_org = (*ent).s.pos.trBase;
                     }
@@ -3382,7 +3368,7 @@ pub fn CanCounterThrow(
     let thrower: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), thrower) };
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let powerUse: forcePowers_t;
 
@@ -3415,7 +3401,7 @@ pub fn CanCounterThrow(
             && !(*thrower).client.is_null()
         {
             //in siege, pull will affect people if they are not facing you, so they can't run away so much
-            let tcl = (*thrower).client as *mut gclient_t;
+            let tcl = (*thrower).client;
             let mut d: vec3_t = [
                 (*tcl).ps.origin[0] - (*cl).ps.origin[0],
                 (*tcl).ps.origin[1] - (*cl).ps.origin[1],
@@ -3521,7 +3507,7 @@ pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         (*cl).ps.pm_flags &= !PMF_STUCK_TO_WALL;
         if BG_InReboundJump((*cl).ps.legsAnim) != 0 || BG_InReboundHold((*cl).ps.legsAnim) != 0 {
             (*cl).ps.legsTimer = 0;
@@ -3545,7 +3531,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
         let mut push_list: [*mut gentity_t; MAX_GENTITIES as usize] =
@@ -3767,7 +3753,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                 }
 
                 let thispush_org: vec3_t = if !(*ent).client.is_null() {
-                    (*((*ent).client as *mut gclient_t)).ps.origin
+                    (*((*ent).client)).ps.origin
                 } else {
                     (*ent).s.pos.trBase
                 };
@@ -3882,9 +3868,9 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                     continue;
                                 }
                             }
-                        } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_GALAKMECH
-                            || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_ATST
-                            || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_RANCOR
+                        } else if (*((*ent).client)).NPC_class == CLASS_GALAKMECH
+                            || (*((*ent).client)).NPC_class == CLASS_ATST
+                            || (*((*ent).client)).NPC_class == CLASS_RANCOR
                         {
                             //can't push ATST or Galak or Rancor
                             continue;
@@ -4004,7 +3990,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                 let mut modPowerLevel = powerLevel;
 
                 if !(*push_list[x]).client.is_null() {
-                    let pcl = (*push_list[x]).client as *mut gclient_t;
+                    let pcl = (*push_list[x]).client;
                     modPowerLevel = WP_AbsorbConversion(
                         ctx,
                         ctx.entity_id_of(push_list[x]).unwrap(),
@@ -4023,14 +4009,14 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                 pushPower = 256 * modPowerLevel;
 
                 let thispush_org: vec3_t = if !(*push_list[x]).client.is_null() {
-                    (*((*push_list[x]).client as *mut gclient_t)).ps.origin
+                    (*((*push_list[x]).client)).ps.origin
                 } else {
                     (*push_list[x]).s.origin
                 };
 
                 if !(*push_list[x]).client.is_null() {
                     //FIXME: make enemy jedi able to hunker down and resist this?
-                    let pcl = (*push_list[x]).client as *mut gclient_t;
+                    let pcl = (*push_list[x]).client;
                     let mut otherPushPower = (*pcl).ps.fd.forcePowerLevel[powerUse as usize];
                     let mut canPullWeapon = qtrue;
                     let mut dirLen: f32 = 0.0;
@@ -4207,7 +4193,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                     && !(*vehEnt).client.is_null()
                                     && !(*vehEnt).m_pVehicle.is_null()
                                 {
-                                    let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                                    let pVeh = (*vehEnt).m_pVehicle;
                                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                                         || (*(*pVeh).m_pVehicleInfo).r#type
                                             == vehicleType_t::VH_ANIMAL
@@ -4468,7 +4454,7 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let wasActive = (*cl).ps.fd.forcePowersActive;
 
@@ -4524,12 +4510,7 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
                     && !(*gripEnt).client.is_null()
                     && (*gripEnt).health > 0
                     && (*gripEnt).inuse != 0
-                    && (level_time as f32
-                        - (*((*gripEnt).client as *mut gclient_t))
-                            .ps
-                            .fd
-                            .forceGripStarted)
-                        > 500.0
+                    && (level_time as f32 - (*((*gripEnt).client)).ps.fd.forceGripStarted) > 500.0
                 {
                     //if we had our throat crushed in for more than half a second, gasp for air when we're let go
                     if wasActive & (1 << FP_GRIP) != 0 {
@@ -4544,9 +4525,7 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
                 }
 
                 if !(*gripEnt).client.is_null() && (*gripEnt).inuse != 0 {
-                    (*((*gripEnt).client as *mut gclient_t))
-                        .ps
-                        .forceGripChangeMovetype = PM_NORMAL as c_int;
+                    (*((*gripEnt).client)).ps.forceGripChangeMovetype = PM_NORMAL as c_int;
                 }
 
                 if (*cl).ps.forceHandExtend == HANDEXTEND_FORCE_HOLD as c_int {
@@ -4628,7 +4607,7 @@ pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePow
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         (*cl).dangerTime = level_time;
@@ -4653,13 +4632,11 @@ pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePow
             (*cl).ps.fd.forceGripEntityNum = ENTITYNUM_NONE;
 
             if !gripEnt.is_null() && !(*gripEnt).client.is_null() && (*gripEnt).inuse != 0 {
-                (*((*gripEnt).client as *mut gclient_t))
-                    .ps
-                    .forceGripChangeMovetype = PM_NORMAL as c_int;
+                (*((*gripEnt).client)).ps.forceGripChangeMovetype = PM_NORMAL as c_int;
             }
             return;
         }
-        let gcl = (*gripEnt).client as *mut gclient_t;
+        let gcl = (*gripEnt).client;
 
         let a: vec3_t = [
             (*gcl).ps.origin[0] - (*cl).ps.origin[0],
@@ -4970,7 +4947,7 @@ fn WP_UpdateMindtrickEnts(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let g_time_since = ctx.world.globals.g_TimeSinceLastFrame;
         let gametype = ctx.world.cvars.g_gametype.integer;
@@ -4983,14 +4960,12 @@ fn WP_UpdateMindtrickEnts(ctx: &mut GameContext, self_: EntityId) {
                 if (*ent).client.is_null()
                     || (*ent).inuse == 0
                     || (*ent).health < 1
-                    || ((*((*ent).client as *mut gclient_t)).ps.fd.forcePowersActive
-                        & (1 << FP_SEE))
-                        != 0
+                    || ((*((*ent).client)).ps.fd.forcePowersActive & (1 << FP_SEE)) != 0
                 {
                     RemoveTrickedEnt(&mut (*cl).ps.fd, i);
                 } else if (level_time - (*cl).dangerTime) < g_time_since * 4 {
                     //Untrick this entity if the tricker (self) fires while in his fov
-                    let ecl = (*ent).client as *mut gclient_t;
+                    let ecl = (*ent).client;
                     if trap::InPVS(
                         ctx.engine,
                         GInPvsArgs::new(
@@ -5002,9 +4977,7 @@ fn WP_UpdateMindtrickEnts(ctx: &mut GameContext, self_: EntityId) {
                     {
                         RemoveTrickedEnt(&mut (*cl).ps.fd, i);
                     }
-                } else if BG_HasYsalamiri(gametype, &mut (*((*ent).client as *mut gclient_t)).ps)
-                    != 0
-                {
+                } else if BG_HasYsalamiri(gametype, &mut (*((*ent).client)).ps) != 0 {
                     RemoveTrickedEnt(&mut (*cl).ps.fd, i);
                 }
             }
@@ -5040,7 +5013,7 @@ fn WP_ForcePowerRun(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     // Raven declares `extern usercmd_t ucmd;` here but never references it.
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         match forcePower {
@@ -5255,7 +5228,7 @@ pub fn WP_DoSpecificPower(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
 
         let mut powerSucceeded = 1;
 
@@ -5395,7 +5368,7 @@ pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     //Find another client that would be considered a threat.
     unsafe {
-        let scl = (*self_).client as *mut gclient_t;
+        let scl = (*self_).client;
         let mut besten: *mut gentity_t = core::ptr::null_mut();
         let mut blen: f32 = 99999999.0;
 
@@ -5407,10 +5380,10 @@ pub fn FindGenericEnemyIndex(ctx: &mut GameContext, self_: EntityId) {
                 && (*ent).s.number != (*self_).s.number
                 && (*ent).health > 0
                 && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(ent)) == 0
-                && (*((*ent).client as *mut gclient_t)).ps.pm_type != PM_INTERMISSION as c_int
-                && (*((*ent).client as *mut gclient_t)).ps.pm_type != PM_SPECTATOR as c_int
+                && (*((*ent).client)).ps.pm_type != PM_INTERMISSION as c_int
+                && (*((*ent).client)).ps.pm_type != PM_SPECTATOR as c_int
             {
-                let ecl = (*ent).client as *mut gclient_t;
+                let ecl = (*ent).client;
                 let a: vec3_t = [
                     (*ecl).ps.origin[0] - (*scl).ps.origin[0],
                     (*ecl).ps.origin[1] - (*scl).ps.origin[1],
@@ -5450,7 +5423,7 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
 
         if (*cl).ps.eFlags & EF_SEEKERDRONE == 0 {
@@ -5562,7 +5535,7 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
             } else if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(en)) != 0 {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
             } else {
-                let ecl = (*en).client as *mut gclient_t;
+                let ecl = (*en).client;
                 if InFront((*ecl).ps.origin, (*cl).ps.origin, (*cl).ps.viewangles, 0.8) == 0 {
                     (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
                 } else if OrgVisible(ctx, (*cl).ps.origin, (*ecl).ps.origin, (*self_).s.number) == 0
@@ -5599,7 +5572,7 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
 
             //org is now where the thing should be client-side because it uses the same time-based offset
             if (*cl).ps.droneFireTime < (level_time) as f32 {
-                let ecl = (*en).client as *mut gclient_t;
+                let ecl = (*en).client;
                 let mut tr: trace_t = core::mem::zeroed();
                 trap::Trace(
                     ctx.engine,
@@ -5651,7 +5624,7 @@ pub fn HolocronUpdate(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     //keep holocron status updated in holocron mode
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
 
         let mut noHRank = 0;
 
@@ -5737,7 +5710,7 @@ pub fn JediMasterUpdate(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     //keep jedi master status updated for JM gametype
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
 
         trap::Cvar_Update(
             ctx.engine,
@@ -5814,7 +5787,7 @@ pub fn G_SpecialRollGetup(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let mut rolled: qboolean = qfalse;
         let cmd = &mut (*cl).pers.cmd as *mut usercmd_t;
@@ -5909,7 +5882,7 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
         if (*self_).client.is_null() {
             return;
         }
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let gametype = ctx.world.cvars.g_gametype.integer;
 
@@ -6449,7 +6422,7 @@ pub fn Jedi_DodgeEvasion(
         if self_.is_null() || (*self_).client.is_null() || (*self_).health <= 0 {
             return qfalse;
         }
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         let level_time = ctx.world.level.time;
         let g_forceDodge = ctx.world.cvars.g_forceDodge.integer;
 

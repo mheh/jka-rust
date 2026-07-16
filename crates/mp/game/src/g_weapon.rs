@@ -225,7 +225,7 @@ pub fn W_TraceSetStart(
         }
 
         let mut eyePoint = (*ent).s.pos.trBase;
-        eyePoint[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32;
+        eyePoint[2] += (*((*ent).client)).ps.viewheight as f32;
 
         let mut tr: trace_t = std::mem::zeroed();
         trap::Trace(
@@ -286,9 +286,7 @@ pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: qboolea
         if altFire != qfalse {
             let mut boxSize: f32 = 0.0;
 
-            count = ((ctx.world.level.time
-                - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                as f32
+            count = ((ctx.world.level.time - (*((*ent).client)).ps.weaponChargeTime) as f32
                 / BRYAR_CHARGE_UNIT) as c_int;
 
             if count < 1 {
@@ -612,8 +610,8 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
             damage = DISRUPTOR_MAIN_DAMAGE_SIEGE;
         }
 
-        start = (*((*ent).client as *mut gclient_t)).ps.origin;
-        start[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32; // By eyes
+        start = (*((*ent).client)).ps.origin;
+        start[2] += (*((*ent).client)).ps.viewheight as f32; // By eyes
 
         for i in 0..3 {
             end[i] = start[i] + shotRange * ctx.world.globals.forward[i];
@@ -678,9 +676,8 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                     && !(*traceEnt).client.is_null()
                     && !(*traceEnt).ghoul2.is_null()
                 {
-                    (*((*traceEnt).client as *mut gclient_t)).g2LastSurfaceHit = tr.surfaceFlags;
-                    (*((*traceEnt).client as *mut gclient_t)).g2LastSurfaceTime =
-                        ctx.world.level.time;
+                    (*((*traceEnt).client)).g2LastSurfaceHit = tr.surfaceFlags;
+                    (*((*traceEnt).client)).g2LastSurfaceTime = ctx.world.level.time;
                 }
 
                 if !(*traceEnt).ghoul2.is_null() {
@@ -690,8 +687,8 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
 
             if !traceEnt.is_null()
                 && !(*traceEnt).client.is_null()
-                && (*((*traceEnt).client as *mut gclient_t)).ps.duelInProgress != 0
-                && (*((*traceEnt).client as *mut gclient_t)).ps.duelIndex != (*ent).s.number
+                && (*((*traceEnt).client)).ps.duelInProgress != 0
+                && (*((*traceEnt).client)).ps.duelIndex != (*ent).s.number
             {
                 start = tr.endpos;
                 ignore = (tr.entityNum) as i32;
@@ -709,10 +706,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 continue;
             } else if !traceEnt.is_null()
                 && !(*traceEnt).client.is_null()
-                && (*((*traceEnt).client as *mut gclient_t))
-                    .ps
-                    .fd
-                    .forcePowerLevel[FP_SABER_DEFENSE as usize]
+                && (*((*traceEnt).client)).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize]
                     >= FORCE_LEVEL_3
             {
                 if crate::w_saber::WP_SaberCanBlock(
@@ -781,7 +775,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                         ctx.entity_id_of(ent),
                     ) != qfalse
                 {
-                    (*((*ent).client as *mut gclient_t)).accuracy_hits += 1;
+                    (*((*ent).client)).accuracy_hits += 1;
                 }
 
                 crate::g_combat::G_Damage(
@@ -833,7 +827,7 @@ pub fn G_CanDisruptify(ent: Option<&gentity_t>) -> qboolean {
             return qtrue;
         }
 
-        let veh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        let veh = (*ent).m_pVehicle;
         if (*(*veh).m_pVehicleInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_ANIMAL {
             // animal is only type that can be disintigeiteigerated
             return qtrue;
@@ -869,12 +863,10 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
         let mut fullCharge = qfalse;
 
         if !(*ent).client.is_null() {
-            start = (*((*ent).client as *mut gclient_t)).ps.origin;
-            start[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32;
+            start = (*((*ent).client)).ps.origin;
+            start[2] += (*((*ent).client)).ps.viewheight as f32;
 
-            count = ((ctx.world.level.time
-                - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                as f32
+            count = ((ctx.world.level.time - (*((*ent).client)).ps.weaponChargeTime) as f32
                 / DISRUPTOR_CHARGE_UNIT) as c_int;
             if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                 maxCount = 200;
@@ -960,9 +952,8 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     && !(*traceEnt).client.is_null()
                     && !(*traceEnt).ghoul2.is_null()
                 {
-                    (*((*traceEnt).client as *mut gclient_t)).g2LastSurfaceHit = tr.surfaceFlags;
-                    (*((*traceEnt).client as *mut gclient_t)).g2LastSurfaceTime =
-                        ctx.world.level.time;
+                    (*((*traceEnt).client)).g2LastSurfaceHit = tr.surfaceFlags;
+                    (*((*traceEnt).client)).g2LastSurfaceTime = ctx.world.level.time;
                 }
                 if !(*traceEnt).ghoul2.is_null() {
                     tr.surfaceFlags = 0;
@@ -975,8 +966,8 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
 
             if !traceEnt.is_null()
                 && !(*traceEnt).client.is_null()
-                && (*((*traceEnt).client as *mut gclient_t)).ps.duelInProgress != 0
-                && (*((*traceEnt).client as *mut gclient_t)).ps.duelIndex != (*ent).s.number
+                && (*((*traceEnt).client)).ps.duelInProgress != 0
+                && (*((*traceEnt).client)).ps.duelIndex != (*ent).s.number
             {
                 skip = (tr.entityNum) as i32;
                 start = tr.endpos;
@@ -991,10 +982,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                 continue;
             } else if !traceEnt.is_null()
                 && !(*traceEnt).client.is_null()
-                && (*((*traceEnt).client as *mut gclient_t))
-                    .ps
-                    .fd
-                    .forcePowerLevel[FP_SABER_DEFENSE as usize]
+                && (*((*traceEnt).client)).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize]
                     >= FORCE_LEVEL_3
             {
                 if crate::w_saber::WP_SaberCanBlock(
@@ -1055,7 +1043,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     ) != qfalse
                         && !(*ent).client.is_null()
                     {
-                        (*((*ent).client as *mut gclient_t)).accuracy_hits += 1;
+                        (*((*ent).client)).accuracy_hits += 1;
                     }
                 } else {
                     if (*traceEnt).r.svFlags & SVF_GLASS_BRUSH != 0
@@ -1112,9 +1100,9 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     let attacker_eid = ctx.entity_id_of(ent);
                     let dmg_dir = Some(&mut (*ctx.world_raw()).globals.forward); // STAGE-2b: irreducible — &mut world.globals.forward aliases the ctx passed to the same call.
                     if !(*traceEnt).client.is_null() {
-                        preLegs = (*((*traceEnt).client as *mut gclient_t)).ps.legsAnim;
-                        preTorso = (*((*traceEnt).client as *mut gclient_t)).ps.torsoAnim;
-                        preAng = (*((*traceEnt).client as *mut gclient_t)).ps.viewangles;
+                        preLegs = (*((*traceEnt).client)).ps.legsAnim;
+                        preTorso = (*((*traceEnt).client)).ps.torsoAnim;
+                        preAng = (*((*traceEnt).client)).ps.viewangles;
                     }
 
                     crate::g_combat::G_Damage(
@@ -1135,13 +1123,13 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                         && fullCharge != qfalse
                         && G_CanDisruptify(traceEnt.as_ref()) != qfalse
                     {
-                        (*((*traceEnt).client as *mut gclient_t)).ps.viewangles = preAng;
-                        (*((*traceEnt).client as *mut gclient_t)).ps.eFlags |= EF_DISINTEGRATION;
-                        (*((*traceEnt).client as *mut gclient_t)).ps.lastHitLoc = tr.endpos;
-                        (*((*traceEnt).client as *mut gclient_t)).ps.legsAnim = preLegs;
-                        (*((*traceEnt).client as *mut gclient_t)).ps.torsoAnim = preTorso;
+                        (*((*traceEnt).client)).ps.viewangles = preAng;
+                        (*((*traceEnt).client)).ps.eFlags |= EF_DISINTEGRATION;
+                        (*((*traceEnt).client)).ps.lastHitLoc = tr.endpos;
+                        (*((*traceEnt).client)).ps.legsAnim = preLegs;
+                        (*((*traceEnt).client)).ps.torsoAnim = preTorso;
                         (*traceEnt).r.contents = 0;
-                        (*((*traceEnt).client as *mut gclient_t)).ps.velocity = [0.0; 3];
+                        (*((*traceEnt).client)).ps.velocity = [0.0; 3];
                     }
 
                     tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
@@ -1175,7 +1163,7 @@ pub fn WP_FireDisruptor(ctx: &mut GameContext, ent: Option<EntityId>, altFire: q
         let client = if ent.is_null() {
             std::ptr::null_mut()
         } else {
-            (*ent).client as *mut gclient_t
+            (*ent).client
         };
         if ent.is_null() || client.is_null() || (*client).ps.zoomMode != 1 {
             // do not ever let it do the alt fire when not zoomed
@@ -1259,9 +1247,7 @@ pub fn WP_BowcasterMainFire(ctx: &mut GameContext, ent: EntityId) {
         if (*ent).client.is_null() {
             count = 1;
         } else {
-            count = ((ctx.world.level.time
-                - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                as f32
+            count = ((ctx.world.level.time - (*((*ent).client)).ps.weaponChargeTime) as f32
                 / BOWCASTER_CHARGE_UNIT) as c_int;
         }
 
@@ -1624,38 +1610,37 @@ pub fn DEMP2_AltRadiusDamage(ctx: &mut GameContext, ent: EntityId) {
                     (*ent).splashMethodOfDeath,
                 );
                 if (*gent).takedamage != 0 && !(*gent).client.is_null() {
-                    if (*((*gent).client as *mut gclient_t)).ps.electrifyTime < ctx.world.level.time
-                    {
+                    if (*((*gent).client)).ps.electrifyTime < ctx.world.level.time {
                         // electrocution effect
                         if (*gent).s.eType == entityType_t::ET_NPC as c_int
                             && (*gent).s.NPC_class == (CLASS_VEHICLE) as i32
                             && !(*gent).m_pVehicle.is_null()
                             && {
-                                let veh = (*gent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+                                let veh = (*gent).m_pVehicle;
                                 let vtype = (*(*veh).m_pVehicleInfo).r#type;
                                 vtype == mp_bg::vehicles::vehicleType_t::VH_SPEEDER
                                     || vtype == mp_bg::vehicles::vehicleType_t::VH_WALKER
                             }
                         {
                             // do some extra stuff to speeders/walkers
-                            (*((*gent).client as *mut gclient_t)).ps.electrifyTime =
+                            (*((*gent).client)).ps.electrifyTime =
                                 ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 4000);
                         } else if (*gent).s.NPC_class != (CLASS_VEHICLE) as i32
                             || (!(*gent).m_pVehicle.is_null() && {
-                                let veh = (*gent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+                                let veh = (*gent).m_pVehicle;
                                 (*(*veh).m_pVehicleInfo).r#type
                                     != mp_bg::vehicles::vehicleType_t::VH_FIGHTER
                             })
                         {
                             // don't do this to fighters
-                            (*((*gent).client as *mut gclient_t)).ps.electrifyTime =
+                            (*((*gent).client)).ps.electrifyTime =
                                 ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(300, 800);
                         }
                     }
-                    if (*((*gent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
+                    if (*((*gent).client)).ps.powerups[PW_CLOAKED as usize] != 0 {
                         // disable cloak temporarily
                         Jedi_Decloak(ctx, ctx.entity_id_of(gent));
-                        (*((*gent).client as *mut gclient_t)).cloakToggleTime =
+                        (*((*gent).client)).cloakToggleTime =
                             ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 10000);
                     }
                 }
@@ -1728,8 +1713,7 @@ pub fn WP_DEMP2_AltFire(ctx: &mut GameContext, ent: EntityId) {
             end[i] = start[i] + DEMP2_ALT_RANGE as f32 * ctx.world.globals.forward[i];
         }
 
-        count = ((ctx.world.level.time - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-            as f32
+        count = ((ctx.world.level.time - (*((*ent).client)).ps.weaponChargeTime) as f32
             / DEMP2_CHARGE_UNIT) as c_int;
 
         origcount = count;
@@ -1964,7 +1948,7 @@ pub fn WP_TraceSetStart(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                 &mut tr,
-                &(*((*ent).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                &(*((*ent).client)).ps.origin as *const vec3_t,
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 &start as *const vec3_t,
@@ -2172,7 +2156,7 @@ pub fn rocketThink(ctx: &mut GameContext, ent: EntityId) {
             let enemy = &mut ctx.world.g_entities[eid.index()] as *mut gentity_t;
             (*enemy).client.is_null()
                 || (*enemy).health <= 0
-                || (*((*enemy).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0
+                || (*((*enemy).client)).ps.powerups[PW_CLOAKED as usize] != 0
         } {
             // no enemy or enemy not a client or enemy dead or enemy cloaked
             if (*ent).genericValue1 == 0 {
@@ -2187,12 +2171,10 @@ pub fn rocketThink(ctx: &mut GameContext, ent: EntityId) {
 
         if (*ent).spawnflags & 1 != 0 {
             // vehicle rocket
-            if !(*enemy).client.is_null()
-                && (*((*enemy).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE
-            {
+            if !(*enemy).client.is_null() && (*((*enemy).client)).NPC_class == CLASS_VEHICLE {
                 // tracking another vehicle
-                if (*((*enemy).client as *mut gclient_t)).ps.speed as f32 + 4000.0 > vel {
-                    vel = (*((*enemy).client as *mut gclient_t)).ps.speed as f32 + 4000.0;
+                if (*((*enemy).client)).ps.speed as f32 + 4000.0 > vel {
+                    vel = (*((*enemy).client)).ps.speed as f32 + 4000.0;
                 }
             }
         }
@@ -2268,8 +2250,7 @@ pub fn rocketThink(ctx: &mut GameContext, ent: EntityId) {
             (*ent).random *= 0.9;
 
             if !(*enemy).client.is_null()
-                && (*((*enemy).client as *mut gclient_t)).ps.groundEntityNum
-                    != ENTITYNUM_NONE as c_int
+                && (*((*enemy).client)).ps.groundEntityNum != ENTITYNUM_NONE as c_int
             {
                 // tracking a client who's on the ground, aim at the floor...?
                 // Try to crash into the ground if we get close enough to do splash damage
@@ -2344,17 +2325,17 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
             crate::g_missile::CreateMissile(ctx, muzzle, forward, vel, 10000, ent_eid, altFire);
 
         if !(*ent).client.is_null()
-            && (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex != ENTITYNUM_NONE as c_int
+            && (*((*ent).client)).ps.rocketLockIndex != ENTITYNUM_NONE as c_int
         {
             let lockTimeInterval = (if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
                 2400.0
             } else {
                 1200.0
             }) / 16.0;
-            rTime = (*((*ent).client as *mut gclient_t)).ps.rocketLockTime as f32;
+            rTime = (*((*ent).client)).ps.rocketLockTime as f32;
 
             if rTime == -1.0 {
-                rTime = (*((*ent).client as *mut gclient_t)).ps.rocketLastValidTime as f32;
+                rTime = (*((*ent).client)).ps.rocketLastValidTime as f32;
             }
             dif = ((ctx.world.level.time as f32 - rTime) / lockTimeInterval) as c_int;
 
@@ -2366,7 +2347,7 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
             // have a sturdy lock first, and because there's a slight difference in
             // time between server and client
             if dif >= 10 && rTime != -1.0 {
-                let enemy_idx = (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex as usize;
+                let enemy_idx = (*((*ent).client)).ps.rocketLockIndex as usize;
                 let enemy = &mut ctx.world.g_entities[enemy_idx] as *mut gentity_t;
                 (*missile).enemy = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), enemy));
 
@@ -2385,9 +2366,9 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
                 }
             }
 
-            (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex = ENTITYNUM_NONE as c_int;
-            (*((*ent).client as *mut gclient_t)).ps.rocketLockTime = (0) as f32;
-            (*((*ent).client as *mut gclient_t)).ps.rocketTargetTime = (0) as f32;
+            (*((*ent).client)).ps.rocketLockIndex = ENTITYNUM_NONE as c_int;
+            (*((*ent).client)).ps.rocketLockTime = (0) as f32;
+            (*((*ent).client)).ps.rocketTargetTime = (0) as f32;
         }
 
         (*missile).classname = c"rocket_proj".as_ptr() as *mut c_char;
@@ -2481,7 +2462,7 @@ pub fn thermalDetonatorExplode(ctx: &mut GameContext, ent: EntityId) {
             ) != qfalse
             {
                 let owner = &mut ctx.world.g_entities[(*ent).r.ownerNum as usize];
-                (*((*owner).client as *mut gclient_t)).accuracy_hits += 1;
+                (*((*owner).client)).accuracy_hits += 1;
             }
 
             trap::LinkEntity(
@@ -2551,9 +2532,7 @@ pub fn WP_FireThermalDetonator(
         ); // make sure our start point isn't on the other side of a wall
 
         if !(*ent).client.is_null() {
-            chargeAmount = (ctx.world.level.time
-                - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                as f32;
+            chargeAmount = (ctx.world.level.time - (*((*ent).client)).ps.weaponChargeTime) as f32;
         }
 
         // get charge amount
@@ -2626,7 +2605,7 @@ pub fn WP_DropThermal(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
     // file-static globals; referenced bare, reported missing.
     unsafe {
         crate::q_math::AngleVectors(
-            (*((*ent).client as *mut gclient_t)).ps.viewangles,
+            (*((*ent).client)).ps.viewangles,
             Some(&mut ctx.world.globals.forward),
             Some(&mut ctx.world.globals.vright),
             Some(&mut ctx.world.globals.up),
@@ -2988,8 +2967,7 @@ pub fn proxMineThink(ctx: &mut GameContext, ent: EntityId) {
             || owner.is_null()
             || (*owner).inuse == qfalse
             || (*owner).client.is_null()
-            || (*((*owner).client as *mut gclient_t)).pers.connected
-                != crate::client::client_connected::CON_CONNECTED
+            || (*((*owner).client)).pers.connected != crate::client::client_connected::CON_CONNECTED
         {
             // time to die!
             (*ent).think = Some(EntThink::laserTrapExplode).into();
@@ -3003,11 +2981,11 @@ pub fn proxMineThink(ctx: &mut GameContext, ent: EntityId) {
 
             if (*cl).inuse != qfalse
                 && !(*cl).client.is_null()
-                && (*((*cl).client as *mut gclient_t)).pers.connected
+                && (*((*cl).client)).pers.connected
                     == crate::client::client_connected::CON_CONNECTED
                 && owner != cl
-                && (*((*cl).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
-                && (*((*cl).client as *mut gclient_t)).tempSpectate < ctx.world.level.time
+                && (*((*cl).client)).sess.sessionTeam != TEAM_SPECTATOR
+                && (*((*cl).client)).tempSpectate < ctx.world.level.time
                 && (*cl).health > 0
             {
                 if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(owner), ctx.entity_id_of(cl))
@@ -3018,7 +2996,7 @@ pub fn proxMineThink(ctx: &mut GameContext, ent: EntityId) {
                     let mut v: vec3_t = [0.0; 3];
                     crate::q_math::_VectorSubtract(
                         (*ent).r.currentOrigin,
-                        (*((*cl).client as *mut gclient_t)).ps.origin,
+                        (*((*cl).client)).ps.origin,
                         &mut v,
                     );
                     if crate::q_math::VectorLength(v) < (*ent).splashRadius as f32 / 2.0f32 {
@@ -3700,7 +3678,7 @@ pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
         let fofs_classname = core::mem::offset_of!(gentity_t, classname) as c_int;
-        if (*((*ent).client as *mut gclient_t)).ps.hasDetPackPlanted != qfalse {
+        if (*((*ent).client)).ps.hasDetPackPlanted != qfalse {
             let mut found: *mut gentity_t = std::ptr::null_mut();
             loop {
                 found = crate::g_utils::G_Find(
@@ -3730,7 +3708,7 @@ pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
                     );
                 }
             }
-            (*((*ent).client as *mut gclient_t)).ps.hasDetPackPlanted = qfalse;
+            (*((*ent).client)).ps.hasDetPackPlanted = qfalse;
         }
     }
 }
@@ -3820,7 +3798,7 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: qb
             BlowDetpacks(ctx, ctx.entity_id_of(ent).unwrap());
         } else {
             crate::q_math::AngleVectors(
-                (*((*ent).client as *mut gclient_t)).ps.viewangles,
+                (*((*ent).client)).ps.viewangles,
                 Some(&mut ctx.world.globals.forward),
                 Some(&mut ctx.world.globals.vright),
                 Some(&mut ctx.world.globals.up),
@@ -3845,7 +3823,7 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: qb
             let forward = ctx.world.globals.forward;
             drop_charge(ctx, ent_eid, muzzle, forward);
 
-            (*((*ent).client as *mut gclient_t)).ps.hasDetPackPlanted = qtrue;
+            (*((*ent).client)).ps.hasDetPackPlanted = qtrue;
         }
     }
 }
@@ -3875,17 +3853,17 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
 
         // Shove us backwards for half a second
         crate::q_math::_VectorMA(
-            (*((*ent).client as *mut gclient_t)).ps.velocity,
+            (*((*ent).client)).ps.velocity,
             -200.0,
             ctx.world.globals.forward,
-            &mut (*((*ent).client as *mut gclient_t)).ps.velocity,
+            &mut (*((*ent).client)).ps.velocity,
         );
-        (*((*ent).client as *mut gclient_t)).ps.groundEntityNum = ENTITYNUM_NONE as c_int;
-        if (*((*ent).client as *mut gclient_t)).ps.pm_flags & PMF_DUCKED != 0 {
+        (*((*ent).client)).ps.groundEntityNum = ENTITYNUM_NONE as c_int;
+        if (*((*ent).client)).ps.pm_flags & PMF_DUCKED != 0 {
             // hunkered down
-            (*((*ent).client as *mut gclient_t)).ps.pm_time = 100;
+            (*((*ent).client)).ps.pm_time = 100;
         } else {
-            (*((*ent).client as *mut gclient_t)).ps.pm_time = 250;
+            (*((*ent).client)).ps.pm_time = 250;
         }
 
         muzzle2 = ctx.world.globals.muzzle; // making a backup copy
@@ -3945,9 +3923,8 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                     && !(*traceEnt).client.is_null()
                     && !(*traceEnt).ghoul2.is_null()
                 {
-                    (*((*traceEnt).client as *mut gclient_t)).g2LastSurfaceHit = tr.surfaceFlags;
-                    (*((*traceEnt).client as *mut gclient_t)).g2LastSurfaceTime =
-                        ctx.world.level.time;
+                    (*((*traceEnt).client)).g2LastSurfaceHit = tr.surfaceFlags;
+                    (*((*traceEnt).client)).g2LastSurfaceTime = ctx.world.level.time;
                 }
                 if !(*traceEnt).ghoul2.is_null() {
                     tr.surfaceFlags = 0;
@@ -3998,7 +3975,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                             ) != qfalse
                         {
                             // NOTE: hitting multiple ents can still get you over 100% accuracy
-                            (*((*ent).client as *mut gclient_t)).accuracy_hits += 1;
+                            (*((*ent).client)).accuracy_hits += 1;
                         }
 
                         let targ_eid = ctx.entity_id_of(traceEnt);
@@ -4007,8 +3984,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                         let dmg_dir = Some(&mut (*ctx.world_raw()).globals.forward); // STAGE-2b: irreducible — &mut world.globals.forward aliases the ctx passed to the same call.
                         let noKnockBack = (*traceEnt).flags & FL_NO_KNOCKBACK; // will be set if they die, I want to know if it was on *before* they died
                         if !(*traceEnt).client.is_null()
-                            && (*((*traceEnt).client as *mut gclient_t)).NPC_class
-                                == CLASS_GALAKMECH
+                            && (*((*traceEnt).client)).NPC_class == CLASS_GALAKMECH
                         {
                             let targ_eid = ctx.entity_id_of(traceEnt);
                             let inflictor_eid = ctx.entity_id_of(ent);
@@ -4056,10 +4032,10 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                                 // alive
                                 if noKnockBack == 0
                                     && (*traceEnt).localAnimIndex == 0
-                                    && (*((*traceEnt).client as *mut gclient_t)).ps.forceHandExtend
+                                    && (*((*traceEnt).client)).ps.forceHandExtend
                                         != (HANDEXTEND_KNOCKDOWN) as i32
                                     && crate::bg_pmove::BG_KnockDownable(
-                                        &mut (*((*traceEnt).client as *mut gclient_t)).ps,
+                                        &mut (*((*traceEnt).client)).ps,
                                     ) != qfalse
                                 {
                                     // knock-downable
@@ -4069,8 +4045,8 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                                     // cap it and stuff, base the strength and whether or not we
                                     // can knockdown on the distance from the shooter to the target
                                     crate::q_math::_VectorSubtract(
-                                        (*((*traceEnt).client as *mut gclient_t)).ps.origin,
-                                        (*((*ent).client as *mut gclient_t)).ps.origin,
+                                        (*((*traceEnt).client)).ps.origin,
+                                        (*((*ent).client)).ps.origin,
                                         &mut plPDif,
                                     );
                                     pStr = 500.0 - crate::q_math::VectorLength(plPDif);
@@ -4078,35 +4054,25 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                                         pStr = 150.0;
                                     }
                                     if pStr > 200.0 {
-                                        (*((*traceEnt).client as *mut gclient_t))
-                                            .ps
-                                            .forceHandExtend = (HANDEXTEND_KNOCKDOWN) as i32;
-                                        (*((*traceEnt).client as *mut gclient_t))
-                                            .ps
-                                            .forceHandExtendTime = ctx.world.level.time + 1100;
-                                        (*((*traceEnt).client as *mut gclient_t))
-                                            .ps
-                                            .forceDodgeAnim = 0; // this toggles between 1 and 0, when it's 1 we should play the get up anim
+                                        (*((*traceEnt).client)).ps.forceHandExtend =
+                                            (HANDEXTEND_KNOCKDOWN) as i32;
+                                        (*((*traceEnt).client)).ps.forceHandExtendTime =
+                                            ctx.world.level.time + 1100;
+                                        (*((*traceEnt).client)).ps.forceDodgeAnim = 0;
+                                        // this toggles between 1 and 0, when it's 1 we should play the get up anim
                                     }
-                                    (*((*traceEnt).client as *mut gclient_t)).ps.otherKiller =
-                                        (*ent).s.number;
-                                    (*((*traceEnt).client as *mut gclient_t)).ps.otherKillerTime =
+                                    (*((*traceEnt).client)).ps.otherKiller = (*ent).s.number;
+                                    (*((*traceEnt).client)).ps.otherKillerTime =
                                         ctx.world.level.time + 5000;
-                                    (*((*traceEnt).client as *mut gclient_t))
-                                        .ps
-                                        .otherKillerDebounceTime = ctx.world.level.time + 100;
-                                    (*((*traceEnt).client as *mut gclient_t)).otherKillerMOD =
-                                        MOD_UNKNOWN as c_int;
-                                    (*((*traceEnt).client as *mut gclient_t))
-                                        .otherKillerVehWeapon = 0;
-                                    (*((*traceEnt).client as *mut gclient_t))
-                                        .otherKillerWeaponType = WP_NONE;
+                                    (*((*traceEnt).client)).ps.otherKillerDebounceTime =
+                                        ctx.world.level.time + 100;
+                                    (*((*traceEnt).client)).otherKillerMOD = MOD_UNKNOWN as c_int;
+                                    (*((*traceEnt).client)).otherKillerVehWeapon = 0;
+                                    (*((*traceEnt).client)).otherKillerWeaponType = WP_NONE;
 
-                                    (*((*traceEnt).client as *mut gclient_t)).ps.velocity[0] +=
-                                        pushDir[0] * pStr;
-                                    (*((*traceEnt).client as *mut gclient_t)).ps.velocity[1] +=
-                                        pushDir[1] * pStr;
-                                    (*((*traceEnt).client as *mut gclient_t)).ps.velocity[2] = pStr;
+                                    (*((*traceEnt).client)).ps.velocity[0] += pushDir[0] * pStr;
+                                    (*((*traceEnt).client)).ps.velocity[1] += pushDir[1] * pStr;
+                                    (*((*traceEnt).client)).ps.velocity[2] = pStr;
                                 }
                             }
                         }
@@ -4215,8 +4181,8 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean
             muzzleStun = (*ent).r.currentOrigin;
             muzzleStun[2] += 8.0;
         } else {
-            muzzleStun = (*((*ent).client as *mut gclient_t)).ps.origin;
-            muzzleStun[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32 - 6.0;
+            muzzleStun = (*((*ent).client)).ps.origin;
+            muzzleStun[2] += (*((*ent).client)).ps.viewheight as f32 - 6.0;
         }
 
         let mut tmp = muzzleStun;
@@ -4258,15 +4224,15 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean
 
         if !tr_ent.is_null() && (*tr_ent).takedamage != 0 && !(*tr_ent).client.is_null() {
             // see if either party is involved in a duel
-            if (*((*tr_ent).client as *mut gclient_t)).ps.duelInProgress != 0
-                && (*((*tr_ent).client as *mut gclient_t)).ps.duelIndex != (*ent).s.number
+            if (*((*tr_ent).client)).ps.duelInProgress != 0
+                && (*((*tr_ent).client)).ps.duelIndex != (*ent).s.number
             {
                 return;
             }
 
             if !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).ps.duelInProgress != 0
-                && (*((*ent).client as *mut gclient_t)).ps.duelIndex != (*tr_ent).s.number
+                && (*((*ent).client)).ps.duelInProgress != 0
+                && (*((*ent).client)).ps.duelIndex != (*tr_ent).s.number
             {
                 return;
             }
@@ -4302,9 +4268,9 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean
 
             if !(*tr_ent).client.is_null() {
                 // if it's a player then use the shock effect
-                if (*((*tr_ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
+                if (*((*tr_ent).client)).NPC_class == CLASS_VEHICLE {
                     // not on vehicles
-                    let pVeh = (*tr_ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+                    let pVeh = (*tr_ent).m_pVehicle;
                     if pVeh.is_null()
                         || (*(*pVeh).m_pVehicleInfo).r#type
                             == mp_bg::vehicles::vehicleType_t::VH_ANIMAL
@@ -4312,12 +4278,11 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean
                             == mp_bg::vehicles::vehicleType_t::VH_FLIER
                     {
                         // can zap animals
-                        (*((*tr_ent).client as *mut gclient_t)).ps.electrifyTime =
+                        (*((*tr_ent).client)).ps.electrifyTime =
                             ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(3000, 4000);
                     }
                 } else {
-                    (*((*tr_ent).client as *mut gclient_t)).ps.electrifyTime =
-                        ctx.world.level.time + 700;
+                    (*((*tr_ent).client)).ps.electrifyTime = ctx.world.level.time + 700;
                 }
             }
         }
@@ -4332,20 +4297,14 @@ pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        if !(*ent).client.is_null()
-            && (*((*ent).client as *mut gclient_t)).ps.torsoAnim == (BOTH_MELEE2) as i32
-        {
+        if !(*ent).client.is_null() && (*((*ent).client)).ps.torsoAnim == (BOTH_MELEE2) as i32 {
             // right
-            if (*((*ent).client as *mut gclient_t)).ps.brokenLimbs & (1 << (BROKENLIMB_RARM as i32))
-                != 0
-            {
+            if (*((*ent).client)).ps.brokenLimbs & (1 << (BROKENLIMB_RARM as i32)) != 0 {
                 return;
             }
         } else {
             // left
-            if (*((*ent).client as *mut gclient_t)).ps.brokenLimbs & (1 << (BROKENLIMB_LARM as i32))
-                != 0
-            {
+            if (*((*ent).client)).ps.brokenLimbs & (1 << (BROKENLIMB_LARM as i32)) != 0 {
                 return;
             }
         }
@@ -4355,8 +4314,8 @@ pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
             muzzlePunch = (*ent).r.currentOrigin;
             muzzlePunch[2] += 8.0;
         } else {
-            muzzlePunch = (*((*ent).client as *mut gclient_t)).ps.origin;
-            muzzlePunch[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32 - 6.0;
+            muzzlePunch = (*((*ent).client)).ps.origin;
+            muzzlePunch[2] += (*((*ent).client)).ps.viewheight as f32 - 6.0;
         }
 
         let mut tmp = muzzlePunch;
@@ -4406,15 +4365,15 @@ pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
 
             if (*tr_ent).takedamage != 0 && !(*tr_ent).client.is_null() {
                 // special duel checks
-                if (*((*tr_ent).client as *mut gclient_t)).ps.duelInProgress != 0
-                    && (*((*tr_ent).client as *mut gclient_t)).ps.duelIndex != (*ent).s.number
+                if (*((*tr_ent).client)).ps.duelInProgress != 0
+                    && (*((*tr_ent).client)).ps.duelIndex != (*ent).s.number
                 {
                     return;
                 }
 
                 if !(*ent).client.is_null()
-                    && (*((*ent).client as *mut gclient_t)).ps.duelInProgress != 0
-                    && (*((*ent).client as *mut gclient_t)).ps.duelIndex != (*tr_ent).s.number
+                    && (*((*ent).client)).ps.duelInProgress != 0
+                    && (*((*ent).client)).ps.duelIndex != (*tr_ent).s.number
                 {
                     return;
                 }
@@ -4429,7 +4388,7 @@ pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
                 let attacker_eid = ctx.entity_id_of(ent);
                 let dmg_dir = Some(&mut (*ctx.world_raw()).globals.forward); // STAGE-2b: irreducible — &mut world.globals.forward aliases the ctx passed to the same call.
                 if !(*ent).client.is_null()
-                    && (*((*ent).client as *mut gclient_t)).ps.torsoAnim == (BOTH_MELEE2) as i32
+                    && (*((*ent).client)).ps.torsoAnim == (BOTH_MELEE2) as i32
                 {
                     // do a tad bit more damage on the second swing
                     dmg = MELEE_SWING2_DAMAGE;
@@ -4505,7 +4464,7 @@ pub fn LogAccuracyHit(
             return qfalse;
         }
 
-        let targetClient = (*target).client as *mut gclient_t;
+        let targetClient = (*target).client;
         if (*targetClient).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0 {
             return qfalse;
         }
@@ -4546,8 +4505,7 @@ pub fn CalcMuzzlePoint(
             crate::q_math::_VectorMA(tmp, muzzleOffPoint[0], forward, muzzlePoint);
             let tmp = *muzzlePoint;
             crate::q_math::_VectorMA(tmp, muzzleOffPoint[1], right, muzzlePoint);
-            muzzlePoint[2] +=
-                (*((*ent).client as *mut gclient_t)).ps.viewheight as f32 + muzzleOffPoint[2];
+            muzzlePoint[2] += (*((*ent).client)).ps.viewheight as f32 + muzzleOffPoint[2];
         }
 
         // Referee probe: CalcMuzzlePoint pre-snap muzzle, trBase, and aim forward.
@@ -4589,7 +4547,7 @@ pub fn CalcMuzzlePointOrigin(
     // verbatim (Stage-2 debt).
     let ent: *const gentity_t = ent;
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let mut muzzlePoint = (*ent).s.pos.trBase;
         muzzlePoint[2] += (*client).ps.viewheight as f32;
         // VectorMA( muzzlePoint, 14, forward, muzzlePoint )
@@ -4635,7 +4593,7 @@ pub fn WP_CalcVehMuzzle(ctx: &mut GameContext, ent: EntityId, muzzleNum: c_int) 
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        let pVeh = (*ent).m_pVehicle;
         let mut boltMatrix: mdxaBone_t = std::mem::zeroed();
         let mut vehAngles: vec3_t;
 
@@ -4651,7 +4609,7 @@ pub fn WP_CalcVehMuzzle(ctx: &mut GameContext, ent: EntityId, muzzleNum: c_int) 
         // Uh... how about we set this, hunh...?  :)
         (*pVeh).m_iMuzzleTime[muzzleNum as usize] = ctx.world.level.time;
 
-        vehAngles = (*((*ent).client as *mut gclient_t)).ps.viewangles;
+        vehAngles = (*((*ent).client)).ps.viewangles;
         if !(*pVeh).m_pVehicleInfo.is_null()
             && ((*(*pVeh).m_pVehicleInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_ANIMAL
                 || (*(*pVeh).m_pVehicleInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_WALKER
@@ -4669,7 +4627,7 @@ pub fn WP_CalcVehMuzzle(ctx: &mut GameContext, ent: EntityId, muzzleNum: c_int) 
                 (*pVeh).m_iMuzzleTag[muzzleNum as usize],
                 &mut boltMatrix,
                 &vehAngles as *const vec3_t,
-                &(*((*ent).client as *mut gclient_t)).ps.origin as *const vec3_t,
+                &(*((*ent).client)).ps.origin as *const vec3_t,
                 ctx.world.level.time,
                 core::ptr::null_mut(),
                 &(*ent).modelScale as *const vec3_t,
@@ -4818,7 +4776,7 @@ pub fn WP_FireVehicleWeapon(
             }
 
             // pilot should own this projectile on server if we have a pilot
-            let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+            let pVeh = (*ent).m_pVehicle;
             if !pVeh.is_null() && !(*pVeh).m_pPilot.is_null() {
                 // owned by vehicle pilot
                 (*missile).r.ownerNum =
@@ -4857,15 +4815,14 @@ pub fn WP_FireVehicleWeapon(
             if (*vehWeapon).fHoming != 0.0 {
                 // homing missile
                 if !(*ent).client.is_null()
-                    && (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex
-                        != ENTITYNUM_NONE as c_int
+                    && (*((*ent).client)).ps.rocketLockIndex != ENTITYNUM_NONE as c_int
                 {
                     let mut dif: c_int = 0;
                     let mut rTime: f32;
-                    rTime = (*((*ent).client as *mut gclient_t)).ps.rocketLockTime as f32;
+                    rTime = (*((*ent).client)).ps.rocketLockTime as f32;
 
                     if rTime == -1.0 {
-                        rTime = (*((*ent).client as *mut gclient_t)).ps.rocketLastValidTime as f32;
+                        rTime = (*((*ent).client)).ps.rocketLastValidTime as f32;
                     }
 
                     if (*vehWeapon).iLockOnTime == 0 {
@@ -4885,7 +4842,7 @@ pub fn WP_FireVehicleWeapon(
                     // time between server and client
                     if dif >= 10 && rTime != -1.0 {
                         let enemy = &mut ctx.world.g_entities
-                            [(*((*ent).client as *mut gclient_t)).ps.rocketLockIndex as usize]
+                            [(*((*ent).client)).ps.rocketLockIndex as usize]
                             as *mut gentity_t;
                         (*missile).enemy = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), enemy));
 
@@ -4976,7 +4933,7 @@ pub fn G_VehMuzzleFireFX(
     let broadcaster: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), broadcaster) };
     unsafe {
-        let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        let pVeh = (*ent).m_pVehicle;
 
         if pVeh.is_null() {
             return;
@@ -4987,7 +4944,7 @@ pub fn G_VehMuzzleFireFX(
             // oh well. We will WASTE A TEMPENT.
             b = crate::g_utils::G_TempEntity(
                 ctx,
-                (*((*ent).client as *mut gclient_t)).ps.origin,
+                (*((*ent).client)).ps.origin,
                 EV_VEH_FIRE as c_int,
             );
         } else {
@@ -5150,47 +5107,42 @@ pub fn WP_GetVehicleCamPos(
     // isn't ported yet; fields referenced through it exactly as the oracle
     // cites them, reported as missing symbols.
     unsafe {
-        let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        let pVeh = (*ent).m_pVehicle;
         let vehInfo = (*pVeh).m_pVehicleInfo as *mut mp_bg::vehicles::vehicleInfo_t;
         let mut thirdPersonHorzOffset: f32 = (*vehInfo).cameraHorzOffset;
         let mut thirdPersonRange: f32 = (*vehInfo).cameraRange;
         let mut pitchOffset: f32 = (*vehInfo).cameraPitchOffset;
         let mut vertOffset: f32 = (*vehInfo).cameraVertOffset;
 
-        if (*((*ent).client as *mut gclient_t)).ps.hackingTime != 0 {
-            thirdPersonHorzOffset += ((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32
-                / MAX_STRAFE_TIME)
-                * -80.0;
+        if (*((*ent).client)).ps.hackingTime != 0 {
+            thirdPersonHorzOffset +=
+                ((*((*ent).client)).ps.hackingTime as f32 / MAX_STRAFE_TIME) * -80.0;
             // C: `fabs(((float)hackingTime)/MAX_STRAFE_TIME)*100.0f` — libm `fabs`
             // promotes to double, the double product rounds once at the f32 `+=`.
             // Source: `oracle/codemp/game/g_weapon.c:3971`
             thirdPersonRange = (thirdPersonRange as f64
-                + (((*((*ent).client as *mut gclient_t)).ps.hackingTime as f32 / MAX_STRAFE_TIME)
-                    as f64)
-                    .abs()
+                + (((*((*ent).client)).ps.hackingTime as f32 / MAX_STRAFE_TIME) as f64).abs()
                     * 100.0) as f32;
         }
 
         if (*vehInfo).cameraPitchDependantVertOffset != qfalse {
-            if (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] > 0.0 {
-                vertOffset =
-                    130.0 + (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] * -10.0;
+            if (*((*pilot).client)).ps.viewangles[PITCH] > 0.0 {
+                vertOffset = 130.0 + (*((*pilot).client)).ps.viewangles[PITCH] * -10.0;
                 if vertOffset < -170.0 {
                     vertOffset = -170.0;
                 }
-            } else if (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] < 0.0 {
-                vertOffset =
-                    130.0 + (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] * -5.0;
+            } else if (*((*pilot).client)).ps.viewangles[PITCH] < 0.0 {
+                vertOffset = 130.0 + (*((*pilot).client)).ps.viewangles[PITCH] * -5.0;
                 if vertOffset > 130.0 {
                     vertOffset = 130.0;
                 }
             } else {
                 vertOffset = 30.0;
             }
-            if (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] > 0.0 {
-                pitchOffset = (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] * -0.75;
-            } else if (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] < 0.0 {
-                pitchOffset = (*((*pilot).client as *mut gclient_t)).ps.viewangles[PITCH] * -0.75;
+            if (*((*pilot).client)).ps.viewangles[PITCH] > 0.0 {
+                pitchOffset = (*((*pilot).client)).ps.viewangles[PITCH] * -0.75;
+            } else if (*((*pilot).client)).ps.viewangles[PITCH] < 0.0 {
+                pitchOffset = (*((*pilot).client)).ps.viewangles[PITCH] * -0.75;
             } else {
                 pitchOffset = 0.0;
             }
@@ -5201,9 +5153,9 @@ pub fn WP_GetVehicleCamPos(
         // bump inside G_EstimateCamPos lands in the pilot's ps.origin buffer.
         G_EstimateCamPos(
             ctx,
-            (*((*ent).client as *mut gclient_t)).ps.viewangles,
-            &mut (*((*pilot).client as *mut gclient_t)).ps.origin,
-            (*((*pilot).client as *mut gclient_t)).ps.viewheight as f32,
+            (*((*ent).client)).ps.viewangles,
+            &mut (*((*pilot).client)).ps.origin,
+            (*((*pilot).client)).ps.viewheight as f32,
             thirdPersonRange,
             thirdPersonHorzOffset,
             vertOffset,
@@ -5233,19 +5185,16 @@ pub fn WP_VehLeadCrosshairVeh(
         if ctx.world.cvars.g_vehAutoAimLead.integer != 0 {
             if !camTraceEnt.is_null()
                 && !(*camTraceEnt).client.is_null()
-                && (*((*camTraceEnt).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE
+                && (*((*camTraceEnt).client)).NPC_class == CLASS_VEHICLE
             {
-                let dot = crate::q_math::_DotProduct(
-                    (*((*camTraceEnt).client as *mut gclient_t)).ps.velocity,
-                    dir,
-                );
+                let dot = crate::q_math::_DotProduct((*((*camTraceEnt).client)).ps.velocity, dir);
                 let distAdjust = dot;
                 let mut predPos = [0.0f32; 3];
                 let mut predShotDir = [0.0f32; 3];
 
                 if distAdjust > 500.0f32
                     || crate::q_math::DistanceSquared(
-                        (*((*camTraceEnt).client as *mut gclient_t)).ps.origin,
+                        (*((*camTraceEnt).client)).ps.origin,
                         shotStart,
                     ) > 7000000.0f32
                 {
@@ -5283,7 +5232,7 @@ pub fn WP_VehCheckTraceFromCamPos(
         if ent.is_null() || (*ent).m_pVehicle.is_null() {
             return qfalse;
         }
-        let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        let pVeh = (*ent).m_pVehicle;
         if (*pVeh).m_pVehicleInfo.is_null() || (*pVeh).m_pPilot.is_null() {
             return qfalse;
         }
@@ -5306,7 +5255,7 @@ pub fn WP_VehCheckTraceFromCamPos(
             if (*vehInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_WALKER {
                 // for some reason, the walker always draws the crosshair out from the first muzzle point
                 crate::q_math::AngleVectors(
-                    (*((*ent).client as *mut gclient_t)).ps.viewangles,
+                    (*((*ent).client)).ps.viewangles,
                     Some(&mut dir),
                     None,
                     None,
@@ -5399,7 +5348,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        let pVeh = (*ent).m_pVehicle;
         if pVeh.is_null() {
             return;
         }
@@ -5411,7 +5360,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
         }
 
         if pVeh.m_pVehicleInfo.as_ref().unwrap().r#type == VH_WALKER
-            && (*((*ent).client as *mut gclient_t)).ps.electrifyTime > ctx.world.level.time
+            && (*((*ent).client)).ps.electrifyTime > ctx.world.level.time
         {
             return;
         }
@@ -5681,8 +5630,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
                             && !(pVeh.m_pParentEntity as *mut gentity_t).is_null()
                             && !(*(pVeh.m_pParentEntity as *mut gentity_t)).client.is_null()
                         {
-                            (*((*(pVeh.m_pParentEntity as *mut gentity_t)).client
-                                as *mut gclient_t))
+                            (*((*(pVeh.m_pParentEntity as *mut gentity_t)).client))
                                 .ps
                                 .ammo[weaponNum as usize] =
                                 pVeh.weaponStatus[weaponNum as usize].ammo;
@@ -5702,7 +5650,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
                         && !(pVeh.m_pParentEntity as *mut gentity_t).is_null()
                         && !(*(pVeh.m_pParentEntity as *mut gentity_t)).client.is_null()
                     {
-                        (*((*(pVeh.m_pParentEntity as *mut gentity_t)).client as *mut gclient_t))
+                        (*((*(pVeh.m_pParentEntity as *mut gentity_t)).client))
                             .ps
                             .ammo[weaponNum as usize] = pVeh.weaponStatus[weaponNum as usize].ammo;
                     }
@@ -5723,9 +5671,9 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
             } // 'try_fire (oracle `tryFire:` label)
 
             if clearRocketLockEntity != 0 {
-                (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex = ENTITYNUM_NONE as c_int;
-                (*((*ent).client as *mut gclient_t)).ps.rocketLockTime = (0) as f32;
-                (*((*ent).client as *mut gclient_t)).ps.rocketTargetTime = (0) as f32;
+                (*((*ent).client)).ps.rocketLockIndex = ENTITYNUM_NONE as c_int;
+                (*((*ent).client)).ps.rocketLockTime = (0) as f32;
+                (*((*ent).client)).ps.rocketTargetTime = (0) as f32;
             }
 
             if !vehWeapon.is_null() && muzzlesFired > 0 {
@@ -5748,7 +5696,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
     let ent: *mut gentity_t =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
-        if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_QUAD as usize] != 0 {
+        if (*((*ent).client)).ps.powerups[PW_QUAD as usize] != 0 {
             ctx.world.globals.s_quadFactor = ctx.world.cvars.g_quadfactor.value;
         } else {
             ctx.world.globals.s_quadFactor = 1.0f32;
@@ -5759,15 +5707,15 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
             && (*ent).s.weapon != WP_MELEE
         {
             if (*ent).s.weapon == WP_FLECHETTE {
-                (*((*ent).client as *mut gclient_t)).accuracy_shots += FLECHETTE_SHOTS;
+                (*((*ent).client)).accuracy_shots += FLECHETTE_SHOTS;
             } else {
-                (*((*ent).client as *mut gclient_t)).accuracy_shots += 1;
+                (*((*ent).client)).accuracy_shots += 1;
             }
         }
 
         if !ent.is_null()
             && !(*ent).client.is_null()
-            && (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE
+            && (*((*ent).client)).NPC_class == CLASS_VEHICLE
         {
             FireVehicleWeapon(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
             return;
@@ -5783,11 +5731,8 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
                                                                  // its statics so the WP_Fire* readers below observe them.
                                                                  // Source: `oracle/codemp/game/g_weapon.c:4448-4512`
 
-        if (*ent).s.weapon == WP_EMPLACED_GUN
-            && (*((*ent).client as *mut gclient_t)).ps.emplacedIndex != 0
-        {
-            let emp = &mut ctx.world.g_entities
-                [(*((*ent).client as *mut gclient_t)).ps.emplacedIndex as usize]
+        if (*ent).s.weapon == WP_EMPLACED_GUN && (*((*ent).client)).ps.emplacedIndex != 0 {
+            let emp = &mut ctx.world.g_entities[(*((*ent).client)).ps.emplacedIndex as usize]
                 as *mut gentity_t;
 
             if (*emp).inuse != 0 {
@@ -5795,16 +5740,13 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
                 let mut viewAngCap = [0.0f32; 3];
                 let mut override_val = 0;
 
-                crate::q_math::_VectorCopy(
-                    (*((*ent).client as *mut gclient_t)).ps.viewangles,
-                    &mut viewAngCap,
-                );
+                crate::q_math::_VectorCopy((*((*ent).client)).ps.viewangles, &mut viewAngCap);
                 if viewAngCap[0] > 40.0f32 {
                     viewAngCap[0] = 40.0f32;
                 }
 
                 override_val = BG_EmplacedView(
-                    (*((*ent).client as *mut gclient_t)).ps.viewangles,
+                    (*((*ent).client)).ps.viewangles,
                     (*emp).s.angles,
                     &mut yaw,
                     (*emp).s.origin2[0],
@@ -5822,19 +5764,18 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
                 );
             } else {
                 crate::q_math::AngleVectors(
-                    (*((*ent).client as *mut gclient_t)).ps.viewangles,
+                    (*((*ent).client)).ps.viewangles,
                     Some(&mut ctx.world.globals.forward),
                     Some(&mut ctx.world.globals.vright),
                     Some(&mut ctx.world.globals.up),
                 );
             }
         } else if (*ent).s.number < MAX_CLIENTS as c_int
-            && (*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum != 0
+            && (*((*ent).client)).ps.m_iVehicleNum != 0
             && (*ent).s.weapon == WP_BLASTER
         {
             let mut vehTurnAngles = [0.0f32; 3];
-            let vehEnt = &mut ctx.world.g_entities
-                [(*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum as usize]
+            let vehEnt = &mut ctx.world.g_entities[(*((*ent).client)).ps.m_iVehicleNum as usize]
                 as *mut gentity_t;
 
             if (*vehEnt).inuse != 0
@@ -5842,20 +5783,16 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
                 && !(*vehEnt).m_pVehicle.is_null()
             {
                 crate::q_math::_VectorCopy(
-                    *((*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation
-                        as *const vec3_t),
+                    *((*((*vehEnt).m_pVehicle)).m_vOrientation as *const vec3_t),
                     &mut vehTurnAngles,
                 );
-                vehTurnAngles[0] = (*((*ent).client as *mut gclient_t)).ps.viewangles[0];
+                vehTurnAngles[0] = (*((*ent).client)).ps.viewangles[0];
             } else {
-                crate::q_math::_VectorCopy(
-                    (*((*ent).client as *mut gclient_t)).ps.viewangles,
-                    &mut vehTurnAngles,
-                );
+                crate::q_math::_VectorCopy((*((*ent).client)).ps.viewangles, &mut vehTurnAngles);
             }
-            if (*((*ent).client as *mut gclient_t)).pers.cmd.rightmove > 0 {
+            if (*((*ent).client)).pers.cmd.rightmove > 0 {
                 vehTurnAngles[1] -= 90.0f32;
-            } else if (*((*ent).client as *mut gclient_t)).pers.cmd.rightmove < 0 {
+            } else if (*((*ent).client)).pers.cmd.rightmove < 0 {
                 vehTurnAngles[1] += 90.0f32;
             }
 
@@ -5867,7 +5804,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
             );
         } else {
             crate::q_math::AngleVectors(
-                (*((*ent).client as *mut gclient_t)).ps.viewangles,
+                (*((*ent).client)).ps.viewangles,
                 Some(&mut ctx.world.globals.forward),
                 Some(&mut ctx.world.globals.vright),
                 Some(&mut ctx.world.globals.up),
@@ -5933,7 +5870,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
                 WP_DropDetPack(ctx, ctx.entity_id_of(ent), altFire);
             }
             WP_EMPLACED_GUN => {
-                if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).ewebIndex != 0 {
+                if !(*ent).client.is_null() && (*((*ent).client)).ewebIndex != 0 {
                 } else {
                     WP_FireEmplaced(ctx, ctx.entity_id_of(ent).unwrap(), altFire);
                 }
@@ -5956,12 +5893,11 @@ pub fn WP_FireEmplaced(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) 
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.emplacedIndex == 0 {
+        if (*((*ent).client)).ps.emplacedIndex == 0 {
             return;
         }
 
-        let gun = &mut ctx.world.g_entities
-            [(*((*ent).client as *mut gclient_t)).ps.emplacedIndex as usize]
+        let gun = &mut ctx.world.g_entities[(*((*ent).client)).ps.emplacedIndex as usize]
             as *mut gentity_t;
 
         if (*gun).inuse == 0 || (*gun).health <= 0 {
@@ -5973,7 +5909,7 @@ pub fn WP_FireEmplaced(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) 
 
         let mut right = [0.0f32; 3];
         crate::q_math::AngleVectors(
-            (*((*ent).client as *mut gclient_t)).ps.viewangles,
+            (*((*ent).client)).ps.viewangles,
             None,
             Some(&mut right),
             None,
@@ -6038,39 +5974,31 @@ pub fn emplaced_gun_use(
             return;
         }
 
-        if (*((*activator).client as *mut gclient_t)).ps.emplacedTime
-            > (ctx.world.level.time) as f32
-        {
+        if (*((*activator).client)).ps.emplacedTime > (ctx.world.level.time) as f32 {
             return;
         }
 
-        if (*((*activator).client as *mut gclient_t))
-            .ps
-            .forceHandExtend
-            != (HANDEXTEND_NONE) as i32
-        {
+        if (*((*activator).client)).ps.forceHandExtend != (HANDEXTEND_NONE) as i32 {
             return;
         }
 
         let zoffset = 50.0f32;
-        if (*((*activator).client as *mut gclient_t)).ps.origin[2]
-            > (*self_).s.origin[2] + zoffset - 8.0f32
-        {
+        if (*((*activator).client)).ps.origin[2] > (*self_).s.origin[2] + zoffset - 8.0f32 {
             return;
         }
 
-        if ((*((*activator).client as *mut gclient_t)).ps.pm_flags & PMF_DUCKED) != 0 {
+        if ((*((*activator).client)).ps.pm_flags & PMF_DUCKED) != 0 {
             return;
         }
 
-        if (*((*activator).client as *mut gclient_t)).ps.isJediMaster != 0 {
+        if (*((*activator).client)).ps.isJediMaster != 0 {
             return;
         }
 
         let mut vLen = [0.0f32; 3];
         crate::q_math::_VectorSubtract(
             (*self_).s.origin,
-            (*((*activator).client as *mut gclient_t)).ps.origin,
+            (*((*activator).client)).ps.origin,
             &mut vLen,
         );
         let ownLen = crate::q_math::VectorLength(vLen);
@@ -6082,7 +6010,7 @@ pub fn emplaced_gun_use(
         let mut fwd1 = [0.0f32; 3];
         let mut fwd2 = [0.0f32; 3];
         crate::q_math::AngleVectors(
-            (*((*activator).client as *mut gclient_t)).ps.viewangles,
+            (*((*activator).client)).ps.viewangles,
             Some(&mut fwd1),
             None,
             None,
@@ -6098,7 +6026,7 @@ pub fn emplaced_gun_use(
 
         crate::q_math::_VectorSubtract(
             (*self_).s.origin,
-            (*((*activator).client as *mut gclient_t)).ps.origin,
+            (*((*activator).client)).ps.origin,
             &mut fwd1,
         );
         crate::q_math::VectorNormalize(&mut fwd1);
@@ -6114,12 +6042,11 @@ pub fn emplaced_gun_use(
 
         let oldWeapon = (*activator).s.weapon;
 
-        (*((*activator).client as *mut gclient_t)).ps.weapon = (*self_).s.weapon;
-        (*((*activator).client as *mut gclient_t)).ps.weaponstate = (WEAPON_READY) as i32;
-        (*((*activator).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
-            (1 << WP_EMPLACED_GUN);
+        (*((*activator).client)).ps.weapon = (*self_).s.weapon;
+        (*((*activator).client)).ps.weaponstate = (WEAPON_READY) as i32;
+        (*((*activator).client)).ps.stats[STAT_WEAPONS as usize] |= (1 << WP_EMPLACED_GUN);
 
-        (*((*activator).client as *mut gclient_t)).ps.emplacedIndex = (*self_).s.number;
+        (*((*activator).client)).ps.emplacedIndex = (*self_).s.number;
 
         (*self_).s.emplacedOwner = (*activator).s.number;
         (*self_).s.activeForcePass = (NUM_FORCE_POWERS + 1) as i32;
@@ -6132,7 +6059,7 @@ pub fn emplaced_gun_use(
         let mut anglesToOwner = [0.0f32; 3];
         crate::q_math::_VectorSubtract(
             (*self_).r.currentOrigin,
-            (*((*activator).client as *mut gclient_t)).ps.origin,
+            (*((*activator).client)).ps.origin,
             &mut anglesToOwner,
         );
         crate::q_math::vectoangles(anglesToOwner, &mut anglesToOwner);
@@ -6261,22 +6188,22 @@ pub fn emplaced_gun_update(ctx: &mut GameContext, self_: EntityId) {
             let mut vLen = [0.0f32; 3];
             crate::q_math::_VectorSubtract(
                 (*self_).s.origin,
-                (*((*activator).client as *mut gclient_t)).ps.origin,
+                (*((*activator).client)).ps.origin,
                 &mut vLen,
             );
             ownLen = crate::q_math::VectorLength(vLen);
 
-            if ((*((*activator).client as *mut gclient_t)).pers.cmd.buttons & BUTTON_USE) == 0
+            if ((*((*activator).client)).pers.cmd.buttons & BUTTON_USE) == 0
                 && (*self_).genericValue1 != 0
             {
                 (*self_).genericValue1 = 0;
             }
 
-            if (((*((*activator).client as *mut gclient_t)).pers.cmd.buttons & BUTTON_USE) != 0)
+            if (((*((*activator).client)).pers.cmd.buttons & BUTTON_USE) != 0)
                 && (*self_).genericValue1 == 0
             {
-                (*((*activator).client as *mut gclient_t)).ps.emplacedIndex = 0;
-                (*((*activator).client as *mut gclient_t)).ps.saberHolstered = 0;
+                (*((*activator).client)).ps.emplacedIndex = 0;
+                (*((*activator).client)).ps.saberHolstered = 0;
                 (*self_).nextthink = ctx.world.level.time + 50;
                 return;
             }
@@ -6284,27 +6211,25 @@ pub fn emplaced_gun_update(ctx: &mut GameContext, self_: EntityId) {
 
         if (!(*self_).activator.is_none() && !(*activator).client.is_null())
             && ((*activator).inuse == 0
-                || (*((*activator).client as *mut gclient_t)).ps.emplacedIndex != (*self_).s.number
+                || (*((*activator).client)).ps.emplacedIndex != (*self_).s.number
                 || (*self_).genericValue4 != 0
                 || ownLen > 64.0f32)
         {
-            (*((*activator).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] &=
-                !(1 << WP_EMPLACED_GUN);
+            (*((*activator).client)).ps.stats[STAT_WEAPONS as usize] &= !(1 << WP_EMPLACED_GUN);
 
-            let oldWeap = (*((*activator).client as *mut gclient_t)).ps.weapon;
-            (*((*activator).client as *mut gclient_t)).ps.weapon = (*self_).s.weapon;
+            let oldWeap = (*((*activator).client)).ps.weapon;
+            (*((*activator).client)).ps.weapon = (*self_).s.weapon;
             (*self_).s.weapon = oldWeap;
-            (*((*activator).client as *mut gclient_t)).ps.emplacedTime =
-                (ctx.world.level.time + 1000) as f32;
-            (*((*activator).client as *mut gclient_t)).ps.emplacedIndex = 0;
-            (*((*activator).client as *mut gclient_t)).ps.saberHolstered = 0;
+            (*((*activator).client)).ps.emplacedTime = (ctx.world.level.time + 1000) as f32;
+            (*((*activator).client)).ps.emplacedIndex = 0;
+            (*((*activator).client)).ps.saberHolstered = 0;
             (*activator).r.ownerNum = (ENTITYNUM_NONE as u32) as i32;
             (*self_).activator = None;
 
             (*self_).s.activeForcePass = 0;
         } else if !(*self_).activator.is_none() && !(*activator).client.is_null() {
-            (*((*activator).client as *mut gclient_t)).ps.weapon = WP_EMPLACED_GUN;
-            (*((*activator).client as *mut gclient_t)).ps.weaponstate = (WEAPON_READY) as i32;
+            (*((*activator).client)).ps.weapon = WP_EMPLACED_GUN;
+            (*((*activator).client)).ps.weaponstate = (WEAPON_READY) as i32;
         }
         (*self_).nextthink = ctx.world.level.time + 50;
 

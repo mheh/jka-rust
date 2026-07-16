@@ -99,14 +99,14 @@ pub fn G_ClearEnemy(ctx: &mut GameContext, self_: EntityId) {
         NPC_CheckLookTarget(ctx, ctx.entity_id_of(self_).unwrap());
 
         if !(*self_).enemy.is_none() {
-            let client = (*self_).client as *mut gclient_t;
+            let client = (*self_).client;
             let enemy =
                 &mut ctx.world.g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
             if !client.is_null() && (*client).renderInfo.lookTarget == (*enemy).s.number {
                 NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
             }
 
-            let npc = (*self_).NPC as *mut gNPC_t;
+            let npc = (*self_).NPC;
             if !npc.is_null() && (*self_).enemy == (*npc).goalEntity {
                 (*npc).goalEntity = None;
             }
@@ -131,7 +131,7 @@ pub fn G_AngerAlert(ctx: &mut GameContext, self_: Option<EntityId>) {
         let ent = ent_ptr(ctx, (*self_).enemy);
         let ent_id = ctx.entity_id_of(ent);
         if !self_.is_null() {
-            let npc = (*self_).NPC as *mut gNPC_t;
+            let npc = (*self_).NPC;
             if !npc.is_null() && ((*npc).scriptFlags & SCF_NO_GROUPS) != 0 {
                 //I'm not a team playa...
                 return;
@@ -165,11 +165,11 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let self_client = (*self_).client as *mut gclient_t;
+        let self_client = (*self_).client;
         if self_client.is_null() || (*self_client).playerTeam == NPCTEAM_FREE {
             return 0;
         }
-        let self_npc = (*self_).NPC as *mut gNPC_t;
+        let self_npc = (*self_).NPC;
         if !self_npc.is_null() && ((*self_npc).scriptFlags & SCF_NO_GROUPS) != 0 {
             //I'm not a team playa...
             return 0;
@@ -184,7 +184,7 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             if (*ent).health <= 0 {
                 continue;
             }
-            let ent_client = (*ent).client as *mut gclient_t;
+            let ent_client = (*ent).client;
             if ent_client.is_null() {
                 continue;
             }
@@ -194,7 +194,7 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
             }
             if !(*ent).enemy.is_none() {
                 //they have an enemy
-                let enemy_client = (*ent_ptr(ctx, (*ent).enemy)).client as *mut gclient_t;
+                let enemy_client = (*ent_ptr(ctx, (*ent).enemy)).client;
                 if enemy_client.is_null() || (*enemy_client).playerTeam != (*self_client).playerTeam
                 {
                     //the ent's enemy is either a normal ent or is a player/NPC that is not on my team
@@ -219,8 +219,8 @@ pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<Entit
             return;
         }
         //delay their attack based on how far away they're facing from enemy
-        let client = (*self_).client as *mut gclient_t;
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let client = (*self_).client;
+        let npc = (*self_).NPC;
 
         // VectorSubtract( self->client->renderInfo.eyePoint, enemy->r.currentOrigin, dir );//purposely backwards
         let eye = (*client).renderInfo.eyePoint;
@@ -400,7 +400,7 @@ pub fn G_ForceSaberOn(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         if (*client).ps.saberInFlight != 0 {
             //alright, can't turn it on now in any case, so forget it.
             return;
@@ -462,7 +462,7 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
             return;
         }
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if npc.is_null() {
             (*self_).enemy = ent_id_opt(base, enemy);
             return;
@@ -481,8 +481,8 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
         //		enemy->client->playerTeam = TEAM_PLAYER;
         //	}
 
-        let client = (*self_).client as *mut gclient_t;
-        let enemy_client = (*enemy).client as *mut gclient_t;
+        let client = (*self_).client;
+        let enemy_client = (*enemy).client;
         if !client.is_null()
             && !enemy_client.is_null()
             && (*enemy_client).playerTeam == (*client).playerTeam
@@ -637,8 +637,8 @@ pub fn ChangeWeapon(ctx: &mut GameContext, ent: Option<EntityId>, newWeapon: c_i
             return;
         }
 
-        let client = (*ent).client as *mut gclient_t;
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let client = (*ent).client;
+        let npc = (*ent).NPC;
 
         (*client).ps.weapon = newWeapon;
         (*client).pers.cmd.weapon = newWeapon as u8;
@@ -943,7 +943,7 @@ pub fn WeaponThink(ctx: &mut GameContext, inCombat: qboolean) {
 
         //MCG - Begin
         //For now, no-one runs out of ammo
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
         if (*npc_client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize] < 10 {
             let npc_id = ctx.entity_id_of(npc).unwrap();
             Add_Ammo(ctx, npc_id, (*client).ps.weapon, 100);
@@ -1059,7 +1059,7 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
         let mut traceEnt = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
 
         // point blank, baby!
-        let shooter_npc = (*shooter).NPC as *mut gNPC_t;
+        let shooter_npc = (*shooter).NPC;
         if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_none()
         {
             traceEnt = &mut ctx.world.g_entities[(*shooter_npc).touchedByPlayer.unwrap().index()]
@@ -1129,8 +1129,8 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
         }
 
         // don't deliberately shoot a teammate
-        let traceEnt_client = (*traceEnt).client as *mut gclient_t;
-        let shooter_client = (*shooter).client as *mut gclient_t;
+        let traceEnt_client = (*traceEnt).client;
+        let shooter_client = (*shooter).client;
         if !traceEnt_client.is_null()
             && !shooter_client.is_null()
             && (*traceEnt_client).playerTeam == (*shooter_client).playerTeam
@@ -1208,7 +1208,7 @@ pub fn NPC_AttackDebounceForWeapon(ctx: &mut GameContext) -> c_int {
     unsafe {
         let npc = ctx.world.globals.NPC;
         let npc_info = ctx.world.globals.NPCInfo;
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
         match (*npc_client).ps.weapon {
             WP_SABER => 0,
             _ => (*npc_info).burstSpacing, //was 100 by default
@@ -1240,7 +1240,7 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
                 }
             }
             WP_SABER => {
-                let npc_client = (*npc).client as *mut gclient_t;
+                let npc_client = (*npc).client;
                 if !npc_client.is_null() && (*npc_client).saber[0].blade[0].lengthMax != 0.0 {
                     //FIXME: account for whether enemy and I are heading towards each other!
                     // C's `1.5` is a double literal: the `*1.5`, the sum, and the
@@ -1274,7 +1274,7 @@ pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
         }
 
         if ((*ent).flags & FL_NOTARGET) == 0 && (*ent).health > 0 {
-            let ent_client = (*ent).client as *mut gclient_t;
+            let ent_client = (*ent).client;
             if ent_client.is_null() {
                 return qtrue;
             } else if (*ent_client).sess.sessionTeam == TEAM_SPECTATOR {
@@ -1282,7 +1282,7 @@ pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
                 return qfalse;
             } else {
                 let mut entTeam: c_int = NPCTEAM_FREE;
-                let ent_npc = (*ent).NPC as *mut gNPC_t;
+                let ent_npc = (*ent).NPC;
                 if !ent_npc.is_null() && !ent_client.is_null() {
                     entTeam = (*ent_client).playerTeam;
                 } else if !ent_client.is_null() {
@@ -1294,7 +1294,7 @@ pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
                         entTeam = NPCTEAM_NEUTRAL;
                     }
                 }
-                let npc_client = (*npc).client as *mut gclient_t;
+                let npc_client = (*npc).client;
                 if entTeam == NPCTEAM_FREE
                     || (*npc_client).enemyTeam == NPCTEAM_FREE
                     || entTeam == (*npc_client).enemyTeam
@@ -1327,7 +1327,7 @@ pub fn NPC_EnemyTooFar(
 
         if toShoot == qfalse {
             //Not trying to actually press fire button with this check
-            let npc_client = (*npc).client as *mut gclient_t;
+            let npc_client = (*npc).client;
             if (*npc_client).ps.weapon == WP_SABER {
                 //Just have to get to him
                 return qfalse;
@@ -1432,7 +1432,7 @@ pub fn NPC_PickEnemy(
                         &mut diff,
                     );
                     let mut relDist = VectorLengthSquared(diff);
-                    let newenemy_client = (*newenemy).client as *mut gclient_t;
+                    let newenemy_client = (*newenemy).client;
                     if (*newenemy_client).hiddenDist > 0.0 {
                         if relDist > (*newenemy_client).hiddenDist * (*newenemy_client).hiddenDist {
                             //out of hidden range
@@ -1561,7 +1561,7 @@ pub fn NPC_PickEnemy(
                 continue;
             }
 
-            let newenemy_client = (*newenemy).client as *mut gclient_t;
+            let newenemy_client = (*newenemy).client;
             let newenemy_id = ctx.entity_id_of(newenemy);
             let ok = (!newenemy_client.is_null() && NPC_ValidEnemy(ctx, newenemy_id) != qfalse)
                 || (newenemy_client.is_null() && (*newenemy).alliedTeam == enemyTeam);
@@ -1569,7 +1569,7 @@ pub fn NPC_PickEnemy(
                 continue;
             }
 
-            let npc_client = (*npc).client as *mut gclient_t;
+            let npc_client = (*npc).client;
             if (*npc_client).playerTeam == NPCTEAM_PLAYER
                 && enemyTeam == NPCTEAM_PLAYER
                 && (*newenemy).s.number != 0
@@ -1730,7 +1730,7 @@ pub fn NPC_PickAlly(
     unsafe {
         let npc = ctx.world.globals.NPC;
         let base = ent_base(ctx);
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
 
         let mut closestAlly: *mut gentity_t = core::ptr::null_mut();
         let mut bestDist = range;
@@ -1742,7 +1742,7 @@ pub fn NPC_PickAlly(
                 continue;
             }
 
-            let ally_client = (*ally).client as *mut gclient_t;
+            let ally_client = (*ally).client;
             if (*ally_client).playerTeam == (*npc_client).playerTeam
                 || (*npc_client).playerTeam == NPCTEAM_ENEMY
             {
@@ -1869,7 +1869,7 @@ pub fn NPC_CheckEnemy(
             ) == qfalse
             {
                 //FIXME: should this be a line-of site check?
-                let enemy_client = (*enemy).client as *mut gclient_t;
+                let enemy_client = (*enemy).client;
                 if !enemy_client.is_null() && (*enemy_client).hiddenDist != 0.0 {
                     //He ducked into shadow while we weren't looking
                     NPC_LostEnemyDecideChase(ctx);
@@ -1929,7 +1929,7 @@ pub fn NPC_CheckEnemy(
             }
 
             //If enemy dead or unshootable, look for others on out enemy's team
-            let npc_client = (*npc).client as *mut gclient_t;
+            let npc_client = (*npc).client;
             if (*npc_client).enemyTeam != NPCTEAM_NEUTRAL {
                 //NOTE:  this only checks vis if can't hit enemy for 10 tries, which I suppose
                 //means they need to find one that in more than just PVS
@@ -1969,9 +1969,9 @@ pub fn NPC_CheckEnemy(
 
         if !(*npc).enemy.is_none() {
             let enemy = ent_ptr(ctx, (*npc).enemy);
-            let enemy_client = (*enemy).client as *mut gclient_t;
+            let enemy_client = (*enemy).client;
             if !enemy_client.is_null() && (*enemy_client).playerTeam != 0 {
-                let npc_client = (*npc).client as *mut gclient_t;
+                let npc_client = (*npc).client;
                 if (*npc_client).playerTeam != (*enemy_client).playerTeam {
                     (*npc_client).enemyTeam = (*enemy_client).playerTeam;
                 }
@@ -2065,7 +2065,7 @@ pub fn NPC_ShotEntity(
         if (*npc).s.weapon == WP_THERMAL {
             //thermal aims from slightly above head
             //FIXME: what about low-angle shots, rolling the thermal under something?
-            let npc_client = (*npc).client as *mut gclient_t;
+            let npc_client = (*npc).client;
             CalcEntitySpot(ctx, ctx.entity_id_of(npc), spot_t::SPOT_HEAD, &mut muzzle);
             let angles: vec3_t = [0.0, (*npc_client).ps.viewangles[1], 0.0];
             let mut forward: vec3_t = [0.0; 3];
@@ -2240,7 +2240,7 @@ pub fn NPC_CheckCanAttack(
         vectoangles(delta, &mut angleToEnemy);
         let distanceToEnemy = VectorNormalize(&mut delta);
 
-        let npc_npc = (*npc).NPC as *mut gNPC_t;
+        let npc_npc = (*npc).NPC;
         (*npc_npc).desiredYaw = angleToEnemy[YAW];
         NPC_UpdateFiringAngles(ctx, qfalse, qtrue);
 
@@ -2272,7 +2272,7 @@ pub fn NPC_CheckCanAttack(
             attack_ok = qtrue;
 
             //Check to duck
-            let enemy_client = (*enemy).client as *mut gclient_t;
+            let enemy_client = (*enemy).client;
             if !enemy_client.is_null() {
                 if (*enemy).enemy == ent_id_opt(ent_base(ctx), npc) {
                     if ((*enemy_client).buttons & BUTTON_ATTACK) != 0 {
@@ -2314,8 +2314,8 @@ pub fn NPC_CheckCanAttack(
 
                 hitspot = tr.endpos;
 
-                let traceEnt_client = (*traceEnt).client as *mut gclient_t;
-                let npc_client = (*npc).client as *mut gclient_t;
+                let traceEnt_client = (*traceEnt).client;
+                let npc_client = (*npc).client;
                 if traceEnt == enemy
                     || (!traceEnt_client.is_null()
                         && !npc_client.is_null()
@@ -3198,7 +3198,7 @@ pub fn G_AimSet(ctx: &mut GameContext, self_: EntityId, aim: c_int) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if !npc.is_null() {
             (*npc).currentAim = aim;
             //Com_Printf( "%s new aim = %d\n", self->NPC_type, self->NPC->currentAim );

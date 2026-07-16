@@ -224,9 +224,7 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
         let mut stateMin: c_int = 0;
         let mut stateMax: c_int = 0;
 
-        if ent.is_null()
-            || (*ent).client.is_null()
-            || (*((*ent).client as *mut gclient_t)).sess.teamLeader == qfalse
+        if ent.is_null() || (*ent).client.is_null() || (*((*ent).client)).sess.teamLeader == qfalse
         {
             return;
         }
@@ -318,7 +316,7 @@ pub fn BotMindTricked(ctx: &mut GameContext, botClient: c_int, enemyClient: c_in
         }
         // Raven's `if (!fd)` guards `&ps.fd`, a member address that is never
         // null — a structurally dead check, dropped here.
-        let fd = &(*(en.client as *mut gclient_t)).ps.fd;
+        let fd = &(*(en.client)).ps.fd;
         if botClient > 47 {
             if fd.forceMindtrickTargetIndex4 & (1 << (botClient - 48)) != 0 {
                 return 1;
@@ -376,7 +374,7 @@ pub fn BotAI_GetClientState(
         if ent.client.is_null() {
             return qfalse;
         }
-        core::ptr::copy_nonoverlapping(&(*(ent.client as *mut gclient_t)).ps, state, 1);
+        core::ptr::copy_nonoverlapping(&(*(ent.client)).ps, state, 1);
         qtrue
     }
 }
@@ -891,9 +889,7 @@ pub fn PlayersInGame(ctx: &mut GameContext) -> c_int {
         let mut pl = 0;
         while i < MAX_CLIENTS {
             let ent = &ctx.world.g_entities[i];
-            if !ent.client.is_null()
-                && (*(ent.client as *mut gclient_t)).pers.connected == CON_CONNECTED
-            {
+            if !ent.client.is_null() && (*(ent.client)).pers.connected == CON_CONNECTED {
                 pl += 1;
             }
             i += 1;
@@ -2011,7 +2007,7 @@ pub fn PassStandardEnemyChecks(
             return 0;
         }
 
-        let en_cl = (*en).client as *mut gclient_t;
+        let en_cl = (*en).client;
 
         if (*en_cl).ps.pm_type == PM_INTERMISSION as c_int
             || (*en_cl).ps.pm_type == PM_SPECTATOR as c_int
@@ -2102,7 +2098,7 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
     unsafe {
         // STAGE-1: `bot` is the hurt entity's `EntityId`; re-derive its `gclient_t*`
         // (Raven's `bot`). `attacker` is an `Option<EntityId>` handle. Body verbatim.
-        let bot: *mut gclient_t = ctx.entity_mut(bot).client as *mut gclient_t;
+        let bot: *mut gclient_t = ctx.entity_mut(bot).client;
         let attacker: *mut gentity_t = ent_ptr(ctx, attacker);
         let base = ctx.world.g_entities.as_mut_ptr();
 
@@ -2194,7 +2190,7 @@ pub fn BotCanHear(
             return 0;
         }
 
-        let en_cl = (*en).client as *mut gclient_t;
+        let en_cl = (*en).client;
         let lt = ctx.world.level.time;
 
         let mut minlen: f32 = 'compute: {
@@ -2395,10 +2391,7 @@ pub fn ScanForEnemies(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
         }
 
         let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
-        if !ce.is_null()
-            && !(*ce).client.is_null()
-            && (*((*ce).client as *mut gclient_t)).ps.isJediMaster != qfalse
-        {
+        if !ce.is_null() && !(*ce).client.is_null() && (*((*ce).client)).ps.isJediMaster != qfalse {
             // The Jedi Master must die.
             return -1;
         }
@@ -2425,14 +2418,10 @@ pub fn ScanForEnemies(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
                     ctx.entity_id_of(ent),
                 ) == qfalse
                 && PassStandardEnemyChecks(ctx, bs, ctx.entity_id_of(ent)) != 0
-                && BotPVSCheck(
-                    ctx,
-                    (*((*ent).client as *mut gclient_t)).ps.origin,
-                    (*bs).eye,
-                ) != qfalse
+                && BotPVSCheck(ctx, (*((*ent).client)).ps.origin, (*bs).eye) != qfalse
                 && PassLovedOneCheck(ctx, bs, ctx.entity_id_of(ent)) != 0
             {
-                let ent_cl = (*ent).client as *mut gclient_t;
+                let ent_cl = (*ent).client;
                 crate::q_math::_VectorSubtract((*ent_cl).ps.origin, (*bs).eye, &mut a);
                 distcheck = crate::q_math::VectorLength(a);
                 crate::q_math::vectoangles(a, &mut a);
@@ -2569,7 +2558,7 @@ pub fn BotIsAChickenWuss(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
                 let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
                 if !ce.is_null()
                     && !(*ce).client.is_null()
-                    && (*((*ce).client as *mut gclient_t)).ps.isJediMaster != qfalse
+                    && (*((*ce).client)).ps.isJediMaster != qfalse
                     && (*ce).health > 40
                     && (*bs).cur_ps.weapon < WP_ROCKET_LAUNCHER
                 {
@@ -2582,7 +2571,7 @@ pub fn BotIsAChickenWuss(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
             if gt == GT_CTF {
                 let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
                 if !ce.is_null() && !(*ce).client.is_null() {
-                    let ce_cl = (*ce).client as *mut gclient_t;
+                    let ce_cl = (*ce).client;
                     if (*ce_cl).ps.powerups[PW_REDFLAG as usize] != 0
                         || (*ce_cl).ps.powerups[PW_BLUEFLAG as usize] != 0
                     {
@@ -2633,7 +2622,7 @@ pub fn BotIsAChickenWuss(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
         let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
         if !ce.is_null()
             && !(*ce).client.is_null()
-            && (*((*ce).client as *mut gclient_t)).ps.weapon == WP_SABER
+            && (*((*ce).client)).ps.weapon == WP_SABER
             && (*bs).frame_Enemy_Len < 512.0
             && (*bs).cur_ps.weapon != WP_SABER
         {
@@ -2874,7 +2863,7 @@ pub fn BotGetFlagBack(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
             ent = base.add(i as usize);
 
             if !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).ps.powerups[myFlag as usize] != 0
+                && (*((*ent).client)).ps.powerups[myFlag as usize] != 0
                 && OnSameTeam(
                     ctx,
                     ctx.entity_id_of(base.add((*bs).client as usize)),
@@ -2899,10 +2888,7 @@ pub fn BotGetFlagBack(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
         if (*bs).wpDestSwitchTime < ctx.world.level.time as f32 {
             let mut usethisvec: vec3_t = [0.0; 3];
             if !(*ent).client.is_null() {
-                crate::q_math::_VectorCopy(
-                    (*((*ent).client as *mut gclient_t)).ps.origin,
-                    &mut usethisvec,
-                );
+                crate::q_math::_VectorCopy((*((*ent).client)).ps.origin, &mut usethisvec);
             } else {
                 crate::q_math::_VectorCopy((*ent).s.origin, &mut usethisvec);
             }
@@ -2944,7 +2930,7 @@ pub fn BotGuardFlagCarrier(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int
             ent = base.add(i as usize);
 
             if !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).ps.powerups[enemyFlag as usize] != 0
+                && (*((*ent).client)).ps.powerups[enemyFlag as usize] != 0
                 && OnSameTeam(
                     ctx,
                     ctx.entity_id_of(base.add((*bs).client as usize)),
@@ -2969,10 +2955,7 @@ pub fn BotGuardFlagCarrier(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int
         if (*bs).wpDestSwitchTime < ctx.world.level.time as f32 {
             let mut usethisvec: vec3_t = [0.0; 3];
             if !(*ent).client.is_null() {
-                crate::q_math::_VectorCopy(
-                    (*((*ent).client as *mut gclient_t)).ps.origin,
-                    &mut usethisvec,
-                );
+                crate::q_math::_VectorCopy((*((*ent).client)).ps.origin, &mut usethisvec);
             } else {
                 crate::q_math::_VectorCopy((*ent).s.origin, &mut usethisvec);
             }
@@ -3228,7 +3211,7 @@ pub fn CTFTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
             ent = base.add(i);
 
             if !ent.is_null() && !(*ent).client.is_null() {
-                let cl = (*ent).client as *mut gclient_t;
+                let cl = (*ent).client;
                 if (*cl).ps.powerups[enemyFlag as usize] != 0
                     && OnSameTeam(
                         ctx,
@@ -3514,7 +3497,7 @@ pub fn Siege_DefendFromAttackers(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut ent: *mut gentity_t;
         let mut a: vec3_t = [0.0; 3];
 
-        let myteam = (*((*base.add((*bs).client as usize)).client as *mut gclient_t))
+        let myteam = (*((*base.add((*bs).client as usize)).client))
             .sess
             .sessionTeam;
 
@@ -3523,15 +3506,11 @@ pub fn Siege_DefendFromAttackers(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
-                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != myteam
+                && (*((*ent).client)).sess.sessionTeam != myteam
                 && (*ent).health > 0
-                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+                && (*((*ent).client)).sess.sessionTeam != TEAM_SPECTATOR
             {
-                _VectorSubtract(
-                    (*((*ent).client as *mut gclient_t)).ps.origin,
-                    (*bs).origin,
-                    &mut a,
-                );
+                _VectorSubtract((*((*ent).client)).ps.origin, (*bs).origin, &mut a);
 
                 testdist = VectorLength(a);
 
@@ -3550,9 +3529,7 @@ pub fn Siege_DefendFromAttackers(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
         wpClose = GetNearestVisibleWP(
             ctx,
-            (*((*base.add(bestindex as usize)).client as *mut gclient_t))
-                .ps
-                .origin,
+            (*((*base.add(bestindex as usize)).client)).ps.origin,
             -1,
         );
 
@@ -3578,7 +3555,7 @@ pub fn Siege_CountDefenders(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
         let mut ent: *mut gentity_t;
         let mut bot: *mut bot_state_t;
 
-        let myteam = (*((*base.add((*bs).client as usize)).client as *mut gclient_t))
+        let myteam = (*((*base.add((*bs).client as usize)).client))
             .sess
             .sessionTeam;
 
@@ -3588,7 +3565,7 @@ pub fn Siege_CountDefenders(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
 
             if !ent.is_null() && !(*ent).client.is_null() && !bot.is_null() {
                 if (*bot).siegeState == bot_siege_state_t::SIEGESTATE_DEFENDER as c_int
-                    && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == myteam
+                    && (*((*ent).client)).sess.sessionTeam == myteam
                 {
                     num += 1;
                 }
@@ -3610,14 +3587,13 @@ pub fn Siege_CountTeammates(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
         // iteration; the bot's own client is always valid, so hoist it.
         let myteam = {
             let me = &ctx.world.g_entities[(*bs).client as usize];
-            (*(me.client as *mut gclient_t)).sess.sessionTeam
+            (*(me.client)).sess.sessionTeam
         };
         let mut i: usize = 0;
         let mut num = 0;
         while i < MAX_CLIENTS {
             let ent = &ctx.world.g_entities[i];
-            if !ent.client.is_null() && (*(ent.client as *mut gclient_t)).sess.sessionTeam == myteam
-            {
+            if !ent.client.is_null() && (*(ent.client)).sess.sessionTeam == myteam {
                 num += 1;
             }
             i += 1;
@@ -3652,7 +3628,7 @@ pub fn SiegeTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int 
             return 0;
         }
 
-        bcl = (*base.add((*bs).client as usize)).client as *mut gclient_t;
+        bcl = (*base.add((*bs).client as usize)).client;
 
         if bcl.is_null() {
             return 0;
@@ -3838,9 +3814,7 @@ pub fn JMTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 
         while i < MAX_CLIENTS {
             let ge = base.add(i);
-            if !(*ge).client.is_null()
-                && (*ge).inuse != 0
-                && (*((*ge).client as *mut gclient_t)).ps.isJediMaster != 0
+            if !(*ge).client.is_null() && (*ge).inuse != 0 && (*((*ge).client)).ps.isJediMaster != 0
             {
                 (*bs).jmState = i as c_int;
                 break;
@@ -3866,9 +3840,7 @@ pub fn JMTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
             if !(*theImportantEntity).client.is_null() {
                 wpClose = GetNearestVisibleWP(
                     ctx,
-                    (*((*theImportantEntity).client as *mut gclient_t))
-                        .ps
-                        .origin,
+                    (*((*theImportantEntity).client)).ps.origin,
                     (*theImportantEntity).s.number,
                 );
             } else {
@@ -4164,18 +4136,14 @@ pub fn GetIdealDestination(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if !revengeEnemy.is_null()
             && (*revengeEnemy).health > 0
             && !(*revengeEnemy).client.is_null()
-            && ((*((*revengeEnemy).client as *mut gclient_t)).pers.connected
-                == connstate_t::CA_ACTIVE as c_int
-                || (*((*revengeEnemy).client as *mut gclient_t)).pers.connected
+            && ((*((*revengeEnemy).client)).pers.connected == connstate_t::CA_ACTIVE as c_int
+                || (*((*revengeEnemy).client)).pers.connected
                     == connstate_t::CA_AUTHORIZING as c_int)
         {
             // if we hate someone, always try to get to them
             if (*bs).wpDestSwitchTime < ctx.world.level.time as f32 {
                 if !(*revengeEnemy).client.is_null() {
-                    _VectorCopy(
-                        (*((*revengeEnemy).client as *mut gclient_t)).ps.origin,
-                        &mut usethisvec,
-                    );
+                    _VectorCopy((*((*revengeEnemy).client)).ps.origin, &mut usethisvec);
                 } else {
                     _VectorCopy((*revengeEnemy).s.origin, &mut usethisvec);
                 }
@@ -4193,17 +4161,13 @@ pub fn GetIdealDestination(ctx: &mut GameContext, bs: *mut bot_state_t) {
         } else if !squadLeader.is_null()
             && (*squadLeader).health > 0
             && !(*squadLeader).client.is_null()
-            && ((*((*squadLeader).client as *mut gclient_t)).pers.connected
-                == connstate_t::CA_ACTIVE as c_int
-                || (*((*squadLeader).client as *mut gclient_t)).pers.connected
+            && ((*((*squadLeader).client)).pers.connected == connstate_t::CA_ACTIVE as c_int
+                || (*((*squadLeader).client)).pers.connected
                     == connstate_t::CA_AUTHORIZING as c_int)
         {
             if (*bs).wpDestSwitchTime < ctx.world.level.time as f32 {
                 if !(*squadLeader).client.is_null() {
-                    _VectorCopy(
-                        (*((*squadLeader).client as *mut gclient_t)).ps.origin,
-                        &mut usethisvec,
-                    );
+                    _VectorCopy((*((*squadLeader).client)).ps.origin, &mut usethisvec);
                 } else {
                     _VectorCopy((*squadLeader).s.origin, &mut usethisvec);
                 }
@@ -4220,10 +4184,7 @@ pub fn GetIdealDestination(ctx: &mut GameContext, bs: *mut bot_state_t) {
             }
         } else if !currentEnemy.is_null() {
             if !(*currentEnemy).client.is_null() {
-                _VectorCopy(
-                    (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
-                    &mut usethisvec,
-                );
+                _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
             } else {
                 _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
             }
@@ -4349,7 +4310,7 @@ pub fn CommanderBotCTFAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
             ent = base.add(i);
 
             if !ent.is_null() && !(*ent).client.is_null() {
-                let cl = (*ent).client as *mut gclient_t;
+                let cl = (*ent).client;
                 if (*cl).ps.powerups[enemyFlag as usize] != 0
                     && OnSameTeam(
                         ctx,
@@ -4727,10 +4688,7 @@ pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
 
         if !(*currentEnemy).client.is_null() {
-            _VectorCopy(
-                (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
-                &mut usethisvec,
-            );
+            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
         } else {
             _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
         }
@@ -4832,10 +4790,7 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
 
         if !(*currentEnemy).client.is_null() {
-            _VectorCopy(
-                (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
-                &mut usethisvec,
-            );
+            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
         } else {
             _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
         }
@@ -4918,10 +4873,7 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if me_down == en_down && en_down == mid_down {
             if usethisvec[2] > ((*bs).origin[2] + 32.0)
                 && !(*currentEnemy).client.is_null()
-                && (*((*currentEnemy).client as *mut gclient_t))
-                    .ps
-                    .groundEntityNum
-                    == ENTITYNUM_NONE
+                && (*((*currentEnemy).client)).ps.groundEntityNum == ENTITYNUM_NONE
             {
                 (*bs).jumpTime = (ctx.world.level.time + 100) as f32;
             }
@@ -4952,7 +4904,7 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
             }
 
             if !currentEnemy.is_null() && !(*currentEnemy).client.is_null() {
-                let cecl = (*currentEnemy).client as *mut gclient_t;
+                let cecl = (*currentEnemy).client;
                 if BG_SaberInSpecial((*cecl).ps.saberMove) == 0
                     && (*bs).frame_Enemy_Len > 90.0
                     && (*bs).saberBFTime > ctx.world.level.time
@@ -5088,7 +5040,7 @@ pub fn BotAimLeading(
             return;
         }
 
-        let ce_client = (*currentEnemy).client as *mut gclient_t;
+        let ce_client = (*currentEnemy).client;
         let vel = (*ce_client).ps.velocity;
 
         let mut vtotal: f32 = 0.0;
@@ -5343,10 +5295,7 @@ pub fn CombatBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32) 
         let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
 
         if !(*currentEnemy).client.is_null() {
-            _VectorCopy(
-                (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
-                &mut eorg,
-            );
+            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut eorg);
         } else {
             _VectorCopy((*currentEnemy).s.origin, &mut eorg);
         }
@@ -5613,7 +5562,7 @@ pub fn BotSelectIdealWeapon(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
         if !currentEnemy.is_null()
             && (*bs).frame_Enemy_Len > 300.0
             && !(*currentEnemy).client.is_null()
-            && (*((*currentEnemy).client as *mut gclient_t)).ps.weapon != WP_SABER
+            && (*((*currentEnemy).client)).ps.weapon != WP_SABER
             && bestweapon == WP_SABER
         {
             // if the enemy is far away, and we have our saber selected, see if we have any good
@@ -5742,7 +5691,7 @@ pub fn GetLoveLevel(ctx: &mut GameContext, bs: *mut bot_state_t, love: *mut bot_
             return 1;
         }
 
-        lname = (*((*base.add((*love).client as usize)).client as *mut gclient_t))
+        lname = (*((*base.add((*love).client as usize)).client))
             .pers
             .netname
             .as_ptr();
@@ -6343,7 +6292,7 @@ pub fn BotCheckDetPacks(ctx: &mut GameContext, bs: *mut bot_state_t) {
         }
 
         // stillmadeit:
-        let ce_client = (*currentEnemy).client as *mut gclient_t;
+        let ce_client = (*currentEnemy).client;
         _VectorSubtract((*ce_client).ps.origin, (*myDet).s.pos.trBase, &mut a);
         enLen = VectorLength(a);
 
@@ -6597,7 +6546,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
 
         if (*me).inuse != 0
             && !(*me).client.is_null()
-            && (*((*me).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+            && (*((*me).client)).sess.sessionTeam == TEAM_SPECTATOR
         {
             (*bs).wpCurrent = core::ptr::null_mut();
             (*bs).currentEnemy = None;
@@ -6613,7 +6562,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
 
             if (*botEnt).inuse != 0
                 && !(*botEnt).client.is_null()
-                && (*((*botEnt).client as *mut gclient_t)).ps.m_iVehicleNum != 0
+                && (*((*botEnt).client)).ps.m_iVehicleNum != 0
             {
                 //in a vehicle, so...
                 (*bs).noUseTime = lt + 5000;
@@ -6639,7 +6588,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                         && (*vehicle).s.eType == entityType_t::ET_NPC as c_int
                         && (*vehicle).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                         && !(*vehicle).m_pVehicle.is_null()
-                        && ((*((*vehicle).client as *mut gclient_t)).ps.m_iVehicleNum != 0
+                        && ((*((*vehicle).client)).ps.m_iVehicleNum != 0
                             || ctx.world.cvars.bot_getinthecarrr.integer == 2)
                     {
                         //ok, this is a vehicle, and it has a pilot/passengers
@@ -6651,11 +6600,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     //broke before end so we must've found something
                     let mut v: vec3_t = [0.0; 3];
 
-                    _VectorSubtract(
-                        (*((*vehicle).client as *mut gclient_t)).ps.origin,
-                        (*bs).origin,
-                        &mut v,
-                    );
+                    _VectorSubtract((*((*vehicle).client)).ps.origin, (*bs).origin, &mut v);
                     VectorNormalize(&mut v);
                     vectoangles(v, &mut (*bs).goalAngles);
                     MoveTowardIdealAngles(bs);
@@ -6701,7 +6646,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     let mut mdir: vec3_t = [0.0; 3];
 
                     _VectorSubtract(
-                        (*((*base.add(0)).client as *mut gclient_t)).ps.origin,
+                        (*((*base.add(0)).client)).ps.origin,
                         (*bs).origin,
                         &mut mdir,
                     );
@@ -6812,9 +6757,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
             let revengeEnemy = resolve((*bs).revengeEnemy);
             if !revengeEnemy.is_null()
                 && !(*revengeEnemy).client.is_null()
-                && (*((*revengeEnemy).client as *mut gclient_t)).pers.connected
-                    != connstate_t::CA_ACTIVE as c_int
-                && (*((*revengeEnemy).client as *mut gclient_t)).pers.connected
+                && (*((*revengeEnemy).client)).pers.connected != connstate_t::CA_ACTIVE as c_int
+                && (*((*revengeEnemy).client)).pers.connected
                     != connstate_t::CA_AUTHORIZING as c_int
             {
                 (*bs).revengeEnemy = None;
@@ -6826,9 +6770,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
             let currentEnemy = resolve((*bs).currentEnemy);
             if !currentEnemy.is_null()
                 && !(*currentEnemy).client.is_null()
-                && (*((*currentEnemy).client as *mut gclient_t)).pers.connected
-                    != connstate_t::CA_ACTIVE as c_int
-                && (*((*currentEnemy).client as *mut gclient_t)).pers.connected
+                && (*((*currentEnemy).client)).pers.connected != connstate_t::CA_ACTIVE as c_int
+                && (*((*currentEnemy).client)).pers.connected
                     != connstate_t::CA_AUTHORIZING as c_int
             {
                 (*bs).currentEnemy = None;
@@ -6849,7 +6792,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
             && (*bs).frame_Enemy_Vis != 0
             && (*bs).forceJumpChargeTime < lt
         {
-            let ce_cl = (*currentEnemy).client as *mut gclient_t;
+            let ce_cl = (*currentEnemy).client;
             _VectorSubtract((*ce_cl).ps.origin, (*bs).eye, &mut a_fo);
             let a_fo_copy = a_fo;
             vectoangles(a_fo_copy, &mut a_fo);
@@ -7186,13 +7129,10 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                 && ctx.world.cvars.g_privateDuel.integer != 0
                 && (*bs).frame_Enemy_Vis != 0
                 && (*bs).frame_Enemy_Len < 400.0
-                && (*((*currentEnemy).client as *mut gclient_t)).ps.weapon == WP_SABER
-                && (*((*currentEnemy).client as *mut gclient_t))
-                    .ps
-                    .saberHolstered
-                    != 0
+                && (*((*currentEnemy).client)).ps.weapon == WP_SABER
+                && (*((*currentEnemy).client)).ps.saberHolstered != 0
             {
-                let ce_cl = (*currentEnemy).client as *mut gclient_t;
+                let ce_cl = (*currentEnemy).client;
                 let mut e_ang_vec: vec3_t = [0.0; 3];
 
                 _VectorSubtract((*ce_cl).ps.origin, (*bs).eye, &mut e_ang_vec);
@@ -7306,7 +7246,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
         if (*bs).currentEnemy.is_some() {
             let currentEnemy = resolve((*bs).currentEnemy);
             if !(*currentEnemy).client.is_null() {
-                let ce_cl = (*currentEnemy).client as *mut gclient_t;
+                let ce_cl = (*currentEnemy).client;
                 _VectorCopy((*ce_cl).ps.origin, &mut eorg);
                 eorg[2] += (*ce_cl).ps.viewheight as f32;
             } else {
@@ -7581,7 +7521,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
             }
 
             if !(*currentEnemy).client.is_null() {
-                let ce_cl = (*currentEnemy).client as *mut gclient_t;
+                let ce_cl = (*currentEnemy).client;
                 _VectorCopy((*ce_cl).ps.origin, &mut headlevel);
                 headlevel[2] += (*ce_cl).ps.viewheight as f32;
             } else {
@@ -7607,7 +7547,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                         mLen = (VectorLength(a) > 128.0) as c_int as f32;
                         if mLen > 128.0 && mLen < 1024.0 {
                             _VectorSubtract(
-                                (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
+                                (*((*currentEnemy).client)).ps.origin,
                                 (*bs).lastEnemySpotted,
                                 &mut a,
                             );
@@ -7640,7 +7580,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
             let currentEnemy = resolve((*bs).currentEnemy);
             if BotGetWeaponRange(bs) == BWEAPONRANGE_SABER {
                 let mut saberRange: c_int = SABER_ATTACK_RANGE;
-                let ce_cl = (*currentEnemy).client as *mut gclient_t;
+                let ce_cl = (*currentEnemy).client;
 
                 _VectorSubtract((*ce_cl).ps.origin, (*bs).eye, &mut a_fo);
                 let a_fo_copy = a_fo;
@@ -8038,11 +7978,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                         (*cl).ps.fd.forcePowerSelected = FP_TEAM_HEAL;
                         useTheForce = 1;
                         forceHostile = 0;
-                    } else if (*((*friendInLOF).client as *mut gclient_t))
-                        .ps
-                        .fd
-                        .forcePower
-                        <= 50
+                    } else if (*((*friendInLOF).client)).ps.fd.forcePower <= 50
                         && (*cl).ps.fd.forcePower
                             > forcePowerNeeded
                                 [(*cl).ps.fd.forcePowerLevel[FP_TEAM_FORCE as usize] as usize]
@@ -8068,11 +8004,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     (*cl).ps.fd.forcePowerSelected = FP_TEAM_HEAL;
                     useTheForce = 1;
                     forceHostile = 0;
-                } else if (*((*friendInLOF).client as *mut gclient_t))
-                    .ps
-                    .fd
-                    .forcePower
-                    <= 50
+                } else if (*((*friendInLOF).client)).ps.fd.forcePower <= 50
                     && (*cl).ps.fd.forcePower
                         > forcePowerNeeded
                             [(*cl).ps.fd.forcePowerLevel[FP_TEAM_FORCE as usize] as usize]
@@ -8100,7 +8032,7 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                 && (*bs).saberDefending != 0
                 && (*bs).currentEnemy.is_some()
                 && !(*currentEnemy).client.is_null()
-                && BotWeaponBlockable((*((*currentEnemy).client as *mut gclient_t)).ps.weapon) != 0
+                && BotWeaponBlockable((*((*currentEnemy).client)).ps.weapon) != 0
             {
                 (*bs).doAttack = 0;
             }
@@ -8243,7 +8175,7 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
             if (*bi).botthink_residual >= thinktime {
                 (*bi).botthink_residual -= thinktime;
 
-                let cl = (*base.add(i)).client as *mut gclient_t;
+                let cl = (*base.add(i)).client;
                 if (*cl).pers.connected == CON_CONNECTED {
                     BotAI(ctx, i as c_int, thinktime as f32 / 1000.0);
                 }
@@ -8259,7 +8191,7 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
                 i += 1;
                 continue;
             }
-            let cl = (*base.add(i)).client as *mut gclient_t;
+            let cl = (*base.add(i)).client;
             if (*cl).pers.connected != CON_CONNECTED {
                 i += 1;
                 continue;

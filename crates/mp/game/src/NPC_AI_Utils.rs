@@ -103,7 +103,7 @@ pub fn AI_GetGroupSize(
             if !avoid.is_null() && check == avoid {
                 continue;
             }
-            let client = (*check).client as *mut gclient_t;
+            let client = (*check).client;
             if (*client).playerTeam != playerTeam {
                 continue;
             }
@@ -127,7 +127,7 @@ pub fn AI_GetGroupSize2(ctx: &mut GameContext, ent: Option<EntityId>, radius: c_
         if ent.is_null() || (*ent).client.is_null() {
             return -1;
         }
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         AI_GetGroupSize(
             ctx,
             (*ent).r.currentOrigin,
@@ -314,7 +314,7 @@ pub fn AI_FindSelfInPreviousGroup(ctx: &mut GameContext, self_: EntityId) -> qbo
             if (*group).numGroup != 0 {
                 for j in 0..(*group).numGroup as usize {
                     if (*group).member[j].number == (*self_).s.number {
-                        let npc = (*self_).NPC as *mut gNPC_t;
+                        let npc = (*self_).NPC;
                         (*npc).group = group;
                         return 1;
                     }
@@ -345,17 +345,17 @@ pub fn AI_InsertGroupMember(group: *mut AIGroupInfo_t, member: &mut gentity_t) {
             //found him in group already
         } else {
             //add him in
-            let npc = (*member).NPC as *mut gNPC_t;
+            let npc = (*member).NPC;
             let idx = (*group).numGroup as usize;
             (*group).member[idx].number = (*member).s.number;
             (*group).numGroup += 1;
             (*group).numState[(*npc).squadState as usize] += 1;
         }
-        let npc = (*member).NPC as *mut gNPC_t;
+        let npc = (*member).NPC;
         let commanderRank = if (*group).commander.is_null() {
             RANK_CIVILIAN
         } else {
-            let cnpc = (*(*group).commander).NPC as *mut gNPC_t;
+            let cnpc = (*(*group).commander).NPC;
             (*cnpc).rank
         };
         if (*group).commander.is_null() || (*npc).rank > commanderRank {
@@ -419,14 +419,14 @@ pub fn AI_GetNextEmptyGroup(ctx: &mut GameContext, self_: EntityId) -> qboolean 
             let group = &mut ctx.world.level.groups[i] as *mut AIGroupInfo_t;
             if (*group).numGroup == 0 {
                 //make a new one
-                let npc = (*self_).NPC as *mut gNPC_t;
+                let npc = (*self_).NPC;
                 (*npc).group = group;
                 return 1;
             }
         }
 
         //WTF?  Out of groups!
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).group = core::ptr::null_mut();
         0
     }
@@ -502,13 +502,13 @@ pub fn AI_ValidateGroupMember(
         if (*member).client.is_null() {
             return 0;
         }
-        let client = (*member).client as *mut gclient_t;
+        let client = (*member).client;
 
         //Validate NPCs
         if (*member).NPC.is_null() {
             return 0;
         }
-        let npc = (*member).NPC as *mut gNPC_t;
+        let npc = (*member).NPC;
 
         //must be aware
         if (*npc).confusionTime > ctx.world.level.time {
@@ -614,7 +614,7 @@ pub fn AI_GetGroup(ctx: &mut GameContext, self_: Option<EntityId>) {
         if self_.is_null() || (*self_).NPC.is_null() {
             return;
         }
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
 
         if ctx.world.cvars.d_noGroupAI.integer != 0 {
             (*npc).group = core::ptr::null_mut();
@@ -649,7 +649,7 @@ pub fn AI_GetGroup(ctx: &mut GameContext, self_: Option<EntityId>) {
         let group = (*npc).group;
         *group = core::mem::zeroed::<AIGroupInfo_t>();
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         (*group).enemy = match (*self_).enemy {
             Some(id) => &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t,
             None => core::ptr::null_mut(),
@@ -713,9 +713,9 @@ pub fn AI_SetNewGroupCommander(ctx: &mut GameContext, group: *mut AIGroupInfo_t)
             let commanderNpc = if (*group).commander.is_null() {
                 core::ptr::null_mut()
             } else {
-                (*(*group).commander).NPC as *mut gNPC_t
+                (*(*group).commander).NPC
             };
-            let memberNpc = (*member).NPC as *mut gNPC_t;
+            let memberNpc = (*member).NPC;
             if (*group).commander.is_null()
                 || (!member.is_null()
                     && !memberNpc.is_null()
@@ -742,7 +742,7 @@ pub fn AI_DeleteGroupMember(ctx: &mut GameContext, group: *mut AIGroupInfo_t, me
         let ent = &mut ctx.world.g_entities[(*group).member[memberNum as usize].number as usize]
             as *mut gentity_t;
         if !(*ent).NPC.is_null() {
-            let npc = (*ent).NPC as *mut gNPC_t;
+            let npc = (*ent).NPC;
             (*npc).group = core::ptr::null_mut();
         }
         let mut i = memberNum;
@@ -772,7 +772,7 @@ pub fn AI_DeleteSelfFromGroup(ctx: &mut GameContext, self_: EntityId) {
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
         //FIXME: if killed, keep track of how many in group killed?  To affect morale?
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         let group = (*npc).group;
         for i in 0..(*group).numGroup as usize {
             if (*group).member[i].number == (*self_).s.number {
@@ -793,7 +793,7 @@ pub fn AI_GroupMemberKilled(ctx: &mut GameContext, self_: Option<EntityId>) {
         if self_.is_null() {
             return;
         }
-        let selfNpc = (*self_).NPC as *mut gNPC_t;
+        let selfNpc = (*self_).NPC;
         let group = if selfNpc.is_null() {
             core::ptr::null_mut()
         } else {
@@ -818,7 +818,7 @@ pub fn AI_GroupMemberKilled(ctx: &mut GameContext, self_: Option<EntityId>) {
             if member == self_ {
                 continue;
             }
-            let memberNpc = (*member).NPC as *mut gNPC_t;
+            let memberNpc = (*member).NPC;
             if (*memberNpc).rank > RANK_ENSIGN {
                 //officers do not panic
                 noflee = true;
@@ -841,7 +841,7 @@ pub fn AI_GroupMemberKilled(ctx: &mut GameContext, self_: Option<EntityId>) {
                 if member == self_ {
                     continue;
                 }
-                let memberNpc = (*member).NPC as *mut gNPC_t;
+                let memberNpc = (*member).NPC;
                 if (*memberNpc).rank < RANK_ENSIGN {
                     //grunt
                     if !(*group).enemy.is_null()
@@ -937,7 +937,7 @@ pub fn AI_GroupUpdateSquadstates(
     // verbatim body still expects.
     let member: *mut gentity_t = member;
     unsafe {
-        let npc = (*member).NPC as *mut gNPC_t;
+        let npc = (*member).NPC;
         if group.is_null() {
             (*npc).squadState = newSquadState;
             return;
@@ -1028,12 +1028,12 @@ pub fn AI_RefreshGroup(ctx: &mut GameContext, group: *mut AIGroupInfo_t) -> qboo
             } else {
                 //membership is valid
                 //keep track of squadStates
-                let npc = (*member).NPC as *mut gNPC_t;
+                let npc = (*member).NPC;
                 (*group).numState[(*npc).squadState as usize] += 1;
                 let commanderRank = if (*group).commander.is_null() {
                     RANK_CIVILIAN
                 } else {
-                    let cnpc = (*(*group).commander).NPC as *mut gNPC_t;
+                    let cnpc = (*(*group).commander).NPC;
                     (*cnpc).rank
                 };
                 if (*group).commander.is_null() || (*npc).rank > commanderRank {
@@ -1053,7 +1053,7 @@ pub fn AI_RefreshGroup(ctx: &mut GameContext, group: *mut AIGroupInfo_t) -> qboo
         for i in 0..(*group).numGroup as usize {
             let member =
                 &mut ctx.world.g_entities[(*group).member[i].number as usize] as *mut gentity_t;
-            let npc = (*member).NPC as *mut gNPC_t;
+            let npc = (*member).NPC;
             if (*npc).rank < RANK_ENSIGN {
                 //grunts
                 (*group).morale += 1;
@@ -1178,8 +1178,8 @@ pub fn AI_CheckEnemyCollision(
         if !info.blocker.is_null()
             && ent_id_opt(ctx.world.g_entities.as_ptr(), info.blocker) != (*ent).enemy
         {
-            let blockerClient = (*info.blocker).client as *mut gclient_t;
-            let entClient = (*ent).client as *mut gclient_t;
+            let blockerClient = (*info.blocker).client;
+            let entClient = (*ent).client;
             if !blockerClient.is_null() && (*blockerClient).playerTeam == (*entClient).enemyTeam {
                 if takeEnemy != 0 {
                     G_SetEnemy(
@@ -1280,8 +1280,8 @@ pub fn AI_DistributeAttack(
                 continue;
             }
 
-            let checkClient = (*check).client as *mut gclient_t;
-            let enemyClient = (*enemy).client as *mut gclient_t;
+            let checkClient = (*check).client;
+            let enemyClient = (*enemy).client;
             //Must be on the same team
             if (*checkClient).playerTeam != (*enemyClient).playerTeam {
                 continue;

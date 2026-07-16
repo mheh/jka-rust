@@ -80,11 +80,11 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
     // Update our angles regardless
     crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
 
-    if unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[2] } != 0.0 {
-        unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY };
+    if unsafe { (*((*npc).client)).ps.velocity[2] } != 0.0 {
+        unsafe { (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY };
 
-        if unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() } < 2.0 {
-            unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0 };
+        if unsafe { (*((*npc).client)).ps.velocity[2].abs() } < 2.0 {
+            unsafe { (*((*npc).client)).ps.velocity[2] = 0.0 };
         }
     }
 
@@ -119,8 +119,8 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
                 }
                 dif *= 10.0;
                 unsafe {
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
-                        ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0
+                    (*((*npc).client)).ps.velocity[2] =
+                        ((*((*npc).client)).ps.velocity[2] + dif) / 2.0
                 };
                 crate::g_utils::G_Sound(
                     ctx,
@@ -151,27 +151,27 @@ pub fn Remote_MaintainHeight(ctx: &mut GameContext) {
             if dif.abs() > 24.0 {
                 dif = if dif < 0.0 { -24.0 } else { 24.0 };
                 unsafe {
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
-                        ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0
+                    (*((*npc).client)).ps.velocity[2] =
+                        ((*((*npc).client)).ps.velocity[2] + dif) / 2.0
                 };
             }
         }
     }
 
     // Apply friction
-    if unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[0] } != 0.0 {
-        unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[0] *= VELOCITY_DECAY };
+    if unsafe { (*((*npc).client)).ps.velocity[0] } != 0.0 {
+        unsafe { (*((*npc).client)).ps.velocity[0] *= VELOCITY_DECAY };
 
-        if unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[0].abs() } < 1.0 {
-            unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[0] = 0.0 };
+        if unsafe { (*((*npc).client)).ps.velocity[0].abs() } < 1.0 {
+            unsafe { (*((*npc).client)).ps.velocity[0] = 0.0 };
         }
     }
 
-    if unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[1] } != 0.0 {
-        unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[1] *= VELOCITY_DECAY };
+    if unsafe { (*((*npc).client)).ps.velocity[1] } != 0.0 {
+        unsafe { (*((*npc).client)).ps.velocity[1] *= VELOCITY_DECAY };
 
-        if unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[1].abs() } < 1.0 {
-            unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[1] = 0.0 };
+        if unsafe { (*((*npc).client)).ps.velocity[1].abs() } < 1.0 {
+            unsafe { (*((*npc).client)).ps.velocity[1] = 0.0 };
         }
     }
 }
@@ -191,7 +191,7 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
 
     crate::q_math::AngleVectors(
-        unsafe { (*((*npc).client as *mut gclient_t)).renderInfo.eyeAngles },
+        unsafe { (*((*npc).client)).renderInfo.eyeAngles },
         None,
         Some(&mut right),
         None,
@@ -226,7 +226,7 @@ pub fn Remote_Strafe(ctx: &mut GameContext) {
     // Close enough
     if tr.fraction > 0.9f32 {
         unsafe {
-            let client_ref = &mut *((*npc).client as *mut gclient_t);
+            let client_ref = &mut *((*npc).client);
             crate::q_math::_VectorMA(
                 client_ref.ps.velocity,
                 REMOTE_STRAFE_VEL * dir as f32,
@@ -312,7 +312,7 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
     }
 
     unsafe {
-        let client_ref = &mut *((*npc).client as *mut gclient_t);
+        let client_ref = &mut *((*npc).client);
         crate::q_math::_VectorMA(
             client_ref.ps.velocity,
             speed,

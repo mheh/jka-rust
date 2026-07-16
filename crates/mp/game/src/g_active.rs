@@ -125,7 +125,7 @@ use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 pub fn P_SetTwitchInfo(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: gclient param reshaped to its owning entity's EntityId; raw
     // client re-derived verbatim (Stage-2 debt).
-    let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
+    let client: *mut gclient_t = ctx.entity_mut(ent).client;
     unsafe {
         (*client).ps.painTime = ctx.world.level.time;
         (*client).ps.painDirection ^= 1;
@@ -139,7 +139,7 @@ pub fn P_DamageFeedback(ctx: &mut GameContext, player: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let player: *mut gentity_t = ctx.entity_mut(player);
     unsafe {
-        let client = (*player).client as *mut gclient_t;
+        let client = (*player).client;
         if (*client).ps.pm_type == PM_DEAD as c_int {
             return;
         }
@@ -217,7 +217,7 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         if (*client).noclip != 0 {
             (*client).airOutTime = ctx.world.level.time + 12000; // don't need air
             return;
@@ -343,7 +343,7 @@ pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageS
         let cont: c_int;
         let mut easyBreakBrush: qboolean = qtrue;
 
-        let selfCl = (*self_).client as *mut gclient_t;
+        let selfCl = (*self_).client;
         if !selfCl.is_null() {
             velocity = (*selfCl).ps.velocity;
             if (*self_).mass == 0.0 {
@@ -514,7 +514,7 @@ pub fn Client_CheckImpactBBrush(
         let selfCl = if self_.is_null() {
             core::ptr::null_mut()
         } else {
-            (*self_).client as *mut gclient_t
+            (*self_).client
         };
         if self_.is_null()
             || (*self_).inuse == 0
@@ -551,7 +551,7 @@ pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let level_time = ctx.world.level.time;
         if !client.is_null() && (*client).isHacking != 0 {
             //loop hacking sound
@@ -647,7 +647,7 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
         if (*ent).client.is_null() {
             return;
         }
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         // dead clients don't activate triggers!
         if (*client).ps.stats[STAT_HEALTH as usize] <= 0 {
@@ -870,7 +870,7 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         if (*client).sess.spectatorState != SPECTATOR_FOLLOW {
             (*client).ps.pm_type = (PM_SPECTATOR) as i32;
@@ -950,7 +950,7 @@ pub fn SpectatorThink(ctx: &mut GameContext, ent: EntityId, ucmd: *mut usercmd_t
 pub fn ClientInactivityTimer(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: gclient param reshaped to its owning entity's EntityId; raw
     // client re-derived verbatim (Stage-2 debt).
-    let client: *mut gclient_t = ctx.entity_mut(ent).client as *mut gclient_t;
+    let client: *mut gclient_t = ctx.entity_mut(ent).client;
     unsafe {
         let level_time = ctx.world.level.time;
         let clients = ctx.world.level.clients;
@@ -1000,7 +1000,7 @@ pub fn ClientTimerActions(ent: &mut gentity_t, msec: c_int) {
     // STAGE-1: ctx-free gentity leaf borrows &mut gentity_t; raw re-derived (Stage-2 debt).
     let ent: *mut gentity_t = ent;
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         (*client).timeResidual += msec;
 
         while (*client).timeResidual >= 1000 {
@@ -1053,7 +1053,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
     // body re-derived verbatim (Stage-2 debt).
     let vehEnt: *mut gentity_t = ctx.entity_mut(vehEnt);
     unsafe {
-        let veh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+        let veh = (*vehEnt).m_pVehicle;
         if !vehEnt.is_null() && !veh.is_null() && !(*veh).m_pDroidUnit.is_null() {
             let droidEnt = (*veh).m_pDroidUnit as *mut gentity_t;
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -1081,7 +1081,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: &mut GameContext, vehEnt: EntityId) {
             BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut fwd);
             vectoangles(fwd, &mut (*droidEnt).r.currentAngles);
 
-            let droidCl = (*droidEnt).client as *mut gclient_t;
+            let droidCl = (*droidEnt).client;
             if !droidCl.is_null() {
                 (*droidCl).ps.viewangles = (*droidEnt).r.currentAngles;
                 (*droidCl).ps.origin = (*droidEnt).r.currentOrigin;
@@ -1117,10 +1117,10 @@ pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
             return;
         }
 
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
 
         if ev == EV_FIRE_WEAPON as c_int {
-            let veh = (*ent).m_pVehicle as *mut Vehicle_t;
+            let veh = (*ent).m_pVehicle;
             if !veh.is_null()
                 && (*(*veh).m_pVehicleInfo).r#type == VH_SPEEDER
                 && (*cl).ps.m_iVehicleNum != 0
@@ -1130,7 +1130,7 @@ pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
                     as *mut gentity_t;
                 if (*rider).inuse != 0 && !(*rider).client.is_null() {
                     //pilot is valid...
-                    let rcl = (*rider).client as *mut gclient_t;
+                    let rcl = (*rider).client;
                     if (*rcl).ps.weapon != WP_MELEE
                         && ((*rcl).ps.weapon != WP_SABER || (*rcl).ps.saberHolstered == 0)
                     {
@@ -1160,7 +1160,7 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let mut oldEventSequence = oldEventSequence;
 
         if oldEventSequence < (*client).ps.eventSequence - MAX_PS_EVENTS as c_int {
@@ -1326,7 +1326,7 @@ pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // Any clients with force sight on should see this client
         let numConnectedClients = ctx.world.level.numConnectedClients;
-        let selfCl = (*self_).client as *mut gclient_t;
+        let selfCl = (*self_).client;
         for i in 0..numConnectedClients {
             let ent = &mut ctx.world.g_entities[ctx.world.level.sortedClients[i as usize] as usize]
                 as *mut gentity_t;
@@ -1337,7 +1337,7 @@ pub fn G_UpdateForceSightBroadcasts(ctx: &mut GameContext, self_: EntityId) {
                 continue;
             }
 
-            let entCl = (*ent).client as *mut gclient_t;
+            let entCl = (*ent).client;
             // Not using force sight so we shouldnt broadcast to this one
             if (*entCl).ps.fd.forcePowersActive & (1 << FP_SEE) == 0 {
                 continue;
@@ -1377,7 +1377,7 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let selfCl = (*self_).client as *mut gclient_t;
+        let selfCl = (*self_).client;
 
         // Not jedi master mode then nothing to do
         if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
@@ -1401,7 +1401,7 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: &mut GameContext, self_: EntityId) {
                 continue;
             }
 
-            let entCl = (*ent).client as *mut gclient_t;
+            let entCl = (*ent).client;
             for k in 0..3 {
                 angles[k] = (*selfCl).ps.origin[k] - (*entCl).ps.origin[k];
             }
@@ -1456,7 +1456,7 @@ pub fn G_AddPushVecToUcmd(ctx: &mut GameContext, self_: EntityId, ucmd: *mut use
         let mut right: vec3_t = [0.0; 3];
         let mut moveDir: vec3_t = [0.0; 3];
 
-        let cl = (*self_).client as *mut gclient_t;
+        let cl = (*self_).client;
         if cl.is_null() {
             return;
         }
@@ -1554,7 +1554,7 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
         let cl = if ent.is_null() {
             core::ptr::null_mut()
         } else {
-            (*ent).client as *mut gclient_t
+            (*ent).client
         };
         if ent.is_null()
             || cl.is_null()
@@ -1705,7 +1705,7 @@ pub fn NPC_Accelerate(ent: &gentity_t, fullWalkAcc: qboolean, fullRunAcc: qboole
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
             return;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         if (*npc).stats.acceleration == 0 {
             //No acceleration means just start and stop
@@ -1758,7 +1758,7 @@ pub fn NPC_GetWalkSpeed(ent: &gentity_t) -> c_int {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
             return 0;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
         // Raven's switch on playerTeam has only the NPCTEAM_PLAYER / default arm,
         // both yielding walkSpeed (stub code).
         (*npc).stats.walkSpeed
@@ -1775,8 +1775,8 @@ pub fn NPC_GetRunSpeed(ent: &gentity_t) -> c_int {
         if (*ent).client.is_null() || (*ent).NPC.is_null() {
             return 0;
         }
-        let cl = (*ent).client as *mut gclient_t;
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let cl = (*ent).client;
+        let npc = (*ent).NPC;
 
         // team no longer indicates species/race. Use NPC_class to adjust speed.
         let runSpeed: c_int = match (*cl).NPC_class {
@@ -1798,7 +1798,7 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         if !cl.is_null() {
             if (!(*ent).NPC.is_null() && VectorCompare(vec3_origin, (*cl).ps.moveDir) == qfalse) //moving using moveDir
                 || (*ucmd).forwardmove != 0
@@ -1858,12 +1858,12 @@ pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut 
         let cl = if ent.is_null() {
             core::ptr::null_mut()
         } else {
-            (*ent).client as *mut gclient_t
+            (*ent).client
         };
         //NOTE: lookTarget is an entity number, so this presumes that client 0 is NOT a Rancor...
         if !ent.is_null() && !cl.is_null() && (*cl).ps.hasLookTarget != 0 {
             let monster = &mut ctx.world.g_entities[(*cl).ps.lookTarget as usize] as *mut gentity_t;
-            let mcl = (*monster).client as *mut gclient_t;
+            let mcl = (*monster).client;
             if !monster.is_null() && !mcl.is_null() {
                 //take the monster's waypoint as your own
                 (*ent).waypoint = (*monster).waypoint;
@@ -1909,7 +1909,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         let level_time = ctx.world.level.time;
 
         if (*cl).pers.cmd.upmove != 0
@@ -2187,7 +2187,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let mut isNPC = qfalse;
         let mut controlledByPlayer = qfalse;
         let mut killJetFlags = qtrue;
@@ -2211,11 +2211,11 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             {
                 let veh = &mut ctx.world.g_entities[(*client).ps.m_iVehicleNum as usize]
                     as *mut gentity_t;
-                let vehVehicle = (*veh).m_pVehicle as *mut Vehicle_t;
+                let vehVehicle = (*veh).m_pVehicle;
 
                 if !vehVehicle.is_null() && (*vehVehicle).m_pPilot == ent as *mut _ {
                     // only take input from the pilot...
-                    let vehClient = (*veh).client as *mut gclient_t;
+                    let vehClient = (*veh).client;
                     (*vehClient).ps.commandTime = (*client).ps.commandTime;
                     (*vehVehicle).m_ucmd = (*client).pers.cmd;
                     if (*vehVehicle).m_ucmd.buttons & BUTTON_TALK != 0 {
@@ -2513,7 +2513,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
 
         if !(*ent).NPC.is_null() && (*ent).s.NPC_class != CLASS_VEHICLE as c_int {
             // vehicles manage their own speed
-            let npc = (*ent).NPC as *mut gNPC_t;
+            let npc = (*ent).NPC;
             // FIXME: swoop should keep turning (and moving forward?) for a little bit?
             if (*npc).combatMove == qfalse {
                 // Not leaning
@@ -2653,11 +2653,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             (*client).ps.basespeed = (*client).ps.speed as c_int;
         }
 
-        if (*ent).NPC.is_null()
-            || (*((*ent).NPC as *mut gNPC_t)).aiFlags & NPCAI_CUSTOM_GRAVITY == 0
-        {
+        if (*ent).NPC.is_null() || (*((*ent).NPC)).aiFlags & NPCAI_CUSTOM_GRAVITY == 0 {
             // use global gravity
-            let vehVehicle = (*ent).m_pVehicle as *mut Vehicle_t;
+            let vehVehicle = (*ent).m_pVehicle;
             if !(*ent).NPC.is_null()
                 && (*ent).s.NPC_class == CLASS_VEHICLE as c_int
                 && !vehVehicle.is_null()
@@ -2728,14 +2726,11 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                 if !duelAgainst.is_null()
                     && !(*duelAgainst).client.is_null()
                     && (*duelAgainst).inuse != qfalse
-                    && (*((*duelAgainst).client as *mut gclient_t)).ps.weapon == WP_SABER
-                    && (*((*duelAgainst).client as *mut gclient_t))
-                        .ps
-                        .saberHolstered
-                        != 0
-                    && (*((*duelAgainst).client as *mut gclient_t)).ps.duelTime != 0
+                    && (*((*duelAgainst).client)).ps.weapon == WP_SABER
+                    && (*((*duelAgainst).client)).ps.saberHolstered != 0
+                    && (*((*duelAgainst).client)).ps.duelTime != 0
                 {
-                    let daClient = (*duelAgainst).client as *mut gclient_t;
+                    let daClient = (*duelAgainst).client;
                     (*daClient).ps.saberHolstered = 0;
 
                     if (*daClient).saber[0].soundOn != 0 {
@@ -2770,14 +2765,14 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             if duelAgainst.is_null()
                 || (*duelAgainst).client.is_null()
                 || (*duelAgainst).inuse == qfalse
-                || (*((*duelAgainst).client as *mut gclient_t)).ps.duelIndex != (*ent).s.number
+                || (*((*duelAgainst).client)).ps.duelIndex != (*ent).s.number
             {
                 (*client).ps.duelInProgress = 0;
                 G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 0);
             } else if (*duelAgainst).health < 1
-                || (*((*duelAgainst).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] < 1
+                || (*((*duelAgainst).client)).ps.stats[STAT_HEALTH as usize] < 1
             {
-                let daClient = (*duelAgainst).client as *mut gclient_t;
+                let daClient = (*duelAgainst).client;
                 (*client).ps.duelInProgress = 0;
                 (*daClient).ps.duelInProgress = 0;
 
@@ -2839,13 +2834,13 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                 let mut vSub: vec3_t = [0.0; 3];
                 crate::q_math::_VectorSubtract(
                     (*client).ps.origin,
-                    (*((*duelAgainst).client as *mut gclient_t)).ps.origin,
+                    (*((*duelAgainst).client)).ps.origin,
                     &mut vSub,
                 );
                 let subLen = VectorLength(vSub);
 
                 if subLen >= 1024.0 {
-                    let daClient = (*duelAgainst).client as *mut gclient_t;
+                    let daClient = (*duelAgainst).client;
                     (*client).ps.duelInProgress = 0;
                     (*daClient).ps.duelInProgress = 0;
 
@@ -2876,15 +2871,15 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             if (*throwee).inuse == qfalse
                 || (*throwee).client.is_null()
                 || (*throwee).health < 1
-                || (*((*throwee).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
-                || (*((*throwee).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW != 0
-                || (*((*throwee).client as *mut gclient_t)).throwingIndex != (*ent).s.number
+                || (*((*throwee).client)).sess.sessionTeam == TEAM_SPECTATOR
+                || (*((*throwee).client)).ps.pm_flags & PMF_FOLLOW != 0
+                || (*((*throwee).client)).throwingIndex != (*ent).s.number
             {
                 (*client).doingThrow = 0;
                 (*client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
 
                 if (*throwee).inuse != qfalse && !(*throwee).client.is_null() {
-                    let toClient = (*throwee).client as *mut gclient_t;
+                    let toClient = (*throwee).client;
                     (*toClient).ps.heldByClient = 0;
                     (*toClient).beingThrown = 0;
 
@@ -2902,9 +2897,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             if (*thrower).inuse == qfalse
                 || (*thrower).client.is_null()
                 || (*thrower).health < 1
-                || (*((*thrower).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
-                || (*((*thrower).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW != 0
-                || (*((*thrower).client as *mut gclient_t)).throwingIndex != (*ent).s.number
+                || (*((*thrower).client)).sess.sessionTeam == TEAM_SPECTATOR
+                || (*((*thrower).client)).ps.pm_flags & PMF_FOLLOW != 0
+                || (*((*thrower).client)).throwingIndex != (*ent).s.number
             {
                 (*client).ps.heldByClient = 0;
                 (*client).beingThrown = 0;
@@ -2914,12 +2909,12 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                 }
 
                 if (*thrower).inuse != qfalse && !(*thrower).client.is_null() {
-                    let thClient = (*thrower).client as *mut gclient_t;
+                    let thClient = (*thrower).client;
                     (*thClient).doingThrow = 0;
                     (*thClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                 }
             } else {
-                let thClient = (*thrower).client as *mut gclient_t;
+                let thClient = (*thrower).client;
                 if !(*thrower).ghoul2.is_null()
                     && trap::G2_HaveWeGhoul2Models(
                         ctx.engine,
@@ -3298,7 +3293,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             crate::q_math::_VectorCopy((*ent).r.mins, &mut pm.mins);
             crate::q_math::_VectorCopy((*ent).r.maxs, &mut pm.maxs);
 
-            let vehVehicle = (*ent).m_pVehicle as *mut Vehicle_t;
+            let vehVehicle = (*ent).m_pVehicle;
             if (*ent).s.NPC_class == CLASS_VEHICLE as c_int && !vehVehicle.is_null() {
                 if !(*vehVehicle).m_pPilot.is_null() {
                     // vehicles want to use their last pilot ucmd I guess
@@ -3318,7 +3313,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
 
                     // NOTE: button presses were getting lost!
                     let pilotEnt = (*vehVehicle).m_pPilot as *mut gentity_t;
-                    let pilotClient = (*pilotEnt).client as *mut gclient_t;
+                    let pilotClient = (*pilotEnt).client;
                     pm.cmd.buttons =
                         (*pilotClient).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK);
                 }
@@ -3392,7 +3387,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                     && (*clientLost).inuse != qfalse
                     && ctx.world.bg_state.rng.Q_irand(0, 40) > (*clientLost).health
                 {
-                    let clClient = (*clientLost).client as *mut gclient_t;
+                    let clClient = (*clientLost).client;
                     let mut attDir: vec3_t = [0.0; 3];
                     crate::q_math::_VectorSubtract(
                         (*client).ps.origin,
@@ -3434,18 +3429,12 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                     ctx.world.globals.gGAvoidDismember = 0;
                 } else if !(*clientLost).client.is_null()
                     && (*clientLost).inuse != qfalse
-                    && (*((*clientLost).client as *mut gclient_t))
-                        .ps
-                        .forceHandExtend
-                        != HANDEXTEND_KNOCKDOWN as c_int
-                    && (*((*clientLost).client as *mut gclient_t))
-                        .ps
-                        .saberEntityNum
-                        != 0
+                    && (*((*clientLost).client)).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int
+                    && (*((*clientLost).client)).ps.saberEntityNum != 0
                 {
                     // if we didn't knock down it was a circle lock. So as punishment,
                     // make them lose their saber and go into a proper anim
-                    let clClient = (*clientLost).client as *mut gclient_t;
+                    let clClient = (*clientLost).client;
                     let saberEnt = &mut ctx.world.g_entities[(*clClient).ps.saberEntityNum as usize]
                         as *mut gentity_t;
                     saberCheckKnockdown_DuelLoss(
@@ -3471,8 +3460,8 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                 && !(*groundEnt).m_pVehicle.is_null()
             {
                 // standing on a valid, living vehicle
-                let groundClient = (*groundEnt).client as *mut gclient_t;
-                let groundVeh = (*groundEnt).m_pVehicle as *mut Vehicle_t;
+                let groundClient = (*groundEnt).client;
+                let groundVeh = (*groundEnt).m_pVehicle;
                 if (*groundClient).ps.speed == 0.0 && (*groundVeh).m_ucmd.upmove > 0 {
                     // a vehicle that's trying to take off!
                     // just kill me
@@ -3721,7 +3710,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         // use the snapped origin for linking so it matches client predicted versions
         crate::q_math::_VectorCopy((*ent).s.pos.trBase, &mut (*ent).r.currentOrigin);
 
-        let vehVehicle = (*ent).m_pVehicle as *mut Vehicle_t;
+        let vehVehicle = (*ent).m_pVehicle;
         if (*ent).s.eType != ET_NPC as c_int
             || (*ent).s.NPC_class != CLASS_VEHICLE as c_int
             || vehVehicle.is_null()
@@ -3782,15 +3771,12 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             if !(*faceKicked).client.is_null()
                 && (OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(faceKicked)) == qfalse
                     || ctx.world.cvars.g_friendlyFire.integer != 0)
-                && ((*((*faceKicked).client as *mut gclient_t))
-                    .ps
-                    .duelInProgress
-                    == qfalse
-                    || (*((*faceKicked).client as *mut gclient_t)).ps.duelIndex == (*ent).s.number)
+                && ((*((*faceKicked).client)).ps.duelInProgress == qfalse
+                    || (*((*faceKicked).client)).ps.duelIndex == (*ent).s.number)
                 && ((*client).ps.duelInProgress == qfalse
                     || (*client).ps.duelIndex == (*faceKicked).s.number)
             {
-                let fkClient = (*faceKicked).client as *mut gclient_t;
+                let fkClient = (*faceKicked).client;
                 if !(*faceKicked).client.is_null()
                     && (*faceKicked).health != 0
                     && (*faceKicked).takedamage != qfalse
@@ -3918,7 +3904,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             let vehEnt =
                 &mut ctx.world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*vehEnt).inuse != qfalse && !(*vehEnt).client.is_null() {
-                let vehVehicle = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+                let vehVehicle = (*vehEnt).m_pVehicle;
                 ClientThink(
                     ctx,
                     (*client).ps.m_iVehicleNum,
@@ -3939,7 +3925,7 @@ pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         // Only timeout supported right now is the timeout to spectator mode
         if ctx.world.cvars.g_timeouttospec.integer == 0 {
             return;
@@ -3972,7 +3958,7 @@ pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
 pub fn ClientThink(ctx: &mut GameContext, clientNum: c_int, ucmd: *mut usercmd_t) {
     unsafe {
         let ent = &mut ctx.world.g_entities[clientNum as usize] as *mut gentity_t;
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         if clientNum < (MAX_CLIENTS) as i32 {
             trap::GetUsercmd(
                 ctx.engine,
@@ -4012,7 +3998,7 @@ pub fn G_RunClient(ctx: &mut GameContext, ent: EntityId) {
         if (*ent).r.svFlags & SVF_BOT == 0 && ctx.world.cvars.g_synchronousClients.integer == 0 {
             return;
         }
-        let cl = (*ent).client as *mut gclient_t;
+        let cl = (*ent).client;
         (*cl).pers.cmd.serverTime = ctx.world.level.time;
         ClientThink_real(ctx, ctx.entity_id_of(ent).unwrap());
     }
@@ -4025,7 +4011,7 @@ pub fn SpectatorClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let entCl = (*ent).client as *mut gclient_t;
+        let entCl = (*ent).client;
 
         if (*ent).s.eType == ET_NPC as c_int {
             debug_assert!(false, "SpectatorClientEndFrame called on ET_NPC");
@@ -4083,7 +4069,7 @@ pub fn ClientEndFrame(ctx: &mut GameContext, ent: EntityId) {
             isNPC = qtrue;
         }
 
-        let entCl = (*ent).client as *mut gclient_t;
+        let entCl = (*ent).client;
 
         if (*entCl).sess.sessionTeam == TEAM_SPECTATOR {
             SpectatorClientEndFrame(ctx, ctx.entity_id_of(ent).unwrap());

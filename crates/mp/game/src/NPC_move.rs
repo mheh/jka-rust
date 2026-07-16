@@ -127,8 +127,7 @@ pub fn NPC_LadderMove(ctx: &mut GameContext, dir: vec3_t) {
         let npc = ctx.world.globals.NPC;
 
         if (dir[2] > 0.0)
-            || (dir[2] < 0.0
-                && (*((*npc).client as *mut gclient_t)).ps.groundEntityNum == ENTITYNUM_NONE)
+            || (dir[2] < 0.0 && (*((*npc).client)).ps.groundEntityNum == ENTITYNUM_NONE)
         {
             // Set our movement direction
             ctx.world.globals.ucmd.upmove = if dir[2] > 0.0 { 127 } else { -127 };
@@ -423,7 +422,7 @@ pub fn G_UcmdMoveForDir(self_: &mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t)
 
         // Store the movement direction in playerstate for NPC cheating
         // (preserves precision lost in ucmd conversion).
-        (*((*self_).client as *mut gclient_t)).ps.moveDir = move_dir;
+        (*((*self_).client)).ps.moveDir = move_dir;
 
         // Compute dot products with forward and right vectors, scaled to [-127, 127].
         let mut fDot =
@@ -465,7 +464,7 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
         let mut dir = [0.0f32; 3];
 
         // If taking full body pain, don't move
-        if PM_InKnockDown(&mut (*((*npc).client as *mut gclient_t)).ps) == qtrue
+        if PM_InKnockDown(&mut (*((*npc).client)).ps) == qtrue
             || ((*npc).s.legsAnim >= BOTH_PAIN1 as c_int
                 && (*npc).s.legsAnim <= BOTH_PAIN18 as c_int)
         {
@@ -482,9 +481,9 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
         // Convert the move to angles
         crate::q_math::vectoangles(dir, &mut npc_info.lastPathAngles);
         if (ctx.world.globals.ucmd.buttons & BUTTON_WALKING) != 0 {
-            (*((*npc).client as *mut gclient_t)).ps.speed = npc_info.stats.walkSpeed as f32;
+            (*((*npc).client)).ps.speed = npc_info.stats.walkSpeed as f32;
         } else {
-            (*((*npc).client as *mut gclient_t)).ps.speed = npc_info.stats.runSpeed as f32;
+            (*((*npc).client)).ps.speed = npc_info.stats.runSpeed as f32;
         }
 
         // If in combat move, then move directly towards our goal
@@ -503,7 +502,7 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
             npc_info.desiredYaw = crate::q_math::AngleNormalize360(npc_info.lastPathAngles[1]);
 
             // Pitch towards the goal and also update if flying or swimming
-            if ((*((*npc).client as *mut gclient_t)).ps.eFlags2 & EF2_FLYING) != 0 {
+            if ((*((*npc).client)).ps.eFlags2 & EF2_FLYING) != 0 {
                 npc_info.desiredPitch =
                     crate::q_math::AngleNormalize360(npc_info.lastPathAngles[0]);
 
@@ -514,7 +513,7 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
                     } else if scale < -64.0 {
                         scale = -64.0;
                     }
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] = scale;
+                    (*((*npc).client)).ps.velocity[2] = scale;
                 }
             }
 
@@ -534,7 +533,7 @@ pub fn NPC_SlideMoveToGoal(ctx: &mut GameContext) -> qboolean {
         let npc = ctx.world.globals.NPC;
         let npc_info = &mut *ctx.world.globals.NPCInfo;
 
-        let save_yaw = (*((*npc).client as *mut gclient_t)).ps.viewangles[1];
+        let save_yaw = (*((*npc).client)).ps.viewangles[1];
 
         npc_info.combatMove = 1;
 
@@ -553,11 +552,7 @@ pub fn NPC_ApplyRoff(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
 
-        BG_PlayerStateToEntityState(
-            &mut (*((*npc).client as *mut gclient_t)).ps,
-            &mut (*npc).s,
-            qfalse,
-        );
+        BG_PlayerStateToEntityState(&mut (*((*npc).client)).ps, &mut (*npc).s, qfalse);
 
         // use the precise origin for linking
         crate::trap::LinkEntity(

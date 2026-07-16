@@ -95,7 +95,7 @@ pub fn Interrogator_die(
         // SAFETY: self_ accessed through game context.
         self_.as_mut().map(|ent| {
             if !ent.client.is_null() {
-                let client = &mut *(ent.client as *mut gclient_t);
+                let client = &mut *(ent.client);
                 client.ps.velocity[2] = -100.0;
 
                 // Clear flying flag and set random horizontal velocity
@@ -225,8 +225,8 @@ pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
                         dif = if dif < 0.0 { -16.0 } else { 16.0 };
                     }
 
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
-                        ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
+                    (*((*npc).client)).ps.velocity[2] =
+                        ((*((*npc).client)).ps.velocity[2] + dif) / 2.0;
                 }
             }
         } else {
@@ -255,39 +255,39 @@ pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
                         4
                     };
                 } else {
-                    if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
-                        (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
+                    if (*((*npc).client)).ps.velocity[2] != 0.0 {
+                        (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                        if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
-                            (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
+                        if (*((*npc).client)).ps.velocity[2].abs() < 2.0 {
+                            (*((*npc).client)).ps.velocity[2] = 0.0;
                         }
                     }
                 }
             }
             // Apply friction
-            else if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
-                (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
+            else if (*((*npc).client)).ps.velocity[2] != 0.0 {
+                (*((*npc).client)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 1.0 {
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
+                if (*((*npc).client)).ps.velocity[2].abs() < 1.0 {
+                    (*((*npc).client)).ps.velocity[2] = 0.0;
                 }
             }
         }
 
         // Apply friction
-        if (*((*npc).client as *mut gclient_t)).ps.velocity[0] != 0.0 {
-            (*((*npc).client as *mut gclient_t)).ps.velocity[0] *= VELOCITY_DECAY;
+        if (*((*npc).client)).ps.velocity[0] != 0.0 {
+            (*((*npc).client)).ps.velocity[0] *= VELOCITY_DECAY;
 
-            if (*((*npc).client as *mut gclient_t)).ps.velocity[0].abs() < 1.0 {
-                (*((*npc).client as *mut gclient_t)).ps.velocity[0] = 0.0;
+            if (*((*npc).client)).ps.velocity[0].abs() < 1.0 {
+                (*((*npc).client)).ps.velocity[0] = 0.0;
             }
         }
 
-        if (*((*npc).client as *mut gclient_t)).ps.velocity[1] != 0.0 {
-            (*((*npc).client as *mut gclient_t)).ps.velocity[1] *= VELOCITY_DECAY;
+        if (*((*npc).client)).ps.velocity[1] != 0.0 {
+            (*((*npc).client)).ps.velocity[1] *= VELOCITY_DECAY;
 
-            if (*((*npc).client as *mut gclient_t)).ps.velocity[1].abs() < 1.0 {
-                (*((*npc).client as *mut gclient_t)).ps.velocity[1] = 0.0;
+            if (*((*npc).client)).ps.velocity[1].abs() < 1.0 {
+                (*((*npc).client)).ps.velocity[1] = 0.0;
             }
         }
     }
@@ -308,7 +308,7 @@ pub fn Interrogator_Strafe(ctx: &mut GameContext) {
         let mut tr: trace_t = core::mem::zeroed();
 
         crate::q_math::AngleVectors(
-            (*((*npc).client as *mut gclient_t)).renderInfo.eyeAngles,
+            (*((*npc).client)).renderInfo.eyeAngles,
             None,
             Some(&mut right),
             None,
@@ -344,10 +344,10 @@ pub fn Interrogator_Strafe(ctx: &mut GameContext) {
         // Close enough
         if tr.fraction > 0.9f32 {
             crate::q_math::_VectorMA(
-                (*((*npc).client as *mut gclient_t)).ps.velocity,
+                (*((*npc).client)).ps.velocity,
                 (HUNTER_STRAFE_VEL * dir) as f32,
                 right,
-                &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
+                &mut (*((*npc).client)).ps.velocity,
             );
 
             // Add a slight upward push
@@ -371,7 +371,7 @@ pub fn Interrogator_Strafe(ctx: &mut GameContext) {
                         };
                     }
 
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] += dif;
+                    (*((*npc).client)).ps.velocity[2] += dif;
                 }
             }
 
@@ -446,10 +446,10 @@ pub fn Interrogator_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboo
         let speed = HUNTER_FORWARD_BASE_SPEED as f32
             + (HUNTER_FORWARD_MULTIPLIER as f32) * ctx.world.cvars.g_spskill.integer as f32;
         crate::q_math::_VectorMA(
-            (*((*npc).client as *mut gclient_t)).ps.velocity,
+            (*((*npc).client)).ps.velocity,
             speed,
             forward,
-            &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
+            &mut (*((*npc).client)).ps.velocity,
         );
     }
 }

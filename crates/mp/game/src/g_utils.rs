@@ -412,7 +412,7 @@ pub fn G_RadiusList(
 }
 
 /// Raven `G_Throw`. `targ->client` reached via the house
-/// `(*ent).client as *mut gclient_t` cast (see `g_combat.rs`/`g_items.rs`).
+/// `(*ent).client` cast (see `g_combat.rs`/`g_items.rs`).
 ///
 /// Source: `oracle/codemp/game/g_utils.c:315-370`
 pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32) {
@@ -449,7 +449,7 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
         }
 
         if !(*targ).client.is_null() {
-            let client = (*targ).client as *mut gclient_t;
+            let client = (*targ).client;
             for i in 0..3 {
                 (*client).ps.velocity[i] += kvel[i];
             }
@@ -467,7 +467,7 @@ pub fn G_Throw(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, push: f32)
         // set the timer so that the other client can't cancel
         // out the movement immediately
         if !(*targ).client.is_null() {
-            let client = (*targ).client as *mut gclient_t;
+            let client = (*targ).client;
             if (*client).ps.pm_time == 0 {
                 let mut t = (push * 2.0) as c_int;
                 if t < 50 {
@@ -575,7 +575,7 @@ pub fn G_CleanAllFakeClients(ctx: &mut GameContext) {
                 && (*ent).s.eType == ET_NPC as c_int
                 && !(*ent).client.is_null()
             {
-                G_FreeFakeClient(&mut (*ent).client as *mut *mut c_void as *mut *mut gclient_t);
+                G_FreeFakeClient(&mut (*ent).client);
             }
             i += 1;
         }
@@ -604,7 +604,7 @@ pub fn G_SetAnim(
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
         let anims = (&ctx.world.bg_state.bgAllAnims)[(*ent).localAnimIndex as usize].anims;
-        let ps = &mut (*((*ent).client as *mut gclient_t)).ps as *mut playerState_t;
+        let ps = &mut (*((*ent).client)).ps as *mut playerState_t;
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
             // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
@@ -1092,7 +1092,7 @@ pub fn G_KillG2Queue(ctx: &mut GameContext, entNum: c_int) {
 }
 
 /// Raven `G_FreeEntity`. `ed->client` reached via the house
-/// `(*ent).client as *mut gclient_t` cast.
+/// `(*ent).client` cast.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:932-1043`
 pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
@@ -1130,13 +1130,13 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
 
         if (*ed).s.eType == ET_NPC as c_int && !(*ed).m_pVehicle.is_null() {
             // tell the "vehicle pool" that this one is now free
-            G_FreeVehicleObject(ctx, (*ed).m_pVehicle as *mut Vehicle_t);
+            G_FreeVehicleObject(ctx, (*ed).m_pVehicle);
         }
 
         if (*ed).s.eType == ET_NPC as c_int && !(*ed).client.is_null() {
             // this "client" structure is one of our dynamically allocated
             // ones, so free the memory
-            let client = (*ed).client as *mut gclient_t;
+            let client = (*ed).client;
             let mut saberEntNum: c_int = -1;
             if (*client).ps.saberEntityNum != 0 {
                 saberEntNum = (*client).ps.saberEntityNum;
@@ -1169,7 +1169,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
                 }
             }
 
-            G_FreeFakeClient(&mut (*ed).client as *mut *mut c_void as *mut *mut gclient_t);
+            G_FreeFakeClient(&mut (*ed).client);
         }
 
         if (*ed).s.eFlags & EF_SOUNDTRACKER != 0 {
@@ -1177,7 +1177,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
             while i < MAX_CLIENTS {
                 let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
                 if !ent.is_null() && (*ent).inuse != qfalse && !(*ent).client.is_null() {
-                    let client = (*ent).client as *mut gclient_t;
+                    let client = (*ent).client;
                     let mut ch = (trackchan_t::TRACK_CHANNEL_NONE as c_int - 50) as usize;
                     while ch < (trackchan_t::NUM_TRACK_CHANNELS as c_int - 50) as usize {
                         if (*client).ps.fd.killSoundEntIndex[ch] == (*ed).s.number {
@@ -1308,7 +1308,7 @@ pub fn G_ScaleNetHealth(self_: &mut gentity_t) {
 }
 
 /// Raven `G_KillBox`. `ent->client` reached via the house
-/// `(*ent).client as *mut gclient_t` cast; `G_Damage` is itself the deferred
+/// `(*ent).client` cast; `G_Damage` is itself the deferred
 /// monster fn (`g_combat.rs`) — calling it here matches the mechanical
 /// dependency chain the rest of this pass follows.
 ///
@@ -1317,7 +1317,7 @@ pub fn G_KillBox(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let mut mins = [0.0f32; 3];
         let mut maxs = [0.0f32; 3];
         for i in 0..3 {
@@ -1384,7 +1384,7 @@ pub fn G_AddPredictableEvent(ent: Option<&mut gentity_t>, event: c_int, eventPar
         crate::bg_misc::BG_AddPredictableEventToPlayerstate(
             event,
             eventParm,
-            &mut (*((*ent).client as *mut gclient_t)).ps,
+            &mut (*((*ent).client)).ps,
         );
     }
 }
@@ -1415,7 +1415,7 @@ pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
         let level_time = (*crate::g_strap::strap_world()).level.time;
 
         if !(*ent).client.is_null() {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             let mut bits = (*client).ps.externalEvent & EV_EVENT_BITS;
             bits = (bits + EV_EVENT_BIT1) & EV_EVENT_BITS;
             (*client).ps.externalEvent = event | bits;
@@ -1531,7 +1531,7 @@ pub fn G_MuteSound(ctx: &mut GameContext, entnum: c_int, channel: c_int) {
 }
 
 /// Raven `G_Sound`. `ent->client` reached via the house
-/// `(*ent).client as *mut gclient_t` cast.
+/// `(*ent).client` cast.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1345-1372`
 pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, soundIndex: c_int) {
@@ -1556,14 +1556,14 @@ pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, sou
         {
             // let the client remember the index of the player entity so he
             // can kill the most recent sound on request
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             let idx = (channel - 50) as usize;
             let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
             if ctx.world.g_entities[killIdx as usize].inuse != qfalse
                 && killIdx > MAX_CLIENTS as c_int
             {
                 G_MuteSound(ctx, killIdx, mp_qshared::shared::sound_channel::CHAN_VOICE);
-                let client = (*ent).client as *mut gclient_t;
+                let client = (*ent).client;
                 let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
                 if killIdx > MAX_CLIENTS as c_int
                     && ctx.world.g_entities[killIdx as usize].inuse != qfalse
@@ -1670,7 +1670,7 @@ pub fn G_UseDispenserOn(ctx: &mut GameContext, ent: EntityId, dispType: c_int, t
         let level_time = ctx.world.level.time;
 
         if dispType == HI_HEALTHDISP {
-            let client = (*target).client as *mut gclient_t;
+            let client = (*target).client;
             (*client).ps.stats[STAT_HEALTH] += 4;
 
             if (*client).ps.stats[STAT_HEALTH] > (*client).ps.stats[STAT_MAX_HEALTH] {
@@ -1680,10 +1680,10 @@ pub fn G_UseDispenserOn(ctx: &mut GameContext, ent: EntityId, dispType: c_int, t
             (*client).isMedHealed = level_time + 500;
             (*target).health = (*client).ps.stats[STAT_HEALTH];
         } else if dispType == HI_AMMODISP {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if (*client).medSupplyDebounce < level_time {
                 // do the next increment; based on the amount of ammo used per normal shot.
-                let tclient = (*target).client as *mut gclient_t;
+                let tclient = (*target).client;
                 let weap = (*tclient).ps.weapon as usize;
                 let ammo_index = weaponData[weap].ammoIndex as usize;
                 (*tclient).ps.ammo[ammo_index] += weaponData[weap].energyPerShot;
@@ -1696,7 +1696,7 @@ pub fn G_UseDispenserOn(ctx: &mut GameContext, ent: EntityId, dispType: c_int, t
                 // base the next supply time on how long the weapon takes to fire.
                 (*client).medSupplyDebounce = level_time + weaponData[weap].fireTime;
             }
-            let client = (*target).client as *mut gclient_t;
+            let client = (*target).client;
             (*client).isMedSupplied = level_time + 500;
         }
     }
@@ -1727,19 +1727,19 @@ pub fn G_CanUseDispOn(ctx: &mut GameContext, ent: Option<EntityId>, dispType: c_
             || (*ent).client.is_null()
             || (*ent).inuse == qfalse
             || (*ent).health < 1
-            || (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH] < 1
+            || (*((*ent).client)).ps.stats[STAT_HEALTH] < 1
         {
             return 0;
         }
 
         if dispType == HI_HEALTHDISP {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if (*client).ps.stats[STAT_HEALTH] < (*client).ps.stats[STAT_MAX_HEALTH] {
                 return 1;
             }
             return 0;
         } else if dispType == HI_AMMODISP {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if (*client).ps.weapon <= WP_NONE || (*client).ps.weapon > LAST_USEABLE_WEAPON {
                 // not a player-useable weapon
                 return 0;
@@ -1781,7 +1781,7 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
             return qfalse;
         }
 
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         if ctx.world.cvars.g_gametype.integer != GT_SIEGE
             || (*client).siegeClass == -1
             || target.is_null()
@@ -1894,21 +1894,21 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         if ent.is_null()
             || (*ent).client.is_null()
-            || ((*ent).client as *mut gclient_t != core::ptr::null_mut()
-                && ((*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
-                    && (*((*ent).client as *mut gclient_t)).ps.torsoAnim != BOTH_BUTTON_HOLD
-                    && (*((*ent).client as *mut gclient_t)).ps.torsoAnim != BOTH_CONSOLE1))
+            || ((*ent).client != core::ptr::null_mut()
+                && ((*((*ent).client)).ps.weaponTime > 0
+                    && (*((*ent).client)).ps.torsoAnim != BOTH_BUTTON_HOLD
+                    && (*((*ent).client)).ps.torsoAnim != BOTH_CONSOLE1))
             || (*ent).health < 1
-            || (((*((*ent).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW) != 0)
-            || ((*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR)
-            || ((*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE
-                && (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_DRAGGING)
+            || (((*((*ent).client)).ps.pm_flags & PMF_FOLLOW) != 0)
+            || ((*((*ent).client)).sess.sessionTeam == TEAM_SPECTATOR)
+            || ((*((*ent).client)).ps.forceHandExtend != HANDEXTEND_NONE
+                && (*((*ent).client)).ps.forceHandExtend != HANDEXTEND_DRAGGING)
         {
             return;
         }
 
         // Check if on emplaced gun or using vehicle
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         if (*client).ps.emplacedIndex != 0 {
             return;
         }
@@ -1918,7 +1918,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
             let current_veh =
                 &mut ctx.world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*current_veh).inuse != qfalse && !(*current_veh).m_pVehicle.is_null() {
-                let pVeh = (*current_veh).m_pVehicle as *mut Vehicle_t;
+                let pVeh = (*current_veh).m_pVehicle;
                 if (*pVeh).m_iBoarding == 0 {
                     crate::veh_dispatch::eject(ctx, pVeh, ent as *mut bgEntity_t, qfalse);
                 }
@@ -1940,7 +1940,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
                     &mut ctx.world.g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
                 if (*grabbed).inuse != qfalse {
                     if !(*grabbed).client.is_null() {
-                        let grabbed_client = (*grabbed).client as *mut gclient_t;
+                        let grabbed_client = (*grabbed).client;
                         (*grabbed_client).ps.ragAttach = 0;
                     } else {
                         (*grabbed).s.ragAttach = 0;
@@ -1993,7 +1993,7 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
             && ((*client).ps.zoomMode == qfalse)
         {
             //if target is a vehicle then perform appropriate checks
-            let pVeh = (*target).m_pVehicle as *mut Vehicle_t;
+            let pVeh = (*target).m_pVehicle;
             if !(*pVeh).m_pVehicleInfo.is_null() {
                 if (*ent).r.ownerNum == (*target).s.number {
                     //user is already on this vehicle so eject him
@@ -2117,7 +2117,7 @@ fn goto_tryJetPack(ctx: &mut GameContext, ent: EntityId) {
     // mp_qshared::shared::limits) so the STAT_HOLDABLE_ITEMS bit tests and the
     // ItemUse_UseDisp / EV_USE_ITEM0 dispType all use the real values.
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
 
         // Jetpack check
         if ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_JETPACK)) != 0 {

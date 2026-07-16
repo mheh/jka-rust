@@ -59,7 +59,7 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
                 (*ent).ghoul2 = core::ptr::null_mut();
             }
             if !(*ent).client.is_null() {
-                let client = (*ent).client as *mut gclient_t;
+                let client = (*ent).client;
                 let mut j: usize = 0;
                 while j < MAX_SABERS {
                     if !(*client).weaponGhoul2[j].is_null()

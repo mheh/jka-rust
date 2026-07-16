@@ -786,7 +786,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         }
 
         // If we're not a vehicle, then an error here would be valid...
-        let client_ptr = (*spawner).client as *mut gclient_t;
+        let client_ptr = (*spawner).client;
         if client_ptr.is_null() || (*client_ptr).NPC_class != CLASS_VEHICLE {
             if md3_model != 0 {
                 crate::g_main::Com_Printf(
@@ -838,7 +838,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         let mut sound: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut playerModel: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut customSkin: [c_char; MAX_QPATH] = [0; MAX_QPATH];
-        let client_ptr = (*NPC).client as *mut gclient_t;
+        let client_ptr = (*NPC).client;
         let ri: *mut renderInfo_t = &mut (*client_ptr).renderInfo as *mut renderInfo_t;
         let mut stats: *mut gNPCstats_t = std::ptr::null_mut();
         let mut md3Model: qboolean = 1; // qtrue
@@ -859,7 +859,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             NPCName = c"Player".as_ptr();
         }
 
-        let npc_ptr = (*NPC).NPC as *mut gNPC_t;
+        let npc_ptr = (*NPC).NPC;
         if !npc_ptr.is_null() {
             stats = &mut (*npc_ptr).stats as *mut gNPCstats_t;
             // fill in defaults
@@ -1737,7 +1737,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                let vehForHeight = (*NPC).m_pVehicle as *mut Vehicle_t;
+                let vehForHeight = (*NPC).m_pVehicle;
                 if (*client_ptr).NPC_class == CLASS_VEHICLE
                     && !(*NPC).m_pVehicle.is_null()
                     && !(*vehForHeight).m_pVehicleInfo.is_null()

@@ -146,10 +146,7 @@ pub fn VEH_TurretAnglesToEnemy(
             _VectorSubtract(org, (*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut diff);
             let dist = VectorNormalize(&mut diff);
             if !(*turretEnemy).client.is_null() {
-                _VectorCopy(
-                    (*((*turretEnemy).client as *mut gclient_t)).ps.velocity,
-                    &mut velocity,
-                );
+                _VectorCopy((*((*turretEnemy).client)).ps.velocity, &mut velocity);
             } else {
                 _VectorCopy((*turretEnemy).s.pos.trDelta, &mut velocity);
             }
@@ -388,7 +385,7 @@ pub fn VEH_TurretFindEnemies(
                 }
                 // else: we will shoot at bbrushes!
             } else if !(*target).client.is_null()
-                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+                && (*((*target).client)).sess.sessionTeam == TEAM_SPECTATOR
             {
                 i += 1;
                 continue;
@@ -400,20 +397,16 @@ pub fn VEH_TurretFindEnemies(
                 i += 1;
                 continue;
             }
-            if !(*parent).client.is_null()
-                && (*((*parent).client as *mut gclient_t)).sess.sessionTeam != 0
-            {
+            if !(*parent).client.is_null() && (*((*parent).client)).sess.sessionTeam != 0 {
                 if !(*target).client.is_null() {
-                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam
-                        == (*((*parent).client as *mut gclient_t)).sess.sessionTeam
+                    if (*((*target).client)).sess.sessionTeam
+                        == (*((*parent).client)).sess.sessionTeam
                     {
                         // A bot/client/NPC we don't want to shoot
                         i += 1;
                         continue;
                     }
-                } else if (*target).teamnodmg
-                    == (*((*parent).client as *mut gclient_t)).sess.sessionTeam
-                {
+                } else if (*target).teamnodmg == (*((*parent).client)).sess.sessionTeam {
                     // some other entity that's allied with us
                     i += 1;
                     continue;
@@ -498,10 +491,7 @@ pub fn VEH_TurretObeyPassengerControl(
                 &mut (&mut ctx.world.bg_state.g_vehWeaponInfo)[(*turretStats).iWeapon as usize];
             let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
             let mut aimAngles = [0f32; 3];
-            _VectorCopy(
-                (*((*passenger).client as *mut gclient_t)).ps.viewangles,
-                &mut aimAngles,
-            );
+            _VectorCopy((*((*passenger).client)).ps.viewangles, &mut aimAngles);
 
             VEH_TurretAim(
                 ctx,
@@ -514,8 +504,7 @@ pub fn VEH_TurretObeyPassengerControl(
                 curMuzzle,
                 &mut aimAngles,
             );
-            if ((*((*passenger).client as *mut gclient_t)).pers.cmd.buttons
-                & (BUTTON_ATTACK | BUTTON_ALT_ATTACK))
+            if ((*((*passenger).client)).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK))
                 != 0
             {
                 // he's pressing an attack button, so fire!
@@ -593,7 +582,7 @@ pub fn VEH_TurretThink(
                 || turretEnemy == parent
                 || (*turretEnemy).r.ownerNum == (*parent).s.number // a passenger?
                 || (!(*turretEnemy).client.is_null()
-                    && (*((*turretEnemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR)
+                    && (*((*turretEnemy).client)).sess.sessionTeam == TEAM_SPECTATOR)
             {
                 // don't keep going after spectators, pilot, self, dead people, etc.
                 turretEnemy = core::ptr::null_mut();

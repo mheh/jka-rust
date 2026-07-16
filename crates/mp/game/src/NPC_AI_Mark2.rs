@@ -390,8 +390,8 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
                 BOTH_RUN1START as c_int,
                 SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
             );
-            if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0
-                && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1START as c_int
+            if (*((*npc_ptr).client)).ps.legsTimer <= 0
+                && (*((*npc_ptr).client)).ps.torsoAnim == BOTH_RUN1START as c_int
             {
                 (*npc_info_ptr).localState = LSTATE_NONE;
             }
@@ -461,8 +461,8 @@ pub fn Mark2_AttackDecision(ctx: &mut GameContext) {
             let delay = ctx.world.bg_state.rng.Q_irand(3000, 9000);
             TIMER_Set(ctx, npc_id, b"downTime\0".as_ptr() as *const c_char, delay);
 
-            if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0
-                && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1STOP as c_int
+            if (*((*npc_ptr).client)).ps.legsTimer <= 0
+                && (*((*npc_ptr).client)).ps.torsoAnim == BOTH_RUN1STOP as c_int
             {
                 (*npc_ptr).flags |= FL_SHIELDED;
                 (*npc_info_ptr).localState = LSTATE_DOWN;

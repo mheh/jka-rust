@@ -64,7 +64,7 @@ pub fn Wampa_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
     let self_: *mut gentity_t = unsafe { ent_resolve_opt(ctx, self_) };
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
-            let ri = &mut (*((*self_).client as *mut gclient_t)).renderInfo;
+            let ri = &mut (*((*self_).client)).renderInfo;
             ri.headBolt = trap::G2API_AddBolt(
                 ctx.engine,
                 mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
@@ -179,7 +179,7 @@ pub fn Wampa_CheckRoar(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                 ctx,
                 ctx.entity_id_of(self_),
                 c"rageTime".as_ptr(),
-                (*((*self_).client as *mut gclient_t)).ps.legsTimer,
+                (*((*self_).client)).ps.legsTimer,
             );
             return qtrue;
         }
@@ -274,8 +274,7 @@ pub fn Wampa_Move(ctx: &mut GameContext, visible: qboolean) {
 
             if (*npc_info).stats.runSpeed == 300 {
                 // need to use the alternate run - hunched over on all fours
-                (*((*npc).client as *mut gclient_t)).ps.eFlags2 |=
-                    mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
+                (*((*npc).client)).ps.eFlags2 |= mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
             }
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
             (*npc_info).goalRadius = MAX_DISTANCE; // just get us within combat range
@@ -352,20 +351,14 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                     // actually push the enemy
                     let mut pushDir: [f32; 3] = [0.0; 3];
                     let mut angs: [f32; 3] = [0.0; 3];
-                    crate::q_math::_VectorCopy(
-                        (*((*npc).client as *mut gclient_t)).ps.viewangles,
-                        &mut angs,
-                    );
+                    crate::q_math::_VectorCopy((*((*npc).client)).ps.viewangles, &mut angs);
                     angs[crate::prelude::YAW as usize] += ctx.world.bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] =
                         ctx.world.bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
-                    if (*((*radiusEnt).client as *mut gclient_t)).NPC_class
-                        != crate::prelude::CLASS_WAMPA
-                        && (*((*radiusEnt).client as *mut gclient_t)).NPC_class
-                            != crate::prelude::CLASS_RANCOR
-                        && (*((*radiusEnt).client as *mut gclient_t)).NPC_class
-                            != crate::prelude::CLASS_ATST
+                    if (*((*radiusEnt).client)).NPC_class != crate::prelude::CLASS_WAMPA
+                        && (*((*radiusEnt).client)).NPC_class != crate::prelude::CLASS_RANCOR
+                        && (*((*radiusEnt).client)).NPC_class != crate::prelude::CLASS_ATST
                     {
                         crate::g_utils::G_Throw(
                             ctx,
@@ -374,20 +367,18 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                             65.0,
                         );
                         if crate::bg_pmove::BG_KnockDownable(
-                            &mut (*((*radiusEnt).client as *mut gclient_t)).ps as *mut _,
+                            &mut (*((*radiusEnt).client)).ps as *mut _,
                         ) != 0
                             && (*radiusEnt).health > 0
                             && ctx.world.bg_state.rng.Q_irand(0, 1) != 0
                         {
                             // do pain on enemy
-                            (*((*radiusEnt).client as *mut gclient_t))
-                                .ps
-                                .forceHandExtend = crate::prelude::HANDEXTEND_KNOCKDOWN as c_int;
-                            (*((*radiusEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
-                            (*((*radiusEnt).client as *mut gclient_t))
-                                .ps
-                                .forceHandExtendTime = ctx.world.level.time + 1100;
-                            (*((*radiusEnt).client as *mut gclient_t)).ps.quickerGetup = qfalse;
+                            (*((*radiusEnt).client)).ps.forceHandExtend =
+                                crate::prelude::HANDEXTEND_KNOCKDOWN as c_int;
+                            (*((*radiusEnt).client)).ps.forceDodgeAnim = 0;
+                            (*((*radiusEnt).client)).ps.forceHandExtendTime =
+                                ctx.world.level.time + 1100;
+                            (*((*radiusEnt).client)).ps.quickerGetup = qfalse;
                         }
                     }
                 } else if (*radiusEnt).health <= 0 && !(*radiusEnt).client.is_null() {
@@ -423,7 +414,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                             hitLoc,
                             90.0,
                             0.0,
-                            (*((*radiusEnt).client as *mut gclient_t)).ps.torsoAnim,
+                            (*((*radiusEnt).client)).ps.torsoAnim,
                             qtrue,
                         );
                     }
@@ -431,10 +422,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                     // one out of every 4 normal hits does a knockdown, too
                     let mut pushDir: [f32; 3] = [0.0; 3];
                     let mut angs: [f32; 3] = [0.0; 3];
-                    crate::q_math::_VectorCopy(
-                        (*((*npc).client as *mut gclient_t)).ps.viewangles,
-                        &mut angs,
-                    );
+                    crate::q_math::_VectorCopy((*((*npc).client)).ps.viewangles, &mut angs);
                     angs[crate::prelude::YAW as usize] += ctx.world.bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] =
                         ctx.world.bg_state.rng.flrand(-25.0, -15.0);
@@ -460,7 +448,7 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
         let npc = ctx.world.globals.NPC;
         if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == 0 {
             let npc_id = ctx.entity_id_of(npc);
-            let attacking = (*((*npc).client as *mut gclient_t)).ps.legsTimer as c_int
+            let attacking = (*((*npc).client)).ps.legsTimer as c_int
                 + (ctx.world.bg_state.rng.random() * 200.0) as c_int;
             if ctx.world.bg_state.rng.Q_irand(0, 2) != 0 && doCharge == 0 {
                 // double slash
@@ -483,8 +471,7 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                 crate::q_math::VectorSet(
                     &mut yawAng,
                     0.0,
-                    (*((*npc).client as *mut gclient_t)).ps.viewangles
-                        [crate::prelude::YAW as usize],
+                    (*((*npc).client)).ps.viewangles[crate::prelude::YAW as usize],
                     0.0,
                 );
                 crate::npc_c::NPC_SetAnim(
@@ -499,11 +486,10 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                 crate::q_math::_VectorScale(
                     fwd,
                     distance * 1.5,
-                    &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
+                    &mut (*((*npc).client)).ps.velocity,
                 );
-                (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 150.0;
-                (*((*npc).client as *mut gclient_t)).ps.groundEntityNum =
-                    crate::prelude::ENTITYNUM_NONE;
+                (*((*npc).client)).ps.velocity[2] = 150.0;
+                (*((*npc).client)).ps.groundEntityNum = crate::prelude::ENTITYNUM_NONE;
             } else {
                 // backhand
                 crate::npc_c::NPC_SetAnim(
@@ -528,15 +514,9 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
         if crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), qtrue)
             != 0
         {
-            match (*((*npc).client as *mut gclient_t)).ps.legsAnim {
-                _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
-                    == crate::prelude::BOTH_ATTACK1 as c_int =>
-                {
-                    Wampa_Slash(
-                        ctx,
-                        (*((*npc).client as *mut gclient_t)).renderInfo.handRBolt,
-                        qfalse,
-                    );
+            match (*((*npc).client)).ps.legsAnim {
+                _ if (*((*npc).client)).ps.legsAnim == crate::prelude::BOTH_ATTACK1 as c_int => {
+                    Wampa_Slash(ctx, (*((*npc).client)).renderInfo.handRBolt, qfalse);
                     // do second hit
                     crate::g_timer::TIMER_Set(
                         ctx,
@@ -545,14 +525,8 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                         100,
                     );
                 }
-                _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
-                    == crate::prelude::BOTH_ATTACK2 as c_int =>
-                {
-                    Wampa_Slash(
-                        ctx,
-                        (*((*npc).client as *mut gclient_t)).renderInfo.handRBolt,
-                        qfalse,
-                    );
+                _ if (*((*npc).client)).ps.legsAnim == crate::prelude::BOTH_ATTACK2 as c_int => {
+                    Wampa_Slash(ctx, (*((*npc).client)).renderInfo.handRBolt, qfalse);
                     crate::g_timer::TIMER_Set(
                         ctx,
                         ctx.entity_id_of(npc),
@@ -560,14 +534,8 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                         100,
                     );
                 }
-                _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
-                    == crate::prelude::BOTH_ATTACK3 as c_int =>
-                {
-                    Wampa_Slash(
-                        ctx,
-                        (*((*npc).client as *mut gclient_t)).renderInfo.handLBolt,
-                        qtrue,
-                    );
+                _ if (*((*npc).client)).ps.legsAnim == crate::prelude::BOTH_ATTACK3 as c_int => {
+                    Wampa_Slash(ctx, (*((*npc).client)).renderInfo.handLBolt, qtrue);
                 }
                 _ => {}
             }
@@ -578,24 +546,12 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
             qtrue,
         ) != 0
         {
-            match (*((*npc).client as *mut gclient_t)).ps.legsAnim {
-                _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
-                    == crate::prelude::BOTH_ATTACK1 as c_int =>
-                {
-                    Wampa_Slash(
-                        ctx,
-                        (*((*npc).client as *mut gclient_t)).renderInfo.handLBolt,
-                        qfalse,
-                    );
+            match (*((*npc).client)).ps.legsAnim {
+                _ if (*((*npc).client)).ps.legsAnim == crate::prelude::BOTH_ATTACK1 as c_int => {
+                    Wampa_Slash(ctx, (*((*npc).client)).renderInfo.handLBolt, qfalse);
                 }
-                _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim
-                    == crate::prelude::BOTH_ATTACK2 as c_int =>
-                {
-                    Wampa_Slash(
-                        ctx,
-                        (*((*npc).client as *mut gclient_t)).renderInfo.handLBolt,
-                        qfalse,
-                    );
+                _ if (*((*npc).client)).ps.legsAnim == crate::prelude::BOTH_ATTACK2 as c_int => {
+                    Wampa_Slash(ctx, (*((*npc).client)).renderInfo.handLBolt, qfalse);
                 }
                 _ => {}
             }
@@ -604,7 +560,7 @@ pub fn Wampa_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
         // Just using this to remove the attacking flag at the right time
         crate::g_timer::TIMER_Done2(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr(), qtrue);
 
-        if (*((*npc).client as *mut gclient_t)).ps.legsAnim == crate::prelude::BOTH_ATTACK1 as c_int
+        if (*((*npc).client)).ps.legsAnim == crate::prelude::BOTH_ATTACK1 as c_int
             && distance > ((*npc).r.maxs[0] as f32 + MIN_DISTANCE as f32)
         {
             // okay to keep moving
@@ -733,7 +689,7 @@ pub fn NPC_Wampa_Pain(
         let mut hitByWampa = qfalse;
         if !attacker.is_null()
             && !(*attacker).client.is_null()
-            && (*((*attacker).client as *mut gclient_t)).NPC_class == crate::prelude::CLASS_WAMPA
+            && (*((*attacker).client)).NPC_class == crate::prelude::CLASS_WAMPA
         {
             hitByWampa = qtrue;
         }
@@ -753,8 +709,7 @@ pub fn NPC_Wampa_Pain(
                 || (*enemy_ptr).health == 0
                 || (!(*self_).enemy.is_none()
                     && !(*enemy_ptr).client.is_null()
-                    && (*((*enemy_ptr).client as *mut gclient_t)).NPC_class
-                        == crate::prelude::CLASS_WAMPA)
+                    && (*((*enemy_ptr).client)).NPC_class == crate::prelude::CLASS_WAMPA)
                 || (ctx.world.bg_state.rng.Q_irand(0, 4) == 0
                     && crate::q_math::DistanceSquared(
                         (*attacker).r.currentOrigin,
@@ -793,17 +748,14 @@ pub fn NPC_Wampa_Pain(
             }
         }
         if (hitByWampa != 0 || ctx.world.bg_state.rng.Q_irand(0, 100) < damage) // hit by wampa, hit while holding live victim, or took a lot of damage
-            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE1) as i32
-            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
+            && (*((*self_).client)).ps.legsAnim != (crate::prelude::BOTH_GESTURE1) as i32
+            && (*((*self_).client)).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
             && crate::g_timer::TIMER_Done(ctx, ctx.entity_id_of(self_), c"takingPain".as_ptr()) != 0
         {
             if Wampa_CheckRoar(ctx, ctx.entity_id_of(self_).unwrap()) == 0 {
-                if (*((*self_).client as *mut gclient_t)).ps.legsAnim
-                    != (crate::prelude::BOTH_ATTACK1) as i32
-                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim
-                        != (crate::prelude::BOTH_ATTACK2) as i32
-                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim
-                        != (crate::prelude::BOTH_ATTACK3) as i32
+                if (*((*self_).client)).ps.legsAnim != (crate::prelude::BOTH_ATTACK1) as i32
+                    && (*((*self_).client)).ps.legsAnim != (crate::prelude::BOTH_ATTACK2) as i32
+                    && (*((*self_).client)).ps.legsAnim != (crate::prelude::BOTH_ATTACK3) as i32
                 {
                     // cant interrupt one of the big attack anims
                     if (*self_).health > 100 || hitByWampa != 0 {
@@ -814,7 +766,7 @@ pub fn NPC_Wampa_Pain(
                         );
 
                         crate::q_math::_VectorCopy(
-                            (*((*self_).NPC as *mut gNPC_t)).lastPathAngles,
+                            (*((*self_).NPC)).lastPathAngles,
                             &mut (*self_).s.angles,
                         );
 
@@ -839,7 +791,7 @@ pub fn NPC_Wampa_Pain(
                         // Oracle reads legsTimer + draws Q_irand(0,500) LAST —
                         // after the anim-pick draw and after NPC_SetAnim.
                         // Source: oracle/codemp/game/NPC_AI_Wampa.c:485
-                        let taking_pain = (*((*self_).client as *mut gclient_t)).ps.legsTimer
+                        let taking_pain = (*((*self_).client)).ps.legsTimer
                             + ctx.world.bg_state.rng.Q_irand(0, 500);
                         crate::g_timer::TIMER_Set(
                             ctx,
@@ -868,8 +820,7 @@ pub fn NPC_Wampa_Pain(
                         );
 
                         if !(*self_).NPC.is_null() {
-                            (*((*self_).NPC as *mut crate::npc::g_npc_t::gNPC_t)).localState =
-                                LSTATE_WAITING;
+                            (*((*self_).NPC)).localState = LSTATE_WAITING;
                         }
                     }
                 }
@@ -886,8 +837,7 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
         let npc = ctx.world.globals.NPC;
         let npc_info = ctx.world.globals.NPCInfo;
 
-        (*((*npc).client as *mut gclient_t)).ps.eFlags2 &=
-            !mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
+        (*((*npc).client)).ps.eFlags2 &= !mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
         // NORMAL ANIMS
         // stand1 = normal stand
         // walk1 = normal, non-angry walk
@@ -942,8 +892,7 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                 // else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
                 if !(*npc).enemy.is_none()
                     && !(*enemy_ptr).client.is_null()
-                    && (*((*enemy_ptr).client as *mut gclient_t)).NPC_class
-                        == crate::prelude::CLASS_WAMPA
+                    && (*((*enemy_ptr).client)).NPC_class == crate::prelude::CLASS_WAMPA
                 {
                     // got mad at another Wampa, look for a valid enemy
                     if crate::g_timer::TIMER_Done(

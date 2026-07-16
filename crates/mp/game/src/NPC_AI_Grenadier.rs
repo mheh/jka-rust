@@ -167,7 +167,7 @@ pub fn NPC_Grenadier_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) 
             c"flee".as_ptr() as *const c_char,
             0,
         );
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).squadState = SQUAD_IDLE;
         (*npc).tempBehavior = bState_t::BS_DEFAULT;
         G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap()); // FIXME: or just self->enemy = NULL;? (Raven comment).
@@ -188,7 +188,7 @@ pub fn NPC_Grenadier_Pain(
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
     unsafe {
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).localState = LSTATE_UNDERFIRE;
 
         TIMER_Set(
@@ -269,7 +269,7 @@ pub fn Grenadier_Move(ctx: &mut GameContext) -> qboolean {
         if moved == qfalse {
             // couldn't get to enemy
             if ((*npc_info_ptr).scriptFlags & SCF_CHASE_ENEMIES) != 0
-                && (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_THERMAL
+                && (*((*npc_ptr).client)).ps.weapon == WP_THERMAL
                 && !(*npc_info_ptr).goalEntity.is_none()
                 && (*npc_info_ptr).goalEntity == (*npc_ptr).enemy
             {
@@ -388,10 +388,9 @@ pub fn NPC_BSGrenadier_Patrol(ctx: &mut GameContext) {
                                 && (*ctx.world.level.alertEvents[alertEvent as usize].owner).health
                                     >= 0
                                 && (*((*ctx.world.level.alertEvents[alertEvent as usize].owner)
-                                    .client
-                                    as *mut gclient_t))
+                                    .client))
                                     .playerTeam
-                                    == (*((*npc_ptr).client as *mut gclient_t)).enemyTeam
+                                    == (*((*npc_ptr).client)).enemyTeam
                             {
                                 let npc_id = ctx.entity_id_of(npc_ptr).unwrap();
                                 let owner_id = ctx.entity_id_of(
@@ -437,7 +436,7 @@ pub fn NPC_BSGrenadier_Patrol(ctx: &mut GameContext) {
 
                     crate::q_math::_VectorSubtract(
                         (*npc_info_ptr).investigateGoal,
-                        (*((*npc_ptr).client as *mut gclient_t)).renderInfo.eyePoint,
+                        (*((*npc_ptr).client)).renderInfo.eyePoint,
                         &mut dir,
                     );
                     vectoangles(dir, &mut angles);
@@ -529,7 +528,7 @@ pub fn Grenadier_CheckMoveState(ctx: &mut GameContext) {
                             ctx,
                             duck_npc_id,
                             c"duck".as_ptr() as *const c_char,
-                            ((*npc_ptr).client as *mut gclient_t)
+                            ((*npc_ptr).client)
                                 .as_ref()
                                 .map(|c| ((c.pers.maxHealth - (*npc_ptr).health) * 100) as c_int)
                                 .unwrap_or(0),
@@ -638,7 +637,7 @@ pub fn Grenadier_CheckFireState(ctx: &mut GameContext) {
         }
 
         if crate::q_math::VectorCompare(
-            (*((*npc_ptr).client as *mut gclient_t)).ps.velocity,
+            (*((*npc_ptr).client)).ps.velocity,
             crate::q_math::vec3_origin,
         ) == qfalse
         {
@@ -749,12 +748,11 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
         // See if we should switch to melee attack
         if ctx.world.globals.enemyDist3 < 16384.0
             && ((*enemy_ent).client.is_null()
-                || (*((*enemy_ent).client as *mut gclient_t)).ps.weapon
-                    != mp_bg::weapons::weapon_t::WP_SABER
-                || BG_SabersOff(&mut (*((*enemy_ent).client as *mut gclient_t)).ps) != qfalse)
+                || (*((*enemy_ent).client)).ps.weapon != mp_bg::weapons::weapon_t::WP_SABER
+                || BG_SabersOff(&mut (*((*enemy_ent).client)).ps) != qfalse)
         {
             // enemy is close and not using saber
-            if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
+            if (*((*npc_ptr).client)).ps.weapon == WP_THERMAL {
                 // grenadier
                 let mut trace: trace_t = core::mem::zeroed();
                 trap::Trace(
@@ -783,14 +781,12 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
             }
         } else if ctx.world.globals.enemyDist3 > 65536.0
             || (!(*enemy_ent).client.is_null()
-                && (*((*enemy_ent).client as *mut gclient_t)).ps.weapon
-                    == mp_bg::weapons::weapon_t::WP_SABER
-                && (*((*enemy_ent).client as *mut gclient_t)).ps.saberHolstered == 0)
+                && (*((*enemy_ent).client)).ps.weapon == mp_bg::weapons::weapon_t::WP_SABER
+                && (*((*enemy_ent).client)).ps.saberHolstered == 0)
         {
             // enemy is far or using saber
-            if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON
-                && (((*((*npc_ptr).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
-                    & (1 << WP_THERMAL))
+            if (*((*npc_ptr).client)).ps.weapon == WP_STUN_BATON
+                && (((*((*npc_ptr).client)).ps.stats[STAT_WEAPONS as usize] & (1 << WP_THERMAL))
                     != 0)
             {
                 // fisticuffs, make switch to thermal if have it
@@ -804,12 +800,12 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
             (*npc_info_ptr).enemyLastSeenTime = ctx.world.level.time;
             ctx.world.globals.enemyLOS3 = qtrue;
 
-            if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON {
+            if (*((*npc_ptr).client)).ps.weapon == WP_STUN_BATON {
                 if ctx.world.globals.enemyDist3 <= 4096.0
                     && InFOV3(
                         (*enemy_ent).r.currentOrigin,
                         (*npc_ptr).r.currentOrigin,
-                        (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles,
+                        (*((*npc_ptr).client)).ps.viewangles,
                         90,
                         45,
                     ) != qfalse
@@ -824,7 +820,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
             } else if InFOV3(
                 (*enemy_ent).r.currentOrigin,
                 (*npc_ptr).r.currentOrigin,
-                (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles,
+                (*((*npc_ptr).client)).ps.viewangles,
                 45,
                 90,
             ) != qfalse
@@ -836,8 +832,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
                 let hit_ent = &ctx.world.g_entities[hit as usize];
                 if hit == (*enemy_ent).s.number
                     || (!hit_ent.client.is_null()
-                        && (*(hit_ent.client as *mut gclient_t)).playerTeam
-                            == (*((*npc_ptr).client as *mut gclient_t)).enemyTeam)
+                        && (*(hit_ent.client)).playerTeam == (*((*npc_ptr).client)).enemyTeam)
                 {
                     let enemyHorzDist = DistanceHorizontalSquared(
                         (*enemy_ent).r.currentOrigin,
@@ -868,10 +863,10 @@ pub fn NPC_BSGrenadier_Attack(ctx: &mut GameContext) {
 
         if ctx.world.globals.enemyCS3 != qfalse {
             ctx.world.globals.shoot3 = qtrue;
-            if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
+            if (*((*npc_ptr).client)).ps.weapon == WP_THERMAL {
                 // don't chase and throw
                 ctx.world.globals.move3 = qfalse;
-            } else if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON
+            } else if (*((*npc_ptr).client)).ps.weapon == WP_STUN_BATON
                 && ctx.world.globals.enemyDist3
                     < (((*npc_ptr).r.maxs[0] + (*enemy_ent).r.maxs[0] + 16.0)
                         * ((*npc_ptr).r.maxs[0] + (*enemy_ent).r.maxs[0] + 16.0))

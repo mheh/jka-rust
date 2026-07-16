@@ -322,7 +322,7 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
 
         // Helper: the player's netname (or "<Unknown>" when clientless).
         let player_name = |i: usize| -> String {
-            let pc = (*world_ptr).g_entities[i].client as *mut gclient_t;
+            let pc = (*world_ptr).g_entities[i].client;
             if !pc.is_null() {
                 cstr_to_str((*pc).pers.netname.as_ptr()).to_string()
             } else {
@@ -578,7 +578,7 @@ pub fn CalculateEfficiency(
             if player.inuse == qfalse {
                 continue;
             }
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             let n_shots_fired = (*pc).accuracy_shots;
             let n_shots_hit = (*pc).accuracy_hits;
             let f_accuracy_ratio = n_shots_hit as f32 / n_shots_fired as f32;
@@ -609,7 +609,7 @@ pub fn CalculateSharpshooter(ctx: &mut GameContext, ent: EntityId, frags: *mut c
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let ec = (*ent).client as *mut gclient_t;
+        let ec = (*ent).client;
         let play_time = (ctx.world.level.time - (*ec).pers.enterTime) / 60000;
         let ent_idx = (*ent).s.number as usize;
 
@@ -653,7 +653,7 @@ pub fn CalculateUntouchable(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let ec = (*ent).client as *mut gclient_t;
+        let ec = (*ent).client;
         let play_time = (ctx.world.level.time - (*ec).pers.enterTime) / 60000;
 
         if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER && (*ec).ps.isJediMaster != qfalse {
@@ -732,7 +732,7 @@ pub fn CalculateTactician(ctx: &mut GameContext, ent: EntityId, kills: *mut c_in
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let ec = (*ent).client as *mut gclient_t;
+        let ec = (*ent).client;
         let play_time = (ctx.world.level.time - (*ec).pers.enterTime) / 60000;
 
         if HasSetSaberOnly(ctx) != qfalse {
@@ -814,7 +814,7 @@ pub fn CalculateDemolitionist(ctx: &mut GameContext, ent: EntityId, kills: *mut 
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let ec = (*ent).client as *mut gclient_t;
+        let ec = (*ent).client;
         let play_time = (ctx.world.level.time - (*ec).pers.enterTime) / 60000;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         let mut n_most_kills: c_int = 0;
@@ -872,14 +872,14 @@ pub fn CalculateTeamMVP(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &ctx.world.g_entities[i as usize];
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
@@ -910,7 +910,7 @@ pub fn CalculateTeamMVPByRank(ctx: &mut GameContext, ent: EntityId) -> qboolean 
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_RANK as usize] + 1;
         let b_tied = team == 3;
         let mut n_best_player: c_int = -1;
@@ -921,7 +921,7 @@ pub fn CalculateTeamMVPByRank(ctx: &mut GameContext, ent: EntityId) -> qboolean 
             if player.inuse == qfalse {
                 continue;
             }
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if !b_tied && (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
             }
@@ -950,14 +950,14 @@ pub fn CalculateTeamDefender(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &ctx.world.g_entities[i as usize];
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
@@ -987,14 +987,14 @@ pub fn CalculateTeamWarrior(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &ctx.world.g_entities[i as usize];
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
@@ -1024,14 +1024,14 @@ pub fn CalculateTeamCarrier(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &ctx.world.g_entities[i as usize];
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
@@ -1061,14 +1061,14 @@ pub fn CalculateTeamInterceptor(ctx: &mut GameContext, ent: EntityId) -> qboolea
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &ctx.world.g_entities[i as usize];
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;
@@ -1099,14 +1099,14 @@ pub fn CalculateTeamRedShirt(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        let client = (*ent).client as *mut gclient_t;
+        let client = (*ent).client;
         let team = (*client).ps.persistant[persEnum_t::PERS_TEAM as usize];
         let mut n_best_player: c_int = -1;
         let mut n_highest_score: c_int = 0;
         let maxclients = ctx.world.cvars.g_maxclients.integer;
         for i in 0..maxclients {
             let player = &ctx.world.g_entities[i as usize];
-            let pc = player.client as *mut gclient_t;
+            let pc = player.client;
             if player.inuse == qfalse || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
             {
                 continue;

@@ -182,7 +182,7 @@ pub fn CalcEntitySpot(
                 }
             }
             spot_t::SPOT_CHEST | spot_t::SPOT_HEAD => {
-                let client = (*ent).client as *mut gclient_t;
+                let client = (*ent).client;
                 //Actual tag_head eyespot!
                 //FIXME: Stasis aliens may have a problem here...
                 if !client.is_null() && VectorLengthSquared((*client).renderInfo.eyePoint) != 0.0 {
@@ -210,7 +210,7 @@ pub fn CalcEntitySpot(
                 }
             }
             spot_t::SPOT_HEAD_LEAN => {
-                let client = (*ent).client as *mut gclient_t;
+                let client = (*ent).client;
                 if !client.is_null() && VectorLengthSquared((*client).renderInfo.eyePoint) != 0.0 {
                     //Actual tag_head eyespot!
                     *point = (*client).renderInfo.eyePoint;
@@ -237,8 +237,8 @@ pub fn CalcEntitySpot(
                 let mut forward: vec3_t = [0.0; 3];
                 let mut right: vec3_t = [0.0; 3];
                 let mut up: vec3_t = [0.0; 3];
-                let npc = (*ent).NPC as *mut gNPC_t;
-                let client = (*ent).client as *mut gclient_t;
+                let npc = (*ent).NPC;
+                let client = (*ent).client;
                 let use_shoot_angles = !npc.is_null()
                     && (*npc).shootAngles != vec3_origin
                     && (*npc).shootAngles != (*client).ps.viewangles;
@@ -351,7 +351,7 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
             yaw_speed = (*npc_info).stats.yawSpeed;
         }
 
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
         if (*npc).s.weapon == WP_SABER
             && ((*npc_client).ps.fd.forcePowersActive & (1 << (FP_SPEED as c_int))) != 0
         {
@@ -543,7 +543,7 @@ pub fn NPC_UpdateFiringAngles(
                 ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(250, 2000);
         }
 
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
 
         if doYaw != qfalse {
             // decay yaw diff
@@ -702,7 +702,7 @@ pub fn SetTeamNumbers(ctx: &mut GameContext) {
             let found = &mut ctx.world.g_entities[i] as *mut gentity_t;
             if !(*found).client.is_null() {
                 if (*found).health > 0 {
-                    let client = (*found).client as *mut gclient_t;
+                    let client = (*found).client;
                     let team = (*client).playerTeam as usize;
                     ctx.world.teamNumbers[team] += 1;
                     ctx.world.teamStrength[team] += (*found).health;
@@ -742,9 +742,8 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
         }
 
         if bSID > -1 {
-            (*((*self_).NPC as *mut gNPC_t)).tempBehavior = bState_t::BS_DEFAULT;
-            (*((*self_).NPC as *mut gNPC_t)).behaviorState =
-                core::mem::transmute::<c_int, bState_t>(bSID);
+            (*((*self_).NPC)).tempBehavior = bState_t::BS_DEFAULT;
+            (*((*self_).NPC)).behaviorState = core::mem::transmute::<c_int, bState_t>(bSID);
         } else {
             // if (0) branch is dead code in oracle
             let script_path = format!(
@@ -944,7 +943,7 @@ pub fn NPC_SomeoneLookingAtMe(ctx: &mut GameContext, ent: EntityId) -> qboolean 
 
             let eligible =
                 !pEnt.is_null() && (*pEnt).inuse != qfalse && !(*pEnt).client.is_null() && {
-                    let cl = (*pEnt).client as *mut gclient_t;
+                    let cl = (*pEnt).client;
                     (*cl).sess.sessionTeam != TEAM_SPECTATOR
                         && ((*cl).ps.pm_flags & PMF_FOLLOW) == 0
                         && (*pEnt).s.weapon != WP_NONE
@@ -1051,7 +1050,7 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
             return qfalse;
         }
 
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
 
         //Must be an NPC
         if (*ent).client.is_null() {
@@ -1066,12 +1065,12 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
             } else {
                 return qfalse;
             }
-        } else if (*(((*ent).client) as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR {
+        } else if (*((*ent).client)).sess.sessionTeam == TEAM_SPECTATOR {
             //don't go after spectators
             return qfalse;
         }
 
-        let ent_client = (*ent).client as *mut gclient_t;
+        let ent_client = (*ent).client;
 
         if !(*ent).NPC.is_null() && !(*ent).client.is_null() {
             ent_team = (*ent_client).playerTeam as c_int;
@@ -1109,7 +1108,7 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
                 && !ent_enemy.is_null()
                 && !(*ent_enemy).client.is_null()
                 && ({
-                    let enemy_client = (*ent_enemy).client as *mut gclient_t;
+                    let enemy_client = (*ent_enemy).client;
                     (*enemy_client).playerTeam == (*npc_client).playerTeam
                         || ((*enemy_client).playerTeam as c_int != NPCTEAM_ENEMY
                             && (*npc_client).playerTeam as c_int == NPCTEAM_PLAYER)
@@ -1272,8 +1271,8 @@ pub fn NPC_PickEnemyExt(ctx: &mut GameContext, checkAlerts: qboolean) -> *mut ge
                     //If it's on our team, then take its enemy as well
                     let owner = (*event).owner;
                     if !(*owner).client.is_null() {
-                        let owner_client = (*owner).client as *mut gclient_t;
-                        let npc_client = (*npc).client as *mut gclient_t;
+                        let owner_client = (*owner).client;
+                        let npc_client = (*npc).client;
                         if (*owner_client).playerTeam == (*npc_client).playerTeam {
                             return (*owner)
                                 .enemy
@@ -1344,7 +1343,7 @@ pub fn NPC_FindEnemy(ctx: &mut GameContext, checkAlerts: qboolean) -> qboolean {
 
         //Otherwise, turn off the flag
         //See if the player is closer than our current enemy
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
         if (*npc_client).NPC_class != CLASS_RANCOR
             && (*npc_client).NPC_class != CLASS_WAMPA
             && NPC_CheckPlayerDistance() != qfalse
@@ -1398,7 +1397,7 @@ pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboole
         let mut angles: vec3_t = [0.0; 3];
         let mut facing = qtrue;
 
-        let npc_client = (*npc).client as *mut gclient_t;
+        let npc_client = (*npc).client;
 
         //Get the positions
         if !npc_client.is_null()
@@ -1436,7 +1435,7 @@ pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboole
         if let Some(enemy_id) = (*npc).enemy {
             let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
             if !(*enemy).client.is_null() {
-                let enemy_client = (*enemy).client as *mut gclient_t;
+                let enemy_client = (*enemy).client;
                 if (*enemy_client).NPC_class == CLASS_ATST {
                     // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
                     // C's `sin` is the double libm function: the float `time*0.004f`
@@ -1553,7 +1552,7 @@ pub fn NPC_ClearLookTarget(self_: &mut gentity_t) {
         if (*self_).client.is_null() {
             return;
         }
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
 
         if (*client).ps.eFlags2 & EF2_HELD_BY_MONSTER != 0 {
             //lookTarget is set by and to the monster that's holding you, no
@@ -1576,7 +1575,7 @@ pub fn NPC_SetLookTarget(self_: &mut gentity_t, entNum: c_int, clearTime: c_int)
         if (*self_).client.is_null() {
             return;
         }
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
 
         if (*client).ps.eFlags2 & EF2_HELD_BY_MONSTER != 0 {
             //lookTarget is set by and to the monster that's holding you, no
@@ -1597,7 +1596,7 @@ pub fn NPC_CheckLookTarget(ctx: &mut GameContext, self_: EntityId) -> qboolean {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         if !(*self_).client.is_null() {
-            let client = (*self_).client as *mut gclient_t;
+            let client = (*self_).client;
             let lookTarget = (*client).renderInfo.lookTarget;
 
             if lookTarget >= 0 && lookTarget < ENTITYNUM_WORLD {
@@ -1642,7 +1641,7 @@ pub fn NPC_CheckCharmed(ctx: &mut GameContext) {
             && !(*npc).client.is_null()
         {
             //we were charmed, set us back!
-            let client = (*npc).client as *mut gclient_t;
+            let client = (*npc).client;
             (*client).playerTeam = (*npc).genericValue1;
             (*client).enemyTeam = (*npc).genericValue2;
             (*npc).s.teamowner = (*npc).genericValue3;
@@ -1687,7 +1686,7 @@ pub fn G_GetBoltPosition(
         let mut angles: vec3_t = [0.0; 3];
         if !(*self_).client.is_null() {
             angles[0] = 0.0;
-            angles[1] = (*((*self_).client as *mut gclient_t)).ps.viewangles[YAW];
+            angles[1] = (*((*self_).client)).ps.viewangles[YAW];
             angles[2] = 0.0;
         } else {
             angles[0] = 0.0;

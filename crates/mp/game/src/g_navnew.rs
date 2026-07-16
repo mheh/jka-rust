@@ -105,7 +105,7 @@ pub fn NPC_ClearBlocked(self_: &mut gentity_t) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = self_;
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if npc.is_null() {
             return;
         }
@@ -122,7 +122,7 @@ pub fn NPC_SetBlocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<En
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if npc.is_null() {
             return;
         }
@@ -197,7 +197,7 @@ pub fn NAVNEW_PushBlocker(
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         if (*npc).shoveCount > 30 {
             //don't push for more than 3 seconds;
             return;
@@ -208,7 +208,7 @@ pub fn NAVNEW_PushBlocker(
             return;
         }
 
-        let client = (*blocker).client as *mut gclient_t;
+        let client = (*blocker).client;
         // Oracle: `!blocker->client || !VectorCompare(pushVec, vec3_origin)` — bail
         // when the blocker has no client OR is already being pushed elsewhere.
         if client.is_null() || VectorCompare((*client).pushVec, [0.0f32, 0.0, 0.0]) == qfalse {
@@ -323,7 +323,7 @@ pub fn NAVNEW_DanceWithBlocker(
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         // `self_` is unused by Raven's body (kept for signature fidelity).
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
-        let client = (*blocker).client as *mut gclient_t;
+        let client = (*blocker).client;
         if !client.is_null() && (*client).ps.velocity != [0.0f32, 0.0, 0.0] {
             let mut blocker_movedir = (*client).ps.velocity;
             blocker_movedir[2] = 0.0; //cancel any vertical motion
@@ -381,7 +381,7 @@ pub fn NAVNEW_SidestepBlocker(
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         let mut mins = [0.0f32; 3];
         crate::q_math::_VectorCopy((*self_).r.mins, &mut mins);
         mins[2] += STEPSIZE;
@@ -639,7 +639,7 @@ pub fn NAVNEW_CheckDoubleBlock(
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *const gentity_t = self_;
         let blocker: *const gentity_t = blocker;
-        let npc = (*blocker).NPC as *mut gNPC_t;
+        let npc = (*blocker).NPC;
         if !npc.is_null() && (*npc).blockingEntNum == (*self_).s.number {
             return qtrue;
         }
@@ -770,10 +770,10 @@ pub fn NAVNEW_AvoidCollision(
             }
 
             if setBlockedInfo != qfalse {
-                if (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves > blockedMovesLimit {
+                if (*((*self_).NPC)).consecutiveBlockedMoves > blockedMovesLimit {
                     if ctx.world.cvars.d_patched.integer != 0 {
                         //use patch-style navigation
-                        (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves += 1;
+                        (*((*self_).NPC)).consecutiveBlockedMoves += 1;
                     }
                     NPC_SetBlocked(
                         ctx,
@@ -782,7 +782,7 @@ pub fn NAVNEW_AvoidCollision(
                     );
                     return qfalse;
                 }
-                (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves += 1;
+                (*((*self_).NPC)).consecutiveBlockedMoves += 1;
             }
             //See if we're moving along with them
             //if ( NAVNEW_TrueCollision( self, info->blocker, movedir, info->direction ) == qfalse )
@@ -825,7 +825,7 @@ pub fn NAVNEW_AvoidCollision(
             return qtrue;
         } else {
             if setBlockedInfo != qfalse {
-                (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves = 0;
+                (*((*self_).NPC)).consecutiveBlockedMoves = 0;
             }
         }
 
@@ -961,11 +961,11 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
         );
 
         //Must have a goal entity to move there
-        if (*((*self_).NPC as *mut gNPC_t)).goalEntity.is_none() {
+        if (*((*self_).NPC)).goalEntity.is_none() {
             return WAYPOINT_NONE;
         }
 
-        let goal_entity = match (*((*self_).NPC as *mut gNPC_t)).goalEntity {
+        let goal_entity = match (*((*self_).NPC)).goalEntity {
             Some(eid) => eid,
             None => return WAYPOINT_NONE,
         };
@@ -1076,10 +1076,10 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                     );
                     if bestNode == (*self_).waypoint {
                         //we fell back to our waypoint, reset the origin
-                        (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
+                        (*((*self_).NPC)).aiFlags |= NPCAI_BLOCKED;
                         trap::Nav_GetNodePosition(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(oldBestNode, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t),
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(oldBestNode, &mut (*((*self_).NPC)).blockedDest as *mut vec3_t),
                         );
                         trap::Nav_GetNodePosition(
                             ctx.engine,
@@ -1148,11 +1148,8 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                 if (*self_).s.weapon == WP_SABER {
                     //jedi
                     if (*info).direction[2] * (*info).distance > 64.0 {
-                        (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
-                        crate::q_math::_VectorCopy(
-                            origin,
-                            &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest,
-                        );
+                        (*((*self_).NPC)).aiFlags |= NPCAI_BLOCKED;
+                        crate::q_math::_VectorCopy(origin, &mut (*((*self_).NPC)).blockedDest);
                         // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
                         // Source: `oracle/codemp/game/g_navnew.c:730,844`
                         trap::Nav_GetNodePosition(
@@ -1168,12 +1165,12 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
             } else {
                 //blocked by ent!
                 if setBlockedInfo != qfalse {
-                    (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
+                    (*((*self_).NPC)).aiFlags |= NPCAI_BLOCKED;
                     trap::Nav_GetNodePosition(
                         ctx.engine,
                         mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
                             bestNode,
-                            &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t,
+                            &mut (*((*self_).NPC)).blockedDest as *mut vec3_t,
                         ),
                     );
                 }
@@ -1360,7 +1357,7 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
             );
         }
 
-        (*((*self_).NPC as *mut gNPC_t)).shoveCount = 0;
+        (*((*self_).NPC)).shoveCount = 0;
 
         //let me keep this waypoint for a while
         if (*self_).noWaypointTime < ctx.world.level.time {

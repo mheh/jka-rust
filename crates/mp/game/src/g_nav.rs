@@ -121,7 +121,7 @@ pub fn FlyingCreature(ent: &gentity_t) -> qboolean {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let ent: *const gentity_t = ent;
         if !(*ent).client.is_null() {
-            let client = (*ent).client as *mut gclient_t;
+            let client = (*ent).client;
             if (*client).ps.gravity <= 0 {
                 return qtrue;
             }
@@ -141,7 +141,7 @@ pub fn NPC_Blocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<Entit
         if (*self_).NPC.is_null() {
             return;
         }
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
 
         // Don't do this too often
         if (*npc).blockedSpeechDebounceTime > ctx.world.level.time {
@@ -157,8 +157,8 @@ pub fn NPC_Blocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<Entit
 
         // If this is one of our enemies, then just attack him
         if !(*blocker).client.is_null() {
-            let blocker_client = (*blocker).client as *mut gclient_t;
-            let self_client = (*self_).client as *mut gclient_t;
+            let blocker_client = (*blocker).client;
+            let self_client = (*self_).client;
             if (*blocker_client).playerTeam == (*self_client).enemyTeam {
                 G_SetEnemy(
                     ctx,
@@ -199,7 +199,7 @@ pub fn NPC_SetMoveGoal(
         if (*ent).NPC.is_null() {
             return;
         }
-        let npc = (*ent).NPC as *mut gNPC_t;
+        let npc = (*ent).NPC;
 
         let temp_goal_id = match (*npc).tempGoal {
             Some(id) => id, // must still have a goal
@@ -583,7 +583,7 @@ pub fn NAV_ClearBlockedInfo(self_: &mut gentity_t) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = self_;
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).aiFlags &= !NPCAI_BLOCKED;
         (*npc).blockingEntNum = ENTITYNUM_WORLD;
     }
@@ -596,7 +596,7 @@ pub fn NAV_SetBlockedInfo(self_: &mut gentity_t, entId: c_int) {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
         let self_: *mut gentity_t = self_;
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         (*npc).aiFlags |= NPCAI_BLOCKED;
         (*npc).blockingEntNum = entId;
     }
@@ -857,7 +857,7 @@ pub fn NAV_Bypass(
 
         // Check to see what dir the other guy is moving in (if any) and pick the opposite dir
         if !(*blocker).client.is_null() {
-            let blocker_client = (*blocker).client as *mut gclient_t;
+            let blocker_client = (*blocker).client;
             if VectorCompare((*blocker_client).ps.velocity, [0.0, 0.0, 0.0]) == 0 {
                 let mut blocker_movedir = [0.0f32; 3];
                 VectorNormalize2((*blocker_client).ps.velocity, &mut blocker_movedir);
@@ -963,7 +963,7 @@ pub fn NAV_MoveBlocker(self_: &mut gentity_t, shove_dir: vec3_t) -> qboolean {
         temp_dir[YAW] += 45.0;
         AngleVectors(temp_dir, Some(&mut forward), None, None);
 
-        let client = (*self_).client as *mut gclient_t;
+        let client = (*self_).client;
         crate::q_math::_VectorScale(forward, SHOVE_SPEED as f32, &mut (*client).ps.velocity);
         (*client).ps.velocity[2] += SHOVE_LIFT as f32;
 
@@ -986,7 +986,7 @@ pub fn NAV_ResolveBlock(
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         // Stop double waiting
         if !(*blocker).NPC.is_null() {
-            let blocker_npc = (*blocker).NPC as *mut gNPC_t;
+            let blocker_npc = (*blocker).NPC;
             if (*blocker_npc).blockingEntNum == (*self_).s.number {
                 return qtrue;
             }
@@ -1022,7 +1022,7 @@ pub fn NAV_TrueCollision(
             return qfalse;
         }
 
-        let self_client = (*self_).client as *mut gclient_t;
+        let self_client = (*self_).client;
         let mut velocityDir = [0.0f32; 3];
         // Get the player's move direction and speed
         let speed = VectorNormalize2((*self_client).ps.velocity, &mut velocityDir);
@@ -1349,7 +1349,7 @@ pub fn NAV_AvoidCollision(
         crate::q_math::_VectorCopy((*info).direction, &mut movedir);
 
         if !self_.is_null() && !(*self_).NPC.is_null() {
-            let npc = (*self_).NPC as *mut gNPC_t;
+            let npc = (*self_).NPC;
             if (*npc).aiFlags & NPCAI_NO_COLL_AVOID != 0 {
                 // pretend there's no-one in the way
                 return qtrue;
@@ -1603,7 +1603,7 @@ pub fn NAV_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navInfo
         let mut origin = [0.0f32; 3];
         let mut end = [0.0f32; 3];
 
-        let npc = (*self_).NPC as *mut gNPC_t;
+        let npc = (*self_).NPC;
         // Must have a goal entity to move there
         let goal_id = match (*npc).goalEntity {
             Some(id) => id,
