@@ -219,6 +219,32 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
     `g_active.rs` `gentity_t`→`bgEntity_t` base-pointer overlay (D12 layout
     contract), `ghoul2` identity casts feeding G2API traps, botlib trap-arg
     packing in `ai_main.rs`.
+- **4D + Stage-5 severing (2026-07-16)** — wave execution, each commit
+  six-referee-scenario byte-identical + workspace tests:
+  - 4D-S1 `113df526` — abi seam opaque (`gentity_s` ZST forward-decl,
+    20 abi files, 273 `.cast()` seam sites); `gentity_t` struct moved to
+    `mp_game` (`entity/gentity.rs`, body machine-verified identical);
+    `ent_id`/`ent_id_opt` relocated (offset_from needs the concrete type).
+  - S5-1 `37eee618` — bg overlay retypes. Gate-1 PROOF (do not extend the
+    pattern): the client→playerState guard swaps are safe only behind the
+    fighter-vehicle/eType gates; `SP_misc_weapon_shooter` sets `client`
+    without `playerState` (g_misc.c:3449) and is excluded by those gates.
+  - S5-2 `9a029cf6` — 7 GameCallbacks methods (my_saber,
+    suspended/landed_vehicle_boardable, set_solid_hack,
+    humanoid_inuse_client, fighter_not_suspended, set_other_killer); both
+    BG_MySaber forms deleted, 40 reroutes; adversarial gate-2 clean; the
+    panimate pm-null saber guard was port drift — removal proven equal to
+    oracle (bg_panimate.c:2739/2745).
+  - 4D-S2 `e3ac0300` — real field types restored (client/NPC/m_pVehicle),
+    2,407 identity casts deleted (64 files) + 8 reverse stores; **shard 4D
+    is COMPLETE**.
+  - **S5-3/S5-4 in flight at pause (2026-07-16)**: worker severing loader
+    upcalls/BG_ParseField/g_strap/consts (S5-3) + the 71-site uniform
+    Com_Printf/Com_Error BgTraps trap route (S5-4) in an agent worktree;
+    commits land there UNINTEGRATED — next session: gate-1 review, referee,
+    cherry-pick. Then S5-5 (twin port-down per the re-scope above; also
+    sweep bg files' leftover m_pVehicle identity casts) and S5-6 (the
+    physical move).
 - **Stage 4 — DONE except 4D (2026-07-15)**, four referee-gated commits, each
   six-scenario byte-identical + workspace tests + fmt; i686 lane green at
   stage end:
