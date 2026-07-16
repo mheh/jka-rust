@@ -1484,10 +1484,17 @@ pub fn G_CreateFighterNPC(
         std::ptr::write_bytes(*pVeh, 0, 1);
 
         // Set the vehicle info pointer based on vehicle type name.
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            world: ctx.world_raw(),
+            engine: ctx.engine,
+        };
         let veh_index = BG_VehicleGetIndex(
             strType,
             &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            &mut callbacks,
         );
         (*(*pVeh)).m_pVehicleInfo = &(&ctx.world.bg_state.g_vehicleInfo)[veh_index as usize]
             as *const _ as *mut vehicleInfo_t;

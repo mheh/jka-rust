@@ -390,7 +390,7 @@ pub fn saber_snd_tape_drain() -> Vec<String> {
 /// Raven: builds under both `QAGAME` and `CGAME`; only the `QAGAME` branch
 /// (`G_SoundIndex`) is live in this crate (jampgame).
 /// Source: `oracle/codemp/game/bg_saberLoad.c:32-39`
-pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
+pub fn BG_SoundIndex(sound: *mut c_char, callbacks: &mut dyn GameCallbacks) -> c_int {
     SABER_SND_TAPE.with(|t| {
         if let Some(v) = t.borrow_mut().as_mut() {
             if !sound.is_null() {
@@ -400,7 +400,7 @@ pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
             }
         }
     });
-    crate::g_utils::G_SoundIndex(sound as *const c_char)
+    callbacks.sound_index(sound as *const c_char)
 }
 
 /// Raven `BG_ParseLiteral`.
@@ -768,7 +768,7 @@ pub fn WP_SaberCanTurnOffSomeBlades(saber: *mut saberInfo_t) -> qboolean {
 /// Raven `WP_SaberSetDefaults`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:488-613`
-pub fn WP_SaberSetDefaults(saber: *mut saberInfo_t) {
+pub fn WP_SaberSetDefaults(saber: *mut saberInfo_t, callbacks: &mut dyn GameCallbacks) {
     unsafe {
         let s = &mut *saber;
 
@@ -786,11 +786,18 @@ pub fn WP_SaberSetDefaults(saber: *mut saberInfo_t) {
             c"models/weapons2/saber_reborn/saber_w.glm".as_ptr(),
         );
         s.skin = 0;
-        s.soundOn =
-            BG_SoundIndex(c"sound/weapons/saber/enemy_saber_on.wav".as_ptr() as *mut c_char);
-        s.soundLoop = BG_SoundIndex(c"sound/weapons/saber/saberhum3.wav".as_ptr() as *mut c_char);
-        s.soundOff =
-            BG_SoundIndex(c"sound/weapons/saber/enemy_saber_off.wav".as_ptr() as *mut c_char);
+        s.soundOn = BG_SoundIndex(
+            c"sound/weapons/saber/enemy_saber_on.wav".as_ptr() as *mut c_char,
+            callbacks,
+        );
+        s.soundLoop = BG_SoundIndex(
+            c"sound/weapons/saber/saberhum3.wav".as_ptr() as *mut c_char,
+            callbacks,
+        );
+        s.soundOff = BG_SoundIndex(
+            c"sound/weapons/saber/enemy_saber_off.wav".as_ptr() as *mut c_char,
+            callbacks,
+        );
         s.numBlades = 1;
         s.r#type = saberType_t::SABER_SINGLE;
         s.stylesLearned = 0;
@@ -915,6 +922,7 @@ pub fn WP_SaberParseParms(
     saber: *mut saberInfo_t,
     bg: &mut BgState,
     traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
 ) -> qboolean {
     unsafe {
         let mut useSaber: [c_char; 1024] = [0; 1024];
@@ -927,7 +935,7 @@ pub fn WP_SaberParseParms(
         }
 
         // Set defaults so that, if it fails, there's at least something there
-        WP_SaberSetDefaults(saber);
+        WP_SaberSetDefaults(saber, callbacks);
 
         if SaberName.is_null() || *SaberName == 0 {
             c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
@@ -1067,21 +1075,21 @@ pub fn WP_SaberParseParms(
             // on sound
             if qstricmp_eq(tok, c"soundOn") {
                 let value = parse_string_field!();
-                s.soundOn = BG_SoundIndex(value as *mut c_char);
+                s.soundOn = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
 
             // loop sound
             if qstricmp_eq(tok, c"soundLoop") {
                 let value = parse_string_field!();
-                s.soundLoop = BG_SoundIndex(value as *mut c_char);
+                s.soundLoop = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
 
             // off sound
             if qstricmp_eq(tok, c"soundOff") {
                 let value = parse_string_field!();
-                s.soundOff = BG_SoundIndex(value as *mut c_char);
+                s.soundOff = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
 
@@ -1425,24 +1433,24 @@ pub fn WP_SaberParseParms(
             // spin sound (when thrown)
             if qstricmp_eq(tok, c"spinSound") {
                 let value = parse_string_field!();
-                s.spinSound = BG_SoundIndex(value as *mut c_char);
+                s.spinSound = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
 
             // swing sound - NOTE: must provide all 3!!!
             if qstricmp_eq(tok, c"swingSound1") {
                 let value = parse_string_field!();
-                s.swingSound[0] = BG_SoundIndex(value as *mut c_char);
+                s.swingSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"swingSound2") {
                 let value = parse_string_field!();
-                s.swingSound[1] = BG_SoundIndex(value as *mut c_char);
+                s.swingSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"swingSound3") {
                 let value = parse_string_field!();
-                s.swingSound[2] = BG_SoundIndex(value as *mut c_char);
+                s.swingSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
 
@@ -1919,47 +1927,47 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"hitSound1") {
                 let value = parse_string_field!();
-                s.hitSound[0] = BG_SoundIndex(value as *mut c_char);
+                s.hitSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"hitSound2") {
                 let value = parse_string_field!();
-                s.hitSound[1] = BG_SoundIndex(value as *mut c_char);
+                s.hitSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"hitSound3") {
                 let value = parse_string_field!();
-                s.hitSound[2] = BG_SoundIndex(value as *mut c_char);
+                s.hitSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"blockSound1") {
                 let value = parse_string_field!();
-                s.blockSound[0] = BG_SoundIndex(value as *mut c_char);
+                s.blockSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"blockSound2") {
                 let value = parse_string_field!();
-                s.blockSound[1] = BG_SoundIndex(value as *mut c_char);
+                s.blockSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"blockSound3") {
                 let value = parse_string_field!();
-                s.blockSound[2] = BG_SoundIndex(value as *mut c_char);
+                s.blockSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"bounceSound1") {
                 let value = parse_string_field!();
-                s.bounceSound[0] = BG_SoundIndex(value as *mut c_char);
+                s.bounceSound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"bounceSound2") {
                 let value = parse_string_field!();
-                s.bounceSound[1] = BG_SoundIndex(value as *mut c_char);
+                s.bounceSound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"bounceSound3") {
                 let value = parse_string_field!();
-                s.bounceSound[2] = BG_SoundIndex(value as *mut c_char);
+                s.bounceSound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             // block/hitPerson/hitOther/blade effects: QAGAME branch is
@@ -2110,47 +2118,47 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"hit2Sound1") {
                 let value = parse_string_field!();
-                s.hit2Sound[0] = BG_SoundIndex(value as *mut c_char);
+                s.hit2Sound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"hit2Sound2") {
                 let value = parse_string_field!();
-                s.hit2Sound[1] = BG_SoundIndex(value as *mut c_char);
+                s.hit2Sound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"hit2Sound3") {
                 let value = parse_string_field!();
-                s.hit2Sound[2] = BG_SoundIndex(value as *mut c_char);
+                s.hit2Sound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"block2Sound1") {
                 let value = parse_string_field!();
-                s.block2Sound[0] = BG_SoundIndex(value as *mut c_char);
+                s.block2Sound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"block2Sound2") {
                 let value = parse_string_field!();
-                s.block2Sound[1] = BG_SoundIndex(value as *mut c_char);
+                s.block2Sound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"block2Sound3") {
                 let value = parse_string_field!();
-                s.block2Sound[2] = BG_SoundIndex(value as *mut c_char);
+                s.block2Sound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"bounce2Sound1") {
                 let value = parse_string_field!();
-                s.bounce2Sound[0] = BG_SoundIndex(value as *mut c_char);
+                s.bounce2Sound[0] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"bounce2Sound2") {
                 let value = parse_string_field!();
-                s.bounce2Sound[1] = BG_SoundIndex(value as *mut c_char);
+                s.bounce2Sound[1] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"bounce2Sound3") {
                 let value = parse_string_field!();
-                s.bounce2Sound[2] = BG_SoundIndex(value as *mut c_char);
+                s.bounce2Sound[2] = BG_SoundIndex(value as *mut c_char, callbacks);
                 continue;
             }
             if qstricmp_eq(tok, c"blockEffect2") {
@@ -2307,14 +2315,18 @@ pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) ->
 /// Raven `WP_RemoveSaber`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:2664-2688`
-pub fn WP_RemoveSaber(sabers: *mut saberInfo_t, saberNum: c_int) {
+pub fn WP_RemoveSaber(
+    sabers: *mut saberInfo_t,
+    saberNum: c_int,
+    callbacks: &mut dyn GameCallbacks,
+) {
     if sabers.is_null() {
         return;
     }
     unsafe {
         let entry = sabers.offset(saberNum as isize);
         // reset everything for this saber just in case
-        WP_SaberSetDefaults(entry);
+        WP_SaberSetDefaults(entry, callbacks);
 
         c_strcpy((*entry).name.as_mut_ptr(), c"none".as_ptr());
         (*entry).model[0] = 0;
@@ -2334,6 +2346,7 @@ pub fn WP_SetSaber(
     saberName: *const c_char,
     bg: &mut BgState,
     traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
 ) {
     unsafe {
         if sabers.is_null() {
@@ -2342,7 +2355,7 @@ pub fn WP_SetSaber(
         if qstricmp_eq(saberName, c"none") || qstricmp_eq(saberName, c"remove") {
             if saberNum != 0 {
                 // can't remove saber 0 ever
-                WP_RemoveSaber(sabers, saberNum);
+                WP_RemoveSaber(sabers, saberNum, callbacks);
             }
             return;
         }
@@ -2353,20 +2366,27 @@ pub fn WP_SetSaber(
                 sabers.offset(saberNum as isize),
                 bg,
                 traps,
+                callbacks,
             ); // get saber info
         } else {
-            WP_SaberParseParms(saberName, sabers.offset(saberNum as isize), bg, traps);
+            WP_SaberParseParms(
+                saberName,
+                sabers.offset(saberNum as isize),
+                bg,
+                traps,
+                callbacks,
+            );
             // get saber info
         }
         if ((*sabers.offset(1)).saberFlags & SFL_TWO_HANDED) != 0 {
             // not allowed to use a 2-handed saber as second saber
-            WP_RemoveSaber(sabers, 1);
+            WP_RemoveSaber(sabers, 1, callbacks);
             return;
         } else if ((*sabers.offset(0)).saberFlags & SFL_TWO_HANDED) != 0
             && (*sabers.offset(1)).model[0] != 0
         {
             // you can't use a two-handed saber with a second saber, so remove saber 2
-            WP_RemoveSaber(sabers, 1);
+            WP_RemoveSaber(sabers, 1, callbacks);
         }
     }
 }

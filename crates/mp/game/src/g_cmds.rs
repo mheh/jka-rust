@@ -2071,6 +2071,12 @@ pub fn G_SetSaber(
             write_cstr_field(&mut truncSaberName, "Kyle");
         }
 
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            world: ctx.world_raw(),
+            engine: ctx.engine,
+        };
         crate::bg_saberLoad::WP_SetSaber(
             (*ent).s.number,
             (*client).saber.as_mut_ptr(),
@@ -2078,6 +2084,7 @@ pub fn G_SetSaber(
             truncSaberName.as_ptr(),
             &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            &mut callbacks,
         );
 
         if (*client).saber[0].model[0] == 0 {

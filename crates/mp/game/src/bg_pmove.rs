@@ -26,11 +26,6 @@ use crate::bg_panimate::{
     BG_InRoll, BG_SaberInAttack, BG_SaberInSpecial, BG_SaberLockBreakAnim, BG_SpinningSaberAnim,
     PM_CanRollFromSoulCal, PM_SaberInTransition,
 };
-use crate::g_strap::strap_G2API_SetBoneAngles;
-use crate::g_strap::{
-    strap_G2API_AnimateG2Models, strap_G2API_GetBoltMatrix, strap_G2API_GetBoneAnim,
-    strap_G2API_IKMove, strap_G2API_SetBoneAnim, strap_G2API_SetBoneIKState,
-};
 use crate::q_math::{
     _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleNormalize180,
     AngleNormalize360, AnglesSubtract, AnglesToAxis, VectorClear, VectorCompare, VectorNormalize,
@@ -2408,7 +2403,6 @@ impl PmoveContext<'_> {
         ucmd: *mut usercmd_t,
         doMove: qboolean,
     ) -> qboolean {
-        use crate::saber::saber_flags::*;
         use animNumber_t::*;
         unsafe {
             if ((BG_InReboundJump((*ps).legsAnim) != qfalse
@@ -2599,7 +2593,6 @@ impl PmoveContext<'_> {
     /// Raven `PM_CheckJump`. `METROID_JUMP` is defined, so that block is compiled.
     /// Source: `oracle/codemp/game/bg_pmove.c:1788-2775`
     pub fn PM_CheckJump(&mut self) -> qboolean {
-        use crate::saber::saber_flags::*;
         use animNumber_t::*;
         use mp_bg::public::jump_velocity::JUMP_VELOCITY;
         unsafe {
@@ -4109,7 +4102,6 @@ impl PmoveContext<'_> {
     /// Source: `oracle/codemp/game/bg_pmove.c:3597-3681`
     pub fn PM_TryRoll(&mut self) -> c_int {
         use crate::bg_slidemove::STEPSIZE;
-        use crate::saber::saber_flags::*;
         use animNumber_t::*;
         unsafe {
             let pm = self.pm;
@@ -5296,31 +5288,31 @@ impl PmoveContext<'_> {
 
             let interval = 4.0f32;
 
-            strap_G2API_GetBoltMatrix(
+            self.traps.g2api_get_bolt_matrix(
                 (*pm).ghoul2,
                 0,
                 (*pm).g2Bolts_LFoot,
                 &mut boltMatrix,
-                G2Angles,
-                (*ps).origin,
+                &G2Angles,
+                &(*ps).origin,
                 (*pm).cmd.serverTime,
                 core::ptr::null_mut(),
-                (*pm).modelScale,
+                &(*pm).modelScale,
             );
             footLPoint[0] = boltMatrix.matrix[0][3];
             footLPoint[1] = boltMatrix.matrix[1][3];
             footLPoint[2] = boltMatrix.matrix[2][3];
 
-            strap_G2API_GetBoltMatrix(
+            self.traps.g2api_get_bolt_matrix(
                 (*pm).ghoul2,
                 0,
                 (*pm).g2Bolts_RFoot,
                 &mut boltMatrix,
-                G2Angles,
-                (*ps).origin,
+                &G2Angles,
+                &(*ps).origin,
                 (*pm).cmd.serverTime,
                 core::ptr::null_mut(),
-                (*pm).modelScale,
+                &(*pm).modelScale,
             );
             footRPoint[0] = boltMatrix.matrix[0][3];
             footRPoint[1] = boltMatrix.matrix[1][3];
@@ -6226,6 +6218,12 @@ impl PmoveContext<'_> {
     }
 }
 
+/// Raven `MAX_XHAIR_DIST_ACCURACY` — auto-aim crosshair trace reach. bg_pmove
+/// keeps its own private `#define`; `g_weapon.c` and `cg_draw.c` each define an
+/// identical private copy (the game-tier twin lives in `g_weapon.rs`).
+/// Source: `oracle/codemp/game/bg_pmove.c:5832`
+const MAX_XHAIR_DIST_ACCURACY: f32 = 20000.0;
+
 /// Raven `BG_VehTraceFromCamPos`. `QAGAME` is defined, so the game-side branch is compiled.
 /// Source: `oracle/codemp/game/bg_pmove.c:5833-5872`
 pub fn BG_VehTraceFromCamPos(
@@ -6266,12 +6264,7 @@ pub fn BG_VehTraceFromCamPos(
         _VectorCopy(end, newEnd);
         _VectorSubtract(end, camPos, &mut viewDir2End);
         VectorNormalize(&mut viewDir2End);
-        _VectorMA(
-            camPos,
-            crate::g_weapon::MAX_XHAIR_DIST_ACCURACY,
-            viewDir2End,
-            &mut extraEnd,
-        );
+        _VectorMA(camPos, MAX_XHAIR_DIST_ACCURACY, viewDir2End, &mut extraEnd);
 
         // QAGAME
         let vec3_origin_local = crate::q_math::vec3_origin;
@@ -6288,8 +6281,8 @@ pub fn BG_VehTraceFromCamPos(
         if (*camTrace).allsolid == 0
             && (*camTrace).startsolid == 0
             && (*camTrace).fraction < 1.0
-            && ((*camTrace).fraction * crate::g_weapon::MAX_XHAIR_DIST_ACCURACY) > minAutoAimDist
-            && (((*camTrace).fraction * crate::g_weapon::MAX_XHAIR_DIST_ACCURACY)
+            && ((*camTrace).fraction * MAX_XHAIR_DIST_ACCURACY) > minAutoAimDist
+            && (((*camTrace).fraction * MAX_XHAIR_DIST_ACCURACY)
                 - crate::q_math::Distance(entOrg, camPos))
                 < bestDist
         {
@@ -8468,6 +8461,7 @@ pub fn BG_IK_MoveArm(
     blendTime: c_int,
     forceHalt: qboolean,
     bg: &BgState,
+    traps: &dyn BgTraps,
 ) {
     unsafe {
         let mut lHandMatrix: mdxaBone_t = core::mem::zeroed();
@@ -8507,7 +8501,7 @@ pub fn BG_IK_MoveArm(
             ikP.force_anim_on_bone = qfalse; // let it use existing anim if same as this one
 
             // call with a null bone name first to init the ik system on the g2 instance
-            if strap_G2API_SetBoneIKState(
+            if traps.g2api_set_bone_ik_state(
                 ghoul2,
                 time,
                 core::ptr::null(),
@@ -8519,7 +8513,7 @@ pub fn BG_IK_MoveArm(
             }
 
             // Now create our IK bone state.
-            if strap_G2API_SetBoneIKState(
+            if traps.g2api_set_bone_ik_state(
                 ghoul2,
                 time,
                 b"lhumerus\0".as_ptr() as *const c_char,
@@ -8531,7 +8525,7 @@ pub fn BG_IK_MoveArm(
                 VectorSet(&mut ikP.pcj_mins, -90.0, -20.0, -20.0);
                 VectorSet(&mut ikP.pcj_maxs, 30.0, 20.0, -20.0);
 
-                if strap_G2API_SetBoneIKState(
+                if traps.g2api_set_bone_ik_state(
                     ghoul2,
                     time,
                     b"lradius\0".as_ptr() as *const c_char,
@@ -8558,16 +8552,16 @@ pub fn BG_IK_MoveArm(
             tAngles[PITCH] = 0.0;
             tAngles[ROLL] = 0.0;
 
-            strap_G2API_GetBoltMatrix(
+            traps.g2api_get_bolt_matrix(
                 ghoul2,
                 0,
                 lHandBolt,
                 &mut lHandMatrix,
-                tAngles,
-                origin,
+                &tAngles,
+                &origin,
                 time,
                 core::ptr::null_mut(),
-                scale,
+                &scale,
             );
             // Get the point position from the matrix.
             lHand[0] = lHandMatrix.matrix[0][3];
@@ -8595,7 +8589,7 @@ pub fn BG_IK_MoveArm(
             _VectorCopy(origin, &mut ikM.origin); // our position in the world.
 
             ikM.bone_name[0] = 0;
-            if strap_G2API_IKMove(ghoul2, time, &mut ikM) != qfalse {
+            if traps.g2api_ik_move(ghoul2, time, &mut ikM) != qfalse {
                 // now do the standard model animate stuff with ragdoll update params.
                 _VectorCopy(angles, &mut tuParms.angles);
                 tuParms.angles[PITCH] = 0.0;
@@ -8606,7 +8600,7 @@ pub fn BG_IK_MoveArm(
                 tuParms.me = (*ent).number;
                 VectorClear(&mut tuParms.velocity);
 
-                strap_G2API_AnimateG2Models(ghoul2, time, &mut tuParms);
+                traps.g2api_animate_g2_models(ghoul2, time, &mut tuParms);
             } else {
                 *ikInProgress = qfalse;
             }
@@ -8618,14 +8612,14 @@ pub fn BG_IK_MoveArm(
             let mut eFrame: c_int = 0;
             let mut flags: c_int = 0;
 
-            strap_G2API_SetBoneIKState(
+            traps.g2api_set_bone_ik_state(
                 ghoul2,
                 time,
                 b"lhumerus\0".as_ptr() as *const c_char,
                 IKS_NONE as c_int,
                 core::ptr::null_mut(),
             );
-            strap_G2API_SetBoneIKState(
+            traps.g2api_set_bone_ik_state(
                 ghoul2,
                 time,
                 b"lradius\0".as_ptr() as *const c_char,
@@ -8634,11 +8628,11 @@ pub fn BG_IK_MoveArm(
             );
 
             // then reset the angles/anims on these PCJs
-            strap_G2API_SetBoneAngles(
+            traps.g2api_set_bone_angles(
                 ghoul2,
                 0,
                 b"lhumerus\0".as_ptr() as *const c_char,
-                crate::q_math::vec3_origin,
+                &crate::q_math::vec3_origin,
                 BONE_ANGLES_POSTMULT,
                 POSITIVE_X as c_int,
                 NEGATIVE_Y as c_int,
@@ -8647,11 +8641,11 @@ pub fn BG_IK_MoveArm(
                 0,
                 time,
             );
-            strap_G2API_SetBoneAngles(
+            traps.g2api_set_bone_angles(
                 ghoul2,
                 0,
                 b"lradius\0".as_ptr() as *const c_char,
-                crate::q_math::vec3_origin,
+                &crate::q_math::vec3_origin,
                 BONE_ANGLES_POSTMULT,
                 POSITIVE_X as c_int,
                 NEGATIVE_Y as c_int,
@@ -8662,7 +8656,7 @@ pub fn BG_IK_MoveArm(
             );
 
             // Match the left arm back up with the pelvis anim/frames again.
-            strap_G2API_GetBoneAnim(
+            traps.g2api_get_bone_anim(
                 ghoul2,
                 b"pelvis\0".as_ptr() as *const c_char,
                 time,
@@ -8674,7 +8668,7 @@ pub fn BG_IK_MoveArm(
                 core::ptr::null_mut(),
                 0,
             );
-            strap_G2API_SetBoneAnim(
+            traps.g2api_set_bone_anim(
                 ghoul2,
                 0,
                 b"lhumerus\0".as_ptr() as *const c_char,
@@ -8686,7 +8680,7 @@ pub fn BG_IK_MoveArm(
                 sFrame as f32,
                 300,
             );
-            strap_G2API_SetBoneAnim(
+            traps.g2api_set_bone_anim(
                 ghoul2,
                 0,
                 b"lradius\0".as_ptr() as *const c_char,
@@ -8700,7 +8694,7 @@ pub fn BG_IK_MoveArm(
             );
 
             // finally, get rid of all the ik state effector data (null bone name).
-            strap_G2API_SetBoneIKState(
+            traps.g2api_set_bone_ik_state(
                 ghoul2,
                 time,
                 core::ptr::null(),
@@ -8795,6 +8789,7 @@ pub fn BG_G2ClientNeckAngles(
     thoracicAngles: &mut vec3_t,
     headClampMinAngles: vec3_t,
     headClampMaxAngles: vec3_t,
+    traps: &dyn BgTraps,
 ) {
     let mut lA: vec3_t = lookAngles;
     //clamp the headangles (which should now be relative to the cervical (neck) angles
@@ -8847,11 +8842,11 @@ pub fn BG_G2ClientNeckAngles(
     headAngles[ROLL] = (lA[ROLL] as f64 * 0.6) as f32;
 
     unsafe {
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"cranium\0".as_ptr() as *const c_char,
-            *headAngles,
+            &*headAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,
@@ -8860,11 +8855,11 @@ pub fn BG_G2ClientNeckAngles(
             0,
             time,
         );
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"cervical\0".as_ptr() as *const c_char,
-            *neckAngles,
+            &*neckAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,
@@ -8873,11 +8868,11 @@ pub fn BG_G2ClientNeckAngles(
             0,
             time,
         );
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"thoracic\0".as_ptr() as *const c_char,
-            *thoracicAngles,
+            &*thoracicAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,
@@ -8914,12 +8909,12 @@ pub fn BG_G2ClientSpineAngles(
     tPitchAngle: *mut f32,
     tYawAngle: *mut f32,
     corrTime: *mut c_int,
+    traps: &dyn BgTraps,
 ) {
     use crate::bg_panimate::{
         BG_FlippingAnim, BG_InDeathAnim, BG_InSpecialJump, BG_SaberInSpecial,
         BG_SaberInSpecialAttack, BG_SpinningSaberAnim,
     };
-    use crate::g_strap::strap_G2API_GetBoltMatrix_NoRecNoRot;
     unsafe {
         let mut doCorr = qfalse;
 
@@ -8971,16 +8966,16 @@ pub fn BG_G2ClientSpineAngles(
             let mut motionRt: vec3_t = [0.0; 3];
             let mut tempAng: vec3_t = [0.0; 3];
 
-            strap_G2API_GetBoltMatrix_NoRecNoRot(
+            traps.g2api_get_bolt_matrix_no_rec_no_rot(
                 ghoul2,
                 0,
                 motionBolt,
                 &mut boltMatrix,
-                crate::q_math::vec3_origin,
-                cent_lerpOrigin,
+                &crate::q_math::vec3_origin,
+                &cent_lerpOrigin,
                 time,
                 core::ptr::null_mut(),
-                modelScale,
+                &modelScale,
             );
             //BG_GiveMeVectorFromMatrix( &boltMatrix, NEGATIVE_Y, motionFwd );
             motionFwd[0] = -boltMatrix.matrix[0][1];
@@ -9152,6 +9147,7 @@ pub fn BG_G2PlayerAngles(
     lookTime: c_int,
     emplaced: *mut entityState_t,
     crazySmoothFactor: *mut c_int,
+    traps: &dyn BgTraps,
 ) {
     // C `vec3_t lastHeadAngles` decays to float*: BG_UpdateLookAngles' final
     // VectorCopy writes back into the caller's `client->lastHeadAngles` — that
@@ -9205,11 +9201,11 @@ pub fn BG_G2PlayerAngles(
                     b"thoracic\0".as_ptr() as *const c_char,
                     b"cervical\0".as_ptr() as *const c_char,
                 ] {
-                    strap_G2API_SetBoneAngles(
+                    traps.g2api_set_bone_angles(
                         ghoul2,
                         0,
                         bone,
-                        crate::q_math::vec3_origin,
+                        &crate::q_math::vec3_origin,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9458,12 +9454,13 @@ pub fn BG_G2PlayerAngles(
                         tPitchAngle,
                         tYawAngle,
                         corrTime,
+                        traps,
                     );
-                    strap_G2API_SetBoneAngles(
+                    traps.g2api_set_bone_angles(
                         ghoul2,
                         0,
                         b"lower_lumbar\0".as_ptr() as *const c_char,
-                        llAngles,
+                        &llAngles,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9472,11 +9469,11 @@ pub fn BG_G2PlayerAngles(
                         0,
                         time,
                     );
-                    strap_G2API_SetBoneAngles(
+                    traps.g2api_set_bone_angles(
                         ghoul2,
                         0,
                         b"upper_lumbar\0".as_ptr() as *const c_char,
-                        ulAngles,
+                        &ulAngles,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9485,11 +9482,11 @@ pub fn BG_G2PlayerAngles(
                         0,
                         time,
                     );
-                    strap_G2API_SetBoneAngles(
+                    traps.g2api_set_bone_angles(
                         ghoul2,
                         0,
                         b"cranium\0".as_ptr() as *const c_char,
-                        crate::q_math::vec3_origin,
+                        &crate::q_math::vec3_origin,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9506,11 +9503,11 @@ pub fn BG_G2PlayerAngles(
                         facingAngles[YAW] -= 32.0;
                     }
                 } else {
-                    strap_G2API_SetBoneAngles(
+                    traps.g2api_set_bone_angles(
                         ghoul2,
                         0,
                         b"cranium\0".as_ptr() as *const c_char,
-                        crate::q_math::vec3_origin,
+                        &crate::q_math::vec3_origin,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9522,11 +9519,11 @@ pub fn BG_G2PlayerAngles(
                 }
 
                 _VectorScale(facingAngles, 0.6, &mut facingAngles);
-                strap_G2API_SetBoneAngles(
+                traps.g2api_set_bone_angles(
                     ghoul2,
                     0,
                     b"lower_lumbar\0".as_ptr() as *const c_char,
-                    crate::q_math::vec3_origin,
+                    &crate::q_math::vec3_origin,
                     BONE_ANGLES_POSTMULT,
                     POSITIVE_X as c_int,
                     NEGATIVE_Y as c_int,
@@ -9536,11 +9533,11 @@ pub fn BG_G2PlayerAngles(
                     time,
                 );
                 _VectorScale(facingAngles, 0.8, &mut facingAngles);
-                strap_G2API_SetBoneAngles(
+                traps.g2api_set_bone_angles(
                     ghoul2,
                     0,
                     b"upper_lumbar\0".as_ptr() as *const c_char,
-                    facingAngles,
+                    &facingAngles,
                     BONE_ANGLES_POSTMULT,
                     POSITIVE_X as c_int,
                     NEGATIVE_Y as c_int,
@@ -9550,11 +9547,11 @@ pub fn BG_G2PlayerAngles(
                     time,
                 );
                 _VectorScale(facingAngles, 0.8, &mut facingAngles);
-                strap_G2API_SetBoneAngles(
+                traps.g2api_set_bone_angles(
                     ghoul2,
                     0,
                     b"thoracic\0".as_ptr() as *const c_char,
-                    facingAngles,
+                    &facingAngles,
                     BONE_ANGLES_POSTMULT,
                     POSITIVE_X as c_int,
                     NEGATIVE_Y as c_int,
@@ -9567,11 +9564,11 @@ pub fn BG_G2PlayerAngles(
                 // Now we want the head angled toward where we are facing
                 VectorSet(&mut facingAngles, 0.0, dif2, 0.0);
                 _VectorScale(facingAngles, 0.6, &mut facingAngles);
-                strap_G2API_SetBoneAngles(
+                traps.g2api_set_bone_angles(
                     ghoul2,
                     0,
                     b"cervical\0".as_ptr() as *const c_char,
-                    facingAngles,
+                    &facingAngles,
                     BONE_ANGLES_POSTMULT,
                     POSITIVE_X as c_int,
                     NEGATIVE_Y as c_int,
@@ -9603,6 +9600,7 @@ pub fn BG_G2PlayerAngles(
             tPitchAngle,
             tYawAngle,
             corrTime,
+            traps,
         );
 
         _VectorCopy(cent_lerpAngles, &mut eyeAngles);
@@ -9660,13 +9658,14 @@ pub fn BG_G2PlayerAngles(
             &mut thoracicAngles,
             headClampMinAngles,
             headClampMaxAngles,
+            traps,
         );
 
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"lower_lumbar\0".as_ptr() as *const c_char,
-            llAngles,
+            &llAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,
@@ -9675,11 +9674,11 @@ pub fn BG_G2PlayerAngles(
             0,
             time,
         );
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"upper_lumbar\0".as_ptr() as *const c_char,
-            ulAngles,
+            &ulAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,
@@ -9688,11 +9687,11 @@ pub fn BG_G2PlayerAngles(
             0,
             time,
         );
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"thoracic\0".as_ptr() as *const c_char,
-            thoracicAngles,
+            &thoracicAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,
@@ -9707,14 +9706,19 @@ pub fn BG_G2PlayerAngles(
 /// Raven `BG_G2ATSTAngles`.
 ///
 /// Source: `oracle/codemp/game/bg_pmove.c:9459-9462`
-pub fn BG_G2ATSTAngles(ghoul2: *mut c_void, time: c_int, cent_lerpAngles: vec3_t) {
+pub fn BG_G2ATSTAngles(
+    ghoul2: *mut c_void,
+    time: c_int,
+    cent_lerpAngles: vec3_t,
+    traps: &dyn BgTraps,
+) {
     unsafe {
         // up = POSITIVE_X, right = NEGATIVE_Y, fwd = NEGATIVE_Z
-        strap_G2API_SetBoneAngles(
+        traps.g2api_set_bone_angles(
             ghoul2,
             0,
             b"thoracic\0".as_ptr() as *const c_char,
-            cent_lerpAngles,
+            &cent_lerpAngles,
             BONE_ANGLES_POSTMULT,
             POSITIVE_X as c_int,
             NEGATIVE_Y as c_int,

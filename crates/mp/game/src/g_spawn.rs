@@ -795,12 +795,18 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         // get the next free entity
         let ent = G_Spawn(ctx);
 
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // field; a raw store is required (bg-seam re-entry).
+            world: ctx.world_raw(),
+            engine: ctx.engine,
+        };
         let num_spawn_vars = ctx.world.level.numSpawnVars;
         for i in 0..num_spawn_vars {
             let key = ctx.world.level.spawnVars[i as usize][0];
             let value = ctx.world.level.spawnVars[i as usize][1];
             BG_ParseField(
-                ctx,
+                &mut callbacks,
                 FIELDS.as_ptr() as *mut BG_field_t,
                 key,
                 value,
@@ -1168,6 +1174,12 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             );
         }
 
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // field; a raw store is required (bg-seam re-entry).
+            world: ctx.world_raw(),
+            engine: ctx.engine,
+        };
         for i in 0..ctx.world.level.numSpawnVars {
             if Q_stricmp(
                 c"spawnscript".as_ptr(),
@@ -1179,7 +1191,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
                 let ent_base = ctx.world.g_entities.as_mut_ptr() as *mut byte;
                 // Only let them set spawnscript, we don't want them setting an angle or something on the world.
                 BG_ParseField(
-                    ctx,
+                    &mut callbacks,
                     FIELDS.as_ptr() as *mut BG_field_t,
                     field_key,
                     field_value,

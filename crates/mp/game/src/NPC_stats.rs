@@ -2135,11 +2135,18 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 let saber_name = crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
                 crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
+                let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                    // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                    // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                    world: ctx.world_raw(),
+                    engine: ctx.engine,
+                };
                 crate::bg_saberLoad::WP_SaberParseParms(
                     saber_name,
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut ctx.world.bg_state,
                     &GameBgTraps::new(ctx.engine),
+                    &mut callbacks,
                 );
                 let idx_s = format!("@{}", cstr_to_str(saber_name));
                 npcSaber1 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
@@ -2166,15 +2173,26 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     let saber_name = crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
                     crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
+                    let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                        // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                        // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                        world: ctx.world_raw(),
+                        engine: ctx.engine,
+                    };
                     crate::bg_saberLoad::WP_SaberParseParms(
                         saber_name,
                         &mut (*client_ptr).saber[1] as *mut saberInfo_t,
                         &mut ctx.world.bg_state,
                         &GameBgTraps::new(ctx.engine),
+                        &mut callbacks,
                     );
                     if (*client_ptr).saber[1].saberFlags & SFL_TWO_HANDED != 0 {
                         //tsk tsk, can't use a twoHanded saber as second saber
-                        crate::bg_saberLoad::WP_RemoveSaber((*client_ptr).saber.as_mut_ptr(), 1);
+                        crate::bg_saberLoad::WP_RemoveSaber(
+                            (*client_ptr).saber.as_mut_ptr(),
+                            1,
+                            &mut callbacks,
+                        );
                     } else {
                         //NPC->client->ps.dualSabers = qtrue;
                         let idx_s = format!("@{}", cstr_to_str(saber_name));
@@ -2489,11 +2507,18 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             if npcSaber1 == 0 {
                 //use "kyle" for a default then
                 npcSaber1 = crate::g_utils::G_ModelIndex(cstr("@Kyle").as_ptr());
+                let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                    // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                    // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                    world: ctx.world_raw(),
+                    engine: ctx.engine,
+                };
                 crate::bg_saberLoad::WP_SaberParseParms(
                     cstr("Kyle").as_ptr(),
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut ctx.world.bg_state,
                     &GameBgTraps::new(ctx.engine),
+                    &mut callbacks,
                 );
             }
 

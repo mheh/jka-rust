@@ -422,10 +422,17 @@ pub fn G_CreateWalkerNPC(
             core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
 
             // Set the vehicle info pointer to the appropriate vehicle type
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            };
             let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
                 strAnimalType,
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &mut callbacks,
             );
             (**pVeh).m_pVehicleInfo =
                 &mut (&mut ctx.world.bg_state.g_vehicleInfo)[veh_index as usize];

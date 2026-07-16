@@ -25,8 +25,6 @@
 use crate::prelude::*;
 
 use crate::bg_lib::atof;
-use crate::g_ICARUScb::Q3_SetParm;
-use crate::g_spawn::G_NewString;
 use crate::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
 use crate::q_shared::Q_stricmp;
 
@@ -252,12 +250,13 @@ pub fn BG_FileExists(fileName: *const c_char, bg: &BgState, traps: &dyn BgTraps)
 /// whatever the hell you want.
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:358-423`
-// PORT-NOTE(ctx-cascade): gained `ctx: &mut GameContext` so the `F_PARM*` branch
-// can forward to the game-tier `Q3_SetParm` (which now reaches the entity arena
-// through `ctx.world`); both call sites (`G_SpawnGEntityFromSpawnVars`,
-// `SP_worldspawn`) already carry `ctx`.
+// PORT-NOTE(callbacks-cascade): the `F_LSTRING`/`F_PARM*` branches forward to the
+// game-tier `G_NewString`/`Q3_SetParm` through the `GameCallbacks` seam
+// (`new_string`/`q3_set_parm`), keeping bg free of a direct `crate::g_*` reach;
+// both call sites (`G_SpawnGEntityFromSpawnVars`, `SP_worldspawn`) build the
+// handle from their `ctx`.
 pub fn BG_ParseField(
-    ctx: &mut GameContext,
+    callbacks: &mut dyn GameCallbacks,
     l_fields: *mut BG_field_t,
     key: *const c_char,
     value: *const c_char,
@@ -274,8 +273,8 @@ pub fn BG_ParseField(
                 let b = ent;
                 match (*f).r#type {
                     fieldtype_t::F_LSTRING => {
-                        // QAGAME (jampgame) branch: G_NewString.
-                        let s = G_NewString(ctx, value);
+                        // QAGAME (jampgame) branch: G_NewString via the callbacks seam.
+                        let s = callbacks.new_string(value);
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
                     fieldtype_t::F_VECTOR => {
@@ -327,7 +326,7 @@ pub fn BG_ParseField(
                         // Source: `oracle/codemp/game/bg_misc.c` (BG_ParseField F_PARM branch)
                         let g = ent as *mut bgEntity_t;
                         let parm_num = (*f).r#type as c_int - fieldtype_t::F_PARM1 as c_int;
-                        Q3_SetParm(ctx, (*g).s.number, parm_num, value);
+                        callbacks.q3_set_parm((*g).s.number, parm_num, value);
                     }
                     _ => {
                         // F_IGNORE and any other tag: no-op.
@@ -1105,13 +1104,12 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
     unsafe {
         let tr_ref = &*tr;
         match tr_ref.trType {
-            crate::trajectory::trType_t::TR_STATIONARY
-            | crate::trajectory::trType_t::TR_INTERPOLATE => {
+            trType_t::TR_STATIONARY | trType_t::TR_INTERPOLATE => {
                 result[0] = tr_ref.trBase[0];
                 result[1] = tr_ref.trBase[1];
                 result[2] = tr_ref.trBase[2];
             }
-            crate::trajectory::trType_t::TR_LINEAR => {
+            trType_t::TR_LINEAR => {
                 // Raven: `deltaTime = ( atTime - tr->trTime ) * 0.001` — the `*
                 // 0.001` is a double multiply stored back into `float deltaTime`,
                 // so the intermediate rounds through f64 before the f32 MA.
@@ -1120,7 +1118,7 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_SINE => {
+            trType_t::TR_SINE => {
                 let deltaTime = (atTime - tr_ref.trTime) as f32 / tr_ref.trDuration as f32;
                 // Raven calls the double libm `sin` with double `M_PI`, storing
                 // the result into `float phase`.
@@ -1129,7 +1127,7 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 result[1] = tr_ref.trBase[1] + phase * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + phase * tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_LINEAR_STOP => {
+            trType_t::TR_LINEAR_STOP => {
                 let mut t = atTime;
                 if t > tr_ref.trTime + tr_ref.trDuration {
                     t = tr_ref.trTime + tr_ref.trDuration;
@@ -1142,7 +1140,7 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_NONLINEAR_STOP => {
+            trType_t::TR_NONLINEAR_STOP => {
                 let mut t = atTime;
                 if t > tr_ref.trTime + tr_ref.trDuration {
                     t = tr_ref.trTime + tr_ref.trDuration;
@@ -1161,7 +1159,7 @@ pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mu
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
                 result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_GRAVITY => {
+            trType_t::TR_GRAVITY => {
                 let deltaTime = ((atTime - tr_ref.trTime) as f64 * 0.001) as f32;
                 result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
@@ -1189,18 +1187,17 @@ pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result
     unsafe {
         let tr_ref = &*tr;
         match tr_ref.trType {
-            crate::trajectory::trType_t::TR_STATIONARY
-            | crate::trajectory::trType_t::TR_INTERPOLATE => {
+            trType_t::TR_STATIONARY | trType_t::TR_INTERPOLATE => {
                 result[0] = 0.0;
                 result[1] = 0.0;
                 result[2] = 0.0;
             }
-            crate::trajectory::trType_t::TR_LINEAR => {
+            trType_t::TR_LINEAR => {
                 result[0] = tr_ref.trDelta[0];
                 result[1] = tr_ref.trDelta[1];
                 result[2] = tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_SINE => {
+            trType_t::TR_SINE => {
                 let deltaTime = (atTime - tr_ref.trTime) as f32 / tr_ref.trDuration as f32;
                 // Raven: `phase = cos(...)` (double libm) stored into `float
                 // phase`, then `phase *= 0.5` (a second f32 rounding).
@@ -1210,7 +1207,7 @@ pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result
                 result[1] = phase * tr_ref.trDelta[1];
                 result[2] = phase * tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_LINEAR_STOP => {
+            trType_t::TR_LINEAR_STOP => {
                 if atTime > tr_ref.trTime + tr_ref.trDuration {
                     result[0] = 0.0;
                     result[1] = 0.0;
@@ -1221,7 +1218,7 @@ pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result
                 result[1] = tr_ref.trDelta[1];
                 result[2] = tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_NONLINEAR_STOP => {
+            trType_t::TR_NONLINEAR_STOP => {
                 if atTime - tr_ref.trTime > tr_ref.trDuration || atTime - tr_ref.trTime <= 0 {
                     result[0] = 0.0;
                     result[1] = 0.0;
@@ -1238,7 +1235,7 @@ pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result
                 result[1] = deltaTime * tr_ref.trDelta[1];
                 result[2] = deltaTime * tr_ref.trDelta[2];
             }
-            crate::trajectory::trType_t::TR_GRAVITY => {
+            trType_t::TR_GRAVITY => {
                 let deltaTime = ((atTime - tr_ref.trTime) as f64 * 0.001) as f32;
                 result[0] = tr_ref.trDelta[0];
                 result[1] = tr_ref.trDelta[1];

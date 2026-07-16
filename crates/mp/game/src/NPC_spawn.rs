@@ -1198,10 +1198,17 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         let npc_vehicle = cstr("NPC_Vehicle");
         if crate::q_shared::Q_stricmp((*ent).classname as *const c_char, npc_vehicle.as_ptr()) == 0
         {
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            };
             let i_veh_index = BG_VehicleGetIndex(
                 (*ent).NPC_type as *const c_char,
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &mut callbacks,
             );
 
             if i_veh_index == VEHICLE_NONE {
@@ -1635,10 +1642,17 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
         // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
         let spawner: *mut gentity_t = ctx.entity_mut(spawner);
         let mut droid_npc_type: *const c_char = core::ptr::null();
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+            world: ctx.world_raw(),
+            engine: ctx.engine,
+        };
         let i_veh_index = BG_VehicleGetIndex(
             (*spawner).NPC_type as *const c_char,
             &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            &mut callbacks,
         );
         if i_veh_index == VEHICLE_NONE {
             return qfalse;

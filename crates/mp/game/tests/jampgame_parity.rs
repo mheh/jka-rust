@@ -731,7 +731,7 @@ mod saberload {
     use mp_abi::game::imports::MpGameImport;
     use mp_engine_qcommon::vm::{arm_game_slot, game_syscall_trampoline};
     use mp_engine_select::Engine;
-    use mp_game::bg_channel::{BgState, BgTraps};
+    use mp_game::bg_channel::{BgState, BgTraps, GameCallbacksImpl};
     use mp_game::bg_saberLoad::{
         saber_snd_tape_drain, saber_snd_tape_enable, WP_SaberLoadParms, WP_SaberParseParms,
     };
@@ -1145,7 +1145,8 @@ mod saberload {
         // world; the tested path never touches it (same contract as before).
         let w: &'static mut mp_game::world::GameWorld =
             Box::leak(mp_game::world::GameWorld::zeroed_boxed());
-        mp_game::g_strap::init_strap_world(w as *mut _);
+        let w_ptr = w as *mut mp_game::world::GameWorld;
+        mp_game::g_strap::init_strap_world(w_ptr);
 
         let dir = oracle_dir().join("fixtures");
         let traps = TestTraps::new(dir);
@@ -1153,6 +1154,14 @@ mod saberload {
 
         saber_snd_tape_enable();
         WP_SaberLoadParms(&mut bg, &traps);
+
+        // `BG_SoundIndex` now routes through `GameCallbacks::sound_index`, whose
+        // game impl calls the same ctx-free `G_SoundIndex` (world unused on this
+        // path); build the handle over the strap world + engine.
+        let mut callbacks = GameCallbacksImpl {
+            world: w_ptr,
+            engine: ENGINE.get().unwrap(),
+        };
 
         let mut o = String::new();
         o.push_str("== saberload ==\n");
@@ -1163,7 +1172,7 @@ mod saberload {
 
             let mut saber: saberInfo_t = unsafe { core::mem::zeroed() };
             let cname = cstr(name);
-            let ret = WP_SaberParseParms(cname.as_ptr(), &mut saber, &mut bg, &traps);
+            let ret = WP_SaberParseParms(cname.as_ptr(), &mut saber, &mut bg, &traps, &mut callbacks);
 
             let pi = |o: &mut String, tag: &str, v: c_int| {
                 let _ = writeln!(o, "{tag} {v}");

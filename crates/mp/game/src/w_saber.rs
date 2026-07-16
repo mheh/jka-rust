@@ -1201,6 +1201,7 @@ pub fn G_G2PlayerAngles(
                 (*sc).lookTime,
                 emplaced,
                 core::ptr::null_mut(),
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
             );
 
             if (*sc).ps.heldByClient != 0 && (*sc).ps.heldByClient <= MAX_CLIENTS as c_int {
@@ -1270,6 +1271,7 @@ pub fn G_G2PlayerAngles(
                         500,
                         qfalse,
                         &ctx.world.bg_state,
+                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
                     );
                 }
             } else if (*sc).ikStatus != 0 {
@@ -1309,6 +1311,7 @@ pub fn G_G2PlayerAngles(
                         500,
                         qtrue,
                         &ctx.world.bg_state,
+                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
                     );
                 }
             }
@@ -1328,7 +1331,12 @@ pub fn G_G2PlayerAngles(
             lookAngles[YAW as usize] = 0.0;
             lookAngles[ROLL as usize] = 0.0;
 
-            crate::bg_pmove::BG_G2ATSTAngles((*ent).ghoul2, ctx.world.level.time, lookAngles);
+            crate::bg_pmove::BG_G2ATSTAngles(
+                (*ent).ghoul2,
+                ctx.world.level.time,
+                lookAngles,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
         } else if !(*ent).NPC.is_null() {
             // an NPC not using a humanoid skeleton, do special angle stuff.
             if (*ent).s.eType == ET_NPC as c_int

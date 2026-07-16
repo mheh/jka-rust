@@ -13,7 +13,6 @@
 //! in the port report.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::g_utils::G_EffectIndex;
 use crate::prelude::*;
 use crate::q_shared::{COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine};
 use mp_bg::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
@@ -44,6 +43,9 @@ pub fn BG_ParseVehWeaponParm(
     // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
     // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
     bg: &mut BgState,
+    // Routes the `VF_MODEL`/`VF_EFFECT`/`VF_SOUND` field types to the game-tier
+    // `G_ModelIndex`/`G_EffectIndex`/`G_SoundIndex` via the bg→game upcall seam.
+    callbacks: &mut dyn GameCallbacks,
 ) -> qboolean {
     unsafe {
         let value = cstr_to_str(pValue);
@@ -120,18 +122,18 @@ pub fn BG_ParseVehWeaponParm(
                     }
                     VF_MODEL | VF_MODEL_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            G_ModelIndex(cstr(&value).as_ptr());
+                            callbacks.model_index(cstr(&value).as_ptr());
                     }
                     VF_EFFECT | VF_EFFECT_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            G_EffectIndex(cstr(&value).as_ptr());
+                            callbacks.effect_index(cstr(&value).as_ptr());
                     }
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: neither `WE_ARE_IN_THE_UI` nor `CGAME`; dead here.
                     }
                     VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            G_SoundIndex(cstr(&value).as_ptr());
+                            callbacks.sound_index(cstr(&value).as_ptr());
                     }
                     // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
                     // comments out the `G_SoundIndex` — the game module leaves the
@@ -157,7 +159,13 @@ pub fn BG_ParseVehWeaponParm(
 /// Source: `oracle/codemp/game/bg_vehicleLoad.c:309-411`
 // MISSING-SYMBOL: `BgState::VehWeaponParms` scratch buffer field (see
 // `BG_ClearVehicleParseParms`); referenced as `bg.VehWeaponParms`.
-pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_int {
+pub fn VEH_LoadVehWeapon(
+    vehWeaponName: *const c_char,
+    bg: &mut BgState,
+    // Threaded through to `BG_ParseVehWeaponParm` for the model/effect/sound
+    // field-index upcalls.
+    callbacks: &mut dyn GameCallbacks,
+) -> c_int {
     unsafe {
         // `p` walks the `VehWeaponParms` text buffer via `COM_ParseExt`'s
         // `*const *const c_char` cursor idiom.
@@ -223,7 +231,9 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
                     ))
                     .as_ptr(),
                 );
-            } else if BG_ParseVehWeaponParm(vehWeapon, parmName.as_mut_ptr(), value, bg) == qfalse {
+            } else if BG_ParseVehWeaponParm(vehWeapon, parmName.as_mut_ptr(), value, bg, callbacks)
+                == qfalse
+            {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
                 Com_Printf(
@@ -255,7 +265,12 @@ pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_in
 // `MAX_VEH_WEAPONS` (referenced elsewhere in this crate, e.g. `g_weapon.rs`,
 // but not resolvable from this file without an import path); see
 // missing_symbols.
-pub fn VEH_VehWeaponIndexForName(vehWeaponName: *const c_char, bg: &mut BgState) -> c_int {
+pub fn VEH_VehWeaponIndexForName(
+    vehWeaponName: *const c_char,
+    bg: &mut BgState,
+    // Threaded through to `VEH_LoadVehWeapon` for the field-index upcalls.
+    callbacks: &mut dyn GameCallbacks,
+) -> c_int {
     unsafe {
         if vehWeaponName.is_null() || *vehWeaponName == 0 {
             Com_Printf(
@@ -287,7 +302,7 @@ pub fn VEH_VehWeaponIndexForName(vehWeaponName: *const c_char, bg: &mut BgState)
             );
             return VEH_WEAPON_NONE;
         }
-        vw = VEH_LoadVehWeapon(vehWeaponName, bg);
+        vw = VEH_LoadVehWeapon(vehWeaponName, bg, callbacks);
         if vw == VEH_WEAPON_NONE {
             let name = cstr_to_str(vehWeaponName);
             Com_Printf(
@@ -368,6 +383,9 @@ pub fn BG_ParseVehicleParm(
     // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
     // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
     bg: &mut BgState,
+    // Routes the `VF_MODEL`/`VF_EFFECT`/`VF_SOUND` field types to the game-tier
+    // `G_ModelIndex`/`G_EffectIndex`/`G_SoundIndex` via the bg→game upcall seam.
+    callbacks: &mut dyn GameCallbacks,
 ) -> qboolean {
     unsafe {
         let value = cstr_to_str(pValue);
@@ -452,18 +470,18 @@ pub fn BG_ParseVehicleParm(
                     }
                     VF_MODEL | VF_MODEL_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            G_ModelIndex(cstr(&value).as_ptr());
+                            callbacks.model_index(cstr(&value).as_ptr());
                     }
                     VF_EFFECT | VF_EFFECT_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            G_EffectIndex(cstr(&value).as_ptr());
+                            callbacks.effect_index(cstr(&value).as_ptr());
                     }
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: dead (neither WE_ARE_IN_THE_UI nor CGAME).
                     }
                     VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            G_SoundIndex(cstr(&value).as_ptr());
+                            callbacks.sound_index(cstr(&value).as_ptr());
                     }
                     // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
                     // comments out the `G_SoundIndex` — the game module leaves the
@@ -489,7 +507,14 @@ pub fn BG_ParseVehicleParm(
 /// Source: `oracle/codemp/game/bg_vehicleLoad.c:983-1362`
 // MISSING-SYMBOL: `BgState::VehicleParms` scratch buffer field; see
 // `BG_ClearVehicleParseParms`/missing_symbols.
-pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn BgTraps) -> c_int {
+pub fn VEH_LoadVehicle(
+    vehicleName: *const c_char,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    // Routes the model/effect/sound registrations (field parse + the trailing
+    // precache block) to the game tier via the bg→game upcall seam.
+    callbacks: &mut dyn GameCallbacks,
+) -> c_int {
     unsafe {
         if bg.numVehicles == 0 {
             // `BG_VehicleLoadParms` reaches the engine, so `traps: &dyn BgTraps`
@@ -576,7 +601,9 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                 ) == 0
             }) {
                 Q_strncpyz(weap_muzzle[n - 1].as_mut_ptr(), value, 128);
-            } else if BG_ParseVehicleParm(vehicle, parmName.as_mut_ptr(), value, bg) == qfalse {
+            } else if BG_ParseVehicleParm(vehicle, parmName.as_mut_ptr(), value, bg, callbacks)
+                == qfalse
+            {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
                 Com_Printf(
@@ -598,6 +625,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                 cstr("weap1").as_ptr() as *mut c_char,
                 weap1.as_mut_ptr(),
                 bg,
+                callbacks,
             ) == qfalse
             {
                 let w = cstr_to_str(weap1.as_ptr());
@@ -617,6 +645,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                 cstr("weap2").as_ptr() as *mut c_char,
                 weap2.as_mut_ptr(),
                 bg,
+                callbacks,
             ) == qfalse
             {
                 let w = cstr_to_str(weap2.as_ptr());
@@ -638,6 +667,7 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
                     cstr(&key).as_ptr() as *mut c_char,
                     weap_muzzle[n - 1].as_mut_ptr(),
                     bg,
+                    callbacks,
                 ) == qfalse
                 {
                     let w = cstr_to_str(weap_muzzle[n - 1].as_ptr());
@@ -670,8 +700,8 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
 
         if !(*vehicle).model.is_null() {
             let model = cstr_to_str((*vehicle).model);
-            (*vehicle).modelIndex =
-                G_ModelIndex(cstr(&format!("models/players/{}/model.glm", model)).as_ptr());
+            (*vehicle).modelIndex = callbacks
+                .model_index(cstr(&format!("models/players/{}/model.glm", model)).as_ptr());
         }
 
         // SP-only skin-registration block (`#ifndef _JK2MP`) and the MP
@@ -682,18 +712,18 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
         BG_SetSharedVehicleFunctions(vehicle);
 
         if (*vehicle).explosionDamage != 0 {
-            G_EffectIndex(cstr("ships/ship_explosion_mark").as_ptr());
+            callbacks.effect_index(cstr("ships/ship_explosion_mark").as_ptr());
         }
         if (*vehicle).flammable != 0 {
-            G_SoundIndex(cstr("sound/vehicles/common/fire_lp.wav").as_ptr());
+            callbacks.sound_index(cstr("sound/vehicles/common/fire_lp.wav").as_ptr());
         }
         if (*vehicle).hoverHeight > 0.0 {
-            G_EffectIndex(cstr("ships/swoop_dust").as_ptr());
+            callbacks.effect_index(cstr("ships/swoop_dust").as_ptr());
         }
 
-        G_EffectIndex(cstr("volumetric/black_smoke").as_ptr());
-        G_EffectIndex(cstr("ships/fire").as_ptr());
-        G_SoundIndex(cstr("sound/vehicles/common/release.wav").as_ptr());
+        callbacks.effect_index(cstr("volumetric/black_smoke").as_ptr());
+        callbacks.effect_index(cstr("ships/fire").as_ptr());
+        callbacks.sound_index(cstr("sound/vehicles/common/release.wav").as_ptr());
         // QAGAME: the CGAME-only shader/fx/hideRider registrations (`#elif
         // CGAME`) are dead here; dropped per porting-rules §20.
 
@@ -713,6 +743,8 @@ pub fn VEH_VehicleIndexForName(
     vehicleName: *const c_char,
     bg: &mut BgState,
     traps: &dyn BgTraps,
+    // Threaded through to `VEH_LoadVehicle` for the model/effect/sound upcalls.
+    callbacks: &mut dyn GameCallbacks,
 ) -> c_int {
     unsafe {
         if vehicleName.is_null() || *vehicleName == 0 {
@@ -745,7 +777,7 @@ pub fn VEH_VehicleIndexForName(
             );
             return VEHICLE_NONE;
         }
-        v = VEH_LoadVehicle(vehicleName, bg, traps);
+        v = VEH_LoadVehicle(vehicleName, bg, traps, callbacks);
         if v == VEHICLE_NONE {
             let name = cstr_to_str(vehicleName);
             Com_Printf(
@@ -902,8 +934,11 @@ pub fn BG_VehicleGetIndex(
     vehicleName: *const c_char,
     bg: &mut BgState,
     traps: &dyn BgTraps,
+    // Threaded through to `VEH_VehicleIndexForName` for the model/effect/sound
+    // upcalls when loading an as-yet-unregistered vehicle.
+    callbacks: &mut dyn GameCallbacks,
 ) -> c_int {
-    VEH_VehicleIndexForName(vehicleName, bg, traps)
+    VEH_VehicleIndexForName(vehicleName, bg, traps, callbacks)
 }
 
 /// Raven `BG_GetVehicleModelName`.
@@ -915,10 +950,17 @@ pub fn BG_VehicleGetIndex(
 /// Source: `oracle/codemp/game/bg_vehicleLoad.c:1599-1611`
 // PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` so `BG_VehicleGetIndex`
 // (now `(name, bg, traps)`) can load an as-yet-unregistered vehicle.
-pub fn BG_GetVehicleModelName(modelname: *mut c_char, bg: &mut BgState, traps: &dyn BgTraps) {
+// PORT-NOTE(callbacks-cascade): gained `callbacks: &mut dyn GameCallbacks` so the
+// vehicle-load model/effect/sound registrations route through the bg→game seam.
+pub fn BG_GetVehicleModelName(
+    modelname: *mut c_char,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
+) {
     unsafe {
         let veh_name = modelname.add(1);
-        let v_index = BG_VehicleGetIndex(veh_name, bg, traps);
+        let v_index = BG_VehicleGetIndex(veh_name, bg, traps, callbacks);
         debug_assert!(*modelname == b'$' as c_char);
 
         if v_index == VEHICLE_NONE {
@@ -949,10 +991,17 @@ pub fn BG_GetVehicleModelName(modelname: *mut c_char, bg: &mut BgState, traps: &
 // MISSING-SYMBOL: `ERR_DROP` (`Com_Error` level const) not yet ported; see
 // missing_symbols.
 // PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` for `BG_VehicleGetIndex`.
-pub fn BG_GetVehicleSkinName(skinname: *mut c_char, bg: &mut BgState, traps: &dyn BgTraps) {
+// PORT-NOTE(callbacks-cascade): gained `callbacks: &mut dyn GameCallbacks` for
+// `BG_VehicleGetIndex`'s model/effect/sound upcalls.
+pub fn BG_GetVehicleSkinName(
+    skinname: *mut c_char,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
+) {
     unsafe {
         let veh_name = skinname.add(1);
-        let v_index = BG_VehicleGetIndex(veh_name, bg, traps);
+        let v_index = BG_VehicleGetIndex(veh_name, bg, traps, callbacks);
         debug_assert!(*skinname == b'$' as c_char);
 
         if v_index == VEHICLE_NONE {

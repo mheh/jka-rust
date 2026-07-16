@@ -544,15 +544,23 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             );
 
             // precache saber data for classes that use sabers on both teams
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                // field aliasing bg_state; a raw store is required (bg-seam re-entry).
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            };
             BG_PrecacheSabersForSiegeTeam(
                 SIEGETEAM_TEAM1,
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &mut callbacks,
             );
             BG_PrecacheSabersForSiegeTeam(
                 SIEGETEAM_TEAM2,
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &mut callbacks,
             );
 
             G_SiegeRegisterWeaponsAndHoldables(ctx, SIEGETEAM_TEAM1);
