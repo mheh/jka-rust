@@ -35,7 +35,10 @@ pub const MAX_IPFILTERS: usize = 1024;
 /// Parse an IP address string into mask and compare values for IP filtering.
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:62-102`
-pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut c_void) -> qboolean {
+// `f` typed to `*mut ipFilter_t`; the port's `*mut c_void` erasure is retired. Kept a raw pointer
+// (not `&mut`) because callers pass `&mut world.globals.ipFilters[i]` that aliases the `ctx` argument
+// (STAGE-2b irreducible marker at the AddIP/G_LoadIPBans call sites).
+pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut ipFilter_t) -> qboolean {
     let mut num = [0u8; 128];
     let mut i: c_int = 0;
     let mut b = [0u8; 4];
@@ -89,10 +92,12 @@ pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut c_void) -> 
         }
     }
 
-    let f_filter = f as *mut ipFilter_t;
+    let f_filter = f;
+    // Oracle `*(unsigned *)m` / `*(unsigned *)b`: reinterpret the 4 filled bytes as a native-endian
+    // u32. `from_ne_bytes` reproduces that exact read (g_svcmds.c:100-101).
     unsafe {
-        (*f_filter).mask = *(m.as_ptr() as *const c_uint);
-        (*f_filter).compare = *(b.as_ptr() as *const c_uint);
+        (*f_filter).mask = u32::from_ne_bytes(m);
+        (*f_filter).compare = u32::from_ne_bytes(b);
     }
 
     qtrue
@@ -111,11 +116,13 @@ pub fn UpdateIPBans(ctx: &mut GameContext) {
             continue;
         }
 
-        let b_ptr = &ctx.world.globals.ipFilters[i].compare as *const c_uint as *const u8;
-        let b0 = unsafe { *b_ptr };
-        let b1 = unsafe { *b_ptr.offset(1) };
-        let b2 = unsafe { *b_ptr.offset(2) };
-        let b3 = unsafe { *b_ptr.offset(3) };
+        // Oracle walks `compare` byte-by-byte via `((byte *)&ipFilters[i].compare)[0..3]`;
+        // `to_ne_bytes` yields the same 4 bytes in the same order (g_svcmds.c:119-122).
+        let bytes = ctx.world.globals.ipFilters[i].compare.to_ne_bytes();
+        let b0 = bytes[0];
+        let b1 = bytes[1];
+        let b2 = bytes[2];
+        let b3 = bytes[3];
 
         iplist.push_str(&format!("{}.{}.{}.{} ", b0, b1, b2, b3));
     }
@@ -158,7 +165,8 @@ pub fn G_FilterPacket(ctx: &mut GameContext, from: *mut c_char) -> qboolean {
         }
     }
 
-    in_ = unsafe { *(m.as_ptr() as *const c_uint) };
+    // Oracle `*(unsigned *)m`: reinterpret the 4 bytes as a native-endian u32 (g_svcmds.c:161).
+    in_ = u32::from_ne_bytes(m);
 
     for i in 0..(ctx.world.globals.numIPFilters as usize) {
         if (in_ & ctx.world.globals.ipFilters[i].mask) == ctx.world.globals.ipFilters[i].compare {
@@ -213,7 +221,7 @@ pub fn AddIP(ctx: &mut GameContext, str: *mut c_char) {
         if StringToFilter(
             ctx,
             str,
-            &mut (&mut (*world_ptr).globals.ipFilters)[i as usize] as *mut _ as *mut c_void,
+            &mut (&mut (*world_ptr).globals.ipFilters)[i as usize] as *mut ipFilter_t,
         ) == qfalse
         {
             (&mut ctx.world.globals.ipFilters)[i as usize].compare = 0xffffffffu32;
@@ -290,7 +298,7 @@ pub fn Svcmd_RemoveIP_f(ctx: &mut GameContext) {
         mask: 0,
         compare: 0,
     };
-    if StringToFilter(ctx, str.as_mut_ptr(), &mut f as *mut _ as *mut c_void) == qfalse {
+    if StringToFilter(ctx, str.as_mut_ptr(), &mut f as *mut ipFilter_t) == qfalse {
         return;
     }
 
@@ -342,12 +350,13 @@ pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
             if (&ctx.world.globals.ipFilters)[i].compare == 0xffffffff {
                 G_Printf(ctx, c"unused\n".as_ptr());
             } else {
-                let b_ptr =
-                    &(&ctx.world.globals.ipFilters)[i].compare as *const c_uint as *const u8;
-                let b0 = *b_ptr;
-                let b1 = *b_ptr.offset(1);
-                let b2 = *b_ptr.offset(2);
-                let b3 = *b_ptr.offset(3);
+                // Oracle walks `compare` byte-by-byte via `(byte *)&ipFilters[i].compare`;
+                // `to_ne_bytes` yields the same 4 bytes in the same order.
+                let bytes = (&ctx.world.globals.ipFilters)[i].compare.to_ne_bytes();
+                let b0 = bytes[0];
+                let b1 = bytes[1];
+                let b2 = bytes[2];
+                let b3 = bytes[3];
 
                 let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
                 let s_cstr = cstr(&s);
@@ -391,11 +400,13 @@ pub fn G_SaveBanIP(ctx: &mut GameContext) {
                 GFsWriteArgs::new(unused_cstr.as_ptr() as *const u8, unused.len() as c_int, fh),
             );
         } else {
-            let b_ptr = &ctx.world.globals.ipFilters[i].compare as *const c_uint as *const u8;
-            let b0 = unsafe { *b_ptr };
-            let b1 = unsafe { *b_ptr.offset(1) };
-            let b2 = unsafe { *b_ptr.offset(2) };
-            let b3 = unsafe { *b_ptr.offset(3) };
+            // Oracle walks `compare` byte-by-byte via `(byte *)&ipFilters[i].compare`;
+            // `to_ne_bytes` yields the same 4 bytes in the same order.
+            let bytes = ctx.world.globals.ipFilters[i].compare.to_ne_bytes();
+            let b0 = bytes[0];
+            let b1 = bytes[1];
+            let b2 = bytes[2];
+            let b3 = bytes[3];
 
             let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
             let s_cstr = cstr(&s);
@@ -465,7 +476,7 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
                     // from ctx's borrow.
                     let world_ptr = ctx.world_raw();
                     StringToFilter(ctx, token as *mut c_char, unsafe {
-                        &mut (&mut (*world_ptr).globals.ipFilters)[i] as *mut _ as *mut c_void
+                        &mut (&mut (*world_ptr).globals.ipFilters)[i] as *mut ipFilter_t
                     });
                 }
             } else {

@@ -102,7 +102,8 @@ pub fn TIMER_Clear2(ctx: &mut GameContext, ent: Option<EntityId>) {
 /// Raven `TIMER_GetNew`.
 ///
 /// Source: `oracle/codemp/game/g_timer.c:79-103`
-pub fn TIMER_GetNew(ctx: &mut GameContext, num: c_int, identifier: *const c_char) -> *mut c_void {
+// Returns Raven's `gtimer_t*` directly; the port's `*mut c_void` generic-handle erasure is now typed.
+pub fn TIMER_GetNew(ctx: &mut GameContext, num: c_int, identifier: *const c_char) -> *mut gtimer_t {
     unsafe {
         let num_usize = num as usize;
         let mut p = ctx.world.globals.g_timers.0[num_usize];
@@ -111,7 +112,7 @@ pub fn TIMER_GetNew(ctx: &mut GameContext, num: c_int, identifier: *const c_char
         while !p.is_null() {
             if Q_stricmp((*p).name, identifier) == 0 {
                 // Found it
-                return p as *mut c_void;
+                return p;
             }
 
             p = (*p).next;
@@ -126,18 +127,19 @@ pub fn TIMER_GetNew(ctx: &mut GameContext, num: c_int, identifier: *const c_char
         ctx.world.globals.g_timerFreeList = (*ctx.world.globals.g_timerFreeList).next;
         (*p).next = ctx.world.globals.g_timers.0[num_usize];
         ctx.world.globals.g_timers.0[num_usize] = p;
-        p as *mut c_void
+        p
     }
 }
 
 /// Raven `TIMER_GetExisting`.
 ///
 /// Source: `oracle/codemp/game/g_timer.c:106-121`
+// Returns Raven's `gtimer_t*` directly; the port's `*mut c_void` generic-handle erasure is now typed.
 pub fn TIMER_GetExisting(
     ctx: &mut GameContext,
     num: c_int,
     identifier: *const c_char,
-) -> *mut c_void {
+) -> *mut gtimer_t {
     unsafe {
         let num_usize = num as usize;
         let mut p = ctx.world.globals.g_timers.0[num_usize];
@@ -145,7 +147,7 @@ pub fn TIMER_GetExisting(
         while !p.is_null() {
             if Q_stricmp((*p).name, identifier) == 0 {
                 // Found it
-                return p as *mut c_void;
+                return p;
             }
 
             p = (*p).next;
@@ -173,7 +175,7 @@ pub fn TIMER_Set(
             return;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetNew(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetNew(ctx, ent_ref.s.number, identifier);
 
         if timer.is_null() {
             return;
@@ -197,7 +199,7 @@ pub fn TIMER_Get(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *cons
             return -1;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
 
         if timer.is_null() {
             return -1;
@@ -224,7 +226,7 @@ pub fn TIMER_Done(
             return qtrue;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
 
         if timer.is_null() {
             return qtrue;
@@ -244,10 +246,10 @@ pub fn TIMER_Done(
 /// and put it on the free list.
 ///
 /// Source: `oracle/codemp/game/g_timer.c:187-211`
-pub fn TIMER_RemoveHelper(ctx: &mut GameContext, num: c_int, timer: *mut c_void) {
+// `timer` typed to Raven's `gtimer_t*`; the port's `*mut c_void` generic-handle erasure is now typed.
+pub fn TIMER_RemoveHelper(ctx: &mut GameContext, num: c_int, timer: *mut gtimer_t) {
     unsafe {
         let num_usize = num as usize;
-        let timer = timer as *mut gtimer_t;
 
         let mut p = ctx.world.globals.g_timers.0[num_usize];
 
@@ -299,7 +301,7 @@ pub fn TIMER_Done2(
             return qfalse;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
 
         if timer.is_null() {
             return qfalse;
@@ -309,7 +311,7 @@ pub fn TIMER_Done2(
 
         if res && remove == qtrue {
             // Put it back on the free list
-            TIMER_RemoveHelper(ctx, ent_ref.s.number, timer as *mut c_void);
+            TIMER_RemoveHelper(ctx, ent_ref.s.number, timer);
         }
 
         if res {
@@ -337,7 +339,7 @@ pub fn TIMER_Exists(
             return qfalse;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
 
         if timer.is_null() {
             qfalse
@@ -362,14 +364,14 @@ pub fn TIMER_Remove(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *c
             return;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier);
 
         if timer.is_null() {
             return;
         }
 
         // Put it back on the free list
-        TIMER_RemoveHelper(ctx, ent_ref.s.number, timer as *mut c_void);
+        TIMER_RemoveHelper(ctx, ent_ref.s.number, timer);
     }
 }
 
