@@ -34,9 +34,17 @@
 //!
 //! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! take `&mut`/`&gentity_t`. Callers bridge at the boundary via
+//! `ctx.entity_id_of(ptr)`.
+//!
+//! Safe-state migration **campaign 2c** (deref regime): the Stage-1 fn-top raw
+//! re-derives are gone — entity fields are read/written through
+//! `ctx.world.entity(id)`/`entity_mut(id)` at the point of use. The only raw
+//! derefs left carry a one-line `FLAG` and are the sanctioned categories:
+//! `gNPC_t` (`NPCInfo`, no accessor) and the BG_Alloc'd pool clients an NPC/
+//! vehicle entity carries (`ent.client`, `level.clients` is not valid for them —
+//! trap 2b); each is a tight unsafe deref through a pointer value copied out of
+//! the safe entity borrow.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_lib::atof;
@@ -67,16 +75,6 @@ use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
-
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 // Raven `#define VALID_ATTACK_CONE 2.0f` (this file's own macro).
 // Source: `oracle/codemp/game/NPC_utils.c:11`
@@ -158,149 +156,157 @@ pub fn CalcEntitySpot(
     spot: spot_t,
     point: &mut vec3_t,
 ) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *const gentity_t = ent_ptr(ctx, ent);
-        if ent.is_null() {
-            return;
+    let ent_id = match ent {
+        Some(i) => i,
+        None => return,
+    };
+
+    match spot {
+        spot_t::SPOT_ORIGIN => {
+            if ctx.world.entity(ent_id).r.currentOrigin == vec3_origin {
+                //brush
+                let e = ctx.world.entity(ent_id);
+                let size = [
+                    e.r.absmax[0] - e.r.absmin[0],
+                    e.r.absmax[1] - e.r.absmin[1],
+                    e.r.absmax[2] - e.r.absmin[2],
+                ];
+                let absmin = e.r.absmin;
+                for i in 0..3 {
+                    point[i] = absmin[i] + 0.5 * size[i];
+                }
+            } else {
+                *point = ctx.world.entity(ent_id).r.currentOrigin;
+            }
         }
-
-        match spot {
-            spot_t::SPOT_ORIGIN => {
-                if (*ent).r.currentOrigin == vec3_origin {
-                    //brush
-                    let size = [
-                        (*ent).r.absmax[0] - (*ent).r.absmin[0],
-                        (*ent).r.absmax[1] - (*ent).r.absmin[1],
-                        (*ent).r.absmax[2] - (*ent).r.absmin[2],
-                    ];
-                    for i in 0..3 {
-                        point[i] = (*ent).r.absmin[i] + 0.5 * size[i];
-                    }
-                } else {
-                    *point = (*ent).r.currentOrigin;
+        spot_t::SPOT_CHEST | spot_t::SPOT_HEAD => {
+            // FLAG: entity may be an NPC carrying a BG_Alloc'd pool client; deref
+            // the client pointer raw via the safe entity borrow (trap 2b).
+            let client = ctx.world.entity(ent_id).client;
+            //Actual tag_head eyespot!
+            //FIXME: Stasis aliens may have a problem here...
+            if !client.is_null()
+                && unsafe { VectorLengthSquared((*client).renderInfo.eyePoint) } != 0.0
+            {
+                *point = unsafe { (*client).renderInfo.eyePoint };
+                if unsafe { (*client).NPC_class } == CLASS_ATST {
+                    //adjust up some
+                    point[2] += 28.0; //magic number :)
+                }
+                if !ctx.world.entity(ent_id).NPC.is_null() {
+                    //always aim from the center of my bbox, so we don't wiggle when we lean forward or backwards
+                    let origin = ctx.world.entity(ent_id).r.currentOrigin;
+                    point[0] = origin[0];
+                    point[1] = origin[1];
+                }
+            } else {
+                *point = ctx.world.entity(ent_id).r.currentOrigin;
+                if !client.is_null() {
+                    point[2] += unsafe { (*client).ps.viewheight } as f32;
                 }
             }
-            spot_t::SPOT_CHEST | spot_t::SPOT_HEAD => {
-                let client = (*ent).client;
+            if matches!(spot, spot_t::SPOT_CHEST) && !client.is_null() {
+                if unsafe { (*client).NPC_class } != CLASS_ATST {
+                    //adjust up some
+                    point[2] -= ctx.world.entity(ent_id).r.maxs[2] * 0.2;
+                }
+            }
+        }
+        spot_t::SPOT_HEAD_LEAN => {
+            // FLAG: entity may be an NPC carrying a BG_Alloc'd pool client; deref
+            // the client pointer raw via the safe entity borrow (trap 2b).
+            let client = ctx.world.entity(ent_id).client;
+            if !client.is_null()
+                && unsafe { VectorLengthSquared((*client).renderInfo.eyePoint) } != 0.0
+            {
                 //Actual tag_head eyespot!
-                //FIXME: Stasis aliens may have a problem here...
-                if !client.is_null() && VectorLengthSquared((*client).renderInfo.eyePoint) != 0.0 {
-                    *point = (*client).renderInfo.eyePoint;
-                    if (*client).NPC_class == CLASS_ATST {
-                        //adjust up some
-                        point[2] += 28.0; //magic number :)
-                    }
-                    if !(*ent).NPC.is_null() {
-                        //always aim from the center of my bbox, so we don't wiggle when we lean forward or backwards
-                        point[0] = (*ent).r.currentOrigin[0];
-                        point[1] = (*ent).r.currentOrigin[1];
-                    }
-                } else {
-                    *point = (*ent).r.currentOrigin;
-                    if !client.is_null() {
-                        point[2] += (*client).ps.viewheight as f32;
-                    }
+                *point = unsafe { (*client).renderInfo.eyePoint };
+                if unsafe { (*client).NPC_class } == CLASS_ATST {
+                    point[2] += 28.0;
                 }
-                if matches!(spot, spot_t::SPOT_CHEST) && !client.is_null() {
-                    if (*client).NPC_class != CLASS_ATST {
-                        //adjust up some
-                        point[2] -= (*ent).r.maxs[2] * 0.2;
-                    }
+                if !ctx.world.entity(ent_id).NPC.is_null() {
+                    let origin = ctx.world.entity(ent_id).r.currentOrigin;
+                    point[0] = origin[0];
+                    point[1] = origin[1];
                 }
-            }
-            spot_t::SPOT_HEAD_LEAN => {
-                let client = (*ent).client;
-                if !client.is_null() && VectorLengthSquared((*client).renderInfo.eyePoint) != 0.0 {
-                    //Actual tag_head eyespot!
-                    *point = (*client).renderInfo.eyePoint;
-                    if (*client).NPC_class == CLASS_ATST {
-                        point[2] += 28.0;
-                    }
-                    if !(*ent).NPC.is_null() {
-                        point[0] = (*ent).r.currentOrigin[0];
-                        point[1] = (*ent).r.currentOrigin[1];
-                    }
-                    //NOTE: automatically takes leaning into account!
-                } else {
-                    *point = (*ent).r.currentOrigin;
-                    if !client.is_null() {
-                        point[2] += (*client).ps.viewheight as f32;
-                    }
-                }
-            }
-            spot_t::SPOT_LEGS => {
-                *point = (*ent).r.currentOrigin;
-                point[2] += (*ent).r.mins[2] * 0.5;
-            }
-            spot_t::SPOT_WEAPON => {
-                let mut forward: vec3_t = [0.0; 3];
-                let mut right: vec3_t = [0.0; 3];
-                let mut up: vec3_t = [0.0; 3];
-                let npc = (*ent).NPC;
-                let client = (*ent).client;
-                let use_shoot_angles = !npc.is_null()
-                    && (*npc).shootAngles != vec3_origin
-                    && (*npc).shootAngles != (*client).ps.viewangles;
-                if use_shoot_angles {
-                    AngleVectors(
-                        (*npc).shootAngles,
-                        Some(&mut forward),
-                        Some(&mut right),
-                        Some(&mut up),
-                    );
-                } else {
-                    AngleVectors(
-                        (*client).ps.viewangles,
-                        Some(&mut forward),
-                        Some(&mut right),
-                        Some(&mut up),
-                    );
-                }
-                crate::g_weapon::CalcMuzzlePoint(
-                    ctx,
-                    ctx.entity_id_of(ent).unwrap(),
-                    forward,
-                    right,
-                    up,
-                    point,
-                );
                 //NOTE: automatically takes leaning into account!
-            }
-            spot_t::SPOT_GROUND => {
-                // if entity is on the ground, just use it's absmin
-                if (*ent).s.groundEntityNum != -1 {
-                    *point = (*ent).r.currentOrigin;
-                    point[2] = (*ent).r.absmin[2];
-                    return;
+            } else {
+                *point = ctx.world.entity(ent_id).r.currentOrigin;
+                if !client.is_null() {
+                    point[2] += unsafe { (*client).ps.viewheight } as f32;
                 }
-
-                // if it is reasonably close to the ground, give the point underneath of it
-                let mut start = (*ent).r.currentOrigin;
-                start[2] = (*ent).r.absmin[2];
-                let mut end = start;
-                end[2] -= 64.0;
-                let mut tr: trace_t = core::mem::zeroed();
-                trap::Trace(
-                    ctx.engine,
-                    GTraceArgs::new(
-                        &mut tr,
-                        &start,
-                        &(*ent).r.mins,
-                        &(*ent).r.maxs,
-                        &end,
-                        (*ent).s.number,
-                        MASK_PLAYERSOLID,
-                    ),
+            }
+        }
+        spot_t::SPOT_LEGS => {
+            *point = ctx.world.entity(ent_id).r.currentOrigin;
+            point[2] += ctx.world.entity(ent_id).r.mins[2] * 0.5;
+        }
+        spot_t::SPOT_WEAPON => {
+            let mut forward: vec3_t = [0.0; 3];
+            let mut right: vec3_t = [0.0; 3];
+            let mut up: vec3_t = [0.0; 3];
+            // FLAG: gNPC_t + pool client derefs stay raw (recipe 2c / trap 2b).
+            let npc = ctx.world.entity(ent_id).NPC;
+            let client = ctx.world.entity(ent_id).client;
+            let use_shoot_angles = unsafe {
+                !npc.is_null()
+                    && (*npc).shootAngles != vec3_origin
+                    && (*npc).shootAngles != (*client).ps.viewangles
+            };
+            if use_shoot_angles {
+                AngleVectors(
+                    unsafe { (*npc).shootAngles },
+                    Some(&mut forward),
+                    Some(&mut right),
+                    Some(&mut up),
                 );
-                if tr.fraction < 1.0 {
-                    *point = tr.endpos;
-                    return;
-                }
-
-                // otherwise just use the origin
-                *point = (*ent).r.currentOrigin;
+            } else {
+                AngleVectors(
+                    unsafe { (*client).ps.viewangles },
+                    Some(&mut forward),
+                    Some(&mut right),
+                    Some(&mut up),
+                );
             }
+            crate::g_weapon::CalcMuzzlePoint(ctx, ent_id, forward, right, up, point);
+            //NOTE: automatically takes leaning into account!
+        }
+        spot_t::SPOT_GROUND => {
+            // if entity is on the ground, just use it's absmin
+            if ctx.world.entity(ent_id).s.groundEntityNum != -1 {
+                *point = ctx.world.entity(ent_id).r.currentOrigin;
+                point[2] = ctx.world.entity(ent_id).r.absmin[2];
+                return;
+            }
+
+            // if it is reasonably close to the ground, give the point underneath of it
+            let mut start = ctx.world.entity(ent_id).r.currentOrigin;
+            start[2] = ctx.world.entity(ent_id).r.absmin[2];
+            let mut end = start;
+            end[2] -= 64.0;
+            let mut tr: trace_t = unsafe { core::mem::zeroed() };
+            let mins = ctx.world.entity(ent_id).r.mins;
+            let maxs = ctx.world.entity(ent_id).r.maxs;
+            let number = ctx.world.entity(ent_id).s.number;
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr,
+                    &start,
+                    &mins,
+                    &maxs,
+                    &end,
+                    number,
+                    MASK_PLAYERSOLID,
+                ),
+            );
+            if tr.fraction < 1.0 {
+                *point = tr.endpos;
+                return;
+            }
+
+            // otherwise just use the origin
+            *point = ctx.world.entity(ent_id).r.currentOrigin;
         }
     }
 }
@@ -315,6 +321,8 @@ pub fn CalcEntitySpot(
 pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolean) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t (NPCInfo) + pool client (NPC) derefs stay raw (recipe 2c / trap 2b).
         let npc_info = ctx.world.globals.NPCInfo;
         let client = ctx.world.globals.client;
 
@@ -324,7 +332,7 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
 
         // if angle changes are locked; just keep the current angles
         // aimTime isn't even set anymore... so this code was never reached, but I need a way to lock NPC's yaw, so instead of making a new SCF_ flag, just use the existing render flag... - dmv
-        if (*npc).enemy.is_none() && ctx.world.level.time < (*npc_info).aimTime {
+        if ctx.world.entity(npc_id).enemy.is_none() && ctx.world.level.time < (*npc_info).aimTime {
             if doPitch != qfalse {
                 target_pitch = (*npc_info).lockedDesiredPitch;
             }
@@ -344,15 +352,15 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
         }
 
         let mut yaw_speed: f32;
-        if (*npc).s.weapon == WP_EMPLACED_GUN {
+        if ctx.world.entity(npc_id).s.weapon == WP_EMPLACED_GUN {
             // FIXME: this seems to do nothing, actually...
             yaw_speed = 20.0;
         } else {
             yaw_speed = (*npc_info).stats.yawSpeed;
         }
 
-        let npc_client = (*npc).client;
-        if (*npc).s.weapon == WP_SABER
+        let npc_client = ctx.world.entity(npc_id).client;
+        if ctx.world.entity(npc_id).s.weapon == WP_SABER
             && ((*npc_client).ps.fd.forcePowersActive & (1 << (FP_SPEED as c_int))) != 0
         {
             let mut buf = [0 as c_char; 128];
@@ -450,38 +458,33 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:519-533`
 pub fn NPC_AimWiggle(ctx: &mut GameContext, enemy_org: &mut vec3_t) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        //shoot for somewhere between the head and torso
-        //NOTE: yes, I know this looks weird, but it works
-        if (*npc_info).aimErrorDebounceTime < ctx.world.level.time {
-            // Raven derefs `NPC->enemy` unconditionally here (assumed non-null
-            // by the caller).
-            let enemy = &mut ctx.world.g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
-            // C's `0.3` is a double literal: `0.3*flrand(...)` evaluates in f64,
-            // narrowing to the float `aimOfs` only at the assignment.
+    //shoot for somewhere between the head and torso
+    //NOTE: yes, I know this looks weird, but it works
+    if unsafe { (*npc_info).aimErrorDebounceTime } < ctx.world.level.time {
+        // Raven derefs `NPC->enemy` unconditionally here (assumed non-null
+        // by the caller).
+        let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+        let mins = ctx.world.entity(enemy_id).r.mins;
+        let maxs = ctx.world.entity(enemy_id).r.maxs;
+        // C's `0.3` is a double literal: `0.3*flrand(...)` evaluates in f64,
+        // narrowing to the float `aimOfs` only at the assignment.
+        unsafe {
             (*npc_info).aimOfs[0] =
-                (0.3 * ctx
-                    .world
-                    .bg_state
-                    .rng
-                    .flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]) as f64) as f32;
+                (0.3 * ctx.world.bg_state.rng.flrand(mins[0], maxs[0]) as f64) as f32;
             (*npc_info).aimOfs[1] =
-                (0.3 * ctx
-                    .world
-                    .bg_state
-                    .rng
-                    .flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]) as f64) as f32;
-            if (*enemy).r.maxs[2] > 0.0 {
-                (*npc_info).aimOfs[2] =
-                    (*enemy).r.maxs[2] * ctx.world.bg_state.rng.flrand(0.0, -1.0);
+                (0.3 * ctx.world.bg_state.rng.flrand(mins[1], maxs[1]) as f64) as f32;
+            if maxs[2] > 0.0 {
+                (*npc_info).aimOfs[2] = maxs[2] * ctx.world.bg_state.rng.flrand(0.0, -1.0);
             }
         }
-        for i in 0..3 {
-            enemy_org[i] += (*npc_info).aimOfs[i];
-        }
+    }
+    for i in 0..3 {
+        enemy_org[i] += unsafe { (*npc_info).aimOfs[i] };
     }
 }
 
@@ -499,6 +502,8 @@ pub fn NPC_UpdateFiringAngles(
 ) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t (NPCInfo) + pool client (NPC) derefs stay raw (recipe 2c / trap 2b).
         let npc_info = ctx.world.globals.NPCInfo;
         let client = ctx.world.globals.client;
 
@@ -543,7 +548,7 @@ pub fn NPC_UpdateFiringAngles(
                 ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(250, 2000);
         }
 
-        let npc_client = (*npc).client;
+        let npc_client = ctx.world.entity(npc_id).client;
 
         if doYaw != qfalse {
             // decay yaw diff
@@ -622,6 +627,7 @@ pub fn NPC_UpdateShootAngles(
     doYaw: qboolean,
 ) {
     unsafe {
+        // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut target_pitch: f32 = 0.0;
@@ -692,30 +698,30 @@ pub fn NPC_UpdateShootAngles(
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:818-847`
 pub fn SetTeamNumbers(ctx: &mut GameContext) {
-    unsafe {
-        for i in 0..4usize {
-            ctx.world.teamNumbers[i] = 0;
-            ctx.world.teamStrength[i] = 0;
-        }
+    for i in 0..4usize {
+        ctx.world.teamNumbers[i] = 0;
+        ctx.world.teamStrength[i] = 0;
+    }
 
-        for i in 0..1usize {
-            let found = &mut ctx.world.g_entities[i] as *mut gentity_t;
-            if !(*found).client.is_null() {
-                if (*found).health > 0 {
-                    let client = (*found).client;
-                    let team = (*client).playerTeam as usize;
-                    ctx.world.teamNumbers[team] += 1;
-                    ctx.world.teamStrength[team] += (*found).health;
-                }
+    for i in 0..1usize {
+        let found_id = EntityId(i as u32);
+        // FLAG: entity's client pointer dereffed raw via the safe borrow (trap 2b).
+        let client = ctx.world.entity(found_id).client;
+        if !client.is_null() {
+            if ctx.world.entity(found_id).health > 0 {
+                let team = unsafe { (*client).playerTeam } as usize;
+                let health = ctx.world.entity(found_id).health;
+                ctx.world.teamNumbers[team] += 1;
+                ctx.world.teamStrength[team] += health;
             }
         }
+    }
 
-        for i in 0..4usize {
-            // Raven: `floor( ((float)(teamStrength[i])) / ((float)(teamNumbers[i])) )`.
-            let strength = ctx.world.teamStrength[i] as f32;
-            let count = ctx.world.teamNumbers[i] as f32;
-            ctx.world.teamStrength[i] = (strength / count).floor() as c_int;
-        }
+    for i in 0..4usize {
+        // Raven: `floor( ((float)(teamStrength[i])) / ((float)(teamNumbers[i])) )`.
+        let strength = ctx.world.teamStrength[i] as f32;
+        let count = ctx.world.teamNumbers[i] as f32;
+        ctx.world.teamStrength[i] = (strength / count).floor() as c_int;
     }
 }
 
@@ -723,42 +729,46 @@ pub fn SetTeamNumbers(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:851-894`
 pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: c_int) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        if self_.is_null() {
-            return qfalse;
+    let self_id = match self_ {
+        Some(i) => i,
+        None => return qfalse,
+    };
+
+    let bs_name = ctx.world.entity(self_id).behaviorSet[bset as usize];
+
+    if !unsafe { VALIDSTRING(bs_name) } {
+        return qfalse;
+    }
+
+    let mut bSID: c_int = -1;
+    // FLAG: gNPC_t (NPC) deref stays raw (recipe 2c).
+    let npc = ctx.world.entity(self_id).NPC;
+    if !npc.is_null() {
+        bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
+    }
+
+    if bSID > -1 {
+        unsafe {
+            (*npc).tempBehavior = bState_t::BS_DEFAULT;
+            (*npc).behaviorState = core::mem::transmute::<c_int, bState_t>(bSID);
         }
-
-        let bs_name = (*self_).behaviorSet[bset as usize];
-
-        if !VALIDSTRING(bs_name) {
-            return qfalse;
-        }
-
-        let mut bSID: c_int = -1;
-        if !(*self_).NPC.is_null() {
-            bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
-        }
-
-        if bSID > -1 {
-            (*((*self_).NPC)).tempBehavior = bState_t::BS_DEFAULT;
-            (*((*self_).NPC)).behaviorState = core::mem::transmute::<c_int, bState_t>(bSID);
-        } else {
-            // if (0) branch is dead code in oracle
-            let script_path = format!(
+    } else {
+        // if (0) branch is dead code in oracle
+        let script_path = unsafe {
+            format!(
                 "{}/{}",
                 cstr_to_str(Q3_SCRIPT_DIR.as_ptr()),
                 cstr_to_str(bs_name)
-            );
-            let script_path_c = cstr(&script_path);
-            trap::ICARUS_RunScript(
-                ctx.engine,
-                GIcarusRunscriptArgs::new(self_.cast(), script_path_c.as_ptr()),
-            );
-        }
-        qtrue
+            )
+        };
+        let script_path_c = cstr(&script_path);
+        let self_ptr = ctx.world.entity_mut(self_id) as *mut gentity_t;
+        trap::ICARUS_RunScript(
+            ctx.engine,
+            GIcarusRunscriptArgs::new(self_ptr.cast(), script_path_c.as_ptr()),
+        );
     }
+    qtrue
 }
 
 /// Raven `NPC_SetBoneAngles`.
@@ -770,103 +780,101 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:906-995`
 pub fn NPC_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_char, angles: vec3_t) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
+    let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
 
-        // Walk the 4 fixed bone-index/bone-angle slot pairs looking for
-        // `boneIndex` (or the first free slot if not already present).
-        let mut thebone: *mut c_int = &mut (*ent).s.boneIndex1;
-        let mut boneVector: *mut vec3_t = &mut (*ent).s.boneAngles1;
-        let mut firstFree: *mut c_int = core::ptr::null_mut();
-        let mut freeBoneVec: *mut vec3_t = core::ptr::null_mut();
-        let mut i = 0;
-        let mut found = false;
-
-        loop {
-            if thebone.is_null() {
-                break;
+    // Walk the 4 fixed bone-index/bone-angle slot pairs looking for `boneIndex`
+    // (or the first free slot if not already present). Raven walks raw pointers
+    // into `ent->s.boneIndexN`/`boneAnglesN`; the slot index does the same job
+    // through the entity accessor.
+    let mut first_free: Option<usize> = None;
+    let mut found_slot: Option<usize> = None;
+    for slot in 0..4usize {
+        let idx = {
+            let e = ctx.world.entity(ent);
+            match slot {
+                0 => e.s.boneIndex1,
+                1 => e.s.boneIndex2,
+                2 => e.s.boneIndex3,
+                _ => e.s.boneIndex4,
             }
-            if *thebone == 0 && firstFree.is_null() {
-                firstFree = thebone;
-                freeBoneVec = boneVector;
-            } else if *thebone != 0 {
-                if *thebone == boneIndex {
-                    found = true;
-                    break;
-                }
-            }
-
-            match i {
-                0 => {
-                    thebone = &mut (*ent).s.boneIndex2;
-                    boneVector = &mut (*ent).s.boneAngles2;
-                }
-                1 => {
-                    thebone = &mut (*ent).s.boneIndex3;
-                    boneVector = &mut (*ent).s.boneAngles3;
-                }
-                2 => {
-                    thebone = &mut (*ent).s.boneIndex4;
-                    boneVector = &mut (*ent).s.boneAngles4;
-                }
-                _ => {
-                    thebone = core::ptr::null_mut();
-                    boneVector = core::ptr::null_mut();
-                }
-            }
-            i += 1;
+        };
+        if idx == 0 && first_free.is_none() {
+            first_free = Some(slot);
+        } else if idx != 0 && idx == boneIndex {
+            found_slot = Some(slot);
+            break;
         }
-
-        if thebone.is_null() {
-            // didn't find it, create it
-            if firstFree.is_null() {
-                let msg =
-                    std::ffi::CString::new("WARNING: NPC has no free bone indexes\n").unwrap();
-                crate::g_main::Com_Printf(msg.as_ptr());
-                return;
-            }
-            thebone = firstFree;
-            *thebone = boneIndex;
-            boneVector = freeBoneVec;
-        }
-
-        // Copy the angles over the vector in the entitystate, so we can use
-        // the corresponding index to set the bone angles on the client.
-        *boneVector = angles;
-
-        // Now set the angles on our server instance if we have one.
-        if (*ent).ghoul2.is_null() {
-            return;
-        }
-
-        let flags = BONE_ANGLES_POSTMULT;
-        let up = POSITIVE_X as c_int;
-        let right = NEGATIVE_Y as c_int;
-        let forward = NEGATIVE_Z as c_int;
-
-        //first 3 bits is forward, second 3 bits is right, third 3 bits is up
-        (*ent).s.boneOrient = forward | (right << 3) | (up << 6);
-
-        let bone_name = std::ffi::CStr::from_ptr(bone as *const c_char).to_owned();
-        trap::G2API_SetBoneAngles(
-            ctx.engine,
-            GG2AngleoverrideArgs::new(
-                (*ent).ghoul2,
-                0,
-                bone_name,
-                &angles as *const vec3_t,
-                flags,
-                up,
-                right,
-                forward,
-                core::ptr::null_mut(),
-                100,
-                ctx.world.level.time,
-            ),
-        );
     }
+
+    let target_slot = match found_slot {
+        Some(s) => s,
+        None => {
+            // didn't find it, create it
+            match first_free {
+                None => {
+                    let msg =
+                        std::ffi::CString::new("WARNING: NPC has no free bone indexes\n").unwrap();
+                    crate::g_main::Com_Printf(msg.as_ptr());
+                    return;
+                }
+                Some(s) => {
+                    let e = ctx.world.entity_mut(ent);
+                    match s {
+                        0 => e.s.boneIndex1 = boneIndex,
+                        1 => e.s.boneIndex2 = boneIndex,
+                        2 => e.s.boneIndex3 = boneIndex,
+                        _ => e.s.boneIndex4 = boneIndex,
+                    }
+                    s
+                }
+            }
+        }
+    };
+
+    // Copy the angles over the vector in the entitystate, so we can use
+    // the corresponding index to set the bone angles on the client.
+    {
+        let e = ctx.world.entity_mut(ent);
+        match target_slot {
+            0 => e.s.boneAngles1 = angles,
+            1 => e.s.boneAngles2 = angles,
+            2 => e.s.boneAngles3 = angles,
+            _ => e.s.boneAngles4 = angles,
+        }
+    }
+
+    // Now set the angles on our server instance if we have one.
+    if ctx.world.entity(ent).ghoul2.is_null() {
+        return;
+    }
+
+    let flags = BONE_ANGLES_POSTMULT;
+    let up = POSITIVE_X as c_int;
+    let right = NEGATIVE_Y as c_int;
+    let forward = NEGATIVE_Z as c_int;
+
+    //first 3 bits is forward, second 3 bits is right, third 3 bits is up
+    ctx.world.entity_mut(ent).s.boneOrient = forward | (right << 3) | (up << 6);
+
+    let bone_name = unsafe { std::ffi::CStr::from_ptr(bone as *const c_char).to_owned() };
+    let ghoul2 = ctx.world.entity(ent).ghoul2;
+    let level_time = ctx.world.level.time;
+    trap::G2API_SetBoneAngles(
+        ctx.engine,
+        GG2AngleoverrideArgs::new(
+            ghoul2,
+            0,
+            bone_name,
+            &angles as *const vec3_t,
+            flags,
+            up,
+            right,
+            forward,
+            core::ptr::null_mut(),
+            100,
+            level_time,
+        ),
+    );
 }
 
 /// Raven `NPC_SetSurfaceOnOff`.
@@ -881,50 +889,47 @@ pub fn NPC_SetSurfaceOnOff(
     surfaceName: *const c_char,
     surfaceFlags: c_int,
 ) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let mut i: c_int = 0;
-        let mut foundIt = qfalse;
+    let mut i: c_int = 0;
+    let mut foundIt = qfalse;
 
-        while i < BG_NUM_TOGGLEABLE_SURFACES {
-            if let Some(surf_name) = bgToggleableSurfaces[i as usize] {
-                if Q_stricmp(surfaceName, surf_name.as_ptr()) == 0 {
-                    foundIt = qtrue;
-                    break;
-                }
-            } else {
+    while i < BG_NUM_TOGGLEABLE_SURFACES {
+        if let Some(surf_name) = bgToggleableSurfaces[i as usize] {
+            if Q_stricmp(surfaceName, surf_name.as_ptr()) == 0 {
+                foundIt = qtrue;
                 break;
             }
-            i += 1;
-        }
-
-        if foundIt == qfalse {
-            let msg = format!(
-                "WARNING: Tried to toggle NPC surface that isn't in toggleable surface list ({})\n",
-                cstr_to_str(surfaceName)
-            );
-            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
-            return;
-        }
-
-        if surfaceFlags == TURN_ON {
-            (*ent).s.surfacesOn |= 1 << i;
-            (*ent).s.surfacesOff &= !(1 << i);
         } else {
-            (*ent).s.surfacesOn &= !(1 << i);
-            (*ent).s.surfacesOff |= 1 << i;
+            break;
         }
-
-        if (*ent).ghoul2.is_null() {
-            return;
-        }
-
-        trap::G2API_SetSurfaceOnOff(
-            ctx.engine,
-            GG2SetsurfaceonoffArgs::new((*ent).ghoul2, surfaceName, surfaceFlags),
-        );
+        i += 1;
     }
+
+    if foundIt == qfalse {
+        let msg = format!(
+            "WARNING: Tried to toggle NPC surface that isn't in toggleable surface list ({})\n",
+            unsafe { cstr_to_str(surfaceName) }
+        );
+        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+        return;
+    }
+
+    if surfaceFlags == TURN_ON {
+        ctx.world.entity_mut(ent).s.surfacesOn |= 1 << i;
+        ctx.world.entity_mut(ent).s.surfacesOff &= !(1 << i);
+    } else {
+        ctx.world.entity_mut(ent).s.surfacesOn &= !(1 << i);
+        ctx.world.entity_mut(ent).s.surfacesOff |= 1 << i;
+    }
+
+    if ctx.world.entity(ent).ghoul2.is_null() {
+        return;
+    }
+
+    let ghoul2 = ctx.world.entity(ent).ghoul2;
+    trap::G2API_SetSurfaceOnOff(
+        ctx.engine,
+        GG2SetsurfaceonoffArgs::new(ghoul2, surfaceName, surfaceFlags),
+    );
 }
 
 /// Raven `NPC_SomeoneLookingAtMe`.
@@ -934,40 +939,40 @@ pub fn NPC_SetSurfaceOnOff(
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1042-1067`
 pub fn NPC_SomeoneLookingAtMe(ctx: &mut GameContext, ent: EntityId) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let mut i: usize = 0;
-        while i < MAX_CLIENTS {
-            let pEnt = &mut ctx.world.g_entities[i] as *mut gentity_t;
+    let mut i: usize = 0;
+    while i < MAX_CLIENTS {
+        let pEnt_id = EntityId(i as u32);
+        // FLAG: pEnt's client pointer dereffed raw via the safe borrow (trap 2b).
+        let cl = ctx.world.entity(pEnt_id).client;
 
-            let eligible =
-                !pEnt.is_null() && (*pEnt).inuse != qfalse && !(*pEnt).client.is_null() && {
-                    let cl = (*pEnt).client;
-                    (*cl).sess.sessionTeam != TEAM_SPECTATOR
-                        && ((*cl).ps.pm_flags & PMF_FOLLOW) == 0
-                        && (*pEnt).s.weapon != WP_NONE
-                };
+        let eligible = ctx.world.entity(pEnt_id).inuse != qfalse
+            && !cl.is_null()
+            && unsafe {
+                (*cl).sess.sessionTeam != TEAM_SPECTATOR && ((*cl).ps.pm_flags & PMF_FOLLOW) == 0
+            }
+            && ctx.world.entity(pEnt_id).s.weapon != WP_NONE;
 
-            if eligible
-                && trap::InPVS(
-                    ctx.engine,
-                    GInPvsArgs::new(
-                        &(*ent).r.currentOrigin as *const vec3_t,
-                        &(*pEnt).r.currentOrigin as *const vec3_t,
-                    ),
-                ) != 0
+        if eligible {
+            let ent_origin = ctx.world.entity(ent).r.currentOrigin;
+            let pent_origin = ctx.world.entity(pEnt_id).r.currentOrigin;
+            if trap::InPVS(
+                ctx.engine,
+                GInPvsArgs::new(
+                    &ent_origin as *const vec3_t,
+                    &pent_origin as *const vec3_t,
+                ),
+            ) != 0
                 //I'm in a 30 fov or so cone from this player.. that's enough I guess.
-                && InFOV(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(pEnt).unwrap(), 30, 30) != 0
+                && InFOV(ctx, Some(ent), pEnt_id, 30, 30) != 0
             {
                 return qtrue;
             }
-
-            i += 1;
         }
 
-        qfalse
+        i += 1;
     }
+
+    qfalse
 }
 
 /// Raven `NPC_ClearLOS`.
@@ -1019,45 +1024,45 @@ pub fn NPC_ClearLOS2(ctx: &mut GameContext, ent: Option<EntityId>, end: vec3_t) 
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1096-1187`
 pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
+    // FLAG: gNPC_t (NPC) + pool client (NPC/ent) derefs stay raw (recipe 2c / trap 2b).
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
+        //Must be a valid pointer
+        let ent_id = match ent {
+            Some(i) => i,
+            None => return qfalse,
+        };
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
         let mut ent_team: c_int = TEAM_FREE as c_int;
 
-        //Must be a valid pointer
-        if ent.is_null() {
-            return qfalse;
-        }
-
         //Must not be me
-        if ent == npc {
+        if ent_id == npc_id {
             return qfalse;
         }
 
         //Must not be deleted
-        if (*ent).inuse == qfalse {
+        if ctx.world.entity(ent_id).inuse == qfalse {
             return qfalse;
         }
 
         //Must be alive
-        if (*ent).health <= 0 {
+        if ctx.world.entity(ent_id).health <= 0 {
             return qfalse;
         }
 
         //In case they're in notarget mode
-        if ((*ent).flags & FL_NOTARGET) != 0 {
+        if (ctx.world.entity(ent_id).flags & FL_NOTARGET) != 0 {
             return qfalse;
         }
 
-        let npc_client = (*npc).client;
+        let npc_client = ctx.world.entity(npc_id).client;
 
         //Must be an NPC
-        if (*ent).client.is_null() {
+        if ctx.world.entity(ent_id).client.is_null() {
             //	if ( ent->svFlags&SVF_NONNPC_ENEMY )
-            if (*ent).s.eType != ET_NPC as c_int {
+            if ctx.world.entity(ent_id).s.eType != ET_NPC as c_int {
                 //still potentially valid
-                if (*ent).alliedTeam == (*npc_client).playerTeam as c_int {
+                if ctx.world.entity(ent_id).alliedTeam == (*npc_client).playerTeam as c_int {
                     return qfalse;
                 } else {
                     return qtrue;
@@ -1065,16 +1070,16 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
             } else {
                 return qfalse;
             }
-        } else if (*((*ent).client)).sess.sessionTeam == TEAM_SPECTATOR {
+        } else if (*ctx.world.entity(ent_id).client).sess.sessionTeam == TEAM_SPECTATOR {
             //don't go after spectators
             return qfalse;
         }
 
-        let ent_client = (*ent).client;
+        let ent_client = ctx.world.entity(ent_id).client;
 
-        if !(*ent).NPC.is_null() && !(*ent).client.is_null() {
+        if !ctx.world.entity(ent_id).NPC.is_null() && !ctx.world.entity(ent_id).client.is_null() {
             ent_team = (*ent_client).playerTeam as c_int;
-        } else if !(*ent).client.is_null() {
+        } else if !ctx.world.entity(ent_id).client.is_null() {
             if ctx.world.cvars.g_gametype.integer < GT_TEAM {
                 ent_team = NPCTEAM_PLAYER;
             } else {
@@ -1093,22 +1098,19 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
             return qfalse;
         }
 
-        let ent_enemy = match (*ent).enemy {
-            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
-            None => core::ptr::null_mut(),
-        };
+        let ent_enemy_id = ctx.world.entity(ent_id).enemy;
 
         //if haven't seen him in a while, give up
         if ent_team == (*npc_client).enemyTeam as c_int //simplest case: they're on my enemy team
             || ((*npc_client).enemyTeam as c_int == NPCTEAM_FREE && (*ent_client).NPC_class != (*npc_client).NPC_class) //I get mad at anyone and this guy isn't the same class as me
-            || ((*ent_client).NPC_class == CLASS_WAMPA && !ent_enemy.is_null()) //a rampaging wampa
-            || ((*ent_client).NPC_class == CLASS_RANCOR && !ent_enemy.is_null()) //a rampaging rancor
+            || ((*ent_client).NPC_class == CLASS_WAMPA && ent_enemy_id.is_some()) //a rampaging wampa
+            || ((*ent_client).NPC_class == CLASS_RANCOR && ent_enemy_id.is_some()) //a rampaging rancor
             || (ent_team == NPCTEAM_FREE
                 && (*ent_client).enemyTeam as c_int == NPCTEAM_FREE
-                && !ent_enemy.is_null()
-                && !(*ent_enemy).client.is_null()
+                && ent_enemy_id.is_some()
+                && !ctx.world.entity(ent_enemy_id.unwrap()).client.is_null()
                 && ({
-                    let enemy_client = (*ent_enemy).client;
+                    let enemy_client = ctx.world.entity(ent_enemy_id.unwrap()).client;
                     (*enemy_client).playerTeam == (*npc_client).playerTeam
                         || ((*enemy_client).playerTeam as c_int != NPCTEAM_ENEMY
                             && (*npc_client).playerTeam as c_int == NPCTEAM_PLAYER)
@@ -1126,108 +1128,110 @@ pub fn NPC_ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1195-1210`
 pub fn NPC_TargetVisible(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let ent_id = ent.unwrap();
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        //Make sure we're in a valid range
-        if DistanceSquared((*ent).r.currentOrigin, (*npc).r.currentOrigin)
-            > (*npc_info).stats.visrange * (*npc_info).stats.visrange
-        {
-            return qfalse;
-        }
+    let ent_origin = ctx.world.entity(ent_id).r.currentOrigin;
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
 
-        //Check our FOV
-        if InFOV(
-            ctx,
-            ctx.entity_id_of(ent),
-            ctx.entity_id_of(npc).unwrap(),
-            (*npc_info).stats.hfov,
-            (*npc_info).stats.vfov,
-        ) == qfalse
-        {
-            return qfalse;
-        }
-
-        //Check for sight
-        if NPC_ClearLOS4(ctx, ctx.entity_id_of(ent)) == qfalse {
-            return qfalse;
-        }
-
-        qtrue
+    //Make sure we're in a valid range
+    if DistanceSquared(ent_origin, npc_origin)
+        > unsafe { (*npc_info).stats.visrange * (*npc_info).stats.visrange }
+    {
+        return qfalse;
     }
+
+    //Check our FOV
+    if InFOV(
+        ctx,
+        ent,
+        npc_id,
+        unsafe { (*npc_info).stats.hfov },
+        unsafe { (*npc_info).stats.vfov },
+    ) == qfalse
+    {
+        return qfalse;
+    }
+
+    //Check for sight
+    if NPC_ClearLOS4(ctx, ent) == qfalse {
+        return qfalse;
+    }
+
+    qtrue
 }
 
 /// Raven `NPC_FindNearestEnemy`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1246-1294`
 pub fn NPC_FindNearestEnemy(ctx: &mut GameContext, ent: EntityId) -> c_int {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let npc_info = ctx.world.globals.NPCInfo;
+    // FLAG: gNPC_t (NPCInfo) derefs stay raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        let mut nearest_ent_id: c_int = -1;
-        let mut nearest_dist = WORLD_SIZE * WORLD_SIZE;
+    let mut nearest_ent_id: c_int = -1;
+    let mut nearest_dist = WORLD_SIZE * WORLD_SIZE;
 
-        //Setup the bbox to search in
-        let mut mins: vec3_t = [0.0; 3];
-        let mut maxs: vec3_t = [0.0; 3];
-        for i in 0..3 {
-            mins[i] = (*ent).r.currentOrigin[i] - (*npc_info).stats.visrange;
-            maxs[i] = (*ent).r.currentOrigin[i] + (*npc_info).stats.visrange;
-        }
-
-        //Get a number of entities in a given space
-        let mut iradius_ents = [0i32; MAX_RADIUS_ENTS];
-        let num_ents = trap::EntitiesInBox(
-            ctx.engine,
-            GEntitiesInBoxArgs::new(
-                &mins as *const vec3_t,
-                &maxs as *const vec3_t,
-                iradius_ents.as_mut_ptr(),
-                MAX_RADIUS_ENTS as c_int,
-            ),
-        );
-
-        let mut i = 0;
-        while i < num_ents {
-            let rad_ent =
-                &mut ctx.world.g_entities[iradius_ents[i as usize] as usize] as *mut gentity_t;
-
-            //Don't consider self
-            if rad_ent == ent {
-                i += 1;
-                continue;
-            }
-
-            //Must be valid
-            if NPC_ValidEnemy(ctx, ctx.entity_id_of(rad_ent)) == qfalse {
-                i += 1;
-                continue;
-            }
-
-            //Must be visible
-            if NPC_TargetVisible(ctx, ctx.entity_id_of(rad_ent)) == qfalse {
-                i += 1;
-                continue;
-            }
-
-            let distance = DistanceSquared((*ent).r.currentOrigin, (*rad_ent).r.currentOrigin);
-
-            //Found one closer to us
-            if distance < nearest_dist {
-                nearest_ent_id = (*rad_ent).s.number;
-                nearest_dist = distance;
-            }
-
-            i += 1;
-        }
-
-        nearest_ent_id
+    //Setup the bbox to search in
+    let mut mins: vec3_t = [0.0; 3];
+    let mut maxs: vec3_t = [0.0; 3];
+    let ent_origin = ctx.world.entity(ent).r.currentOrigin;
+    let visrange = unsafe { (*npc_info).stats.visrange };
+    for i in 0..3 {
+        mins[i] = ent_origin[i] - visrange;
+        maxs[i] = ent_origin[i] + visrange;
     }
+
+    //Get a number of entities in a given space
+    let mut iradius_ents = [0i32; MAX_RADIUS_ENTS];
+    let num_ents = trap::EntitiesInBox(
+        ctx.engine,
+        GEntitiesInBoxArgs::new(
+            &mins as *const vec3_t,
+            &maxs as *const vec3_t,
+            iradius_ents.as_mut_ptr(),
+            MAX_RADIUS_ENTS as c_int,
+        ),
+    );
+
+    let mut i = 0;
+    while i < num_ents {
+        let rad_ent_id = EntityId(iradius_ents[i as usize] as u32);
+
+        //Don't consider self
+        if rad_ent_id == ent {
+            i += 1;
+            continue;
+        }
+
+        //Must be valid
+        if NPC_ValidEnemy(ctx, Some(rad_ent_id)) == qfalse {
+            i += 1;
+            continue;
+        }
+
+        //Must be visible
+        if NPC_TargetVisible(ctx, Some(rad_ent_id)) == qfalse {
+            i += 1;
+            continue;
+        }
+
+        let ent_origin = ctx.world.entity(ent).r.currentOrigin;
+        let rad_origin = ctx.world.entity(rad_ent_id).r.currentOrigin;
+        let distance = DistanceSquared(ent_origin, rad_origin);
+
+        //Found one closer to us
+        if distance < nearest_dist {
+            nearest_ent_id = ctx.world.entity(rad_ent_id).s.number;
+            nearest_dist = distance;
+        }
+
+        i += 1;
+    }
+
+    nearest_ent_id
 }
 
 /// Raven `NPC_PickEnemyExt`.
@@ -1237,57 +1241,55 @@ pub fn NPC_FindNearestEnemy(ctx: &mut GameContext, ent: EntityId) -> c_int {
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1302-1348`
 pub fn NPC_PickEnemyExt(ctx: &mut GameContext, checkAlerts: qboolean) -> *mut gentity_t {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        //If we've asked for the closest enemy
-        let ent_id = NPC_FindNearestEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+    //If we've asked for the closest enemy
+    let ent_id = NPC_FindNearestEnemy(ctx, npc_id);
 
-        //If we have a valid enemy, use it
-        if ent_id >= 0 {
-            return &mut ctx.world.g_entities[ent_id as usize] as *mut gentity_t;
-        }
+    //If we have a valid enemy, use it
+    if ent_id >= 0 {
+        return ctx.world.entity_mut(EntityId(ent_id as u32)) as *mut gentity_t;
+    }
 
-        if checkAlerts != qfalse {
-            let alert_event =
-                NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qtrue, AEL_DISCOVERED as c_int);
+    if checkAlerts != qfalse {
+        let alert_event =
+            NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qtrue, AEL_DISCOVERED as c_int);
 
-            //There is an event to look at
-            if alert_event >= 0 {
-                let event =
-                    &mut ctx.world.level.alertEvents[alert_event as usize] as *mut alertEvent_t;
+        //There is an event to look at
+        if alert_event >= 0 {
+            let event_owner = ctx.world.level.alertEvents[alert_event as usize].owner;
+            let event_level = ctx.world.level.alertEvents[alert_event as usize].level;
 
-                //Don't pay attention to our own alerts
-                if (*event).owner == npc {
-                    return core::ptr::null_mut();
+            //Don't pay attention to our own alerts
+            if event_owner == npc {
+                return core::ptr::null_mut();
+            }
+
+            if (event_level as c_int) >= (AEL_DISCOVERED as c_int) {
+                //If it's the player, attack him
+                if ctx.entity_id_of(event_owner) == Some(EntityId(0)) {
+                    return event_owner;
                 }
 
-                if ((*event).level as c_int) >= (AEL_DISCOVERED as c_int) {
-                    //If it's the player, attack him
-                    if (*event).owner == &mut ctx.world.g_entities[0] as *mut gentity_t {
-                        return (*event).owner;
-                    }
-
-                    //If it's on our team, then take its enemy as well
-                    let owner = (*event).owner;
-                    if !(*owner).client.is_null() {
-                        let owner_client = (*owner).client;
-                        let npc_client = (*npc).client;
-                        if (*owner_client).playerTeam == (*npc_client).playerTeam {
-                            return (*owner)
-                                .enemy
-                                .map(|id| {
-                                    &mut ctx.world.g_entities[id.0 as usize] as *mut gentity_t
-                                })
-                                .unwrap_or(core::ptr::null_mut());
-                        }
+                //If it's on our team, then take its enemy as well
+                let owner_id = ctx.entity_id_of(event_owner).unwrap();
+                // FLAG: owner/NPC pool client derefs stay raw (trap 2b).
+                let owner_client = ctx.world.entity(owner_id).client;
+                if !owner_client.is_null() {
+                    let npc_client = ctx.world.entity(npc_id).client;
+                    if unsafe { (*owner_client).playerTeam == (*npc_client).playerTeam } {
+                        return match ctx.world.entity(owner_id).enemy {
+                            Some(id) => ctx.world.entity_mut(id) as *mut gentity_t,
+                            None => core::ptr::null_mut(),
+                        };
                     }
                 }
             }
         }
-
-        core::ptr::null_mut()
     }
+
+    core::ptr::null_mut()
 }
 
 /// Raven `NPC_FindPlayer`.
@@ -1316,65 +1318,57 @@ fn NPC_CheckPlayerDistance() -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1407-1461`
 pub fn NPC_FindEnemy(ctx: &mut GameContext, checkAlerts: qboolean) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) + pool client (NPC) derefs stay raw (recipe 2c / trap 2b).
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        //We're ignoring all enemies for now
-        //if( NPC->svFlags & SVF_IGNORE_ENEMIES )
-        if false {
-            //rwwFIXMEFIXME: support for flag
-            G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
-            return qfalse;
-        }
-
-        //we can't pick up any enemies for now
-        if (*npc_info).confusionTime > ctx.world.level.time {
-            return qfalse;
-        }
-
-        //Don't want a new enemy
-        //rwwFIXMEFIXME: support for locked enemy
-
-        //See if the player is closer than our current enemy
-        if NPC_CheckPlayerDistance() != qfalse {
-            return qtrue;
-        }
-
-        //Otherwise, turn off the flag
-        //See if the player is closer than our current enemy
-        let npc_client = (*npc).client;
-        if (*npc_client).NPC_class != CLASS_RANCOR
-            && (*npc_client).NPC_class != CLASS_WAMPA
-            && NPC_CheckPlayerDistance() != qfalse
-        {
-            //rancors, wampas & sand creatures don't care if player is closer, they always go with closest
-            return qtrue;
-        }
-
-        //If we've gotten here alright, then our target it still valid
-        let npc_enemy = match (*npc).enemy {
-            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
-            None => core::ptr::null_mut(),
-        };
-        if NPC_ValidEnemy(ctx, ctx.entity_id_of(npc_enemy)) != qfalse {
-            return qtrue;
-        }
-
-        let newenemy = NPC_PickEnemyExt(ctx, checkAlerts);
-
-        //if we found one, take it as the enemy
-        if NPC_ValidEnemy(ctx, ctx.entity_id_of(newenemy)) != qfalse {
-            G_SetEnemy(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                ctx.entity_id_of(newenemy),
-            );
-            return qtrue;
-        }
-
-        qfalse
+    //We're ignoring all enemies for now
+    //if( NPC->svFlags & SVF_IGNORE_ENEMIES )
+    if false {
+        //rwwFIXMEFIXME: support for flag
+        G_ClearEnemy(ctx, npc_id);
+        return qfalse;
     }
+
+    //we can't pick up any enemies for now
+    if unsafe { (*npc_info).confusionTime } > ctx.world.level.time {
+        return qfalse;
+    }
+
+    //Don't want a new enemy
+    //rwwFIXMEFIXME: support for locked enemy
+
+    //See if the player is closer than our current enemy
+    if NPC_CheckPlayerDistance() != qfalse {
+        return qtrue;
+    }
+
+    //Otherwise, turn off the flag
+    //See if the player is closer than our current enemy
+    let npc_client = ctx.world.entity(npc_id).client;
+    if unsafe { (*npc_client).NPC_class != CLASS_RANCOR && (*npc_client).NPC_class != CLASS_WAMPA }
+        && NPC_CheckPlayerDistance() != qfalse
+    {
+        //rancors, wampas & sand creatures don't care if player is closer, they always go with closest
+        return qtrue;
+    }
+
+    //If we've gotten here alright, then our target it still valid
+    let npc_enemy_id = ctx.world.entity(npc_id).enemy;
+    if NPC_ValidEnemy(ctx, npc_enemy_id) != qfalse {
+        return qtrue;
+    }
+
+    let newenemy = NPC_PickEnemyExt(ctx, checkAlerts);
+
+    //if we found one, take it as the enemy
+    if NPC_ValidEnemy(ctx, ctx.entity_id_of(newenemy)) != qfalse {
+        G_SetEnemy(ctx, npc_id, ctx.entity_id_of(newenemy));
+        return qtrue;
+    }
+
+    qfalse
 }
 
 /// Raven `NPC_CheckEnemyExt`.
@@ -1388,60 +1382,50 @@ pub fn NPC_CheckEnemyExt(ctx: &mut GameContext, checkAlerts: qboolean) -> qboole
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1491-1547`
 pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboolean) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-        let client = ctx.world.globals.client;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) + pool client (NPC/enemy) derefs stay raw (recipe 2c / trap 2b).
+    let npc_info = ctx.world.globals.NPCInfo;
+    let client = ctx.world.globals.client;
 
-        let mut muzzle: vec3_t = [0.0; 3];
-        let mut angles: vec3_t = [0.0; 3];
-        let mut facing = qtrue;
+    let mut muzzle: vec3_t = [0.0; 3];
+    let mut angles: vec3_t = [0.0; 3];
+    let mut facing = qtrue;
 
-        let npc_client = (*npc).client;
+    let npc_client = ctx.world.entity(npc_id).client;
 
-        //Get the positions
-        if !npc_client.is_null()
-            && ((*npc_client).NPC_class == CLASS_RANCOR || (*npc_client).NPC_class == CLASS_WAMPA)
-        {
-            CalcEntitySpot(
-                ctx,
-                ctx.entity_id_of(npc as *const gentity_t),
-                spot_t::SPOT_ORIGIN,
-                &mut muzzle,
-            );
-            muzzle[2] += (*npc).r.maxs[2] * 0.75;
-        } else if !npc_client.is_null() && (*npc_client).NPC_class == CLASS_GALAKMECH {
-            CalcEntitySpot(
-                ctx,
-                ctx.entity_id_of(npc as *const gentity_t),
-                spot_t::SPOT_WEAPON,
-                &mut muzzle,
-            );
-        } else {
-            CalcEntitySpot(
-                ctx,
-                ctx.entity_id_of(npc as *const gentity_t),
-                spot_t::SPOT_HEAD_LEAN,
-                &mut muzzle,
-            ); //SPOT_HEAD
+    //Get the positions
+    if !npc_client.is_null()
+        && unsafe {
+            (*npc_client).NPC_class == CLASS_RANCOR || (*npc_client).NPC_class == CLASS_WAMPA
         }
+    {
+        CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_ORIGIN, &mut muzzle);
+        muzzle[2] += ctx.world.entity(npc_id).r.maxs[2] * 0.75;
+    } else if !npc_client.is_null() && unsafe { (*npc_client).NPC_class == CLASS_GALAKMECH } {
+        CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_WEAPON, &mut muzzle);
+    } else {
+        CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_HEAD_LEAN, &mut muzzle); //SPOT_HEAD
+    }
 
-        //Find the desired angles
-        GetAnglesForDirection(muzzle, position, &mut angles);
+    //Find the desired angles
+    GetAnglesForDirection(muzzle, position, &mut angles);
 
+    unsafe {
         (*npc_info).desiredYaw = AngleNormalize360(angles[YAW]);
         (*npc_info).desiredPitch = AngleNormalize360(angles[PITCH]);
+    }
 
-        if let Some(enemy_id) = (*npc).enemy {
-            let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
-            if !(*enemy).client.is_null() {
-                let enemy_client = (*enemy).client;
-                if (*enemy_client).NPC_class == CLASS_ATST {
-                    // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
-                    // C's `sin` is the double libm function: the float `time*0.004f`
-                    // argument widens to f64, `sin(...)*7` and the `flrand` sum
-                    // evaluate in f64; `+=` promotes desiredYaw and narrows once.
-                    // Source: oracle/codemp/game/NPC_utils.c:1522
+    if let Some(enemy_id) = ctx.world.entity(npc_id).enemy {
+        let enemy_client = ctx.world.entity(enemy_id).client;
+        if !enemy_client.is_null() {
+            if unsafe { (*enemy_client).NPC_class } == CLASS_ATST {
+                // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
+                // C's `sin` is the double libm function: the float `time*0.004f`
+                // argument widens to f64, `sin(...)*7` and the `flrand` sum
+                // evaluate in f64; `+=` promotes desiredYaw and narrows once.
+                // Source: oracle/codemp/game/NPC_utils.c:1522
+                unsafe {
                     (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
                         + ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
                         + (((ctx.world.level.time as f32) * 0.004) as f64).sin() * 7.0)
@@ -1450,35 +1434,35 @@ pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboole
                 }
             }
         }
-        //Face that yaw
-        NPC_UpdateAngles(ctx, qtrue, qtrue);
+    }
+    //Face that yaw
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
 
+    //Find the delta between our goal and our current facing
+    let yaw_delta = AngleNormalize360(unsafe {
+        (*npc_info).desiredYaw
+            - SHORT2ANGLE(ctx.world.globals.ucmd.angles[YAW] + (*client).ps.delta_angles[YAW])
+    });
+
+    //See if we are facing properly
+    if yaw_delta.abs() > VALID_ATTACK_CONE {
+        facing = qfalse;
+    }
+
+    if doPitch != qfalse {
         //Find the delta between our goal and our current facing
-        let yaw_delta = AngleNormalize360(
-            (*npc_info).desiredYaw
-                - SHORT2ANGLE(ctx.world.globals.ucmd.angles[YAW] + (*client).ps.delta_angles[YAW]),
-        );
+        let current_angles = unsafe {
+            SHORT2ANGLE(ctx.world.globals.ucmd.angles[PITCH] + (*client).ps.delta_angles[PITCH])
+        };
+        let pitch_delta = unsafe { (*npc_info).desiredPitch } - current_angles;
 
         //See if we are facing properly
-        if yaw_delta.abs() > VALID_ATTACK_CONE {
+        if pitch_delta.abs() > VALID_ATTACK_CONE {
             facing = qfalse;
         }
-
-        if doPitch != qfalse {
-            //Find the delta between our goal and our current facing
-            let current_angles = SHORT2ANGLE(
-                ctx.world.globals.ucmd.angles[PITCH] + (*client).ps.delta_angles[PITCH],
-            );
-            let pitch_delta = (*npc_info).desiredPitch - current_angles;
-
-            //See if we are facing properly
-            if pitch_delta.abs() > VALID_ATTACK_CONE {
-                facing = qfalse;
-            }
-        }
-
-        facing
     }
+
+    facing
 }
 
 /// Raven `NPC_FaceEntity`.
@@ -1494,66 +1478,60 @@ pub fn NPC_FaceEntity(ctx: &mut GameContext, ent: Option<EntityId>, doPitch: qbo
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1571-1580`
 pub fn NPC_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
+    let npc = ctx.world.globals.NPC;
 
-        if npc.is_null() {
-            return qfalse;
-        }
-
-        let enemy_id = match (*npc).enemy {
-            Some(id) => id,
-            None => return qfalse,
-        };
-        let enemy = &mut ctx.world.g_entities[enemy_id.index()] as *mut gentity_t;
-
-        NPC_FaceEntity(ctx, ctx.entity_id_of(enemy), doPitch)
+    if npc.is_null() {
+        return qfalse;
     }
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+
+    let enemy_id = match ctx.world.entity(npc_id).enemy {
+        Some(id) => id,
+        None => return qfalse,
+    };
+
+    NPC_FaceEntity(ctx, Some(enemy_id), doPitch)
 }
 
 /// Raven `NPC_CheckCanAttackExt`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1588-1603`
 pub fn NPC_CheckCanAttackExt(ctx: &mut GameContext) -> qboolean {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) deref stays raw (recipe 2c).
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        //We don't want them to shoot
-        if ((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0 {
-            return qfalse;
-        }
-
-        //Turn to face
-        if NPC_FaceEnemy(ctx, qtrue) == qfalse {
-            return qfalse;
-        }
-
-        //Must have a clear line of sight to the target
-        let npc_enemy = match (*npc).enemy {
-            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
-            None => core::ptr::null_mut(),
-        };
-        if NPC_ClearShot(ctx, ctx.entity_id_of(npc_enemy)) == qfalse {
-            return qfalse;
-        }
-
-        qtrue
+    //We don't want them to shoot
+    if unsafe { (*npc_info).scriptFlags & SCF_DONT_FIRE } != 0 {
+        return qfalse;
     }
+
+    //Turn to face
+    if NPC_FaceEnemy(ctx, qtrue) == qfalse {
+        return qfalse;
+    }
+
+    //Must have a clear line of sight to the target
+    let npc_enemy_id = ctx.world.entity(npc_id).enemy;
+    if NPC_ClearShot(ctx, npc_enemy_id) == qfalse {
+        return qfalse;
+    }
+
+    qtrue
 }
 
 /// Raven `NPC_ClearLookTarget`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1611-1625`
 pub fn NPC_ClearLookTarget(self_: &mut gentity_t) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = self_;
-        if (*self_).client.is_null() {
-            return;
-        }
-        let client = (*self_).client;
+    // FLAG: entity's client pointer dereffed raw (trap 2b).
+    let client = self_.client;
+    if client.is_null() {
+        return;
+    }
 
+    unsafe {
         if (*client).ps.eFlags2 & EF2_HELD_BY_MONSTER != 0 {
             //lookTarget is set by and to the monster that's holding you, no
             //other operations can change that
@@ -1569,14 +1547,13 @@ pub fn NPC_ClearLookTarget(self_: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1632-1646`
 pub fn NPC_SetLookTarget(self_: &mut gentity_t, entNum: c_int, clearTime: c_int) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = self_;
-        if (*self_).client.is_null() {
-            return;
-        }
-        let client = (*self_).client;
+    // FLAG: entity's client pointer dereffed raw (trap 2b).
+    let client = self_.client;
+    if client.is_null() {
+        return;
+    }
 
+    unsafe {
         if (*client).ps.eFlags2 & EF2_HELD_BY_MONSTER != 0 {
             //lookTarget is set by and to the monster that's holding you, no
             //other operations can change that
@@ -1592,74 +1569,78 @@ pub fn NPC_SetLookTarget(self_: &mut gentity_t, entNum: c_int, clearTime: c_int)
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1653-1679`
 pub fn NPC_CheckLookTarget(ctx: &mut GameContext, self_: EntityId) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        if !(*self_).client.is_null() {
-            let client = (*self_).client;
-            let lookTarget = (*client).renderInfo.lookTarget;
+    // FLAG: entity's client pointer dereffed raw (trap 2b).
+    let client = ctx.world.entity(self_).client;
+    if !client.is_null() {
+        let lookTarget = unsafe { (*client).renderInfo.lookTarget };
 
-            if lookTarget >= 0 && lookTarget < ENTITYNUM_WORLD {
-                //within valid range
-                let target = &mut ctx.world.g_entities[lookTarget as usize] as *mut gentity_t;
-                if (target.is_null()) || (*target).inuse == qfalse {
-                    //lookTarget not inuse or not valid anymore
-                    NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
-                } else if (*client).renderInfo.lookTargetClearTime != 0
-                    && (*client).renderInfo.lookTargetClearTime < ctx.world.level.time
-                {
-                    //Time to clear lookTarget
-                    NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
-                } else if !(*target).client.is_null()
-                    && !(*self_).enemy.is_none()
-                    && (*self_).enemy.map(|id| id.index()) != Some(lookTarget as usize)
-                {
-                    //should always look at current enemy if engaged in
-                    //battle... FIXME: this could override certain scripted
-                    //lookTargets...???
-                    NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
-                } else {
-                    return qtrue;
-                }
+        if lookTarget >= 0 && lookTarget < ENTITYNUM_WORLD {
+            //within valid range
+            let target_id = EntityId(lookTarget as u32);
+            if ctx.world.entity(target_id).inuse == qfalse {
+                //lookTarget not inuse or not valid anymore
+                NPC_ClearLookTarget(ctx.entity_mut(self_));
+            } else if unsafe { (*client).renderInfo.lookTargetClearTime } != 0
+                && unsafe { (*client).renderInfo.lookTargetClearTime } < ctx.world.level.time
+            {
+                //Time to clear lookTarget
+                NPC_ClearLookTarget(ctx.entity_mut(self_));
+            } else if !ctx.world.entity(target_id).client.is_null()
+                && !ctx.world.entity(self_).enemy.is_none()
+                && ctx.world.entity(self_).enemy.map(|id| id.index()) != Some(lookTarget as usize)
+            {
+                //should always look at current enemy if engaged in
+                //battle... FIXME: this could override certain scripted
+                //lookTargets...???
+                NPC_ClearLookTarget(ctx.entity_mut(self_));
+            } else {
+                return qtrue;
             }
         }
-
-        qfalse
     }
+
+    qfalse
 }
 
 /// Raven `NPC_CheckCharmed`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1687-1705`
 pub fn NPC_CheckCharmed(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    // FLAG: gNPC_t (NPCInfo) + pool client (NPC) derefs stay raw (recipe 2c / trap 2b).
+    let npc_info = ctx.world.globals.NPCInfo;
 
-        if (*npc_info).charmedTime != 0
-            && (*npc_info).charmedTime < ctx.world.level.time
-            && !(*npc).client.is_null()
-        {
-            //we were charmed, set us back!
-            let client = (*npc).client;
-            (*client).playerTeam = (*npc).genericValue1;
-            (*client).enemyTeam = (*npc).genericValue2;
-            (*npc).s.teamowner = (*npc).genericValue3;
-
+    let client = ctx.world.entity(npc_id).client;
+    if unsafe { (*npc_info).charmedTime } != 0
+        && unsafe { (*npc_info).charmedTime } < ctx.world.level.time
+        && !client.is_null()
+    {
+        //we were charmed, set us back!
+        let generic1 = ctx.world.entity(npc_id).genericValue1;
+        let generic2 = ctx.world.entity(npc_id).genericValue2;
+        let generic3 = ctx.world.entity(npc_id).genericValue3;
+        unsafe {
+            (*client).playerTeam = generic1;
+            (*client).enemyTeam = generic2;
+        }
+        ctx.world.entity_mut(npc_id).s.teamowner = generic3;
+        unsafe {
             (*client).leader = None;
             if (*npc_info).tempBehavior == bState_t::BS_FOLLOW_LEADER {
                 (*npc_info).tempBehavior = bState_t::BS_DEFAULT;
             }
-            G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
-            (*npc_info).charmedTime = 0;
-            let npc_id = ctx.entity_id_of(npc).unwrap();
-            let confuse_event = ctx.world.bg_state.rng.Q_irand(
-                entity_event_t::EV_CONFUSE1 as c_int,
-                entity_event_t::EV_CONFUSE3 as c_int,
-            );
-            //say something to let player know you've snapped out of it
-            G_AddVoiceEvent(ctx, npc_id, confuse_event, 2000);
         }
+        G_ClearEnemy(ctx, npc_id);
+        unsafe {
+            (*npc_info).charmedTime = 0;
+        }
+        let confuse_event = ctx.world.bg_state.rng.Q_irand(
+            entity_event_t::EV_CONFUSE1 as c_int,
+            entity_event_t::EV_CONFUSE3 as c_int,
+        );
+        //say something to let player know you've snapped out of it
+        G_AddVoiceEvent(ctx, npc_id, confuse_event, 2000);
     }
 }
 
@@ -1676,49 +1657,55 @@ pub fn G_GetBoltPosition(
     pos: Option<&mut vec3_t>,
     modelIndex: c_int,
 ) {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        if self_.is_null() || (*self_).inuse == qfalse {
-            return;
-        }
+    let self_id = match self_ {
+        Some(i) => i,
+        None => return,
+    };
+    if ctx.world.entity(self_id).inuse == qfalse {
+        return;
+    }
 
-        let mut angles: vec3_t = [0.0; 3];
-        if !(*self_).client.is_null() {
-            angles[0] = 0.0;
-            angles[1] = (*((*self_).client)).ps.viewangles[YAW];
-            angles[2] = 0.0;
-        } else {
-            angles[0] = 0.0;
-            angles[1] = (*self_).r.currentAngles[YAW];
-            angles[2] = 0.0;
-        }
+    let mut angles: vec3_t = [0.0; 3];
+    // FLAG: entity's client pointer dereffed raw via the safe borrow (trap 2b).
+    let client = ctx.world.entity(self_id).client;
+    if !client.is_null() {
+        angles[0] = 0.0;
+        angles[1] = unsafe { (*client).ps.viewangles[YAW] };
+        angles[2] = 0.0;
+    } else {
+        angles[0] = 0.0;
+        angles[1] = ctx.world.entity(self_id).r.currentAngles[YAW];
+        angles[2] = 0.0;
+    }
 
-        if (*self_).ghoul2.is_null() {
-            return;
-        }
+    if ctx.world.entity(self_id).ghoul2.is_null() {
+        return;
+    }
 
-        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
-        trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            GG2GetboltArgs::new(
-                (*self_).ghoul2,
-                modelIndex,
-                boltIndex,
-                &mut boltMatrix as *mut mdxaBone_t,
-                &angles as *const vec3_t,
-                &(*self_).r.currentOrigin as *const vec3_t,
-                ctx.world.level.time,
-                core::ptr::null_mut(),
-                &(*self_).modelScale as *const vec3_t,
-            ),
-        );
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+    let ghoul2 = ctx.world.entity(self_id).ghoul2;
+    let currentOrigin = ctx.world.entity(self_id).r.currentOrigin;
+    let modelScale = ctx.world.entity(self_id).modelScale;
+    let level_time = ctx.world.level.time;
+    trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        GG2GetboltArgs::new(
+            ghoul2,
+            modelIndex,
+            boltIndex,
+            &mut boltMatrix as *mut mdxaBone_t,
+            &angles as *const vec3_t,
+            &currentOrigin as *const vec3_t,
+            level_time,
+            core::ptr::null_mut(),
+            &modelScale as *const vec3_t,
+        ),
+    );
 
-        if let Some(pos_ref) = pos {
-            let mut result: vec3_t = [0.0; 3];
-            BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN, &mut result);
-            _VectorCopy(result, pos_ref);
-        }
+    if let Some(pos_ref) = pos {
+        let mut result: vec3_t = [0.0; 3];
+        BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN, &mut result);
+        _VectorCopy(result, pos_ref);
     }
 }
 
@@ -1730,33 +1717,27 @@ pub fn NPC_EntRangeFromBolt(
     targEnt: Option<EntityId>,
     boltIndex: c_int,
 ) -> f32 {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let targEnt: *mut gentity_t = ent_ptr(ctx, targEnt);
-        let npc = ctx.world.globals.NPC;
+    let targEnt_id = match targEnt {
+        Some(i) => i,
+        None => return Q3_INFINITE,
+    };
+    let npc = ctx.world.globals.NPC;
 
-        if targEnt.is_null() {
-            return Q3_INFINITE;
-        }
+    let mut org: vec3_t = [0.0; 3];
+    G_GetBoltPosition(ctx, ctx.entity_id_of(npc), boltIndex, Some(&mut org), 0);
 
-        let mut org: vec3_t = [0.0; 3];
-        G_GetBoltPosition(ctx, ctx.entity_id_of(npc), boltIndex, Some(&mut org), 0);
-
-        Distance((*targEnt).r.currentOrigin, org)
-    }
+    let targ_origin = ctx.world.entity(targEnt_id).r.currentOrigin;
+    Distance(targ_origin, org)
 }
 
 /// Raven `NPC_EnemyRangeFromBolt`.
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:1756-1759`
 pub fn NPC_EnemyRangeFromBolt(ctx: &mut GameContext, boltIndex: c_int) -> f32 {
-    unsafe {
-        let enemy = match (*ctx.world.globals.NPC).enemy {
-            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
-            None => core::ptr::null_mut(),
-        };
-        NPC_EntRangeFromBolt(ctx, ctx.entity_id_of(enemy), boltIndex)
-    }
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    let enemy_id = ctx.world.entity(npc_id).enemy;
+    NPC_EntRangeFromBolt(ctx, enemy_id, boltIndex)
 }
 
 /// Raven `NPC_GetEntsNearBolt`.
