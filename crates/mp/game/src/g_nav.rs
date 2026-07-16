@@ -828,11 +828,15 @@ pub fn NAV_Bypass(
         let yaw = vectoyaw(blocked_dir);
 
         // Get the avoid radius
-        let avoidRadius = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
-            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1])
+        // Raven: `sqrt(a) + sqrt(b)` — the f32 products promote to f64 for libm
+        // sqrt, summed in f64 and narrowed once at the float store.
+        // Source: `oracle/codemp/game/g_nav.c:606-607`
+        let avoidRadius = ((((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
+            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]) as f64)
             .sqrt()
-            + ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1])
-                .sqrt();
+            + (((*self_).r.maxs[0] * (*self_).r.maxs[0]
+                + (*self_).r.maxs[1] * (*self_).r.maxs[1]) as f64)
+                .sqrt()) as f32;
 
         // See if we're inside our avoidance radius
         let mut arcAngle = if blocked_dist <= avoidRadius {
@@ -1069,11 +1073,15 @@ pub fn NAV_StackedCanyon(
         PerpendicularVector(&mut perp, pathDir);
         CrossProduct(pathDir, perp, &mut cross);
 
-        let avoidRadius = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
-            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1])
+        // Raven: `sqrt(a) + sqrt(b)` — the f32 products promote to f64 for libm
+        // sqrt, summed in f64 and narrowed once at the float store.
+        // Source: `oracle/codemp/game/g_nav.c:768-769`
+        let avoidRadius = ((((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
+            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]) as f64)
             .sqrt()
-            + ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1])
-                .sqrt();
+            + (((*self_).r.maxs[0] * (*self_).r.maxs[0]
+                + (*self_).r.maxs[1] * (*self_).r.maxs[1]) as f64)
+                .sqrt()) as f32;
 
         crate::q_math::_VectorMA((*blocker).r.currentOrigin, avoidRadius, cross, &mut test);
 
@@ -1172,15 +1180,15 @@ pub fn NAV_ResolveEntityCollision(
     ctx: &mut GameContext,
     self_: EntityId,
     blocker: Option<EntityId>,
-    movedir: vec3_t,
+    movedir: &mut vec3_t,
     pathDir: vec3_t,
 ) -> qboolean {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        // `movedir` threaded `&mut` (Raven out-param): NAV_Bypass writes the
+        // avoid-direction back for NAV_AvoidCollision to copy into info->direction.
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
-        let mut movedir = movedir;
-        let movedir = &mut movedir;
         let mut blocked_dir = [0.0f32; 3];
 
         // Doors are ignored
@@ -1379,7 +1387,7 @@ pub fn NAV_AvoidCollision(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
                 ctx.entity_id_of((*info).blocker),
-                movedir,
+                &mut movedir,
                 (*info).pathDirection,
             ) == 0
             {
@@ -2221,7 +2229,14 @@ pub fn NAV_WaypointsTooFar(ctx: &mut GameContext, wp1: EntityId, wp2: EntityId) 
             // C guards on the running byte offset (`fatalErrorPointer - fatalErrorString`),
             // not the error count; `fatalErrorPointer` is that write offset.
             if ctx.world.globals.fatalErrorPointer + len >= 4096 {
-                let s = format!("{}TOO MANY FATAL NAV ERRORS!!!\n", temp);
+                // Raven: Com_Error("%s%s%dTOO MANY...", fatalErrorString, temp, fatalErrors).
+                // Source: `oracle/codemp/game/g_nav.c:1644`
+                let s = format!(
+                    "{}{}{}TOO MANY FATAL NAV ERRORS!!!\n",
+                    cstr_to_str(ctx.world.globals.fatalErrorString.0.as_ptr()),
+                    temp,
+                    ctx.world.globals.fatalErrors,
+                );
                 Com_Error(3 /* ERR_DROP */, cstr(&s).as_ptr());
                 return qtrue;
             }
@@ -2343,7 +2358,9 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
     // `TempWaypointList` field).
 
     ctx.world.globals.fatalErrors = 0;
-    ctx.world.globals.fatalErrorString.0[0] = 0;
+    // Raven: `memset(fatalErrorString, 0, 4096)` — clear the whole buffer.
+    // Source: `oracle/codemp/game/g_nav.c:1745`
+    ctx.world.globals.fatalErrorString.0.fill(0);
     ctx.world.globals.fatalErrorPointer = 0;
 
     for i in 0..ctx.world.globals.numStoredWaypoints as usize {
@@ -2410,7 +2427,13 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
     trap::Nav_SetPathsCalculated(ctx.engine, GNavSetpathscalculatedArgs::new(qfalse));
 
     if ctx.world.globals.fatalErrors != 0 {
-        let s = format!("{} FATAL NAV ERRORS\n", ctx.world.globals.fatalErrors);
+        // Raven: Com_Printf("%s%d FATAL NAV ERRORS\n", fatalErrorString, fatalErrors).
+        // Source: `oracle/codemp/game/g_nav.c:1835`
+        let s = format!(
+            "{}{} FATAL NAV ERRORS\n",
+            unsafe { cstr_to_str(ctx.world.globals.fatalErrorString.0.as_ptr()) },
+            ctx.world.globals.fatalErrors,
+        );
         Com_Printf(cstr(&s).as_ptr());
     }
 }

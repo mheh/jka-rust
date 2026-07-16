@@ -576,9 +576,6 @@ pub fn BotInputToUserCommand(
     time: c_int,
     useTime: c_int,
 ) {
-    // PORT-NOTE(ACTION_*/ANGLE2SHORT): the `ACTION_*` bot-input flag family
-    // (be_ai_goal.h) and the `ANGLE2SHORT` macro have no ported home yet;
-    // referenced as cited and reported as missing symbols.
     unsafe {
         let bi = &mut *bi;
         let ucmd = &mut *ucmd;
@@ -688,8 +685,6 @@ pub fn BotUpdateInput(
     time: c_int,
     elapsed_time: c_int,
 ) {
-    // PORT-NOTE(SHORT2ANGLE/ACTION_*): `SHORT2ANGLE` and the `ACTION_*` flags
-    // have no ported home yet; referenced as cited and reported as missing.
     unsafe {
         let mut bi: bot_input_t = core::mem::zeroed();
 
@@ -1276,8 +1271,6 @@ pub fn CheckForFunc(ctx: &mut GameContext, org: vec3_t, ignore: c_int) -> c_int 
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1086-1101`
 pub fn BotPVSCheck(ctx: &mut GameContext, p1: vec3_t, p2: vec3_t) -> qboolean {
-    // PORT-NOTE(bot_pvstype): the `bot_pvstype` cvar has no ported home yet
-    // (ungrouped bot cvar); referenced as cited and reported as missing.
     if ctx.world.cvars.g_RMG.integer != 0 && ctx.world.cvars.bot_pvstype.integer != 0 {
         let mut subPoint: vec3_t = [0.0; 3];
         crate::q_math::_VectorSubtract(p1, p2, &mut subPoint);

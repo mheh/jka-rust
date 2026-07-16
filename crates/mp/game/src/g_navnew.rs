@@ -220,7 +220,10 @@ pub fn NAVNEW_PushBlocker(
         crate::q_math::_VectorCopy((*blocker).r.mins, &mut mins);
         mins[2] += STEPSIZE;
 
-        let moveamt = ((*self_).r.maxs[1] + (*blocker).r.maxs[1]) * 1.2; //yes, magic number
+        // Raven: `(float sum) * 1.2` — the f32 maxs sum promotes to f64 for the
+        // double literal, multiplied in f64 and narrowed once at the float store.
+        // Source: `oracle/codemp/game/g_navnew.c:108`
+        let moveamt = (((*self_).r.maxs[1] + (*blocker).r.maxs[1]) as f64 * 1.2) as f32; //yes, magic number
 
         let mut end = [0.0f32; 3];
         crate::q_math::_VectorMA((*blocker).r.currentOrigin, -moveamt, right, &mut end);
@@ -387,13 +390,15 @@ pub fn NAVNEW_SidestepBlocker(
         let yaw = crate::bg_misc::vectoyaw(blocked_dir);
 
         //Get the avoid radius
-        let avoid_radius_1 = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
-            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1])
-            .sqrt();
-        let avoid_radius_2 = ((*self_).r.maxs[0] * (*self_).r.maxs[0]
-            + (*self_).r.maxs[1] * (*self_).r.maxs[1])
-            .sqrt();
-        let avoidRadius = avoid_radius_1 + avoid_radius_2;
+        // Raven: `sqrt(a) + sqrt(b)` — the f32 products promote to f64 for libm
+        // sqrt, summed in f64 and narrowed once at the float store.
+        // Source: `oracle/codemp/game/g_navnew.c:236-237`
+        let avoidRadius = ((((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
+            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]) as f64)
+            .sqrt()
+            + (((*self_).r.maxs[0] * (*self_).r.maxs[0]
+                + (*self_).r.maxs[1] * (*self_).r.maxs[1]) as f64)
+                .sqrt()) as f32;
 
         //See if we're inside our avoidance radius
         let arcAngle = if blocked_dist <= avoidRadius {
@@ -557,11 +562,13 @@ pub fn NAVNEW_Bypass(
     blocker: Option<EntityId>,
     blocked_dir: vec3_t,
     blocked_dist: f32,
-    movedir: vec3_t,
+    movedir: &mut vec3_t,
     setBlockedInfo: qboolean,
 ) -> qboolean {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        // `movedir` is threaded `&mut` (Raven's out-param): DanceWithBlocker /
+        // SidestepBlocker write the avoid-direction back for the caller to copy.
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         //Draw debug info if requested
@@ -575,17 +582,16 @@ pub fn NAVNEW_Bypass(
 
         let mut moveangles = [0.0f32; 3];
         let mut right = [0.0f32; 3];
-        crate::q_math::vectoangles(movedir, &mut moveangles);
+        crate::q_math::vectoangles(*movedir, &mut moveangles);
         moveangles[2] = 0.0;
         crate::q_math::AngleVectors(moveangles, None, Some(&mut right), None);
 
         //Check to see what dir the other guy is moving in (if any) and pick the opposite dir
-        let mut movedir_local = movedir;
         if NAVNEW_DanceWithBlocker(
             ctx,
             ctx.entity_id_of(self_),
             ctx.entity_id_of(blocker),
-            &mut movedir_local,
+            movedir,
             right,
         ) != qfalse
         {
@@ -593,14 +599,13 @@ pub fn NAVNEW_Bypass(
         }
 
         //Okay, so he's not moving to my side, see which side of him is most clear
-        let mut movedir_out = movedir;
         if NAVNEW_SidestepBlocker(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
             ctx.entity_id_of(blocker),
             blocked_dir,
             blocked_dist,
-            &mut movedir_out,
+            movedir,
             right,
         ) != qfalse
         {
@@ -649,12 +654,14 @@ pub fn NAVNEW_ResolveEntityCollision(
     ctx: &mut GameContext,
     self_: EntityId,
     blocker: Option<EntityId>,
-    movedir: vec3_t,
+    movedir: &mut vec3_t,
     pathDir: vec3_t,
     setBlockedInfo: qboolean,
 ) -> qboolean {
     unsafe {
         // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
+        // `movedir` threaded `&mut` down to Bypass so the avoid-direction write
+        // reaches AvoidCollision's `VectorCopy(movedir, info->direction)`.
         let self_: *mut gentity_t = ctx.entity_mut(self_);
         let blocker: *mut gentity_t = ent_ptr(ctx, blocker);
         //Doors are ignored
@@ -805,7 +812,7 @@ pub fn NAVNEW_AvoidCollision(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
                 ctx.entity_id_of((*info).blocker),
-                movedir,
+                &mut movedir,
                 (*info).pathDirection,
                 setBlockedInfo,
             ) == qfalse
@@ -1032,6 +1039,15 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
             inGoalWP = qfalse;
 
             if bestNode == WAYPOINT_NONE {
+                // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                // Source: `oracle/codemp/game/g_navnew.c:637,844`
+                trap::Nav_GetNodePosition(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                        (*self_).waypoint,
+                        &mut origin as *mut vec3_t,
+                    ),
+                );
                 return WAYPOINT_NONE;
             }
 
@@ -1137,6 +1153,15 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                             origin,
                             &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest,
                         );
+                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // Source: `oracle/codemp/game/g_navnew.c:730,844`
+                        trap::Nav_GetNodePosition(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                                (*self_).waypoint,
+                                &mut origin as *mut vec3_t,
+                            ),
+                        );
                         return WAYPOINT_NONE;
                     }
                 }
@@ -1173,6 +1198,15 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                                 (*self_).waypoint,
                             ),
                         );
+                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // Source: `oracle/codemp/game/g_navnew.c:750,844`
+                        trap::Nav_GetNodePosition(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                                (*self_).waypoint,
+                                &mut origin as *mut vec3_t,
+                            ),
+                        );
                         return WAYPOINT_NONE;
                     } else {
                         //try going for our waypoint this time
@@ -1202,6 +1236,15 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         bestNode = (*self_).waypoint;
                     } else {
                         //we should stop
+                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // Source: `oracle/codemp/game/g_navnew.c:776,844`
+                        trap::Nav_GetNodePosition(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                                (*self_).waypoint,
+                                &mut origin as *mut vec3_t,
+                            ),
+                        );
                         return WAYPOINT_NONE;
                     }
                 } else {
@@ -1217,9 +1260,27 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                         );
                         //Now we should get our waypoints again
                         //FIXME: cache the trace-data for subsequent calls as only the route info would have changed
+                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // Source: `oracle/codemp/game/g_navnew.c:789,844`
+                        trap::Nav_GetNodePosition(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                                (*self_).waypoint,
+                                &mut origin as *mut vec3_t,
+                            ),
+                        );
                         return WAYPOINT_NONE;
                     } else {
                         //we should stop
+                        // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                        // Source: `oracle/codemp/game/g_navnew.c:795,844`
+                        trap::Nav_GetNodePosition(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                                (*self_).waypoint,
+                                &mut origin as *mut vec3_t,
+                            ),
+                        );
                         return WAYPOINT_NONE;
                     }
                 }
@@ -1229,6 +1290,15 @@ pub fn NAVNEW_MoveToGoal(ctx: &mut GameContext, self_: EntityId, info: *mut navI
                     numTries
                 } >= 10
                 {
+                    // failed: label — trap_Nav_GetNodePosition(waypoint, origin) before bail.
+                    // Source: `oracle/codemp/game/g_navnew.c:801,844`
+                    trap::Nav_GetNodePosition(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                            (*self_).waypoint,
+                            &mut origin as *mut vec3_t,
+                        ),
+                    );
                     return WAYPOINT_NONE;
                 }
             }

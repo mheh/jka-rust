@@ -818,6 +818,8 @@ pub fn G_CheckForDanger(ctx: &mut GameContext, self_: EntityId, alertEvent: c_in
         };
 
         let should_flee = if let Some(team) = owner_team {
+            // §19: Raven derefs `self->client->playerTeam` unconditionally here; the
+            // `self->client` null guard is defensive. Source: NPC_senses.c:546.
             !owner.is_null()
                 && owner != self_
                 && unsafe { (*self_).client.is_null() } == false

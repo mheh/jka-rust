@@ -124,6 +124,8 @@ pub fn NPC_CheckAttacker(ctx: &mut GameContext, other: Option<EntityId>, r#mod: 
         }
 
         // Check if we're a Jedi
+        // §19: Raven derefs `NPC->client` unconditionally; the null guard is
+        // defensive (NPCs always have a client here). Source: NPC_reactions.c:89.
         let client = (*npc).client as *mut gclient_t;
         if !client.is_null() && (*client).ps.weapon == WP_SABER {
             // I'm a jedi
@@ -300,6 +302,8 @@ pub fn NPC_ChoosePainAnimation(
                 pain_chance = 1.0f32; // Always take pain from saber
             } else if r#mod == MOD_MELEE {
                 // Higher in rank (skill) we are, less likely we are to be fazed by a punch
+                // §19: Raven derefs `self->NPC->rank` unconditionally; the null
+                // guard is defensive and picks 1.0. Source: NPC_reactions.c:257.
                 let npc = (*self_).NPC as *mut gNPC_t;
                 if !npc.is_null() {
                     pain_chance = 1.0f32
@@ -423,6 +427,10 @@ pub fn NPC_ChoosePainAnimation(
                     * (bg.bgHumanoidAnimations[pain_anim as usize].frameLerp as f32).abs())
                     as c_int
             } else {
+                // §19: Raven indexes `anims[pain_anim]`/`bgHumanoidAnimations[pain_anim]`
+                // unconditionally, so pain_anim == -1 reads element [-1] (deterministic
+                // garbage animLength). We pick 0, so painDebounceTime = level.time.
+                // Source: `oracle/codemp/game/NPC_reactions.c:351`
                 0
             };
 
@@ -474,6 +482,8 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
             return;
         }
 
+        // §19: Raven derefs `self->client->ps.pm_type` unconditionally; the null
+        // guard is defensive. Source: NPC_reactions.c:381.
         let client = (*self_).client as *mut gclient_t;
         if !client.is_null() && (*client).ps.pm_type == PM_DEAD {
             return;
@@ -612,6 +622,8 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
         SetNPCGlobals(ctx, ctx.entity_id_of(self_).unwrap());
 
         // Do extra bits
+        // §19: Raven derefs `NPCInfo->ignorePain` unconditionally (SetNPCGlobals
+        // just set it); the null guard is defensive. Source: NPC_reactions.c:494.
         let npc_info_ptr = ctx.world.globals.NPCInfo;
         if !npc_info_ptr.is_null() && (*npc_info_ptr).ignorePain == 0 {
             (*npc_info_ptr).confusionTime = 0; // Clear any charm or confusion

@@ -3041,11 +3041,14 @@ pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue
 
         let val = Q3_GameSideCheckStringCounterIncrement(parmValue);
         if val != 0.0 {
-            let cur = atof((*(*ent).parms).parm[parmNum as usize].as_ptr()) as f32;
-            let total = val + cur;
+            // Raven: `val += atof(...)` — atof returns double; the f32 `val`
+            // promotes, adds in f64, narrows once. `%f` promotes the float back
+            // to double for its 6-decimal print, so format via f64.
+            // Source: `oracle/codemp/game/g_ICARUScb.c:3676-3677`
+            let total = (val as f64 + atof((*(*ent).parms).parm[parmNum as usize].as_ptr())) as f32;
             write_cstr_field(
                 &mut (*(*ent).parms).parm[parmNum as usize],
-                &format!("{:.6}", total),
+                &format!("{:.6}", total as f64),
             );
         } else {
             // Raven: strncpy + explicit truncation-NUL; write_cstr_field is the

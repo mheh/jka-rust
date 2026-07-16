@@ -384,12 +384,15 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 let flagstr = GetFlagStr(ctx, (*p).flags);
                 ctx.world.globals.gLastPrintedIndex = bestindex;
                 let flagstr_s = cstr_to_str(flagstr);
+                // C `%f` promotes the float weight to double and prints 6 decimals;
+                // format via `as f64` to mirror that promotion exactly.
+                // Source: `oracle/codemp/game/ai_wpnav.c:335`
                 let s = format!(
-                    "^3Waypoint {}\nFlags - {} ({}) (w{})\nOrigin - ({} {} {})\n",
+                    "^3Waypoint {}\nFlags - {} ({}) (w{:.6})\nOrigin - ({} {} {})\n",
                     (*p).index,
                     (*p).flags,
                     flagstr_s,
-                    (*p).weight,
+                    (*p).weight as f64,
                     (*p).origin[0] as c_int,
                     (*p).origin[1] as c_int,
                     (*p).origin[2] as c_int,
@@ -2484,15 +2487,18 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
         FlagObjects(ctx); // currently only used for flagging waypoints nearest CTF flags
 
+        // C `%f` promotes each float arg to double and prints 6 decimals; format
+        // the weight/origin/flLen fields via `as f64` to mirror that promotion.
+        // Source: `oracle/codemp/game/ai_wpnav.c:2418,2447`
         let p0 = ctx.world.globals.gWPArray.0[i as usize];
         let mut file_string = format!(
-            "{} {} {} ({} {} {}) {{ ",
+            "{} {} {:.6} ({:.6} {:.6} {:.6}) {{ ",
             (*p0).index,
             (*p0).flags,
-            (*p0).weight,
-            (*p0).origin[0],
-            (*p0).origin[1],
-            (*p0).origin[2],
+            (*p0).weight as f64,
+            (*p0).origin[0] as f64,
+            (*p0).origin[1] as f64,
+            (*p0).origin[2] as f64,
         );
 
         // PORT-NOTE(bg-0143): Raven builds `storeString` here for waypoint 0's
@@ -2530,20 +2536,20 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
         (*p0).disttonext = fl_len;
 
-        file_string = format!("{}}} {}\n", file_string, fl_len);
+        file_string = format!("{}}} {:.6}\n", file_string, fl_len as f64);
 
         i += 1;
 
         while i < ctx.world.globals.gWPNum {
             let p = ctx.world.globals.gWPArray.0[i as usize];
             let mut store_string = format!(
-                "{} {} {} ({} {} {}) {{ ",
+                "{} {} {:.6} ({:.6} {:.6} {:.6}) {{ ",
                 (*p).index,
                 (*p).flags,
-                (*p).weight,
-                (*p).origin[0],
-                (*p).origin[1],
-                (*p).origin[2],
+                (*p).weight as f64,
+                (*p).origin[0] as f64,
+                (*p).origin[1] as f64,
+                (*p).origin[2] as f64,
             );
 
             let mut n: c_int = 0;
@@ -2575,7 +2581,7 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
 
             (*p).disttonext = fl_len;
 
-            store_string = format!("{}}} {}\n", store_string, fl_len);
+            store_string = format!("{}}} {:.6}\n", store_string, fl_len as f64);
 
             file_string.push_str(&store_string);
 
