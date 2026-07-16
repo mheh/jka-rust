@@ -313,3 +313,23 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
 - Roadmap Stage-2 API shape (EntityMut views, qboolean→bool, …) — follows
   safe-state; only the unsafe-retiring subset of §C7 rides along in Stage 4.
 - SP mirror — inherits the pattern later as a diff.
+
+## 6. Campaign 2c execution log (2026-07-16)
+
+Executed on branch `safe-state-2c` (from master d4149b7d) via the wave
+workflow (worktree-isolated opus packet-workers, pinned recipe, machine
+gates + orchestrator gate-1 review). Six waves, 81 one-file commits, ~9,900
+deref sites converted (census 24,287 → 14,328); referee 7/7 byte-identical
+after every wave; workspace, i686, and the full test suite green; gate-2
+adversarial audits over the referee-blind vehicle + ICARUS/NPC-spawn
+surfaces found zero divergences. Outcome, residue classification, and the
+allow-list ruling are recorded in DEC-29.
+
+Wave ledger: W1 ≤30 bucket (21 files; 2 gate-1 fixes — both the
+clients[i]-for-pool-client trap → recipe rule 2b). W2 31-100 (11 picks;
+2 packets rejected for reference-laundering → rule 2d). W3 101-300 + redos
+(23 picks; g_saga cross-file edit → rule 8). W4 301-800 (13 picks;
+g_trigger conflict resolved to W3's SiegeItemRemoveOwner signature). W5
+800+ giants (10 picks, honest partials per rule 9; g_items + g_mover
+single-entity fns complete). W6 tails (7 picks; remaining tails ruled
+irreducible-for-blind-waves and inventoried in DEC-29).
