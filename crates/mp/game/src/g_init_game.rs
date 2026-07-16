@@ -98,7 +98,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         trap::SV_RegisterSharedMemory(
             ctx.engine,
-            GSetSharedBufferArgs::new(ctx.world.gSharedBuffer.as_mut_ptr() as *mut c_char),
+            GSetSharedBufferArgs::new(ctx.world.gSharedBuffer.as_registration_ptr()),
         );
 
         // Load external vehicle data

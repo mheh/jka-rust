@@ -158,6 +158,32 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
   renamed in place (RNG/syscall order preserved by construction); ~230 dead
   unsafe blocks retired. Unsafe now genuinely retreats to the seam + the
   entity/client deref regime (2c/gclient territory, out of scope).
+- **Stage 4 scope (inventoried 2026-07-15).** The F5 estimate (~50 casts /
+  ~20 files) covered only the ICARUS family. The dominant F5 sub-family is the
+  tier-blocked `c_void` fields on `gentity_t` (`client`, `NPC`, `m_pVehicle` —
+  `mp_qshared` sits below the tiers that own the real types): ~2,440 cast
+  sites / ~70 files. Shard cut:
+  - **4A** ICARUS `gSharedBuffer` → typed `SharedBuffer` adapter (17 overlays,
+    `world/game_context.rs` + registration).
+  - **4B** `g_timer.rs` void*-handle retirement (self-contained, 8 sites) +
+    `g_svcmds.rs` `StringToFilter` param typing and IP byte↔`c_uint`
+    reinterprets (`from_ne_bytes`).
+  - **4C** allocator-result typing: `G_Alloc`/`BG_Alloc` call-site casts and
+    the `.client`/`.NPC` pool-origin sites (`g_utils.rs:559`,
+    `NPC_spawn.rs:1039`).
+  - **4D** `client`/`NPC`/`m_pVehicle` field re-typing (~2,440 sites): ONE
+    design decision (typed accessors vs. tier move), overlaps the gclient
+    deref-regime ruling — **requires the task-#7 interactive sit-down**;
+    held.
+  - **4F** CStr/strcpy family: local-buffer half (cvar `.string`, spawnVars,
+    userinfo, saga config — safe wrapper) executes now; entity-field half
+    (classname/model/bone-name reads) aliases the deref regime and lands
+    with 4D.
+  - Excluded as seam-by-design: qsort comparator `void*` interface (ported
+    qsort's generic contract; Rust sorts would change tie order), the
+    `g_active.rs` `gentity_t`→`bgEntity_t` base-pointer overlay (D12 layout
+    contract), `ghoul2` identity casts feeding G2API traps, botlib trap-arg
+    packing in `ai_main.rs`.
 - **Stage 3 — DONE**: zero `static mut` in mp_game; q_shared parse/format
   state in `BgState.qs` per the execution amendment, game-only scratch in
   `GameWorld.scratch`; ~224 call sites threaded across both tiers; botlib's

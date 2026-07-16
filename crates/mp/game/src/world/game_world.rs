@@ -77,9 +77,10 @@ pub struct GameWorld {
 
     /// `char gSharedBuffer[MAX_G_SHARED_BUFFER_SIZE]`, the module's
     /// engine-registered shared-memory region (`trap_SV_RegisterSharedMemory`).
-    /// Untyped raw bytes, same shape as `memoryPool` above.
+    /// The `SharedBuffer` newtype owns the bytes and exposes one typed overlay
+    /// accessor per `T_G_ICARUS_*` command (safe-state Stage 4, §F5).
     /// Source: `oracle/codemp/game/g_main.c:881`
-    pub gSharedBuffer: Box<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>,
+    pub gSharedBuffer: Box<crate::world::shared_buffer::SharedBuffer>,
 
     /// Game-tier function-local persistent/rotating scratch (safe-state Stage 3,
     /// §B3: the `g_*`/`w_*`/`NPC_*` function-local `static` return buffers).
@@ -139,7 +140,7 @@ impl GameWorld {
             [crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS],
         >();
         let gSharedBuffer =
-            native_platform::zeroed_box::<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>();
+            native_platform::zeroed_box::<crate::world::shared_buffer::SharedBuffer>();
         // Keep in sync with `zeroed_boxed()`: every field in this (compiler-
         // exhaustive) literal needs a matching `addr_of_mut!().write()` there,
         // or its `assume_init` is UB on the missed field.
