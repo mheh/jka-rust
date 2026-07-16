@@ -15,7 +15,16 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_shared::QSharedScratch;
+// S5-5: canonical parse family + string helpers now live in `mp_qshared`.
+use mp_qshared::shared::com_parse::{
+    COM_BeginParseSession, COM_ParseExt, QSharedScratch, SkipBracedSection, SkipRestOfLine,
+};
+use mp_qshared::shared::q_string::{COM_Compress, GetIDForString, Q_strcat, Q_stricmp, Q_stricmpn};
+// BLOCKED (S5-5 step-3 pre-check): `COM_ParseString`/`Int`/`Float` still route
+// their "unexpected EOF" diagnostic through `crate::g_main::Com_Printf` (and
+// `Int`/`Float` also call `cstr_util::atoi`/`bg_lib::atof`), none reachable from
+// `mp_qshared`; they stay game-tier pending an orchestrator ruling.
+use crate::q_shared::{COM_ParseFloat, COM_ParseInt, COM_ParseString};
 
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
@@ -337,9 +346,9 @@ use mp_qshared::shared::limits::MAX_CLIENTS_I32;
 
 // Local helper: mirrors `!Q_stricmp(name, lit)` (Q_stricmp returns 0 on
 // case-insensitive equality). `Q_stricmp` itself is an out-of-file callee
-// (q_shared.c:900, staged skeleton at `crate::q_shared::Q_stricmp`).
+// (q_shared.c:900, staged skeleton at `Q_stricmp`).
 unsafe fn qstricmp_eq(name: *const c_char, lit: &std::ffi::CStr) -> bool {
-    crate::q_shared::Q_stricmp(name, lit.as_ptr()) == 0
+    Q_stricmp(name, lit.as_ptr()) == 0
 }
 
 // Local helper: mirrors libc `strcpy` (copies through the terminating NUL,
@@ -414,14 +423,14 @@ pub fn BG_ParseLiteral(
     traps: &dyn BgTraps,
 ) -> qboolean {
     unsafe {
-        let token = crate::q_shared::COM_ParseExt(qs, data, qtrue);
+        let token = COM_ParseExt(qs, data, qtrue);
         if *token == 0 {
             let msg = std::ffi::CString::new("unexpected EOF\n").unwrap();
             traps.com_printf(msg.as_ptr());
             return qtrue;
         }
 
-        if crate::q_shared::Q_stricmp(token as *const c_char, string) != 0 {
+        if Q_stricmp(token as *const c_char, string) != 0 {
             let s = std::ffi::CStr::from_ptr(string).to_string_lossy();
             let msg = std::ffi::CString::new(format!("required string '{}' missing\n", s)).unwrap();
             traps.com_printf(msg.as_ptr());
@@ -951,19 +960,19 @@ pub fn WP_SaberParseParms(
 
         // try to parse it out
         let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
-        crate::q_shared::COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
+        COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
 
         // look for the right saber
         loop {
             if p.is_null() {
                 break;
             }
-            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
+            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 if triedDefault == qfalse {
                     // fall back to default and restart, should always be there
                     p = bg.SaberParms.as_ptr() as *const c_char;
-                    crate::q_shared::COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
+                    COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
                     c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
                     triedDefault = qtrue;
                 } else {
@@ -971,11 +980,11 @@ pub fn WP_SaberParseParms(
                 }
             }
 
-            if crate::q_shared::Q_stricmp(token as *const c_char, useSaber.as_ptr()) == 0 {
+            if Q_stricmp(token as *const c_char, useSaber.as_ptr()) == 0 {
                 break;
             }
 
-            crate::q_shared::SkipBracedSection(&mut bg.qs, &mut p);
+            SkipBracedSection(&mut bg.qs, &mut p);
         }
         if p.is_null() {
             // even the default saber isn't found?
@@ -991,7 +1000,7 @@ pub fn WP_SaberParseParms(
 
         // parse the saber info block
         loop {
-            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
+            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
@@ -1010,7 +1019,7 @@ pub fn WP_SaberParseParms(
             macro_rules! parse_string_field {
                 () => {{
                     let mut value: *const c_char = std::ptr::null();
-                    if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
                         continue;
                     }
                     value
@@ -1018,16 +1027,16 @@ pub fn WP_SaberParseParms(
             }
             macro_rules! parse_int_field {
                 ($n:expr) => {{
-                    if crate::q_shared::COM_ParseInt(&mut bg.qs, &mut p, &mut $n) != qfalse {
-                        crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                    if COM_ParseInt(&mut bg.qs, &mut p, &mut $n) != qfalse {
+                        SkipRestOfLine(&mut bg.qs, &mut p);
                         continue;
                     }
                 }};
             }
             macro_rules! parse_float_field {
                 ($f:expr) => {{
-                    if crate::q_shared::COM_ParseFloat(&mut bg.qs, &mut p, &mut $f) != qfalse {
-                        crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                    if COM_ParseFloat(&mut bg.qs, &mut p, &mut $f) != qfalse {
+                        SkipRestOfLine(&mut bg.qs, &mut p);
                         continue;
                     }
                 }};
@@ -1045,10 +1054,7 @@ pub fn WP_SaberParseParms(
             // saber type
             if qstricmp_eq(tok, c"saberType") {
                 let value = parse_string_field!();
-                let saberType = crate::q_shared::GetIDForString(
-                    SaberTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                let saberType = GetIDForString(SaberTable.as_ptr() as *mut stringID_table_t, value);
                 if saberType >= saberType_t::SABER_SINGLE as c_int
                     && saberType <= saberType_t::NUM_SABERS as c_int
                 {
@@ -1111,7 +1117,7 @@ pub fn WP_SaberParseParms(
             }
 
             // saberColor
-            if crate::q_shared::Q_stricmpn(tok, c"saberColor".as_ptr(), 10) == 0 {
+            if Q_stricmpn(tok, c"saberColor".as_ptr(), 10) == 0 {
                 let toklen = std::ffi::CStr::from_ptr(tok).to_bytes().len();
                 let mut n: c_int;
                 if toklen == 10 {
@@ -1152,7 +1158,7 @@ pub fn WP_SaberParseParms(
             }
 
             // saber length
-            if crate::q_shared::Q_stricmpn(tok, c"saberLength".as_ptr(), 11) == 0 {
+            if Q_stricmpn(tok, c"saberLength".as_ptr(), 11) == 0 {
                 let toklen = std::ffi::CStr::from_ptr(tok).to_bytes().len();
                 let n: c_int;
                 if toklen == 11 {
@@ -1196,7 +1202,7 @@ pub fn WP_SaberParseParms(
             }
 
             // blade radius
-            if crate::q_shared::Q_stricmpn(tok, c"saberRadius".as_ptr(), 11) == 0 {
+            if Q_stricmpn(tok, c"saberRadius".as_ptr(), 11) == 0 {
                 let toklen = std::ffi::CStr::from_ptr(tok).to_bytes().len();
                 let n: c_int;
                 if toklen == 11 {
@@ -1332,10 +1338,7 @@ pub fn WP_SaberParseParms(
             // force power restrictions
             if qstricmp_eq(tok, c"forceRestrict") {
                 let value = parse_string_field!();
-                let fp = crate::q_shared::GetIDForString(
-                    FPTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                let fp = GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, value);
                 if fp >= FP_FIRST && fp < NUM_FORCE_POWERS as c_int {
                     s.forceRestrictions |= 1 << fp;
                 }
@@ -1494,10 +1497,7 @@ pub fn WP_SaberParseParms(
             // kata move
             if qstricmp_eq(tok, c"kataMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.kataMove = saberMove;
                 }
@@ -1506,10 +1506,7 @@ pub fn WP_SaberParseParms(
             // lungeAtkMove move
             if qstricmp_eq(tok, c"lungeAtkMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.lungeAtkMove = saberMove;
                 }
@@ -1518,10 +1515,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkUpMove move
             if qstricmp_eq(tok, c"jumpAtkUpMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkUpMove = saberMove;
                 }
@@ -1530,10 +1524,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkFwdMove move
             if qstricmp_eq(tok, c"jumpAtkFwdMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkFwdMove = saberMove;
                 }
@@ -1542,10 +1533,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkBackMove move
             if qstricmp_eq(tok, c"jumpAtkBackMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkBackMove = saberMove;
                 }
@@ -1554,10 +1542,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkRightMove move
             if qstricmp_eq(tok, c"jumpAtkRightMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkRightMove = saberMove;
                 }
@@ -1566,10 +1551,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkLeftMove move
             if qstricmp_eq(tok, c"jumpAtkLeftMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(
-                    SaberMoveTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkLeftMove = saberMove;
                 }
@@ -1578,10 +1560,7 @@ pub fn WP_SaberParseParms(
             // readyAnim
             if qstricmp_eq(tok, c"readyAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.readyAnim = anim;
                 }
@@ -1590,10 +1569,7 @@ pub fn WP_SaberParseParms(
             // drawAnim
             if qstricmp_eq(tok, c"drawAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.drawAnim = anim;
                 }
@@ -1602,10 +1578,7 @@ pub fn WP_SaberParseParms(
             // putawayAnim
             if qstricmp_eq(tok, c"putawayAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.putawayAnim = anim;
                 }
@@ -1614,10 +1587,7 @@ pub fn WP_SaberParseParms(
             // tauntAnim
             if qstricmp_eq(tok, c"tauntAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.tauntAnim = anim;
                 }
@@ -1626,10 +1596,7 @@ pub fn WP_SaberParseParms(
             // bowAnim
             if qstricmp_eq(tok, c"bowAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.bowAnim = anim;
                 }
@@ -1638,10 +1605,7 @@ pub fn WP_SaberParseParms(
             // meditateAnim
             if qstricmp_eq(tok, c"meditateAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.meditateAnim = anim;
                 }
@@ -1650,10 +1614,7 @@ pub fn WP_SaberParseParms(
             // flourishAnim
             if qstricmp_eq(tok, c"flourishAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.flourishAnim = anim;
                 }
@@ -1662,10 +1623,7 @@ pub fn WP_SaberParseParms(
             // gloatAnim
             if qstricmp_eq(tok, c"gloatAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(
-                    animTable.as_ptr() as *mut stringID_table_t,
-                    value,
-                );
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.gloatAnim = anim;
                 }
@@ -1784,13 +1742,13 @@ pub fn WP_SaberParseParms(
             // stays on in water
             if qstricmp_eq(tok, c"onInWater") {
                 // ignore in MP
-                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
 
             if qstricmp_eq(tok, c"notInMP") {
                 // ignore this
-                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
 
@@ -1840,20 +1798,20 @@ pub fn WP_SaberParseParms(
             // `trap_R_RegisterShader` call is CGAME-only dead code here (§20).
             if qstricmp_eq(tok, c"g2MarksShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"knockbackScale") {
@@ -2031,20 +1989,20 @@ pub fn WP_SaberParseParms(
             }
             if qstricmp_eq(tok, c"g2MarksShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"g2WeaponMarkShader2") {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
-                    crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                    SkipRestOfLine(&mut bg.qs, &mut p);
                     continue;
                 }
-                crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+                SkipRestOfLine(&mut bg.qs, &mut p);
                 continue;
             }
             if qstricmp_eq(tok, c"knockbackScale2") {
@@ -2199,7 +2157,7 @@ pub fn WP_SaberParseParms(
                 );
                 traps.com_printf(cstr(&msg).as_ptr());
             }
-            crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+            SkipRestOfLine(&mut bg.qs, &mut p);
         }
 
         // FIXME: precache the saberModel(s)?
@@ -2233,23 +2191,23 @@ pub fn WP_SaberParseParm(
 
         // try to parse it out
         let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
-        crate::q_shared::COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
+        COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
 
         // look for the right saber
         loop {
             if p.is_null() {
                 return qfalse;
             }
-            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
+            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 return qfalse;
             }
 
-            if crate::q_shared::Q_stricmp(token as *const c_char, saberName) == 0 {
+            if Q_stricmp(token as *const c_char, saberName) == 0 {
                 break;
             }
 
-            crate::q_shared::SkipBracedSection(&mut bg.qs, &mut p);
+            SkipBracedSection(&mut bg.qs, &mut p);
         }
         if p.is_null() {
             return qfalse;
@@ -2261,7 +2219,7 @@ pub fn WP_SaberParseParm(
 
         // parse the saber info block
         loop {
-            let token = crate::q_shared::COM_ParseExt(&mut bg.qs, &mut p, qtrue);
+            let token = COM_ParseExt(&mut bg.qs, &mut p, qtrue);
             if *token == 0 {
                 let s = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
@@ -2275,16 +2233,16 @@ pub fn WP_SaberParseParm(
                 break;
             }
 
-            if crate::q_shared::Q_stricmp(token as *const c_char, parmname) == 0 {
+            if Q_stricmp(token as *const c_char, parmname) == 0 {
                 let mut value: *const c_char = std::ptr::null();
-                if crate::q_shared::COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
+                if COM_ParseString(&mut bg.qs, &mut p, &mut value) != qfalse {
                     continue;
                 }
                 c_strcpy(saberData, value);
                 return qtrue;
             }
 
-            crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
+            SkipRestOfLine(&mut bg.qs, &mut p);
         }
 
         qfalse
@@ -2490,12 +2448,10 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 traps.fs_read(bg.bgSaberParseTBuffer.as_mut_ptr() as *mut c_void, len, f);
                 bg.bgSaberParseTBuffer[len as usize] = 0;
 
-                len = crate::q_shared::COM_Compress(
-                    bg.bgSaberParseTBuffer.as_mut_ptr() as *mut c_char
-                );
+                len = COM_Compress(bg.bgSaberParseTBuffer.as_mut_ptr() as *mut c_char);
 
                 marker = bg.SaberParms.as_mut_ptr().offset(totallen as isize) as *mut c_char;
-                crate::q_shared::Q_strcat(
+                Q_strcat(
                     marker,
                     MAX_SABER_DATA_SIZE as c_int - totallen,
                     bg.bgSaberParseTBuffer.as_ptr() as *const c_char,
@@ -2504,7 +2460,7 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
                 // get around the stupid problem of not having an endline at the bottom
                 // of a sab file -rww
-                crate::q_shared::Q_strcat(
+                Q_strcat(
                     marker,
                     MAX_SABER_DATA_SIZE as c_int - totallen,
                     c"\n".as_ptr(),

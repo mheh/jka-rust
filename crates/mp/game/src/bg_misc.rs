@@ -25,8 +25,8 @@
 use crate::prelude::*;
 
 use crate::bg_lib::atof;
-use crate::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
-use crate::q_shared::Q_stricmp;
+use mp_qshared::shared::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
+use mp_qshared::shared::q_string::{Q_stricmp, Q_strlen};
 
 /// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
 /// Source: `oracle/codemp/game/bg_public.h:25`
@@ -1920,7 +1920,7 @@ pub fn BG_StringAlloc(source: *const c_char, bg: &mut BgState) -> *mut c_char {
         // Raven `strlen(source)+1` / `strcpy(dest, source)`. `dest` is sized
         // exactly `len`, so `Q_strncpyz(dest, source, len)` copies the same
         // bytes (strlen chars + NUL) as the unbounded `strcpy`.
-        let len = crate::q_shared::Q_strlen(source) + 1;
+        let len = Q_strlen(source) + 1;
         let dest = BG_Alloc(len as c_int, bg);
         Q_strncpyz(dest as *mut c_char, source, len as c_int);
         dest as *mut c_char

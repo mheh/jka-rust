@@ -34,10 +34,6 @@ use crate::bg_pmove::{
     BG_InKnockDown, BG_InSlopeAnim, BG_KnockDownable, BG_SabersOff, PM_RunningAnim,
     PM_SwimmingAnim, PM_WalkingAnim,
 };
-use crate::q_math::{
-    _VectorMA, _VectorScale, _VectorSubtract, AngleVectors, DistanceSquared, Q_random, VectorSet,
-    PITCH, ROLL, YAW,
-};
 use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::anim_number::animNumber_t as A;
@@ -57,6 +53,10 @@ use mp_bg::public::saberlock::SABERLOCK_WIN;
 use mp_bg::public::transition_move_table::transitionMove;
 use mp_qshared::shared::force_powers::{
     FP_GRIP, FP_LEVITATION, FP_SABERTHROW, FP_SABER_DEFENSE, FP_SABER_OFFENSE,
+};
+use mp_qshared::shared::q_math::{
+    _VectorMA, _VectorScale, _VectorSubtract, AngleVectors, DistanceSquared, Q_random,
+    VectorNormalize, VectorSet, PITCH, ROLL, YAW,
 };
 // Raven `saber_styles_t` variants (`SS_*`) spelled bare in the ported bodies.
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::*;
@@ -129,10 +129,10 @@ pub const SFL2_NO_IDLE_EFFECT2: c_int = 1 << 14;
 /// `SFL2_ALWAYS_BLOCK2`. Secondary blade: always blocking.
 pub const SFL2_ALWAYS_BLOCK2: c_int = 1 << 15;
 
-// Vector helpers are the canonical `crate::q_math` forms reached via the
-// prelude glob: `VectorSet`/`_VectorMA`/`_VectorScale`/`_VectorSubtract`
-// (out-param) and `DistanceSquared`. Return-value call sites below are rewritten
-// to the out-param shape.
+// Vector helpers are the canonical `mp_qshared::shared::q_math` forms:
+// `VectorSet`/`_VectorMA`/`_VectorScale`/`_VectorSubtract` (out-param) and
+// `DistanceSquared`. Return-value call sites below are rewritten to the
+// out-param shape.
 
 // Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
 // `qtrue`/`qfalse` spellings are not exported here (see `w_saber.rs`), so the
@@ -902,7 +902,7 @@ impl PmoveContext<'_> {
                     let strength = 8;
                     let mut oppDir: vec3_t = [0.0; 3];
                     _VectorSubtract((*genemy).origin, (*ps).origin, &mut oppDir);
-                    let _ = crate::q_math::VectorNormalize(&mut oppDir);
+                    let _ = VectorNormalize(&mut oppDir);
 
                     if noKnockdown != 0 {
                         // (dead per the oracle's own `noKnockdown` never set nonzero;
@@ -927,14 +927,14 @@ impl PmoveContext<'_> {
                 let strength = 4;
                 let mut oppDir: vec3_t = [0.0; 3];
                 _VectorSubtract((*genemy).origin, (*ps).origin, &mut oppDir);
-                let _ = crate::q_math::VectorNormalize(&mut oppDir);
+                let _ = VectorNormalize(&mut oppDir);
                 (*genemy).velocity[0] = oppDir[0] * (strength * 40) as f32;
                 (*genemy).velocity[1] = oppDir[1] * (strength * 40) as f32;
                 (*genemy).velocity[2] = 150.0;
 
                 let mut oppDir2: vec3_t = [0.0; 3];
                 _VectorSubtract((*ps).origin, (*genemy).origin, &mut oppDir2);
-                let _ = crate::q_math::VectorNormalize(&mut oppDir2);
+                let _ = VectorNormalize(&mut oppDir2);
                 (*ps).velocity[0] = oppDir2[0] * (strength * 40) as f32;
                 (*ps).velocity[1] = oppDir2[1] * (strength * 40) as f32;
                 (*ps).velocity[2] = 150.0;

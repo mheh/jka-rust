@@ -17,8 +17,10 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorLength, VectorNormalize2};
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
+use mp_qshared::shared::q_math::{
+    AngleNormalize180, AnglesSubtract, VectorLength, VectorNormalize2,
+};
 use mp_qshared::shared::trajectory::trType_t;
 
 // --- file-local `#defines` from `bg_slidemove.c` (porting-rules per-file

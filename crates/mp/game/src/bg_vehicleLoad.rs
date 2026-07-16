@@ -14,8 +14,10 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_shared::{COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine};
 use mp_bg::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
+use mp_qshared::shared::com_parse::{
+    COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine,
+};
 
 /// Raven `BG_ClearVehicleParseParms`.
 ///

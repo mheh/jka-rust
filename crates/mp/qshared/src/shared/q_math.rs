@@ -460,3 +460,140 @@ pub fn Sys_SnapVector(v: *mut f32) {
         *v.add(2) = (*v.add(2) as f64).round_ties_even() as f32;
     }
 }
+
+// S5-5: the following vec3/angle helpers moved down from `mp_game`
+// (`crates/mp/game/src/q_math.rs`, byte-identical bodies — the canonical
+// 2026-07 float-audit forms) so the 11 bg files can retarget off
+// `crate::q_math`; imports/paths adjusted for this tier.
+
+// Local transcription of `q_shared.h`'s `VectorSubtract` macro, mirroring the
+// `mp_game` copy's private `vec_sub` helper (used by `Distance`/
+// `DistanceSquared`/`AnglesToAxis` below).
+// Source: `oracle/codemp/game/q_shared.h` (`VectorSubtract` macro).
+#[inline]
+fn vec_sub(a: vec3_t, b: vec3_t) -> vec3_t {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+/// Raven `Distance` (header-inline helper).
+/// Source: `oracle/codemp/game/q_shared.h:1520-1525`
+pub fn Distance(p1: vec3_t, p2: vec3_t) -> vec_t {
+    VectorLength(vec_sub(p2, p1))
+}
+
+/// Raven `DistanceSquared` (header-inline helper).
+/// Source: `oracle/codemp/game/q_shared.h:1527-1532`
+#[inline]
+pub fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
+    let v = vec_sub(p2, p1);
+    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
+}
+
+/// Raven `Q_rand`.
+///
+/// Source: `oracle/codemp/game/q_math.c:126-129`
+pub fn Q_rand(seed: *mut c_int) -> c_int {
+    unsafe {
+        *seed = (69069i32).wrapping_mul(*seed).wrapping_add(1);
+        *seed
+    }
+}
+
+/// Raven `Q_random`.
+///
+/// Source: `oracle/codemp/game/q_math.c:131-133`
+pub fn Q_random(seed: *mut c_int) -> f32 {
+    (Q_rand(seed) & 0xffff) as f32 / 0x10000 as f32
+}
+
+/// Raven `AnglesToAxis`.
+///
+/// Source: `oracle/codemp/game/q_math.c:530-536`
+pub fn AnglesToAxis(angles: vec3_t, axis: *mut vec3_t) {
+    let axis: &mut [vec3_t; 3] = unsafe { &mut *(axis as *mut [vec3_t; 3]) };
+    let mut right: vec3_t = [0.0; 3];
+    {
+        // angle vectors returns "right" instead of "y axis"
+        let (first, rest) = axis.split_at_mut(1);
+        let (_, third) = rest.split_at_mut(1);
+        AngleVectors(
+            angles,
+            Some(&mut first[0]),
+            Some(&mut right),
+            Some(&mut third[0]),
+        );
+    }
+    axis[1] = vec_sub(vec3_origin, right);
+}
+
+/// Raven `Q_fabs`.
+///
+/// Source: `oracle/codemp/game/q_math.c:638-642`
+pub fn Q_fabs(f: f32) -> f32 {
+    let tmp = (f.to_bits() as i32) & 0x7FFFFFFF;
+    f32::from_bits(tmp as u32)
+}
+
+/// Raven `AngleSubtract`.
+///
+/// Always returns a value from -180 to 180.
+/// Source: `oracle/codemp/game/q_math.c:675-687`
+pub fn AngleSubtract(a1: f32, a2: f32) -> f32 {
+    let mut a = a1 - a2;
+    a %= 360.0; // chop it down quickly, then level it out (Rust `%` matches C `fmod`)
+    while a > 180.0 {
+        a -= 360.0;
+    }
+    while a < -180.0 {
+        a += 360.0;
+    }
+    a
+}
+
+/// Raven `AnglesSubtract`.
+///
+/// Source: `oracle/codemp/game/q_math.c:690-694`
+pub fn AnglesSubtract(v1: vec3_t, v2: vec3_t, v3: &mut vec3_t) {
+    v3[0] = AngleSubtract(v1[0], v2[0]);
+    v3[1] = AngleSubtract(v1[1], v2[1]);
+    v3[2] = AngleSubtract(v1[2], v2[2]);
+}
+
+/// Raven `AngleMod`.
+///
+/// Source: `oracle/codemp/game/q_math.c:697-700`
+pub fn AngleMod(a: f32) -> f32 {
+    // Raven's `65536/360.0` and `360.0/65536` are double literals, so the
+    // scale and product evaluate in f64 (rounded to the float result); an
+    // all-f32 form diverges from the oracle at the int-truncation boundary.
+    ((360.0f64 / 65536.0) * (((a as f64 * (65536.0 / 360.0)) as i32) & 65535) as f64) as f32
+}
+
+/// Raven `AngleNormalize360`.
+///
+/// Returns angle normalized to the range [0 <= angle < 360].
+/// Source: `oracle/codemp/game/q_math.c:710-712`
+pub fn AngleNormalize360(angle: f32) -> f32 {
+    // f64 constant math, matching Raven's double literals (see `AngleMod`).
+    ((360.0f64 / 65536.0) * (((angle as f64 * (65536.0 / 360.0)) as i32) & 65535) as f64) as f32
+}
+
+/// Raven `AngleNormalize180`.
+///
+/// Returns angle normalized to the range [-180 < angle <= 180].
+/// Source: `oracle/codemp/game/q_math.c:722-728`
+pub fn AngleNormalize180(angle: f32) -> f32 {
+    let mut angle = AngleNormalize360(angle);
+    if angle > 180.0 {
+        angle -= 360.0;
+    }
+    angle
+}
+
+/// Raven `AngleDelta`.
+///
+/// Returns the normalized delta from angle1 to angle2.
+/// Source: `oracle/codemp/game/q_math.c:738-740`
+pub fn AngleDelta(angle1: f32, angle2: f32) -> f32 {
+    AngleNormalize180(angle1 - angle2)
+}

@@ -21,13 +21,13 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_shared::Q_strcmp;
-use crate::q_shared::Q_stricmp;
-// `strlen` resolves to the crate's `Q_strlen` (the `g_spawn.rs` precedent for
-// aliasing the libc name); `strcpy`/`strcat` are the file-local unchecked
-// helpers below, matching the `c_strcpy` house pattern in `q_shared.rs` /
-// `bg_saberLoad.rs` (Raven uses raw libc on fixed buffers here).
-use crate::q_shared::Q_strlen as strlen;
+use mp_qshared::shared::q_string::Q_strcmp;
+use mp_qshared::shared::q_string::Q_stricmp;
+// `strlen` resolves to `Q_strlen` (the `g_spawn.rs` precedent for aliasing the
+// libc name); `strcpy`/`strcat` are the file-local unchecked helpers below,
+// matching the `c_strcpy` house pattern in `q_shared.rs` / `bg_saberLoad.rs`
+// (Raven uses raw libc on fixed buffers here).
+use mp_qshared::shared::q_string::Q_strlen as strlen;
 // Raven `saber_styles_t` variants (`SS_*`) spelled bare in the saber-style table.
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::*;
 

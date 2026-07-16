@@ -26,14 +26,15 @@ use crate::bg_panimate::{
     BG_InRoll, BG_SaberInAttack, BG_SaberInSpecial, BG_SaberLockBreakAnim, BG_SpinningSaberAnim,
     PM_CanRollFromSoulCal, PM_SaberInTransition,
 };
-use crate::q_math::{
+use mp_qshared::shared::q_math::{
     _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleNormalize180,
     AngleNormalize360, AnglesSubtract, AnglesToAxis, VectorClear, VectorCompare, VectorNormalize,
     VectorSet,
 };
-use crate::q_math::{vectoangles, AngleVectors, Q_fabs};
-use crate::q_math::{AngleMod, AngleSubtract};
-use crate::q_math::{PITCH, ROLL, YAW};
+use mp_qshared::shared::q_math::{vec3_origin, AngleDelta, Distance, VectorLengthSquared};
+use mp_qshared::shared::q_math::{vectoangles, AngleVectors, Q_fabs};
+use mp_qshared::shared::q_math::{AngleMod, AngleSubtract};
+use mp_qshared::shared::q_math::{PITCH, ROLL, YAW};
 // Additional bg helpers reached by the pmove pipeline (pass-3 call surface).
 use crate::bg_misc::{
     vectoyaw, BG_AddPredictableEventToPlayerstate, BG_CanUseFPNow, BG_CycleInven, BG_HasYsalamiri,
@@ -46,11 +47,11 @@ use crate::bg_panimate::{
     PM_InRollComplete, PM_InSaberAnim, PM_LandingAnim, PM_PainAnim, PM_SaberInStart,
 };
 use crate::bg_saber::BG_ForcePowerDrain;
-use crate::q_math::{CrossProduct, VectorLength};
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
 use mp_qshared::probe;
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
+use mp_qshared::shared::q_math::{CrossProduct, VectorLength};
 use mp_qshared::shared::shared_eik_move_state::sharedEIKMoveState::{IKS_DYNAMIC, IKS_NONE};
 
 // Pass-3 bg state channel: the per-call working set + the
@@ -239,14 +240,14 @@ impl PmoveContext<'_> {
             let mut new_angles: vec3_t = [0.0, 0.0, 0.0];
 
             //if we don't have a slope, get one
-            if VectorCompare(crate::q_math::vec3_origin, pass_slope) != qfalse {
+            if VectorCompare(vec3_origin, pass_slope) != qfalse {
                 let mut trace: trace_t = core::mem::zeroed();
 
                 _VectorCopy((*(*self.pm).ps).origin, &mut startspot);
                 startspot[2] += (*self.pm).mins[2] + 4.0;
                 _VectorCopy(startspot, &mut endspot);
                 endspot[2] -= 300.0;
-                let vec3_origin_local = crate::q_math::vec3_origin;
+                let vec3_origin_local = vec3_origin;
                 self.traps.trace(
                     &mut trace,
                     core::ptr::addr_of!((*(*self.pm).ps).origin) as *const vec3_t,
@@ -261,7 +262,7 @@ impl PmoveContext<'_> {
                     return;
                 }
 
-                if VectorCompare(crate::q_math::vec3_origin, trace.plane.normal) != qfalse {
+                if VectorCompare(vec3_origin, trace.plane.normal) != qfalse {
                     return;
                 }
 
@@ -3638,7 +3639,7 @@ impl PmoveContext<'_> {
             if (*ps).clientNum >= MAX_CLIENTS as c_int {
                 //NPC
                 if (fmove != 0.0 || smove != 0.0)
-                    && VectorCompare((*ps).moveDir, crate::q_math::vec3_origin) != qfalse
+                    && VectorCompare((*ps).moveDir, vec3_origin) != qfalse
                 {
                     for i in 0..3 {
                         wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
@@ -3898,14 +3899,14 @@ impl PmoveContext<'_> {
 
             // Get The WishVel And WishSpeed
             if (*ps).clientNum >= MAX_CLIENTS as c_int
-                && VectorCompare((*ps).moveDir, crate::q_math::vec3_origin) == qfalse
+                && VectorCompare((*ps).moveDir, vec3_origin) == qfalse
             {
                 //NPC
                 let pEnt = self.pm_entSelf;
 
                 if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
                     if (fmove != 0.0 || smove != 0.0)
-                        && VectorCompare((*ps).moveDir, crate::q_math::vec3_origin) != qfalse
+                        && VectorCompare((*ps).moveDir, vec3_origin) != qfalse
                     {
                         for i in 0..3 {
                             wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
@@ -4035,7 +4036,7 @@ impl PmoveContext<'_> {
             // friction
             let speed = VectorLength((*ps).velocity);
             if speed < 1.0 {
-                _VectorCopy(crate::q_math::vec3_origin, &mut (*ps).velocity);
+                _VectorCopy(vec3_origin, &mut (*ps).velocity);
             } else {
                 let mut drop = 0.0f32;
 
@@ -5803,7 +5804,7 @@ impl PmoveContext<'_> {
                 bobmove = 0.5; // ducked characters bob much faster
 
                 if ((PM_RunningAnim((*ps).legsAnim) != qfalse
-                    && crate::q_math::VectorLengthSquared((*ps).velocity) >= 40000.0)
+                    && VectorLengthSquared((*ps).velocity) >= 40000.0)
                     || PM_CanRollFromSoulCal(ps) != qfalse)
                     && BG_InRoll(ps, (*ps).legsAnim) == qfalse
                 {
@@ -6062,7 +6063,7 @@ impl PmoveContext<'_> {
 
             // if just entered a water volume, play a sound
             if self.pml.previous_waterlevel == 0 && (*pm).waterlevel != 0 {
-                if crate::q_math::VectorLengthSquared((*ps).velocity) > 40000.0 {
+                if VectorLengthSquared((*ps).velocity) > 40000.0 {
                     impact_splash = qtrue;
                 }
                 self.PM_AddEvent(EV_WATER_TOUCH as c_int);
@@ -6070,7 +6071,7 @@ impl PmoveContext<'_> {
 
             // if just completely exited a water volume, play a sound
             if self.pml.previous_waterlevel != 0 && (*pm).waterlevel == 0 {
-                if crate::q_math::VectorLengthSquared((*ps).velocity) > 40000.0 {
+                if VectorLengthSquared((*ps).velocity) > 40000.0 {
                     impact_splash = qtrue;
                 }
                 self.PM_AddEvent(EV_WATER_LEAVE as c_int);
@@ -6088,7 +6089,7 @@ impl PmoveContext<'_> {
                 start[2] += 10.0;
                 end[2] -= 40.0;
 
-                let vec3_origin_local = crate::q_math::vec3_origin;
+                let vec3_origin_local = vec3_origin;
                 self.traps.trace(
                     &mut tr,
                     core::ptr::addr_of!(start) as *const vec3_t,
@@ -6252,9 +6253,8 @@ pub fn BG_VehTraceFromCamPos(
             &mut camPos as *mut vec3_t,
         );
 
-        let minAutoAimDist = crate::q_math::Distance(entOrg, camPos)
-            + ((*(*veh).m_pVehicleInfo).length / 2.0)
-            + 200.0;
+        let minAutoAimDist =
+            Distance(entOrg, camPos) + ((*(*veh).m_pVehicleInfo).length / 2.0) + 200.0;
 
         _VectorCopy(end, newEnd);
         _VectorSubtract(end, camPos, &mut viewDir2End);
@@ -6262,7 +6262,7 @@ pub fn BG_VehTraceFromCamPos(
         _VectorMA(camPos, MAX_XHAIR_DIST_ACCURACY, viewDir2End, &mut extraEnd);
 
         // QAGAME
-        let vec3_origin_local = crate::q_math::vec3_origin;
+        let vec3_origin_local = vec3_origin;
         traps.trace(
             camTrace,
             core::ptr::addr_of!(camPos) as *const vec3_t,
@@ -6277,8 +6277,7 @@ pub fn BG_VehTraceFromCamPos(
             && (*camTrace).startsolid == 0
             && (*camTrace).fraction < 1.0
             && ((*camTrace).fraction * MAX_XHAIR_DIST_ACCURACY) > minAutoAimDist
-            && (((*camTrace).fraction * MAX_XHAIR_DIST_ACCURACY)
-                - crate::q_math::Distance(entOrg, camPos))
+            && (((*camTrace).fraction * MAX_XHAIR_DIST_ACCURACY) - Distance(entOrg, camPos))
                 < bestDist
         {
             //this trace hit something closer than the main trace hit, so use this result instead
@@ -7182,7 +7181,7 @@ impl PmoveContext<'_> {
                 } else if fhe == HANDEXTEND_TAUNT as c_int {
                     desiredAnim = (*ps).forceDodgeAnim as c_int;
                     if desiredAnim != BOTH_ENGAGETAUNT as c_int
-                        && VectorCompare((*ps).velocity, crate::q_math::vec3_origin) != qfalse
+                        && VectorCompare((*ps).velocity, vec3_origin) != qfalse
                         && (*ps).groundEntityNum != ENTITYNUM_NONE
                     {
                         playFullBody = qtrue;
@@ -8627,7 +8626,7 @@ pub fn BG_IK_MoveArm(
                 ghoul2,
                 0,
                 b"lhumerus\0".as_ptr() as *const c_char,
-                &crate::q_math::vec3_origin,
+                &vec3_origin,
                 BONE_ANGLES_POSTMULT,
                 POSITIVE_X as c_int,
                 NEGATIVE_Y as c_int,
@@ -8640,7 +8639,7 @@ pub fn BG_IK_MoveArm(
                 ghoul2,
                 0,
                 b"lradius\0".as_ptr() as *const c_char,
-                &crate::q_math::vec3_origin,
+                &vec3_origin,
                 BONE_ANGLES_POSTMULT,
                 POSITIVE_X as c_int,
                 NEGATIVE_Y as c_int,
@@ -8751,17 +8750,17 @@ pub fn BG_UpdateLookAngles(
         }
 
         for ang in 0..3 {
-            lookAnglesDiff[ang] = crate::q_math::AngleNormalize180(lookAnglesDiff[ang]);
+            lookAnglesDiff[ang] = AngleNormalize180(lookAnglesDiff[ang]);
         }
 
-        if crate::q_math::VectorLengthSquared(lookAnglesDiff) != 0.0 {
-            lookAngles[PITCH] = crate::q_math::AngleNormalize180(
+        if VectorLengthSquared(lookAnglesDiff) != 0.0 {
+            lookAngles[PITCH] = AngleNormalize180(
                 oldLookAngles[PITCH] + (lookAnglesDiff[PITCH] * fFrameInter * lookSpeed),
             );
-            lookAngles[YAW] = crate::q_math::AngleNormalize180(
+            lookAngles[YAW] = AngleNormalize180(
                 oldLookAngles[YAW] + (lookAnglesDiff[YAW] * fFrameInter * lookSpeed),
             );
-            lookAngles[ROLL] = crate::q_math::AngleNormalize180(
+            lookAngles[ROLL] = AngleNormalize180(
                 oldLookAngles[ROLL] + (lookAnglesDiff[ROLL] * fFrameInter * lookSpeed),
             );
         }
@@ -8914,7 +8913,7 @@ pub fn BG_G2ClientSpineAngles(
         let mut doCorr = qfalse;
 
         //*tPitchAngle = viewAngles[PITCH];
-        viewAngles[YAW] = crate::q_math::AngleDelta(cent_lerpAngles[YAW], angles[YAW]);
+        viewAngles[YAW] = AngleDelta(cent_lerpAngles[YAW], angles[YAW]);
         //*tYawAngle = viewAngles[YAW];
 
         if BG_FlippingAnim((*cent).legsAnim) == qfalse
@@ -8966,7 +8965,7 @@ pub fn BG_G2ClientSpineAngles(
                 0,
                 motionBolt,
                 &mut boltMatrix,
-                &crate::q_math::vec3_origin,
+                &vec3_origin,
                 &cent_lerpOrigin,
                 time,
                 core::ptr::null_mut(),
@@ -8988,9 +8987,8 @@ pub fn BG_G2ClientSpineAngles(
             motionAngles[ROLL] = -tempAng[PITCH];
 
             for ang in 0..3 {
-                viewAngles[ang] = crate::q_math::AngleNormalize180(
-                    viewAngles[ang] - crate::q_math::AngleNormalize180(motionAngles[ang]),
-                );
+                viewAngles[ang] =
+                    AngleNormalize180(viewAngles[ang] - AngleNormalize180(motionAngles[ang]));
             }
         }
 
@@ -9200,7 +9198,7 @@ pub fn BG_G2PlayerAngles(
                         ghoul2,
                         0,
                         bone,
-                        &crate::q_math::vec3_origin,
+                        &vec3_origin,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9317,7 +9315,7 @@ pub fn BG_G2PlayerAngles(
 
         _VectorSubtract(cent_lerpOrigin, velPos, &mut velAng);
 
-        if VectorCompare(velAng, crate::q_math::vec3_origin) == qfalse {
+        if VectorCompare(velAng, vec3_origin) == qfalse {
             vectoangles(velAng, &mut velAng);
 
             if velAng[YAW] <= legsAngles[YAW] {
@@ -9481,7 +9479,7 @@ pub fn BG_G2PlayerAngles(
                         ghoul2,
                         0,
                         b"cranium\0".as_ptr() as *const c_char,
-                        &crate::q_math::vec3_origin,
+                        &vec3_origin,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9502,7 +9500,7 @@ pub fn BG_G2PlayerAngles(
                         ghoul2,
                         0,
                         b"cranium\0".as_ptr() as *const c_char,
-                        &crate::q_math::vec3_origin,
+                        &vec3_origin,
                         BONE_ANGLES_POSTMULT,
                         POSITIVE_X as c_int,
                         NEGATIVE_Y as c_int,
@@ -9518,7 +9516,7 @@ pub fn BG_G2PlayerAngles(
                     ghoul2,
                     0,
                     b"lower_lumbar\0".as_ptr() as *const c_char,
-                    &crate::q_math::vec3_origin,
+                    &vec3_origin,
                     BONE_ANGLES_POSTMULT,
                     POSITIVE_X as c_int,
                     NEGATIVE_Y as c_int,

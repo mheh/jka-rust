@@ -5,6 +5,7 @@ use core::ffi::{c_char, c_int};
 
 use crate::shared::limits::{BIG_INFO_STRING, MAX_INFO_STRING, MAX_TOKEN_CHARS};
 use crate::shared::q_format::{c_vsprintf, FmtArg};
+use crate::shared::string_id_table::stringID_table_t;
 use crate::shared::{qboolean, qfalse, qtrue, MAX_QPATH};
 
 // Parse-session state (mirrors Raven's file-static globals in q_shared.c);
@@ -913,5 +914,78 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
         }
         *d = 0;
         string
+    }
+}
+
+// S5-5: the following pure string helpers moved down from `mp_game`
+// (`crates/mp/game/src/q_shared.rs`, byte-identical bodies) so the 11 bg files
+// can retarget off `crate::q_shared`; imports/paths adjusted for this tier.
+
+/// Raven `GetIDForString`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:13-27`
+pub fn GetIDForString(table: *mut stringID_table_t, string: *const c_char) -> c_int {
+    unsafe {
+        let mut index: isize = 0;
+        loop {
+            let entry = *table.offset(index);
+            if entry.name.is_null() || *entry.name == 0 {
+                break;
+            }
+            if Q_stricmp(entry.name as *const c_char, string) == 0 {
+                return entry.id;
+            }
+            index += 1;
+        }
+        -1
+    }
+}
+
+/// C standard-library `strcmp` (case-sensitive), as called bare (not via a
+/// `Q_*` wrapper) at various `q_shared.c` sites. Housed alongside the other
+/// `q_shared.c` string helpers per the file's existing string-fn family.
+///
+/// Source: `oracle/codemp/game/q_shared.c` (bare `strcmp` call sites).
+pub fn Q_strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
+    unsafe {
+        let mut p1 = s1;
+        let mut p2 = s2;
+        loop {
+            let c1 = *p1 as c_int;
+            let c2 = *p2 as c_int;
+            p1 = p1.offset(1);
+            p2 = p2.offset(1);
+
+            if c1 != c2 {
+                return if c1 < c2 { -1 } else { 1 };
+            }
+            if c1 == 0 {
+                return 0;
+            }
+        }
+    }
+}
+
+/// C standard-library `strlen`, as called bare (not a Raven `Q_*` wrapper) at
+/// the `NPC_VehiclePrecache` GLA-name/animation.cfg path-splice site. Housed
+/// alongside the other `q_shared.c` string helpers per the file's existing
+/// string-fn family.
+///
+/// Source: `oracle/codemp/game/NPC_spawn.c` (`NPC_VehiclePrecache`,
+/// literal `strlen("/animation.cfg")` call).
+pub fn Q_strlen(string: *const c_char) -> usize {
+    unsafe { std::ffi::CStr::from_ptr(string).to_bytes().len() }
+}
+
+/// Raven `Q_strcat`.
+///
+/// Source: `oracle/codemp/game/q_shared.c:929-937`
+pub fn Q_strcat(dest: *mut c_char, size: c_int, src: *const c_char) {
+    unsafe {
+        let l1 = c_strlen(dest) as c_int;
+        if l1 >= size {
+            panic!("Q_strcat: already overflowed"); // Com_Error(ERR_FATAL, ...) -> panic (frozen Group A).
+        }
+        Q_strncpyz(dest.offset(l1 as isize), src, size - l1);
     }
 }

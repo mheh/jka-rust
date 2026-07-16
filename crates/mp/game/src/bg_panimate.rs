@@ -35,7 +35,7 @@
 use crate::bg_channel::GameCallbacks;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::prelude::*;
-use crate::q_shared::COM_Parse;
+use mp_qshared::shared::com_parse::COM_Parse;
 
 // Raven `#define MAX_ANIM_FILES 64`.
 // Source: `oracle/codemp/game/bg_public.h:255`
