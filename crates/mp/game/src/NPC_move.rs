@@ -13,60 +13,62 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_panimate::PM_InKnockDown;
-use crate::g_nav::{NAV_AvoidCollision, NAV_MoveToGoal};
+use crate::g_nav::{NAV_AvoidCollision, NAV_CheckAhead, NAV_MoveToGoal};
 use crate::g_navnew::{NAVNEW_AvoidCollision, NAVNEW_MoveToGoal};
 use crate::prelude::*;
 use crate::q_math::{_VectorCopy, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize};
 use crate::trap;
 use std::ffi::c_int;
 
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 /// Raven `NPC_ClearPathToGoal`.
 ///
 /// Source: `oracle/codemp/game/NPC_move.c:27-70`
 pub fn NPC_ClearPathToGoal(ctx: &mut GameContext, dir: vec3_t, goal: Option<EntityId>) -> qboolean {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // Raven derefs `goal` unconditionally; callers pass a live goalEntity.
+        let goal_id = goal.unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &*ctx.world.globals.NPCInfo;
 
         // Look ahead and see if we're clear to move to our goal position
-        if crate::g_nav::NAV_CheckAhead(
+        let goal_origin = ctx.world.entity(goal_id).r.currentOrigin;
+        let clipmask = (ctx.world.entity(npc_id).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP;
+        if NAV_CheckAhead(
             ctx,
-            ctx.entity_id_of(npc).unwrap(),
-            (*goal).r.currentOrigin,
+            npc_id,
+            goal_origin,
             &mut trace as *mut trace_t,
-            ((*npc).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+            clipmask,
         ) == qtrue
         {
             return qtrue;
         }
 
-        if FlyingCreature(&*npc) == qfalse {
+        if FlyingCreature(ctx.world.entity(npc_id)) == qfalse {
             // See if we're too far above
-            if ((*npc).r.currentOrigin[2] - (*goal).r.currentOrigin[2]).abs() > 48.0 {
+            if (ctx.world.entity(npc_id).r.currentOrigin[2]
+                - ctx.world.entity(goal_id).r.currentOrigin[2])
+                .abs()
+                > 48.0
+            {
                 return qfalse;
             }
         }
 
         // This is a work around
-        let radius = if (*npc).r.maxs[0] > (*npc).r.maxs[1] {
-            (*npc).r.maxs[0]
+        let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+        let radius = if npc_maxs[0] > npc_maxs[1] {
+            npc_maxs[0]
         } else {
-            (*npc).r.maxs[1]
+            npc_maxs[1]
         };
-        let dist = crate::q_math::Distance((*npc).r.currentOrigin, (*goal).r.currentOrigin);
+        let dist = crate::q_math::Distance(
+            ctx.world.entity(npc_id).r.currentOrigin,
+            ctx.world.entity(goal_id).r.currentOrigin,
+        );
         let t_frac = 1.0f32 - (radius / dist);
 
         if trace.fraction >= t_frac {
@@ -74,15 +76,15 @@ pub fn NPC_ClearPathToGoal(ctx: &mut GameContext, dir: vec3_t, goal: Option<Enti
         }
 
         // See if we're looking for a navgoal
-        if ((*goal).flags & FL_NAVGOAL) != 0 {
+        if (ctx.world.entity(goal_id).flags & FL_NAVGOAL) != 0 {
             // Okay, didn't get all the way there, let's see if we got close enough
             if NAV_HitNavGoal(
                 trace.endpos,
-                (*npc).r.mins,
-                (*npc).r.maxs,
-                (*goal).r.currentOrigin,
+                ctx.world.entity(npc_id).r.mins,
+                ctx.world.entity(npc_id).r.maxs,
+                ctx.world.entity(goal_id).r.currentOrigin,
                 npc_info.goalRadius,
-                FlyingCreature(&*npc),
+                FlyingCreature(ctx.world.entity(npc_id)),
             ) == qtrue
             {
                 return qtrue;
@@ -99,11 +101,14 @@ pub fn NPC_ClearPathToGoal(ctx: &mut GameContext, dir: vec3_t, goal: Option<Enti
 pub fn NPC_CheckCombatMove(ctx: &mut GameContext) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &*ctx.world.globals.NPCInfo;
+        let npc_enemy = ctx.world.entity(npc_id).enemy;
 
         if (npc_info.goalEntity.is_some()
-            && (*npc).enemy.is_some()
-            && npc_info.goalEntity == (*npc).enemy)
+            && npc_enemy.is_some()
+            && npc_info.goalEntity == npc_enemy)
             || npc_info.combatMove != 0
         {
             return qtrue;
@@ -125,10 +130,12 @@ pub fn NPC_CheckCombatMove(ctx: &mut GameContext) -> qboolean {
 pub fn NPC_LadderMove(ctx: &mut GameContext, dir: vec3_t) {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPC entities carry BG_Alloc'd pool clients (not level.clients);
+        // the gclient_t deref stays raw (recipe 2b).
+        let client = ctx.world.entity(npc_id).client;
 
-        if (dir[2] > 0.0)
-            || (dir[2] < 0.0 && (*((*npc).client)).ps.groundEntityNum == ENTITYNUM_NONE)
-        {
+        if (dir[2] > 0.0) || (dir[2] < 0.0 && (*client).ps.groundEntityNum == ENTITYNUM_NONE) {
             // Set our movement direction
             ctx.world.globals.ucmd.upmove = if dir[2] > 0.0 { 127 } else { -127 };
 
@@ -149,21 +156,20 @@ pub fn NPC_GetMoveInformation(
 ) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &mut *ctx.world.globals.NPCInfo;
 
         // Make sure we have somewhere to go
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
+            let goal_origin = ctx.world.entity(goal_id).r.currentOrigin;
+            let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
 
             // Get our move info
-            crate::q_math::_VectorSubtract(
-                (*goal_ptr).r.currentOrigin,
-                (*npc).r.currentOrigin,
-                dir,
-            );
+            crate::q_math::_VectorSubtract(goal_origin, npc_origin, dir);
             *distance = crate::q_math::VectorNormalize(dir);
 
-            crate::q_math::_VectorCopy((*goal_ptr).r.currentOrigin, &mut npc_info.blockedDest);
+            crate::q_math::_VectorCopy(goal_origin, &mut npc_info.blockedDest);
 
             return qtrue;
         }
@@ -194,6 +200,8 @@ pub fn NPC_GetMoveDirection(
 ) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &mut *ctx.world.globals.NPCInfo;
         let mut angles = [0.0f32; 3];
         // STAGE-2b: irreducible — the raw `&mut` into the ambient `frameNavInfo`
@@ -215,16 +223,14 @@ pub fn NPC_GetMoveDirection(
         _VectorCopy((*nav).direction, &mut (*nav).pathDirection);
 
         // If on a ladder, move appropriately
-        if ((*npc).watertype & CONTENTS_LADDER) != 0 {
+        if (ctx.world.entity(npc_id).watertype & CONTENTS_LADDER) != 0 {
             NPC_LadderMove(ctx, (*nav).direction);
             return qtrue;
         }
 
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
-            if NPC_ClearPathToGoal(ctx, (*nav).direction, ctx.entity_id_of(goal_ptr)) == qfalse {
-                let npc_id = ctx.entity_id_of(npc).unwrap();
+            if NPC_ClearPathToGoal(ctx, (*nav).direction, Some(goal_id)) == qfalse {
                 // See if we're just stuck
                 if NAV_MoveToGoal(ctx, npc_id, &mut (*nav) as *mut navInfo_t) == WAYPOINT_NONE {
                     // Can't reach goal, just face
@@ -241,16 +247,8 @@ pub fn NPC_GetMoveDirection(
 
         // Avoid any collisions on the way
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
-            if NAV_AvoidCollision(
-                ctx,
-                ctx.entity_id_of(npc).unwrap(),
-                ctx.entity_id_of(goal_ptr),
-                &mut (*nav),
-            ) == qfalse
-            {
+            if NAV_AvoidCollision(ctx, npc_id, Some(goal_id), &mut (*nav)) == qfalse {
                 if ((*nav).flags & NIF_MACRO_NAV) == 0 {
-                    let npc_id = ctx.entity_id_of(npc).unwrap();
                     // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
                     // See if we're just stuck
                     if NAV_MoveToGoal(ctx, npc_id, &mut (*nav) as *mut navInfo_t) == WAYPOINT_NONE {
@@ -286,6 +284,8 @@ pub fn NPC_GetMoveDirectionAltRoute(
 ) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &mut *ctx.world.globals.NPCInfo;
         let mut angles = [0.0f32; 3];
         // STAGE-2b: irreducible — the raw `&mut` into the ambient `frameNavInfo`
@@ -309,18 +309,16 @@ pub fn NPC_GetMoveDirectionAltRoute(
         _VectorCopy((*nav).direction, &mut (*nav).pathDirection);
 
         // If on a ladder, move appropriately
-        if ((*npc).watertype & CONTENTS_LADDER) != 0 {
+        if (ctx.world.entity(npc_id).watertype & CONTENTS_LADDER) != 0 {
             NPC_LadderMove(ctx, (*nav).direction);
             return qtrue;
         }
 
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = &mut ctx.world.g_entities[goal_id.index()] as *mut gentity_t;
             if tryStraight == qfalse
-                || NPC_ClearPathToGoal(ctx, (*nav).direction, ctx.entity_id_of(goal_ptr)) == qfalse
+                || NPC_ClearPathToGoal(ctx, (*nav).direction, Some(goal_id)) == qfalse
             {
-                let npc_id = ctx.entity_id_of(npc).unwrap();
                 // blocked — Can't get straight to goal, use macro nav
                 if NAVNEW_MoveToGoal(ctx, npc_id, &mut (*nav)) == WAYPOINT_NONE {
                     // Can't reach goal, just face
@@ -338,16 +336,9 @@ pub fn NPC_GetMoveDirectionAltRoute(
                 if ctx.world.cvars.d_altRoutes.integer != 0 {
                     // try macro nav
                     let mut temp_info = (*nav);
-                    if NAVNEW_AvoidCollision(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        ctx.entity_id_of(goal_ptr),
-                        &mut temp_info,
-                        qtrue,
-                        5,
-                    ) == qfalse
+                    if NAVNEW_AvoidCollision(ctx, npc_id, Some(goal_id), &mut temp_info, qtrue, 5)
+                        == qfalse
                     {
-                        let npc_id = ctx.entity_id_of(npc).unwrap();
                         // revert to macro nav — Can't get straight to goal, dump tempInfo and use macro nav
                         if NAVNEW_MoveToGoal(ctx, npc_id, &mut (*nav)) == WAYPOINT_NONE {
                             // Can't reach goal, just face
@@ -365,14 +356,8 @@ pub fn NPC_GetMoveDirectionAltRoute(
                     }
                 } else {
                     // OR: just give up
-                    if NAVNEW_AvoidCollision(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        ctx.entity_id_of(goal_ptr),
-                        &mut (*nav),
-                        qtrue,
-                        30,
-                    ) == qfalse
+                    if NAVNEW_AvoidCollision(ctx, npc_id, Some(goal_id), &mut (*nav), qtrue, 30)
+                        == qfalse
                     {
                         // give up
                         return qfalse;
@@ -399,15 +384,13 @@ pub fn NPC_GetMoveDirectionAltRoute(
 ///
 /// Source: `oracle/codemp/game/NPC_move.c:324-370`
 pub fn G_UcmdMoveForDir(self_: &mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = self_;
     unsafe {
         let mut forward = [0.0f32; 3];
         let mut right = [0.0f32; 3];
 
         // Get forward and right vectors from entity's current angles.
         AngleVectors(
-            (*self_).r.currentAngles,
+            self_.r.currentAngles,
             Some(&mut forward),
             Some(&mut right),
             None,
@@ -422,7 +405,8 @@ pub fn G_UcmdMoveForDir(self_: &mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t)
 
         // Store the movement direction in playerstate for NPC cheating
         // (preserves precision lost in ucmd conversion).
-        (*((*self_).client)).ps.moveDir = move_dir;
+        // FLAG: NPC pool client — the gclient_t deref stays raw (recipe 2b).
+        (*self_.client).ps.moveDir = move_dir;
 
         // Compute dot products with forward and right vectors, scaled to [-127, 127].
         let mut fDot =
@@ -458,15 +442,20 @@ pub fn G_UcmdMoveForDir(self_: &mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t)
 pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &mut *ctx.world.globals.NPCInfo;
+        // FLAG: NPC pool client — the gclient_t deref stays raw (recipe 2b). The
+        // raw pointer is stable across the ctx calls below.
+        let client = ctx.world.entity(npc_id).client;
 
         let mut distance = 0.0f32;
         let mut dir = [0.0f32; 3];
 
         // If taking full body pain, don't move
-        if PM_InKnockDown(&mut (*((*npc).client)).ps) == qtrue
-            || ((*npc).s.legsAnim >= BOTH_PAIN1 as c_int
-                && (*npc).s.legsAnim <= BOTH_PAIN18 as c_int)
+        let legs_anim = ctx.world.entity(npc_id).s.legsAnim;
+        if PM_InKnockDown(&mut (*client).ps) == qtrue
+            || (legs_anim >= BOTH_PAIN1 as c_int && legs_anim <= BOTH_PAIN18 as c_int)
         {
             return qtrue;
         }
@@ -481,9 +470,9 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
         // Convert the move to angles
         crate::q_math::vectoangles(dir, &mut npc_info.lastPathAngles);
         if (ctx.world.globals.ucmd.buttons & BUTTON_WALKING) != 0 {
-            (*((*npc).client)).ps.speed = npc_info.stats.walkSpeed as f32;
+            (*client).ps.speed = npc_info.stats.walkSpeed as f32;
         } else {
-            (*((*npc).client)).ps.speed = npc_info.stats.runSpeed as f32;
+            (*client).ps.speed = npc_info.stats.runSpeed as f32;
         }
 
         // If in combat move, then move directly towards our goal
@@ -502,7 +491,7 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
             npc_info.desiredYaw = crate::q_math::AngleNormalize360(npc_info.lastPathAngles[1]);
 
             // Pitch towards the goal and also update if flying or swimming
-            if ((*((*npc).client)).ps.eFlags2 & EF2_FLYING) != 0 {
+            if ((*client).ps.eFlags2 & EF2_FLYING) != 0 {
                 npc_info.desiredPitch =
                     crate::q_math::AngleNormalize360(npc_info.lastPathAngles[0]);
 
@@ -513,7 +502,7 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
                     } else if scale < -64.0 {
                         scale = -64.0;
                     }
-                    (*((*npc).client)).ps.velocity[2] = scale;
+                    (*client).ps.velocity[2] = scale;
                 }
             }
 
@@ -531,9 +520,12 @@ pub fn NPC_MoveToGoal(ctx: &mut GameContext, tryStraight: qboolean) -> qboolean 
 pub fn NPC_SlideMoveToGoal(ctx: &mut GameContext) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
         let npc_info = &mut *ctx.world.globals.NPCInfo;
 
-        let save_yaw = (*((*npc).client)).ps.viewangles[1];
+        // FLAG: NPC pool client — the gclient_t deref stays raw (recipe 2b).
+        let save_yaw = (*ctx.world.entity(npc_id).client).ps.viewangles[1];
 
         npc_info.combatMove = 1;
 
@@ -551,8 +543,15 @@ pub fn NPC_SlideMoveToGoal(ctx: &mut GameContext) -> qboolean {
 pub fn NPC_ApplyRoff(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: NPC pool client — the gclient_t deref stays raw (recipe 2b).
+        let client = ctx.world.entity(npc_id).client;
 
-        BG_PlayerStateToEntityState(&mut (*((*npc).client)).ps, &mut (*npc).s, qfalse);
+        BG_PlayerStateToEntityState(
+            &mut (*client).ps,
+            &mut ctx.world.entity_mut(npc_id).s,
+            qfalse,
+        );
 
         // use the precise origin for linking
         crate::trap::LinkEntity(
