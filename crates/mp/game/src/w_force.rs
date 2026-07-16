@@ -26,11 +26,13 @@
 //! porter — "Do NOT run cargo"). `forcePowerNeeded` is the bg-shared const
 //! table (const tables stay const), referenced by its Raven name.
 //!
-//! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
+//! Safe-state migration **Stage 1 → 2c**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5) instead of raw `gentity_t*`; ctx-free leaf
-//! helpers borrow `&gentity_t`/`&mut gentity_t`. Signature-only reshape —
-//! bodies re-derive the raw pointers verbatim at the top (`// STAGE-1:` markers,
-//! Stage-2 body debt). Behavior is byte-identical, referee-verified.
+//! helpers borrow `&gentity_t`/`&mut gentity_t`. Entity fields are read/written
+//! through `ctx.world.entity(id)`/`entity_mut(id)` at the point of use.
+//! `gclient_t`/vehicle-vtable derefs stay raw in tight `unsafe` blocks through a
+//! copied pointer value (recipe 2b; NPC targets carry pool clients). Behavior is
+//! byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::npc::g_npc_t::gNPC_t;
@@ -3397,14 +3399,16 @@ pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
 // un-ported deps — parked.
 // MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
-    // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
-        let cl = (*self_).client;
+        // FLAG: gclient_t derefs stay raw (recipe 2b; `self_`/targets can be NPC
+        // pool clients); read the pointer value via the safe entity borrow. Entity
+        // fields are read through `ctx.world.entity(id)` at the point of use;
+        // `push_list` holds `EntityId` handles rather than raw `gentity_t*`.
+        let cl = ctx.entity(self_).client;
         let level_time = ctx.world.level.time;
         let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
-        let mut push_list: [*mut gentity_t; MAX_GENTITIES as usize] =
-            [std::ptr::null_mut(); MAX_GENTITIES as usize];
+        let mut push_list: [EntityId; MAX_GENTITIES as usize] =
+            [EntityId(0); MAX_GENTITIES as usize];
         let mut numListedEntities: c_int;
         let radius: f32 = 1024.0; //since it's view-based now. //350;
         let powerLevel: c_int;
@@ -3429,7 +3433,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
             return;
         }
 
-        if (*self_).health <= 0 {
+        if ctx.entity(self_).health <= 0 {
             return;
         }
         if (*cl).ps.powerups[PW_DISINT_4 as usize] > level_time {
@@ -3437,37 +3441,27 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
         }
         let powerUse: forcePowers_t = if pull != 0 { FP_PULL } else { FP_PUSH };
 
-        if WP_ForcePowerUsable(ctx, ctx.entity_id_of(self_).unwrap(), powerUse) == 0 {
+        if WP_ForcePowerUsable(ctx, self_, powerUse) == 0 {
             return;
         }
 
         if pull == 0 && (*cl).ps.saberLockTime > level_time && (*cl).ps.saberLockFrame != 0 {
             let s = cstr("sound/weapons/force/push.wav");
-            G_Sound(
-                ctx,
-                ctx.entity_id_of(self_),
-                CHAN_BODY,
-                G_SoundIndex(s.as_ptr()),
-            );
+            G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex(s.as_ptr()));
             (*cl).ps.powerups[PW_DISINT_4 as usize] = level_time + 1500;
 
             (*cl).ps.saberLockHits += (*cl).ps.fd.forcePowerLevel[FP_PUSH as usize] * 2;
 
-            WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), FP_PUSH, 0);
+            WP_ForcePowerStart(ctx, self_, FP_PUSH, 0);
             return;
         }
 
-        WP_ForcePowerStart(ctx, ctx.entity_id_of(self_).unwrap(), powerUse, 0);
+        WP_ForcePowerStart(ctx, self_, powerUse, 0);
 
         //make sure this plays and that you cannot press fire for about 1 second after this
         if pull != 0 {
             let s = cstr("sound/weapons/force/pull.wav");
-            G_Sound(
-                ctx,
-                ctx.entity_id_of(self_),
-                CHAN_BODY,
-                G_SoundIndex(s.as_ptr()),
-            );
+            G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex(s.as_ptr()));
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
                 if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int
@@ -3483,12 +3477,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
             (*cl).ps.powerups[PW_PULL as usize] = (*cl).ps.powerups[PW_DISINT_4 as usize];
         } else {
             let s = cstr("sound/weapons/force/push.wav");
-            G_Sound(
-                ctx,
-                ctx.entity_id_of(self_),
-                CHAN_BODY,
-                G_SoundIndex(s.as_ptr()),
-            );
+            G_Sound(ctx, Some(self_), CHAN_BODY, G_SoundIndex(s.as_ptr()));
             if (*cl).ps.forceHandExtend == HANDEXTEND_NONE as c_int {
                 (*cl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                 (*cl).ps.forceHandExtendTime = level_time + 1000;
@@ -3556,17 +3545,18 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     std::ptr::null(),
                     std::ptr::null(),
                     &tto as *const vec3_t,
-                    (*self_).s.number,
+                    ctx.entity(self_).s.number,
                     MASK_PLAYERSOLID,
                 ),
             );
 
             if tr.fraction != 1.0 && tr.entityNum != (ENTITYNUM_NONE) as i16 {
-                let hit = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-                if (*hit).client.is_null() && (*hit).s.eType == ET_NPC as c_int {
+                let hit_id = EntityId(tr.entityNum as u32);
+                let hcl = ctx.world.entity(hit_id).client;
+                if hcl.is_null() && ctx.world.entity(hit_id).s.eType == ET_NPC as c_int {
                     //g2animent
-                    if (*hit).s.genericenemyindex < level_time {
-                        (*hit).s.genericenemyindex = level_time + 2000;
+                    if ctx.world.entity(hit_id).s.genericenemyindex < level_time {
+                        ctx.world.entity_mut(hit_id).s.genericenemyindex = level_time + 2000;
                     }
                 }
 
@@ -3574,23 +3564,11 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                 entityList[numListedEntities as usize] = (tr.entityNum) as i32;
 
                 if pull != 0 {
-                    if ForcePowerUsableOn(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        ctx.entity_id_of(hit),
-                        FP_PULL,
-                    ) == 0
-                    {
+                    if ForcePowerUsableOn(ctx, Some(self_), Some(hit_id), FP_PULL) == 0 {
                         return;
                     }
                 } else {
-                    if ForcePowerUsableOn(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        ctx.entity_id_of(hit),
-                        FP_PUSH,
-                    ) == 0
-                    {
+                    if ForcePowerUsableOn(ctx, Some(self_), Some(hit_id), FP_PUSH) == 0 {
                         return;
                     }
                 }
@@ -3612,19 +3590,20 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
 
             let mut e: usize = 0;
             while (e as c_int) < numListedEntities {
-                let ent = &mut ctx.world.g_entities[entityList[e] as usize] as *mut gentity_t;
+                let ent_id = EntityId(entityList[e] as u32);
+                let ecl = ctx.world.entity(ent_id).client;
 
-                if (*ent).client.is_null() && (*ent).s.eType == ET_NPC as c_int {
+                if ecl.is_null() && ctx.world.entity(ent_id).s.eType == ET_NPC as c_int {
                     //g2animent
-                    if (*ent).s.genericenemyindex < level_time {
-                        (*ent).s.genericenemyindex = level_time + 2000;
+                    if ctx.world.entity(ent_id).s.genericenemyindex < level_time {
+                        ctx.world.entity_mut(ent_id).s.genericenemyindex = level_time + 2000;
                     }
                 }
 
-                let thispush_org: vec3_t = if !(*ent).client.is_null() {
-                    (*((*ent).client)).ps.origin
+                let thispush_org: vec3_t = if !ecl.is_null() {
+                    (*ecl).ps.origin
                 } else {
-                    (*ent).s.pos.trBase
+                    ctx.world.entity(ent_id).s.pos.trBase
                 };
 
                 //not in the arc, don't consider it
@@ -3637,36 +3616,19 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                 ];
                 vectoangles(a, &mut a);
 
-                if !(*ent).client.is_null()
+                if !ecl.is_null()
                     && InFieldOfVision((*cl).ps.viewangles, visionArc, a) == 0
-                    && ForcePowerUsableOn(
-                        ctx,
-                        ctx.entity_id_of(self_),
-                        ctx.entity_id_of(ent),
-                        powerUse,
-                    ) != 0
+                    && ForcePowerUsableOn(ctx, Some(self_), Some(ent_id), powerUse) != 0
                 {
                     //only bother with arc rules if the victim is a client
                     entityList[e] = ENTITYNUM_NONE;
-                } else if !(*ent).client.is_null() {
+                } else if !ecl.is_null() {
                     if pull != 0 {
-                        if ForcePowerUsableOn(
-                            ctx,
-                            ctx.entity_id_of(self_),
-                            ctx.entity_id_of(ent),
-                            FP_PULL,
-                        ) == 0
-                        {
+                        if ForcePowerUsableOn(ctx, Some(self_), Some(ent_id), FP_PULL) == 0 {
                             entityList[e] = ENTITYNUM_NONE;
                         }
                     } else {
-                        if ForcePowerUsableOn(
-                            ctx,
-                            ctx.entity_id_of(self_),
-                            ctx.entity_id_of(ent),
-                            FP_PUSH,
-                        ) == 0
-                        {
+                        if ForcePowerUsableOn(ctx, Some(self_), Some(ent_id), FP_PUSH) == 0 {
                             entityList[e] = ENTITYNUM_NONE;
                         }
                     }
@@ -3676,53 +3638,57 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
         }
 
         for e in 0..(numListedEntities as usize) {
-            let ent: *mut gentity_t = if entityList[e] != ENTITYNUM_NONE
+            let ent_id = if entityList[e] != ENTITYNUM_NONE
                 && entityList[e] >= 0
                 && entityList[e] < MAX_GENTITIES as c_int
             {
-                &mut ctx.world.g_entities[entityList[e] as usize] as *mut gentity_t
+                Some(EntityId(entityList[e] as u32))
             } else {
-                std::ptr::null_mut()
+                None
             };
 
-            if ent.is_null() {
+            let ent_id = match ent_id {
+                Some(id) => id,
+                None => continue,
+            };
+            if ent_id == self_ {
                 continue;
             }
-            if ent == self_ {
+            // FLAG: gclient_t deref stays raw (recipe 2b; `ent_id` can be an NPC
+            // pool client).
+            let ecl = ctx.world.entity(ent_id).client;
+            if !ecl.is_null() && OnSameTeam(ctx, Some(ent_id), Some(self_)) != 0 {
                 continue;
             }
-            if !(*ent).client.is_null()
-                && OnSameTeam(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(self_)) != 0
-            {
+            if ctx.world.entity(ent_id).inuse == 0 {
                 continue;
             }
-            if (*ent).inuse == 0 {
-                continue;
-            }
-            if (*ent).s.eType != ET_MISSILE as c_int {
-                if (*ent).s.eType != ET_ITEM as c_int {
+            if ctx.world.entity(ent_id).s.eType != ET_MISSILE as c_int {
+                if ctx.world.entity(ent_id).s.eType != ET_ITEM as c_int {
                     //FIXME: need pushable objects
-                    let classname = cstr_to_str((*ent).classname);
+                    let classname = cstr_to_str(ctx.world.entity(ent_id).classname);
                     if classname.eq_ignore_ascii_case("func_button") {
                         //we might push it
-                        if pull != 0 || (*ent).spawnflags & SPF_BUTTON_FPUSHABLE == 0 {
+                        if pull != 0
+                            || ctx.world.entity(ent_id).spawnflags & SPF_BUTTON_FPUSHABLE == 0
+                        {
                             //not force-pushable, never pullable
                             continue;
                         }
                     } else {
-                        if (*ent).s.eFlags & EF_NODRAW != 0 {
+                        if ctx.world.entity(ent_id).s.eFlags & EF_NODRAW != 0 {
                             continue;
                         }
-                        if (*ent).client.is_null() {
+                        if ecl.is_null() {
                             if !classname.eq_ignore_ascii_case("lightsaber") {
                                 //not a lightsaber
                                 if !classname.eq_ignore_ascii_case("func_door")
-                                    || (*ent).spawnflags & 2 == 0
+                                    || ctx.world.entity(ent_id).spawnflags & 2 == 0
                                 //not a force-usable door
                                 {
                                     if !classname.eq_ignore_ascii_case("func_static")
-                                        || ((*ent).spawnflags & 1 == 0
-                                            && (*ent).spawnflags & 2 == 0)
+                                        || (ctx.world.entity(ent_id).spawnflags & 1 == 0
+                                            && ctx.world.entity(ent_id).spawnflags & 2 == 0)
                                     //not a force-usable func_static
                                     {
                                         if !classname.eq_ignore_ascii_case("limb") {
@@ -3730,16 +3696,16 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                             continue;
                                         }
                                     }
-                                } else if (*ent).moverState != MOVER_POS1 as c_int
-                                    && (*ent).moverState != MOVER_POS2 as c_int
+                                } else if ctx.world.entity(ent_id).moverState != MOVER_POS1 as c_int
+                                    && ctx.world.entity(ent_id).moverState != MOVER_POS2 as c_int
                                 {
                                     //not at rest
                                     continue;
                                 }
                             }
-                        } else if (*((*ent).client)).NPC_class == CLASS_GALAKMECH
-                            || (*((*ent).client)).NPC_class == CLASS_ATST
-                            || (*((*ent).client)).NPC_class == CLASS_RANCOR
+                        } else if (*ecl).NPC_class == CLASS_GALAKMECH
+                            || (*ecl).NPC_class == CLASS_ATST
+                            || (*ecl).NPC_class == CLASS_RANCOR
                         {
                             //can't push ATST or Galak or Rancor
                             continue;
@@ -3747,11 +3713,15 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     }
                 }
             } else {
-                if (*ent).s.pos.trType == TR_STATIONARY && (*ent).s.eFlags & EF_MISSILE_STICK != 0 {
+                if ctx.world.entity(ent_id).s.pos.trType == TR_STATIONARY
+                    && ctx.world.entity(ent_id).s.eFlags & EF_MISSILE_STICK != 0
+                {
                     //can't force-push/pull stuck missiles (detpacks, tripmines)
                     continue;
                 }
-                if (*ent).s.pos.trType == TR_STATIONARY && (*ent).s.weapon != WP_THERMAL as c_int {
+                if ctx.world.entity(ent_id).s.pos.trType == TR_STATIONARY
+                    && ctx.world.entity(ent_id).s.weapon != WP_THERMAL as c_int
+                {
                     //only thermal detonators can be pushed once stopped
                     continue;
                 }
@@ -3761,24 +3731,24 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
             // find the distance from the edge of the bounding box
             let mut v: vec3_t = [0.0; 3];
             for i in 0..3 {
-                if center[i] < (*ent).r.absmin[i] {
-                    v[i] = (*ent).r.absmin[i] - center[i];
-                } else if center[i] > (*ent).r.absmax[i] {
-                    v[i] = center[i] - (*ent).r.absmax[i];
+                if center[i] < ctx.world.entity(ent_id).r.absmin[i] {
+                    v[i] = ctx.world.entity(ent_id).r.absmin[i] - center[i];
+                } else if center[i] > ctx.world.entity(ent_id).r.absmax[i] {
+                    v[i] = center[i] - ctx.world.entity(ent_id).r.absmax[i];
                 } else {
                     v[i] = 0.0;
                 }
             }
 
             let size: vec3_t = [
-                (*ent).r.absmax[0] - (*ent).r.absmin[0],
-                (*ent).r.absmax[1] - (*ent).r.absmin[1],
-                (*ent).r.absmax[2] - (*ent).r.absmin[2],
+                ctx.world.entity(ent_id).r.absmax[0] - ctx.world.entity(ent_id).r.absmin[0],
+                ctx.world.entity(ent_id).r.absmax[1] - ctx.world.entity(ent_id).r.absmin[1],
+                ctx.world.entity(ent_id).r.absmax[2] - ctx.world.entity(ent_id).r.absmin[2],
             ];
             let ent_org: vec3_t = [
-                (*ent).r.absmin[0] + 0.5 * size[0],
-                (*ent).r.absmin[1] + 0.5 * size[1],
-                (*ent).r.absmin[2] + 0.5 * size[2],
+                ctx.world.entity(ent_id).r.absmin[0] + 0.5 * size[0],
+                ctx.world.entity(ent_id).r.absmin[1] + 0.5 * size[1],
+                ctx.world.entity(ent_id).r.absmin[2] + 0.5 * size[2],
             ];
 
             let mut dir: vec3_t = [
@@ -3802,7 +3772,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
             }
 
             //in PVS?
-            if (*ent).r.bmodel == 0
+            if ctx.world.entity(ent_id).r.bmodel == 0
                 && trap::InPVS(
                     ctx.engine,
                     GInPvsArgs::new(&ent_org as *const vec3_t, &(*cl).ps.origin as *const vec3_t),
@@ -3821,11 +3791,11 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     &vec3_origin as *const vec3_t,
                     &vec3_origin as *const vec3_t,
                     &ent_org as *const vec3_t,
-                    (*self_).s.number,
+                    ctx.entity(self_).s.number,
                     MASK_SHOT,
                 ),
             );
-            if tr.fraction < 1.0 && tr.entityNum != ((*ent).s.number) as i16 {
+            if tr.fraction < 1.0 && tr.entityNum != (ctx.world.entity(ent_id).s.number) as i16 {
                 //must have clear LOS
                 //try from eyes too before you give up
                 let mut eyePoint: vec3_t = (*cl).ps.origin;
@@ -3838,33 +3808,35 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                         &vec3_origin as *const vec3_t,
                         &vec3_origin as *const vec3_t,
                         &ent_org as *const vec3_t,
-                        (*self_).s.number,
+                        ctx.entity(self_).s.number,
                         MASK_SHOT,
                     ),
                 );
 
-                if tr.fraction < 1.0 && tr.entityNum != ((*ent).s.number) as i16 {
+                if tr.fraction < 1.0 && tr.entityNum != (ctx.world.entity(ent_id).s.number) as i16 {
                     continue;
                 }
             }
 
             // ok, we are within the radius, add us to the incoming list
-            push_list[ent_count] = ent;
+            push_list[ent_count] = ent_id;
             ent_count += 1;
         }
 
         if ent_count != 0 {
             //method1:
             for x in 0..ent_count {
+                // FLAG: gclient_t deref stays raw (recipe 2b; target can be an NPC
+                // pool client); read the pointer value via the safe entity borrow.
+                let pcl = ctx.world.entity(push_list[x]).client;
                 let mut modPowerLevel = powerLevel;
 
-                if !(*push_list[x]).client.is_null() {
-                    let pcl = (*push_list[x]).client;
+                if !pcl.is_null() {
                     modPowerLevel = WP_AbsorbConversion(
                         ctx,
-                        ctx.entity_id_of(push_list[x]).unwrap(),
+                        push_list[x],
                         (*pcl).ps.fd.forcePowerLevel[FP_ABSORB as usize],
-                        ctx.entity_id_of(self_),
+                        Some(self_),
                         powerUse,
                         powerLevel,
                         forcePowerNeeded[(*cl).ps.fd.forcePowerLevel[powerUse as usize] as usize]
@@ -3877,15 +3849,14 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
 
                 pushPower = 256 * modPowerLevel;
 
-                let thispush_org: vec3_t = if !(*push_list[x]).client.is_null() {
-                    (*((*push_list[x]).client)).ps.origin
+                let thispush_org: vec3_t = if !pcl.is_null() {
+                    (*pcl).ps.origin
                 } else {
-                    (*push_list[x]).s.origin
+                    ctx.world.entity(push_list[x]).s.origin
                 };
 
-                if !(*push_list[x]).client.is_null() {
+                if !pcl.is_null() {
                     //FIXME: make enemy jedi able to hunker down and resist this?
-                    let pcl = (*push_list[x]).client;
                     let mut otherPushPower = (*pcl).ps.fd.forcePowerLevel[powerUse as usize];
                     let mut canPullWeapon = qtrue;
                     let mut dirLen: f32 = 0.0;
@@ -3895,7 +3866,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                             //no resistance if stuck to wall
                             //push/pull them off the wall
                             otherPushPower = 0;
-                            G_LetGoOfWall(ctx, ctx.entity_id_of(push_list[x]));
+                            G_LetGoOfWall(ctx, Some(push_list[x]));
                         }
                     }
 
@@ -3916,31 +3887,16 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     }
 
                     if otherPushPower != 0
-                        && CanCounterThrow(
-                            ctx,
-                            ctx.entity_id_of(push_list[x]).unwrap(),
-                            ctx.entity_id_of(self_),
-                            pull,
-                        ) != 0
+                        && CanCounterThrow(ctx, push_list[x], Some(self_), pull) != 0
                     {
                         if pull != 0 {
                             let s = cstr("sound/weapons/force/pull.wav");
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(push_list[x]),
-                                CHAN_BODY,
-                                G_SoundIndex(s.as_ptr()),
-                            );
+                            G_Sound(ctx, Some(push_list[x]), CHAN_BODY, G_SoundIndex(s.as_ptr()));
                             (*pcl).ps.forceHandExtend = HANDEXTEND_FORCEPULL as c_int;
                             (*pcl).ps.forceHandExtendTime = level_time + 400;
                         } else {
                             let s = cstr("sound/weapons/force/push.wav");
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(push_list[x]),
-                                CHAN_BODY,
-                                G_SoundIndex(s.as_ptr()),
-                            );
+                            G_Sound(ctx, Some(push_list[x]), CHAN_BODY, G_SoundIndex(s.as_ptr()));
                             (*pcl).ps.forceHandExtend = HANDEXTEND_FORCEPUSH as c_int;
                             (*pcl).ps.forceHandExtendTime = level_time + 1000;
                         }
@@ -3999,11 +3955,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                 randfact = 10;
                             }
 
-                            if OnSameTeam(
-                                ctx,
-                                ctx.entity_id_of(self_),
-                                ctx.entity_id_of(push_list[x]),
-                            ) == 0
+                            if OnSameTeam(ctx, Some(self_), Some(push_list[x])) == 0
                                 && ctx.world.bg_state.rng.Q_irand(1, 10) <= randfact
                                 && canPullWeapon != 0
                             {
@@ -4017,12 +3969,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                 ];
                                 VectorNormalize(&mut vecnorm);
 
-                                TossClientWeapon(
-                                    ctx,
-                                    ctx.entity_id_of(push_list[x]).unwrap(),
-                                    vecnorm,
-                                    500.0,
-                                );
+                                TossClientWeapon(ctx, push_list[x], vecnorm, 500.0);
                             }
                         }
                     } else {
@@ -4035,7 +3982,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     let mut pushDir = pushDir;
 
                     if (modPowerLevel > otherPushPower || (*pcl).ps.m_iVehicleNum != 0)
-                        && !(*push_list[x]).client.is_null()
+                        && !pcl.is_null()
                     {
                         if modPowerLevel == FORCE_LEVEL_3 as c_int
                             && (*pcl).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int
@@ -4050,30 +3997,30 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                 (*pcl).ps.forceHandExtendTime = level_time + 700;
                                 (*pcl).ps.forceDodgeAnim = 0; //this toggles between 1 and 0, when it's 1 we should play the get up anim
                                 (*pcl).ps.quickerGetup = qtrue;
-                            } else if (*push_list[x]).s.number < MAX_CLIENTS as c_int
+                            } else if ctx.world.entity(push_list[x]).s.number < MAX_CLIENTS as c_int
                                 && (*pcl).ps.m_iVehicleNum != 0
                                 && dirLen <= 128.0
                             {
                                 //a player on a vehicle
-                                let vehEnt = &mut ctx.world.g_entities
-                                    [(*pcl).ps.m_iVehicleNum as usize]
-                                    as *mut gentity_t;
-                                if (*vehEnt).inuse != qfalse
-                                    && !(*vehEnt).client.is_null()
-                                    && !(*vehEnt).m_pVehicle.is_null()
+                                let veh_id = EntityId((*pcl).ps.m_iVehicleNum as u32);
+                                if ctx.world.entity(veh_id).inuse != qfalse
+                                    && !ctx.world.entity(veh_id).client.is_null()
+                                    && !ctx.world.entity(veh_id).m_pVehicle.is_null()
                                 {
-                                    let pVeh = (*vehEnt).m_pVehicle;
+                                    // FLAG: vehicle-vtable seam — `m_pVehicle`/
+                                    // `m_pVehicleInfo` derefs stay raw; `eject` takes
+                                    // a raw `bgEntity_t*` (no EntityId overload,
+                                    // one-file rule), materialized tight at the call.
+                                    let pVeh = ctx.world.entity(veh_id).m_pVehicle;
                                     if (*(*pVeh).m_pVehicleInfo).r#type == vehicleType_t::VH_SPEEDER
                                         || (*(*pVeh).m_pVehicleInfo).r#type
                                             == vehicleType_t::VH_ANIMAL
                                     {
                                         //push the guy off
-                                        crate::veh_dispatch::eject(
-                                            ctx,
-                                            pVeh,
-                                            push_list[x] as *mut bgEntity_t,
-                                            qfalse,
-                                        );
+                                        let pEnt = ctx.world.entity_mut(push_list[x])
+                                            as *mut gentity_t
+                                            as *mut bgEntity_t;
+                                        crate::veh_dispatch::eject(ctx, pVeh, pEnt, qfalse);
                                     }
                                 }
                             }
@@ -4089,14 +4036,10 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     //escape a force grip if we're in one
                     if (*cl).ps.fd.forceGripBeingGripped > level_time as f32 {
                         //force the enemy to stop gripping me if I managed to push him
-                        if (*pcl).ps.fd.forceGripEntityNum == (*self_).s.number {
+                        if (*pcl).ps.fd.forceGripEntityNum == ctx.entity(self_).s.number {
                             if modPowerLevel >= (*pcl).ps.fd.forcePowerLevel[FP_GRIP as usize] {
                                 //only break the grip if our push/pull level is >= their grip level
-                                WP_ForcePowerStop(
-                                    ctx,
-                                    ctx.entity_id_of(push_list[x]).unwrap(),
-                                    FP_GRIP,
-                                );
+                                WP_ForcePowerStop(ctx, push_list[x], FP_GRIP);
                                 (*cl).ps.fd.forceGripBeingGripped = 0.0;
                                 (*pcl).ps.fd.forceGripUseTime = level_time + 1000;
                                 //since we just broke out of it..
@@ -4104,7 +4047,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                         }
                     }
 
-                    (*pcl).ps.otherKiller = (*self_).s.number;
+                    (*pcl).ps.otherKiller = ctx.entity(self_).s.number;
                     (*pcl).ps.otherKillerTime = level_time + 5000;
                     (*pcl).ps.otherKillerDebounceTime = level_time + 100;
                     (*pcl).otherKillerMOD = MOD_UNKNOWN as c_int;
@@ -4132,42 +4075,29 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     } else {
                         (*pcl).ps.velocity[2] = pushDir[2] * pushPowerMod as f32;
                     }
-                } else if (*push_list[x]).s.eType == ET_MISSILE as c_int
-                    && (*push_list[x]).s.pos.trType != TR_STATIONARY
-                    && ((*push_list[x]).s.pos.trType != TR_INTERPOLATE
-                        || (*push_list[x]).s.weapon != WP_THERMAL as c_int)
+                } else if ctx.world.entity(push_list[x]).s.eType == ET_MISSILE as c_int
+                    && ctx.world.entity(push_list[x]).s.pos.trType != TR_STATIONARY
+                    && (ctx.world.entity(push_list[x]).s.pos.trType != TR_INTERPOLATE
+                        || ctx.world.entity(push_list[x]).s.weapon != WP_THERMAL as c_int)
                 //rolling and stationary thermal detonators are dealt with below
                 {
                     if pull != 0 {
                         //deflect rather than reflect?
                     } else {
-                        G_ReflectMissile(
-                            ctx,
-                            ctx.entity_id_of(self_).unwrap(),
-                            ctx.entity_id_of(push_list[x]).unwrap(),
-                            forward,
-                        );
+                        G_ReflectMissile(ctx, self_, push_list[x], forward);
                     }
-                } else if cstr_to_str((*push_list[x]).classname).eq_ignore_ascii_case("func_static")
+                } else if cstr_to_str(ctx.world.entity(push_list[x]).classname)
+                    .eq_ignore_ascii_case("func_static")
                 {
                     //force-usable func_static
-                    if pull == 0 && (*push_list[x]).spawnflags & 1 != 0 {
-                        GEntity_UseFunc(
-                            ctx,
-                            ctx.entity_id_of(push_list[x]).unwrap(),
-                            ctx.entity_id_of(self_),
-                            ctx.entity_id_of(self_),
-                        );
-                    } else if pull != 0 && (*push_list[x]).spawnflags & 2 != 0 {
-                        GEntity_UseFunc(
-                            ctx,
-                            ctx.entity_id_of(push_list[x]).unwrap(),
-                            ctx.entity_id_of(self_),
-                            ctx.entity_id_of(self_),
-                        );
+                    if pull == 0 && ctx.world.entity(push_list[x]).spawnflags & 1 != 0 {
+                        GEntity_UseFunc(ctx, push_list[x], Some(self_), Some(self_));
+                    } else if pull != 0 && ctx.world.entity(push_list[x]).spawnflags & 2 != 0 {
+                        GEntity_UseFunc(ctx, push_list[x], Some(self_), Some(self_));
                     }
-                } else if cstr_to_str((*push_list[x]).classname).eq_ignore_ascii_case("func_door")
-                    && (*push_list[x]).spawnflags & 2 != 0
+                } else if cstr_to_str(ctx.world.entity(push_list[x]).classname)
+                    .eq_ignore_ascii_case("func_door")
+                    && ctx.world.entity(push_list[x]).spawnflags & 2 != 0
                 {
                     //push/pull the door
                     let mut trFrom: vec3_t = (*cl).ps.origin;
@@ -4189,11 +4119,11 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                             &vec3_origin as *const vec3_t,
                             &vec3_origin as *const vec3_t,
                             &end as *const vec3_t,
-                            (*self_).s.number,
+                            ctx.entity(self_).s.number,
                             MASK_SHOT,
                         ),
                     );
-                    if tr.entityNum != ((*push_list[x]).s.number) as i16
+                    if tr.entityNum != (ctx.world.entity(push_list[x]).s.number) as i16
                         || tr.fraction == 1.0
                         || tr.allsolid != 0
                         || tr.startsolid != 0
@@ -4205,63 +4135,66 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                     let mut center2: vec3_t;
                     let mut pos1: vec3_t;
                     let mut pos2: vec3_t;
-                    if VectorCompare(vec3_origin, (*push_list[x]).s.origin) != 0 {
+                    if VectorCompare(vec3_origin, ctx.world.entity(push_list[x]).s.origin) != 0 {
                         //does not have an origin brush, so pos1 & pos2 are relative to world origin, need to calc center
                         let size: vec3_t = [
-                            (*push_list[x]).r.absmax[0] - (*push_list[x]).r.absmin[0],
-                            (*push_list[x]).r.absmax[1] - (*push_list[x]).r.absmin[1],
-                            (*push_list[x]).r.absmax[2] - (*push_list[x]).r.absmin[2],
+                            ctx.world.entity(push_list[x]).r.absmax[0]
+                                - ctx.world.entity(push_list[x]).r.absmin[0],
+                            ctx.world.entity(push_list[x]).r.absmax[1]
+                                - ctx.world.entity(push_list[x]).r.absmin[1],
+                            ctx.world.entity(push_list[x]).r.absmax[2]
+                                - ctx.world.entity(push_list[x]).r.absmin[2],
                         ];
                         center2 = [
-                            (*push_list[x]).r.absmin[0] + 0.5 * size[0],
-                            (*push_list[x]).r.absmin[1] + 0.5 * size[1],
-                            (*push_list[x]).r.absmin[2] + 0.5 * size[2],
+                            ctx.world.entity(push_list[x]).r.absmin[0] + 0.5 * size[0],
+                            ctx.world.entity(push_list[x]).r.absmin[1] + 0.5 * size[1],
+                            ctx.world.entity(push_list[x]).r.absmin[2] + 0.5 * size[2],
                         ];
-                        if (*push_list[x]).spawnflags & 1 != 0
-                            && (*push_list[x]).moverState == MOVER_POS1 as c_int
+                        if ctx.world.entity(push_list[x]).spawnflags & 1 != 0
+                            && ctx.world.entity(push_list[x]).moverState == MOVER_POS1 as c_int
                         {
                             //if at pos1 and started open, make sure we get the center where it *started* because we're going to add back in the relative values pos1 and pos2
                             center2 = [
-                                center2[0] - (*push_list[x]).pos1[0],
-                                center2[1] - (*push_list[x]).pos1[1],
-                                center2[2] - (*push_list[x]).pos1[2],
+                                center2[0] - ctx.world.entity(push_list[x]).pos1[0],
+                                center2[1] - ctx.world.entity(push_list[x]).pos1[1],
+                                center2[2] - ctx.world.entity(push_list[x]).pos1[2],
                             ];
-                        } else if (*push_list[x]).spawnflags & 1 == 0
-                            && (*push_list[x]).moverState == MOVER_POS2 as c_int
+                        } else if ctx.world.entity(push_list[x]).spawnflags & 1 == 0
+                            && ctx.world.entity(push_list[x]).moverState == MOVER_POS2 as c_int
                         {
                             //if at pos2, make sure we get the center where it *started* because we're going to add back in the relative values pos1 and pos2
                             center2 = [
-                                center2[0] - (*push_list[x]).pos2[0],
-                                center2[1] - (*push_list[x]).pos2[1],
-                                center2[2] - (*push_list[x]).pos2[2],
+                                center2[0] - ctx.world.entity(push_list[x]).pos2[0],
+                                center2[1] - ctx.world.entity(push_list[x]).pos2[1],
+                                center2[2] - ctx.world.entity(push_list[x]).pos2[2],
                             ];
                         }
                         pos1 = [
-                            center2[0] + (*push_list[x]).pos1[0],
-                            center2[1] + (*push_list[x]).pos1[1],
-                            center2[2] + (*push_list[x]).pos1[2],
+                            center2[0] + ctx.world.entity(push_list[x]).pos1[0],
+                            center2[1] + ctx.world.entity(push_list[x]).pos1[1],
+                            center2[2] + ctx.world.entity(push_list[x]).pos1[2],
                         ];
                         pos2 = [
-                            center2[0] + (*push_list[x]).pos2[0],
-                            center2[1] + (*push_list[x]).pos2[1],
-                            center2[2] + (*push_list[x]).pos2[2],
+                            center2[0] + ctx.world.entity(push_list[x]).pos2[0],
+                            center2[1] + ctx.world.entity(push_list[x]).pos2[1],
+                            center2[2] + ctx.world.entity(push_list[x]).pos2[2],
                         ];
                     } else {
                         //actually has an origin, pos1 and pos2 are absolute
-                        center2 = (*push_list[x]).r.currentOrigin;
-                        pos1 = (*push_list[x]).pos1;
-                        pos2 = (*push_list[x]).pos2;
+                        center2 = ctx.world.entity(push_list[x]).r.currentOrigin;
+                        pos1 = ctx.world.entity(push_list[x]).pos1;
+                        pos2 = ctx.world.entity(push_list[x]).pos2;
                     }
 
                     if Distance(pos1, trFrom) < Distance(pos2, trFrom) {
                         //pos1 is closer
-                        if (*push_list[x]).moverState == MOVER_POS1 as c_int {
+                        if ctx.world.entity(push_list[x]).moverState == MOVER_POS1 as c_int {
                             //at the closest pos
                             if pull != 0 {
                                 //trying to pull, but already at closest point, so screw it
                                 continue;
                             }
-                        } else if (*push_list[x]).moverState == MOVER_POS2 as c_int {
+                        } else if ctx.world.entity(push_list[x]).moverState == MOVER_POS2 as c_int {
                             //at farthest pos
                             if pull == 0 {
                                 //trying to push, but already at farthest point, so screw it
@@ -4270,13 +4203,13 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                         }
                     } else {
                         //pos2 is closer
-                        if (*push_list[x]).moverState == MOVER_POS1 as c_int {
+                        if ctx.world.entity(push_list[x]).moverState == MOVER_POS1 as c_int {
                             //at the farthest pos
                             if pull == 0 {
                                 //trying to push, but already at farthest point, so screw it
                                 continue;
                             }
-                        } else if (*push_list[x]).moverState == MOVER_POS2 as c_int {
+                        } else if ctx.world.entity(push_list[x]).moverState == MOVER_POS2 as c_int {
                             //at closest pos
                             if pull != 0 {
                                 //trying to pull, but already at closest point, so screw it
@@ -4284,21 +4217,12 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                             }
                         }
                     }
-                    GEntity_UseFunc(
-                        ctx,
-                        ctx.entity_id_of(push_list[x]).unwrap(),
-                        ctx.entity_id_of(self_),
-                        ctx.entity_id_of(self_),
-                    );
-                } else if cstr_to_str((*push_list[x]).classname).eq_ignore_ascii_case("func_button")
+                    GEntity_UseFunc(ctx, push_list[x], Some(self_), Some(self_));
+                } else if cstr_to_str(ctx.world.entity(push_list[x]).classname)
+                    .eq_ignore_ascii_case("func_button")
                 {
                     //pretend you pushed it
-                    Touch_Button(
-                        ctx,
-                        ctx.entity_id_of(push_list[x]).unwrap(),
-                        ctx.entity_id_of(self_),
-                        std::ptr::null_mut(),
-                    );
+                    Touch_Button(ctx, push_list[x], Some(self_), std::ptr::null_mut());
                     continue;
                 }
             }
