@@ -5,10 +5,14 @@
 //! (`level`, `g_entities`, cvars) and engine traps through the threaded
 //! `GameContext`/`GameWorld` handle.
 //!
-//! Safe-state migration **Stage 1**: `gentity_t*` params are `EntityId` /
-//! `&gentity_t` handles (§B5). `Vehicle_t*`/`bgEntity_t*`/`playerState_t*`
-//! params are NOT entity handles and stay raw (§D12 seam). The only in-scope
-//! `gentity_t*` here is `FighterIsInSpace`'s ctx-free read receiver.
+//! Safe-state migration **2c**: `Vehicle_t*`/`vehicleInfo_t*`/`playerState_t*`
+//! are pool/seam objects with no accessor and stay raw (§D12). The `gentity_t`
+//! reached through `pVeh->m_pParentEntity`/`m_pPilot` (and the owner-derived
+//! rider) is a `g_entities` arena entity: its handle is recovered with
+//! `entity_id_of` and its fields (`s.number`, `s.owner`, `playerState`, `client`,
+//! `r.mins`/`r.maxs`, `spawnflags`) read through `ctx.world.entity(id)`; the
+//! `playerState`/`client` pointers so obtained are pool objects, derefed raw at
+//! the point of use. `FighterIsInSpace` keeps its `&gentity_t` read receiver.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -132,10 +136,13 @@ pub fn BG_FighterUpdate(
             }
         }
 
-        // Get parent's player state. Oracle: `pVeh->m_pParentEntity->playerState`
-        // reads the bgEntity's playerState pointer field, not a reinterpret of the
-        // bgEntity pointer itself (whose first member is entityState_t s).
-        parentPS = (*(*pVeh).m_pParentEntity).playerState;
+        // Get parent's player state. `m_pParentEntity` is a g_entities arena
+        // entity; recover its handle and read `playerState` (a pool object,
+        // derefed raw below) through the accessor.
+        let parent_id = ctx
+            .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+            .unwrap();
+        parentPS = ctx.world.entity(parent_id).playerState;
         if parentPS.is_null() {
             // ERROR: NULL PS
             return qfalse;
@@ -172,6 +179,7 @@ pub fn BG_FighterUpdate(
 
         // Trace down for the landing surface. Oracle contentmask is
         // `MASK_NPCSOLID & ~CONTENTS_BODY`.
+        let parent_num = ctx.world.entity(parent_id).s.number;
         traceFunc(
             ctx,
             &mut (*pVeh).m_LandTrace,
@@ -179,12 +187,7 @@ pub fn BG_FighterUpdate(
             trMins,
             trMaxs,
             bottom,
-            (*pVeh)
-                .m_pParentEntity
-                .cast::<gentity_t>()
-                .as_ref()
-                .map(|e| e.s.number)
-                .unwrap_or(0),
+            parent_num,
             MASK_NPCSOLID & !CONTENTS_BODY,
         );
 
@@ -204,18 +207,16 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUcmd: *const usercmd
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         debug_assert!(!parent.is_null());
+        let parent_id = ctx.entity_id_of(parent).unwrap();
 
         let gravity = ctx.world.cvars.g_gravity.value;
-        if BG_FighterUpdate(
-            ctx,
-            pVeh,
-            pUcmd,
-            (*parent).r.mins,
-            (*parent).r.maxs,
-            gravity,
-            G_VehicleTrace,
-        ) == qfalse
-        {
+        // `trMins`/`trMaxs` are the parent gentity's `r.mins`/`r.maxs`; read them
+        // through the accessor before the &mut-ctx call.
+        let (trMins, trMaxs) = {
+            let e = ctx.world.entity(parent_id);
+            (e.r.mins, e.r.maxs)
+        };
+        if BG_FighterUpdate(ctx, pVeh, pUcmd, trMins, trMaxs, gravity, G_VehicleTrace) == qfalse {
             return qfalse;
         }
 
@@ -348,7 +349,11 @@ pub fn FighterIsLaunching(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) ->
 /// Raven `FighterSuspended`.
 ///
 /// Source: `oracle/codemp/game/FighterNPC.c:340-355`
-pub fn FighterSuspended(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> qboolean {
+pub fn FighterSuspended(
+    ctx: &mut GameContext,
+    pVeh: *mut Vehicle_t,
+    parentPS: *mut playerState_t,
+) -> qboolean {
     unsafe {
         // QAGAME-only check; jampgame always defines QAGAME, so this is
         // unconditional on the game side (the CGAME branch just returns qfalse).
@@ -357,8 +362,12 @@ pub fn FighterSuspended(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> q
             && (*pVeh).m_ucmd.forwardmove <= 0
             && !(*pVeh).m_pParentEntity.is_null()
         {
-            let parent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-            if !parent.is_null() && ((*parent).spawnflags & 2) != 0 {
+            // `m_pParentEntity` is an arena entity; read `spawnflags` through the
+            // accessor (the null guard above matches Raven's `if (parent)`).
+            let parent_id = ctx
+                .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                .unwrap();
+            if (ctx.world.entity(parent_id).spawnflags & 2) != 0 {
                 return qtrue;
             }
         }
@@ -479,8 +488,10 @@ pub fn FighterDamageRoutine(
                 // Death spiral
                 (*pVeh).m_ucmd.upmove = 0;
 
-                let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-                let num = (*parent_ent).s.number;
+                let parent_id = ctx
+                    .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                    .unwrap();
+                let num = ctx.world.entity(parent_id).s.number;
 
                 if num % 3 == 0 {
                     // NOT everyone should do this
@@ -515,9 +526,11 @@ pub fn FighterDamageRoutine(
 
         // If off the ground and not suspended, pitch down
         if (*pVeh).m_LandTrace.fraction >= 0.1f32 {
-            if FighterSuspended(pVeh, parentPS) == qfalse {
-                let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-                let num = (*parent_ent).s.number;
+            if FighterSuspended(ctx, pVeh, parentPS) == qfalse {
+                let parent_id = ctx
+                    .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                    .unwrap();
+                let num = ctx.world.entity(parent_id).s.number;
 
                 if num % 3 != 0 {
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
@@ -541,12 +554,17 @@ pub fn FighterDamageRoutine(
         // are missing, then die.
         // Source: oracle/codemp/game/FighterNPC.c:1021-1032
         if (*pVeh).m_LandTrace.fraction < 1.0f32 {
-            let parent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-            let parent_origin = (*((*parent).client)).ps.origin;
+            let parent_id = ctx
+                .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                .unwrap();
+            // `parent->client` is a pool-allocated gclient_t for vehicle NPCs:
+            // read the ptr via the accessor, deref it raw (recipe 2c pool-client).
+            let parent_client = ctx.world.entity(parent_id).client;
+            let parent_origin = (*parent_client).ps.origin;
             G_DamageFromKiller(
                 ctx,
-                ctx.entity_id_of(parent),
-                ctx.entity_id_of(parent),
+                Some(parent_id),
+                Some(parent_id),
                 None,
                 parent_origin,
                 999999,
@@ -574,8 +592,10 @@ pub fn FighterDamageRoutine(
                 factor *= 2.0f32; // All wings broken
             }
 
-            let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-            let num = (*parent_ent).s.number;
+            let parent_id = ctx
+                .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                .unwrap();
+            let num = ctx.world.entity(parent_id).s.number;
             if num % 2 == 0 || num % 6 == 0 {
                 factor *= 4.0f32;
             }
@@ -588,8 +608,10 @@ pub fn FighterDamageRoutine(
                 factor *= 2.0f32;
             }
 
-            let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-            let num = (*parent_ent).s.number;
+            let parent_id = ctx
+                .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                .unwrap();
+            let num = ctx.world.entity(parent_id).s.number;
             if num % 2 == 0 || num % 6 == 0 {
                 factor *= 4.0f32;
             }
@@ -602,8 +624,10 @@ pub fn FighterDamageRoutine(
                 factor *= 2.0f32;
             }
 
-            let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-            let num = (*parent_ent).s.number;
+            let parent_id = ctx
+                .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+                .unwrap();
+            let num = ctx.world.entity(parent_id).s.number;
             if num % 2 == 0 || num % 6 == 0 {
                 factor *= 4.0f32;
             }
@@ -736,8 +760,9 @@ pub fn FighterPitchClamp(
 pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
+        let parent_id = ctx.entity_id_of(parent as *const gentity_t).unwrap();
         let curTime: c_int = (*pVeh).m_ucmd.serverTime;
-        let parentPS: *mut playerState_t = (*parent).playerState;
+        let parentPS: *mut playerState_t = ctx.world.entity(parent_id).playerState;
         let vi = (*pVeh).m_pVehicleInfo;
 
         // Going to Hyperspace: totally override movement.
@@ -793,13 +818,7 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             if (*pVeh).m_ucmd.upmove > 0 {
                 if (*parentPS).velocity[2] <= 0.0 && (*vi).soundTakeOff != 0 {
                     // taking off for the first time (QAGAME game-side)
-                    let parent_ent = parent as *mut gentity_t;
-                    crate::g_utils::G_EntitySound(
-                        ctx,
-                        ctx.entity_id_of(parent_ent).unwrap(),
-                        CHAN_AUTO,
-                        (*vi).soundTakeOff,
-                    );
+                    crate::g_utils::G_EntitySound(ctx, parent_id, CHAN_AUTO, (*vi).soundTakeOff);
                 }
                 (*parentPS).velocity[2] += (*vi).acceleration * (*pVeh).m_fTimeModifier;
             } else if (*pVeh).m_ucmd.upmove < 0 {
@@ -831,13 +850,7 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 (*pVeh).m_iTurboTime = curTime + (*vi).turboDuration;
                 if (*vi).soundTurbo != 0 {
                     // QAGAME game-side turbo sound
-                    let parent_ent = parent as *mut gentity_t;
-                    crate::g_utils::G_EntitySound(
-                        ctx,
-                        ctx.entity_id_of(parent_ent).unwrap(),
-                        CHAN_AUTO,
-                        (*vi).soundTurbo,
-                    );
+                    crate::g_utils::G_EntitySound(ctx, parent_id, CHAN_AUTO, (*vi).soundTurbo);
                 }
             }
         }
@@ -877,7 +890,7 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             // go out of control
             (*parentPS).speed += speedInc;
             (*pVeh).m_ucmd.forwardmove = 127;
-        } else if FighterSuspended(pVeh, parentPS) != qfalse {
+        } else if FighterSuspended(ctx, pVeh, parentPS) != qfalse {
             (*parentPS).speed = 0.0;
             (*pVeh).m_ucmd.forwardmove = 0;
         } else if crate::veh_dispatch::inhabited(ctx, pVeh) == qfalse && (*parentPS).speed > 0.0 {
@@ -1049,7 +1062,7 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         // QAGAME gravity/pitch handling (the `#else` one-liner is dead in this build).
         if (*(*pVeh).m_vOrientation.add(0) * 0.1) > 10.0 {
             // pitched downward: increase speed based on tilt
-            if FighterIsInSpace(&*(parent as *mut gentity_t)) != qfalse {
+            if FighterIsInSpace(ctx.world.entity(parent_id)) != qfalse {
                 // in space, do nothing with speed based on pitch
             } else {
                 let mut mult = *(*pVeh).m_vOrientation.add(0) * 0.1;
@@ -1066,11 +1079,11 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
         if (*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime {
             // going down
-            if FighterIsInSpace(&*(parent as *mut gentity_t)) != qfalse {
+            if FighterIsInSpace(ctx.world.entity(parent_id)) != qfalse {
                 // in a valid trigger_space brush; simulate randomness
-                if (*parent).s.number & 3 == 0 {
+                if ctx.world.entity(parent_id).s.number & 3 == 0 {
                     (*parentPS).gravity = 0;
-                } else if (*parent).s.number & 2 == 0 {
+                } else if ctx.world.entity(parent_id).s.number & 2 == 0 {
                     (*parentPS).gravity = -500;
                     (*parentPS).velocity[2] = 80.0;
                 } else {
@@ -1082,13 +1095,13 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 (*parentPS).gravity = 500;
                 (*parentPS).velocity[2] = -80.0;
             }
-        } else if FighterSuspended(pVeh, parentPS) != qfalse {
+        } else if FighterSuspended(ctx, pVeh, parentPS) != qfalse {
             (*parentPS).gravity = 0;
         } else if ((*parentPS).speed == 0.0 || (*parentPS).speed < speedIdle)
             && (*pVeh).m_ucmd.upmove <= 0
         {
             // slowing down or stopped and not trying to take off
-            if FighterIsInSpace(&*(parent as *mut gentity_t)) != qfalse {
+            if FighterIsInSpace(ctx.world.entity(parent_id)) != qfalse {
                 if FighterOverValidLandingSurface(pVeh) != qfalse {
                     (*parentPS).gravity = ((speedIdle - (*parentPS).speed) / 4.0) as c_int;
                 }
@@ -1112,23 +1125,20 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
+        let parent_id = ctx.entity_id_of(parent as *const gentity_t).unwrap();
         let vi = (*pVeh).m_pVehicleInfo;
         let groundFraction = 0.1f32;
         let mut curRoll = 0.0f32;
         let curTime: c_int = (*pVeh).m_ucmd.serverTime;
 
-        // Resolve the rider (QAGAME `PM_BGEntForNum` == `&g_entities[owner]`).
-        let mut rider: *mut bgEntity_t = core::ptr::null_mut();
-        if (*parent).s.owner != ENTITYNUM_NONE {
-            rider = &mut ctx.world.g_entities[(*parent).s.owner as usize] as *mut gentity_t
-                as *mut bgEntity_t;
-        }
-        if rider.is_null() {
-            rider = parent as *mut gentity_t;
-        }
+        // Resolve the rider. Oracle `_JK2MP`: `if (owner != ENTITYNUM_NONE) rider
+        // = PM_BGEntForNum(owner);` (== `&g_entities[owner]`) then `if (!rider)
+        // rider = parent;`. `from_num` maps NONE → the parent fallback.
+        let owner = ctx.world.entity(parent_id).s.owner;
+        let rider_id = EntityId::from_num(owner).unwrap_or(parent_id);
 
-        let parentPS: *mut playerState_t = (*parent).playerState;
-        let riderPS: *mut playerState_t = (*rider).playerState;
+        let parentPS: *mut playerState_t = ctx.world.entity(parent_id).playerState;
+        let riderPS: *mut playerState_t = ctx.world.entity(rider_id).playerState;
         let isDead: qboolean = if (*parentPS).eFlags & EF_DEAD != 0 {
             qtrue
         } else {
@@ -1250,11 +1260,20 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 FighterYawAdjust(pVeh, riderPS, parentPS);
             }
         } else if ((*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime)
-            && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
+            && (ctx.world.entity(parent_id).s.number % 2 == 0
+                || ctx.world.entity(parent_id).s.number % 6 == 0)
         {
             // spiralling out of control: no yaw control
         } else if !(*pVeh).m_pPilot.is_null()
-            && (*(*pVeh).m_pPilot).s.number < MAX_CLIENTS as c_int
+            && ctx
+                .world
+                .entity(
+                    ctx.entity_id_of((*pVeh).m_pPilot as *const gentity_t)
+                        .unwrap(),
+                )
+                .s
+                .number
+                < MAX_CLIENTS as c_int
             && (*parentPS).speed > 0.0
         {
             if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) != qfalse {
@@ -1324,8 +1343,8 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         // No one aboard and up in the sky: pitch forward as it tumbles down (QAGAME).
         if crate::veh_dispatch::inhabited(ctx, pVeh) == qfalse
             && (*pVeh).m_LandTrace.fraction >= groundFraction
-            && FighterIsInSpace(&*(parent as *mut gentity_t)) == qfalse
-            && FighterSuspended(pVeh, parentPS) == qfalse
+            && FighterIsInSpace(ctx.world.entity(parent_id)) == qfalse
+            && FighterSuspended(ctx, pVeh, parentPS) == qfalse
         {
             (*pVeh).m_ucmd.upmove = 0;
             *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
@@ -1342,7 +1361,8 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             if *(*pVeh).m_vOrientation.add(2) != 0.0 {
                 // continually adjust the yaw based on the roll
                 if ((*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime)
-                    && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
+                    && (ctx.world.entity(parent_id).s.number % 2 == 0
+                        || ctx.world.entity(parent_id).s.number % 6 == 0)
                 {
                     // spiralling out of control: leave YAW alone
                 } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &ctx.world.bg_state) == qfalse {
@@ -1393,7 +1413,10 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut Anim: c_int = -1;
-        let parentPS: *mut playerState_t = (*(*pVeh).m_pParentEntity).playerState;
+        let parent_id = ctx
+            .entity_id_of((*pVeh).m_pParentEntity as *const gentity_t)
+            .unwrap();
+        let parentPS: *mut playerState_t = ctx.world.entity(parent_id).playerState;
         let curTime: c_int = ctx.world.level.time;
         let vi = (*pVeh).m_pVehicleInfo;
 
@@ -1425,13 +1448,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 if (*pVeh).m_ulFlags & VEH_GEARSOPEN == 0 {
                     if (*vi).soundLand != 0 {
                         // just landed (QAGAME game-side)
-                        let parent_ent = (*pVeh).m_pParentEntity as *mut gentity_t;
-                        crate::g_utils::G_EntitySound(
-                            ctx,
-                            ctx.entity_id_of(parent_ent).unwrap(),
-                            CHAN_AUTO,
-                            (*vi).soundLand,
-                        );
+                        crate::g_utils::G_EntitySound(ctx, parent_id, CHAN_AUTO, (*vi).soundLand);
                     }
                     (*pVeh).m_ulFlags |= VEH_GEARSOPEN;
                     Anim = BOTH_GEARS_OPEN as c_int;
