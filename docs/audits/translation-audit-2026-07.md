@@ -183,11 +183,51 @@ single-truncation parity decision (same as g_main G_RunThink, wave 3).
 Mover/trigger recalibration recorded by the auditor: power-of-two scalars
 (0.5/2.0) make f32 mul-add bit-exact vs f64 intermediates — not findings.
 
-### Wave-5 queue
+## Wave 5 (2026-07-15) — g_team+g_saga+g_arenas, g_misc+g_object+g_exphysics+g_timer+g_log, vehicles+turrets
 
-- Remaining unaudited g_* files: g_team, g_object, g_misc, g_exphysics,
-  g_vehicles + turrets, g_saga, g_arenas, g_log, g_timer, g_nav/g_navnew,
-  g_ICARUScb; then NPC_* and the ai_wpnav/CTF/Siege/chat tails from wave 3.
+### CLEAN in full
+
+g_arenas (UpdateTournamentInfo byte-faithful, dead podium block correctly
+unported); g_exphysics (every literal f32-suffixed in oracle); g_log (the
+855b73ef §19 marker stands, sibling guards all marked); g_vehicleTurret
+(all 6 fns).
+
+### Findings (fix batch below)
+
+| # | Site | Oracle | Finding | Severity |
+|---|---|---|---|---|
+| 1 | `g_team.rs:384` Team_SetFlagStatus | `g_team.c:316` | **Literal 6 instead of CS_FLAGSTATUS (23)** — every CTF/CTY flag-status update clobbers CS_SCORES1 and the flag HUD never updates. Referee-blind (duel1 has no flags). | **live CTF** |
+| 2 | `g_vehicles.rs:1371-1383` Update | `g_vehicles.c:1770,2245` | Oracle truncates `prevSpeed`/`nextSpeed` to int and compares as ints; port compares f32 — the gear-shift gate flips at fractional speeds and short-circuits `Q_irand(0,1000)` differently → **RNG stream desync**, every frame per active vehicle. | latent PRIORITY (vehicle maps/Siege) |
+| 3 | `game_globals.rs:1073` gSiegeBeginTime | `g_saga.c:39` | Oracle file-scope-inits to Q3_INFINITE; port defaults to 0 — can skip the 5s Siege warmup when both teams populate at first check. | latent (siege) |
+| 4 | `g_object.rs:239` G_RunObject | `g_object.c:196` | `normal[2] < 0.7` f32 compare; bare-double 0.7 + `<` is divergence-capable (sharp criterion) — slope-vs-bounce spine. | latent (F3) |
+| 5 | `g_misc.rs:1968,1287` shield_floor/holocron | `g_misc.c:1618-1631,1020-1033` | Spawn Z-nudge `±0.1` bare-double flattened to f32 (oracle inconsistent: ammo_floor uses 0.1f — port matches that one). | latent (spawn, low) |
+| 6 | `g_team.rs:415` Team_ForceGesture | `g_team.c:341` | Loop bound g_maxclients vs oracle MAX_CLIENTS (dead fn — call site rww-commented). | low (dead) |
+| 7 | doc-only | — | §19 notes: Team_SetFlagStatus zero-init `st[4]` (oracle sends stack garbage in non-CTF); six g_timer null guards. | doc-only |
+
+Wave-5 fix batch landed: `a1649893` (findings 1-7 + validator GAP closure:
+gPainHitLoc/gLastPrintedIndex/saberClashEventParm seeded to Raven's
+file-scope values for exact load-state parity; adversarially validated,
+full referee suite green). Validator lifecycle ruling: GameGlobals
+rebuilds per GAME_INIT, matching the oracle's dylib-reload-per-map-change
+init; light map_restart retention is a pre-existing architectural
+property, not batch-introduced.
+
+Parked additions to the single-truncation class (no action, same parity
+decision as G_RunThink): g_turret bounceCount, g_turret_G2
+attackDebounce/bounceCount, g_object hitTime, g_misc fx_runner nextthink.
+Also recorded, no action: g_saga Com_sprintf team-name-as-format (needs
+`%` in a .siege name); g_saga objective-cfg 1024 cap (needs ~511
+objectives); G_StartObjectMoving dir shadow (zero callers).
+
+RNG-coupled paths verified stream-faithful: CTF/Siege spawn selection
+(`rand() % count`), SiegeItemThink Q_irand velocities, HolocronPopOut /
+misc_faller draw orders, G_RunObject flrand order.
+
+### Wave-6 queue
+
+- Remaining g_* files: g_nav/g_navnew, g_ICARUScb, g_init_game/
+  g_shutdown_game, w_force follow-ups; then NPC_* (20+ files) and the
+  ai_wpnav/CTF/Siege/chat tails from wave 3.
 - Port-wide F3 sweep using the sharp criterion (only round-direction-
   matching literals can diverge — much smaller site set than the naive grep).
 - bg_* remainder: bg_panimate, bg_saberLoad, bg_saga, bg_vehicleLoad,
