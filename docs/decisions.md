@@ -388,3 +388,25 @@ entangled hub files (serial mandatory there — every shard rewrites shared
 dispatch tables and future shards' call sites; 2-wide worktree waves are
 allowed only for the caller-disjoint tail, with serial human-reviewed
 integration and the full referee before each commit).
+
+## DEC-25 — `last-c-golden`: frozen pre-reshape reference point (2026-07-15)
+
+The commit tagged `last-c-golden` (also branch `last-c-golden`, never
+merged, never deleted) marks the last point where `mp_game` carries its
+maximally C-faithful shape: the file-by-file translation audit is
+complete (waves 1-6 + F1/F2/F3 sweeps, eight fix batches, every batch
+adversarially validated and referee-byte-identical), and the very next
+roadmap work (safe-state Stages 4-5, bg crate split, seam ratification —
+DEC-24) deliberately reshapes internals away from the C structure per
+porting-rules §A2.
+
+What the mark certifies: audit-complete and referee-verified **on the
+exercised tape set** (mock + real-map duel1). It does NOT certify proven
+parity on referee-blind surface — the ratified verification tracks
+(scenario burn-down, expression-width harness, dual-host engine referee;
+see the wave-7 queue in `docs/audits/translation-audit-2026-07.md`) are
+queued to strengthen the claim, and a second tag may be added when they
+land. Use: permanent bisect/diff anchor if post-reshape referee runs
+diverge — the tapes and oracle harness live in-tree, so the frozen point
+remains independently checkable. CI is branch-filtered to master, so the
+tag/branch cost no CI runs.
