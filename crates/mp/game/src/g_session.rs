@@ -18,30 +18,15 @@ use mp_bg::public::duel_team::duelTeam_t::*;
 ///
 /// Source: `oracle/codemp/game/g_session.c:23-96`
 pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
-    // STAGE-1: client-index param; re-derive the raw pointer the verbatim body
-    // still expects (Stage-2 debt). `client_mut(i)` shares `level.clients`'s base,
-    // so the body's `client - level.clients` index recomputes to `client`.
-    let client: *mut gclient_t = ctx.world.client_mut(client);
     let mut siege_class: [c_char; 64] = [0; 64];
     let mut saber_type: [c_char; 64] = [0; 64];
     let mut saber2_type: [c_char; 64] = [0; 64];
 
-    unsafe {
-        core::ptr::copy_nonoverlapping(
-            (*client).sess.siegeClass.as_ptr(),
-            siege_class.as_mut_ptr(),
-            64,
-        );
-        core::ptr::copy_nonoverlapping(
-            (*client).sess.saberType.as_ptr(),
-            saber_type.as_mut_ptr(),
-            64,
-        );
-        core::ptr::copy_nonoverlapping(
-            (*client).sess.saber2Type.as_ptr(),
-            saber2_type.as_mut_ptr(),
-            64,
-        );
+    {
+        let c = ctx.world.client(client);
+        siege_class.copy_from_slice(&c.sess.siegeClass);
+        saber_type.copy_from_slice(&c.sess.saberType);
+        saber2_type.copy_from_slice(&c.sess.saber2Type);
     }
 
     let mut i = 0;
@@ -80,37 +65,31 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
     let saber_type_str = unsafe { cstr_to_str(saber_type.as_ptr()) };
     let saber2_type_str = unsafe { cstr_to_str(saber2_type.as_ptr()) };
 
-    let client_idx = {
-        let base = ctx.world.level.clients;
-        if client >= base {
-            (client as usize - base as usize) / std::mem::size_of::<gclient_t>()
-        } else {
-            0
-        }
-    };
-
-    let s = unsafe {
+    // `client - level.clients` recomputes to the client index `client` (both
+    // alias `world.clients`), so the session cvar name uses it directly.
+    let s = {
+        let c = ctx.world.client(client);
         format!(
             "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
-            (*client).sess.sessionTeam as i32,
-            (*client).sess.spectatorTime,
-            (*client).sess.spectatorState as i32,
-            (*client).sess.spectatorClient,
-            (*client).sess.wins,
-            (*client).sess.losses,
-            (*client).sess.teamLeader as i32,
-            (*client).sess.setForce,
-            (*client).sess.saberLevel,
-            (*client).sess.selectedFP,
-            (*client).sess.duelTeam,
-            (*client).sess.siegeDesiredTeam,
+            c.sess.sessionTeam as i32,
+            c.sess.spectatorTime,
+            c.sess.spectatorState as i32,
+            c.sess.spectatorClient,
+            c.sess.wins,
+            c.sess.losses,
+            c.sess.teamLeader as i32,
+            c.sess.setForce,
+            c.sess.saberLevel,
+            c.sess.selectedFP,
+            c.sess.duelTeam,
+            c.sess.siegeDesiredTeam,
             siege_class_str,
             saber_type_str,
             saber2_type_str
         )
     };
 
-    let var = format!("session{}", client_idx);
+    let var = format!("session{}", client);
     trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr(&var), cstr(&s)));
 }
 
@@ -118,131 +97,121 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
 ///
 /// Source: `oracle/codemp/game/g_session.c:105-177`
 pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
-    // STAGE-1: client-index param; re-derive the raw pointer the verbatim body
-    // still expects (Stage-2 debt).
-    let client: *mut gclient_t = ctx.world.client_mut(client);
-    unsafe {
-        let client_idx = {
-            let base = ctx.world.level.clients;
-            if client >= base {
-                (client as usize - base as usize) / std::mem::size_of::<gclient_t>()
-            } else {
-                0
-            }
-        };
+    // `client - level.clients` recomputes to the client index `client`.
+    let var = format!("session{}", client);
+    let mut s: [c_char; MAX_STRING_CHARS as usize] = [0; MAX_STRING_CHARS as usize];
 
-        let var = format!("session{}", client_idx);
-        let mut s: [c_char; MAX_STRING_CHARS as usize] = [0; MAX_STRING_CHARS as usize];
+    trap::Cvar_VariableStringBuffer(
+        ctx.engine,
+        GCvarVariableStringBufferArgs::new(cstr(&var), s.as_mut_ptr(), MAX_STRING_CHARS as i32),
+    );
 
-        trap::Cvar_VariableStringBuffer(
-            ctx.engine,
-            GCvarVariableStringBufferArgs::new(cstr(&var), s.as_mut_ptr(), MAX_STRING_CHARS as i32),
-        );
+    let s_str = unsafe { cstr_to_str(s.as_ptr()) };
+    let parts: Vec<&str> = s_str.split_whitespace().collect();
 
-        let s_str = cstr_to_str(s.as_ptr());
-        let parts: Vec<&str> = s_str.split_whitespace().collect();
+    let mut idx = 0;
+    // §19: C's sscanf leaves these uninitialized when the session string has
+    // fewer than the expected tokens and then assigns that garbage (UB); a
+    // short string reads as 0 here instead.
+    let mut session_team: i32 = 0;
+    let mut spectator_state: i32 = 0;
+    let mut team_leader: i32 = 0;
 
-        let mut idx = 0;
-        // §19: C's sscanf leaves these uninitialized when the session string has
-        // fewer than the expected tokens and then assigns that garbage (UB); a
-        // short string reads as 0 here instead.
-        let mut session_team: i32 = 0;
-        let mut spectator_state: i32 = 0;
-        let mut team_leader: i32 = 0;
+    let c = ctx.world.client_mut(client);
 
-        if idx < parts.len() {
-            session_team = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.spectatorTime = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            spectator_state = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.spectatorClient = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.wins = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.losses = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            team_leader = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.setForce = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.saberLevel = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.selectedFP = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.duelTeam = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            (*client).sess.siegeDesiredTeam = parts[idx].parse().unwrap_or(0);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            write_cstr_field(&mut (*client).sess.siegeClass, parts[idx]);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            write_cstr_field(&mut (*client).sess.saberType, parts[idx]);
-            idx += 1;
-        }
-        if idx < parts.len() {
-            write_cstr_field(&mut (*client).sess.saber2Type, parts[idx]);
-        }
-
-        let mut i = 0;
-        while i < (*client).sess.siegeClass.len() && (*client).sess.siegeClass[i] != 0 {
-            if (*client).sess.siegeClass[i] == 1 {
-                (*client).sess.siegeClass[i] = b' ' as c_char;
-            }
-            i += 1;
-        }
-
-        i = 0;
-        while i < (*client).sess.saberType.len() && (*client).sess.saberType[i] != 0 {
-            if (*client).sess.saberType[i] == 1 {
-                (*client).sess.saberType[i] = b' ' as c_char;
-            }
-            i += 1;
-        }
-
-        i = 0;
-        while i < (*client).sess.saber2Type.len() && (*client).sess.saber2Type[i] != 0 {
-            if (*client).sess.saber2Type[i] == 1 {
-                (*client).sess.saber2Type[i] = b' ' as c_char;
-            }
-            i += 1;
-        }
-
-        (*client).sess.sessionTeam = session_team as team_t;
-        (*client).sess.spectatorState =
-            core::mem::transmute::<i32, spectatorState_t>(spectator_state);
-        (*client).sess.teamLeader = if team_leader != 0 { qtrue } else { qfalse };
-
-        (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
-        (*client).ps.fd.saberDrawAnimLevel = (*client).sess.saberLevel;
-        (*client).ps.fd.forcePowerSelected = (*client).sess.selectedFP;
+    if idx < parts.len() {
+        session_team = parts[idx].parse().unwrap_or(0);
+        idx += 1;
     }
+    if idx < parts.len() {
+        c.sess.spectatorTime = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        spectator_state = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.spectatorClient = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.wins = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.losses = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        team_leader = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.setForce = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.saberLevel = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.selectedFP = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.duelTeam = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        c.sess.siegeDesiredTeam = parts[idx].parse().unwrap_or(0);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        write_cstr_field(&mut c.sess.siegeClass, parts[idx]);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        write_cstr_field(&mut c.sess.saberType, parts[idx]);
+        idx += 1;
+    }
+    if idx < parts.len() {
+        write_cstr_field(&mut c.sess.saber2Type, parts[idx]);
+    }
+
+    let mut i = 0;
+    while i < c.sess.siegeClass.len() && c.sess.siegeClass[i] != 0 {
+        if c.sess.siegeClass[i] == 1 {
+            c.sess.siegeClass[i] = b' ' as c_char;
+        }
+        i += 1;
+    }
+
+    i = 0;
+    while i < c.sess.saberType.len() && c.sess.saberType[i] != 0 {
+        if c.sess.saberType[i] == 1 {
+            c.sess.saberType[i] = b' ' as c_char;
+        }
+        i += 1;
+    }
+
+    i = 0;
+    while i < c.sess.saber2Type.len() && c.sess.saber2Type[i] != 0 {
+        if c.sess.saber2Type[i] == 1 {
+            c.sess.saber2Type[i] = b' ' as c_char;
+        }
+        i += 1;
+    }
+
+    c.sess.sessionTeam = session_team as team_t;
+    // spectatorState_t is `#[repr(i32)]`; the sscanf'd int transmutes to it.
+    c.sess.spectatorState =
+        unsafe { core::mem::transmute::<i32, spectatorState_t>(spectator_state) };
+    c.sess.teamLeader = if team_leader != 0 { qtrue } else { qfalse };
+
+    c.ps.fd.saberAnimLevel = c.sess.saberLevel;
+    c.ps.fd.saberDrawAnimLevel = c.sess.saberLevel;
+    c.ps.fd.forcePowerSelected = c.sess.selectedFP;
 }
 
 /// Raven `G_InitSessionData`.
@@ -254,88 +223,95 @@ pub fn G_InitSessionData(
     userinfo: *mut c_char,
     isBot: qboolean,
 ) {
-    // STAGE-1: client-index param; re-derive the raw pointer the verbatim body
-    // still expects (Stage-2 debt), keeping the index for the write-back call.
-    let client_index: usize = client;
-    let client: *mut gclient_t = ctx.world.client_mut(client);
-    unsafe {
-        (*client).sess.siegeDesiredTeam = TEAM_FREE;
+    // `client - level.clients` recomputes to the client index `client`.
+    let client_id = EntityId(client as u32);
 
-        if ctx.world.cvars.g_gametype.integer >= GT_TEAM as i32 {
-            if ctx.world.cvars.g_teamAutoJoin.integer != 0 {
-                (*client).sess.sessionTeam = PickTeam(ctx, -1);
-                let client_id = EntityId(client.offset_from(ctx.world.level.clients) as u32);
-                BroadcastTeamChange(ctx, client_id, -1);
-            } else {
-                if isBot == qfalse {
-                    (*client).sess.sessionTeam = TEAM_SPECTATOR;
-                } else {
-                    let value = Info_ValueForKey(
-                        &mut ctx.world.bg_state.qs,
-                        userinfo,
-                        cstr("team").as_ptr(),
-                    );
-                    let value_char = if value.is_null() { 0 as c_char } else { *value };
-                    let client_id = EntityId(client.offset_from(ctx.world.level.clients) as u32);
-                    if value_char == b'r' as c_char || value_char == b'R' as c_char {
-                        (*client).sess.sessionTeam = TEAM_RED;
-                    } else if value_char == b'b' as c_char || value_char == b'B' as c_char {
-                        (*client).sess.sessionTeam = TEAM_BLUE;
-                    } else {
-                        (*client).sess.sessionTeam = PickTeam(ctx, -1);
-                    }
-                    BroadcastTeamChange(ctx, client_id, -1);
-                }
-            }
+    ctx.world.client_mut(client).sess.siegeDesiredTeam = TEAM_FREE;
+
+    if ctx.world.cvars.g_gametype.integer >= GT_TEAM as i32 {
+        if ctx.world.cvars.g_teamAutoJoin.integer != 0 {
+            let team = PickTeam(ctx, -1);
+            ctx.world.client_mut(client).sess.sessionTeam = team;
+            BroadcastTeamChange(ctx, client_id, -1);
         } else {
-            let value =
-                Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo, cstr("team").as_ptr());
-            let value_char = if value.is_null() { 0 as c_char } else { *value };
-            if value_char == b's' as c_char {
-                (*client).sess.sessionTeam = TEAM_SPECTATOR;
+            if isBot == qfalse {
+                ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
             } else {
-                match ctx.world.cvars.g_gametype.integer {
-                    x if x == GT_DUEL as i32 => {
-                        if ctx.world.level.numNonSpectatorClients >= 2 {
-                            (*client).sess.sessionTeam = TEAM_SPECTATOR;
-                        } else {
-                            (*client).sess.sessionTeam = TEAM_FREE;
-                        }
+                let value =
+                    Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo, cstr("team").as_ptr());
+                // `value` is the info-string return (seam), deref stays raw.
+                let value_char = if value.is_null() {
+                    0 as c_char
+                } else {
+                    unsafe { *value }
+                };
+                if value_char == b'r' as c_char || value_char == b'R' as c_char {
+                    ctx.world.client_mut(client).sess.sessionTeam = TEAM_RED;
+                } else if value_char == b'b' as c_char || value_char == b'B' as c_char {
+                    ctx.world.client_mut(client).sess.sessionTeam = TEAM_BLUE;
+                } else {
+                    let team = PickTeam(ctx, -1);
+                    ctx.world.client_mut(client).sess.sessionTeam = team;
+                }
+                BroadcastTeamChange(ctx, client_id, -1);
+            }
+        }
+    } else {
+        let value = Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo, cstr("team").as_ptr());
+        // `value` is the info-string return (seam), deref stays raw.
+        let value_char = if value.is_null() {
+            0 as c_char
+        } else {
+            unsafe { *value }
+        };
+        if value_char == b's' as c_char {
+            ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
+        } else {
+            match ctx.world.cvars.g_gametype.integer {
+                x if x == GT_DUEL as i32 => {
+                    if ctx.world.level.numNonSpectatorClients >= 2 {
+                        ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
+                    } else {
+                        ctx.world.client_mut(client).sess.sessionTeam = TEAM_FREE;
                     }
-                    x if x == GT_POWERDUEL as i32 => {
-                        let mut loners: c_int = 0;
-                        let mut doubles: c_int = 0;
-                        G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
-                        if doubles == 0 || loners > (doubles / 2) {
-                            (*client).sess.duelTeam = DUELTEAM_DOUBLE as c_int;
-                        } else {
-                            (*client).sess.duelTeam = DUELTEAM_LONE as c_int;
-                        }
-                        (*client).sess.sessionTeam = TEAM_SPECTATOR;
+                }
+                x if x == GT_POWERDUEL as i32 => {
+                    let mut loners: c_int = 0;
+                    let mut doubles: c_int = 0;
+                    G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
+                    if doubles == 0 || loners > (doubles / 2) {
+                        ctx.world.client_mut(client).sess.duelTeam = DUELTEAM_DOUBLE as c_int;
+                    } else {
+                        ctx.world.client_mut(client).sess.duelTeam = DUELTEAM_LONE as c_int;
                     }
-                    _ => {
-                        if ctx.world.cvars.g_maxGameClients.integer > 0
-                            && ctx.world.level.numNonSpectatorClients
-                                >= ctx.world.cvars.g_maxGameClients.integer
-                        {
-                            (*client).sess.sessionTeam = TEAM_SPECTATOR;
-                        } else {
-                            (*client).sess.sessionTeam = TEAM_FREE;
-                        }
+                    ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
+                }
+                _ => {
+                    if ctx.world.cvars.g_maxGameClients.integer > 0
+                        && ctx.world.level.numNonSpectatorClients
+                            >= ctx.world.cvars.g_maxGameClients.integer
+                    {
+                        ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
+                    } else {
+                        ctx.world.client_mut(client).sess.sessionTeam = TEAM_FREE;
                     }
                 }
             }
         }
-
-        (*client).sess.spectatorState = SPECTATOR_FREE;
-        (*client).sess.spectatorTime = ctx.world.level.time;
-
-        (*client).sess.siegeClass[0] = 0;
-        (*client).sess.saberType[0] = 0;
-        (*client).sess.saber2Type[0] = 0;
-
-        G_WriteClientSessionData(ctx, client_index);
     }
+
+    ctx.world.client_mut(client).sess.spectatorState = SPECTATOR_FREE;
+    let time = ctx.world.level.time;
+    ctx.world.client_mut(client).sess.spectatorTime = time;
+
+    {
+        let c = ctx.world.client_mut(client);
+        c.sess.siegeClass[0] = 0;
+        c.sess.saberType[0] = 0;
+        c.sess.saber2Type[0] = 0;
+    }
+
+    G_WriteClientSessionData(ctx, client);
 }
 
 /// Raven `G_InitWorldSession`.
@@ -368,15 +344,12 @@ pub fn G_InitWorldSession(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_session.c:312-322`
 pub fn G_WriteSessionData(ctx: &mut GameContext) {
-    unsafe {
-        let s = format!("{}", ctx.world.cvars.g_gametype.integer);
-        trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("session"), cstr(&s)));
+    let s = format!("{}", ctx.world.cvars.g_gametype.integer);
+    trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("session"), cstr(&s)));
 
-        for i in 0..ctx.world.level.maxclients {
-            let client = ctx.world.level.clients.add(i as usize);
-            if (*client).pers.connected == CON_CONNECTED {
-                G_WriteClientSessionData(ctx, i as usize);
-            }
+    for i in 0..ctx.world.level.maxclients {
+        if ctx.world.client(i as usize).pers.connected == CON_CONNECTED {
+            G_WriteClientSessionData(ctx, i as usize);
         }
     }
 }
