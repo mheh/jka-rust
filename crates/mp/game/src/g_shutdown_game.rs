@@ -1,5 +1,4 @@
 //! `g_shutdown_game` — Raven `G_ShutdownGame`.
-#![deny(unsafe_code)]
 
 use std::ffi::CString;
 
@@ -56,13 +55,15 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
             );
             ctx.world.g_entities[i].ghoul2 = core::ptr::null_mut();
         }
-        // A non-null `ent->client` only ever occurs for player slots
-        // (i < MAX_CLIENTS), where `ent->client == &level.clients[i]`
-        // (g_client.rs:1874), so the client index is the loop index `i`
-        // (the g_session.rs `client_mut` precedent).
-        if !ctx.world.g_entities[i].client.is_null() {
+        // `ent->client` is non-null for player slots (arena `clients[i]`) AND
+        // for NPCs at i >= MAX_CLIENTS, whose clients are BG_Alloc'd pool
+        // structs (`gClPtrs`) that `G_FreeFakeClient` never frees or nulls —
+        // so the weaponGhoul2 reads must go through the entity's client
+        // pointer (gclient deref regime, task #7), not `clients[i]`.
+        let client = ctx.world.g_entities[i].client;
+        if !client.is_null() {
             for j in 0..MAX_SABERS {
-                let weapon_ghoul2 = ctx.world.clients[i].weaponGhoul2[j];
+                let weapon_ghoul2 = unsafe { (*client).weaponGhoul2[j] };
                 if !weapon_ghoul2.is_null()
                     && trap::G2_HaveWeGhoul2Models(
                         ctx.engine,
@@ -71,9 +72,9 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
                 {
                     trap::G2API_CleanGhoul2Models(
                         ctx.engine,
-                        GG2CleanmodelsArgs::new(
-                            &mut ctx.world.clients[i].weaponGhoul2[j] as *mut *mut c_void,
-                        ),
+                        GG2CleanmodelsArgs::new(unsafe {
+                            core::ptr::addr_of_mut!((*client).weaponGhoul2[j]) as *mut *mut c_void
+                        }),
                     );
                 }
             }
