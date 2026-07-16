@@ -481,15 +481,18 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let spawner: *mut gentity_t = ctx.entity_mut(spawner);
+        // `spawner` stays an `EntityId`; entity fields go through
+        // `ctx.world.entity(spawner)` accessor borrows (2c). Its pool `client`
+        // (`gClPtrs`) is read via the safe borrow, then dereffed raw.
         let mut player_team: team_t = NPCTEAM_FREE;
         let mut md3_model: qboolean = 0; // qfalse
         let mut custom_skin: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut sound: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut playerModel: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-        if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), (*spawner).NPC_type) == 0 {
+        if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), ctx.world.entity(spawner).NPC_type)
+            == 0
+        {
             //sorry, can't precache a random just yet
             return;
         }
@@ -513,7 +516,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
             if *token == 0 {
                 return;
             }
-            if crate::q_shared::Q_stricmp(token, (*spawner).NPC_type) == 0 {
+            if crate::q_shared::Q_stricmp(token, ctx.world.entity(spawner).NPC_type) == 0 {
                 break;
             }
             crate::q_shared::SkipBracedSection(
@@ -546,7 +549,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
             if *token == 0 {
                 let msg = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
-                    cstr_to_str((*spawner).NPC_type)
+                    cstr_to_str(ctx.world.entity(spawner).NPC_type)
                 );
                 crate::g_main::Com_Printf(cstr(&msg).as_ptr());
                 return;
@@ -680,12 +683,13 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                if (*spawner).r.svFlags & SVF_NO_BASIC_SOUNDS == 0 {
+                if ctx.world.entity(spawner).r.svFlags & SVF_NO_BASIC_SOUNDS == 0 {
                     crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
                     let sound_s = cstr_to_str(sound.as_ptr());
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
-                    (*spawner).s.csSounds_Std = crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                    ctx.world.entity_mut(spawner).s.csSounds_Std =
+                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
                 }
                 continue;
             }
@@ -701,12 +705,12 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                if (*spawner).r.svFlags & SVF_NO_COMBAT_SOUNDS == 0 {
+                if ctx.world.entity(spawner).r.svFlags & SVF_NO_COMBAT_SOUNDS == 0 {
                     crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
                     let sound_s = cstr_to_str(sound.as_ptr());
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
-                    (*spawner).s.csSounds_Combat =
+                    ctx.world.entity_mut(spawner).s.csSounds_Combat =
                         crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
                 }
                 continue;
@@ -723,12 +727,12 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                if (*spawner).r.svFlags & SVF_NO_EXTRA_SOUNDS == 0 {
+                if ctx.world.entity(spawner).r.svFlags & SVF_NO_EXTRA_SOUNDS == 0 {
                     crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
                     let sound_s = cstr_to_str(sound.as_ptr());
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
-                    (*spawner).s.csSounds_Extra =
+                    ctx.world.entity_mut(spawner).s.csSounds_Extra =
                         crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
                 }
                 continue;
@@ -745,12 +749,12 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                if (*spawner).r.svFlags & SVF_NO_EXTRA_SOUNDS == 0 {
+                if ctx.world.entity(spawner).r.svFlags & SVF_NO_EXTRA_SOUNDS == 0 {
                     crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
                     let sound_s = cstr_to_str(sound.as_ptr());
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
-                    (*spawner).s.csSounds_Jedi =
+                    ctx.world.entity_mut(spawner).s.csSounds_Jedi =
                         crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
                 }
                 continue;
@@ -787,7 +791,10 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         }
 
         // If we're not a vehicle, then an error here would be valid...
-        let client_ptr = (*spawner).client;
+        // FLAG: `spawner.client` is a `BG_Alloc`'d pool `gClPtrs` client
+        // (`g_utils.c:430`), not a `level.clients` slot; read the pointer via the
+        // safe borrow, deref raw (recipe 2b/2c).
+        let client_ptr = ctx.world.entity(spawner).client;
         if client_ptr.is_null() || (*client_ptr).NPC_class != CLASS_VEHICLE {
             if md3_model != 0 {
                 crate::g_main::Com_Printf(
@@ -809,11 +816,13 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         }
 
         //precache this NPC's possible weapons
+        let spawner_spawnflags = ctx.world.entity(spawner).spawnflags;
+        let spawner_npc_type = ctx.world.entity(spawner).NPC_type;
         crate::NPC_stats::NPC_PrecacheWeapons(
             ctx,
             player_team,
-            (*spawner).spawnflags,
-            (*spawner).NPC_type,
+            spawner_spawnflags,
+            spawner_npc_type,
         );
 
         //	CG_RegisterNPCCustomSounds( &ci );
@@ -832,24 +841,28 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
-        // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-        let NPC: *mut gentity_t = ctx.entity_mut(NPC);
+        // `NPC` stays an `EntityId`; entity fields go through
+        // `ctx.world.entity(NPC)` accessor borrows (2c).
         let mut NPCName = NPCName_in;
 
         let mut sound: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut playerModel: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut customSkin: [c_char; MAX_QPATH] = [0; MAX_QPATH];
-        let client_ptr = (*NPC).client;
+        // FLAG: `NPC.client`/`NPC.NPC` are `BG_Alloc`'d pool `gClPtrs`/`gNPC_t`
+        // (`g_utils.c:430`), not `level.clients`/accessor-backed; read the raw
+        // pointer values via the safe borrow, deref raw below (recipe 2b/2c).
+        let client_ptr = ctx.world.entity(NPC).client;
         let ri: *mut renderInfo_t = &mut (*client_ptr).renderInfo as *mut renderInfo_t;
         let mut stats: *mut gNPCstats_t = std::ptr::null_mut();
         let mut md3Model: qboolean = 1; // qtrue
         let mut surfOff: [c_char; 1024] = [0; 1024];
         let mut surfOn: [c_char; 1024] = [0; 1024];
-        let parsingPlayer: qboolean = if (*NPC).s.number == 0 && !client_ptr.is_null() {
-            1
-        } else {
-            0
-        };
+        let parsingPlayer: qboolean =
+            if ctx.world.entity(NPC).s.number == 0 && !client_ptr.is_null() {
+                1
+            } else {
+                0
+            };
         let mut localPlayerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
         let mut localPlayerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
         let mut npcSaber1: c_int = 0;
@@ -860,7 +873,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             NPCName = c"Player".as_ptr();
         }
 
-        let npc_ptr = (*NPC).NPC;
+        let npc_ptr = ctx.world.entity(NPC).NPC;
         if !npc_ptr.is_null() {
             stats = &mut (*npc_ptr).stats as *mut gNPCstats_t;
             // fill in defaults
@@ -904,8 +917,11 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         (*ri).torsoPitchRangeUp = 30;
         (*ri).torsoPitchRangeDown = 50;
 
-        (*NPC).r.mins = localPlayerMins;
-        (*NPC).r.maxs = localPlayerMaxs;
+        {
+            let e = ctx.world.entity_mut(NPC);
+            e.r.mins = localPlayerMins;
+            e.r.maxs = localPlayerMaxs;
+        }
         (*client_ptr).ps.crouchheight = CROUCH_MAXS_2 as c_int;
         (*client_ptr).ps.standheight = DEFAULT_MAXS_2 as c_int;
 
@@ -1259,7 +1275,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     }
 
                     let scale = n0 as f32 / 100.0f32;
-                    (*NPC).modelScale = [scale, scale, scale];
+                    ctx.world.entity_mut(NPC).modelScale = [scale, scale, scale];
                 }
                 continue;
             }
@@ -1583,7 +1599,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                (*NPC).fullName = crate::g_spawn::G_NewString(ctx, value);
+                let full_name = crate::g_spawn::G_NewString(ctx, value);
+                ctx.world.entity_mut(NPC).fullName = full_name;
                 continue;
             }
 
@@ -1605,7 +1622,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     tk_c.as_ptr(),
                 );
                 (*client_ptr).playerTeam = team_id;
-                (*NPC).s.teamowner = team_id;
+                ctx.world.entity_mut(NPC).s.teamowner = team_id;
                 continue;
             }
 
@@ -1654,11 +1671,11 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     } else {
                         class_t::CLASS_NONE
                     };
-                (*NPC).s.NPC_class = class_id; //we actually only need this value now, but at the moment I don't feel like changing the 200+ references to client->NPC_class.
+                ctx.world.entity_mut(NPC).s.NPC_class = class_id; //we actually only need this value now, but at the moment I don't feel like changing the 200+ references to client->NPC_class.
 
                 // No md3's for vehicles.
                 if (*client_ptr).NPC_class == CLASS_VEHICLE {
-                    if (*NPC).m_pVehicle.is_null() {
+                    if ctx.world.entity(NPC).m_pVehicle.is_null() {
                         //you didn't spawn this guy right!
                         let msg = format!(
                             "ERROR: Tried to spawn a vehicle NPC ({}) without using NPC_Vehicle or 'NPC spawn vehicle <vehiclename>'!!!  Bad, bad, bad!  Shame on you!\n",
@@ -1722,10 +1739,13 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                (*NPC).r.mins[0] = -(n0 as f32);
-                (*NPC).r.mins[1] = -(n0 as f32);
-                (*NPC).r.maxs[0] = n0 as f32;
-                (*NPC).r.maxs[1] = n0 as f32;
+                {
+                    let e = ctx.world.entity_mut(NPC);
+                    e.r.mins[0] = -(n0 as f32);
+                    e.r.mins[1] = -(n0 as f32);
+                    e.r.maxs[0] = n0 as f32;
+                    e.r.maxs[1] = n0 as f32;
+                }
                 continue;
             }
 
@@ -1739,9 +1759,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                let vehForHeight = (*NPC).m_pVehicle;
+                let vehForHeight = ctx.world.entity(NPC).m_pVehicle;
                 if (*client_ptr).NPC_class == CLASS_VEHICLE
-                    && !(*NPC).m_pVehicle.is_null()
+                    && !ctx.world.entity(NPC).m_pVehicle.is_null()
                     && !(*vehForHeight).m_pVehicleInfo.is_null()
                     && (*(*vehForHeight).m_pVehicleInfo).r#type == VH_FIGHTER
                 {
@@ -1749,22 +1769,31 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     // Raven `maxs[2] = ps.standheight = (n/2.0f)`: the chained assign stores
                     // through int `standheight` first, so `maxs[2]` gets the truncated `floor(n/2)`.
                     (*client_ptr).ps.standheight = (n0 as f32 / 2.0f32) as c_int;
-                    (*NPC).r.maxs[2] = (*client_ptr).ps.standheight as f32;
-                    (*NPC).r.mins[2] = -(*NPC).r.maxs[2];
-                    (*NPC).s.origin[2] += (DEFAULT_MINS_2 - (*NPC).r.mins[2]) + 0.125f32;
-                    crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*client_ptr).ps.origin);
-                    crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*NPC).r.currentOrigin);
-                    crate::g_utils::G_SetOrigin(&mut *(NPC), (*NPC).s.origin);
+                    let standheight_f = (*client_ptr).ps.standheight as f32;
+                    ctx.world.entity_mut(NPC).r.maxs[2] = standheight_f;
+                    let maxs2 = ctx.world.entity(NPC).r.maxs[2];
+                    ctx.world.entity_mut(NPC).r.mins[2] = -maxs2;
+                    let mins2 = ctx.world.entity(NPC).r.mins[2];
+                    ctx.world.entity_mut(NPC).s.origin[2] += (DEFAULT_MINS_2 - mins2) + 0.125f32;
+                    let origin = ctx.world.entity(NPC).s.origin;
+                    crate::q_math::_VectorCopy(origin, &mut (*client_ptr).ps.origin);
+                    crate::q_math::_VectorCopy(
+                        origin,
+                        &mut ctx.world.entity_mut(NPC).r.currentOrigin,
+                    );
+                    crate::g_utils::G_SetOrigin(ctx.world.entity_mut(NPC), origin);
+                    let np = ctx.world.entity_mut(NPC) as *mut gentity_t;
                     trap::LinkEntity(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(NPC.cast()),
+                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(np.cast()),
                     );
                 } else {
-                    (*NPC).r.mins[2] = DEFAULT_MINS_2; //Cannot change
-                    (*NPC).r.maxs[2] = n0 as f32 + DEFAULT_MINS_2;
-                    (*client_ptr).ps.standheight = (*NPC).r.maxs[2] as c_int;
+                    ctx.world.entity_mut(NPC).r.mins[2] = DEFAULT_MINS_2; //Cannot change
+                    ctx.world.entity_mut(NPC).r.maxs[2] = n0 as f32 + DEFAULT_MINS_2;
+                    let maxs2 = ctx.world.entity(NPC).r.maxs[2];
+                    (*client_ptr).ps.standheight = maxs2 as c_int;
                 }
-                (*NPC).radius = n0 as f32;
+                ctx.world.entity_mut(NPC).radius = n0 as f32;
                 continue;
             }
 
@@ -1949,7 +1978,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         {
                             continue 'parse;
                         }
-                        if (*NPC).r.svFlags & $flag == 0 {
+                        if ctx.world.entity(NPC).r.svFlags & $flag == 0 {
                             crate::q_shared::Q_strncpyz(
                                 sound.as_mut_ptr(),
                                 value,
@@ -2524,8 +2553,11 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 );
             }
 
-            (*NPC).s.npcSaber1 = npcSaber1;
-            (*NPC).s.npcSaber2 = npcSaber2;
+            {
+                let e = ctx.world.entity_mut(NPC);
+                e.s.npcSaber1 = npcSaber1;
+                e.s.npcSaber2 = npcSaber2;
+            }
 
             if customSkin[0] == 0 {
                 write_cstr_field(&mut customSkin, "default");
@@ -2538,22 +2570,22 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             }
             crate::g_client::SetupGameGhoul2Model(
                 ctx,
-                ctx.entity_id_of(NPC).unwrap(),
+                NPC,
                 playerModel.as_mut_ptr(),
                 customSkin.as_mut_ptr(),
             );
 
-            if (*NPC).NPC_type.is_null() {
+            if ctx.world.entity(NPC).NPC_type.is_null() {
                 //just do this for now so NPC_Precache can see the name.
-                (*NPC).NPC_type = NPCName as *mut c_char;
+                ctx.world.entity_mut(NPC).NPC_type = NPCName as *mut c_char;
                 set_type_back = 1;
             }
 
-            NPC_Precache(ctx, ctx.entity_id_of(NPC).unwrap()); //this will just soundindex some values for sounds on the client,
+            NPC_Precache(ctx, NPC); //this will just soundindex some values for sounds on the client,
 
             if set_type_back != 0 {
                 //don't want this being set if we aren't ready yet.
-                (*NPC).NPC_type = std::ptr::null_mut();
+                ctx.world.entity_mut(NPC).NPC_type = std::ptr::null_mut();
             }
         } else {
             crate::g_main::Com_Printf(cstr("MD3 MODEL NPC'S ARE NOT SUPPORTED IN MP!\n").as_ptr());
