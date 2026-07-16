@@ -145,16 +145,53 @@ with SSE f32 operands, a double-vs-f32 threshold compare diverges ONLY at
 f32 rounding direction — `>`/`>=` diverge for round-UP literals (0.1, 0.2,
 0.3, 0.4, 0.6, 0.8…), `<`/`<=` for round-DOWN literals (0.7, 0.9…).
 
-### Wave-4 queue
+## Wave 4 (2026-07-15) — bg_itemlist+g_cmds-tail+g_main-helpers, g_mover+g_trigger+g_target, g_bot+g_session+g_spawn+g_svcmds
 
-- bg_itemlist table check (`crates/mp/bg/src/public/bg_itemlist.rs`).
-- g_cmds ~38-fn unaudited tail; g_main scoring/vote helpers (spot-checked
-  only); ai_wpnav + CTF/Siege/chat tails above.
-- Remaining unaudited g_* files: g_mover, g_trigger, g_target, g_team,
-  g_bot, g_session, g_spawn, g_svcmds, g_object, g_misc, g_exphysics,
-  g_vehicles + turrets, w_saber follow-ups; then NPC_*.
+### CLEAN in full
+
+bg_itemlist (all 52 rows field-by-field, missing-comma quirk preserved —
+closes the wave-3 coverage note); g_main scoring/vote/tournament helpers
+(vote int-division thresholds, SortRanks comparator signs); g_trigger (all
+42 fns — RNG-coupled strike/asteroid paths operand-faithful, crandom
+nextthink chains correctly f64); g_bot (G_AddRandomBot RNG stream-faithful
+— relevant negative result for the lethality residual); g_session
+round-trip; g_svcmds filters.
+
+### Findings (fix batch below)
+
+| # | Site | Oracle | Finding | Severity |
+|---|---|---|---|---|
+| 1 | `g_mover.rs:261-271` G_TryPushingEntity | `g_mover.c:185` | Rotating-crusher G_Damage passes dflags 0; oracle passes DAMAGE_NO_KNOCKBACK (port flings crushed entities retail doesn't). Stale "const not ported" comment — it is. | live-branch |
+| 2 | `g_mover.rs:794,809` SetMoverState | `g_mover.c:560,575` | `1000.0/trDuration` f64 divide flattened to f32 — trDelta crosses the wire into mover prediction. | latent (wire) |
+| 3 | `g_spawn.rs:1122-1124` G_ParseSpawnVars | `g_spawn.c:1061-1064` | **Structural**: HandleEntityAdjustment called per key/value pair; oracle calls once after the loop. Sub-BSP instances re-rotate/re-prefix N times. | latent (sub-BSP) |
+| 4 | `g_spawn.rs:623-700` FIELDS behaviorSet | `g_spawn.c:106-121` | Offsets hard-code 8-byte pointer stride — wrong on ILP32 retail target (4-byte slots); referee-blind (LP64 correct). | latent (ILP32) |
+| 5 | `g_cmds.rs:854` G_CheckTKAutoKickBan | `g_cmds.c:541` | Added `IPstring[0]!=0` guard; C tests the array address (always true) — AddIP skipped for empty-IP clients. Twin in Cmd_Kill_f ported correctly. | rare-branch |
+| 6 | `g_cmds.rs:285` ConcatArgs | `g_cmds.c:137-149` | **Root of the UTF-8 latent class**: from_utf8_lossy inflates 0x80-0xFF and shifts the MAX_STRING_CHARS break point vs C's strlen/memcpy. | latent (class root) |
+| 7 | `g_cmds.rs:825` Cmd_TeamTask_f | `g_cmds.c:520-521` | Whole userinfo lossily re-encoded and persisted via SetUserinfo; C mutates one key in place. | latent |
+| 8 | `g_spawn.rs:948,1009` HandleEntityAdjustment | `g_spawn.c:905,945-949` | DEG2RAD all-f32 (C: f64 via double M_PI); fresh `direction` buffer vs oracle's reused `angles` on partial sscanf. | latent (sub-BSP) |
+| 9 | `g_target.rs:253-259` Use_Target_Print | `g_target.c:149-181` | `#ifndef FINAL_BUILD` Com_Error aborts dropped (live in referee build; genericValue15 write kept — inconsistent). | low |
+| 10 | doc-only | — | §19 notes needed: Cmd_DebugSetSaberMove_f negative-index panic pick; G_LoadIPBans defined banIPFile. | doc-only |
+
+Wave-4 fix batch landed: `c4d17d75` (findings 1-10 above; adversarially
+validated, full referee suite green).
+
+Parked (recorded, no action): remaining lossy-UTF-8 netname print
+instances (class shrinks once ConcatArgs is byte-exact); g_session
+sscanf-abort vs parse-continue on corrupt cvars; w_force ForceThrow
+`forward` persistence (wave 3 #2); the `(float)level.time + X`
+single-truncation parity decision (same as g_main G_RunThink, wave 3).
+Mover/trigger recalibration recorded by the auditor: power-of-two scalars
+(0.5/2.0) make f32 mul-add bit-exact vs f64 intermediates — not findings.
+
+### Wave-5 queue
+
+- Remaining unaudited g_* files: g_team, g_object, g_misc, g_exphysics,
+  g_vehicles + turrets, g_saga, g_arenas, g_log, g_timer, g_nav/g_navnew,
+  g_ICARUScb; then NPC_* and the ai_wpnav/CTF/Siege/chat tails from wave 3.
 - Port-wide F3 sweep using the sharp criterion (only round-direction-
   matching literals can diverge — much smaller site set than the naive grep).
+- bg_* remainder: bg_panimate, bg_saberLoad, bg_saga, bg_vehicleLoad,
+  bg_g2_utils, q_math (vs oracle q_math.c), bg_lib divergence check.
 
 ### NEW SWEEP ITEM — F3: unsuffixed-double THRESHOLD COMPARES in f32
 
