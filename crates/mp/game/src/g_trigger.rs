@@ -69,10 +69,10 @@ pub const PUSH_LINEAR: c_int = 4;
 pub const PUSH_RELATIVE: c_int = 16;
 // Source: oracle/codemp/game/g_trigger.c:897
 pub const PUSH_MULTIPLE: c_int = 2048;
-// Source: oracle/codemp/game/bg_public.h:1679
-pub const HYPERSPACE_TIME: c_int = 4000;
-// Source: oracle/codemp/game/bg_public.h:1680
-pub const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75;
+// `HYPERSPACE_TIME`/`HYPERSPACE_TELEPORT_FRAC` are `bg_public.h` constants; they
+// live in `mp_bg::public::hyperspace` (bg consumers reach them there) and reach
+// this file through `crate::prelude::*`.
+// Source: oracle/codemp/game/bg_public.h:1679-1680
 // `EF2_HYPERSPACE`/`EF_RAG` are ported (`mp_bg::public::entity_effects`) and
 // reach this file through `crate::prelude::*`.
 // Source: oracle/codemp/game/g_trigger.c:1441

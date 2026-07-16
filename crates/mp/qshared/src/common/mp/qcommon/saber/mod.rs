@@ -2,6 +2,7 @@
 
 pub mod blade_info;
 pub mod saber_colors;
+pub mod saber_flags;
 pub mod saber_info;
 pub mod saber_styles;
 pub mod saber_trail;

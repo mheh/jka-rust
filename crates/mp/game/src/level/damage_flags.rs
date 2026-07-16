@@ -1,5 +1,9 @@
 //! MP `DAMAGE_*` flags (`means-of-damage` modifiers).
 //!
+//! This is the canonical (game-tier) home. `DAMAGE_NO_ARMOR` — the one flag bg
+//! consumes (`bg_slidemove`) — is mirrored as a bit-identical twin in
+//! `mp_bg::public::damage_flags` (keep the value in sync).
+//!
 //! Source: `oracle/codemp/game/g_local.h:1170-1190`
 
 use core::ffi::c_int;

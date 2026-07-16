@@ -29,12 +29,14 @@ use mp_qshared::shared::MAX_CLIENTS;
 // Source: `oracle/codemp/game/q_shared.h`
 
 // Raven color escape `#define`s (porting-rules §C8: `#define` -> `const`).
+// Relocated to the qshared tier (`q_shared.h` is a shared header) for the bg
+// crate; re-exported here so game importers and the prelude keep resolving
+// `crate::g_team::S_COLOR_*` unchanged. Canonical home:
+// `mp_qshared::shared::q_color`.
 // Source: `oracle/codemp/game/q_shared.h:1145-1167`
-pub const S_COLOR_RED: &CStr = c"^1";
-pub const S_COLOR_GREEN: &CStr = c"^2";
-pub const S_COLOR_YELLOW: &CStr = c"^3";
-pub const S_COLOR_BLUE: &CStr = c"^4";
-pub const S_COLOR_WHITE: &CStr = c"^7";
+pub use mp_qshared::shared::q_color::{
+    S_COLOR_BLUE, S_COLOR_GREEN, S_COLOR_RED, S_COLOR_WHITE, S_COLOR_YELLOW,
+};
 
 // Raven color index `#define`s (porting-rules §C8: `#define` -> `const`).
 // Source: `oracle/codemp/game/q_shared.h:1150-1157`

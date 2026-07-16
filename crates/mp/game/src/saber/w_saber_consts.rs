@@ -1,6 +1,11 @@
 //! MP `w_saber.h` free-standing `#define` constants and the anonymous
 //! force-jump-direction enum.
 //!
+//! This is the canonical (game-tier) home. The subset bg consumes
+//! (`SEF_LOCK_WON`, `SABER_RADIUS_STANDARD`, `SABERMINS_*`/`SABERMAXS_*`,
+//! `SABER_MIN_THROW_DIST`) is mirrored as bit-identical twins in
+//! `mp_bg::public::saber_consts` (keep values in sync).
+//!
 //! Source: `oracle/codemp/game/w_saber.h`
 
 use core::ffi::c_int;
