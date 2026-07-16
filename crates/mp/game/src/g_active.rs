@@ -597,8 +597,9 @@ pub fn G_SetClientSound(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:478-506`
 pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`/`other` fields via checked entity borrows; the raw `*mut gentity_t`
+    // pairs are re-acquired at the point of use for the `dispatch_touch` seam
+    // (which threads `ctx` alongside the two entity pointers).
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
@@ -614,32 +615,35 @@ pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
                 i += 1;
                 continue; // duplicated
             }
-            let other =
-                &mut ctx.world.g_entities[(*pm).touchents[i as usize] as usize] as *mut gentity_t;
+            let other = EntityId::from_num((*pm).touchents[i as usize]).unwrap();
 
-            if (*ent).r.svFlags & SVF_BOT != 0 {
-                if let Some(t) = (*ent).touch.get() {
+            if ctx.world.entity(ent).r.svFlags & SVF_BOT != 0 {
+                if let Some(t) = ctx.world.entity(ent).touch.get() {
+                    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+                    let other_ptr = ctx.world.entity_mut(other) as *mut gentity_t;
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
-                        ent,
-                        other,
+                        ent_ptr,
+                        other_ptr,
                         &mut trace as *mut trace_t,
                     );
                 }
             }
 
-            let other_touch = (*other).touch.get();
+            let other_touch = ctx.world.entity(other).touch.get();
             let Some(other_touch) = other_touch else {
                 i += 1;
                 continue;
             };
 
+            let other_ptr = ctx.world.entity_mut(other) as *mut gentity_t;
+            let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
             crate::ent_fn_enums::dispatch_touch(
                 ctx,
                 other_touch,
-                other,
-                ent,
+                other_ptr,
+                ent_ptr,
                 &mut trace as *mut trace_t,
             );
             i += 1;
@@ -654,13 +658,14 @@ pub fn ClientImpacts(ctx: &mut GameContext, ent: EntityId, pm: *mut pmove_t) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:516-590`
 pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`/`hit` fields via checked entity borrows; the `gclient_t*` (may be an
+    // NPC pool client — recipe 2b) is dereffed raw. Raw `*mut gentity_t` pairs
+    // are re-acquired at the `dispatch_touch` seam calls.
+    let client = ctx.world.entity(ent).client;
     unsafe {
-        if (*ent).client.is_null() {
+        if client.is_null() {
             return;
         }
-        let client = (*ent).client;
 
         // dead clients don't activate triggers!
         if (*client).ps.stats[STAT_HEALTH as usize] <= 0 {
@@ -687,29 +692,31 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
         );
 
         // can't use ent->r.absmin, because that has a one unit pad
-        crate::q_math::_VectorAdd((*client).ps.origin, (*ent).r.mins, &mut mins);
-        crate::q_math::_VectorAdd((*client).ps.origin, (*ent).r.maxs, &mut maxs);
+        let ent_mins = ctx.world.entity(ent).r.mins;
+        let ent_maxs = ctx.world.entity(ent).r.maxs;
+        crate::q_math::_VectorAdd((*client).ps.origin, ent_mins, &mut mins);
+        crate::q_math::_VectorAdd((*client).ps.origin, ent_maxs, &mut maxs);
 
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
         while i < num {
-            let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
+            let hit = EntityId::from_num(touch[i as usize]).unwrap();
 
-            if (*hit).touch.is_none() && (*ent).touch.is_none() {
+            if ctx.world.entity(hit).touch.is_none() && ctx.world.entity(ent).touch.is_none() {
                 i += 1;
                 continue;
             }
-            if (*hit).r.contents & CONTENTS_TRIGGER == 0 {
+            if ctx.world.entity(hit).r.contents & CONTENTS_TRIGGER == 0 {
                 i += 1;
                 continue;
             }
 
             // ignore most entities if a spectator
             if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-                if (*hit).s.eType != ET_TELEPORT_TRIGGER as c_int
+                if ctx.world.entity(hit).s.eType != ET_TELEPORT_TRIGGER as c_int
                     // this is ugly but adding a new ET_? type will
                     // most likely cause network incompatibilities
-                    && (*hit).touch.get() != Some(EntTouch::Touch_DoorTrigger)
+                    && ctx.world.entity(hit).touch.get() != Some(EntTouch::Touch_DoorTrigger)
                 {
                     i += 1;
                     continue;
@@ -718,39 +725,52 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
 
             // use seperate code for determining if an item is picked up
             // so you don't have to actually contact its bounding box
-            if (*hit).s.eType == ET_ITEM as c_int {
-                if BG_PlayerTouchesItem(&mut (*client).ps, &mut (*hit).s, ctx.world.level.time)
-                    == qfalse
+            if ctx.world.entity(hit).s.eType == ET_ITEM as c_int {
+                let level_time = ctx.world.level.time;
+                let hit_s = &mut ctx.world.entity_mut(hit).s as *mut _;
+                if BG_PlayerTouchesItem(&mut (*client).ps, hit_s, level_time) == qfalse {
+                    i += 1;
+                    continue;
+                }
+            } else {
+                let hit_ptr = ctx.world.entity(hit) as *const gentity_t;
+                if trap::EntityContact(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
+                        &mins as *const vec3_t,
+                        &maxs as *const vec3_t,
+                        hit_ptr.cast(),
+                    ),
+                ) == qfalse
                 {
                     i += 1;
                     continue;
                 }
-            } else if trap::EntityContact(
-                ctx.engine,
-                mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
-                    &mins as *const vec3_t,
-                    &maxs as *const vec3_t,
-                    (hit as *const gentity_t).cast(),
-                ),
-            ) == qfalse
-            {
-                i += 1;
-                continue;
             }
 
             trace = core::mem::zeroed();
 
-            if let Some(t) = (*hit).touch.get() {
-                crate::ent_fn_enums::dispatch_touch(ctx, t, hit, ent, &mut trace as *mut trace_t);
+            if let Some(t) = ctx.world.entity(hit).touch.get() {
+                let hit_ptr = ctx.world.entity_mut(hit) as *mut gentity_t;
+                let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+                crate::ent_fn_enums::dispatch_touch(
+                    ctx,
+                    t,
+                    hit_ptr,
+                    ent_ptr,
+                    &mut trace as *mut trace_t,
+                );
             }
 
-            if (*ent).r.svFlags & SVF_BOT != 0 {
-                if let Some(t) = (*ent).touch.get() {
+            if ctx.world.entity(ent).r.svFlags & SVF_BOT != 0 {
+                if let Some(t) = ctx.world.entity(ent).touch.get() {
+                    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
+                    let hit_ptr = ctx.world.entity_mut(hit) as *mut gentity_t;
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
-                        ent,
-                        hit,
+                        ent_ptr,
+                        hit_ptr,
                         &mut trace as *mut trace_t,
                     );
                 }
@@ -774,24 +794,28 @@ pub fn G_TouchTriggers(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_active.c:601-671`
 pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: vec3_t) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent`/`hit` fields via checked entity borrows; raw `*mut gentity_t` pairs
+    // are re-acquired at the `dispatch_touch` seam call.
     unsafe {
         // non-moving movers don't hit triggers!
-        if VectorLengthSquared((*ent).s.pos.trDelta) == 0.0 {
+        if VectorLengthSquared(ctx.world.entity(ent).s.pos.trDelta) == 0.0 {
             return;
         }
 
         let range: vec3_t = [40.0, 40.0, 52.0];
         let mut size: vec3_t = [0.0; 3];
-        crate::q_math::_VectorSubtract((*ent).r.mins, (*ent).r.maxs, &mut size);
+        crate::q_math::_VectorSubtract(
+            ctx.world.entity(ent).r.mins,
+            ctx.world.entity(ent).r.maxs,
+            &mut size,
+        );
         let mut stepSize = VectorLength(size);
         if stepSize < 1.0 {
             stepSize = 1.0;
         }
 
         let mut dir: vec3_t = [0.0; 3];
-        crate::q_math::_VectorSubtract((*ent).r.currentOrigin, oldOrg, &mut dir);
+        crate::q_math::_VectorSubtract(ctx.world.entity(ent).r.currentOrigin, oldOrg, &mut dir);
         let dist = VectorNormalize(&mut dir);
 
         let mut mins: vec3_t = [0.0; 3];
@@ -803,7 +827,12 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
         let mut step = 0.0f32;
         while step <= dist {
             let mut checkSpot: vec3_t = [0.0; 3];
-            crate::q_math::_VectorMA((*ent).r.currentOrigin, step, dir, &mut checkSpot);
+            crate::q_math::_VectorMA(
+                ctx.world.entity(ent).r.currentOrigin,
+                step,
+                dir,
+                &mut checkSpot,
+            );
             crate::q_math::_VectorSubtract(checkSpot, range, &mut mins);
             crate::q_math::_VectorAdd(checkSpot, range, &mut maxs);
 
@@ -818,34 +847,37 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
             );
 
             // can't use ent->r.absmin, because that has a one unit pad
-            crate::q_math::_VectorAdd(checkSpot, (*ent).r.mins, &mut mins);
-            crate::q_math::_VectorAdd(checkSpot, (*ent).r.maxs, &mut maxs);
+            let ent_mins = ctx.world.entity(ent).r.mins;
+            let ent_maxs = ctx.world.entity(ent).r.maxs;
+            crate::q_math::_VectorAdd(checkSpot, ent_mins, &mut mins);
+            crate::q_math::_VectorAdd(checkSpot, ent_maxs, &mut maxs);
 
             let mut i = 0;
             while i < num {
-                let hit = &mut ctx.world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
+                let hit = EntityId::from_num(touch[i as usize]).unwrap();
 
-                if (*hit).s.eType != ET_PUSH_TRIGGER as c_int {
+                if ctx.world.entity(hit).s.eType != ET_PUSH_TRIGGER as c_int {
                     i += 1;
                     continue;
                 }
 
-                if (*hit).touch.is_none() {
+                if ctx.world.entity(hit).touch.is_none() {
                     i += 1;
                     continue;
                 }
 
-                if (*hit).r.contents & CONTENTS_TRIGGER == 0 {
+                if ctx.world.entity(hit).r.contents & CONTENTS_TRIGGER == 0 {
                     i += 1;
                     continue;
                 }
 
+                let hit_ptr = ctx.world.entity(hit) as *const gentity_t;
                 if trap::EntityContact(
                     ctx.engine,
                     mp_abi::game::syscalls::G_ENTITY_CONTACT::GEntityContactArgs::new(
                         &mins as *const vec3_t,
                         &maxs as *const vec3_t,
-                        (hit as *const gentity_t).cast(),
+                        hit_ptr.cast(),
                     ),
                 ) == qfalse
                 {
@@ -855,12 +887,14 @@ pub fn G_MoverTouchPushTriggers(ctx: &mut GameContext, ent: EntityId, oldOrg: ve
 
                 trace = core::mem::zeroed();
 
-                if let Some(t) = (*hit).touch.get() {
+                if let Some(t) = ctx.world.entity(hit).touch.get() {
+                    let hit_ptr = ctx.world.entity_mut(hit) as *mut gentity_t;
+                    let ent_ptr = ctx.world.entity_mut(ent) as *mut gentity_t;
                     crate::ent_fn_enums::dispatch_touch(
                         ctx,
                         t,
-                        hit,
-                        ent,
+                        hit_ptr,
+                        ent_ptr,
                         &mut trace as *mut trace_t,
                     );
                 }
@@ -1930,10 +1964,10 @@ pub fn G_HeldByMonster(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mut 
 ///
 /// Source: `oracle/codemp/game/g_active.c:1662-1926`
 pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t = ctx.entity_mut(ent);
+    // `ent` fields via checked entity borrow; the `gclient_t*` (may be an NPC
+    // pool client — recipe 2b) is dereffed raw.
+    let cl = ctx.world.entity(ent).client;
     unsafe {
-        let cl = (*ent).client;
         let level_time = ctx.world.level.time;
 
         if (*cl).pers.cmd.upmove != 0
@@ -1973,7 +2007,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                             //turn off second saber
                             G_Sound(
                                 ctx,
-                                ctx.entity_id_of(ent),
+                                Some(ent),
                                 CHAN_WEAPON as c_int,
                                 (*cl).saber[1].soundOff,
                             );
@@ -1981,7 +2015,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                             //turn off first
                             G_Sound(
                                 ctx,
-                                ctx.entity_id_of(ent),
+                                Some(ent),
                                 CHAN_WEAPON as c_int,
                                 (*cl).saber[0].soundOff,
                             );
@@ -1996,32 +2030,17 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     } else if saberAnimLevel == SS_DUAL as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn on second saber
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[1].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
                         } else if (*cl).ps.saberHolstered == 2 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_DUAL_TAUNT as c_int;
                     } else if saberAnimLevel == SS_STAFF as c_int {
                         if (*cl).ps.saberHolstered > 0 {
                             //turn on all blades
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_STAFF_TAUNT as c_int;
@@ -2039,7 +2058,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off second saber
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[1].soundOff,
                     );
@@ -2047,7 +2066,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off first
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[0].soundOff,
                     );
@@ -2065,7 +2084,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off second saber
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[1].soundOff,
                     );
@@ -2073,7 +2092,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     //turn off first
                     G_Sound(
                         ctx,
-                        ctx.entity_id_of(ent),
+                        Some(ent),
                         CHAN_WEAPON as c_int,
                         (*cl).saber[0].soundOff,
                     );
@@ -2083,20 +2102,10 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                 if (*cl).ps.weapon == WP_SABER {
                     if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                         //turn on second saber
-                        G_Sound(
-                            ctx,
-                            ctx.entity_id_of(ent),
-                            CHAN_WEAPON as c_int,
-                            (*cl).saber[1].soundOn,
-                        );
+                        G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
                     } else if (*cl).ps.saberHolstered == 2 {
                         //turn on first
-                        G_Sound(
-                            ctx,
-                            ctx.entity_id_of(ent),
-                            CHAN_WEAPON as c_int,
-                            (*cl).saber[0].soundOn,
-                        );
+                        G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                     }
                     (*cl).ps.saberHolstered = 0;
                     if (*cl).saber[0].flourishAnim != -1 {
@@ -2136,44 +2145,24 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     {
                         if (*cl).ps.saberHolstered != 0 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_STRONG as c_int;
                     } else if saberAnimLevel == SS_DUAL as c_int {
                         if (*cl).ps.saberHolstered == 1 && (*cl).saber[1].model[0] != 0 {
                             //turn on second saber
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[1].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[1].soundOn);
                         } else if (*cl).ps.saberHolstered == 2 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_DUAL as c_int;
                     } else if saberAnimLevel == SS_STAFF as c_int {
                         if (*cl).ps.saberHolstered != 0 {
                             //turn on first
-                            G_Sound(
-                                ctx,
-                                ctx.entity_id_of(ent),
-                                CHAN_WEAPON as c_int,
-                                (*cl).saber[0].soundOn,
-                            );
+                            G_Sound(ctx, Some(ent), CHAN_WEAPON as c_int, (*cl).saber[0].soundOn);
                         }
                         (*cl).ps.saberHolstered = 0;
                         anim = BOTH_VICTORY_STAFF as c_int;
@@ -2184,16 +2173,17 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                 if (*cl).ps.groundEntityNum != ENTITYNUM_NONE {
                     (*cl).ps.forceHandExtend = HANDEXTEND_TAUNT as c_int;
                     (*cl).ps.forceDodgeAnim = anim;
+                    let local_anim_index = ctx.world.entity(ent).localAnimIndex;
                     (*cl).ps.forceHandExtendTime = level_time
                         + crate::bg_panimate::BG_AnimLength(
                             &ctx.world.bg_state,
-                            (*ent).localAnimIndex,
+                            local_anim_index,
                             anim,
                         );
                 }
                 if taunt != TAUNT_MEDITATE && taunt != TAUNT_BOW {
                     //no sound for meditate or bow
-                    G_AddEvent(&mut *(ent), EV_TAUNT as c_int, taunt);
+                    G_AddEvent(ctx.world.entity_mut(ent), EV_TAUNT as c_int, taunt);
                 }
             }
         }
