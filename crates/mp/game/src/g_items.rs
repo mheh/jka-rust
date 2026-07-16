@@ -4270,7 +4270,7 @@ pub fn SaveRegisteredItems(ctx: &mut GameContext) {
         string[bg_numItems as usize] = 0;
 
         //	G_Printf( "%i items registered\n", count );
-        let s = core::ffi::CStr::from_ptr(string.as_ptr()).to_owned();
+        let s = cstr_from_chars(&string).to_owned();
         trap::SetConfigstring(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s),

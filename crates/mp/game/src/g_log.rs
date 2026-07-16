@@ -20,7 +20,6 @@ use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
 use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
 use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
 use mp_abi::game::syscalls::G_GET_SERVERINFO::GGetServerinfoArgs;
-use std::ffi::{CStr, CString};
 
 /// Raven `char *weaponNameFromIndex[WP_NUM_WEAPONS]` — display names for the
 /// per-weapon log tables written by `G_LogWeaponOutput`. Raven's initializer
@@ -289,7 +288,7 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
         // it returns the pointer; the raw world pointer is captured by-copy).
         let world_ptr = ctx.world_raw();
         let engine = ctx.engine;
-        let log_name = CStr::from_ptr((*world_ptr).cvars.g_statLogFile.string.as_ptr()).to_owned();
+        let log_name = cstr_from_chars(&(*world_ptr).cvars.g_statLogFile.string).to_owned();
         trap::FS_FOpenFile(
             engine,
             GFsFopenFileArgs::new(log_name, &mut weaponfile, FS_APPEND),

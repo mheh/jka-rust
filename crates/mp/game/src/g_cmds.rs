@@ -828,7 +828,7 @@ pub fn Cmd_TeamTask_f(ctx: &mut GameContext, ent: EntityId) {
             ctx.engine,
             mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
                 clientNum,
-                std::ffi::CStr::from_ptr(userinfo.as_ptr()).to_owned(),
+                cstr_from_chars(&userinfo).to_owned(),
             ),
         );
         crate::g_client::ClientUserinfoChanged(ctx, clientNum);

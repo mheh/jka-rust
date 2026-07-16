@@ -1,8 +1,6 @@
 //! `g_init_game` — Raven `G_InitGame` (`g_main.c:897-1118`).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use core::ffi::CStr;
-
 use crate::prelude::*;
 
 use crate::ai_main::{BotAILoadMap, BotAISetup};
@@ -153,7 +151,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             } else {
                 FS_APPEND
             };
-            let log_path = CStr::from_ptr(ctx.world.cvars.g_log.string.as_ptr()).to_owned();
+            let log_path = cstr_from_chars(&ctx.world.cvars.g_log.string).to_owned();
             let _ = trap::FS_FOpenFile(
                 ctx.engine,
                 GFsFopenFileArgs::new(
@@ -274,7 +272,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             ),
         );
 
-        let mapname_cstr = CStr::from_ptr(mapname.string.as_ptr()).to_owned();
+        let mapname_cstr = cstr_from_chars(&mapname.string).to_owned();
         let nav_loaded =
             trap::Nav_Load(ctx.engine, GNavLoadArgs::new(mapname_cstr, ck_sum.integer));
         ctx.world.globals.navCalculatePaths = if nav_loaded == qfalse { qtrue } else { qfalse };

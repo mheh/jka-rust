@@ -372,7 +372,7 @@ pub fn COM_Parse(qs: &mut QSharedScratch, data_p: *mut *const c_char) -> *mut c_
 pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
         let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
-        let parsename_str = std::ffi::CStr::from_ptr(qs.com_parsename.as_ptr()).to_string_lossy();
+        let parsename_str = cstr_from_chars(&qs.com_parsename).to_string_lossy();
         let com_lines = qs.com_lines;
         let msg = format!("ERROR: {}, line {}: {}", parsename_str, com_lines, fmt_str);
         let c_msg = std::ffi::CString::new(msg).unwrap();
@@ -389,7 +389,7 @@ pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
 pub fn COM_ParseWarning(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
         let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
-        let parsename_str = std::ffi::CStr::from_ptr(qs.com_parsename.as_ptr()).to_string_lossy();
+        let parsename_str = cstr_from_chars(&qs.com_parsename).to_string_lossy();
         let com_lines = qs.com_lines;
         let msg = format!(
             "WARNING: {}, line {}: {}",

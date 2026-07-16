@@ -3491,8 +3491,7 @@ pub fn NAV_CheckCalcPaths(ctx: &mut GameContext) {
             } else if trap::Nav_Save(
                 ctx.engine,
                 mp_abi::game::syscalls::G_NAV_SAVE::GNavSaveArgs::new(
-                    CString::new(std::ffi::CStr::from_ptr(mapname.string.as_ptr()).to_bytes())
-                        .unwrap(),
+                    CString::new(cstr_from_chars(&mapname.string).to_bytes()).unwrap(),
                     ck_sum.integer,
                 ),
             ) == qfalse

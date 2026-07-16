@@ -214,7 +214,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
             let levelname_s = format!(
                 "maps/{}.siege\0",
-                core::ffi::CStr::from_ptr(mapname.string.as_ptr()).to_string_lossy()
+                cstr_from_chars(&mapname.string).to_string_lossy()
             );
 
             if levelname_s.is_empty() || levelname_s.as_bytes()[0] == 0 {
@@ -278,8 +278,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                     // check for override
                     write_cstr_field(
                         &mut ctx.world.globals.team1,
-                        &core::ffi::CStr::from_ptr(ctx.world.cvars.g_siegeTeam1.string.as_ptr())
-                            .to_string_lossy(),
+                        &cstr_from_chars(&ctx.world.cvars.g_siegeTeam1.string).to_string_lossy(),
                     );
                 } else {
                     // otherwise use level default
@@ -298,8 +297,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 {
                     write_cstr_field(
                         &mut ctx.world.globals.team2,
-                        &core::ffi::CStr::from_ptr(ctx.world.cvars.g_siegeTeam2.string.as_ptr())
-                            .to_string_lossy(),
+                        &cstr_from_chars(&ctx.world.cvars.g_siegeTeam2.string).to_string_lossy(),
                     );
                 } else {
                     BG_SiegeGetPairedValue(
@@ -328,8 +326,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                         ctx.engine,
                         mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
                             CString::new("team2_icon").unwrap(),
-                            CString::new(core::ffi::CStr::from_ptr(teamIcon.as_ptr()).to_bytes())
-                                .unwrap(),
+                            CString::new(cstr_from_chars(&teamIcon).to_bytes()).unwrap(),
                         ),
                     );
                 }
@@ -385,8 +382,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                         ctx.engine,
                         mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
                             CString::new("team1_icon").unwrap(),
-                            CString::new(core::ffi::CStr::from_ptr(teamIcon.as_ptr()).to_bytes())
-                                .unwrap(),
+                            CString::new(cstr_from_chars(&teamIcon).to_bytes()).unwrap(),
                         ),
                     );
                 }
@@ -589,7 +585,9 @@ pub fn G_SiegeSetObjectiveComplete(
         // GameWorld field). `strstr` has no ported home; inlined as a plain
         // byte scan (not a named helper) per the zero-park policy.
         let buf = ctx.world.globals.gObjectiveCfgStr.as_mut_ptr();
-        let buf_len = core::ffi::CStr::from_ptr(buf).to_bytes().len();
+        let buf_len = cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr)
+            .to_bytes()
+            .len();
         let needle: &[u8] = if team == SIEGETEAM_TEAM1 {
             b"t1"
         } else if team == SIEGETEAM_TEAM2 {
@@ -644,10 +642,7 @@ pub fn G_SiegeSetObjectiveComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
                 CS_SIEGE_OBJECTIVES,
-                cstr(
-                    &core::ffi::CStr::from_ptr(ctx.world.globals.gObjectiveCfgStr.as_ptr())
-                        .to_string_lossy(),
-                ),
+                cstr(&cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr).to_string_lossy()),
             ),
         );
     }
@@ -669,7 +664,9 @@ pub fn G_SiegeGetCompletionStatus(
         // inlined as a plain byte scan per the zero-park policy (see
         // `G_SiegeSetObjectiveComplete`).
         let buf = ctx.world.globals.gObjectiveCfgStr.as_mut_ptr();
-        let buf_len = core::ffi::CStr::from_ptr(buf).to_bytes().len();
+        let buf_len = cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr)
+            .to_bytes()
+            .len();
         let needle: &[u8] = if team == SIEGETEAM_TEAM1 {
             b"t1"
         } else if team == SIEGETEAM_TEAM2 {
@@ -1043,12 +1040,12 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
         if winningteam == SIEGETEAM_TEAM1 {
             write_cstr_field(
                 &mut teamstr,
-                &core::ffi::CStr::from_ptr(ctx.world.globals.team1.as_ptr()).to_string_lossy(),
+                &cstr_from_chars(&ctx.world.globals.team1).to_string_lossy(),
             );
         } else {
             write_cstr_field(
                 &mut teamstr,
-                &core::ffi::CStr::from_ptr(ctx.world.globals.team2.as_ptr()).to_string_lossy(),
+                &cstr_from_chars(&ctx.world.globals.team2).to_string_lossy(),
             );
         }
 
@@ -1251,9 +1248,7 @@ pub fn SetTeamQuick(ctx: &mut GameContext, ent: EntityId, team: c_int, doBegin: 
             }
         }
 
-        let info_cstring =
-            std::ffi::CString::new(core::ffi::CStr::from_ptr(userinfo.as_ptr()).to_bytes())
-                .unwrap();
+        let info_cstring = std::ffi::CString::new(cstr_from_chars(&userinfo).to_bytes()).unwrap();
         trap::SetUserinfo(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
@@ -1593,12 +1588,12 @@ pub fn siegeTriggerUse(
         if (*ent).side == SIEGETEAM_TEAM1 {
             write_cstr_field(
                 &mut teamstr,
-                &core::ffi::CStr::from_ptr(ctx.world.globals.team1.as_ptr()).to_string_lossy(),
+                &cstr_from_chars(&ctx.world.globals.team1).to_string_lossy(),
             );
         } else {
             write_cstr_field(
                 &mut teamstr,
-                &core::ffi::CStr::from_ptr(ctx.world.globals.team2.as_ptr()).to_string_lossy(),
+                &cstr_from_chars(&ctx.world.globals.team2).to_string_lossy(),
             );
         }
 
@@ -1854,12 +1849,12 @@ pub fn decompTriggerUse(
         if (*ent).side == SIEGETEAM_TEAM1 {
             write_cstr_field(
                 &mut teamstr,
-                &core::ffi::CStr::from_ptr(ctx.world.globals.team1.as_ptr()).to_string_lossy(),
+                &cstr_from_chars(&ctx.world.globals.team1).to_string_lossy(),
             );
         } else {
             write_cstr_field(
                 &mut teamstr,
-                &core::ffi::CStr::from_ptr(ctx.world.globals.team2.as_ptr()).to_string_lossy(),
+                &cstr_from_chars(&ctx.world.globals.team2).to_string_lossy(),
             );
         }
 
@@ -2778,7 +2773,7 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
             ctx.engine,
             mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
                 (*msgTarg).s.number,
-                cstr(&core::ffi::CStr::from_ptr(str_buf.as_ptr()).to_string_lossy()),
+                cstr(&cstr_from_chars(&str_buf).to_string_lossy()),
             ),
         );
     }

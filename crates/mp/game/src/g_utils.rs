@@ -142,12 +142,10 @@ pub fn BuildShaderStateConfig(ctx: &mut GameContext) -> *const c_char {
         }
 
         for i in 0..ctx.world.globals.remapCount as usize {
-            let old_shader_str =
-                CStr::from_ptr(ctx.world.globals.remappedShaders.0[i].oldShader.as_ptr())
-                    .to_string_lossy();
-            let new_shader_str =
-                CStr::from_ptr(ctx.world.globals.remappedShaders.0[i].newShader.as_ptr())
-                    .to_string_lossy();
+            let old_shader_str = cstr_from_chars(&ctx.world.globals.remappedShaders.0[i].oldShader)
+                .to_string_lossy();
+            let new_shader_str = cstr_from_chars(&ctx.world.globals.remappedShaders.0[i].newShader)
+                .to_string_lossy();
             let time_offset = ctx.world.globals.remappedShaders.0[i].timeOffset;
 
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);

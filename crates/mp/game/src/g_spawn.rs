@@ -1310,7 +1310,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             ctx.engine,
             GSetConfigstringArgs::new(
                 CS_MOTD,
-                CStr::from_ptr(ctx.world.cvars.g_motd.string.as_ptr()).to_owned(),
+                cstr_from_chars(&ctx.world.cvars.g_motd.string).to_owned(),
             ),
         ); // message of the day
 

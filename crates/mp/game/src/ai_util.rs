@@ -659,9 +659,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut f: fileHandle_t = 0;
         // Pass the raw filename bytes (no lossy UTF-8 round-trip) to FS_FOpenFile,
         // per the Cmd_TeamTask_f precedent (g_cmds.rs).
-        let path =
-            std::ffi::CStr::from_ptr(bs_ref.settings.personalityfile.as_ptr() as *const c_char)
-                .to_owned();
+        let path = cstr_from_chars(&bs_ref.settings.personalityfile).to_owned();
         let len = trap::FS_FOpenFile(
             ctx.engine,
             mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs::new(
