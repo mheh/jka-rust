@@ -108,6 +108,20 @@ sketch on this point): gameplay logic stays free fns taking ctx permanently.
 Accessors on GameWorld/GameContext remain methods; the ruling is about ported
 Raven gameplay functions.
 
+**Sit-down rulings (user, 2026-07-15)** — all four decision points settled
+(DEC-26/27/28):
+
+7. **4D shape: `gentity_t` moves to `mp_game`** with real field types;
+   `mp_abi` goes opaque via a forward-decl entity type (DEC-26).
+8. **Stage-5 cut: full split** — QAGAME residue lifted into `GameCallbacks`,
+   `bg_saga` params severed, then all 11 bg files move (DEC-27).
+9. **`GameCallbacksImpl.world`: sanctioned seam** (DEC-28), retag
+   `SEAM-BG-REENTRY`; remaining ~34 irreducibles triaged during 2c.
+10. **Deref-regime campaign (2c, ~12,600 sites) runs after 4D + Stage 5**,
+    Stage-2b-style sharding, referee gate per shard. Idiomatic views
+    (roadmap Stage-2 API) stay out of scope — 2c establishes safe typed
+    access to the unchanged C-shaped data.
+
 **Tail execution ruling (user, 2026-07-12):** after the hub shards, Stage-1
 runs 2-wide — two worktree-isolated agents per wave with mutually-exclusive
 file lists (cross-bridges into the partner's files are reported, not edited,

@@ -410,3 +410,43 @@ land. Use: permanent bisect/diff anchor if post-reshape referee runs
 diverge — the tapes and oracle harness live in-tree, so the frozen point
 remains independently checkable. CI is branch-filtered to master, so the
 tag/branch cost no CI runs.
+
+## DEC-26 — `gentity_t` homes in `mp_game`; the abi seam goes opaque (2026-07-15)
+
+Raven defines `gentity_t` in `g_local.h` — game-private; the port's
+placement in `mp_qshared` was a tiering workaround for the 22 `mp_abi`
+syscall structs that name `*mut gentity_t`, and it forced the
+`client`/`NPC`/`m_pVehicle` fields down to `*mut c_void` (~2,535 casts
+across ~70 files). Ruled: move `gentity_t` to `mp_game` and restore the
+real field types (`*mut gclient_t` / `*mut gNPC_t` / `*mut Vehicle_t`);
+`mp_abi`/`mp_qshared` reference entities through an opaque
+forward-declaration type (C's own `struct gentity_s;` idiom — the DEC-16
+type-erased-slot pattern one tier up), with the cast pair confined to
+trap packing at the seam. ABI-identical throughout (pointer-sized);
+layout asserts and the `bgEntity_t` head contract (D12) move with the
+struct. Executes as safe-state shard 4D.
+
+## DEC-27 — Stage-5 bg split: full split, QAGAME residue severed first (2026-07-15)
+
+The bg↔game boundary is already a trait wall (`GameCallbacks`, 28
+methods, entity-num params only; `BgTraps` for engine services). Ruled:
+all 11 bg files move to `mp_bg` (matching Raven's three-way-shared bg
+set — game/cgame/ui per the vcproj listings), after the residual
+in-place `#ifdef QAGAME` branches in `bg_misc`/`bg_pmove`/`bg_saber`/
+`bg_slidemove` are lifted into `GameCallbacks` methods and `bg_saga`'s
+`GameContext`/`GameWorld` params are severed through the same seam.
+`GameBgTraps`/`GameCallbacksImpl` (the game-tier implementors) stay in
+`mp_game`. The traits and `BgState`/`PmoveContext` move with the bodies.
+
+## DEC-28 — `GameCallbacksImpl.world` raw store: sanctioned seam, not debt (2026-07-15)
+
+The 13 construction sites storing `*mut GameWorld` into
+`GameCallbacksImpl` are the honest expression of a two-sided seam:
+`PmoveContext` must hold `&mut world.bg_state` while the callbacks
+object re-enters full game logic that itself draws from `bg_state`
+(RNG) — two live `&mut` into one world, unexpressible without the raw
+store, and loan-out restructures break on exactly that reentrancy.
+Ruled: sanctioned permanent, retagged `SEAM-BG-REENTRY` (replacing
+`STAGE-2b: irreducible`); the STATE-D6 leaf-reborrow discipline inside
+the method bodies is the containment. The remaining ~34 irreducible
+markers stay transitional and are triaged during campaign 2c.
