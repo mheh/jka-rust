@@ -167,6 +167,8 @@ pub fn TIMER_Set(
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
+        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
+        // port guards and returns early. Source: g_timer.c:131
         if ent.is_null() {
             return;
         }
@@ -189,6 +191,8 @@ pub fn TIMER_Get(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *cons
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
+        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
+        // port guards and returns early. Source: g_timer.c:149
         if ent.is_null() {
             return -1;
         }
@@ -214,6 +218,8 @@ pub fn TIMER_Done(
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
+        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
+        // port guards and returns early. Source: g_timer.c:167
         if ent.is_null() {
             return qtrue;
         }
@@ -287,6 +293,8 @@ pub fn TIMER_Done2(
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
+        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
+        // port guards and returns early. Source: g_timer.c:225
         if ent.is_null() {
             return qfalse;
         }
@@ -323,6 +331,8 @@ pub fn TIMER_Exists(
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
+        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
+        // port guards and returns early. Source: g_timer.c:251
         if ent.is_null() {
             return qfalse;
         }
@@ -346,6 +356,8 @@ pub fn TIMER_Remove(ctx: &mut GameContext, ent: Option<EntityId>, identifier: *c
     // STAGE-1: Option<EntityId> param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = unsafe { resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
+        // §19: oracle derefs `ent->s.number` unconditionally (UB if null);
+        // port guards and returns early. Source: g_timer.c:269
         if ent.is_null() {
             return;
         }

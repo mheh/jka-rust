@@ -23,6 +23,7 @@ use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::global_team_sound::global_team_sound_t;
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_qshared::shared::flag_status::{FLAG_ATBASE, FLAG_DROPPED};
+use mp_qshared::shared::MAX_CLIENTS;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -367,6 +368,8 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
 
         if modified != 0 {
             let ctfFlagStatusRemap: &[u8] = &[b'0', b'1', b'*', b'*', b'2'];
+            // §19: oracle reads `char st[4]` uninitialized outside CTF/CTY (UB);
+            // port zero-inits, sending "". Source: g_team.c:308-314
             let mut st: [c_char; 4] = [0; 4];
 
             if ctx.world.cvars.g_gametype.integer == GT_CTF as c_int
@@ -381,7 +384,7 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
             trap::SetConfigstring(
                 ctx.engine,
                 mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    6,
+                    CS_FLAGSTATUS,
                     cstr(&cstr_to_str(st.as_ptr())),
                 ),
             );
@@ -412,10 +415,10 @@ pub fn Team_CheckDroppedItem(ctx: &mut GameContext, dropped: EntityId) {
 /// Source: `oracle/codemp/game/g_team.c:337-352`
 pub fn Team_ForceGesture(ctx: &mut GameContext, team: c_int) {
     unsafe {
-        let max_clients = ctx.world.cvars.g_maxclients.integer;
-
-        for i in 0..max_clients {
-            let ent = &mut ctx.world.g_entities[i as usize];
+        // Oracle loops fixed `MAX_CLIENTS`, not `g_maxclients.integer`.
+        // Source: g_team.c:341
+        for i in 0..MAX_CLIENTS {
+            let ent = &mut ctx.world.g_entities[i];
             if (*ent).inuse == 0 {
                 continue;
             }

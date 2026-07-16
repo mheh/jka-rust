@@ -1284,8 +1284,10 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
         (*ent).r.maxs = [8.0, 8.0, 8.0];
         (*ent).r.mins = [-8.0, -8.0, -8.0];
 
-        (*ent).s.origin[2] += 0.1;
-        (*ent).r.maxs[2] -= 0.1;
+        // `0.1` is a bare double in the oracle; add in f64, narrow once at
+        // the f32 store. Source: g_misc.c:1020-1021
+        (*ent).s.origin[2] = ((*ent).s.origin[2] as f64 + 0.1) as f32;
+        (*ent).r.maxs[2] = ((*ent).r.maxs[2] as f64 - 0.1) as f32;
 
         dest = [
             (*ent).s.origin[0],
@@ -1314,8 +1316,8 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        // add the 0.1 back after the trace
-        (*ent).r.maxs[2] += 0.1;
+        // add the 0.1 back after the trace (bare double; g_misc.c:1033)
+        (*ent).r.maxs[2] = ((*ent).r.maxs[2] as f64 + 0.1) as f32;
 
         // allow to ride movers
         //	ent->s.groundEntityNum = tr.entityNum;
@@ -1965,8 +1967,10 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         (*ent).r.mins = [-16.0, -16.0, 0.0];
         (*ent).r.maxs = [16.0, 16.0, 40.0];
 
-        (*ent).s.origin[2] += 0.1;
-        (*ent).r.maxs[2] -= 0.1;
+        // `0.1` is a bare double in the oracle; add in f64, narrow once at
+        // the f32 store. Source: g_misc.c:1618-1619
+        (*ent).s.origin[2] = ((*ent).s.origin[2] as f64 + 0.1) as f32;
+        (*ent).r.maxs[2] = ((*ent).r.maxs[2] as f64 - 0.1) as f32;
 
         dest = [
             (*ent).s.origin[0],
@@ -1995,8 +1999,8 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        // add the 0.1 back after the trace
-        (*ent).r.maxs[2] += 0.1;
+        // add the 0.1 back after the trace (bare double; g_misc.c:1631)
+        (*ent).r.maxs[2] = ((*ent).r.maxs[2] as f64 + 0.1) as f32;
 
         // allow to ride movers
         (*ent).s.groundEntityNum = (tr.entityNum) as i32;

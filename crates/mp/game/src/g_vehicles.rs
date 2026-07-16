@@ -1368,18 +1368,22 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
         }
 
         // Process the move commands.
-        let prevSpeed = (*parentPS).speed;
+        // Oracle declares `int prevSpeed`/`int nextSpeed` — truncating the float
+        // `speed` to int — and gates the shift sound on integer compares; fractional
+        // speeds must not flip the term or the Q_irand draw desyncs.
+        // Source: g_vehicles.c:1770-1771,2245-2247
+        let prevSpeed = (*parentPS).speed as c_int;
         crate::veh_dispatch::process_move_commands(ctx, pVeh);
-        let nextSpeed = (*parentPS).speed;
+        let nextSpeed = (*parentPS).speed as c_int;
         let halfMaxSpeed = ((*vi).speedMax * 0.5f32) as c_int;
 
         // Shifting Sounds
         if (*pVeh).m_iTurboTime < curTime
             && (*pVeh).m_iSoundDebounceTimer < curTime
             && ((nextSpeed > prevSpeed
-                && nextSpeed > (halfMaxSpeed) as f32
-                && prevSpeed < (halfMaxSpeed) as f32)
-                || (nextSpeed > (halfMaxSpeed) as f32
+                && nextSpeed > halfMaxSpeed
+                && prevSpeed < halfMaxSpeed)
+                || (nextSpeed > halfMaxSpeed
                     && ctx.world.bg_state.rng.Q_irand(0, 1000) == 0))
         {
             let mut shiftSound = ctx.world.bg_state.rng.Q_irand(1, 4);

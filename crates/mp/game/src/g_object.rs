@@ -236,7 +236,9 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
         // do impact physics
         if (*ent).s.pos.trType == TR_GRAVITY {
             // FIXME: only do this if no trDelta
-            if ctx.world.cvars.g_gravity.value <= 0.0f32 || tr.plane.normal[2] < 0.7f32 {
+            // `0.7` is a bare double in the oracle; promote to f64 so the
+            // round-down `<` compare matches. Source: g_object.c:196
+            if ctx.world.cvars.g_gravity.value <= 0.0f32 || (tr.plane.normal[2] as f64) < 0.7 {
                 if (*ent).flags & (FL_BOUNCE | FL_BOUNCE_HALF) != 0 {
                     if tr.fraction <= 0.0f32 {
                         crate::q_math::_VectorCopy(tr.endpos, &mut (*ent).r.currentOrigin);
