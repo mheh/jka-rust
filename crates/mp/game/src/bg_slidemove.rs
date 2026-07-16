@@ -16,7 +16,6 @@
 //! ported in this file (a future cgame port re-derives it per §20).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::g_main::Com_Printf;
 use crate::prelude::*;
 use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorLength, VectorNormalize2};
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
@@ -1034,7 +1033,7 @@ impl PmoveContext<'_> {
                 if (*self.pm).debugLevel != 0 {
                     // Com_Printf("%i:bend can't step\n", c_pmove);
                     let msg = format!("{}:bend can't step\n", self.bg.c_pmove);
-                    Com_Printf(msg.as_ptr() as *const c_char);
+                    self.traps.com_printf(msg.as_ptr() as *const c_char);
                 }
                 return; // can't step up
             }
@@ -1130,7 +1129,7 @@ impl PmoveContext<'_> {
             if (*self.pm).debugLevel != 0 {
                 // Com_Printf("%i:stepped\n", c_pmove);
                 let msg = format!("{}:stepped\n", self.bg.c_pmove);
-                Com_Printf(msg.as_ptr() as *const c_char);
+                self.traps.com_printf(msg.as_ptr() as *const c_char);
             }
         }
     }

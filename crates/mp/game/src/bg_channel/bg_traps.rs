@@ -234,4 +234,19 @@ pub trait BgTraps {
         value: *const c_char,
         flags: c_int,
     );
+
+    // --- console (Com_Printf/Com_Error map to trap_Print/trap_Error) ---
+
+    /// Raven `Com_Printf`: bg code calls it, and in the module it maps to
+    /// `trap_Print` (`G_PRINT`) — mirroring the game-tier `Com_Printf` port.
+    /// Source: `oracle/codemp/game/g_main.c:1219-1228`.
+    fn com_printf(&self, msg: *const c_char);
+
+    /// Raven `Com_Error`: bg code calls it, and in the module it maps to
+    /// `trap_Error` (`G_ERROR`). `error_level` is dropped at the seam, matching
+    /// the game-tier `Com_Error` port's `G_Error("%s", text)` (which never
+    /// forwards the level). Returns unit, as that port does — call-site control
+    /// flow is unchanged.
+    /// Source: `oracle/codemp/game/g_main.c:1208-1217`.
+    fn com_error(&self, error_level: c_int, msg: *const c_char);
 }

@@ -530,6 +530,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
             &mut ctx.world.bg_state.qs,
             &mut p as *mut *const c_char,
             cstr("{").as_ptr(),
+            &crate::bg_channel::GameBgTraps::new(ctx.engine),
         ) != 0
         {
             return;
@@ -954,6 +955,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             &mut ctx.world.bg_state.qs,
             &mut p as *mut *const c_char,
             cstr("{").as_ptr(),
+            &crate::bg_channel::GameBgTraps::new(ctx.engine),
         ) != 0
         {
             return 0;

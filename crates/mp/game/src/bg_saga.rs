@@ -1423,7 +1423,7 @@ pub fn BG_SiegeParseClassFile(
                         .as_ptr()
                 )
             );
-            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+            traps.com_printf(cstr(&s).as_ptr());
         }
 
         if BG_SiegeGetPairedValue(

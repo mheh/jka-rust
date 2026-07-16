@@ -306,6 +306,12 @@ impl TestTraps {
 }
 
 impl BgTraps for TestTraps {
+    fn com_printf(&self, _msg: *const c_char) {}
+    fn com_error(&self, error_level: c_int, msg: *const c_char) {
+        panic!("com_error({}) in test: {:?}", error_level, unsafe {
+            std::ffi::CStr::from_ptr(msg)
+        });
+    }
     fn trace(
         &self,
         results: *mut trace_t,

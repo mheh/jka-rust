@@ -440,6 +440,22 @@ impl BgTraps for GameBgTraps<'_> {
             GCvarRegisterArgs::new(cvar, var_name, value, flags),
         )
     }
+
+    fn com_printf(&self, msg: *const c_char) {
+        // Raven `Com_Printf` -> `trap_Print` (`G_PRINT`), the same route the
+        // game-tier `Com_Printf` port takes. Source: `g_main.c:1219-1228`.
+        use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
+        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_owned();
+        crate::trap::Printf(self.engine, GPrintArgs::new(msg))
+    }
+    fn com_error(&self, error_level: c_int, msg: *const c_char) {
+        // Raven `Com_Error` -> `trap_Error` (`G_ERROR`); `error_level` is dropped
+        // at the seam like the game-tier `Com_Error` port. Source: `g_main.c:1208-1217`.
+        use mp_abi::game::syscalls::G_ERROR::GErrorArgs;
+        let _ = error_level;
+        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_owned();
+        crate::trap::Error(self.engine, GErrorArgs::new(msg))
+    }
 }
 
 /// The game-side `GameCallbacks` implementation. Carries the game handles the

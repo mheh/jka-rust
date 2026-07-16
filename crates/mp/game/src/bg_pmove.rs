@@ -4532,9 +4532,8 @@ impl PmoveContext<'_> {
             let mut point: vec3_t = [0.0; 3];
 
             if (*pm).debugLevel != 0 {
-                crate::g_main::Com_Printf(
-                    cstr(&format!("{}:allsolid\n", self.bg.c_pmove)).as_ptr(),
-                );
+                self.traps
+                    .com_printf(cstr(&format!("{}:allsolid\n", self.bg.c_pmove)).as_ptr());
             }
 
             // jitter around
@@ -4610,9 +4609,8 @@ impl PmoveContext<'_> {
             {
                 // we just transitioned into freefall
                 if (*pm).debugLevel != 0 {
-                    crate::g_main::Com_Printf(
-                        cstr(&format!("{}:lift\n", self.bg.c_pmove)).as_ptr(),
-                    );
+                    self.traps
+                        .com_printf(cstr(&format!("{}:lift\n", self.bg.c_pmove)).as_ptr());
                 }
 
                 _VectorCopy((*ps).origin, &mut point);
@@ -4749,9 +4747,8 @@ impl PmoveContext<'_> {
                 + (*ps).velocity[2] * trace.plane.normal[2];
             if (*ps).velocity[2] > 0.0 && dp > 10.0 {
                 if (*pm).debugLevel != 0 {
-                    crate::g_main::Com_Printf(
-                        cstr(&format!("{}:kickoff\n", self.bg.c_pmove)).as_ptr(),
-                    );
+                    self.traps
+                        .com_printf(cstr(&format!("{}:kickoff\n", self.bg.c_pmove)).as_ptr());
                 }
                 // go into jump animation
                 if (*pm).cmd.forwardmove >= 0 {
@@ -4771,9 +4768,8 @@ impl PmoveContext<'_> {
             // slopes that are too steep will not be considered onground
             if trace.plane.normal[2] < minNormal {
                 if (*pm).debugLevel != 0 {
-                    crate::g_main::Com_Printf(
-                        cstr(&format!("{}:steep\n", self.bg.c_pmove)).as_ptr(),
-                    );
+                    self.traps
+                        .com_printf(cstr(&format!("{}:steep\n", self.bg.c_pmove)).as_ptr());
                 }
                 (*ps).groundEntityNum = ENTITYNUM_NONE;
                 self.pml.groundPlane = qtrue;
@@ -4793,9 +4789,8 @@ impl PmoveContext<'_> {
             if (*ps).groundEntityNum == ENTITYNUM_NONE {
                 // just hit the ground
                 if (*pm).debugLevel != 0 {
-                    crate::g_main::Com_Printf(
-                        cstr(&format!("{}:Land\n", self.bg.c_pmove)).as_ptr(),
-                    );
+                    self.traps
+                        .com_printf(cstr(&format!("{}:Land\n", self.bg.c_pmove)).as_ptr());
                 }
 
                 self.PM_CrashLand();
@@ -9247,7 +9242,7 @@ pub fn BG_G2PlayerAngles(
             dir = (*cent).angles2[YAW] as c_int;
             if dir < 0 || dir > 7 {
                 let e = cstr(&format!("Bad player movement angle ({})", dir));
-                crate::g_main::Com_Error(ERR_DROP as c_int, e.as_ptr());
+                traps.com_error(ERR_DROP as c_int, e.as_ptr());
             }
         }
 

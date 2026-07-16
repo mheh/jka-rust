@@ -1853,7 +1853,7 @@ impl PmoveContext<'_> {
         }
         if anim < 0 {
             let s = format!("ERROR: anim {} < 0\n", anim);
-            crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&s).as_ptr());
+            self.traps.com_error(ERR_DROP as c_int, cstr(&s).as_ptr());
         }
         unsafe {
             ((*(*self.pm).animations.offset(anim as isize)).numFrames as f32
@@ -1879,8 +1879,8 @@ impl PmoveContext<'_> {
             {
                 let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].name));
                 let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].name));
-                crate::g_main::Com_Printf(cstr(&old_str).as_ptr());
-                crate::g_main::Com_Printf(cstr(&new_str).as_ptr());
+                self.traps.com_printf(cstr(&old_str).as_ptr());
+                self.traps.com_printf(cstr(&new_str).as_ptr());
             }
         }
     }
@@ -2047,7 +2047,7 @@ impl PmoveContext<'_> {
                         "{} exceeds the allowed game-side animation buffer!",
                         unsafe { cstr_to_str(filename) }
                     );
-                    crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&s).as_ptr());
+                    self.traps.com_error(ERR_DROP as c_int, cstr(&s).as_ptr());
                 }
                 return -1;
             }

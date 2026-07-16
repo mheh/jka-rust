@@ -411,19 +411,20 @@ pub fn BG_ParseLiteral(
     qs: &mut QSharedScratch,
     data: *mut *const c_char,
     string: *const c_char,
+    traps: &dyn BgTraps,
 ) -> qboolean {
     unsafe {
         let token = crate::q_shared::COM_ParseExt(qs, data, qtrue);
         if *token == 0 {
             let msg = std::ffi::CString::new("unexpected EOF\n").unwrap();
-            crate::g_main::Com_Printf(msg.as_ptr());
+            traps.com_printf(msg.as_ptr());
             return qtrue;
         }
 
         if crate::q_shared::Q_stricmp(token as *const c_char, string) != 0 {
             let s = std::ffi::CStr::from_ptr(string).to_string_lossy();
             let msg = std::ffi::CString::new(format!("required string '{}' missing\n", s)).unwrap();
-            crate::g_main::Com_Printf(msg.as_ptr());
+            traps.com_printf(msg.as_ptr());
             return qtrue;
         }
 
@@ -984,7 +985,7 @@ pub fn WP_SaberParseParms(
         // got the name we're using for sure
         c_strcpy((*saber).name.as_mut_ptr(), useSaber.as_ptr());
 
-        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr()) != qfalse {
+        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr(), traps) != qfalse {
             return qfalse;
         }
 
@@ -996,7 +997,7 @@ pub fn WP_SaberParseParms(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(useSaber.as_ptr())
                 );
-                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                traps.com_printf(cstr(&s).as_ptr());
                 return qfalse;
             }
 
@@ -1102,7 +1103,7 @@ pub fn WP_SaberParseParms(
                         "WP_SaberParseParms: saber {} has illegal number of blades ({}) max: {}",
                         s_useSaber, n, MAX_BLADES
                     );
-                    crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&msg).as_ptr());
+                    traps.com_error(ERR_DROP as c_int, cstr(&msg).as_ptr());
                     continue;
                 }
                 s.numBlades = n;
@@ -1123,7 +1124,7 @@ pub fn WP_SaberParseParms(
                             cstr_to_str(tok),
                             cstr_to_str(useSaber.as_ptr())
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        traps.com_printf(cstr(&msg).as_ptr());
                         continue;
                     }
                 } else {
@@ -1132,7 +1133,7 @@ pub fn WP_SaberParseParms(
                         cstr_to_str(tok),
                         cstr_to_str(useSaber.as_ptr())
                     );
-                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    traps.com_printf(cstr(&msg).as_ptr());
                     continue;
                 }
 
@@ -1164,7 +1165,7 @@ pub fn WP_SaberParseParms(
                             cstr_to_str(tok),
                             cstr_to_str(useSaber.as_ptr())
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        traps.com_printf(cstr(&msg).as_ptr());
                         continue;
                     }
                     n = idx;
@@ -1174,7 +1175,7 @@ pub fn WP_SaberParseParms(
                         cstr_to_str(tok),
                         cstr_to_str(useSaber.as_ptr())
                     );
-                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    traps.com_printf(cstr(&msg).as_ptr());
                     continue;
                 }
 
@@ -1208,7 +1209,7 @@ pub fn WP_SaberParseParms(
                             cstr_to_str(tok),
                             cstr_to_str(useSaber.as_ptr())
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        traps.com_printf(cstr(&msg).as_ptr());
                         continue;
                     }
                     n = idx;
@@ -1218,7 +1219,7 @@ pub fn WP_SaberParseParms(
                         cstr_to_str(tok),
                         cstr_to_str(useSaber.as_ptr())
                     );
-                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    traps.com_printf(cstr(&msg).as_ptr());
                     continue;
                 }
 
@@ -2196,7 +2197,7 @@ pub fn WP_SaberParseParms(
                     cstr_to_str(tok),
                     cstr_to_str(useSaber.as_ptr())
                 );
-                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                traps.com_printf(cstr(&msg).as_ptr());
             }
             crate::q_shared::SkipRestOfLine(&mut bg.qs, &mut p);
         }
@@ -2219,6 +2220,7 @@ pub fn WP_SaberParseParm(
     parmname: *const c_char,
     saberData: *mut c_char,
     bg: &mut BgState,
+    traps: &dyn BgTraps,
 ) -> qboolean {
     unsafe {
         if saberName.is_null() || *saberName == 0 {
@@ -2253,7 +2255,7 @@ pub fn WP_SaberParseParm(
             return qfalse;
         }
 
-        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr()) != qfalse {
+        if BG_ParseLiteral(&mut bg.qs, &mut p, c"{".as_ptr(), traps) != qfalse {
             return qfalse;
         }
 
@@ -2265,7 +2267,7 @@ pub fn WP_SaberParseParm(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(saberName)
                 );
-                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                traps.com_printf(cstr(&s).as_ptr());
                 return qfalse;
             }
 
@@ -2292,10 +2294,21 @@ pub fn WP_SaberParseParm(
 /// Raven `WP_SaberValidForPlayerInMP`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:2647-2662`
-pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) -> qboolean {
+pub fn WP_SaberValidForPlayerInMP(
+    saberName: *const c_char,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+) -> qboolean {
     unsafe {
         let mut allowed: [c_char; 8] = [0; 8];
-        if WP_SaberParseParm(saberName, c"notInMP".as_ptr(), allowed.as_mut_ptr(), bg) == qfalse {
+        if WP_SaberParseParm(
+            saberName,
+            c"notInMP".as_ptr(),
+            allowed.as_mut_ptr(),
+            bg,
+            traps,
+        ) == qfalse
+        {
             // not defined, default is yes
             return qtrue;
         }
@@ -2360,7 +2373,7 @@ pub fn WP_SetSaber(
             return;
         }
 
-        if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName, bg) == qfalse {
+        if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName, bg, traps) == qfalse {
             WP_SaberParseParms(
                 c"Kyle".as_ptr(),
                 sabers.offset(saberNum as isize),
@@ -2465,10 +2478,10 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
             len = traps.fs_fopen(path_c.as_ptr(), &mut f, FS_READ);
 
             if len == -1 {
-                crate::g_main::Com_Printf(c"error reading file\n".as_ptr());
+                traps.com_printf(c"error reading file\n".as_ptr());
             } else {
                 if (totallen + len + 1/* for the endline */) >= MAX_SABER_DATA_SIZE as c_int {
-                    crate::g_main::Com_Error(
+                    traps.com_error(
                         ERR_DROP as c_int,
                         c"Saber extensions (*.sab) are too large".as_ptr(),
                     );

@@ -43,6 +43,8 @@ pub fn BG_ParseVehWeaponParm(
     // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
     // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
     bg: &mut BgState,
+    // Engine `Com_Printf` print seam, routed through the trap channel.
+    traps: &dyn BgTraps,
     // Routes the `VF_MODEL`/`VF_EFFECT`/`VF_SOUND` field types to the game-tier
     // `G_ModelIndex`/`G_EffectIndex`/`G_SoundIndex` via the bg→game upcall seam.
     callbacks: &mut dyn GameCallbacks,
@@ -81,7 +83,7 @@ pub fn BG_ParseVehWeaponParm(
                         // shared libc-`%f` scanner's returned count.
                         let n = sscanf_f32s(&value, &mut vec);
                         if n != 3 {
-                            Com_Printf(
+                            traps.com_printf(
                                 cstr(&format!(
                                     "{}BG_ParseVehWeaponParm: VEC3 sscanf() failed to read 3 floats ('angle' key bug?)\n",
                                     S_COLOR_YELLOW.to_str().unwrap()
@@ -162,6 +164,8 @@ pub fn BG_ParseVehWeaponParm(
 pub fn VEH_LoadVehWeapon(
     vehWeaponName: *const c_char,
     bg: &mut BgState,
+    // Engine `Com_Printf` print seam; also threaded to `BG_ParseVehWeaponParm`.
+    traps: &dyn BgTraps,
     // Threaded through to `BG_ParseVehWeaponParm` for the model/effect/sound
     // field-index upcalls.
     callbacks: &mut dyn GameCallbacks,
@@ -205,7 +209,7 @@ pub fn VEH_LoadVehWeapon(
             let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if *token == 0 {
                 let name = cstr_to_str(vehWeaponName);
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: unexpected EOF while parsing Vehicle Weapon '{}'\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -223,7 +227,7 @@ pub fn VEH_LoadVehWeapon(
             let value = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if value.is_null() || *value == 0 {
                 let pn = cstr_to_str(parmName.as_ptr());
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: Vehicle Weapon token '{}' has no value!\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -231,12 +235,18 @@ pub fn VEH_LoadVehWeapon(
                     ))
                     .as_ptr(),
                 );
-            } else if BG_ParseVehWeaponParm(vehWeapon, parmName.as_mut_ptr(), value, bg, callbacks)
-                == qfalse
+            } else if BG_ParseVehWeaponParm(
+                vehWeapon,
+                parmName.as_mut_ptr(),
+                value,
+                bg,
+                traps,
+                callbacks,
+            ) == qfalse
             {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: Unknown Vehicle Weapon key/value pair '{}','{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -268,12 +278,14 @@ pub fn VEH_LoadVehWeapon(
 pub fn VEH_VehWeaponIndexForName(
     vehWeaponName: *const c_char,
     bg: &mut BgState,
+    // Engine `Com_Printf` print seam; also threaded to `VEH_LoadVehWeapon`.
+    traps: &dyn BgTraps,
     // Threaded through to `VEH_LoadVehWeapon` for the field-index upcalls.
     callbacks: &mut dyn GameCallbacks,
 ) -> c_int {
     unsafe {
         if vehWeaponName.is_null() || *vehWeaponName == 0 {
-            Com_Printf(
+            traps.com_printf(
                 cstr(&format!(
                     "{}ERROR: Trying to read Vehicle Weapon with no name!\n",
                     S_COLOR_RED.to_str().unwrap()
@@ -292,7 +304,7 @@ pub fn VEH_VehWeaponIndexForName(
         }
         if vw >= MAX_VEH_WEAPONS as c_int {
             let name = cstr_to_str(vehWeaponName);
-            Com_Printf(
+            traps.com_printf(
                 cstr(&format!(
                     "{}ERROR: Too many Vehicle Weapons (max 16), aborting load on {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
@@ -302,10 +314,10 @@ pub fn VEH_VehWeaponIndexForName(
             );
             return VEH_WEAPON_NONE;
         }
-        vw = VEH_LoadVehWeapon(vehWeaponName, bg, callbacks);
+        vw = VEH_LoadVehWeapon(vehWeaponName, bg, traps, callbacks);
         if vw == VEH_WEAPON_NONE {
             let name = cstr_to_str(vehWeaponName);
-            Com_Printf(
+            traps.com_printf(
                 cstr(&format!(
                     "{}ERROR: Could not find Vehicle Weapon {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
@@ -383,6 +395,8 @@ pub fn BG_ParseVehicleParm(
     // Threaded so the MP (`_JK2MP`) `VF_LSTRING` branch can bump the bg pool
     // (`BG_Alloc`); the game pool is unreachable from bg-tier code.
     bg: &mut BgState,
+    // Engine `Com_Printf` print seam, routed through the trap channel.
+    traps: &dyn BgTraps,
     // Routes the `VF_MODEL`/`VF_EFFECT`/`VF_SOUND` field types to the game-tier
     // `G_ModelIndex`/`G_EffectIndex`/`G_SoundIndex` via the bg→game upcall seam.
     callbacks: &mut dyn GameCallbacks,
@@ -422,7 +436,7 @@ pub fn BG_ParseVehicleParm(
                         // shared libc-`%f` scanner's returned count.
                         let n = sscanf_f32s(&value, &mut vec);
                         if n != 3 {
-                            Com_Printf(
+                            traps.com_printf(
                                 cstr(&format!(
                                     "{}BG_ParseVehicleParm: VEC3 sscanf() failed to read 3 floats ('angle' key bug?)\n",
                                     S_COLOR_YELLOW.to_str().unwrap()
@@ -564,7 +578,7 @@ pub fn VEH_LoadVehicle(
             let token = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if *token == 0 {
                 let name = cstr_to_str(vehicleName);
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: unexpected EOF while parsing Vehicle '{}'\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -582,7 +596,7 @@ pub fn VEH_LoadVehicle(
             let value = COM_ParseExt(&mut bg.qs, &mut p as *mut *const c_char, qtrue);
             if value.is_null() || *value == 0 {
                 let pn = cstr_to_str(parmName.as_ptr());
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: Vehicle token '{}' has no value!\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -601,12 +615,18 @@ pub fn VEH_LoadVehicle(
                 ) == 0
             }) {
                 Q_strncpyz(weap_muzzle[n - 1].as_mut_ptr(), value, 128);
-            } else if BG_ParseVehicleParm(vehicle, parmName.as_mut_ptr(), value, bg, callbacks)
-                == qfalse
+            } else if BG_ParseVehicleParm(
+                vehicle,
+                parmName.as_mut_ptr(),
+                value,
+                bg,
+                traps,
+                callbacks,
+            ) == qfalse
             {
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -625,11 +645,12 @@ pub fn VEH_LoadVehicle(
                 cstr("weap1").as_ptr() as *mut c_char,
                 weap1.as_mut_ptr(),
                 bg,
+                traps,
                 callbacks,
             ) == qfalse
             {
                 let w = cstr_to_str(weap1.as_ptr());
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: Unknown Vehicle key/value pair 'weap1', '{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -645,11 +666,12 @@ pub fn VEH_LoadVehicle(
                 cstr("weap2").as_ptr() as *mut c_char,
                 weap2.as_mut_ptr(),
                 bg,
+                traps,
                 callbacks,
             ) == qfalse
             {
                 let w = cstr_to_str(weap2.as_ptr());
-                Com_Printf(
+                traps.com_printf(
                     cstr(&format!(
                         "{}ERROR: Unknown Vehicle key/value pair 'weap2', '{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
@@ -667,11 +689,12 @@ pub fn VEH_LoadVehicle(
                     cstr(&key).as_ptr() as *mut c_char,
                     weap_muzzle[n - 1].as_mut_ptr(),
                     bg,
+                    traps,
                     callbacks,
                 ) == qfalse
                 {
                     let w = cstr_to_str(weap_muzzle[n - 1].as_ptr());
-                    Com_Printf(
+                    traps.com_printf(
                         cstr(&format!(
                             "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
                             S_COLOR_RED.to_str().unwrap(),
@@ -748,7 +771,7 @@ pub fn VEH_VehicleIndexForName(
 ) -> c_int {
     unsafe {
         if vehicleName.is_null() || *vehicleName == 0 {
-            Com_Printf(
+            traps.com_printf(
                 cstr(&format!(
                     "{}ERROR: Trying to read Vehicle with no name!\n",
                     S_COLOR_RED.to_str().unwrap()
@@ -767,7 +790,7 @@ pub fn VEH_VehicleIndexForName(
         }
         if v >= MAX_VEHICLES as c_int {
             let name = cstr_to_str(vehicleName);
-            Com_Printf(
+            traps.com_printf(
                 cstr(&format!(
                     "{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
@@ -780,7 +803,7 @@ pub fn VEH_VehicleIndexForName(
         v = VEH_LoadVehicle(vehicleName, bg, traps, callbacks);
         if v == VEHICLE_NONE {
             let name = cstr_to_str(vehicleName);
-            Com_Printf(
+            traps.com_printf(
                 cstr(&format!(
                     "{}ERROR: Could not find Vehicle {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
@@ -826,7 +849,7 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
             let len = traps.fs_fopen(cstr(&path).as_ptr(), &mut f as *mut fileHandle_t, FS_READ);
 
             if len == -1 {
-                Com_Printf(cstr("error reading file\n").as_ptr());
+                traps.com_printf(cstr("error reading file\n").as_ptr());
             } else {
                 traps.fs_read(temp_read_buffer.as_mut_ptr() as *mut c_void, len, f);
                 temp_read_buffer[len as usize] = 0;
@@ -838,7 +861,7 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 }
 
                 if total_len + len as usize >= MAX_VEH_WEAPON_DATA_SIZE as usize {
-                    crate::g_main::Com_Error(
+                    traps.com_error(
                         ERR_DROP as c_int,
                         cstr("Vehicle Weapon extensions (*.vwp) are too large").as_ptr(),
                     );
@@ -888,7 +911,7 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
             let len = traps.fs_fopen(cstr(&path).as_ptr(), &mut f as *mut fileHandle_t, FS_READ);
 
             if len == -1 {
-                Com_Printf(cstr("error reading file\n").as_ptr());
+                traps.com_printf(cstr("error reading file\n").as_ptr());
             } else {
                 traps.fs_read(temp_read_buffer.as_mut_ptr() as *mut c_void, len, f);
                 temp_read_buffer[len as usize] = 0;
@@ -899,7 +922,7 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 }
 
                 if total_len + len as usize >= MAX_VEHICLE_DATA_SIZE as usize {
-                    crate::g_main::Com_Error(
+                    traps.com_error(
                         ERR_DROP as c_int,
                         cstr("Vehicle extensions (*.veh) are too large").as_ptr(),
                     );
@@ -965,7 +988,7 @@ pub fn BG_GetVehicleModelName(
 
         if v_index == VEHICLE_NONE {
             let name = cstr_to_str(veh_name);
-            crate::g_main::Com_Error(
+            traps.com_error(
                 ERR_DROP as c_int,
                 cstr(&format!(
                     "BG_GetVehicleModelName:  couldn't find vehicle {}",
@@ -1006,7 +1029,7 @@ pub fn BG_GetVehicleSkinName(
 
         if v_index == VEHICLE_NONE {
             let name = cstr_to_str(veh_name);
-            crate::g_main::Com_Error(
+            traps.com_error(
                 ERR_DROP as c_int,
                 cstr(&format!(
                     "BG_GetVehicleSkinName:  couldn't find vehicle {}",

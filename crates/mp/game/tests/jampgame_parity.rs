@@ -838,6 +838,12 @@ mod saberload {
     }
 
     impl BgTraps for TestTraps {
+        fn com_printf(&self, _msg: *const c_char) {}
+        fn com_error(&self, error_level: c_int, msg: *const c_char) {
+            panic!("com_error({}) in test: {:?}", error_level, unsafe {
+                std::ffi::CStr::from_ptr(msg)
+            });
+        }
         fn fs_getfilelist(
             &self,
             path: *const c_char,
@@ -1172,7 +1178,8 @@ mod saberload {
 
             let mut saber: saberInfo_t = unsafe { core::mem::zeroed() };
             let cname = cstr(name);
-            let ret = WP_SaberParseParms(cname.as_ptr(), &mut saber, &mut bg, &traps, &mut callbacks);
+            let ret =
+                WP_SaberParseParms(cname.as_ptr(), &mut saber, &mut bg, &traps, &mut callbacks);
 
             let pi = |o: &mut String, tag: &str, v: c_int| {
                 let _ = writeln!(o, "{tag} {v}");
