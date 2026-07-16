@@ -1412,7 +1412,14 @@ pub fn BG_SiegeParseClassFile(
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
             }
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
+            //No entry!  Bad bad bad
+            // Oracle only prints; playerClass keeps its prior value (no
+            // SPC_INFANTRY default here). Source: `bg_saga.c:1041-1044`
+            let s = format!(
+                "ERROR: no class_shader defined for class {}\n",
+                cstr_to_str(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name.as_ptr())
+            );
+            crate::g_main::Com_Printf(cstr(&s).as_ptr());
         }
 
         if BG_SiegeGetPairedValue(

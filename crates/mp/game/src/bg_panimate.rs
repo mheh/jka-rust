@@ -2458,9 +2458,11 @@ impl PmoveContext<'_> {
                         if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
                             // Make sure to only wait in full 1/20 sec server frame intervals.
                             // Oracle: `int dur; int speedDif;` — both truncate to int
-                            // before the add (bg_panimate.c:2839-2844).
-                            let dur0 = ((frame.numFrames - 1) as f32
-                                * (frame.frameLerp as f32).abs())
+                            // before the add; `numFrames-1` promotes the ushort to
+                            // SIGNED int (0 → -1, not a u16 wrap), and the product with
+                            // double `fabs` runs in f64 (bg_panimate.c:2839-2844).
+                            let dur0 = ((frame.numFrames as c_int - 1) as f64
+                                * ((frame.frameLerp as f32) as f64).abs())
                                 as c_int;
                             let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
                             let dur = dur0 + speedDif;
@@ -2503,9 +2505,11 @@ impl PmoveContext<'_> {
                         if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
                             // Make sure to only wait in full 1/20 sec server frame intervals.
                             // Oracle: `int dur; int speedDif;` — both truncate to int
-                            // before the add (bg_panimate.c:2887-2892).
-                            let dur0 = ((frame.numFrames - 1) as f32
-                                * (frame.frameLerp as f32).abs())
+                            // before the add; `numFrames-1` promotes the ushort to
+                            // SIGNED int (0 → -1, not a u16 wrap), and the product with
+                            // double `fabs` runs in f64 (bg_panimate.c:2887-2892).
+                            let dur0 = ((frame.numFrames as c_int - 1) as f64
+                                * ((frame.frameLerp as f32) as f64).abs())
                                 as c_int;
                             let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
                             let dur = dur0 + speedDif;

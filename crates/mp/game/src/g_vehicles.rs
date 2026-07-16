@@ -719,9 +719,7 @@ pub fn G_EjectDroidUnit(ctx: &mut GameContext, pVeh: *mut Vehicle_t, kill: qbool
         if kill != qfalse {
             // Kill them, too.
             crate::g_utils::G_MuteSound(ctx, (*droidEnt).s.number, CHAN_VOICE);
-            // PORT-NOTE(G_Damage-null-dir): Raven passes NULL for `dir`; the resolved
-            // G_Damage takes `dir: &mut vec3_t` (reshape covered only OUT-params, not
-            // nullable INs) — a zero vec3 stands in for the C NULL. See shape_mismatch.
+            // Raven passes NULL for `dir`; carried as `None`.
             crate::g_combat::G_Damage(
                 ctx,
                 ctx.entity_id_of(droidEnt),
@@ -2126,9 +2124,8 @@ pub fn G_SetVehDamageFlags(
                                 Some(id) => ctx.world.g_entities.as_mut_ptr().add(id.0 as usize),
                                 None => core::ptr::null_mut(),
                             };
-                            // PORT-NOTE(G_Damage-null-dir/point): Raven passes NULL for both
-                            // `dir` and `point`; resolved sig takes `dir: &mut vec3_t` and
-                            // `point: vec3_t`, so zero vecs stand in.
+                            // Raven passes NULL for both `dir` and `point`; `dir` is
+                            // carried as `None`, `point` as the zero-vec convention.
                             let null_point: vec3_t = [0.0; 3];
                             crate::g_combat::G_Damage(
                                 ctx,

@@ -385,6 +385,7 @@ pub fn ByteToDir(b: c_int, dir: &mut vec3_t) {
 ///
 /// Source: `oracle/codemp/game/q_math.c:333-341`
 pub fn ColorBytes3(r: f32, g: f32, b: f32) -> c_uint {
+    // §19: oracle leaves the 4th packed byte uninitialized (UB); we zero it.
     let bytes = [(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8, 0u8];
     u32::from_ne_bytes(bytes) as c_uint
 }

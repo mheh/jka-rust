@@ -2350,7 +2350,9 @@ pub fn DebugLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int
     let up = [0.0f32, 0.0, 1.0];
     let dot = crate::q_math::_DotProduct(dir, up);
     let mut cross = [0.0f32; 3];
-    if dot > 0.99 || dot < -0.99 {
+    // `0.99` is a bare double in the oracle; both compares promote (fn is dead —
+    // zero callers in either tree — promoted for F3-class purity).
+    if (dot as f64) > 0.99 || (dot as f64) < -0.99 {
         cross = [1.0, 0.0, 0.0];
     } else {
         CrossProduct(dir, up, &mut cross);

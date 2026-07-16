@@ -204,6 +204,15 @@ unported); g_exphysics (every literal f32-suffixed in oracle); g_log (the
 | 6 | `g_team.rs:415` Team_ForceGesture | `g_team.c:341` | Loop bound g_maxclients vs oracle MAX_CLIENTS (dead fn — call site rww-commented). | low (dead) |
 | 7 | doc-only | — | §19 notes: Team_SetFlagStatus zero-init `st[4]` (oracle sends stack garbage in non-CTF); six g_timer null guards. | doc-only |
 
+**CRITERION CORRECTION (2026-07-15, F3 sweep):** the sharp criterion as
+first recorded below lumps `>=` with `>` — wrong. Corrected truth table
+(divergence only at `x == f32(L)`, exact-f32 operand): `>` diverges iff
+L rounds UP; `<` iff DOWN; **`>=` iff DOWN** (C false / Rust true);
+**`<=` iff UP**. Inclusive operators diverge in the OPPOSITE rounding
+direction from their strict forms. All wave-2/3/5 strict-operator fixes
+stand; the sweep confirmed the inclusive-divergent class is empty in the
+whole game corpus.
+
 Wave-5 fix batch landed: `a1649893` (findings 1-7 + validator GAP closure:
 gPainHitLoc/gLastPrintedIndex/saberClashEventParm seeded to Raven's
 file-scope values for exact load-state parity; adversarially validated,
@@ -280,6 +289,36 @@ Q3_Lerp2Angles/NPC_BSPatrol vigilance/species nextthink sites — all
 g_nav.rs:2240 `Com_Error(3 /* ERR_DROP */)` — the literal is inert (the
 port's Com_Error drops `level`, matching Raven's G_Error("%s")), but the
 comment mislabels 3 as ERR_DROP (enum value 1).
+
+## F sweeps (2026-07-15) — F1/F2/F3 port-wide: ALL THREE CLASSES CLOSED
+
+- **F3 (threshold compares): CLOSED.** Mechanical scan of all 89 game .c
+  files (scratchpad f3_scan.py, corrected truth table above): 126
+  FP-literal compares → 25 divergence-capable, every live one already
+  fixed in waves 2/3/5; the inclusive-op divergent class is empty in the
+  corpus; sole remaining f32 site was dead DebugLine (promoted anyway).
+- **F1 (double-arithmetic flattening), unaudited tail: CLOSED.** q_math
+  — the float substrate — audited fully CLEAN (all libm/M_PI chains
+  promoted; Q_crandom/AngleSubtract/powf-bug individually proven
+  bit-exact). bg_lib linkage trap grounded: Raven's own unguarded atof
+  (f32 accumulator) is what natively links, and the port matches it,
+  leading-dot quirk included. bg_saberLoad/bg_vehicleLoad/tri_coll_test/
+  bg_g2_utils/g_mem/g_strap/veh_dispatch/g_init/g_shutdown/
+  g_icarus_set_type (212-row table machine-diffed) all clean. Two real
+  findings, both fixed this batch: **bg_panimate `numFrames-1`** (C
+  promotes the ushort to signed int, 0 → -1 into the dur<=1 fallback;
+  the u16 port panicked/wrapped — also the product runs in f64) and
+  **bg_saga class_shader missing-key arm** (port forced SPC_INFANTRY and
+  dropped the error print; oracle prints and leaves the value).
+- **F2 (dropped nullable-param guards): CLOSED, zero GUARD-LOST.**
+  Scanner over 384 guard sites / 297 func-params: the 956101f7 restores
+  all stand; ~90 params guard-preserved via Option/null/zero-vec
+  conventions with fallbacks intact; 5 provably-dead guards documented;
+  no reachable NULL-branch behavior lost anywhere. Two stale g_vehicles
+  PORT-NOTEs fixed (dir is `None` now, not a zero-vec). Out-of-class
+  flag for a future ABI-arg parity pass: WP_SaberAddG2Model passes an
+  empty CString where C passes raw NULL to G2API_InitGhoul2Model.
+- Doc riders this batch: ColorBytes3 §19 note, g_icarus_set_type cite.
 
 ### Wave-7 queue (PAUSED here at user request)
 
