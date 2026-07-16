@@ -10,6 +10,12 @@
 //!   threaded into this faithful skeleton signature to access them). Also
 //!   reads `level.time` for timer operations and the LCG-based `random()`
 //!   (owned threaded Rng, unavailable here).
+//!
+//! Safe-state campaign 2c: entity (`gentity_t`) derefs of the ambient `NPC`
+//! (and the `self_` handle) reads/writes route through the `GameWorld`/`GameContext`
+//! accessors (`ctx.world.entity()`/`entity_mut()`) instead of raw pointers. The
+//! `NPCInfo` (`gNPC_t`) and `.client` (`gclient_t`) derefs stay raw — those two
+//! regimes are task #7 territory and remain in isolated `unsafe` blocks.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_combat::G_Damage;
@@ -29,17 +35,6 @@ use crate::NPC_utils::{
 };
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::entity_event::entity_event_t;
-
-// EntityId seam helper: resolve `Option<EntityId>` back to the raw pointer the
-// verbatim body still expects (`None` -> null), per the `NPC_AI_Stormtrooper.rs`
-// precedent.
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 // Raven's working combat range defines (NPC_AI_MineMonster.c:3-8):
 // These define the working combat range for these suckers
@@ -83,38 +78,38 @@ pub fn MineMonster_Idle(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:50-83`
 pub fn MineMonster_Patrol(ctx: &mut GameContext) {
+    let mut dif: vec3_t = [0.0; 3];
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
     unsafe {
-        let mut dif: vec3_t = [0.0; 3];
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
-
         (*npc_info).localState = LSTATE_CLEAR;
+    }
 
-        if !UpdateGoal(ctx).is_null() {
-            ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
-            NPC_MoveToGoal(ctx, qtrue);
-        } else {
-            let patrol_timer_id = cstr("patrolTime");
-            if TIMER_Done(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr()) != 0 {
-                let dur = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
-                TIMER_Set(ctx, ctx.entity_id_of(npc), patrol_timer_id.as_ptr(), dur);
-            }
+    if !UpdateGoal(ctx).is_null() {
+        ctx.world.globals.ucmd.buttons &= !BUTTON_WALKING;
+        NPC_MoveToGoal(ctx, qtrue);
+    } else {
+        let patrol_timer_id = cstr("patrolTime");
+        if TIMER_Done(ctx, Some(npc_id), patrol_timer_id.as_ptr()) != 0 {
+            let dur = (ctx.world.bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int;
+            TIMER_Set(ctx, Some(npc_id), patrol_timer_id.as_ptr(), dur);
         }
+    }
 
-        _VectorSubtract(
-            ctx.world.g_entities[0].r.currentOrigin,
-            (*npc).r.currentOrigin,
-            &mut dif,
-        );
+    let e0_origin = ctx.world.g_entities[0].r.currentOrigin;
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    _VectorSubtract(e0_origin, npc_origin, &mut dif);
 
-        if VectorLengthSquared(dif) < 65536.0 {
-            G_SetEnemy(ctx, ctx.entity_id_of(npc).unwrap(), EntityId::from_num(0));
-        }
+    if VectorLengthSquared(dif) < 65536.0 {
+        G_SetEnemy(ctx, npc_id, EntityId::from_num(0));
+    }
 
-        if NPC_CheckEnemyExt(ctx, qtrue) == 0 {
-            MineMonster_Idle(ctx);
-            return;
-        }
+    if NPC_CheckEnemyExt(ctx, qtrue) == 0 {
+        MineMonster_Idle(ctx);
+        return;
     }
 }
 
@@ -122,13 +117,18 @@ pub fn MineMonster_Patrol(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:90-98`
 pub fn MineMonster_Move(ctx: &mut GameContext, visible: qboolean) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if (*npc_info).localState != LSTATE_WAITING {
-            (*npc_info).goalEntity = (*npc).enemy;
-            NPC_MoveToGoal(ctx, qtrue);
+    // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+    if unsafe { (*npc_info).localState } != LSTATE_WAITING {
+        let npc_enemy = ctx.world.entity(npc_id).enemy;
+        unsafe {
+            (*npc_info).goalEntity = npc_enemy;
+        }
+        NPC_MoveToGoal(ctx, qtrue);
+        unsafe {
             (*npc_info).goalRadius = MAX_DISTANCE;
         }
     }
@@ -138,60 +138,64 @@ pub fn MineMonster_Move(ctx: &mut GameContext, visible: qboolean) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:101-126`
 pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, damage: c_int) {
-    // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
-    let enemy: *mut gentity_t = unsafe { ent_resolve_opt(ctx, enemy) };
-    unsafe {
-        if enemy.is_null() {
-            return;
-        }
+    if enemy.is_none() {
+        return;
+    }
 
-        let mut end: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
-        let mut tr: trace_t = core::mem::zeroed();
-        let npc = ctx.world.globals.NPC;
-        let origin = vec3_origin;
-        let start = (*npc).r.currentOrigin;
+    let mut end: vec3_t = [0.0; 3];
+    let mut dir: vec3_t = [0.0; 3];
+    // trace_t POD zero-init (not part of the entity deref regime).
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    let origin = vec3_origin;
+    let start = ctx.world.entity(npc_id).r.currentOrigin;
 
-        AngleVectors((*((*npc).client)).ps.viewangles, Some(&mut dir), None, None);
-        _VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
+    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    let client = ctx.world.entity(npc_id).client;
+    let viewangles = unsafe { (*client).ps.viewangles };
+    AngleVectors(viewangles, Some(&mut dir), None, None);
 
-        trap::Trace(
-            ctx.engine,
-            GTraceArgs::new(
-                core::ptr::addr_of_mut!(tr) as *mut trace_t,
-                core::ptr::addr_of!(start) as *const vec3_t,
-                core::ptr::addr_of!(origin) as *const vec3_t,
-                core::ptr::addr_of!(origin) as *const vec3_t,
-                core::ptr::addr_of!(end) as *const vec3_t,
-                (*npc).s.number,
-                MASK_SHOT,
-            ),
+    let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+    _VectorMA(npc_origin, MIN_DISTANCE as f32, dir, &mut end);
+
+    let npc_number = ctx.world.entity(npc_id).s.number;
+    trap::Trace(
+        ctx.engine,
+        GTraceArgs::new(
+            core::ptr::addr_of_mut!(tr) as *mut trace_t,
+            core::ptr::addr_of!(start) as *const vec3_t,
+            core::ptr::addr_of!(origin) as *const vec3_t,
+            core::ptr::addr_of!(origin) as *const vec3_t,
+            core::ptr::addr_of!(end) as *const vec3_t,
+            npc_number,
+            MASK_SHOT,
+        ),
+    );
+
+    let npc_opt = Some(npc_id);
+    if tr.entityNum >= 0 && (tr.entityNum as c_uint) < ENTITYNUM_NONE as c_uint {
+        let mut dir_copy = dir;
+        G_Damage(
+            ctx,
+            EntityId::from_num(tr.entityNum as c_int),
+            npc_opt,
+            npc_opt,
+            Some(&mut dir_copy),
+            tr.endpos,
+            damage,
+            DAMAGE_NO_KNOCKBACK,
+            MOD_MELEE as c_int,
         );
-
-        if tr.entityNum >= 0 && (tr.entityNum as c_uint) < ENTITYNUM_NONE as c_uint {
-            let damage_entity = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-            let mut dir_copy = dir;
-            G_Damage(
-                ctx,
-                ctx.entity_id_of(damage_entity),
-                ctx.entity_id_of(npc),
-                ctx.entity_id_of(npc),
-                Some(&mut dir_copy),
-                tr.endpos,
-                damage,
-                DAMAGE_NO_KNOCKBACK,
-                MOD_MELEE as c_int,
-            );
-            let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
-            let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
-            let sound_idx = G_EffectIndex(bite_str.as_ptr());
-            G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
-        } else {
-            let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
-            let miss_str = cstr(&format!("sound/chars/mine/misc/miss{}.wav", idx));
-            let sound_idx = G_EffectIndex(miss_str.as_ptr());
-            G_Sound(ctx, ctx.entity_id_of(npc), CHAN_AUTO, sound_idx);
-        }
+        let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
+        let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
+        let sound_idx = G_EffectIndex(bite_str.as_ptr());
+        G_Sound(ctx, npc_opt, CHAN_AUTO, sound_idx);
+    } else {
+        let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
+        let miss_str = cstr(&format!("sound/chars/mine/misc/miss{}.wav", idx));
+        let sound_idx = G_EffectIndex(miss_str.as_ptr());
+        G_Sound(ctx, npc_opt, CHAN_AUTO, sound_idx);
     }
 }
 
@@ -199,171 +203,139 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
 pub fn MineMonster_Attack(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let attacking_id = cstr("attacking");
+    let npc = ctx.world.globals.NPC;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
+    let attacking_id = cstr("attacking");
 
-        if TIMER_Exists(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr()) == 0 {
-            let rng = &mut ctx.world.bg_state.rng;
+    if TIMER_Exists(ctx, Some(npc_id), attacking_id.as_ptr()) == 0 {
+        let npc_enemy = ctx.world.entity(npc_id).enemy;
+        let enemy_height_diff = if let Some(eid) = npc_enemy {
+            ctx.world.entity(eid).r.currentOrigin[2] - ctx.world.entity(npc_id).r.currentOrigin[2]
+        } else {
+            0.0
+        };
 
-            let enemy_height_diff = if let Some(eid) = (*npc).enemy {
-                ctx.world.g_entities[eid.0 as usize].r.currentOrigin[2] - (*npc).r.currentOrigin[2]
-            } else {
-                0.0
-            };
+        let rng = &mut ctx.world.bg_state.rng;
 
-            let do_attack4 = (*npc).enemy.is_some()
-                && ((enemy_height_diff > 10.0 && rng.random() as f32 > 0.1f32)
-                    || rng.random() as f32 > 0.8f32);
+        let do_attack4 = npc_enemy.is_some()
+            && ((enemy_height_diff > 10.0 && rng.random() as f32 > 0.1f32)
+                || rng.random() as f32 > 0.8f32);
 
-            if do_attack4 {
-                let dur = (1750.0 + rng.random() as f32 * 200.0) as c_int;
-                TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), dur);
+        if do_attack4 {
+            let dur = (1750.0 + rng.random() as f32 * 200.0) as c_int;
+            TIMER_Set(ctx, Some(npc_id), attacking_id.as_ptr(), dur);
+            NPC_SetAnim(
+                ctx,
+                npc_id,
+                SETANIM_BOTH,
+                BOTH_ATTACK4 as c_int,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+            TIMER_Set(ctx, Some(npc_id), cstr("attack2_dmg").as_ptr(), 950);
+        } else if rng.random() as f32 > 0.5f32 {
+            if rng.random() as f32 > 0.8f32 {
+                TIMER_Set(ctx, Some(npc_id), attacking_id.as_ptr(), 850);
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(npc).unwrap(),
+                    npc_id,
                     SETANIM_BOTH,
-                    BOTH_ATTACK4 as c_int,
+                    BOTH_ATTACK3 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    cstr("attack2_dmg").as_ptr(),
-                    950,
-                );
-            } else if rng.random() as f32 > 0.5f32 {
-                if rng.random() as f32 > 0.8f32 {
-                    TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 850);
-                    NPC_SetAnim(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        SETANIM_BOTH,
-                        BOTH_ATTACK3 as c_int,
-                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                    );
-                    TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(npc),
-                        cstr("attack2_dmg").as_ptr(),
-                        400,
-                    );
-                } else {
-                    TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 850);
-                    NPC_SetAnim(
-                        ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        SETANIM_BOTH,
-                        BOTH_ATTACK1 as c_int,
-                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                    );
-                    TIMER_Set(
-                        ctx,
-                        ctx.entity_id_of(npc),
-                        cstr("attack1_dmg").as_ptr(),
-                        450,
-                    );
-                }
+                TIMER_Set(ctx, Some(npc_id), cstr("attack2_dmg").as_ptr(), 400);
             } else {
-                TIMER_Set(ctx, ctx.entity_id_of(npc), attacking_id.as_ptr(), 1250);
+                TIMER_Set(ctx, Some(npc_id), attacking_id.as_ptr(), 850);
                 NPC_SetAnim(
                     ctx,
-                    ctx.entity_id_of(npc).unwrap(),
+                    npc_id,
                     SETANIM_BOTH,
-                    BOTH_ATTACK2 as c_int,
+                    BOTH_ATTACK1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
-                TIMER_Set(
-                    ctx,
-                    ctx.entity_id_of(npc),
-                    cstr("attack1_dmg").as_ptr(),
-                    700,
-                );
+                TIMER_Set(ctx, Some(npc_id), cstr("attack1_dmg").as_ptr(), 450);
             }
         } else {
-            if TIMER_Done2(
+            TIMER_Set(ctx, Some(npc_id), attacking_id.as_ptr(), 1250);
+            NPC_SetAnim(
                 ctx,
-                ctx.entity_id_of(npc),
-                cstr("attack1_dmg").as_ptr(),
-                qtrue,
-            ) != 0
-            {
-                if let Some(enemy_id) = (*npc).enemy {
-                    MineMonster_TryDamage(ctx, Some(enemy_id), 5);
-                }
-            } else if TIMER_Done2(
-                ctx,
-                ctx.entity_id_of(npc),
-                cstr("attack2_dmg").as_ptr(),
-                qtrue,
-            ) != 0
-            {
-                if let Some(enemy_id) = (*npc).enemy {
-                    MineMonster_TryDamage(ctx, Some(enemy_id), 10);
-                }
+                npc_id,
+                SETANIM_BOTH,
+                BOTH_ATTACK2 as c_int,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+            TIMER_Set(ctx, Some(npc_id), cstr("attack1_dmg").as_ptr(), 700);
+        }
+    } else {
+        if TIMER_Done2(ctx, Some(npc_id), cstr("attack1_dmg").as_ptr(), qtrue) != 0 {
+            let npc_enemy = ctx.world.entity(npc_id).enemy;
+            if let Some(enemy_id) = npc_enemy {
+                MineMonster_TryDamage(ctx, Some(enemy_id), 5);
+            }
+        } else if TIMER_Done2(ctx, Some(npc_id), cstr("attack2_dmg").as_ptr(), qtrue) != 0 {
+            let npc_enemy = ctx.world.entity(npc_id).enemy;
+            if let Some(enemy_id) = npc_enemy {
+                MineMonster_TryDamage(ctx, Some(enemy_id), 10);
             }
         }
-
-        TIMER_Done2(
-            ctx,
-            ctx.entity_id_of(npc),
-            cstr("attacking").as_ptr(),
-            qtrue,
-        );
     }
+
+    TIMER_Done2(ctx, Some(npc_id), cstr("attacking").as_ptr(), qtrue);
 }
 
 /// Raven `MineMonster_Combat`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
 pub fn MineMonster_Combat(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        let can_see = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
-            NPC_ClearLOS4(ctx, ctx.entity_id_of(enemy_ptr)) != 0
-        } else {
-            false
-        };
+    let npc_enemy = ctx.world.entity(npc_id).enemy;
+    let can_see = if let Some(enemy_id) = npc_enemy {
+        NPC_ClearLOS4(ctx, Some(enemy_id)) != 0
+    } else {
+        false
+    };
 
-        if !can_see || !UpdateGoal(ctx).is_null() {
+    if !can_see || !UpdateGoal(ctx).is_null() {
+        let e = ctx.world.entity(npc_id).enemy;
+        // gNPC_t derefs stay raw (NPCInfo deref regime, task #7) — FLAG.
+        unsafe {
             (*npc_info).combatMove = qtrue;
-            (*npc_info).goalEntity = (*npc).enemy;
+            (*npc_info).goalEntity = e;
             (*npc_info).goalRadius = MAX_DISTANCE;
-            NPC_MoveToGoal(ctx, qtrue);
-            return;
         }
+        NPC_MoveToGoal(ctx, qtrue);
+        return;
+    }
 
-        NPC_FaceEnemy(ctx, qtrue);
+    NPC_FaceEnemy(ctx, qtrue);
 
-        let distance = if let Some(enemy_id) = (*npc).enemy {
-            let enemy_ptr = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
-            DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy_ptr).r.currentOrigin)
-        } else {
-            0.0
-        };
+    let npc_enemy2 = ctx.world.entity(npc_id).enemy;
+    let distance = if let Some(enemy_id) = npc_enemy2 {
+        let npc_origin = ctx.world.entity(npc_id).r.currentOrigin;
+        let enemy_origin = ctx.world.entity(enemy_id).r.currentOrigin;
+        DistanceHorizontalSquared(npc_origin, enemy_origin)
+    } else {
+        0.0
+    };
 
-        let advance = distance > (MIN_DISTANCE_SQR as f32);
+    let advance = distance > (MIN_DISTANCE_SQR as f32);
 
-        if (advance || (*npc_info).localState == LSTATE_WAITING)
-            && TIMER_Done(ctx, ctx.entity_id_of(npc), cstr("attacking").as_ptr()) != 0
-        {
-            if TIMER_Done2(
-                ctx,
-                ctx.entity_id_of(npc),
-                cstr("takingPain").as_ptr(),
-                qtrue,
-            ) != 0
-            {
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    if (advance || unsafe { (*npc_info).localState } == LSTATE_WAITING)
+        && TIMER_Done(ctx, Some(npc_id), cstr("attacking").as_ptr()) != 0
+    {
+        if TIMER_Done2(ctx, Some(npc_id), cstr("takingPain").as_ptr(), qtrue) != 0 {
+            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            unsafe {
                 (*npc_info).localState = LSTATE_CLEAR;
-            } else {
-                MineMonster_Move(ctx, 1);
             }
         } else {
-            MineMonster_Attack(ctx);
+            MineMonster_Move(ctx, 1);
         }
+    } else {
+        MineMonster_Attack(ctx);
     }
 }
 
@@ -377,46 +349,37 @@ pub fn NPC_MineMonster_Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    // STAGE-1: EntityId params, raw body re-derived verbatim (Stage-2 debt).
-    let self_: *mut gentity_t = ctx.entity_mut(self_);
-    let attacker: *mut gentity_t = unsafe { ent_resolve_opt(ctx, attacker) };
-    unsafe {
-        let parm = ((((*self_).health as f32) / ((*((*self_).client)).pers.maxHealth as f32))
-            * 100.0)
-            .floor() as c_int;
-        G_AddEvent(&mut *(self_), EV_PAIN as c_int, parm);
+    let health = ctx.world.entity(self_).health;
+    // gclient deref stays raw (client deref regime, task #7) — FLAG.
+    let client = ctx.world.entity(self_).client;
+    let max_health = unsafe { (*client).pers.maxHealth };
+    let parm = (((health as f32) / (max_health as f32)) * 100.0).floor() as c_int;
+    G_AddEvent(ctx.world.entity_mut(self_), EV_PAIN as c_int, parm);
 
-        if damage >= 10 {
-            TIMER_Remove(ctx, ctx.entity_id_of(self_), cstr("attacking").as_ptr());
-            TIMER_Remove(
-                ctx,
-                ctx.entity_id_of(self_),
-                cstr("attacking1_dmg").as_ptr(),
-            );
-            TIMER_Remove(
-                ctx,
-                ctx.entity_id_of(self_),
-                cstr("attacking2_dmg").as_ptr(),
-            );
-            TIMER_Set(
-                ctx,
-                ctx.entity_id_of(self_),
-                cstr("takingPain").as_ptr(),
-                1350,
-            );
+    if damage >= 10 {
+        TIMER_Remove(ctx, Some(self_), cstr("attacking").as_ptr());
+        TIMER_Remove(ctx, Some(self_), cstr("attacking1_dmg").as_ptr());
+        TIMER_Remove(ctx, Some(self_), cstr("attacking2_dmg").as_ptr());
+        TIMER_Set(ctx, Some(self_), cstr("takingPain").as_ptr(), 1350);
 
-            _VectorCopy((*((*self_).NPC)).lastPathAngles, &mut (*self_).s.angles);
+        // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+        let npc_ptr = ctx.world.entity(self_).NPC;
+        let last_path_angles = unsafe { (*npc_ptr).lastPathAngles };
+        _VectorCopy(last_path_angles, &mut ctx.world.entity_mut(self_).s.angles);
 
-            NPC_SetAnim(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                SETANIM_BOTH,
-                BOTH_PAIN1 as c_int,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
+        NPC_SetAnim(
+            ctx,
+            self_,
+            SETANIM_BOTH,
+            BOTH_PAIN1 as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
 
-            if !(*self_).NPC.is_null() {
-                (*((*self_).NPC)).localState = LSTATE_WAITING;
+        let npc_ptr = ctx.world.entity(self_).NPC;
+        if !npc_ptr.is_null() {
+            // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+            unsafe {
+                (*npc_ptr).localState = LSTATE_WAITING;
             }
         }
     }
@@ -426,18 +389,18 @@ pub fn NPC_MineMonster_Pain(
 ///
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
 pub fn NPC_BSMineMonster_Default(ctx: &mut GameContext) {
-    unsafe {
-        let npc = ctx.world.globals.NPC;
-        let npc_info = ctx.world.globals.NPCInfo;
+    let npc = ctx.world.globals.NPC;
+    let npc_info = ctx.world.globals.NPCInfo;
+    let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if (*npc).enemy.is_some() {
-            MineMonster_Combat(ctx);
-        } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-            MineMonster_Patrol(ctx);
-        } else {
-            MineMonster_Idle(ctx);
-        }
-
-        NPC_UpdateAngles(ctx, qtrue, qtrue);
+    if ctx.world.entity(npc_id).enemy.is_some() {
+        MineMonster_Combat(ctx);
+    // gNPC_t deref stays raw (NPCInfo deref regime, task #7) — FLAG.
+    } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
+        MineMonster_Patrol(ctx);
+    } else {
+        MineMonster_Idle(ctx);
     }
+
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
 }
