@@ -450,3 +450,35 @@ Ruled: sanctioned permanent, retagged `SEAM-BG-REENTRY` (replacing
 `STAGE-2b: irreducible`); the STATE-D6 leaf-reborrow discipline inside
 the method bodies is the containment. The remaining ~34 irreducible
 markers stay transitional and are triaged during campaign 2c.
+
+## DEC-29 — Campaign 2c outcome: accessor regime landed; residue classified (2026-07-16)
+
+Six workflow waves on `safe-state-2c` converted the mp_game raw entity-deref
+regime to point-of-use `GameWorld` accessor borrows: census 24,287 → 14,328
+matched sites (41% eliminated, ~9,900 conversions, 81 one-file commits), the
+six-scenario referee byte-identical after every wave (incl. duel1 combat over
+the converted saber/force/weapon/combat paths), workspace + i686 + full test
+suite green, and adversarial gate-2 audits over the referee-blind vehicle and
+ICARUS/NPC-spawn surfaces returned zero divergences. Ruled classifications of
+the remainder:
+
+- **Permanent (allow-list):** trap-seam raw args (`entity_mut(id) as *mut`
+  at the call, no deref), C-string/byteswap/variadic seams, Vehicle_t /
+  vehicleInfo_t / bgEntity_t / playerState overlay derefs (§D12), the
+  SEAM-BG-REENTRY store (DEC-28), and pool-client (`gClPtrs`) derefs read
+  through the entity's own client pointer — `level.clients[i]` indexing is
+  PROHIBITED unless the index is a proven real client slot (two wave-1
+  defects; recipe rule 2b).
+- **Deferred to the task-#7 regime design (not permanent):** gNPC_t
+  (`NPCInfo`/`.NPC`) derefs (~no accessor exists), `bot_state_t` derefs,
+  ambient-globals `&mut *NPCInfo` holds in pre-2d files, and the 112
+  remaining STAGE-1 fn-top re-derives across 15 files — dominated by
+  g_mover's multi-entity pusher machinery (50), w_saber's giant combat-trace
+  fns (18 + whole-body G_Damage/player_die/ForceThrow tails), and g_client
+  lifecycle fns. Greppable: `let \w+: \*mut gentity_t = ctx.entity_mut(`.
+- **§19 divergences accepted in-campaign:** accessor bounds-panics where
+  Raven had UB (g_vehicles G_AttachToVehicle / pilot-index, Howler_Combat
+  enemy unwrap); each noted at the site.
+
+`#![deny(unsafe_code)]` holds where files went fully clean (prelude,
+g_arenas); broad deny-lint completeness waits on the deferred classes above.
