@@ -2138,7 +2138,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                    // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                    // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                     // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                     world: ctx.world_raw(),
                     engine: ctx.engine,
@@ -2176,7 +2176,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                        // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                         // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                         world: ctx.world_raw(),
                         engine: ctx.engine,
@@ -2510,7 +2510,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 //use "kyle" for a default then
                 npcSaber1 = crate::g_utils::G_ModelIndex(cstr("@Kyle").as_ptr());
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                    // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                    // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                     // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                     world: ctx.world_raw(),
                     engine: ctx.engine,

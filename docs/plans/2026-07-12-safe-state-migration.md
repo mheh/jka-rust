@@ -238,13 +238,36 @@ before each commit. One commit per shard keeps the chain referee-bisectable.
   - 4D-S2 `e3ac0300` — real field types restored (client/NPC/m_pVehicle),
     2,407 identity casts deleted (64 files) + 8 reverse stores; **shard 4D
     is COMPLETE**.
-  - **S5-3/S5-4 in flight at pause (2026-07-16)**: worker severing loader
-    upcalls/BG_ParseField/g_strap/consts (S5-3) + the 71-site uniform
-    Com_Printf/Com_Error BgTraps trap route (S5-4) in an agent worktree;
-    commits land there UNINTEGRATED — next session: gate-1 review, referee,
-    cherry-pick. Then S5-5 (twin port-down per the re-scope above; also
-    sweep bg files' leftover m_pVehicle identity casts) and S5-6 (the
-    physical move).
+  - S5-3 `4099dd7c` + S5-4 `264e6f8f` — remaining game-reach severed
+    (BG_ParseField ctx→callbacks, loader upcalls, g_strap→traps, const
+    relocations) and the 71-site uniform Com_Printf/Com_Error BgTraps trap
+    route (worker's interrupted tail completed at integration: bg_saga:1426,
+    two NPC_stats BG_ParseLiteral callers, three test mocks).
+  - S5-5 `a5688806` — twin port-down: 24 clean retargets; 19 missing
+    symbols verbatim to the mp_qshared twins; the QSharedScratch-threaded
+    COM_Parse family + QSharedScratch moved to mp_qshared::shared::com_parse
+    as canonical (mp_game::q_shared re-export shim, 44 importers unchanged;
+    legacy static-mut twins untouched for engine callers). Every moved body
+    machine-diffed identical (2 declared no-op deviations verified). Parse
+    trio (ParseString/Int/Float) kept game-tier (calls Com_Printf/atoi/atof)
+    — bg twin created in S5-6. 58 bg m_pVehicle identity casts swept.
+  - S5-6a `8babb9e0` — PM_VehicleImpact's parked bg-tier-gap reaches severed
+    (entity_inuse/entity_spawnflags/entity_takedamage/fighter_is_landed);
+    adversarial gate-2 confirmed operand-exact vs oracle.
+  - S5-6b `e657e302` — const homing by Raven-header tier: SFL_* + S_COLOR_*
+    → mp_qshared; animTable/HYPERSPACE_* → mp_bg (moves); w_saber.h saber
+    dims + DAMAGE_NO_ARMOR → mp_bg twins (game copies canonical). Values
+    machine-verified bit-identical.
+  - **S5-6 `70135616` — THE SPLIT IS DONE (2026-07-16)**: 11 bg files + 5
+    bg_channel components (BgState, PmoveContext, Rng, GameCallbacks,
+    BgTraps) moved to mp_bg (git mv, 15/16 machine-diffed bit-pure; the
+    16th's whole delta = 8 traps-threaded parse calls); mp_bg gains
+    prelude/cstr_util subset/com_parse parse-trio twins; game_impl.rs stays
+    game-side; re-export shim keeps all game importers unchanged; mp_bg deps
+    unchanged (mp_qshared + native only). Workspace 363 tests, six referee
+    scenarios byte-identical, i686 lanes green. **Stage 5 is complete**;
+    the DEC-28 SEAM-BG-REENTRY retag (16 markers) landed with the close-out.
+    Remaining plan work: campaign 2c (deref regime) per sit-down ruling 10.
 - **Stage 4 — DONE except 4D (2026-07-15)**, four referee-gated commits, each
   six-scenario byte-identical + workspace tests + fmt; i686 lane green at
   stage end:

@@ -3737,7 +3737,7 @@ pub fn SetupGameGhoul2Model(
                 if !(*ent).client.is_null() && (*((*ent).client)).NPC_class == CLASS_VEHICLE {
                     write_cstr_field(&mut vehicleName, &cstr_to_str(modelname));
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                        // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                        // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                         // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                         world: ctx.world_raw(),
                         engine: ctx.engine,

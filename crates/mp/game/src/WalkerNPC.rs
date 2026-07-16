@@ -423,7 +423,7 @@ pub fn G_CreateWalkerNPC(
 
             // Set the vehicle info pointer to the appropriate vehicle type
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                 // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                 world: ctx.world_raw(),
                 engine: ctx.engine,

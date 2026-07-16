@@ -607,7 +607,7 @@ pub fn G_SetAnim(
         let ps = &mut (*((*ent).client)).ps as *mut playerState_t;
         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
             // field held alongside the `&mut ctx.world.bg_state` borrow below.
             world: ctx.world_raw(),
             engine: ctx.engine,

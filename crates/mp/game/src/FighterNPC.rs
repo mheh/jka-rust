@@ -1485,7 +1485,7 @@ pub fn G_CreateFighterNPC(
 
         // Set the vehicle info pointer based on vehicle type name.
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
             // field aliasing bg_state; a raw store is required (bg-seam re-entry).
             world: ctx.world_raw(),
             engine: ctx.engine,

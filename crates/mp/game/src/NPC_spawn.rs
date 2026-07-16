@@ -1199,7 +1199,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         if crate::q_shared::Q_stricmp((*ent).classname as *const c_char, npc_vehicle.as_ptr()) == 0
         {
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                 // field aliasing bg_state; a raw store is required (bg-seam re-entry).
                 world: ctx.world_raw(),
                 engine: ctx.engine,
@@ -1643,7 +1643,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
         let spawner: *mut gentity_t = ctx.entity_mut(spawner);
         let mut droid_npc_type: *const c_char = core::ptr::null();
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
             // field aliasing bg_state; a raw store is required (bg-seam re-entry).
             world: ctx.world_raw(),
             engine: ctx.engine,

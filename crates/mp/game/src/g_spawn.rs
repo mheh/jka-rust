@@ -796,7 +796,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         let ent = G_Spawn(ctx);
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
             // field; a raw store is required (bg-seam re-entry).
             world: ctx.world_raw(),
             engine: ctx.engine,
@@ -1175,7 +1175,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         }
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-            // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+            // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
             // field; a raw store is required (bg-seam re-entry).
             world: ctx.world_raw(),
             engine: ctx.engine,
@@ -1207,7 +1207,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         if ctx.world.bg_state.BGPAFtextLoaded == qfalse {
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
-                // STAGE-2b: irreducible — GameCallbacksImpl.world is a `*mut GameWorld`
+                // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                 // field aliasing the `bg_state` args below; the callbacks handle and
                 // both `&mut bg_state`/`bgHumanoidAnimations` derefs alias one world,
                 // so the whole `BG_ParseAnimationFile` seam stays a raw-pointer group.
