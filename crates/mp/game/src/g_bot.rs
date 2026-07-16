@@ -1011,9 +1011,16 @@ pub fn G_AddBot(
             cstr(&team_owned).as_ptr(),
         );
 
-        let bot = &mut ctx.world.g_entities[clientNum as usize] as *mut gentity_t;
-        (*bot).r.svFlags |= SVF_BOT;
-        (*bot).inuse = qtrue;
+        // The bot entity lives at `g_entities[clientNum]`; its `.client`
+        // back-pointer aliases `clients[clientNum]` (Raven wires this at
+        // `G_InitGame`), so client access re-indexes by `ci = clientNum`.
+        let bot_id = EntityId::from_num(clientNum).unwrap();
+        let ci = clientNum as usize;
+        {
+            let bot = ctx.world.entity_mut(bot_id);
+            bot.r.svFlags |= SVF_BOT;
+            bot.inuse = qtrue;
+        }
 
         // register the userinfo
         trap::SetUserinfo(
@@ -1025,44 +1032,43 @@ pub fn G_AddBot(
         );
 
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
-            let cl = (*bot).client;
             if Q_stricmp(cstr(&team_owned).as_ptr(), cstr("red").as_ptr()) == 0 {
-                (*cl).sess.sessionTeam = TEAM_RED;
+                ctx.world.client_mut(ci).sess.sessionTeam = TEAM_RED;
             } else if Q_stricmp(cstr(&team_owned).as_ptr(), cstr("blue").as_ptr()) == 0 {
-                (*cl).sess.sessionTeam = TEAM_BLUE;
+                ctx.world.client_mut(ci).sess.sessionTeam = TEAM_BLUE;
             } else {
-                (*cl).sess.sessionTeam = PickTeam(ctx, -1);
+                let t = PickTeam(ctx, -1);
+                ctx.world.client_mut(ci).sess.sessionTeam = t;
             }
         }
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-            let cl = (*bot).client;
-            (*cl).sess.siegeDesiredTeam = (*cl).sess.sessionTeam;
-            (*cl).sess.sessionTeam = TEAM_SPECTATOR;
+            let cl = ctx.world.client_mut(ci);
+            cl.sess.siegeDesiredTeam = cl.sess.sessionTeam;
+            cl.sess.sessionTeam = TEAM_SPECTATOR;
         }
 
-        let cl = (*bot).client;
-        let preTeam = (*cl).sess.sessionTeam;
+        let preTeam = ctx.world.client(ci).sess.sessionTeam;
 
         // have it connect to the game as a normal client
         if !ClientConnect(ctx, clientNum, qtrue, qtrue).is_null() {
             return;
         }
 
-        if (*cl).sess.sessionTeam != preTeam {
+        if ctx.world.client(ci).sess.sessionTeam != preTeam {
             trap::GetUserinfo(
                 ctx.engine,
                 GGetUserinfoArgs::new(clientNum, userinfo.as_mut_ptr(), MAX_INFO_STRING as c_int),
             );
 
-            if (*cl).sess.sessionTeam == TEAM_SPECTATOR {
-                (*cl).sess.sessionTeam = preTeam;
+            if ctx.world.client(ci).sess.sessionTeam == TEAM_SPECTATOR {
+                ctx.world.client_mut(ci).sess.sessionTeam = preTeam;
             }
 
-            let team_final = if (*cl).sess.sessionTeam == TEAM_RED {
+            let team_final = if ctx.world.client(ci).sess.sessionTeam == TEAM_RED {
                 "Red".to_string()
             } else if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-                if (*cl).sess.sessionTeam == TEAM_BLUE {
+                if ctx.world.client(ci).sess.sessionTeam == TEAM_BLUE {
                     "Blue".to_string()
                 } else {
                     "s".to_string()
@@ -1084,7 +1090,8 @@ pub fn G_AddBot(
                 ),
             );
 
-            (*cl).ps.persistant[PERS_TEAM as usize] = (*cl).sess.sessionTeam;
+            let st = ctx.world.client(ci).sess.sessionTeam;
+            ctx.world.client_mut(ci).ps.persistant[PERS_TEAM as usize] = st;
 
             G_ReadSessionData(ctx, clientNum as usize);
             ClientUserinfoChanged(ctx, clientNum);
@@ -1096,7 +1103,7 @@ pub fn G_AddBot(
             let mut loners: c_int = 0;
             let mut doubles: c_int = 0;
 
-            (*cl).sess.duelTeam = 0;
+            ctx.world.client_mut(ci).sess.duelTeam = 0;
             G_PowerDuelCount(
                 ctx,
                 &mut loners as *mut c_int,
@@ -1105,13 +1112,13 @@ pub fn G_AddBot(
             );
 
             if doubles == 0 || loners > doubles / 2 {
-                (*cl).sess.duelTeam = DUELTEAM_DOUBLE as c_int;
+                ctx.world.client_mut(ci).sess.duelTeam = DUELTEAM_DOUBLE as c_int;
             } else {
-                (*cl).sess.duelTeam = DUELTEAM_LONE as c_int;
+                ctx.world.client_mut(ci).sess.duelTeam = DUELTEAM_LONE as c_int;
             }
 
-            (*cl).sess.sessionTeam = TEAM_SPECTATOR;
-            SetTeam(ctx, ctx.entity_id_of(bot).unwrap(), cstr("s").into_raw());
+            ctx.world.client_mut(ci).sess.sessionTeam = TEAM_SPECTATOR;
+            SetTeam(ctx, bot_id, cstr("s").into_raw());
         } else {
             if delay == 0 {
                 ClientBegin(ctx, clientNum, qfalse);
