@@ -7,18 +7,18 @@
 //!
 //! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
-//! take `&mut`/`&gentity_t`. Bodies re-derive the raw pointers verbatim at the
-//! top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary
-//! via `ctx.entity_id_of(ptr)`.
+//! take `&mut`/`&gentity_t`. Callers bridge at the boundary via
+//! `ctx.entity_id_of(ptr)`.
 //!
-//! Safe-state migration **Stage 2b** (body sweep): every world reach is a
-//! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())`
-//! raw-deref regime (and its hoisted `let world = &mut *ctx.world_raw()`
-//! aliases) is gone. The per-body entity/`gNPC_t`/`gclient_t` re-derives stay
-//! raw by design, and the two `Debug_Printf` cvar-pointer sites keep an
-//! irreducible `&raw mut ctx.world.cvars.debugNPCAI` alias (marked in-code)
-//! passed alongside `ctx` to the raw-ABI callee. Behavior is byte-identical,
-//! referee-verified.
+//! Safe-state migration **Stage 2c** (deref regime): entity-field reads/writes
+//! go through `ctx.world.entity(id)` / `entity_mut(id)` accessors at the point
+//! of use — the per-body `gentity_t*` re-derives are gone. What stays raw by
+//! design (each site FLAG-marked): `gNPC_t` (`NPCInfo`/`.NPC`) has no accessor;
+//! `gclient_t` pool clients (`.client`) are BG_Alloc'd, not `level.clients`;
+//! `gitem_t` item tables; caller-provided `trace_t`/ABI buffers; and the
+//! `Debug_Printf` cvar-pointer sites keep an irreducible `&raw mut
+//! ctx.world.cvars.debugNPCAI` alias (marked in-code) passed alongside `ctx` to
+//! the raw-ABI callee. Behavior is byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::flags::FL_NOTARGET;
@@ -69,23 +69,6 @@ use mp_qshared::shared::MASK_SHOT;
 // const; inlined here from the header value.
 const DEBUG_LEVEL_INFO: c_int = 3;
 
-/// `ent - g_entities` base pointer for this file's `ent_id`/`ent_id_opt` calls
-/// (entity-id/pointer seam helper), precedent `g_missile.rs`/`g_trigger.rs`.
-#[inline]
-unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
-    ctx.world.g_entities.as_ptr()
-}
-
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
-
 // Unported types referenced in this file (need porting before this compiles):
 // combatPt_t
 
@@ -94,26 +77,26 @@ unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t
 /// Source: `oracle/codemp/game/NPC_combat.c:17-36`
 pub fn G_ClearEnemy(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        NPC_CheckLookTarget(ctx, ctx.entity_id_of(self_).unwrap());
+        NPC_CheckLookTarget(ctx, self_);
 
-        if !(*self_).enemy.is_none() {
-            let client = (*self_).client;
-            let enemy =
-                &mut ctx.world.g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
-            if !client.is_null() && (*client).renderInfo.lookTarget == (*enemy).s.number {
-                NPC_ClearLookTarget(ctx.entity_mut(ctx.entity_id_of(self_).unwrap()));
+        let enemy_id = ctx.world.entity(self_).enemy;
+        if !enemy_id.is_none() {
+            // FLAG: gclient_t is a BG_Alloc'd pool client for NPCs; deref stays raw (recipe 2b).
+            let client = ctx.world.entity(self_).client;
+            let enemy_number = ctx.world.entity(enemy_id.unwrap()).s.number;
+            if !client.is_null() && (*client).renderInfo.lookTarget == enemy_number {
+                NPC_ClearLookTarget(ctx.entity_mut(self_));
             }
 
-            let npc = (*self_).NPC;
-            if !npc.is_null() && (*self_).enemy == (*npc).goalEntity {
+            // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+            let npc = ctx.world.entity(self_).NPC;
+            if !npc.is_null() && enemy_id == (*npc).goalEntity {
                 (*npc).goalEntity = None;
             }
             //FIXME: set last enemy?
         }
 
-        (*self_).enemy = None;
+        ctx.world.entity_mut(self_).enemy = None;
     }
 }
 
@@ -125,21 +108,17 @@ pub fn G_AngerAlert(ctx: &mut GameContext, self_: Option<EntityId>) {
     pub const ANGER_ALERT_RADIUS: f32 = 512.0;
     pub const ANGER_ALERT_SOUND_RADIUS: f32 = 256.0;
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ent_ptr(ctx, self_);
-        let self_id = ctx.entity_id_of(self_).unwrap();
-        let ent = ent_ptr(ctx, (*self_).enemy);
-        let ent_id = ctx.entity_id_of(ent);
-        if !self_.is_null() {
-            let npc = (*self_).NPC;
-            if !npc.is_null() && ((*npc).scriptFlags & SCF_NO_GROUPS) != 0 {
-                //I'm not a team playa...
-                return;
-            }
+        let self_id = self_.unwrap();
+        let ent_id = ctx.world.entity(self_id).enemy;
+        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        let npc = ctx.world.entity(self_id).NPC;
+        if !npc.is_null() && ((*npc).scriptFlags & SCF_NO_GROUPS) != 0 {
+            //I'm not a team playa...
+            return;
         }
         if TIMER_Done(
             ctx,
-            ctx.entity_id_of(self_),
+            Some(self_id),
             c"interrogating".as_ptr() as *const c_char,
         ) == 0
         {
@@ -163,13 +142,13 @@ pub fn G_AngerAlert(ctx: &mut GameContext, self_: Option<EntityId>) {
 /// Source: `oracle/codemp/game/NPC_combat.c:67-115`
 pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let self_client = (*self_).client;
+        // FLAG: gclient_t pool client for NPCs; deref stays raw (recipe 2b).
+        let self_client = ctx.world.entity(self_).client;
         if self_client.is_null() || (*self_client).playerTeam == NPCTEAM_FREE {
             return 0;
         }
-        let self_npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        let self_npc = ctx.world.entity(self_).NPC;
         if !self_npc.is_null() && ((*self_npc).scriptFlags & SCF_NO_GROUPS) != 0 {
             //I'm not a team playa...
             return 0;
@@ -177,14 +156,15 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 
         let num_entities = ctx.world.level.num_entities;
         for i in 1..num_entities {
-            let ent = &mut ctx.world.g_entities[i as usize] as *mut gentity_t;
-            if ent == self_ {
+            let ent_id = EntityId(i as u32);
+            if ent_id == self_ {
                 continue;
             }
-            if (*ent).health <= 0 {
+            if ctx.world.entity(ent_id).health <= 0 {
                 continue;
             }
-            let ent_client = (*ent).client;
+            // FLAG: gclient_t pool client for NPCs; deref stays raw (recipe 2b).
+            let ent_client = ctx.world.entity(ent_id).client;
             if ent_client.is_null() {
                 continue;
             }
@@ -192,9 +172,10 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
                 //ent is not on my team
                 continue;
             }
-            if !(*ent).enemy.is_none() {
+            let ent_enemy = ctx.world.entity(ent_id).enemy;
+            if !ent_enemy.is_none() {
                 //they have an enemy
-                let enemy_client = (*ent_ptr(ctx, (*ent).enemy)).client;
+                let enemy_client = ctx.world.entity(ent_enemy.unwrap()).client;
                 if enemy_client.is_null() || (*enemy_client).playerTeam != (*self_client).playerTeam
                 {
                     //the ent's enemy is either a normal ent or is a player/NPC that is not on my team
@@ -212,19 +193,18 @@ pub fn G_TeamEnemy(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_combat.c:117-310`
 pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId>) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let enemy: *mut gentity_t = ent_ptr(ctx, enemy);
-        if enemy.is_null() || (*self_).client.is_null() || (*self_).NPC.is_null() {
+        // FLAG: gclient_t pool client / gNPC_t have no accessor; derefs stay raw (recipe 2b/2c).
+        let client = ctx.world.entity(self_).client;
+        let npc = ctx.world.entity(self_).NPC;
+        if enemy.is_none() || client.is_null() || npc.is_null() {
             return;
         }
+        let enemy_id = enemy.unwrap();
         //delay their attack based on how far away they're facing from enemy
-        let client = (*self_).client;
-        let npc = (*self_).NPC;
 
         // VectorSubtract( self->client->renderInfo.eyePoint, enemy->r.currentOrigin, dir );//purposely backwards
         let eye = (*client).renderInfo.eyePoint;
-        let enemy_org = (*enemy).r.currentOrigin;
+        let enemy_org = ctx.world.entity(enemy_id).r.currentOrigin;
         let mut dir = [
             eye[0] - enemy_org[0],
             eye[1] - enemy_org[1],
@@ -307,7 +287,8 @@ pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<Entit
             _ => {}
         }
 
-        match (*self_).s.weapon {
+        let self_weapon = ctx.world.entity(self_).s.weapon;
+        match self_weapon {
             w if w == WP_NONE as c_int || w == WP_SABER as c_int => {
                 return;
             }
@@ -373,7 +354,7 @@ pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<Entit
         }
         TIMER_Set(
             ctx,
-            ctx.entity_id_of(self_),
+            Some(self_),
             c"attackDelay".as_ptr() as *const c_char,
             attDelay,
         ); //ctx.world.bg_state.rng.Q_irand( 1500, 4500 ) );
@@ -386,7 +367,7 @@ pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<Entit
 
         TIMER_Set(
             ctx,
-            ctx.entity_id_of(self_),
+            Some(self_),
             c"roamTime".as_ptr() as *const c_char,
             attDelay,
         ); //was ctx.world.bg_state.rng.Q_irand( 1000, 3500 );
@@ -398,9 +379,8 @@ pub fn G_AttackDelay(ctx: &mut GameContext, self_: EntityId, enemy: Option<Entit
 /// Source: `oracle/codemp/game/NPC_combat.c:312-340`
 pub fn G_ForceSaberOn(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let client = (*ent).client;
+        // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+        let client = ctx.world.entity(ent).client;
         if (*client).ps.saberInFlight != 0 {
             //alright, can't turn it on now in any case, so forget it.
             return;
@@ -420,7 +400,7 @@ pub fn G_ForceSaberOn(ctx: &mut GameContext, ent: EntityId) {
         if (*client).saber[0].soundOn != 0 {
             G_Sound(
                 ctx,
-                ctx.entity_id_of(ent),
+                Some(ent),
                 mp_qshared::shared::sound_channel::CHAN_AUTO,
                 (*client).saber[0].soundOn,
             );
@@ -428,7 +408,7 @@ pub fn G_ForceSaberOn(ctx: &mut GameContext, ent: EntityId) {
         if (*client).saber[1].soundOn != 0 {
             G_Sound(
                 ctx,
-                ctx.entity_id_of(ent),
+                Some(ent),
                 mp_qshared::shared::sound_channel::CHAN_AUTO,
                 (*client).saber[1].soundOn,
             );
@@ -441,30 +421,28 @@ pub fn G_ForceSaberOn(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/NPC_combat.c:349-523`
 pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId>) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let enemy: *mut gentity_t = ent_ptr(ctx, enemy);
-        let base = ent_base(ctx);
         let mut event: c_int = 0;
 
         //Must be valid
-        if enemy.is_null() {
+        if enemy.is_none() {
             return;
         }
+        let enemy_id = enemy.unwrap();
 
         //Must be valid
-        if (*enemy).inuse == 0 {
+        if ctx.world.entity(enemy_id).inuse == 0 {
             return;
         }
 
         //Don't take the enemy if in notarget
-        if ((*enemy).flags & FL_NOTARGET) != 0 {
+        if (ctx.world.entity(enemy_id).flags & FL_NOTARGET) != 0 {
             return;
         }
 
-        let npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
         if npc.is_null() {
-            (*self_).enemy = ent_id_opt(base, enemy);
+            ctx.world.entity_mut(self_).enemy = enemy;
             return;
         }
 
@@ -481,8 +459,9 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
         //		enemy->client->playerTeam = TEAM_PLAYER;
         //	}
 
-        let client = (*self_).client;
-        let enemy_client = (*enemy).client;
+        // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+        let client = ctx.world.entity(self_).client;
+        let enemy_client = ctx.world.entity(enemy_id).client;
         if !client.is_null()
             && !enemy_client.is_null()
             && (*enemy_client).playerTeam == (*client).playerTeam
@@ -496,33 +475,29 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
 
         if !client.is_null() && (*client).ps.weapon == WP_SABER {
             //when get new enemy, set a base aggression based on what that enemy is using, how far they are, etc.
-            NPC_Jedi_RateNewEnemy(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                ctx.entity_id_of(enemy),
-            );
+            NPC_Jedi_RateNewEnemy(ctx, self_, enemy);
         }
 
         //NOTE: this is not necessarily true!
         //self->NPC->enemyLastSeenTime = level.time;
 
-        if (*self_).enemy.is_none() {
+        if ctx.world.entity(self_).enemy.is_none() {
             //TEMP HACK: turn on our saber
-            if (*self_).health > 0 {
-                G_ForceSaberOn(ctx, ctx.entity_id_of(self_).unwrap());
+            if ctx.world.entity(self_).health > 0 {
+                G_ForceSaberOn(ctx, self_);
             }
 
             //FIXME: Have to do this to prevent alert cascading
-            G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap());
-            (*self_).enemy = ent_id_opt(base, enemy);
+            G_ClearEnemy(ctx, self_);
+            ctx.world.entity_mut(self_).enemy = enemy;
 
             //Special case- if player is being hunted by his own people, set their enemy team correctly
-            if (*client).playerTeam == NPCTEAM_PLAYER && (*enemy).s.number == 0 {
+            if (*client).playerTeam == NPCTEAM_PLAYER && ctx.world.entity(enemy_id).s.number == 0 {
                 (*client).enemyTeam = NPCTEAM_PLAYER;
             }
 
             //If have an anger script, run that instead of yelling
-            if G_ActivateBehavior(ctx, ctx.entity_id_of(self_), BSET_ANGER as c_int) != 0 {
+            if G_ActivateBehavior(ctx, Some(self_), BSET_ANGER as c_int) != 0 {
                 // handled by the script
             } else if !client.is_null()
                 && !enemy_client.is_null()
@@ -532,7 +507,7 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
                 //		 Basically, you're first one to notice enemies
                 //if ( self->forcePushTime < level.time ) // not currently being pushed
                 //rwwFIXMEFIXME: Set forcePushTime
-                if G_TeamEnemy(ctx, ctx.entity_id_of(self_).unwrap()) == 0 {
+                if G_TeamEnemy(ctx, self_) == 0 {
                     //team did not have an enemy previously
                     event = ctx
                         .world
@@ -543,23 +518,24 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
 
                 if event != 0 {
                     //yell
-                    G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), event, 2000);
+                    G_AddVoiceEvent(ctx, self_, event, 2000);
                 }
             }
 
-            if (*self_).s.weapon == WP_BLASTER
-                || (*self_).s.weapon == WP_REPEATER
-                || (*self_).s.weapon == WP_THERMAL
+            let self_weapon = ctx.world.entity(self_).s.weapon;
+            if self_weapon == WP_BLASTER
+                || self_weapon == WP_REPEATER
+                || self_weapon == WP_THERMAL
                 /*|| self->s.weapon == WP_BLASTER_PISTOL */
                 //rwwFIXMEFIXME: Blaster pistol useable by npcs?
-                || (*self_).s.weapon == WP_BOWCASTER
+                || self_weapon == WP_BOWCASTER
             {
                 //Hmm, how about sniper and bowcaster?
                 //When first get mad, aim is bad
                 //Hmm, base on game difficulty, too?  Rank?
                 let g_spskill = ctx.world.cvars.g_spskill.integer;
                 if (*client).playerTeam == NPCTEAM_PLAYER {
-                    let self_id = ctx.entity_id_of(self_).unwrap();
+                    let self_id = self_;
                     let delay = ctx.world.bg_state.rng.Q_irand(
                         (*npc).stats.aim - (5 * g_spskill),
                         (*npc).stats.aim - g_spskill,
@@ -578,7 +554,7 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
                         minErr = 5;
                         maxErr = 15;
                     }
-                    let self_id = ctx.entity_id_of(self_).unwrap();
+                    let self_id = self_;
                     let delay = ctx.world.bg_state.rng.Q_irand(
                         (*npc).stats.aim - (maxErr * (3 - g_spskill)),
                         (*npc).stats.aim - (minErr * (3 - g_spskill)),
@@ -589,22 +565,19 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
             }
 
             //Alert anyone else in the area
-            if Q_stricmp(c"desperado".as_ptr(), (*self_).NPC_type as *const c_char) != 0
-                && Q_stricmp(c"paladin".as_ptr(), (*self_).NPC_type as *const c_char) != 0
+            let npc_type = ctx.world.entity(self_).NPC_type;
+            if Q_stricmp(c"desperado".as_ptr(), npc_type as *const c_char) != 0
+                && Q_stricmp(c"paladin".as_ptr(), npc_type as *const c_char) != 0
             {
                 //special holodeck enemies exception
                 if (*client).ps.fd.forceGripBeingGripped < level_time as f32 {
                     //gripped people can't call for help
-                    G_AngerAlert(ctx, ctx.entity_id_of(self_));
+                    G_AngerAlert(ctx, Some(self_));
                 }
             }
 
             //Stormtroopers don't fire right away!
-            G_AttackDelay(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                ctx.entity_id_of(enemy),
-            );
+            G_AttackDelay(ctx, self_, enemy);
 
             //rwwFIXMEFIXME: Deal with this some other way.
             /*
@@ -617,12 +590,12 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
         //Otherwise, just picking up another enemy
 
         if event != 0 {
-            G_AddVoiceEvent(ctx, ctx.entity_id_of(self_).unwrap(), event, 2000);
+            G_AddVoiceEvent(ctx, self_, event, 2000);
         }
 
         //Take the enemy
-        G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap());
-        (*self_).enemy = ent_id_opt(base, enemy);
+        G_ClearEnemy(ctx, self_);
+        ctx.world.entity_mut(self_).enemy = enemy;
     }
 }
 
@@ -631,14 +604,16 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
 /// Source: `oracle/codemp/game/NPC_combat.c:570-842`
 pub fn ChangeWeapon(ctx: &mut GameContext, ent: Option<EntityId>, newWeapon: c_int) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
-        if ent.is_null() || (*ent).client.is_null() || (*ent).NPC.is_null() {
+        if ent.is_none() {
             return;
         }
-
-        let client = (*ent).client;
-        let npc = (*ent).NPC;
+        let ent_id = ent.unwrap();
+        // FLAG: gclient_t pool client / gNPC_t; derefs stay raw (recipe 2b/2c).
+        let client = ctx.world.entity(ent_id).client;
+        let npc = ctx.world.entity(ent_id).NPC;
+        if client.is_null() || npc.is_null() {
+            return;
+        }
 
         (*client).ps.weapon = newWeapon;
         (*client).pers.cmd.weapon = newWeapon as u8;
@@ -769,16 +744,17 @@ pub fn ChangeWeapon(ctx: &mut GameContext, ent: Option<EntityId>, newWeapon: c_i
                     (*npc).burstMean = 2;
                     (*npc).burstMax = 2;
 
-                    if !(*ent).parent.is_none() {
-                        let parent = ent_ptr(ctx, (*ent).parent);
+                    let ent_parent = ctx.world.entity(ent_id).parent;
+                    if !ent_parent.is_none() {
+                        let parent_wait = ctx.world.entity(ent_parent.unwrap()).wait;
                         if g_spskill == 0 {
-                            (*npc).burstSpacing = (*parent).wait as c_int + 400;
+                            (*npc).burstSpacing = parent_wait as c_int + 400;
                             (*npc).burstMin = 1;
                             (*npc).burstMax = 1;
                         } else if g_spskill == 1 {
-                            (*npc).burstSpacing = (*parent).wait as c_int + 200;
+                            (*npc).burstSpacing = parent_wait as c_int + 200;
                         } else {
-                            (*npc).burstSpacing = (*parent).wait as c_int;
+                            (*npc).burstSpacing = parent_wait as c_int;
                         }
                     } else if g_spskill == 0 {
                         (*npc).burstSpacing = 1200;
@@ -814,10 +790,12 @@ pub fn NPC_ChangeWeapon(newWeapon: c_int) {
 pub fn NPC_ApplyWeaponFireDelay(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
         let client = ctx.world.globals.client;
         let level_time = ctx.world.level.time;
 
-        if (*npc).attackDebounceTime > level_time {
+        if ctx.world.entity(npc_id).attackDebounceTime > level_time {
             //Just fired, if attacking again, must be a burst fire, so don't add delay
             //NOTE: Borg AI uses attackDebounceTime "incorrectly", so this will always return for them!
             return;
@@ -848,6 +826,8 @@ pub fn NPC_ApplyWeaponFireDelay(ctx: &mut GameContext) {
 pub fn ShootThink(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
         let npc_info = ctx.world.globals.NPCInfo;
         let client = ctx.world.globals.client;
 
@@ -897,15 +877,16 @@ pub fn ShootThink(ctx: &mut GameContext) {
                 // HACK: dirty little emplaced bits, but is done because it would otherwise require some sort of new variable...
                 if (*client).ps.weapon == WP_EMPLACED_GUN {
                     let g_spskill = ctx.world.cvars.g_spskill.integer;
-                    if !(*npc).parent.is_none() {
+                    let npc_parent = ctx.world.entity(npc_id).parent;
+                    if !npc_parent.is_none() {
                         // try and get the debounce values from the chair if we can
-                        let parent = ent_ptr(ctx, (*npc).parent);
+                        let parent_random = ctx.world.entity(npc_parent.unwrap()).random;
                         if g_spskill == 0 {
-                            delay = (*parent).random as c_int + 150;
+                            delay = parent_random as c_int + 150;
                         } else if g_spskill == 1 {
-                            delay = (*parent).random as c_int + 100;
+                            delay = parent_random as c_int + 100;
                         } else {
-                            delay = (*parent).random as c_int;
+                            delay = parent_random as c_int;
                         }
                     } else if g_spskill == 0 {
                         delay = 350;
@@ -921,7 +902,8 @@ pub fn ShootThink(ctx: &mut GameContext) {
         }
 
         (*npc_info).shotTime = ctx.world.level.time + delay;
-        (*npc).attackDebounceTime = ctx.world.level.time + NPC_AttackDebounceForWeapon(ctx);
+        let debounce = ctx.world.level.time + NPC_AttackDebounceForWeapon(ctx);
+        ctx.world.entity_mut(npc_id).attackDebounceTime = debounce;
     }
 }
 
@@ -943,9 +925,10 @@ pub fn WeaponThink(ctx: &mut GameContext, inCombat: qboolean) {
 
         //MCG - Begin
         //For now, no-one runs out of ammo
-        let npc_client = (*npc).client;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+        let npc_client = ctx.world.entity(npc_id).client;
         if (*npc_client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize] < 10 {
-            let npc_id = ctx.entity_id_of(npc).unwrap();
             Add_Ammo(ctx, npc_id, (*client).ps.weapon, 100);
         }
         //MCG - End
@@ -969,21 +952,14 @@ pub fn HaveWeapon(ctx: &mut GameContext, weapon: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_combat.c:1114-1124`
 pub fn EntIsGlass(check: &gentity_t) -> qboolean {
-    unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let check: *const gentity_t = check;
-        if !(*check).classname.is_null()
-            && Q_stricmp(
-                c"func_breakable".as_ptr(),
-                (*check).classname as *const c_char,
-            ) == 0
-            && (*check).count == 1
-            && (*check).health <= 100
-        {
-            return 1;
-        }
-        0
+    if !check.classname.is_null()
+        && Q_stricmp(c"func_breakable".as_ptr(), check.classname as *const c_char) == 0
+        && check.count == 1
+        && check.health <= 100
+    {
+        return 1;
     }
+    0
 }
 
 /// Raven `ShotThroughGlass`.
@@ -997,12 +973,10 @@ pub fn ShotThroughGlass(
     mask: c_int,
 ) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let target: *mut gentity_t = ent_ptr(ctx, target);
-        let hit = &mut ctx.world.g_entities[(*tr).entityNum as usize] as *mut gentity_t;
-        if hit != target && EntIsGlass(ctx.entity(ctx.entity_id_of(hit).unwrap())) != 0 {
+        let hit_id = EntityId((*tr).entityNum as u32);
+        if Some(hit_id) != target && EntIsGlass(ctx.entity(hit_id)) != 0 {
             //ok to shoot through breakable glass
-            let skip = (*hit).s.number;
+            let skip = ctx.world.entity(hit_id).s.number;
             let muzzle = (*tr).endpos;
 
             trap::Trace(
@@ -1029,21 +1003,14 @@ pub fn ShotThroughGlass(
 /// Source: `oracle/codemp/game/NPC_combat.c:1150-1221`
 pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ctx.entity_mut(ent);
-        let shooter: *mut gentity_t = ctx.entity_mut(shooter);
         let mut tr: trace_t = std::mem::zeroed();
         let mut muzzle: vec3_t = [0.0; 3];
         let mut spot: vec3_t = [0.0; 3];
 
-        CalcEntitySpot(
-            ctx,
-            ctx.entity_id_of(shooter),
-            spot_t::SPOT_WEAPON,
-            &mut muzzle,
-        );
-        CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_ORIGIN, &mut spot); //FIXME preferred target locations for some weapons (feet for R/L)
+        CalcEntitySpot(ctx, Some(shooter), spot_t::SPOT_WEAPON, &mut muzzle);
+        CalcEntitySpot(ctx, Some(ent), spot_t::SPOT_ORIGIN, &mut spot); //FIXME preferred target locations for some weapons (feet for R/L)
 
+        let shooter_num = ctx.world.entity(shooter).s.number;
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
@@ -1052,38 +1019,31 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
                 std::ptr::null(),
                 std::ptr::null(),
                 &spot as *const vec3_t,
-                (*shooter).s.number,
+                shooter_num,
                 MASK_SHOT,
             ),
         );
-        let mut traceEnt = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+        let mut traceEnt_id = EntityId(tr.entityNum as u32);
 
         // point blank, baby!
-        let shooter_npc = (*shooter).NPC;
+        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        let shooter_npc = ctx.world.entity(shooter).NPC;
         if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_none()
         {
-            traceEnt = &mut ctx.world.g_entities[(*shooter_npc).touchedByPlayer.unwrap().index()]
-                as *mut gentity_t;
+            traceEnt_id = (*shooter_npc).touchedByPlayer.unwrap();
         }
 
-        if ShotThroughGlass(
-            ctx,
-            &mut tr as *mut trace_t,
-            ctx.entity_id_of(ent),
-            spot,
-            MASK_SHOT,
-        ) != 0
-        {
-            traceEnt = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+        if ShotThroughGlass(ctx, &mut tr as *mut trace_t, Some(ent), spot, MASK_SHOT) != 0 {
+            traceEnt_id = EntityId(tr.entityNum as u32);
         }
 
         // shot is dead on
-        if traceEnt == ent {
+        if traceEnt_id == ent {
             return 1;
         }
         //MCG - Begin
         //ok, can't hit them in center, try their head
-        CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_HEAD, &mut spot);
+        CalcEntitySpot(ctx, Some(ent), spot_t::SPOT_HEAD, &mut spot);
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
@@ -1092,12 +1052,12 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
                 std::ptr::null(),
                 std::ptr::null(),
                 &spot as *const vec3_t,
-                (*shooter).s.number,
+                shooter_num,
                 MASK_SHOT,
             ),
         );
-        traceEnt = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-        if traceEnt == ent {
+        traceEnt_id = EntityId(tr.entityNum as u32);
+        if traceEnt_id == ent {
             return 1;
         }
 
@@ -1117,20 +1077,21 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
         }
         //MCG - End
         // shot would hit a non-client
-        if (*traceEnt).client.is_null() {
+        // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+        let traceEnt_client = ctx.world.entity(traceEnt_id).client;
+        if traceEnt_client.is_null() {
             return 0;
         }
 
         // shot is blocked by another player
 
         // he's already dead, so go ahead
-        if (*traceEnt).health <= 0 {
+        if ctx.world.entity(traceEnt_id).health <= 0 {
             return 1;
         }
 
         // don't deliberately shoot a teammate
-        let traceEnt_client = (*traceEnt).client;
-        let shooter_client = (*shooter).client;
+        let shooter_client = ctx.world.entity(shooter).client;
         if !traceEnt_client.is_null()
             && !shooter_client.is_null()
             && (*traceEnt_client).playerTeam == (*shooter_client).playerTeam
@@ -1148,30 +1109,28 @@ pub fn CanShoot(ctx: &mut GameContext, ent: EntityId, shooter: EntityId) -> qboo
 /// Source: `oracle/codemp/game/NPC_combat.c:1229-1274`
 pub fn NPC_CheckPossibleEnemy(ctx: &mut GameContext, other: Option<EntityId>, vis: visibility_t) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let other: *mut gentity_t = ent_ptr(ctx, other);
+        let other_ent = other.unwrap();
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
-        let base = ent_base(ctx);
-        let other_id = ent_id_opt(base, other);
 
         // is he is already our enemy?
-        if (*npc).enemy == other_id {
+        if ctx.world.entity(npc_id).enemy == other {
             return;
         }
 
-        if ((*other).flags & FL_NOTARGET) != 0 {
+        if (ctx.world.entity(other_ent).flags & FL_NOTARGET) != 0 {
             return;
         }
 
         // we already have an enemy and this guy is in our FOV, see if this guy would be better
-        if !(*npc).enemy.is_none() && vis == visibility_t::VIS_FOV {
+        if !ctx.world.entity(npc_id).enemy.is_none() && vis == visibility_t::VIS_FOV {
             if (*npc_info).enemyLastSeenTime - ctx.world.level.time < 2000 {
                 return;
             }
             if ctx.world.globals.enemyVisibility == visibility_t::VIS_UNKNOWN {
-                let ent = ent_ptr(ctx, (*npc).enemy);
-                let ent_id = ctx.entity_id_of(ent);
+                let ent_id = ctx.world.entity(npc_id).enemy;
                 ctx.world.globals.enemyVisibility =
                     NPC_CheckVisibility(ctx, ent_id, CHECK_360 | CHECK_FOV);
             }
@@ -1180,23 +1139,21 @@ pub fn NPC_CheckPossibleEnemy(ctx: &mut GameContext, other: Option<EntityId>, vi
             }
         }
 
-        if (*npc).enemy.is_none() {
-            let npc_id = ctx.entity_id_of(npc).unwrap();
-            let other_id = ctx.entity_id_of(other);
+        if ctx.world.entity(npc_id).enemy.is_none() {
             //only take an enemy if you don't have one yet
-            G_SetEnemy(ctx, npc_id, other_id);
+            G_SetEnemy(ctx, npc_id, other);
         }
 
         if vis == visibility_t::VIS_FOV {
             (*npc_info).enemyLastSeenTime = ctx.world.level.time;
-            (*npc_info).enemyLastSeenLocation = (*other).r.currentOrigin;
+            (*npc_info).enemyLastSeenLocation = ctx.world.entity(other_ent).r.currentOrigin;
             (*npc_info).enemyLastHeardTime = 0;
             (*npc_info).enemyLastHeardLocation = [0.0, 0.0, 0.0];
         } else {
             (*npc_info).enemyLastSeenTime = 0;
             (*npc_info).enemyLastSeenLocation = [0.0, 0.0, 0.0];
             (*npc_info).enemyLastHeardTime = ctx.world.level.time;
-            (*npc_info).enemyLastHeardLocation = (*other).r.currentOrigin;
+            (*npc_info).enemyLastHeardLocation = ctx.world.entity(other_ent).r.currentOrigin;
         }
     }
 }
@@ -1207,8 +1164,10 @@ pub fn NPC_CheckPossibleEnemy(ctx: &mut GameContext, other: Option<EntityId>, vi
 pub fn NPC_AttackDebounceForWeapon(ctx: &mut GameContext) -> c_int {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
         let npc_info = ctx.world.globals.NPCInfo;
-        let npc_client = (*npc).client;
+        let npc_client = ctx.world.entity(npc_id).client;
         match (*npc_client).ps.weapon {
             WP_SABER => 0,
             _ => (*npc_info).burstSpacing, //was 100 by default
@@ -1222,6 +1181,8 @@ pub fn NPC_AttackDebounceForWeapon(ctx: &mut GameContext) -> c_int {
 pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
         let npc_info = ctx.world.globals.NPCInfo;
 
         if (*npc_info).stats.shootDistance > 0.0 {
@@ -1229,7 +1190,8 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
             return (*npc_info).stats.shootDistance * (*npc_info).stats.shootDistance;
         }
 
-        match (*npc).s.weapon {
+        let npc_weapon = ctx.world.entity(npc_id).s.weapon;
+        match npc_weapon {
             WP_BLASTER => 1024.0 * 1024.0, //should be shorter?
             WP_BRYAR_PISTOL => 1024.0 * 1024.0,
             WP_DISRUPTOR => {
@@ -1240,13 +1202,13 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
                 }
             }
             WP_SABER => {
-                let npc_client = (*npc).client;
+                let npc_client = ctx.world.entity(npc_id).client;
                 if !npc_client.is_null() && (*npc_client).saber[0].blade[0].lengthMax != 0.0 {
                     //FIXME: account for whether enemy and I are heading towards each other!
                     // C's `1.5` is a double literal: the `*1.5`, the sum, and the
                     // square evaluate in f64, narrowing to float only on return.
                     let reach = (*npc_client).saber[0].blade[0].lengthMax as f64
-                        + (*npc).r.maxs[0] as f64 * 1.5;
+                        + ctx.world.entity(npc_id).r.maxs[0] as f64 * 1.5;
                     (reach * reach) as f32
                 } else {
                     48.0 * 48.0
@@ -1262,19 +1224,22 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: &mut GameContext) -> f32 {
 /// Source: `oracle/codemp/game/NPC_combat.c:1400-1460`
 pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        if ent.is_null() {
+        if ent.is_none() {
             return qfalse;
         }
-        if ent == npc {
+        let ent_id = ent.unwrap();
+        if ent_id == npc_id {
             return qfalse;
         }
 
-        if ((*ent).flags & FL_NOTARGET) == 0 && (*ent).health > 0 {
-            let ent_client = (*ent).client;
+        if (ctx.world.entity(ent_id).flags & FL_NOTARGET) == 0
+            && ctx.world.entity(ent_id).health > 0
+        {
+            // FLAG: gclient_t pool client / gNPC_t; derefs stay raw (recipe 2b/2c).
+            let ent_client = ctx.world.entity(ent_id).client;
             if ent_client.is_null() {
                 return qtrue;
             } else if (*ent_client).sess.sessionTeam == TEAM_SPECTATOR {
@@ -1282,7 +1247,7 @@ pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
                 return qfalse;
             } else {
                 let mut entTeam: c_int = NPCTEAM_FREE;
-                let ent_npc = (*ent).NPC;
+                let ent_npc = ctx.world.entity(ent_id).NPC;
                 if !ent_npc.is_null() && !ent_client.is_null() {
                     entTeam = (*ent_client).playerTeam;
                 } else if !ent_client.is_null() {
@@ -1294,7 +1259,7 @@ pub fn ValidEnemy(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
                         entTeam = NPCTEAM_NEUTRAL;
                     }
                 }
-                let npc_client = (*npc).client;
+                let npc_client = ctx.world.entity(npc_id).client;
                 if entTeam == NPCTEAM_FREE
                     || (*npc_client).enemyTeam == NPCTEAM_FREE
                     || entTeam == (*npc_client).enemyTeam
@@ -1320,14 +1285,14 @@ pub fn NPC_EnemyTooFar(
     toShoot: qboolean,
 ) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let enemy: *mut gentity_t = ent_ptr(ctx, enemy);
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
         let mut dist = dist;
 
         if toShoot == qfalse {
             //Not trying to actually press fire button with this check
-            let npc_client = (*npc).client;
+            // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+            let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).ps.weapon == WP_SABER {
                 //Just have to get to him
                 return qfalse;
@@ -1336,7 +1301,9 @@ pub fn NPC_EnemyTooFar(
 
         if dist == 0.0 {
             let mut vec: vec3_t = [0.0; 3];
-            _VectorSubtract((*npc).r.currentOrigin, (*enemy).r.currentOrigin, &mut vec);
+            let npc_org = ctx.world.entity(npc_id).r.currentOrigin;
+            let enemy_org = ctx.world.entity(enemy.unwrap()).r.currentOrigin;
+            _VectorSubtract(npc_org, enemy_org, &mut vec);
             dist = VectorLengthSquared(vec);
         }
 
@@ -1360,17 +1327,17 @@ pub fn NPC_PickEnemy(
     findClosest: qboolean,
 ) -> *mut gentity_t {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let closestTo: *mut gentity_t = ent_ptr(ctx, closestTo);
+        let closestTo_id = closestTo.unwrap();
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
-        let base = ent_base(ctx);
 
         let mut num_choices: usize = 0;
         // §19: a >128th valid candidate silently overruns the stack array in C
         // (UB); here the index panics — unreachable with realistic enemy counts.
         let mut choice: [c_int; 128] = [0; 128];
-        let mut closestEnemy: *mut gentity_t = core::ptr::null_mut();
+        let mut closestEnemy: Option<EntityId> = None;
         let mut bestDist: f32 = crate::g_public_consts::Q3_INFINITE as f32;
         let mut failed;
         let mut visChecks = CHECK_360 | CHECK_FOV | CHECK_VISRANGE;
@@ -1392,31 +1359,31 @@ pub fn NPC_PickEnemy(
 
         if findPlayersFirst != qfalse {
             //try to find a player first
-            let newenemy = &mut ctx.world.g_entities[0] as *mut gentity_t;
-            if !(*newenemy).client.is_null()
-                && ((*newenemy).flags & FL_NOTARGET) == 0
-                && ((*newenemy).s.eFlags & EF_NODRAW) == 0
-                && (*newenemy).health > 0
-                && NPC_ValidEnemy(ctx, ctx.entity_id_of(newenemy)) != qfalse
-                && ent_id_opt(base, newenemy) != (*npc).lastEnemy
+            let newenemy_id = EntityId(0);
+            if !ctx.world.entity(newenemy_id).client.is_null()
+                && (ctx.world.entity(newenemy_id).flags & FL_NOTARGET) == 0
+                && (ctx.world.entity(newenemy_id).s.eFlags & EF_NODRAW) == 0
+                && ctx.world.entity(newenemy_id).health > 0
+                && NPC_ValidEnemy(ctx, Some(newenemy_id)) != qfalse
+                && Some(newenemy_id) != ctx.world.entity(npc_id).lastEnemy
                 && trap::InPVS(
                     ctx.engine,
                     GInPvsArgs::new(
-                        &(*newenemy).r.currentOrigin as *const vec3_t,
-                        &(*npc).r.currentOrigin as *const vec3_t,
+                        &ctx.world.entity(newenemy_id).r.currentOrigin as *const vec3_t,
+                        &ctx.world.entity(npc_id).r.currentOrigin as *const vec3_t,
                     ),
                 ) != qfalse
             {
                 failed = false;
                 if ((*npc_info).behaviorState == bState_t::BS_INVESTIGATE
                     || (*npc_info).behaviorState == bState_t::BS_PATROL)
-                    && (*npc).enemy.is_none()
+                    && ctx.world.entity(npc_id).enemy.is_none()
                 {
-                    if InVisrange(ctx, ctx.entity_id_of(newenemy)) == qfalse {
+                    if InVisrange(ctx, Some(newenemy_id)) == qfalse {
                         failed = true;
                     } else if NPC_CheckVisibility(
                         ctx,
-                        ctx.entity_id_of(newenemy),
+                        Some(newenemy_id),
                         CHECK_360 | CHECK_FOV | CHECK_VISRANGE,
                     ) != visibility_t::VIS_FOV
                     {
@@ -1426,13 +1393,12 @@ pub fn NPC_PickEnemy(
 
                 if !failed {
                     let mut diff: vec3_t = [0.0; 3];
-                    _VectorSubtract(
-                        (*closestTo).r.currentOrigin,
-                        (*newenemy).r.currentOrigin,
-                        &mut diff,
-                    );
+                    let closestTo_org = ctx.world.entity(closestTo_id).r.currentOrigin;
+                    let newenemy_org = ctx.world.entity(newenemy_id).r.currentOrigin;
+                    _VectorSubtract(closestTo_org, newenemy_org, &mut diff);
                     let mut relDist = VectorLengthSquared(diff);
-                    let newenemy_client = (*newenemy).client;
+                    // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+                    let newenemy_client = ctx.world.entity(newenemy_id).client;
                     if (*newenemy_client).hiddenDist > 0.0 {
                         if relDist > (*newenemy_client).hiddenDist * (*newenemy_client).hiddenDist {
                             //out of hidden range
@@ -1452,10 +1418,13 @@ pub fn NPC_PickEnemy(
                                     let vtos_str_2 = vtos(ctx, normDiff) as *const c_char;
                                     let name_str_2 = cstr_to_str(vtos_str_2);
                                     // variadic slot; pre-format via format! and pass as fmt.
+                                    let npc_targetname = ctx.world.entity(npc_id).targetname;
+                                    let newenemy_targetname =
+                                        ctx.world.entity(newenemy_id).targetname;
                                     let s = format!(
                                         "{} saw {} trying to hide - hiddenDir {} targetDir {} dot {}\n",
-                                        cstr_to_str((*npc).targetname as *const c_char),
-                                        cstr_to_str((*newenemy).targetname as *const c_char), name_str, name_str_2,
+                                        cstr_to_str(npc_targetname as *const c_char),
+                                        cstr_to_str(newenemy_targetname as *const c_char), name_str, name_str_2,
                                         dot
                                     );
                                     let cs = cstr(&s);
@@ -1473,10 +1442,12 @@ pub fn NPC_PickEnemy(
                                 failed = true;
                             }
                         } else {
+                            let npc_targetname = ctx.world.entity(npc_id).targetname;
+                            let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
                             let s = format!(
                                 "{} saw {} trying to hide - hiddenDist {}\n",
-                                cstr_to_str((*npc).targetname as *const c_char),
-                                cstr_to_str((*newenemy).targetname as *const c_char),
+                                cstr_to_str(npc_targetname as *const c_char),
+                                cstr_to_str(newenemy_targetname as *const c_char),
                                 (*newenemy_client).hiddenDist
                             );
                             let cs = cstr(&s);
@@ -1495,39 +1466,34 @@ pub fn NPC_PickEnemy(
                     if !failed {
                         if findClosest != qfalse {
                             if relDist < bestDist
-                                && NPC_EnemyTooFar(ctx, ctx.entity_id_of(newenemy), relDist, qfalse)
+                                && NPC_EnemyTooFar(ctx, Some(newenemy_id), relDist, qfalse)
                                     == qfalse
                             {
                                 if checkVis != qfalse {
-                                    if NPC_CheckVisibility(
-                                        ctx,
-                                        ctx.entity_id_of(newenemy),
-                                        visChecks,
-                                    ) == minVis
+                                    if NPC_CheckVisibility(ctx, Some(newenemy_id), visChecks)
+                                        == minVis
                                     {
                                         bestDist = relDist;
-                                        closestEnemy = newenemy;
+                                        closestEnemy = Some(newenemy_id);
                                     }
                                 } else {
                                     bestDist = relDist;
-                                    closestEnemy = newenemy;
+                                    closestEnemy = Some(newenemy_id);
                                 }
                             }
-                        } else if NPC_EnemyTooFar(ctx, ctx.entity_id_of(newenemy), 0.0, qfalse)
-                            == qfalse
-                        {
+                        } else if NPC_EnemyTooFar(ctx, Some(newenemy_id), 0.0, qfalse) == qfalse {
                             if checkVis != qfalse {
                                 if NPC_CheckVisibility(
                                     ctx,
-                                    ctx.entity_id_of(newenemy),
+                                    Some(newenemy_id),
                                     CHECK_360 | CHECK_FOV | CHECK_VISRANGE,
                                 ) == visibility_t::VIS_FOV
                                 {
-                                    choice[num_choices] = (*newenemy).s.number;
+                                    choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                                     num_choices += 1;
                                 }
                             } else {
-                                choice[num_choices] = (*newenemy).s.number;
+                                choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                                 num_choices += 1;
                             }
                         }
@@ -1536,8 +1502,8 @@ pub fn NPC_PickEnemy(
             }
         }
 
-        if findClosest != qfalse && !closestEnemy.is_null() {
-            return closestEnemy;
+        if findClosest != qfalse && closestEnemy.is_some() {
+            return &mut ctx.world.g_entities[closestEnemy.unwrap().index()] as *mut gentity_t;
         }
 
         if num_choices != 0 {
@@ -1547,47 +1513,50 @@ pub fn NPC_PickEnemy(
 
         num_choices = 0;
         bestDist = crate::g_public_consts::Q3_INFINITE as f32;
-        closestEnemy = core::ptr::null_mut();
+        closestEnemy = None;
 
         for entNum in 0..ctx.world.level.num_entities {
-            let newenemy = &mut ctx.world.g_entities[entNum as usize] as *mut gentity_t;
+            let newenemy_id = EntityId(entNum as u32);
 
-            if newenemy == npc
-                || (*newenemy).client.is_null()
-                || ((*newenemy).flags & FL_NOTARGET) != 0
-                || ((*newenemy).s.eFlags & EF_NODRAW) != 0
-                || (*newenemy).health <= 0
+            if newenemy_id == npc_id
+                || ctx.world.entity(newenemy_id).client.is_null()
+                || (ctx.world.entity(newenemy_id).flags & FL_NOTARGET) != 0
+                || (ctx.world.entity(newenemy_id).s.eFlags & EF_NODRAW) != 0
+                || ctx.world.entity(newenemy_id).health <= 0
             {
                 continue;
             }
 
-            let newenemy_client = (*newenemy).client;
-            let newenemy_id = ctx.entity_id_of(newenemy);
-            let ok = (!newenemy_client.is_null() && NPC_ValidEnemy(ctx, newenemy_id) != qfalse)
-                || (newenemy_client.is_null() && (*newenemy).alliedTeam == enemyTeam);
+            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            let newenemy_client = ctx.world.entity(newenemy_id).client;
+            let ok = (!newenemy_client.is_null()
+                && NPC_ValidEnemy(ctx, Some(newenemy_id)) != qfalse)
+                || (newenemy_client.is_null()
+                    && ctx.world.entity(newenemy_id).alliedTeam == enemyTeam);
             if !ok {
                 continue;
             }
 
-            let npc_client = (*npc).client;
+            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).playerTeam == NPCTEAM_PLAYER
                 && enemyTeam == NPCTEAM_PLAYER
-                && (*newenemy).s.number != 0
+                && ctx.world.entity(newenemy_id).s.number != 0
             {
                 //player allies turning on ourselves?  How?
                 //only turn on the player, not other player allies
                 continue;
             }
 
-            if ent_id_opt(base, newenemy) == (*npc).lastEnemy {
+            if Some(newenemy_id) == ctx.world.entity(npc_id).lastEnemy {
                 continue;
             }
 
             if trap::InPVS(
                 ctx.engine,
                 GInPvsArgs::new(
-                    &(*newenemy).r.currentOrigin as *const vec3_t,
-                    &(*npc).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(newenemy_id).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(npc_id).r.currentOrigin as *const vec3_t,
                 ),
             ) == qfalse
             {
@@ -1596,13 +1565,13 @@ pub fn NPC_PickEnemy(
 
             if ((*npc_info).behaviorState == bState_t::BS_INVESTIGATE
                 || (*npc_info).behaviorState == bState_t::BS_PATROL)
-                && (*npc).enemy.is_none()
+                && ctx.world.entity(npc_id).enemy.is_none()
             {
-                if InVisrange(ctx, ctx.entity_id_of(newenemy)) == qfalse {
+                if InVisrange(ctx, Some(newenemy_id)) == qfalse {
                     continue;
                 } else if NPC_CheckVisibility(
                     ctx,
-                    ctx.entity_id_of(newenemy),
+                    Some(newenemy_id),
                     CHECK_360 | CHECK_FOV | CHECK_VISRANGE,
                 ) != visibility_t::VIS_FOV
                 {
@@ -1611,11 +1580,9 @@ pub fn NPC_PickEnemy(
             }
 
             let mut diff: vec3_t = [0.0; 3];
-            _VectorSubtract(
-                (*closestTo).r.currentOrigin,
-                (*newenemy).r.currentOrigin,
-                &mut diff,
-            );
+            let closestTo_org = ctx.world.entity(closestTo_id).r.currentOrigin;
+            let newenemy_org = ctx.world.entity(newenemy_id).r.currentOrigin;
+            _VectorSubtract(closestTo_org, newenemy_org, &mut diff);
             let relDist = VectorLengthSquared(diff);
             if !newenemy_client.is_null() && (*newenemy_client).hiddenDist > 0.0 {
                 if relDist > (*newenemy_client).hiddenDist * (*newenemy_client).hiddenDist {
@@ -1630,10 +1597,12 @@ pub fn NPC_PickEnemy(
                             let name_str = cstr_to_str(vtos_str);
                             let vtos_str_2 = vtos(ctx, normDiff) as *const c_char;
                             let name_str_2 = cstr_to_str(vtos_str_2);
+                            let npc_targetname = ctx.world.entity(npc_id).targetname;
+                            let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
                             let s = format!(
                                 "{} saw {} trying to hide - hiddenDir {} targetDir {} dot {}\n",
-                                cstr_to_str((*npc).targetname as *const c_char),
-                                cstr_to_str((*newenemy).targetname as *const c_char),
+                                cstr_to_str(npc_targetname as *const c_char),
+                                cstr_to_str(newenemy_targetname as *const c_char),
                                 name_str,
                                 name_str_2,
                                 dot
@@ -1653,10 +1622,12 @@ pub fn NPC_PickEnemy(
                         continue;
                     }
                 } else {
+                    let npc_targetname = ctx.world.entity(npc_id).targetname;
+                    let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
                     let s = format!(
                         "{} saw {} trying to hide - hiddenDist {}\n",
-                        cstr_to_str((*npc).targetname as *const c_char),
-                        cstr_to_str((*newenemy).targetname as *const c_char),
+                        cstr_to_str(npc_targetname as *const c_char),
+                        cstr_to_str(newenemy_targetname as *const c_char),
                         (*newenemy_client).hiddenDist
                     );
                     let cs = cstr(&s);
@@ -1669,35 +1640,31 @@ pub fn NPC_PickEnemy(
 
             if findClosest != qfalse {
                 if relDist < bestDist
-                    && NPC_EnemyTooFar(ctx, ctx.entity_id_of(newenemy), relDist, qfalse) == qfalse
+                    && NPC_EnemyTooFar(ctx, Some(newenemy_id), relDist, qfalse) == qfalse
                 {
                     if checkVis != qfalse {
                         //FIXME: NPCs need to be able to pick up other NPCs behind them,
                         //but for now, commented out because it was picking up enemies it shouldn't
-                        if NPC_CheckVisibility(ctx, ctx.entity_id_of(newenemy), visChecks) == minVis
-                        {
+                        if NPC_CheckVisibility(ctx, Some(newenemy_id), visChecks) == minVis {
                             bestDist = relDist;
-                            closestEnemy = newenemy;
+                            closestEnemy = Some(newenemy_id);
                         }
                     } else {
                         bestDist = relDist;
-                        closestEnemy = newenemy;
+                        closestEnemy = Some(newenemy_id);
                     }
                 }
-            } else if NPC_EnemyTooFar(ctx, ctx.entity_id_of(newenemy), 0.0, qfalse) == qfalse {
+            } else if NPC_EnemyTooFar(ctx, Some(newenemy_id), 0.0, qfalse) == qfalse {
                 if checkVis != qfalse {
-                    if NPC_CheckVisibility(
-                        ctx,
-                        ctx.entity_id_of(newenemy),
-                        CHECK_360 | CHECK_VISRANGE,
-                    ) as i32
+                    if NPC_CheckVisibility(ctx, Some(newenemy_id), CHECK_360 | CHECK_VISRANGE)
+                        as i32
                         >= visibility_t::VIS_360 as i32
                     {
-                        choice[num_choices] = (*newenemy).s.number;
+                        choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                         num_choices += 1;
                     }
                 } else {
-                    choice[num_choices] = (*newenemy).s.number;
+                    choice[num_choices] = ctx.world.entity(newenemy_id).s.number;
                     num_choices += 1;
                 }
             }
@@ -1705,7 +1672,10 @@ pub fn NPC_PickEnemy(
 
         if findClosest != qfalse {
             //FIXME: you can pick up an enemy around a corner this way.
-            return closestEnemy;
+            return match closestEnemy {
+                Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
+                None => core::ptr::null_mut(),
+            };
         }
 
         if num_choices == 0 {
@@ -1729,32 +1699,32 @@ pub fn NPC_PickAlly(
 ) -> *mut gentity_t {
     unsafe {
         let npc = ctx.world.globals.NPC;
-        let base = ent_base(ctx);
-        let npc_client = (*npc).client;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+        let npc_client = ctx.world.entity(npc_id).client;
 
-        let mut closestAlly: *mut gentity_t = core::ptr::null_mut();
+        let mut closestAlly: Option<EntityId> = None;
         let mut bestDist = range;
 
         for entNum in 0..ctx.world.level.num_entities {
-            let ally = &mut ctx.world.g_entities[entNum as usize] as *mut gentity_t;
+            let ally_id = EntityId(entNum as u32);
 
-            if (*ally).client.is_null() || (*ally).health <= 0 {
+            if ctx.world.entity(ally_id).client.is_null() || ctx.world.entity(ally_id).health <= 0 {
                 continue;
             }
 
-            let ally_client = (*ally).client;
+            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            let ally_client = ctx.world.entity(ally_id).client;
             if (*ally_client).playerTeam == (*npc_client).playerTeam
                 || (*npc_client).playerTeam == NPCTEAM_ENEMY
             {
                 //if on same team or if player is disguised as your team
                 if ignoreGroup != qfalse {
-                    if ent_id_opt(base, ally) == (*npc_client).leader {
+                    if Some(ally_id) == (*npc_client).leader {
                         //reject
                         continue;
                     }
-                    if !(*ally_client).leader.is_none()
-                        && ent_ptr(ctx, (*ally_client).leader) == npc
-                    {
+                    if !(*ally_client).leader.is_none() && (*ally_client).leader == Some(npc_id) {
                         //reject
                         continue;
                     }
@@ -1763,8 +1733,8 @@ pub fn NPC_PickAlly(
                 if trap::InPVS(
                     ctx.engine,
                     GInPvsArgs::new(
-                        &(*ally).r.currentOrigin as *const vec3_t,
-                        &(*npc).r.currentOrigin as *const vec3_t,
+                        &ctx.world.entity(ally_id).r.currentOrigin as *const vec3_t,
+                        &ctx.world.entity(npc_id).r.currentOrigin as *const vec3_t,
                     ),
                 ) == qfalse
                 {
@@ -1780,7 +1750,9 @@ pub fn NPC_PickAlly(
                 }
 
                 let mut diff: vec3_t = [0.0; 3];
-                _VectorSubtract((*npc).r.currentOrigin, (*ally).r.currentOrigin, &mut diff);
+                let npc_org = ctx.world.entity(npc_id).r.currentOrigin;
+                let ally_org = ctx.world.entity(ally_id).r.currentOrigin;
+                _VectorSubtract(npc_org, ally_org, &mut diff);
                 let relDist = VectorNormalize(&mut diff);
                 if relDist < bestDist {
                     if facingEachOther != qfalse {
@@ -1805,18 +1777,20 @@ pub fn NPC_PickAlly(
                         //I am facing him
                     }
 
-                    if NPC_CheckVisibility(ctx, ctx.entity_id_of(ally), CHECK_360 | CHECK_VISRANGE)
-                        as i32
+                    if NPC_CheckVisibility(ctx, Some(ally_id), CHECK_360 | CHECK_VISRANGE) as i32
                         >= visibility_t::VIS_360 as i32
                     {
                         bestDist = relDist;
-                        closestAlly = ally;
+                        closestAlly = Some(ally_id);
                     }
                 }
             }
         }
 
-        closestAlly
+        match closestAlly {
+            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        }
     }
 }
 
@@ -1831,17 +1805,18 @@ pub fn NPC_CheckEnemy(
 ) -> *mut gentity_t {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
-        let base = ent_base(ctx);
 
         let mut forcefindNew = qfalse;
-        let mut newEnemy: *mut gentity_t = core::ptr::null_mut();
+        let mut newEnemy: Option<EntityId> = None;
 
-        if !(*npc).enemy.is_none() {
-            let enemy = ent_ptr(ctx, (*npc).enemy);
-            if (*enemy).inuse == 0 {
+        if !ctx.world.entity(npc_id).enemy.is_none() {
+            let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+            if ctx.world.entity(enemy_id).inuse == 0 {
                 if setEnemy != qfalse {
-                    G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                    G_ClearEnemy(ctx, npc_id);
                 }
             }
         }
@@ -1849,27 +1824,28 @@ pub fn NPC_CheckEnemy(
         // if ( NPC->svFlags & SVF_IGNORE_ENEMIES )
         // PORT-NOTE(SVF_IGNORE_ENEMIES): flag not yet ported; oracle-commented `if(0)` faithfully skips this branch.
 
-        if !(*npc).enemy.is_none() {
-            let enemy = ent_ptr(ctx, (*npc).enemy);
-            if NPC_EnemyTooFar(ctx, ctx.entity_id_of(enemy), 0.0, qfalse) != qfalse {
+        if !ctx.world.entity(npc_id).enemy.is_none() {
+            let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+            if NPC_EnemyTooFar(ctx, Some(enemy_id), 0.0, qfalse) != qfalse {
                 if findNew != qfalse {
                     //See if there is a close one and take it if so, else keep this one
                     forcefindNew = qtrue;
                 } else if tooFarOk == qfalse {
                     if setEnemy != qfalse {
-                        G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                        G_ClearEnemy(ctx, npc_id);
                     }
                 }
             } else if trap::InPVS(
                 ctx.engine,
                 GInPvsArgs::new(
-                    &(*npc).r.currentOrigin as *const vec3_t,
-                    &(*enemy).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(npc_id).r.currentOrigin as *const vec3_t,
+                    &ctx.world.entity(enemy_id).r.currentOrigin as *const vec3_t,
                 ),
             ) == qfalse
             {
                 //FIXME: should this be a line-of site check?
-                let enemy_client = (*enemy).client;
+                // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+                let enemy_client = ctx.world.entity(enemy_id).client;
                 if !enemy_client.is_null() && (*enemy_client).hiddenDist != 0.0 {
                     //He ducked into shadow while we weren't looking
                     NPC_LostEnemyDecideChase(ctx);
@@ -1878,78 +1854,77 @@ pub fn NPC_CheckEnemy(
             }
         }
 
-        if !(*npc).enemy.is_none() {
-            let enemy = ent_ptr(ctx, (*npc).enemy);
-            if (*enemy).health <= 0 || ((*enemy).flags & FL_NOTARGET) != 0 {
+        if !ctx.world.entity(npc_id).enemy.is_none() {
+            let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+            if ctx.world.entity(enemy_id).health <= 0
+                || (ctx.world.entity(enemy_id).flags & FL_NOTARGET) != 0
+            {
                 if setEnemy != qfalse {
-                    G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                    G_ClearEnemy(ctx, npc_id);
                 }
             }
         }
 
-        let mut closestTo = npc;
+        let mut closestTo = npc_id;
         //FIXME: check your defendEnt, if you have one, see if their enemy is different
         //than yours, or, if they don't have one, pick the closest enemy to THEM?
         if !(*npc_info).defendEnt.is_none() {
             //Trying to protect someone
-            let defendEnt = ent_ptr(ctx, (*npc_info).defendEnt);
-            if (*defendEnt).health > 0 {
+            let defendEnt_id = (*npc_info).defendEnt.unwrap();
+            if ctx.world.entity(defendEnt_id).health > 0 {
                 //Still alive, We presume we're close to them, navigation should handle this?
-                if !(*defendEnt).enemy.is_none() {
+                let defend_enemy = ctx.world.entity(defendEnt_id).enemy;
+                if !defend_enemy.is_none() {
                     //They were shot or acquired an enemy
-                    if (*npc).enemy != (*defendEnt).enemy {
+                    if ctx.world.entity(npc_id).enemy != defend_enemy {
                         //They have a different enemy, take it!
-                        newEnemy = ent_ptr(ctx, (*defendEnt).enemy);
+                        newEnemy = defend_enemy;
                         if setEnemy != qfalse {
-                            G_SetEnemy(
-                                ctx,
-                                ctx.entity_id_of(npc).unwrap(),
-                                ctx.entity_id_of(newEnemy),
-                            );
+                            G_SetEnemy(ctx, npc_id, newEnemy);
                         }
                     }
-                } else if (*npc).enemy.is_none() {
+                } else if ctx.world.entity(npc_id).enemy.is_none() {
                     //We don't have an enemy, so find closest to defendEnt
-                    closestTo = defendEnt;
+                    closestTo = defendEnt_id;
                 }
             }
         }
 
-        let enemy_dead = (*npc).enemy.is_some() && (*ent_ptr(ctx, (*npc).enemy)).health <= 0;
-        if (*npc).enemy.is_none() || enemy_dead || forcefindNew != qfalse {
+        let npc_enemy = ctx.world.entity(npc_id).enemy;
+        let enemy_dead = npc_enemy.is_some() && ctx.world.entity(npc_enemy.unwrap()).health <= 0;
+        if npc_enemy.is_none() || enemy_dead || forcefindNew != qfalse {
             //FIXME: NPCs that are moving after an enemy should ignore the can't hit enemy counter- that should only be for NPCs that are standing still
             let mut foundenemy = qfalse;
 
             if findNew == qfalse {
                 if setEnemy != qfalse {
-                    (*npc).lastEnemy = (*npc).enemy;
-                    G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                    let e = ctx.world.entity(npc_id).enemy;
+                    ctx.world.entity_mut(npc_id).lastEnemy = e;
+                    G_ClearEnemy(ctx, npc_id);
                 }
                 return core::ptr::null_mut();
             }
 
             //If enemy dead or unshootable, look for others on out enemy's team
-            let npc_client = (*npc).client;
+            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            let npc_client = ctx.world.entity(npc_id).client;
             if (*npc_client).enemyTeam != NPCTEAM_NEUTRAL {
                 //NOTE:  this only checks vis if can't hit enemy for 10 tries, which I suppose
                 //means they need to find one that in more than just PVS
                 //For now, made it so you ALWAYS have to check VIS
-                newEnemy = NPC_PickEnemy(
+                let picked = NPC_PickEnemy(
                     ctx,
-                    ctx.entity_id_of(closestTo),
+                    Some(closestTo),
                     (*npc_client).enemyTeam,
                     qtrue,
                     qfalse,
                     qtrue,
                 );
-                if !newEnemy.is_null() {
+                newEnemy = ctx.entity_id_of(picked);
+                if newEnemy.is_some() {
                     foundenemy = qtrue;
                     if setEnemy != qfalse {
-                        G_SetEnemy(
-                            ctx,
-                            ctx.entity_id_of(npc).unwrap(),
-                            ctx.entity_id_of(newEnemy),
-                        );
+                        G_SetEnemy(ctx, npc_id, newEnemy);
                     }
                 }
             }
@@ -1957,28 +1932,33 @@ pub fn NPC_CheckEnemy(
             if forcefindNew == qfalse {
                 if foundenemy == qfalse {
                     if setEnemy != qfalse {
-                        (*npc).lastEnemy = (*npc).enemy;
-                        G_ClearEnemy(ctx, ctx.entity_id_of(npc).unwrap());
+                        let e = ctx.world.entity(npc_id).enemy;
+                        ctx.world.entity_mut(npc_id).lastEnemy = e;
+                        G_ClearEnemy(ctx, npc_id);
                     }
                 }
 
-                (*npc).cantHitEnemyCounter = 0;
+                ctx.world.entity_mut(npc_id).cantHitEnemyCounter = 0;
             }
             //FIXME: if we can't find any at all, go into INdependant NPC AI, pursue and kill
         }
 
-        if !(*npc).enemy.is_none() {
-            let enemy = ent_ptr(ctx, (*npc).enemy);
-            let enemy_client = (*enemy).client;
+        if !ctx.world.entity(npc_id).enemy.is_none() {
+            let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+            // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+            let enemy_client = ctx.world.entity(enemy_id).client;
             if !enemy_client.is_null() && (*enemy_client).playerTeam != 0 {
-                let npc_client = (*npc).client;
+                let npc_client = ctx.world.entity(npc_id).client;
                 if (*npc_client).playerTeam != (*enemy_client).playerTeam {
                     (*npc_client).enemyTeam = (*enemy_client).playerTeam;
                 }
             }
         }
 
-        newEnemy
+        match newEnemy {
+            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        }
     }
 }
 
@@ -1987,20 +1967,21 @@ pub fn NPC_CheckEnemy(
 /// Source: `oracle/codemp/game/NPC_combat.c:2110-2144`
 pub fn NPC_ClearShot(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let npc = ctx.world.globals.NPC;
-        if npc.is_null() || ent.is_null() {
+        if npc.is_null() || ent.is_none() {
             return qfalse;
         }
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        let ent_id = ent.unwrap();
 
         let mut muzzle: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
-        CalcEntitySpot(ctx, ctx.entity_id_of(npc), spot_t::SPOT_WEAPON, &mut muzzle);
+        CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_WEAPON, &mut muzzle);
 
         // add aim error
         // use weapon instead of specific npc types, although you could add certain npc classes if you wanted
-        if (*npc).s.weapon == WP_BLASTER {
+        let npc_num = ctx.world.entity(npc_id).s.number;
+        if ctx.world.entity(npc_id).s.weapon == WP_BLASTER {
             let mins: vec3_t = [-2.0, -2.0, -2.0];
             let maxs: vec3_t = [2.0, 2.0, 2.0];
             trap::Trace(
@@ -2010,8 +1991,8 @@ pub fn NPC_ClearShot(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
                     &muzzle as *const vec3_t,
                     &mins as *const vec3_t,
                     &maxs as *const vec3_t,
-                    &(*ent).r.currentOrigin as *const vec3_t,
-                    (*npc).s.number,
+                    &ctx.world.entity(ent_id).r.currentOrigin as *const vec3_t,
+                    npc_num,
                     MASK_SHOT,
                 ),
             );
@@ -2023,8 +2004,8 @@ pub fn NPC_ClearShot(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
                     &muzzle as *const vec3_t,
                     std::ptr::null(),
                     std::ptr::null(),
-                    &(*ent).r.currentOrigin as *const vec3_t,
-                    (*npc).s.number,
+                    &ctx.world.entity(ent_id).r.currentOrigin as *const vec3_t,
+                    npc_num,
                     MASK_SHOT,
                 ),
             );
@@ -2034,7 +2015,7 @@ pub fn NPC_ClearShot(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
             return qfalse;
         }
 
-        if tr.entityNum as c_int == (*ent).s.number {
+        if tr.entityNum as c_int == ctx.world.entity(ent_id).s.number {
             return qtrue;
         }
 
@@ -2051,22 +2032,25 @@ pub fn NPC_ShotEntity(
     impactPos: Option<&mut vec3_t>,
 ) -> c_int {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let ent: *mut gentity_t = ent_ptr(ctx, ent);
         let npc = ctx.world.globals.NPC;
         let mut muzzle: vec3_t = [0.0; 3];
         let mut targ: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
 
-        if npc.is_null() || ent.is_null() {
+        if npc.is_null() || ent.is_none() {
             return qfalse as c_int;
         }
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        let ent_id = ent.unwrap();
+        let npc_weapon = ctx.world.entity(npc_id).s.weapon;
+        let npc_num = ctx.world.entity(npc_id).s.number;
 
-        if (*npc).s.weapon == WP_THERMAL {
+        if npc_weapon == WP_THERMAL {
             //thermal aims from slightly above head
             //FIXME: what about low-angle shots, rolling the thermal under something?
-            let npc_client = (*npc).client;
-            CalcEntitySpot(ctx, ctx.entity_id_of(npc), spot_t::SPOT_HEAD, &mut muzzle);
+            // FLAG: gclient_t pool client; deref stays raw (recipe 2b).
+            let npc_client = ctx.world.entity(npc_id).client;
+            CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_HEAD, &mut muzzle);
             let angles: vec3_t = [0.0, (*npc_client).ps.viewangles[1], 0.0];
             let mut forward: vec3_t = [0.0; 3];
             AngleVectors(angles, Some(&mut forward), None, None);
@@ -2081,19 +2065,19 @@ pub fn NPC_ShotEntity(
                     &vec3_origin as *const vec3_t,
                     &vec3_origin as *const vec3_t,
                     &end as *const vec3_t,
-                    (*npc).s.number,
+                    npc_num,
                     MASK_SHOT,
                 ),
             );
             muzzle = tr.endpos;
         } else {
-            CalcEntitySpot(ctx, ctx.entity_id_of(npc), spot_t::SPOT_WEAPON, &mut muzzle);
+            CalcEntitySpot(ctx, Some(npc_id), spot_t::SPOT_WEAPON, &mut muzzle);
         }
-        CalcEntitySpot(ctx, ctx.entity_id_of(ent), spot_t::SPOT_CHEST, &mut targ);
+        CalcEntitySpot(ctx, Some(ent_id), spot_t::SPOT_CHEST, &mut targ);
 
         // add aim error
         // use weapon instead of specific npc types, although you could add certain npc classes if you wanted
-        if (*npc).s.weapon == WP_BLASTER {
+        if npc_weapon == WP_BLASTER {
             let mins: vec3_t = [-2.0, -2.0, -2.0];
             let maxs: vec3_t = [2.0, 2.0, 2.0];
             trap::Trace(
@@ -2104,7 +2088,7 @@ pub fn NPC_ShotEntity(
                     &mins as *const vec3_t,
                     &maxs as *const vec3_t,
                     &targ as *const vec3_t,
-                    (*npc).s.number,
+                    npc_num,
                     MASK_SHOT,
                 ),
             );
@@ -2117,7 +2101,7 @@ pub fn NPC_ShotEntity(
                     std::ptr::null(),
                     std::ptr::null(),
                     &targ as *const vec3_t,
-                    (*npc).s.number,
+                    npc_num,
                     MASK_SHOT,
                 ),
             );
@@ -2137,14 +2121,15 @@ pub fn NPC_ShotEntity(
 pub fn NPC_EvaluateShot(ctx: &mut GameContext, hit: c_int, glassOK: qboolean) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
-        if (*npc).enemy.is_none() {
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        if ctx.world.entity(npc_id).enemy.is_none() {
             return qfalse;
         }
 
-        let enemy = ent_ptr(ctx, (*npc).enemy);
-        let hitEnt = &mut ctx.world.g_entities[hit as usize] as *mut gentity_t;
-        if hit == (*enemy).s.number
-            || ((*hitEnt).r.svFlags & crate::g_public_consts::SVF_GLASS_BRUSH) != 0
+        let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();
+        let hit_id = EntityId(hit as u32);
+        if hit == ctx.world.entity(enemy_id).s.number
+            || (ctx.world.entity(hit_id).r.svFlags & crate::g_public_consts::SVF_GLASS_BRUSH) != 0
         {
             //can hit enemy or will hit glass, so shoot anyway
             return qtrue;
@@ -2205,6 +2190,8 @@ pub fn NPC_CheckCanAttack(
 ) -> qboolean {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_ent = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t / gclient_t pool client have no accessor; derefs stay raw (recipe 2b/2c).
         let npc_info = ctx.world.globals.NPCInfo;
         let client = ctx.world.globals.client;
 
@@ -2213,8 +2200,9 @@ pub fn NPC_CheckCanAttack(
         let mut dead_on = qfalse;
         let max_aim_off = 128.0 - (16.0 * (*npc_info).stats.aim as f32);
 
-        let enemy = ent_ptr(ctx, (*npc).enemy);
-        if ((*enemy).flags & FL_NOTARGET) != 0 {
+        let enemy_opt = ctx.world.entity(npc_ent).enemy;
+        let enemy_ent = enemy_opt.unwrap();
+        if (ctx.world.entity(enemy_ent).flags & FL_NOTARGET) != 0 {
             return qfalse;
         }
 
@@ -2226,13 +2214,11 @@ pub fn NPC_CheckCanAttack(
 
         //Yaw to enemy
         let mut enemy_org: vec3_t = [0.0; 3];
-        let enemy_id = ctx.entity_id_of(enemy);
-        CalcEntitySpot(ctx, enemy_id, spot_t::SPOT_HEAD, &mut enemy_org);
+        CalcEntitySpot(ctx, enemy_opt, spot_t::SPOT_HEAD, &mut enemy_org);
         NPC_AimWiggle(ctx, &mut enemy_org);
 
         let mut muzzle: vec3_t = [0.0; 3];
-        let npc_id = ctx.entity_id_of(npc);
-        CalcEntitySpot(ctx, npc_id, spot_t::SPOT_WEAPON, &mut muzzle);
+        CalcEntitySpot(ctx, Some(npc_ent), spot_t::SPOT_WEAPON, &mut muzzle);
 
         let mut delta: vec3_t = [0.0; 3];
         _VectorSubtract(enemy_org, muzzle, &mut delta);
@@ -2240,12 +2226,12 @@ pub fn NPC_CheckCanAttack(
         vectoangles(delta, &mut angleToEnemy);
         let distanceToEnemy = VectorNormalize(&mut delta);
 
-        let npc_npc = (*npc).NPC;
+        // FLAG: gNPC_t (NPC) has no accessor; derefs stay raw (recipe 2c).
+        let npc_npc = ctx.world.entity(npc_ent).NPC;
         (*npc_npc).desiredYaw = angleToEnemy[YAW];
         NPC_UpdateFiringAngles(ctx, qfalse, qtrue);
 
-        let enemy_id_2 = ctx.entity_id_of(enemy);
-        if NPC_EnemyTooFar(ctx, enemy_id_2, distanceToEnemy * distanceToEnemy, qtrue) != qfalse {
+        if NPC_EnemyTooFar(ctx, enemy_opt, distanceToEnemy * distanceToEnemy, qtrue) != qfalse {
             //Too far away?  Do not attack
             return qfalse;
         }
@@ -2262,19 +2248,19 @@ pub fn NPC_CheckCanAttack(
         }
 
         (*npc_info).enemyLastVisibility = ctx.world.globals.enemyVisibility;
-        let enemy_id_3 = ctx.entity_id_of(enemy);
         //See if they're in our FOV and we have a clear shot to them
         ctx.world.globals.enemyVisibility =
-            NPC_CheckVisibility(ctx, enemy_id_3, CHECK_360 | CHECK_FOV);
+            NPC_CheckVisibility(ctx, enemy_opt, CHECK_360 | CHECK_FOV);
 
         if ctx.world.globals.enemyVisibility as c_int >= visibility_t::VIS_FOV as c_int {
             //He's in our FOV
             attack_ok = qtrue;
 
             //Check to duck
-            let enemy_client = (*enemy).client;
+            // FLAG: gclient_t pool client; derefs stay raw (recipe 2b).
+            let enemy_client = ctx.world.entity(enemy_ent).client;
             if !enemy_client.is_null() {
-                if (*enemy).enemy == ent_id_opt(ent_base(ctx), npc) {
+                if ctx.world.entity(enemy_ent).enemy == Some(npc_ent) {
                     if ((*enemy_client).buttons & BUTTON_ATTACK) != 0 {
                         //FIXME: determine if enemy fire angles would hit me or get close
                         if NPC_CheckDefend(ctx, 1.0) != qfalse {
@@ -2287,7 +2273,7 @@ pub fn NPC_CheckCanAttack(
             }
 
             let mut hitspot: vec3_t = [0.0; 3];
-            let mut traceEnt: *mut gentity_t = core::ptr::null_mut();
+            let mut traceEnt_id: Option<EntityId> = None;
             let mut tr: trace_t = std::mem::zeroed();
             if attack_ok != qfalse {
                 //are we gonna hit him
@@ -2295,6 +2281,7 @@ pub fn NPC_CheckCanAttack(
                 let mut forward: vec3_t = [0.0; 3];
                 AngleVectors((*client).ps.viewangles, Some(&mut forward), None, None);
                 _VectorMA(muzzle, distanceToEnemy, forward, &mut hitspot);
+                let npc_num = ctx.world.entity(npc_ent).s.number;
                 trap::Trace(
                     ctx.engine,
                     GTraceArgs::new(
@@ -2303,20 +2290,20 @@ pub fn NPC_CheckCanAttack(
                         std::ptr::null(),
                         std::ptr::null(),
                         &hitspot as *const vec3_t,
-                        (*npc).s.number,
+                        npc_num,
                         MASK_SHOT,
                     ),
                 );
-                let enemy_id_4 = ctx.entity_id_of(enemy);
-                ShotThroughGlass(ctx, &mut tr as *mut trace_t, enemy_id_4, hitspot, MASK_SHOT);
+                ShotThroughGlass(ctx, &mut tr as *mut trace_t, enemy_opt, hitspot, MASK_SHOT);
 
-                traceEnt = &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
+                traceEnt_id = Some(EntityId(tr.entityNum as u32));
 
                 hitspot = tr.endpos;
 
-                let traceEnt_client = (*traceEnt).client;
-                let npc_client = (*npc).client;
-                if traceEnt == enemy
+                // FLAG: gclient_t pool client(s); derefs stay raw (recipe 2b).
+                let traceEnt_client = ctx.world.entity(traceEnt_id.unwrap()).client;
+                let npc_client = ctx.world.entity(npc_ent).client;
+                if traceEnt_id == Some(enemy_ent)
                     || (!traceEnt_client.is_null()
                         && !npc_client.is_null()
                         && (*npc_client).enemyTeam != 0
@@ -2326,7 +2313,7 @@ pub fn NPC_CheckCanAttack(
                 } else {
                     attack_scale *= 0.5;
                     if (*npc_client).playerTeam != 0
-                        && !traceEnt.is_null()
+                        && traceEnt_id.is_some()
                         && !traceEnt_client.is_null()
                         && (*traceEnt_client).playerTeam != 0
                         && (*npc_client).playerTeam == (*traceEnt_client).playerTeam
@@ -2347,9 +2334,9 @@ pub fn NPC_CheckCanAttack(
                 if dead_on == qfalse {
                     //We're not going to hit him directly, try a suppressing fire
                     //see if where we're going to shoot is too far from his origin
-                    if !traceEnt.is_null()
-                        && ((*traceEnt).health <= 30
-                            || EntIsGlass(ctx.entity(ctx.entity_id_of(traceEnt).unwrap())) != 0)
+                    if traceEnt_id.is_some()
+                        && (ctx.world.entity(traceEnt_id.unwrap()).health <= 30
+                            || EntIsGlass(ctx.entity(traceEnt_id.unwrap())) != 0)
                     {
                         //easy to kill - go for it
                         //rwwFIXMEFIXME: ExplodeDeath_Wait? — dead code path, faithfully skipped (if(0) in oracle)
@@ -2399,13 +2386,13 @@ pub fn NPC_CheckCanAttack(
 /// Source: `oracle/codemp/game/NPC_combat.c:2475-2503`
 pub fn IdealDistance(ctx: &mut GameContext, self_: EntityId) -> f32 {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; deref stays raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut ideal = 225.0 - 20.0 * (*npc_info).stats.aggression as f32;
-        match (*npc).s.weapon {
+        match ctx.world.entity(npc_id).s.weapon {
             WP_ROCKET_LAUNCHER => {
                 ideal += 200.0;
             }
@@ -2424,8 +2411,6 @@ pub fn IdealDistance(ctx: &mut GameContext, self_: EntityId) -> f32 {
 /// Source: `oracle/codemp/game/NPC_combat.c:2516-2546`
 pub fn SP_point_combat(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
         let numCombatPoints = ctx.world.level.numCombatPoints as usize;
         if numCombatPoints >= MAX_COMBAT_POINTS {
             let s = format!(
@@ -2434,33 +2419,38 @@ pub fn SP_point_combat(ctx: &mut GameContext, self_: EntityId) {
                 MAX_COMBAT_POINTS
             );
             Com_Printf(cstr(&s).as_ptr());
-            G_FreeEntity(ctx, ctx.entity_id_of(self_));
+            G_FreeEntity(ctx, Some(self_));
             return;
         }
 
-        (*self_).s.origin[2] += 0.125;
-        G_SetOrigin(&mut *(self_), (*self_).s.origin);
+        ctx.world.entity_mut(self_).s.origin[2] += 0.125;
+        let origin = ctx.world.entity(self_).s.origin;
+        G_SetOrigin(ctx.world.entity_mut(self_), origin);
+        let self_ptr = ctx.world.entity_mut(self_) as *mut gentity_t;
         trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_.cast()),
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_ptr.cast()),
         );
 
-        if G_CheckInSolid(ctx, ctx.entity_id_of(self_).unwrap(), 1) != 0 {
+        if G_CheckInSolid(ctx, self_, 1) != 0 {
+            let currentOrigin = ctx.world.entity(self_).r.currentOrigin;
             let s = format!(
                 "{}ERROR: combat point at {} in solid!\n",
                 S_COLOR_RED.to_str().unwrap(),
-                cstr_to_str(vtos(ctx, (*self_).r.currentOrigin))
+                cstr_to_str(vtos(ctx, currentOrigin))
             );
             Com_Printf(cstr(&s).as_ptr());
         }
 
-        ctx.world.level.combatPoints[numCombatPoints].origin = (*self_).r.currentOrigin;
-        ctx.world.level.combatPoints[numCombatPoints].flags = (*self_).spawnflags;
+        let currentOrigin = ctx.world.entity(self_).r.currentOrigin;
+        let spawnflags = ctx.world.entity(self_).spawnflags;
+        ctx.world.level.combatPoints[numCombatPoints].origin = currentOrigin;
+        ctx.world.level.combatPoints[numCombatPoints].flags = spawnflags;
         ctx.world.level.combatPoints[numCombatPoints].occupied = 0;
 
         ctx.world.level.numCombatPoints += 1;
 
-        G_FreeEntity(ctx, ctx.entity_id_of(self_));
+        G_FreeEntity(ctx, Some(self_));
     }
 }
 
@@ -2613,6 +2603,8 @@ pub fn NPC_FindCombatPoint(
         const CP_COLLECT_RADIUS: f32 = 512.0;
 
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
 
         let mut points: [CombatPt; MAX_COMBAT_POINTS_LOCAL] = [CombatPt {
@@ -2633,11 +2625,11 @@ pub fn NPC_FindCombatPoint(
 
         if (flags & CP_HAS_ROUTE) != 0 || (flags & CP_NEAREST) != 0 {
             //going to be doing macro nav tests
-            if (*npc).waypoint == WAYPOINT_NONE {
-                let npc_id = ctx.entity_id_of(npc).unwrap();
-                waypoint = NAV_GetNearestNode(ctx, npc_id, (*npc).lastWaypoint);
+            if ctx.world.entity(npc_id).waypoint == WAYPOINT_NONE {
+                let lastWaypoint = ctx.world.entity(npc_id).lastWaypoint;
+                waypoint = NAV_GetNearestNode(ctx, npc_id, lastWaypoint);
             } else {
-                waypoint = (*npc).waypoint;
+                waypoint = ctx.world.entity(npc_id).waypoint;
             }
         }
 
@@ -2669,22 +2661,21 @@ pub fn NPC_FindCombatPoint(
 
             //Need a clear LOS to our target... and be within shot range to enemy position (FIXME: make this a separate CS_ flag? and pass in a range?)
             if (flags & CP_CLEAR) != 0 {
-                let enemy = ent_ptr(ctx, (*npc).enemy);
-                let enemy_id = ctx.entity_id_of(enemy);
+                let enemy_id = ctx.world.entity(npc_id).enemy;
                 if NPC_ClearLOS3(ctx, ctx.world.level.combatPoints[i].origin, enemy_id) == qfalse {
                     continue;
                 }
-                let dist = if (*npc).s.weapon == WP_THERMAL {
+                let dist = if ctx.world.entity(npc_id).s.weapon == WP_THERMAL {
                     //horizontal
                     DistanceHorizontalSquared(
                         ctx.world.level.combatPoints[i].origin,
-                        (*enemy).r.currentOrigin,
+                        ctx.world.entity(enemy_id.unwrap()).r.currentOrigin,
                     )
                 } else {
                     //actual
                     DistanceSquared(
                         ctx.world.level.combatPoints[i].origin,
-                        (*enemy).r.currentOrigin,
+                        ctx.world.entity(enemy_id.unwrap()).r.currentOrigin,
                     )
                 };
                 if dist > (*npc_info).stats.visrange * (*npc_info).stats.visrange {
@@ -2779,11 +2770,11 @@ pub fn NPC_FindCombatPoint(
                 GTraceArgs::new(
                     &mut tr as *mut trace_t,
                     &ctx.world.level.combatPoints[i].origin as *const vec3_t,
-                    &(*npc).r.mins as *const vec3_t,
-                    &(*npc).r.maxs as *const vec3_t,
+                    &ctx.world.entity(npc_id).r.mins as *const vec3_t,
+                    &ctx.world.entity(npc_id).r.maxs as *const vec3_t,
                     &ctx.world.level.combatPoints[i].origin as *const vec3_t,
-                    (*npc).s.number,
-                    (*npc).clipmask,
+                    ctx.world.entity(npc_id).s.number,
+                    ctx.world.entity(npc_id).clipmask,
                 ),
             );
             if tr.allsolid != 0 || tr.startsolid != 0 {
@@ -2804,13 +2795,17 @@ pub fn NPC_FindCombatPoint(
                     ) == WAYPOINT_NONE
                 {
                     //can't possibly have a route to any OR can't possibly have a route to this one OR don't have a route to this one
+                    let npc_mins = ctx.world.entity(npc_id).r.mins;
+                    let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+                    let npc_clipmask = ctx.world.entity(npc_id).clipmask;
+                    let cp_origin = ctx.world.level.combatPoints[i].origin;
                     if NAV_ClearPathToPoint(
                         ctx,
-                        ctx.entity_id_of(npc).unwrap(),
-                        (*npc).r.mins,
-                        (*npc).r.maxs,
-                        ctx.world.level.combatPoints[i].origin,
-                        (*npc).clipmask,
+                        npc_id,
+                        npc_mins,
+                        npc_maxs,
+                        cp_origin,
+                        npc_clipmask,
                         ENTITYNUM_NONE_LOCAL,
                     ) == qfalse
                     {
@@ -2984,87 +2979,96 @@ pub fn NPC_SetCombatPoint(ctx: &mut GameContext, combatPointID: c_int) -> qboole
 pub fn NPC_SearchForWeapons(ctx: &mut GameContext) -> *mut gentity_t {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
 
-        let mut bestFound: *mut gentity_t = core::ptr::null_mut();
+        let mut bestFound: Option<EntityId> = None;
         let mut bestDist = crate::g_public_consts::Q3_INFINITE as f32;
 
         let num_entities = ctx.world.level.num_entities as usize;
         for i in 0..num_entities {
-            if ctx.world.g_entities[i].inuse == 0 {
+            let found_id = EntityId(i as u32);
+            if ctx.world.entity(found_id).inuse == 0 {
                 continue;
             }
-
-            let found = &mut ctx.world.g_entities[i] as *mut gentity_t;
 
             //FIXME: Also look for ammo_racks that have weapons on them?
-            if (*found).s.eType != ET_ITEM as c_int {
+            if ctx.world.entity(found_id).s.eType != ET_ITEM as c_int {
                 continue;
             }
-            if (*(*found).item).giType != IT_WEAPON {
+            // FLAG: gitem_t is an external item table; deref of `.item` stays raw.
+            let found_item = ctx.world.entity(found_id).item;
+            if (*found_item).giType != IT_WEAPON {
                 continue;
             }
-            if ((*found).s.eFlags & EF_NODRAW) != 0 {
+            if (ctx.world.entity(found_id).s.eFlags & EF_NODRAW) != 0 {
                 continue;
             }
-            if CheckItemCanBePickedUpByNPC(
-                ctx,
-                ctx.entity_id_of(found).unwrap(),
-                ctx.entity_id_of(npc).unwrap(),
-            ) != qfalse
-            {
+            if CheckItemCanBePickedUpByNPC(ctx, found_id, npc_id) != qfalse {
                 if trap::InPVS(
                     ctx.engine,
                     GInPvsArgs::new(
-                        &(*found).r.currentOrigin as *const vec3_t,
-                        &(*npc).r.currentOrigin as *const vec3_t,
+                        &ctx.world.entity(found_id).r.currentOrigin as *const vec3_t,
+                        &ctx.world.entity(npc_id).r.currentOrigin as *const vec3_t,
                     ),
                 ) != qfalse
                 {
-                    let dist = DistanceSquared((*found).r.currentOrigin, (*npc).r.currentOrigin);
+                    let found_org = ctx.world.entity(found_id).r.currentOrigin;
+                    let npc_org = ctx.world.entity(npc_id).r.currentOrigin;
+                    let dist = DistanceSquared(found_org, npc_org);
                     if dist < bestDist {
+                        let found_ptr =
+                            &mut ctx.world.g_entities[found_id.index()] as *mut gentity_t;
+                        let npc_waypoint = ctx.world.entity(npc_id).waypoint;
+                        let found_waypoint = ctx.world.entity(found_id).waypoint;
                         if trap::Nav_GetBestPathBetweenEnts(
                             ctx.engine,
                             GNavGetbestpathbetweenentsArgs::new(
                                 npc.cast(),
-                                found.cast(),
+                                found_ptr.cast(),
                                 NF_CLEAR_PATH_LOCAL,
                             ),
                         ) == qfalse as c_int
                             || trap::Nav_GetBestNodeAltRoute2(
                                 ctx.engine,
                                 GNavGetbestnodealt2Args::new(
-                                    (*npc).waypoint,
-                                    (*found).waypoint,
+                                    npc_waypoint,
+                                    found_waypoint,
                                     NODE_NONE,
                                 ),
                             ) == WAYPOINT_NONE
                         {
                             //can't possibly have a route to any OR can't possibly have a route to this one OR don't have a route to this one
+                            let npc_mins = ctx.world.entity(npc_id).r.mins;
+                            let npc_maxs = ctx.world.entity(npc_id).r.maxs;
+                            let npc_clipmask = ctx.world.entity(npc_id).clipmask;
                             if NAV_ClearPathToPoint(
                                 ctx,
-                                ctx.entity_id_of(npc).unwrap(),
-                                (*npc).r.mins,
-                                (*npc).r.maxs,
-                                (*found).r.currentOrigin,
-                                (*npc).clipmask,
+                                npc_id,
+                                npc_mins,
+                                npc_maxs,
+                                found_org,
+                                npc_clipmask,
                                 ENTITYNUM_NONE_LOCAL,
                             ) != qfalse
                             {
                                 //have a clear straight path to this one
                                 bestDist = dist;
-                                bestFound = found;
+                                bestFound = Some(found_id);
                             }
                         } else {
                             //can nav to it
                             bestDist = dist;
-                            bestFound = found;
+                            bestFound = Some(found_id);
                         }
                     }
                 }
             }
         }
 
-        bestFound
+        match bestFound {
+            Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        }
     }
 }
 
@@ -3078,25 +3082,20 @@ const NF_CLEAR_PATH_LOCAL: c_int = 0x0000_0002;
 /// Source: `oracle/codemp/game/NPC_combat.c:3047-3058`
 pub fn NPC_SetPickUpGoal(ctx: &mut GameContext, foundWeap: Option<EntityId>) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let foundWeap: *mut gentity_t = ent_ptr(ctx, foundWeap);
+        let foundWeap_id = foundWeap.unwrap();
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
 
         //NPCInfo->goalEntity = foundWeap;
-        let mut org = (*foundWeap).r.currentOrigin;
-        org[2] += 24.0 - ((*foundWeap).r.mins[2] * -1.0); //adjust the origin so that I am on the ground
-        NPC_SetMoveGoal(
-            ctx,
-            ctx.entity_id_of(npc).unwrap(),
-            org,
-            ((*foundWeap).r.maxs[0] * 0.75) as c_int,
-            qfalse,
-            -1,
-            ctx.entity_id_of(foundWeap),
-        );
-        let tempGoal = ent_ptr(ctx, (*npc_info).tempGoal);
-        (*tempGoal).waypoint = (*foundWeap).waypoint;
+        let mut org = ctx.world.entity(foundWeap_id).r.currentOrigin;
+        org[2] += 24.0 - (ctx.world.entity(foundWeap_id).r.mins[2] * -1.0); //adjust the origin so that I am on the ground
+        let radius = (ctx.world.entity(foundWeap_id).r.maxs[0] * 0.75) as c_int;
+        NPC_SetMoveGoal(ctx, npc_id, org, radius, qfalse, -1, foundWeap);
+        let tempGoal_id = (*npc_info).tempGoal.unwrap();
+        let found_waypoint = ctx.world.entity(foundWeap_id).waypoint;
+        ctx.world.entity_mut(tempGoal_id).waypoint = found_waypoint;
         (*npc_info).tempBehavior = bState_t::BS_DEFAULT;
         (*npc_info).squadState = SQUAD_TRANSITION_LOCAL;
     }
@@ -3113,32 +3112,32 @@ const SQUAD_TRANSITION_LOCAL: i32 = 4;
 pub fn NPC_CheckGetNewWeapon(ctx: &mut GameContext) {
     unsafe {
         let npc = ctx.world.globals.NPC;
+        let npc_id = ctx.entity_id_of(npc).unwrap();
+        // FLAG: gNPC_t has no accessor; derefs stay raw (recipe 2c).
         let npc_info = ctx.world.globals.NPCInfo;
 
-        if (*npc).s.weapon == WP_NONE && !(*npc).enemy.is_none() {
+        if ctx.world.entity(npc_id).s.weapon == WP_NONE && !ctx.world.entity(npc_id).enemy.is_none()
+        {
             //if running away because dropped weapon...
             if !(*npc_info).goalEntity.is_none() && (*npc_info).goalEntity == (*npc_info).tempGoal {
-                let goalEntity = ent_ptr(ctx, (*npc_info).goalEntity);
-                if !(*goalEntity).enemy.is_none() {
-                    let goal_enemy = ent_ptr(ctx, (*goalEntity).enemy);
-                    if (*goal_enemy).inuse == 0 {
+                let goalEntity_id = (*npc_info).goalEntity.unwrap();
+                let goal_enemy = ctx.world.entity(goalEntity_id).enemy;
+                if !goal_enemy.is_none() {
+                    if ctx.world.entity(goal_enemy.unwrap()).inuse == 0 {
                         //maybe was running at a weapon that was picked up
                         (*npc_info).goalEntity = None;
                     }
                 }
             }
-            if TIMER_Done(
-                ctx,
-                ctx.entity_id_of(npc),
-                c"panic".as_ptr() as *const c_char,
-            ) != qfalse
+            if TIMER_Done(ctx, Some(npc_id), c"panic".as_ptr() as *const c_char) != qfalse
                 && (*npc_info).goalEntity.is_none()
             {
                 //need a weapon, any lying around?
                 let foundWeap = NPC_SearchForWeapons(ctx);
                 if !foundWeap.is_null() {
                     //try to nav to it
-                    NPC_SetPickUpGoal(ctx, ctx.entity_id_of(foundWeap));
+                    let fw_id = ctx.entity_id_of(foundWeap);
+                    NPC_SetPickUpGoal(ctx, fw_id);
                 }
             }
         }
@@ -3196,16 +3195,15 @@ pub fn NPC_AimAdjust(ctx: &mut GameContext, change: c_int) {
 /// Source: `oracle/codemp/game/NPC_combat.c:3131-3145`
 pub fn G_AimSet(ctx: &mut GameContext, self_: EntityId, aim: c_int) {
     unsafe {
-        // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-        let self_: *mut gentity_t = ctx.entity_mut(self_);
-        let npc = (*self_).NPC;
+        // FLAG: gNPC_t (NPC) has no accessor; deref stays raw (recipe 2c).
+        let npc = ctx.world.entity(self_).NPC;
         if !npc.is_null() {
             (*npc).currentAim = aim;
             //Com_Printf( "%s new aim = %d\n", self->NPC_type, self->NPC->currentAim );
 
             let g_spskill = ctx.world.cvars.g_spskill.integer;
             let debounce = 500 + (3 - g_spskill) * 100;
-            let self_id = ctx.entity_id_of(self_);
+            let self_id = Some(self_);
             let delay = ctx.world.bg_state.rng.Q_irand(debounce, debounce + 1000);
             TIMER_Set(
                 ctx,
