@@ -380,38 +380,45 @@ pub fn FighterWingMalfunctionCheck(pVeh: *mut Vehicle_t, parentPS: *mut playerSt
             &mut mYawOverride,
         );
 
+        // `serverTime*0.001` is a double in C (bare 0.001); sin is double; the
+        // whole chain computes in double and `+=` narrows once.
+        // Source: oracle/codemp/game/FighterNPC.c:896-913
         // Check right wing damage
         if ((*parentPS).brokenLimbs & (1 << 6)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_HEAVY
-            *(*pVeh).m_vOrientation.add(2) += (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
-                + 1.0f32)
-                * (*pVeh).m_fTimeModifier
-                * mYawOverride
-                * 50.0f32;
+            let ptr = (*pVeh).m_vOrientation.add(2);
+            *ptr = (*ptr as f64
+                + (((*pVeh).m_ucmd.serverTime as f64 * 0.001).sin() + 1.0)
+                    * (*pVeh).m_fTimeModifier as f64
+                    * mYawOverride as f64
+                    * 50.0) as f32;
         } else if ((*parentPS).brokenLimbs & (1 << 2)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_LIGHT
-            *(*pVeh).m_vOrientation.add(2) += (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
-                + 1.0f32)
-                * (*pVeh).m_fTimeModifier
-                * mYawOverride
-                * 12.5f32;
+            let ptr = (*pVeh).m_vOrientation.add(2);
+            *ptr = (*ptr as f64
+                + (((*pVeh).m_ucmd.serverTime as f64 * 0.001).sin() + 1.0)
+                    * (*pVeh).m_fTimeModifier as f64
+                    * mYawOverride as f64
+                    * 12.5) as f32;
         }
 
         // Check left wing damage
         if ((*parentPS).brokenLimbs & (1 << 7)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_HEAVY
-            *(*pVeh).m_vOrientation.add(2) -= (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
-                + 1.0f32)
-                * (*pVeh).m_fTimeModifier
-                * mYawOverride
-                * 50.0f32;
+            let ptr = (*pVeh).m_vOrientation.add(2);
+            *ptr = (*ptr as f64
+                - (((*pVeh).m_ucmd.serverTime as f64 * 0.001).sin() + 1.0)
+                    * (*pVeh).m_fTimeModifier as f64
+                    * mYawOverride as f64
+                    * 50.0) as f32;
         } else if ((*parentPS).brokenLimbs & (1 << 3)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_LIGHT
-            *(*pVeh).m_vOrientation.add(2) -= (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
-                + 1.0f32)
-                * (*pVeh).m_fTimeModifier
-                * mYawOverride
-                * 12.5f32;
+            let ptr = (*pVeh).m_vOrientation.add(2);
+            *ptr = (*ptr as f64
+                - (((*pVeh).m_ucmd.serverTime as f64 * 0.001).sin() + 1.0)
+                    * (*pVeh).m_fTimeModifier as f64
+                    * mYawOverride as f64
+                    * 12.5) as f32;
         }
     }
 }
@@ -430,19 +437,26 @@ pub fn FighterNoseMalfunctionCheck(pVeh: *mut Vehicle_t, parentPS: *mut playerSt
             &mut mYawOverride,
         );
 
+        // `serverTime*0.001` is a double in C (bare 0.001); sin is double; the
+        // whole chain computes in double and `+=` narrows once.
+        // Source: oracle/codemp/game/FighterNPC.c:924-932
         // Check nose damage
         if ((*parentPS).brokenLimbs & (1 << 4)) != 0 {
             // SHIPSURF_DAMAGE_FRONT_HEAVY
-            *(*pVeh).m_vOrientation.add(0) += ((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
-                * (*pVeh).m_fTimeModifier
-                * mPitchOverride
-                * 50.0f32;
+            let ptr = (*pVeh).m_vOrientation.add(0);
+            *ptr = (*ptr as f64
+                + ((*pVeh).m_ucmd.serverTime as f64 * 0.001).sin()
+                    * (*pVeh).m_fTimeModifier as f64
+                    * mPitchOverride as f64
+                    * 50.0) as f32;
         } else if ((*parentPS).brokenLimbs & (1 << 0)) != 0 {
             // SHIPSURF_DAMAGE_FRONT_LIGHT
-            *(*pVeh).m_vOrientation.add(0) += ((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
-                * (*pVeh).m_fTimeModifier
-                * mPitchOverride
-                * 20.0f32;
+            let ptr = (*pVeh).m_vOrientation.add(0);
+            *ptr = (*ptr as f64
+                + ((*pVeh).m_ucmd.serverTime as f64 * 0.001).sin()
+                    * (*pVeh).m_fTimeModifier as f64
+                    * mPitchOverride as f64
+                    * 20.0) as f32;
         }
     }
 }
@@ -521,6 +535,24 @@ pub fn FighterDamageRoutine(
                     }
                 }
             }
+        }
+
+        // QAGAME + _JK2MP (both live): if you land at all while pieces of your ship
+        // are missing, then die.
+        // Source: oracle/codemp/game/FighterNPC.c:1021-1032
+        if (*pVeh).m_LandTrace.fraction < 1.0f32 {
+            let parent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
+            let parent_origin = (*((*parent).client as *mut gclient_t)).ps.origin;
+            G_DamageFromKiller(
+                ctx,
+                ctx.entity_id_of(parent),
+                ctx.entity_id_of(parent),
+                None,
+                parent_origin,
+                999999,
+                DAMAGE_NO_ARMOR,
+                MOD_SUICIDE as c_int,
+            );
         }
 
         // Wing damage effects

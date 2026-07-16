@@ -4684,13 +4684,13 @@ pub fn Jedi_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) {
                 if missileSpeed != 0.0 {
                     let mut eDist = crate::q_math::Distance(eyes, enemy_eyes);
                     eDist /= missileSpeed; //How many seconds it will take to get to the enemy
-                    let ee = enemy_eyes;
-                    crate::q_math::_VectorMA(
-                        ee,
-                        eDist * ctx.world.bg_state.rng.flrand(0.95f32, 1.25f32),
-                        (*enemy_client).ps.velocity,
-                        &mut enemy_eyes,
-                    );
+                    // VectorMA is the live `#if 1` macro (q_shared.h:1365): the
+                    // flrand-bearing scale substitutes per component — three draws.
+                    // Source: `oracle/codemp/game/NPC_AI_Jedi.c:3838`
+                    for i in 0..3 {
+                        enemy_eyes[i] += (*enemy_client).ps.velocity[i]
+                            * (eDist * ctx.world.bg_state.rng.flrand(0.95f32, 1.25f32));
+                    }
                 }
             }
         }
@@ -6588,6 +6588,12 @@ pub fn Jedi_CheckDanger(ctx: &mut GameContext) -> qboolean {
             qfalse,
             AEL_MINOR as c_int,
         );
+        // §19: oracle indexes level.alertEvents[-1] (UB, near-always qfalse) when
+        // NPC_CheckAlertEvents returns -1; guard the panic on `as usize`.
+        // Source: oracle/codemp/game/NPC_AI_Jedi.c:5449
+        if alertEvent == -1 {
+            return qfalse;
+        }
         let ae = &ctx.world.level.alertEvents[alertEvent as usize];
         if ae.level as c_int >= AEL_DANGER as c_int {
             //run away!

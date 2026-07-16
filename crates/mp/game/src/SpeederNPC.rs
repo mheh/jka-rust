@@ -335,11 +335,18 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
             );
 
-            // PORT-NOTE(vtable-access): pm->cmd.serverTime access requires bg-channel state;
-            // electrify effect is guarded by pm access which needs threading
-            // if parentPS->electrifyTime > pm->cmd.serverTime {
-            //     pVeh->m_vOrientation[YAW] += (sin(pm->cmd.serverTime/1000.0f32)*3.0f32)*pVeh->m_fTimeModifier;
-            // }
+            // `pm->cmd.serverTime` is `m_ucmd.serverTime` (assigned pm->cmd before
+            // dispatch). C widths: `serverTime/1000.0f` is an f32 divide; `sin` is
+            // double libm (arg promotes); `*3.0f` and `*m_fTimeModifier` compute in
+            // double; `+=` promotes and narrows once.
+            // Source: oracle/codemp/game/SpeederNPC.c:547-550
+            if (*parentPS).electrifyTime > (*pVeh).m_ucmd.serverTime {
+                let yaw_ref = (*pVeh).m_vOrientation.add(YAW);
+                *yaw_ref = (*yaw_ref as f64
+                    + (((*pVeh).m_ucmd.serverTime as f32 / 1000.0f32) as f64).sin()
+                        * 3.0f64
+                        * (*pVeh).m_fTimeModifier as f64) as f32;
+            }
         }
 
         // SP (_JK2MP) code (lines 553-594) is dead code and dropped

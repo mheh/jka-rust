@@ -583,6 +583,9 @@ pub fn NPC_GM_Pain(
                     (*self_).count += 1;
                     let self_id = ctx.entity_id_of(self_).unwrap();
                     let delay = ctx.world.bg_state.rng.Q_irand(3000, 5000);
+                    // §19: oracle derefs `self->NPC->blockedSpeechDebounceTime`
+                    // unconditionally; the null guard is defensive.
+                    // Source: oracle/codemp/game/NPC_AI_GalakMech.c:307
                     if !npc.is_null() {
                         (*npc).blockedSpeechDebounceTime = 0;
                     }

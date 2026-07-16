@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Rancor.c 4/12
+// PORT-COMPLETE: NPC_AI_Rancor.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Rancor.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton. 4 functions are transcribed
@@ -668,8 +668,6 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
         if crate::g_timer::TIMER_Exists(ctx, ctx.entity_id_of(npc), c"attacking".as_ptr()) == qfalse
         {
             let npc_id = ctx.entity_id_of(npc);
-            let attacking = ((*((*npc).client as *mut gclient_t)).ps.legsTimer as f32
-                + ctx.world.bg_state.rng.random() * 200.0) as c_int;
             if (*npc).count == 2 && !(*npc).activator.is_none() {
             } else if (*npc).count == 1 && !(*npc).activator.is_none() {
                 let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
@@ -776,6 +774,11 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                 crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"attack_dmg".as_ptr(), 1000);
             }
 
+            // Oracle computes this LAST — after the attack-type Q_irand draws and
+            // after NPC_SetAnim updated legsTimer.
+            // Source: oracle/codemp/game/NPC_AI_Rancor.c:485
+            let attacking = ((*((*npc).client as *mut gclient_t)).ps.legsTimer as f32
+                + ctx.world.bg_state.rng.random() * 200.0) as c_int;
             crate::g_timer::TIMER_Set(ctx, npc_id, c"attacking".as_ptr(), attacking);
         }
 

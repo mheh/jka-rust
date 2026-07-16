@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_MineMonster.c 1/9
+// PORT-COMPLETE: NPC_AI_MineMonster.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_MineMonster.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!

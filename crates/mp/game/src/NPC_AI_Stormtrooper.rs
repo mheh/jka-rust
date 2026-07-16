@@ -1774,8 +1774,6 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
             let goalEnt = ent_resolve_opt(ctx, (*NPCInfo).goalEntity);
             // Did we make it?
             let flying = FlyingCreature(&*NPC);
-            let npc_id_2 = ctx.entity_id_of(NPC);
-            let delay_2 = ctx.world.bg_state.rng.Q_irand(4000, 8000);
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
@@ -1837,6 +1835,8 @@ pub fn ST_CheckMoveState(ctx: &mut GameContext) {
                 let delay_3 = ctx.world.bg_state.rng.Q_irand(1000, 4000);
                 // don't do something else just yet
                 TIMER_Set(ctx, npc_id_3, c"roamTime".as_ptr(), delay_3);
+                // Source: oracle/codemp/game/NPC_AI_Stormtrooper.c:1352
+                return;
             }
 
             // keep going, hold of roamTimer until we get there

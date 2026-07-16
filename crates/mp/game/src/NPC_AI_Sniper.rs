@@ -1,33 +1,27 @@
-// PORT-COMPLETE: NPC_AI_Sniper.c 2/13
+// PORT-COMPLETE: NPC_AI_Sniper.c 15/15
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Sniper.c`.
 //!
-//! Landed from the `fnskel.py` signature skeleton. 2 functions are
-//! transcribed faithfully from packet + prelude alone; the remaining 13 are
-//! parked (see the `PORT-NOTE` topics below), matching the precedent
-//! set in `NPC_AI_Jedi.rs`/`NPC_AI_Stormtrooper.rs`/`NPC_AI_GalakMech.rs`/
-//! `NPC_AI_Rancor.rs`: almost every body in this file reaches the file-scope
-//! AI globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) or this
-//! file's own file-statics (`enemyLOS2`/`enemyCS2`/`faceEnemy2`/`move2`/
-//! `shoot2`/`enemyDist2` — genuine cross-frame state, a GameWorld field)
-//! or calls a `trap_*` (needs `&Engine`). The AI globals become
-//! `GameWorld`/`GameContext` state, but these faithful
-//! signatures carry no `GameContext`/`&Engine` and the resolved cross-file
-//! signatures are equally context-free.
+//! All functions reach file-scope game state (`level`, `g_entities`, the
+//! file-statics `enemyLOS2`/`enemyCS2`/`faceEnemy2`/`move2`/`shoot2`/
+//! `enemyDist2` — genuine cross-frame state, `GameWorld` fields) and engine
+//! traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_nav::NPC_SetMoveGoal;
 use crate::g_nav::{FlyingCreature, NAV_HitNavGoal};
 use crate::g_timer::{TIMER_Done, TIMER_Get, TIMER_Set};
-use crate::g_utils::GetAnglesForDirection;
+use crate::g_utils::{GetAnglesForDirection, G_SoundOnEnt};
+use crate::g_weapon::CalcMuzzlePoint;
 use crate::npc::g_npc_t::{ENEMY_POS_LAG_INTERVAL, MAX_ENEMY_POS_LAG};
 use crate::prelude::*;
 use crate::q_math::{
-    _VectorMA, vec3_origin, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize,
+    _VectorMA, _VectorSubtract, vec3_origin, vectoangles, AngleNormalize360, AngleVectors,
+    VectorNormalize, PITCH, YAW,
 };
 use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 use crate::NPC_combat::{
-    NPC_ChangeWeapon, NPC_FindCombatPoint, NPC_FreeCombatPoint, NPC_MaxDistSquaredForWeapon,
-    NPC_SetCombatPoint, WeaponThink,
+    G_ClearEnemy, G_SetEnemy, NPC_ChangeWeapon, NPC_FindCombatPoint, NPC_FreeCombatPoint,
+    NPC_MaxDistSquaredForWeapon, NPC_SetCombatPoint, WeaponThink,
 };
 use crate::NPC_goal::{NPC_ReachedGoal, UpdateGoal};
 use crate::NPC_move::NAV_GetLastMove;
@@ -137,8 +131,7 @@ pub fn NPC_Sniper_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
         (*npc).tempBehavior = bState_t::BS_DEFAULT;
 
         // Clear the enemy
-        // Note: Using G_ClearEnemy parked, so we null the field directly
-        (*self_).enemy = None;
+        G_ClearEnemy(ctx, ctx.entity_id_of(self_).unwrap()); // FIXME: or just self->enemy = NULL;? (Raven comment).
 
         (*npc).investigateCount = 0;
     }
@@ -340,14 +333,16 @@ pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
                                 == (*((*NPC).client as *mut gclient_t)).enemyTeam
                         {
                             // an enemy
-                            // G_SetEnemy would need to be called here
-                            // G_SetEnemy(ctx, NPC, owner);
-                            let npc_id = ctx.entity_id_of(NPC);
+                            let npc_id = ctx.entity_id_of(NPC).unwrap();
+                            let owner_id = ctx.entity_id_of(owner);
+                            G_SetEnemy(ctx, npc_id, owner_id);
+                            //NPCInfo->enemyLastSeenTime = level.time;
+                            let attack_npc_id = ctx.entity_id_of(NPC);
                             let delay = ctx.world.bg_state.rng.Q_irand(
                                 (6 - (*NPCInfo).stats.aim) * 100,
                                 (6 - (*NPCInfo).stats.aim) * 500,
                             );
-                            TIMER_Set(ctx, npc_id, c"attackDelay".as_ptr(), delay);
+                            TIMER_Set(ctx, attack_npc_id, c"attackDelay".as_ptr(), delay);
                         }
                     } else {
                         // FIXME: get more suspicious over time?
@@ -375,13 +370,17 @@ pub fn NPC_BSSniper_Patrol(ctx: &mut GameContext) {
                 let mut dir = [0.0f32; 3];
                 let mut angles = [0.0f32; 3];
 
-                // VectorSubtract(NPCInfo->investigateGoal, NPC->client->renderInfo.eyePoint, dir);
-                // vectoangles(dir, angles);
+                _VectorSubtract(
+                    (*NPCInfo).investigateGoal,
+                    (*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint,
+                    &mut dir,
+                );
+                vectoangles(dir, &mut angles);
 
                 let o_yaw = (*NPCInfo).desiredYaw;
                 let o_pitch = (*NPCInfo).desiredPitch;
-                (*NPCInfo).desiredYaw = angles[0]; // YAW
-                (*NPCInfo).desiredPitch = angles[1]; // PITCH
+                (*NPCInfo).desiredYaw = angles[YAW];
+                (*NPCInfo).desiredPitch = angles[PITCH];
 
                 NPC_UpdateAngles(ctx, qtrue, qtrue);
 
@@ -644,16 +643,18 @@ pub fn Sniper_CheckFireState(ctx: &mut GameContext) {
                 let mut dir = [0.0f32; 3];
                 let mut angles = [0.0f32; 3];
 
-                // CalcEntitySpot and VectorSubtract would be needed here
-                // Using parked functions, so we skip this for now
+                CalcEntitySpot(ctx, ctx.entity_id_of(NPC), spot_t::SPOT_WEAPON, &mut muzzle);
+                _VectorSubtract((*NPCInfo).enemyLastSeenLocation, muzzle, &mut dir);
 
-                // VectorNormalize(dir);
-                // vectoangles(dir, angles);
+                VectorNormalize(&mut dir);
 
-                // (*NPCInfo).desiredYaw = angles[0];  // YAW
-                // (*NPCInfo).desiredPitch = angles[1];  // PITCH
+                vectoangles(dir, &mut angles);
+
+                (*NPCInfo).desiredYaw = angles[YAW];
+                (*NPCInfo).desiredPitch = angles[PITCH];
 
                 ctx.world.globals.shoot2 = qtrue;
+                //faceEnemy2 = qfalse;
             }
             return;
         } else if ctx.world.level.time - (*NPCInfo).enemyLastSeenTime > 10000 {
@@ -718,8 +719,10 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
             Some(&mut right),
             Some(&mut up),
         );
-        // CalcMuzzlePoint(ctx, NPC, forward, right, up, &mut muzzle);
-        // CalcEntitySpot(ctx, (*NPC).enemy, SPOT_ORIGIN, &mut target);
+        let npc_id = ctx.entity_id_of(NPC).unwrap();
+        CalcMuzzlePoint(ctx, npc_id, forward, right, up, &mut muzzle);
+        //CalcEntitySpot( NPC, SPOT_WEAPON, muzzle );
+        CalcEntitySpot(ctx, (*NPC).enemy, spot_t::SPOT_ORIGIN, &mut target);
 
         if ctx.world.globals.enemyDist2 > 65536.0 && (*NPCInfo).stats.aim < 5 {
             // is 256 squared, was 16384 (128*128)
@@ -735,7 +738,7 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
                     let mut tryMissCount = 0;
                     let mut trace: trace_t = core::mem::zeroed();
 
-                    // GetAnglesForDirection(muzzle, target, angles);
+                    GetAnglesForDirection(muzzle, target, &mut angles);
                     AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
 
                     while hit != 0 && tryMissCount < 10 {
@@ -744,27 +747,35 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
                             ctx.world.g_entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
                         let enemy_mins2 =
                             ctx.world.g_entities[(*NPC).enemy.unwrap().index()].r.mins[2];
+                        // VectorMA is the live `#if 1` macro (q_shared.h:1365): the
+                        // flrand-bearing scale expression substitutes per component —
+                        // THREE draws per call, distinct offsets, all f32.
+                        // Source: `oracle/codemp/game/NPC_AI_Sniper.c:544-559`
                         if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                             aimError = qtrue;
                             if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-                                let right_offset_max =
-                                    enemy_maxs2 * ctx.world.bg_state.rng.flrand(1.5, 4.0);
-                                _VectorMA(target, right_offset_max, right, &mut target);
+                                for i in 0..3 {
+                                    target[i] += right[i]
+                                        * (enemy_maxs2 * ctx.world.bg_state.rng.flrand(1.5, 4.0));
+                                }
                             } else {
-                                let right_offset_min =
-                                    enemy_mins2 * ctx.world.bg_state.rng.flrand(1.5, 4.0);
-                                _VectorMA(target, right_offset_min, right, &mut target);
+                                for i in 0..3 {
+                                    target[i] += right[i]
+                                        * (enemy_mins2 * ctx.world.bg_state.rng.flrand(1.5, 4.0));
+                                }
                             }
                         }
                         if aimError == qfalse || ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                             if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-                                let up_offset_max =
-                                    enemy_maxs2 * ctx.world.bg_state.rng.flrand(1.5, 4.0);
-                                _VectorMA(target, up_offset_max, up, &mut target);
+                                for i in 0..3 {
+                                    target[i] += up[i]
+                                        * (enemy_maxs2 * ctx.world.bg_state.rng.flrand(1.5, 4.0));
+                                }
                             } else {
-                                let up_offset_min =
-                                    enemy_mins2 * ctx.world.bg_state.rng.flrand(1.5, 4.0);
-                                _VectorMA(target, up_offset_min, up, &mut target);
+                                for i in 0..3 {
+                                    target[i] += up[i]
+                                        * (enemy_mins2 * ctx.world.bg_state.rng.flrand(1.5, 4.0));
+                                }
                             }
                         }
                         trap::Trace(
@@ -797,22 +808,25 @@ pub fn Sniper_FaceEnemy(ctx: &mut GameContext) {
                 } else {
                     missFactor
                 };
+                // §19: C clamps missFactor to ENEMY_POS_LAG_STEPS (24) then reads
+                // enemyLaggedPos[24], one past the 24-elem array (UB). We guard <24 and
+                // skip; unreachable in practice since missFactor = 8-(aim+skill)*3 <= 8.
                 if missFactor >= 0 && (missFactor as usize) < ENEMY_POS_LAG_STEPS as usize {
                     target[0] = (*NPCInfo).enemyLaggedPos[missFactor as usize][0];
                     target[1] = (*NPCInfo).enemyLaggedPos[missFactor as usize][1];
                     target[2] = (*NPCInfo).enemyLaggedPos[missFactor as usize][2];
                 }
             }
-            // GetAnglesForDirection(muzzle, target, angles);
+            GetAnglesForDirection(muzzle, target, &mut angles);
         } else {
             let enemy_maxs2 = ctx.world.g_entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
             target[2] += ctx.world.bg_state.rng.flrand(0.0, enemy_maxs2);
-            // CalcEntitySpot((*NPC).enemy, SPOT_HEAD_LEAN, &mut target);
-            // GetAnglesForDirection(muzzle, target, angles);
+            //CalcEntitySpot( NPC->enemy, SPOT_HEAD_LEAN, target );
+            GetAnglesForDirection(muzzle, target, &mut angles);
         }
 
-        (*NPCInfo).desiredYaw = AngleNormalize360(angles[0]); // YAW
-        (*NPCInfo).desiredPitch = AngleNormalize360(angles[1]); // PITCH
+        (*NPCInfo).desiredYaw = AngleNormalize360(angles[YAW]);
+        (*NPCInfo).desiredPitch = AngleNormalize360(angles[PITCH]);
         NPC_UpdateAngles(ctx, qtrue, qtrue);
     }
 }
@@ -923,9 +937,22 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
                     // SCF_ALT_FIRE = 0x00000040
                     // use primary fire
                     let mut trace: trace_t = core::mem::zeroed();
-                    // trap_Trace(&trace, (*NPC)->enemy->r.currentOrigin, ...);
-                    // if (!trace.allsolid && !trace.startsolid && (trace.fraction == 1.0 || trace.entityNum == NPC->s.number)) {
-                    if true {
+                    trap::Trace(
+                        ctx.engine,
+                        GTraceArgs::new(
+                            &mut trace,
+                            &(*enemy_ptr).r.currentOrigin,
+                            &(*enemy_ptr).r.mins,
+                            &(*enemy_ptr).r.maxs,
+                            &(*NPC).r.currentOrigin,
+                            (*enemy_ptr).s.number,
+                            (*enemy_ptr).clipmask,
+                        ),
+                    );
+                    if trace.allsolid == 0
+                        && trace.startsolid == 0
+                        && (trace.fraction == 1.0 || trace.entityNum as c_int == (*NPC).s.number)
+                    {
                         // he can get right to me
                         (*NPCInfo).scriptFlags &= !0x00000040; // SCF_ALT_FIRE
                                                                // reset fire-timing variables
@@ -984,9 +1011,21 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
                     Some(&mut right),
                     Some(&mut up),
                 );
-                // CalcMuzzlePoint(ctx, NPC, fwd, right, up, &mut muzzle);
-                // VectorMA(muzzle, 8192, fwd, &mut end);
-                // trap_Trace(&tr, muzzle, NULL, NULL, end, NPC->s.number, MASK_SHOT);
+                let npc_shoot_id = ctx.entity_id_of(NPC).unwrap();
+                CalcMuzzlePoint(ctx, npc_shoot_id, fwd, right, up, &mut muzzle);
+                _VectorMA(muzzle, 8192.0, fwd, &mut end);
+                trap::Trace(
+                    ctx.engine,
+                    GTraceArgs::new(
+                        &mut tr,
+                        &muzzle,
+                        core::ptr::null(),
+                        core::ptr::null(),
+                        &end,
+                        (*NPC).s.number,
+                        MASK_SHOT,
+                    ),
+                );
 
                 hit = tr.entityNum;
                 // can we shoot our target?
@@ -1057,7 +1096,7 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
             // we want to face in the dir we're running
             if ctx.world.globals.move2 != 0 {
                 // don't run away and shoot
-                (*NPCInfo).desiredYaw = (*NPCInfo).lastPathAngles[0]; // YAW
+                (*NPCInfo).desiredYaw = (*NPCInfo).lastPathAngles[YAW];
                 (*NPCInfo).desiredPitch = 0.0;
                 ctx.world.globals.shoot2 = qfalse;
             }
@@ -1078,12 +1117,13 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
             if TIMER_Done(ctx, ctx.entity_id_of(NPC), c"attackDelay".as_ptr()) != 0 {
                 WeaponThink(ctx, qtrue);
                 if (ctx.world.globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) != 0 {
-                    // G_SoundOnEnt(ctx, NPC, CHAN_WEAPON, "sound/null.wav");
+                    let sound_npc_id = ctx.entity_id_of(NPC).unwrap();
+                    G_SoundOnEnt(ctx, sound_npc_id, CHAN_WEAPON, c"sound/null.wav".as_ptr());
                 }
 
                 // took a shot, now hide
-                if ((*NPC).spawnflags & 0x0100) == 0 && ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-                    // SPF_NO_HIDE = 0x0100
+                if ((*NPC).spawnflags & 2) == 0 && ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
+                    // SPF_NO_HIDE = 2 (file-local #define, NPC_AI_Sniper.c:11)
                     // FIXME: do this if in combat point and combat point has duck-type cover...
                     Sniper_StartHide(ctx);
                 } else {

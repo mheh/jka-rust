@@ -26,6 +26,8 @@ use crate::ent_fn_enums::dispatch_die;
 use crate::g_ICARUScb::G_DebugPrint;
 use crate::g_ICARUScb::Q3_SetParm;
 use crate::g_public_consts::SVF_NOCLIENT;
+use crate::q_shared::FOFS_targetname;
+use crate::NPC_stats::TeamTable;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
 
 // Unported types referenced in this file (need porting before this compiles):
@@ -267,11 +269,19 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                     (*((*ent).NPC as *mut gNPC_t)).aiFlags |= NPCAI_CUSTOM_GRAVITY;
                     (*((*ent).client as *mut gclient_t)).ps.eFlags2 |= EF2_FLYING;
                 } else {
-                    if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_BLASTER {
-                        crate::NPC_AI_Stormtrooper::ST_ClearTimers(
-                            ctx,
-                            ctx.entity_id_of(ent).unwrap(),
-                        );
+                    // Oracle switch: `default:` falls into `case WP_BLASTER:`, so
+                    // ST_ClearTimers runs for WP_BLASTER and any weapon not in the
+                    // explicit no-op case set. Source: oracle/codemp/game/NPC_spawn.c:412-458
+                    match (*((*ent).client as *mut gclient_t)).ps.weapon {
+                        WP_BRYAR_PISTOL | WP_DISRUPTOR | WP_BOWCASTER | WP_REPEATER
+                        | WP_DEMP2 | WP_FLECHETTE | WP_ROCKET_LAUNCHER | WP_THERMAL
+                        | WP_STUN_BATON => {}
+                        _ => {
+                            crate::NPC_AI_Stormtrooper::ST_ClearTimers(
+                                ctx,
+                                ctx.entity_id_of(ent).unwrap(),
+                            );
+                        }
                     }
                     let galak_mech = cstr("galak_mech");
                     if crate::q_shared::Q_stricmp((*ent).NPC_type, galak_mech.as_ptr()) == 0 {
@@ -1144,11 +1154,14 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         );
 
         if (*((*newent).NPC as *mut gNPC_t)).tempGoal.is_none() {
+            // Oracle nulls NPC and `goto finish` — the finish path returns the
+            // (non-null) newent; the `return NULL` after the goto is unreachable.
+            // Source: oracle/codemp/game/NPC_spawn.c:1442-1447,1756-1762
             (*newent).NPC = core::ptr::null_mut();
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
             }
-            return core::ptr::null_mut();
+            return newent;
         }
         let temp_goal = ent_id::resolve(
             ctx.world.g_entities.as_mut_ptr(),
@@ -2941,7 +2954,7 @@ pub fn NPC_SpawnType(
 
     unsafe {
         (*npc_spawner).think = Some(EntThink::G_FreeEntity).into();
-        (*npc_spawner).nextthink = ctx.world.level.time + 50; // FRAMETIME
+        (*npc_spawner).nextthink = ctx.world.level.time + FRAMETIME;
     }
 
     if npc_type.is_null() {
@@ -2989,7 +3002,7 @@ pub fn NPC_SpawnType(
                 core::ptr::null(),
                 &end as *const vec3_t,
                 0,
-                1,
+                MASK_SOLID,
             ),
         );
 
@@ -3005,7 +3018,7 @@ pub fn NPC_SpawnType(
                 core::ptr::null(),
                 &end as *const vec3_t,
                 0,
-                1,
+                MASK_SOLID,
             ),
         );
 
@@ -3213,8 +3226,10 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
         {
             kill_non_sf = 1;
         } else {
-            kill_team =
-                GetIDForString(std::ptr::null_mut(), name.as_ptr() as *const c_char) as team_t;
+            kill_team = GetIDForString(
+                TeamTable.as_ptr() as *mut stringID_table_t,
+                name.as_ptr() as *const c_char,
+            ) as team_t;
 
             if kill_team == TEAM_FREE {
                 Com_Printf(
@@ -3443,7 +3458,7 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
             let found_ent = G_Find(
                 ctx,
                 ctx.entity_id_of(std::ptr::null_mut()),
-                0,
+                FOFS_targetname,
                 cmd2.as_ptr() as *const c_char,
             );
             if !found_ent.is_null() && !unsafe { (*found_ent).client.is_null() } {

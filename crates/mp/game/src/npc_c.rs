@@ -1,11 +1,11 @@
-// PORT-COMPLETE: NPC.c 23/20
+// PORT-COMPLETE: NPC.c
 //! FAITHFUL port of `oracle/codemp/game/NPC.c`.
 //!
-//! Filled by the jampgame mega-pass. Functions that reach file-scope NPC-AI state (the
-//! `NPC`/`NPCInfo`/`client`/`ucmd` file-scope globals, `level`, `g_entities`,
-//! cvars) or an engine trap (`trap_*`) cannot be threaded against the staged
-//! raw-pointer signatures (no `GameWorld`/engine handle) and are parked;
-//! see PORT-NOTE markers, matching the g_utils.c precedent.
+//! Filled by the jampgame mega-pass; all bodies are live. Functions that reach
+//! file-scope NPC-AI state (the `NPC`/`NPCInfo`/`client`/`ucmd` file-scope
+//! globals, `level`, `g_entities`, cvars) read it through `ctx.world.globals`
+//! and keep raw-pointer internals — see the `PORT-NOTE(raw-ptr-skeleton-…)`
+//! markers (Stage-2 debt), matching the g_utils.c precedent.
 //!
 //! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
@@ -65,6 +65,9 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
         let ucmd_ptr = &raw mut ctx.world.globals.ucmd;
         crate::g_active::ClientThink(ctx, (*self_).s.number, ucmd_ptr);
 
+        // §19: oracle derefs `self->client` (NPC_class, ps, respawnTime, …)
+        // unconditionally throughout; the `!client.is_null()` guards below are
+        // defensive. Source: oracle/codemp/game/NPC.c:54-103
         let client = (*self_).client as *mut gclient_t;
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
             let self_id = ctx.entity_id_of(self_).unwrap();
@@ -147,6 +150,9 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
 
         (*self_).nextthink = ctx.world.level.time + FRAMETIME;
 
+        // §19: oracle derefs `self->NPC` and `self->client` unconditionally
+        // throughout; the `!npc.is_null()`/`!client.is_null()` guards below are
+        // defensive. Source: oracle/codemp/game/NPC.c:115-223
         let npc = (*self_).NPC as *mut gNPC_t;
         if !npc.is_null() && (*npc).nextBStateThink <= ctx.world.level.time {
             trap::ICARUS_MaintainTaskManager(
@@ -840,6 +846,9 @@ pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
         if (*npc_info).greetingDebounceTime != 0
             && (*npc_info).greetingDebounceTime < ctx.world.level.time
         {
+            // Two Q_irand draws as call args; C order is unspecified. Verified with
+            // the referee-oracle compiler (g++-16): args evaluate left-to-right, so
+            // the event draw precedes the delay draw. Source: oracle/codemp/game/NPC.c:813
             let ev = ctx.world.bg_state.rng.Q_irand(
                 entity_event_t::EV_VICTORY1 as c_int,
                 entity_event_t::EV_VICTORY3 as c_int,
@@ -1659,33 +1668,38 @@ pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
             let sound_path = match npc_class {
                 class_t::CLASS_R2D2 => {
                     let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                    format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx)
+                    Some(format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx))
                 }
                 class_t::CLASS_R5D2 => {
                     let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
-                    format!("sound/chars/r5d2/misc/r5talk{}.wav", idx)
+                    Some(format!("sound/chars/r5d2/misc/r5talk{}.wav", idx))
                 }
                 class_t::CLASS_PROBE => {
                     let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                    format!("sound/chars/probe/misc/probetalk{}.wav", idx)
+                    Some(format!("sound/chars/probe/misc/probetalk{}.wav", idx))
                 }
                 class_t::CLASS_MOUSE => {
                     let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
-                    format!("sound/chars/mouse/misc/mousego{}.wav", idx)
+                    Some(format!("sound/chars/mouse/misc/mousego{}.wav", idx))
                 }
                 class_t::CLASS_GONK => {
                     let idx = ctx.world.bg_state.rng.Q_irand(1, 2);
-                    format!("sound/chars/gonk/misc/gonktalk{}.wav", idx)
+                    Some(format!("sound/chars/gonk/misc/gonktalk{}.wav", idx))
                 }
-                _ => return,
+                // Oracle switch has no default: unmatched classes skip the per-class
+                // sound but still fall through to the TIMER_Set + draw below.
+                // Source: oracle/codemp/game/NPC.c:1793-1810
+                _ => None,
             };
 
-            crate::g_utils::G_SoundOnEnt(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                CHAN_AUTO,
-                cstr(&sound_path).as_ptr(),
-            );
+            if let Some(sound_path) = sound_path {
+                crate::g_utils::G_SoundOnEnt(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    CHAN_AUTO,
+                    cstr(&sound_path).as_ptr(),
+                );
+            }
 
             let duration = ctx.world.bg_state.rng.Q_irand(2000, 4000);
             crate::g_timer::TIMER_Set(
@@ -1797,6 +1811,8 @@ pub fn NPC_Think(ctx: &mut GameContext, self_: EntityId) {
                 (*client).pers.cmd.rightmove = 0;
                 (*client).pers.cmd.upmove = 0;
                 (*client).pers.cmd.buttons = 0;
+                // §19: oracle derefs `self->m_pVehicle->m_ucmd` unconditionally.
+                // Source: oracle/codemp/game/NPC.c:1914
                 if !(*self_).m_pVehicle.is_null() {
                     (*((*self_).m_pVehicle as *mut Vehicle_t)).m_ucmd = (*client).pers.cmd;
                 }

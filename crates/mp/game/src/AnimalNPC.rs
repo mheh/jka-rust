@@ -461,47 +461,10 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 }
 
                 if !left_mut && !right_mut {
-                    if !pilot.is_null() && !(*pilot).enemy.is_none() {
-                        let to_enemy_dist: f32;
-                        let mut to_enemy: [f32; 3] = [0.0f32; 3];
-                        let mut actor_right: [f32; 3] = [0.0f32; 3];
-                        let actor_right_dot: f32;
-
-                        // `pilot->enemy` is an `EntityId` arena index (Raven's
-                        // `gentity_t*`); `ctx` now threads the world, so index the
-                        // game arena directly.
-                        let enemy_ent = ctx
-                            .world
-                            .g_entities
-                            .as_mut_ptr()
-                            .add((*pilot).enemy.unwrap().0 as usize);
-                        crate::q_math::_VectorSubtract(
-                            (*pilot).r.currentOrigin,
-                            (*enemy_ent).r.currentOrigin,
-                            &mut to_enemy,
-                        );
-                        to_enemy_dist = crate::q_math::VectorNormalize(&mut to_enemy);
-
-                        crate::q_math::AngleVectors(
-                            (*parent).r.currentAngles,
-                            None,
-                            Some(&mut actor_right),
-                            None,
-                        );
-                        actor_right_dot = crate::q_math::_DotProduct(to_enemy, actor_right);
-
-                        if actor_right_dot.abs() > 0.5f32
-                            || !pilotPS.is_none()
-                                && !pilotPS.unwrap().is_null()
-                                && (*pilotPS.unwrap()).weapon == WP_SABER
-                        {
-                            left_mut = actor_right_dot > 0.0f32;
-                            right_mut = !left_mut;
-                        } else {
-                            right_mut = false;
-                            left_mut = false;
-                        }
-                    } else if !pilotPS.is_none()
+                    // The enemy-direction auto-aim block is `#ifndef _JK2MP` — dead
+                    // in MP; only the WP_SABER fallback survives preprocessing.
+                    // Source: oracle/codemp/game/AnimalNPC.c:746-777
+                    if !pilotPS.is_none()
                         && !pilotPS.unwrap().is_null()
                         && (*pilotPS.unwrap()).weapon == WP_SABER
                         && !left_mut

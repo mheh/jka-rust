@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Remote.c 1/10
+// PORT-COMPLETE: NPC_AI_Remote.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Remote.c`.
 //!
 //! One function ported; ten parked due to ambient-state infrastructure.
@@ -291,6 +291,8 @@ pub fn Remote_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean, 
         }
     } else {
         unsafe {
+            // §19: oracle derefs `NPC->enemy->r.currentOrigin` unconditionally.
+            // Source: oracle/codemp/game/NPC_AI_Remote.c:211
             if let Some(enemy_id) = (*npc).enemy {
                 let enemy_ent = &mut ctx.world.g_entities[enemy_id.0 as usize] as *mut gentity_t;
                 crate::q_math::_VectorSubtract(
@@ -470,12 +472,15 @@ pub fn Remote_Attack(ctx: &mut GameContext) {
     }
 
     idealDist = MIN_DISTANCE_SQR + (MIN_DISTANCE_SQR * ctx.world.bg_state.rng.flrand(0.0, 1.0));
-    advance = if distance > idealDist * 1.25 {
+    // C: `distance`(int) compared against `idealDist`(float)*1.25/0.75(double);
+    // the products promote to double and the compare is in double.
+    // Source: oracle/codemp/game/NPC_AI_Remote.c:317-318
+    advance = if (distance as f64) > idealDist as f64 * 1.25 {
         qtrue
     } else {
         qfalse
     };
-    retreat = if distance < idealDist * 0.75 {
+    retreat = if (distance as f64) < idealDist as f64 * 0.75 {
         qtrue
     } else {
         qfalse

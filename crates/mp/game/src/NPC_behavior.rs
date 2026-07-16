@@ -1334,11 +1334,14 @@ pub fn NPC_BSWander(ctx: &mut GameContext) {
                             );
                             (*tempGoal).waypoint = nextWp;
                         }
-
-                        (*NPCInfo).investigateDebounceTime = 0;
-                        (*NPCInfo).goalEntity = (*NPCInfo).tempGoal;
-                        NPC_MoveToGoal(ctx, qtrue);
                     }
+
+                    // Oracle: these three run inside `if waypoint != WAYPOINT_NONE`
+                    // but outside `if numEdges != WAYPOINT_NONE`.
+                    // Source: oracle/codemp/game/NPC_behavior.c:1276-1280
+                    (*NPCInfo).investigateDebounceTime = 0;
+                    (*NPCInfo).goalEntity = (*NPCInfo).tempGoal;
+                    NPC_MoveToGoal(ctx, qtrue);
                 }
             }
         }

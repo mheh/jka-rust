@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Howler.c 3/6
+// PORT-COMPLETE: NPC_AI_Howler.c
 //!
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Howler.c`.
 //!

@@ -435,7 +435,6 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
                 let num = ctx.world.bg_state.rng.Q_irand(1, 3);
 
                 let self_id = ctx.entity_id_of(self_);
-                let delay = ctx.world.bg_state.rng.Q_irand(300, 1000);
                 // Find place to generate explosion
                 if num == 1 {
                     let random_num = ctx.world.bg_state.rng.Q_irand(8, 10);
@@ -467,6 +466,9 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
                     );
                 }
 
+                // Oracle draws Q_irand(300,1000) LAST, after the branch draw.
+                // Source: oracle/codemp/game/NPC_AI_Mark1.c:273
+                let delay = ctx.world.bg_state.rng.Q_irand(300, 1000);
                 crate::g_timer::TIMER_Set(ctx, self_id, c"dyingExplosion".as_ptr(), delay);
             }
 
@@ -514,6 +516,10 @@ pub fn NPC_Mark1_Pain(
             return;
         }
 
+        // Oracle reads gPainHitLoc BEFORE NPC_Pain + G_Sound.
+        // Source: oracle/codemp/game/NPC_AI_Mark1.c:322-326
+        let hitLoc = ctx.world.globals.gPainHitLoc;
+
         crate::NPC_reactions::NPC_Pain(
             ctx,
             ctx.entity_id_of(self_).unwrap(),
@@ -527,8 +533,6 @@ pub fn NPC_Mark1_Pain(
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_pain".as_ptr()),
         );
-
-        let hitLoc = ctx.world.globals.gPainHitLoc;
 
         // Hit in the CHEST???
         if hitLoc == HL_CHEST {

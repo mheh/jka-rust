@@ -28,14 +28,9 @@
 //! `G_GetBoltPosition`'s `pos` got the vec3 out-param reshape
 //! (`&mut vec3_t` / `Option<&mut vec3_t>`) and same-file callers were fixed up.
 //!
-//! Two markers remain (see PORT-NOTE): `NPC_SetSurfaceOnOff` needs
-//! `bgToggleableSurfaces` (genuinely unported bg-shared table — no Rust home
-//! anywhere in the worktree) and `G_ActivateBehavior` needs `BSTable`
-//! (unported ICARUS string table, same class of gap as `Q3_SetBState` in
-//! `g_ICARUScb.rs`) plus a real-variadic `va(fmt, args…)` call (topic
-//! `va-varargs`, same fork as `g_client.rs`/`w_force.rs`). `G_GetBoltPosition`
-//! is parked on a cross-crate-visibility gap: `BG_GiveMeVectorFromMatrix`
-//! (`NPC_AI_Mark2.rs`) is a private fn in its owning file.
+//! The gaps the mega pass parked are all closed and these functions are ported
+//! live: `NPC_SetSurfaceOnOff` (`bgToggleableSurfaces`), `G_ActivateBehavior`
+//! (`BSTable`) and `G_GetBoltPosition` (`BG_GiveMeVectorFromMatrix`).
 //!
 //! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
@@ -1446,8 +1441,10 @@ pub fn NPC_FacePosition(ctx: &mut GameContext, position: vec3_t, doPitch: qboole
                     // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
                     // C's `sin` is the double libm function: the float `time*0.004f`
                     // argument widens to f64, `sin(...)*7` and the `flrand` sum
-                    // evaluate in f64, narrowing to the float `desiredYaw` on assign.
-                    (*npc_info).desiredYaw += (ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
+                    // evaluate in f64; `+=` promotes desiredYaw and narrows once.
+                    // Source: oracle/codemp/game/NPC_utils.c:1522
+                    (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
+                        + ctx.world.bg_state.rng.flrand(-5.0, 5.0) as f64
                         + (((ctx.world.level.time as f32) * 0.004) as f64).sin() * 7.0)
                         as f32;
                     (*npc_info).desiredPitch += ctx.world.bg_state.rng.flrand(-2.0, 2.0);

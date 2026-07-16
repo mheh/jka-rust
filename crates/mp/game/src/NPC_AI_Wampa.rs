@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Wampa.c 1/10
+// PORT-COMPLETE: NPC_AI_Wampa.c
 //! Port of `oracle/codemp/game/NPC_AI_Wampa.c` (jampgame mega-pass).
 //!
 //! SPINE (fork rulings 1/4): NPC AI think-loop helper functions. Most functions
@@ -819,8 +819,6 @@ pub fn NPC_Wampa_Pain(
                         );
 
                         let self_id = ctx.entity_id_of(self_);
-                        let taking_pain = (*((*self_).client as *mut gclient_t)).ps.legsTimer
-                            + ctx.world.bg_state.rng.Q_irand(0, 500);
                         if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                             crate::npc_c::NPC_SetAnim(
                                 ctx,
@@ -838,6 +836,11 @@ pub fn NPC_Wampa_Pain(
                                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                             );
                         }
+                        // Oracle reads legsTimer + draws Q_irand(0,500) LAST —
+                        // after the anim-pick draw and after NPC_SetAnim.
+                        // Source: oracle/codemp/game/NPC_AI_Wampa.c:485
+                        let taking_pain = (*((*self_).client as *mut gclient_t)).ps.legsTimer
+                            + ctx.world.bg_state.rng.Q_irand(0, 500);
                         crate::g_timer::TIMER_Set(
                             ctx,
                             self_id,

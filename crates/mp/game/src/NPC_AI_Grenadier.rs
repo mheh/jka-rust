@@ -500,8 +500,6 @@ pub fn Grenadier_CheckMoveState(ctx: &mut GameContext) {
 
         // See if we're moving towards a goal, not the enemy
         if (*npc_info_ptr).goalEntity != (*npc_ptr).enemy && !(*npc_info_ptr).goalEntity.is_none() {
-            let npc_id_stale = ctx.entity_id_of(npc_ptr);
-            let roam_delay_stale = ctx.world.bg_state.rng.Q_irand(4000, 8000);
             // Did we make it?
             if NAV_HitNavGoal(
                 (*npc_ptr).r.currentOrigin,
@@ -670,6 +668,9 @@ pub fn Grenadier_EvaluateShot(ctx: &mut GameContext, hit: c_int) -> qboolean {
             return qtrue;
         }
 
+        // §19: oracle indexes `g_entities[hit]` unguarded (`&g_entities[hit] != NULL`
+        // is always true); the bounds check avoids a panic on a bad index.
+        // Source: oracle/codemp/game/NPC_AI_Grenadier.c:448
         if hit >= 0 && (hit as usize) < mp_qshared::shared::MAX_GENTITIES {
             let hit_ent = &ctx.world.g_entities[hit as usize];
             if (hit_ent.r.svFlags & SVF_GLASS_BRUSH as i32) != 0 {

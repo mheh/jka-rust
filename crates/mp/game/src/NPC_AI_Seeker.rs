@@ -331,9 +331,12 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
             }
 
             // then add a very small bit of random in front of/behind the player action
-            // Inline VectorMA: end += crandom * 25 * dir
+            // VectorMA is the live `#if 1` MACRO (q_shared.h:1365) — the scale expr
+            // `crandom()*25` is substituted per component: THREE crandom draws, each
+            // product in f64, narrowed at the store. Never reason from `_VectorMA`'s
+            // float-scale signature (dead `#else` branch, q_shared.h:1381).
+            // Source: oracle/codemp/game/NPC_AI_Seeker.c:207
             for i in 0..3 {
-                // C VectorMA scale `crandom() * 25` is `double`; narrows to float.
                 end[i] =
                     (end[i] as f64 + ctx.world.bg_state.rng.crandom() * 25.0 * dir[i] as f64) as f32;
             }
