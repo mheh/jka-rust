@@ -380,21 +380,20 @@ pub fn BotAI_GetEntityState(
     state: *mut entityState_t,
 ) -> c_int {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
-        let ent = base.add(entityNum as usize);
         core::ptr::write_bytes(state, 0, 1);
-        if (*ent).inuse == qfalse {
+        let ent = ctx.world.entity(EntityId(entityNum as u32));
+        if ent.inuse == qfalse {
             return qfalse;
         }
-        if (*ent).r.linked == qfalse {
+        if ent.r.linked == qfalse {
             return qfalse;
         }
         // SVF_NOCLIENT: only a file-local const exists (g_items.rs); referenced
         // as cited and reported as a missing symbol pending a shared home.
-        if (*ent).r.svFlags & SVF_NOCLIENT != 0 {
+        if ent.r.svFlags & SVF_NOCLIENT != 0 {
             return qfalse;
         }
-        core::ptr::copy_nonoverlapping(&(*ent).s as *const entityState_t, state, 1);
+        core::ptr::copy_nonoverlapping(&ent.s as *const entityState_t, state, 1);
         qtrue
     }
 }
@@ -3876,42 +3875,45 @@ pub fn JMTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
 /// Source: `oracle/codemp/game/ai_main.c:3500-3554`
 pub fn BotHasAssociated(ctx: &mut GameContext, bs: *mut bot_state_t, wp: *mut wpobject_t) -> c_int {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
-        let as_ent: *mut gentity_t;
-
         if (*wp).associated_entity == ENTITYNUM_NONE {
             // make it think this is an item we have so we don't go after nothing
             return 1;
         }
 
-        as_ent = base.add((*wp).associated_entity as usize);
+        // `as_ent`'s only field read is its `*mut gitem_t` `item` (Copy); the
+        // arena entity is borrowed momentarily to fetch it, and the pointer is
+        // dereffed raw (gitem_t has no accessor). The original `as_ent.is_null()`
+        // guard was dead (`&g_entities[i]` is never NULL), so only `item.is_null()`
+        // survives.
+        let item = ctx
+            .world
+            .entity(EntityId((*wp).associated_entity as u32))
+            .item;
 
-        if as_ent.is_null() || (*as_ent).item.is_null() {
+        if item.is_null() {
             return 0;
         }
 
-        if (*(*as_ent).item).giType == IT_WEAPON {
-            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << (*(*as_ent).item).giTag) != 0 {
+        if (*item).giType == IT_WEAPON {
+            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << (*item).giTag) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*(*as_ent).item).giType == IT_HOLDABLE {
-            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << (*(*as_ent).item).giTag)
-                != 0
-            {
+        } else if (*item).giType == IT_HOLDABLE {
+            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << (*item).giTag) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*(*as_ent).item).giType == IT_POWERUP {
-            if (*bs).cur_ps.powerups[(*(*as_ent).item).giTag as usize] != 0 {
+        } else if (*item).giType == IT_POWERUP {
+            if (*bs).cur_ps.powerups[(*item).giTag as usize] != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*(*as_ent).item).giType == IT_AMMO {
-            if (*bs).cur_ps.ammo[(*(*as_ent).item).giTag as usize] > 10 {
+        } else if (*item).giType == IT_AMMO {
+            if (*bs).cur_ps.ammo[(*item).giTag as usize] > 10 {
                 // hack
                 return 1;
             }
@@ -4676,7 +4678,6 @@ pub fn CommanderBotAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
 /// Source: `oracle/codemp/game/ai_main.c:4269-4351`
 pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
         let mut usethisvec: vec3_t = [0.0; 3];
         let mut downvec: vec3_t = [0.0; 3];
         let mut midorg: vec3_t = [0.0; 3];
@@ -4692,12 +4693,16 @@ pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if (*bs).currentEnemy.is_none() {
             return;
         }
-        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+        // `currentEnemy` is the enemy entity handle; its `client` pointer (Copy,
+        // a pool client for NPC enemies) is fetched via a momentary arena borrow
+        // and dereffed raw.
+        let currentEnemy = (*bs).currentEnemy.unwrap();
+        let ce_client = ctx.world.entity(currentEnemy).client;
 
-        if !(*currentEnemy).client.is_null() {
-            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
+        if !ce_client.is_null() {
+            _VectorCopy((*ce_client).ps.origin, &mut usethisvec);
         } else {
-            _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+            _VectorCopy(ctx.world.entity(currentEnemy).s.origin, &mut usethisvec);
         }
 
         if (*bs).meleeStrafeTime < ctx.world.level.time as f32 {
@@ -4778,7 +4783,6 @@ pub fn MeleeCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
 /// Source: `oracle/codemp/game/ai_main.c:4354-4566`
 pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
     unsafe {
-        let base = ctx.world.g_entities.as_mut_ptr();
         let mut usethisvec: vec3_t = [0.0; 3];
         let mut downvec: vec3_t = [0.0; 3];
         let mut midorg: vec3_t = [0.0; 3];
@@ -4794,12 +4798,17 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if (*bs).currentEnemy.is_none() {
             return;
         }
-        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+        // `currentEnemy` is the enemy entity handle; its `client` pointer (Copy,
+        // a pool client for NPC enemies) is fetched via momentary arena borrows at
+        // each use site (the borrow can't span the RNG/trace calls below) and
+        // dereffed raw.
+        let currentEnemy = (*bs).currentEnemy.unwrap();
+        let ce_client = ctx.world.entity(currentEnemy).client;
 
-        if !(*currentEnemy).client.is_null() {
-            _VectorCopy((*((*currentEnemy).client)).ps.origin, &mut usethisvec);
+        if !ce_client.is_null() {
+            _VectorCopy((*ce_client).ps.origin, &mut usethisvec);
         } else {
-            _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+            _VectorCopy(ctx.world.entity(currentEnemy).s.origin, &mut usethisvec);
         }
 
         if (*bs).meleeStrafeTime < ctx.world.level.time as f32 {
@@ -4879,8 +4888,8 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
         if me_down == en_down && en_down == mid_down {
             if usethisvec[2] > ((*bs).origin[2] + 32.0)
-                && !(*currentEnemy).client.is_null()
-                && (*((*currentEnemy).client)).ps.groundEntityNum == ENTITYNUM_NONE
+                && !ctx.world.entity(currentEnemy).client.is_null()
+                && (*ctx.world.entity(currentEnemy).client).ps.groundEntityNum == ENTITYNUM_NONE
             {
                 (*bs).jumpTime = (ctx.world.level.time + 100) as f32;
             }
@@ -4910,8 +4919,8 @@ pub fn SaberCombatHandling(ctx: &mut GameContext, bs: *mut bot_state_t) {
                 _VectorCopy(usethisvec, &mut (*bs).goalPosition);
             }
 
-            if !currentEnemy.is_null() && !(*currentEnemy).client.is_null() {
-                let cecl = (*currentEnemy).client;
+            let cecl = ctx.world.entity(currentEnemy).client;
+            if !cecl.is_null() {
                 if BG_SaberInSpecial((*cecl).ps.saberMove) == 0
                     && (*bs).frame_Enemy_Len > 90.0
                     && (*bs).saberBFTime > ctx.world.level.time
