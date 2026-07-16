@@ -1,4 +1,5 @@
 //! `g_shutdown_game` — Raven `G_ShutdownGame`.
+#![deny(unsafe_code)]
 
 use std::ffi::CString;
 
@@ -30,112 +31,109 @@ use crate::trap;
 ///
 /// Source: `oracle/codemp/game/g_main.c:1128-1199`
 pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
-    unsafe {
-        let restart = args.restart();
+    let restart = args.restart();
 
-        G_SaveBanIP(ctx);
-        // get rid of dynamically allocated fake client structs.
-        G_CleanAllFakeClients(ctx);
+    G_SaveBanIP(ctx);
+    // get rid of dynamically allocated fake client structs.
+    G_CleanAllFakeClients(ctx);
 
-        // free all dynamic allocations made through the engine
-        BG_ClearAnimsets();
+    // free all dynamic allocations made through the engine
+    BG_ClearAnimsets();
 
-        // Com_Printf("... Gameside GHOUL2 Cleanup\n");
-        let mut i: usize = 0;
-        while i < MAX_GENTITIES {
-            // clean up all the ghoul2 instances
-            let ent = &mut ctx.world.g_entities[i] as *mut gentity_t;
-
-            if !(*ent).ghoul2.is_null()
-                && trap::G2_HaveWeGhoul2Models(
-                    ctx.engine,
-                    GG2HaveweghoulmodelsArgs::new((*ent).ghoul2),
-                ) != qfalse
-            {
-                trap::G2API_CleanGhoul2Models(
-                    ctx.engine,
-                    GG2CleanmodelsArgs::new(&mut (*ent).ghoul2 as *mut *mut c_void),
-                );
-                (*ent).ghoul2 = core::ptr::null_mut();
-            }
-            if !(*ent).client.is_null() {
-                let client = (*ent).client;
-                let mut j: usize = 0;
-                while j < MAX_SABERS {
-                    if !(*client).weaponGhoul2[j].is_null()
-                        && trap::G2_HaveWeGhoul2Models(
-                            ctx.engine,
-                            GG2HaveweghoulmodelsArgs::new((*client).weaponGhoul2[j]),
-                        ) != qfalse
-                    {
-                        trap::G2API_CleanGhoul2Models(
-                            ctx.engine,
-                            GG2CleanmodelsArgs::new(
-                                &mut (*client).weaponGhoul2[j] as *mut *mut c_void,
-                            ),
-                        );
-                    }
-                    j += 1;
+    // Com_Printf("... Gameside GHOUL2 Cleanup\n");
+    for i in 0..MAX_GENTITIES {
+        // clean up all the ghoul2 instances. `ghoul2`/`weaponGhoul2[j]` are
+        // `*mut c_void` handle values, not arena pointers — read the value out
+        // and take field addresses through the owned world accessors (§B5).
+        let ghoul2 = ctx.world.g_entities[i].ghoul2;
+        if !ghoul2.is_null()
+            && trap::G2_HaveWeGhoul2Models(ctx.engine, GG2HaveweghoulmodelsArgs::new(ghoul2))
+                != qfalse
+        {
+            trap::G2API_CleanGhoul2Models(
+                ctx.engine,
+                GG2CleanmodelsArgs::new(&mut ctx.world.g_entities[i].ghoul2 as *mut *mut c_void),
+            );
+            ctx.world.g_entities[i].ghoul2 = core::ptr::null_mut();
+        }
+        // A non-null `ent->client` only ever occurs for player slots
+        // (i < MAX_CLIENTS), where `ent->client == &level.clients[i]`
+        // (g_client.rs:1874), so the client index is the loop index `i`
+        // (the g_session.rs `client_mut` precedent).
+        if !ctx.world.g_entities[i].client.is_null() {
+            for j in 0..MAX_SABERS {
+                let weapon_ghoul2 = ctx.world.clients[i].weaponGhoul2[j];
+                if !weapon_ghoul2.is_null()
+                    && trap::G2_HaveWeGhoul2Models(
+                        ctx.engine,
+                        GG2HaveweghoulmodelsArgs::new(weapon_ghoul2),
+                    ) != qfalse
+                {
+                    trap::G2API_CleanGhoul2Models(
+                        ctx.engine,
+                        GG2CleanmodelsArgs::new(
+                            &mut ctx.world.clients[i].weaponGhoul2[j] as *mut *mut c_void,
+                        ),
+                    );
                 }
             }
-            i += 1;
         }
-        if !ctx.world.globals.g2SaberInstance.is_null()
-            && trap::G2_HaveWeGhoul2Models(
-                ctx.engine,
-                GG2HaveweghoulmodelsArgs::new(ctx.world.globals.g2SaberInstance),
-            ) != qfalse
-        {
-            trap::G2API_CleanGhoul2Models(
-                ctx.engine,
-                GG2CleanmodelsArgs::new(&mut ctx.world.globals.g2SaberInstance as *mut *mut c_void),
-            );
-            ctx.world.globals.g2SaberInstance = core::ptr::null_mut();
-        }
-        if !ctx.world.globals.precachedKyle.is_null()
-            && trap::G2_HaveWeGhoul2Models(
-                ctx.engine,
-                GG2HaveweghoulmodelsArgs::new(ctx.world.globals.precachedKyle),
-            ) != qfalse
-        {
-            trap::G2API_CleanGhoul2Models(
-                ctx.engine,
-                GG2CleanmodelsArgs::new(&mut ctx.world.globals.precachedKyle as *mut *mut c_void),
-            );
-            ctx.world.globals.precachedKyle = core::ptr::null_mut();
-        }
-
-        // Com_Printf ("... ICARUS_Shutdown\n");
-        trap::ICARUS_Shutdown(ctx.engine, GIcarusShutdownArgs::new()); // Shut ICARUS down
-
-        // Com_Printf ("... Reference Tags Cleared\n");
-        TAG_Init(ctx); // Clear the reference tags
-
-        G_LogWeaponOutput(ctx);
-
-        if ctx.world.level.logFile != 0 {
-            G_LogPrintf(ctx, cstr("ShutdownGame:\n").as_ptr());
-            G_LogPrintf(
-                ctx,
-                cstr("------------------------------------------------------------\n").as_ptr(),
-            );
-            trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(ctx.world.level.logFile));
-        }
-
-        // write all the client session data so we can get it back
-        G_WriteSessionData(ctx);
-
-        trap::ROFF_Clean(ctx.engine, GRoffCleanArgs::new());
-
-        if trap::Cvar_VariableIntegerValue(
-            ctx.engine,
-            GCvarVariableIntegerValueArgs::new(CString::new("bot_enable").unwrap()),
-        ) != 0
-        {
-            BotAIShutdown(ctx, restart);
-        }
-
-        // clean up all allocations made with B_Alloc
-        B_CleanupAlloc();
     }
+    if !ctx.world.globals.g2SaberInstance.is_null()
+        && trap::G2_HaveWeGhoul2Models(
+            ctx.engine,
+            GG2HaveweghoulmodelsArgs::new(ctx.world.globals.g2SaberInstance),
+        ) != qfalse
+    {
+        trap::G2API_CleanGhoul2Models(
+            ctx.engine,
+            GG2CleanmodelsArgs::new(&mut ctx.world.globals.g2SaberInstance as *mut *mut c_void),
+        );
+        ctx.world.globals.g2SaberInstance = core::ptr::null_mut();
+    }
+    if !ctx.world.globals.precachedKyle.is_null()
+        && trap::G2_HaveWeGhoul2Models(
+            ctx.engine,
+            GG2HaveweghoulmodelsArgs::new(ctx.world.globals.precachedKyle),
+        ) != qfalse
+    {
+        trap::G2API_CleanGhoul2Models(
+            ctx.engine,
+            GG2CleanmodelsArgs::new(&mut ctx.world.globals.precachedKyle as *mut *mut c_void),
+        );
+        ctx.world.globals.precachedKyle = core::ptr::null_mut();
+    }
+
+    // Com_Printf ("... ICARUS_Shutdown\n");
+    trap::ICARUS_Shutdown(ctx.engine, GIcarusShutdownArgs::new()); // Shut ICARUS down
+
+    // Com_Printf ("... Reference Tags Cleared\n");
+    TAG_Init(ctx); // Clear the reference tags
+
+    G_LogWeaponOutput(ctx);
+
+    if ctx.world.level.logFile != 0 {
+        G_LogPrintf(ctx, cstr("ShutdownGame:\n").as_ptr());
+        G_LogPrintf(
+            ctx,
+            cstr("------------------------------------------------------------\n").as_ptr(),
+        );
+        trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(ctx.world.level.logFile));
+    }
+
+    // write all the client session data so we can get it back
+    G_WriteSessionData(ctx);
+
+    trap::ROFF_Clean(ctx.engine, GRoffCleanArgs::new());
+
+    if trap::Cvar_VariableIntegerValue(
+        ctx.engine,
+        GCvarVariableIntegerValueArgs::new(CString::new("bot_enable").unwrap()),
+    ) != 0
+    {
+        BotAIShutdown(ctx, restart);
+    }
+
+    // clean up all allocations made with B_Alloc
+    B_CleanupAlloc();
 }
