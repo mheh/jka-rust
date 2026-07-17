@@ -1,18 +1,17 @@
 // PORT-COMPLETE: g_object.c
 //! `oracle/codemp/game/g_object.c` — object physics (bounce/run/start/stop).
 //!
-//! Safe-state migration **Stage 0 pilot**. Entity params are `EntityId`
-//! handles (§B5) instead of raw `gentity_t*`; bodies reach the world and their
-//! entity through the `GameContext`/`GameWorld` accessors
-//! (`ctx.world`/`ctx.entity()`/`ctx.entity_mut()`), so the per-line
-//! `unsafe { (*ent).… }` derefs are gone. Behavior is byte-identical to the
-//! pre-migration port — this is a mechanical reshape, referee-verified. Callers
-//! in still-raw files bridge their `*mut gentity_t` at the boundary with
-//! `ctx.entity_id_of(ptr)`.
+//! Entity params are `EntityId` handles (§B5); bodies reach the world and
+//! their entity through the `GameContext`/`GameWorld` accessors. Behavior is
+//! byte-identical to the pre-migration port — referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::ent_fn_enums::dispatch_touch;
 use crate::prelude::*;
 use crate::world::GameWorld;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta};
 
 /// Raven `G_BounceObject`. Reflects velocity on trace plane.
 ///
@@ -24,13 +23,13 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
     let hit_time = ctx.world.level.previousTime as c_int
         + ((ctx.world.level.time - ctx.world.level.previousTime) as f32 * trace.fraction) as c_int;
 
-    mp_bg::bg_misc::BG_EvaluateTrajectoryDelta(
+    BG_EvaluateTrajectoryDelta(
         core::ptr::from_ref(&ctx.entity(id).s.pos),
         hit_time,
         &mut velocity,
     );
 
-    let dot = crate::q_math::_DotProduct(velocity, trace.plane.normal);
+    let dot = _DotProduct(velocity, trace.plane.normal);
     // bounceFactor = 60/ent->mass;		// NOTENOTE Mass is not yet implemented
     let bounce_factor = 1.0f32;
     let bounce_factor = if bounce_factor > 1.0f32 {
@@ -39,7 +38,7 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
         bounce_factor
     };
 
-    crate::q_math::_VectorMA(
+    _VectorMA(
         velocity,
         -2.0f32 * dot * bounce_factor,
         trace.plane.normal,
@@ -49,7 +48,7 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
     // FIXME: customized or material-based impact/bounce sounds
     if ctx.entity(id).flags & FL_BOUNCE_HALF != 0 {
         let trDelta = ctx.entity(id).s.pos.trDelta;
-        crate::q_math::_VectorScale(trDelta, 0.5f32, &mut ctx.entity_mut(id).s.pos.trDelta);
+        _VectorScale(trDelta, 0.5f32, &mut ctx.entity_mut(id).s.pos.trDelta);
 
         // check for stop
         let normal_z = trace.plane.normal[2];
@@ -61,12 +60,13 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
         {
             // G_SetOrigin( ent, trace->endpos );
             // ent->nextthink = level.time + 500;
-            ctx.entity_mut(id).s.apos.trType = TR_STATIONARY;
-            let currentAngles = ctx.entity(id).r.currentAngles;
-            crate::q_math::_VectorCopy(currentAngles, &mut ctx.entity_mut(id).s.apos.trBase);
-            crate::q_math::_VectorCopy(trace.endpos, &mut ctx.entity_mut(id).r.currentOrigin);
-            crate::q_math::_VectorCopy(trace.endpos, &mut ctx.entity_mut(id).s.pos.trBase);
-            ctx.entity_mut(id).s.pos.trTime = ctx.world.level.time;
+            let time = ctx.world.level.time;
+            let e = ctx.entity_mut(id);
+            e.s.apos.trType = TR_STATIONARY;
+            e.s.apos.trBase = e.r.currentAngles;
+            e.r.currentOrigin = trace.endpos;
+            e.s.pos.trBase = trace.endpos;
+            e.s.pos.trTime = time;
             return;
         }
     }
@@ -74,12 +74,11 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
     // NEW--It would seem that we want to set our trBase to the trace endpos
     // and set the trTime to the actual time of impact....
     // FIXME: Should we still consider adding the normal though??
-    crate::q_math::_VectorCopy(trace.endpos, &mut ctx.entity_mut(id).r.currentOrigin);
-    ctx.entity_mut(id).s.pos.trTime = hit_time;
-
-    let currentOrigin = ctx.entity(id).r.currentOrigin;
-    crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(id).s.pos.trBase);
-    crate::q_math::_VectorCopy(trace.plane.normal, &mut ctx.entity_mut(id).pos1);
+    let e = ctx.entity_mut(id);
+    e.r.currentOrigin = trace.endpos;
+    e.s.pos.trTime = hit_time;
+    e.s.pos.trBase = e.r.currentOrigin;
+    e.pos1 = trace.plane.normal;
     //???
 }
 
@@ -88,27 +87,27 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
 /// Source: `oracle/codemp/game/g_object.c:72-241`
 pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
     let mut origin: [f32; 3] = [0.0; 3];
-    let mut old_org: [f32; 3] = [0.0; 3];
-    // trace_t has no zeroing constructor; the mem::zeroed is a plain
-    // POD-init, not part of the entity/world unsafe this migration retires.
+    // trace_t has no zeroing constructor; the mem::zeroed is a plain POD-init.
     let mut tr: trace_t = unsafe { std::mem::zeroed() };
 
     // FIXME: floaters need to stop floating up after a while, even if gravity stays negative?
     if ctx.entity(id).s.pos.trType == TR_STATIONARY {
-        ctx.entity_mut(id).s.pos.trType = TR_GRAVITY;
-        let currentOrigin = ctx.entity(id).r.currentOrigin;
-        crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(id).s.pos.trBase);
-        ctx.entity_mut(id).s.pos.trTime = ctx.world.level.previousTime;
-        if ctx.world.cvars.g_gravity.value == 0.0f32 {
-            ctx.entity_mut(id).s.pos.trDelta[2] += 100.0f32;
+        let previousTime = ctx.world.level.previousTime;
+        let zero_grav = ctx.world.cvars.g_gravity.value == 0.0f32;
+        let e = ctx.entity_mut(id);
+        e.s.pos.trType = TR_GRAVITY;
+        e.s.pos.trBase = e.r.currentOrigin;
+        e.s.pos.trTime = previousTime;
+        if zero_grav {
+            e.s.pos.trDelta[2] += 100.0f32;
         }
     }
 
     ctx.entity_mut(id).nextthink = ctx.world.level.time + FRAMETIME as c_int;
 
-    crate::q_math::_VectorCopy(ctx.entity(id).r.currentOrigin, &mut old_org);
+    let old_org = ctx.entity(id).r.currentOrigin;
     // get current position
-    mp_bg::bg_misc::BG_EvaluateTrajectory(
+    BG_EvaluateTrajectory(
         core::ptr::from_ref(&ctx.entity(id).s.pos),
         ctx.world.level.time,
         &mut origin,
@@ -118,13 +117,13 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
     // write target (Raven aliases them through one `gentity_t*`; the snapshot is
     // behavior-identical because `s.apos` is not mutated by the eval).
     let apos = ctx.entity(id).s.apos;
-    mp_bg::bg_misc::BG_EvaluateTrajectory(
+    BG_EvaluateTrajectory(
         core::ptr::from_ref(&apos),
         ctx.world.level.time,
         &mut ctx.entity_mut(id).r.currentAngles,
     );
 
-    if crate::q_math::VectorCompare(ctx.entity(id).r.currentOrigin, origin) != 0 {
+    if VectorCompare(ctx.entity(id).r.currentOrigin, origin) != 0 {
         // error - didn't move at all!
         return;
     }
@@ -137,9 +136,9 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
         ctx.entity(id).s.number as c_int
     };
 
-    crate::trap::Trace(
+    trap::Trace(
         ctx.engine,
-        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+        GTraceArgs::new(
             &mut tr as *mut trace_t,
             core::ptr::from_ref(&ctx.entity(id).r.currentOrigin),
             core::ptr::from_ref(&ctx.entity(id).r.mins),
@@ -151,33 +150,32 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
     );
 
     if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction > 0.0f32 {
-        crate::q_math::_VectorCopy(tr.endpos, &mut ctx.entity_mut(id).r.currentOrigin);
-        crate::trap::LinkEntity(
+        ctx.entity_mut(id).r.currentOrigin = tr.endpos;
+        trap::LinkEntity(
             ctx.engine,
-            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
-                core::ptr::from_mut(ctx.entity_mut(id)).cast(),
-            ),
+            GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(id)).cast()),
         );
     } else {
         // if ( tr.startsolid )
         tr.fraction = 0.0f32;
     }
 
-    crate::g_active::G_MoverTouchPushTriggers(ctx, id, old_org);
+    G_MoverTouchPushTriggers(ctx, id, old_org);
 
     if tr.fraction == 1.0f32 {
         if ctx.world.cvars.g_gravity.value <= 0.0f32 {
             if ctx.entity(id).s.apos.trType == TR_STATIONARY {
-                let currentAngles = ctx.entity(id).r.currentAngles;
-                crate::q_math::_VectorCopy(currentAngles, &mut ctx.entity_mut(id).s.apos.trBase);
-                ctx.entity_mut(id).s.apos.trType = TR_LINEAR;
-                ctx.entity_mut(id).s.apos.trDelta[1] =
-                    ctx.world.bg_state.rng.flrand(-300.0f32, 300.0f32);
-                ctx.entity_mut(id).s.apos.trDelta[0] =
-                    ctx.world.bg_state.rng.flrand(-10.0f32, 10.0f32);
-                ctx.entity_mut(id).s.apos.trDelta[2] =
-                    ctx.world.bg_state.rng.flrand(-10.0f32, 10.0f32);
-                ctx.entity_mut(id).s.apos.trTime = ctx.world.level.time;
+                let time = ctx.world.level.time;
+                let yaw_delta = ctx.world.bg_state.rng.flrand(-300.0f32, 300.0f32);
+                let pitch_delta = ctx.world.bg_state.rng.flrand(-10.0f32, 10.0f32);
+                let roll_delta = ctx.world.bg_state.rng.flrand(-10.0f32, 10.0f32);
+                let e = ctx.entity_mut(id);
+                e.s.apos.trBase = e.r.currentAngles;
+                e.s.apos.trType = TR_LINEAR;
+                e.s.apos.trDelta[1] = yaw_delta;
+                e.s.apos.trDelta[0] = pitch_delta;
+                e.s.apos.trDelta[2] = roll_delta;
+                e.s.apos.trTime = time;
             }
         }
         // friction in zero-G
@@ -188,11 +186,12 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
                 friction = 0.1f32;
             }
 
-            let trDelta = ctx.entity(id).s.pos.trDelta;
-            crate::q_math::_VectorScale(trDelta, friction, &mut ctx.entity_mut(id).s.pos.trDelta);
-            let currentOrigin = ctx.entity(id).r.currentOrigin;
-            crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(id).s.pos.trBase);
-            ctx.entity_mut(id).s.pos.trTime = ctx.world.level.time;
+            let time = ctx.world.level.time;
+            let e = ctx.entity_mut(id);
+            let trDelta = e.s.pos.trDelta;
+            _VectorScale(trDelta, friction, &mut e.s.pos.trDelta);
+            e.s.pos.trBase = e.r.currentOrigin;
+            e.s.pos.trTime = time;
         }
         return;
     }
@@ -207,7 +206,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
     let trace_ent = EntityId(tr.entityNum as u32);
 
     if tr.fraction > 0.0f32 || ctx.entity(trace_ent).takedamage != 0 {
-        if crate::q_math::VectorCompare(ctx.entity(id).r.currentOrigin, old_org) == 0 {
+        if VectorCompare(ctx.entity(id).r.currentOrigin, old_org) == 0 {
             // moved and impacted
             if ctx.entity(trace_ent).takedamage != 0 {
                 // hurt someone
@@ -217,7 +216,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
         }
 
         if ctx.entity(id).s.weapon != WP_SABER {
-            crate::g_active::DoImpact(ctx, id, trace_ent, qtrue);
+            DoImpact(ctx, id, trace_ent, qtrue);
         }
     }
 
@@ -238,10 +237,12 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
         if ctx.world.cvars.g_gravity.value <= 0.0f32 || (tr.plane.normal[2] as f64) < 0.7 {
             if ctx.entity(id).flags & (FL_BOUNCE | FL_BOUNCE_HALF) != 0 {
                 if tr.fraction <= 0.0f32 {
-                    crate::q_math::_VectorCopy(tr.endpos, &mut ctx.entity_mut(id).r.currentOrigin);
-                    crate::q_math::_VectorCopy(tr.endpos, &mut ctx.entity_mut(id).s.pos.trBase);
-                    ctx.entity_mut(id).s.pos.trDelta = [0.0f32; 3];
-                    ctx.entity_mut(id).s.pos.trTime = ctx.world.level.time;
+                    let time = ctx.world.level.time;
+                    let e = ctx.entity_mut(id);
+                    e.r.currentOrigin = tr.endpos;
+                    e.s.pos.trBase = tr.endpos;
+                    e.s.pos.trDelta = [0.0f32; 3];
+                    e.s.pos.trTime = time;
                 } else {
                     G_BounceObject(ctx, id, &tr);
                 }
@@ -251,23 +252,23 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
             }
         } else {
             ctx.entity_mut(id).s.apos.trType = TR_STATIONARY;
-            crate::npc_c::pitch_roll_for_slope(ctx, id, Some(&mut tr.plane.normal));
+            pitch_roll_for_slope(ctx, id, Some(&mut tr.plane.normal));
             // ent->r.currentAngles[0] = 0;//FIXME: match to slope
             // ent->r.currentAngles[2] = 0;//FIXME: match to slope
-            let currentAngles = ctx.entity(id).r.currentAngles;
-            crate::q_math::_VectorCopy(currentAngles, &mut ctx.entity_mut(id).s.apos.trBase);
+            let e = ctx.entity_mut(id);
+            e.s.apos.trBase = e.r.currentAngles;
             // okay, we hit the floor, might as well stop or prediction will
             // make us go through the floor!
             // FIXME: this means we can't fall if something is pulled out from under us...
-            G_StopObjectMoving(ctx.entity_mut(id));
+            G_StopObjectMoving(e);
         }
     } else if ctx.entity(id).s.weapon != WP_SABER {
         ctx.entity_mut(id).s.apos.trType = TR_STATIONARY;
-        crate::npc_c::pitch_roll_for_slope(ctx, id, Some(&mut tr.plane.normal));
+        pitch_roll_for_slope(ctx, id, Some(&mut tr.plane.normal));
         // ent->r.currentAngles[0] = 0;//FIXME: match to slope
         // ent->r.currentAngles[2] = 0;//FIXME: match to slope
-        let currentAngles = ctx.entity(id).r.currentAngles;
-        crate::q_math::_VectorCopy(currentAngles, &mut ctx.entity_mut(id).s.apos.trBase);
+        let e = ctx.entity_mut(id);
+        e.s.apos.trBase = e.r.currentAngles;
     }
 
     // call touch func
@@ -277,7 +278,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
         // needs `ctx` plus both entity pointers) doesn't conflict.
         let self_ptr: *mut gentity_t = ctx.entity_mut(id);
         let trace_ent_ptr: *mut gentity_t = ctx.entity_mut(trace_ent);
-        crate::ent_fn_enums::dispatch_touch(
+        dispatch_touch(
             ctx,
             touch_fn,
             self_ptr,
@@ -295,8 +296,8 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
 /// Source: `oracle/codemp/game/g_object.c:244-258`
 pub fn G_StopObjectMoving(object: &mut gentity_t) {
     object.s.pos.trType = TR_STATIONARY;
-    crate::q_math::_VectorCopy(object.r.currentOrigin, &mut object.s.origin);
-    crate::q_math::_VectorCopy(object.r.currentOrigin, &mut object.s.pos.trBase);
+    object.s.origin = object.r.currentOrigin;
+    object.s.pos.trBase = object.r.currentOrigin;
     object.s.pos.trDelta = [0.0f32; 3];
 
     // Stop spinning (commented out in Raven)
@@ -319,14 +320,15 @@ pub fn G_StartObjectMoving(
     // Skeleton signature took `dir: vec3_t`, not the settled `&mut vec3_t`
     // shape for VectorNormalize out-params; harmless — zero live callers.
     let mut dir_mut = dir;
-    crate::q_math::VectorNormalize(&mut dir_mut);
+    VectorNormalize(&mut dir_mut);
 
     // object->s.eType = ET_GENERAL;
-    ctx.entity_mut(object).s.pos.trType = trType;
-    let currentOrigin = ctx.entity(object).r.currentOrigin;
-    crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(object).s.pos.trBase);
-    crate::q_math::_VectorScale(dir_mut, speed, &mut ctx.entity_mut(object).s.pos.trDelta);
-    ctx.entity_mut(object).s.pos.trTime = ctx.world.level.time;
+    let time = ctx.world.level.time;
+    let e = ctx.entity_mut(object);
+    e.s.pos.trType = trType;
+    e.s.pos.trBase = e.r.currentOrigin;
+    _VectorScale(dir_mut, speed, &mut e.s.pos.trDelta);
+    e.s.pos.trTime = time;
 
     // FIXME: incorporate spin?
     // vectoangles(dir, object->s.angles);
@@ -336,8 +338,10 @@ pub fn G_StartObjectMoving(
 
     // FIXME: make these objects go through G_RunObject automatically, like missiles do
     if ctx.entity(object).think.is_none() {
-        ctx.entity_mut(object).nextthink = ctx.world.level.time + FRAMETIME as c_int;
-        ctx.entity_mut(object).think = Some(EntThink::G_RunObject).into();
+        let time = ctx.world.level.time;
+        let e = ctx.entity_mut(object);
+        e.nextthink = time + FRAMETIME as c_int;
+        e.think = Some(EntThink::G_RunObject).into();
     } else {
         // You're responsible for calling RunObject
     }
