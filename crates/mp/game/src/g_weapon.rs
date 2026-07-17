@@ -715,9 +715,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 && ctx.world.entity(traceEnt_id).takedamage != 0
             {
                 let dmg_dir = Some(&mut (*ctx.world_raw()).globals.forward); // STAGE-2b: irreducible — &mut world.globals.forward aliases the ctx passed to the same call.
-                if !traceEnt_client.is_null()
-                    && LogAccuracyHit(ctx, traceEnt_id, Some(ent)) != qfalse
-                {
+                if !traceEnt_client.is_null() && LogAccuracyHit(ctx, traceEnt_id, Some(ent)) {
                     (*ent_client).accuracy_hits += 1;
                 }
 
@@ -985,9 +983,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                     (*tent).s.eFlags |= EF_ALT_FIRING;
 
-                    if LogAccuracyHit(ctx, traceEnt_id, Some(ent)) != qfalse
-                        && !ent_client.is_null()
-                    {
+                    if LogAccuracyHit(ctx, traceEnt_id, Some(ent)) && !ent_client.is_null() {
                         (*ent_client).accuracy_hits += 1;
                     }
                 } else {
@@ -2368,8 +2364,7 @@ pub fn thermalDetonatorExplode(ctx: &mut GameContext, ent: EntityId) {
             Some(ent),
             Some(ent),
             splashMOD,
-        ) != qfalse
-        {
+        ) {
             // FLAG: owner is arbitrary (r.ownerNum); pool client deref stays raw.
             let owner_id = EntityId(ctx.world.entity(ent).r.ownerNum as u32);
             let owner_client = ctx.world.entity(owner_id).client;
@@ -3873,8 +3868,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                         || ctx.world.entity(traceEnt_id).s.eType == (ET_MOVER) as i32
                     {
                         // Create a simple impact type mark that doesn't last long in the world
-                        if !traceEnt_client.is_null()
-                            && LogAccuracyHit(ctx, traceEnt_id, Some(ent)) != qfalse
+                        if !traceEnt_client.is_null() && LogAccuracyHit(ctx, traceEnt_id, Some(ent))
                         {
                             // NOTE: hitting multiple ents can still get you over 100% accuracy
                             (*ent_client).accuracy_hits += 1;
@@ -4312,42 +4306,38 @@ pub fn SnapVectorTowards(v: vec3_t, to: vec3_t) -> vec3_t {
 /// Raven `LogAccuracyHit`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3485-3516`
-pub fn LogAccuracyHit(
-    ctx: &mut GameContext,
-    target: EntityId,
-    attacker: Option<EntityId>,
-) -> qboolean {
+pub fn LogAccuracyHit(ctx: &mut GameContext, target: EntityId, attacker: Option<EntityId>) -> bool {
     if ctx.world.entity(target).takedamage == 0 {
-        return qfalse;
+        return false;
     }
 
     if Some(target) == attacker {
-        return qfalse;
+        return false;
     }
 
     if ctx.world.entity(target).client.is_null() {
-        return qfalse;
+        return false;
     }
 
     let Some(attacker_id) = attacker else {
-        return qfalse;
+        return false;
     };
 
     if ctx.world.entity(attacker_id).client.is_null() {
-        return qfalse;
+        return false;
     }
 
     // FLAG: target pool client deref stays raw (read the client pointer value).
     let targetClient = ctx.world.entity(target).client;
     if unsafe { (*targetClient).ps.stats[statIndex_t::STAT_HEALTH as usize] } <= 0 {
-        return qfalse;
+        return false;
     }
 
     if crate::g_team::OnSameTeam(ctx, Some(target), Some(attacker_id)) != qfalse {
-        return qfalse;
+        return false;
     }
 
-    qtrue
+    true
 }
 
 /// Raven `CalcMuzzlePoint`.

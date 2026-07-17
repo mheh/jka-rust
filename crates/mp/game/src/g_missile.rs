@@ -300,8 +300,7 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
             Some(ent),
             Some(ent),
             splashMod,
-        ) != 0
-        {
+        ) {
             if let Some(parent_id) = parent {
                 let client = ctx.entity(parent_id).client;
                 // §19: oracle derefs `parent->...client->accuracy_hits++`
@@ -747,7 +746,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             let mut didDmg = false;
 
             let owner_num = ctx.entity(ent).r.ownerNum as u32;
-            if LogAccuracyHit(ctx, other, Some(EntityId(owner_num))) != 0 {
+            if LogAccuracyHit(ctx, other, Some(EntityId(owner_num))) {
                 let owner_client = ctx.entity(EntityId(owner_num)).client;
                 unsafe {
                     (*owner_client).accuracy_hits += 1;
@@ -961,8 +960,7 @@ fn missile_kill_proj(
             Some(other),
             Some(ent),
             splashMod,
-        ) != 0
-        {
+        ) {
             let owner_num = ctx.entity(ent).r.ownerNum as u32;
             let owner_client = ctx.entity(EntityId(owner_num)).client;
             if !hitClient && !owner_client.is_null() {
