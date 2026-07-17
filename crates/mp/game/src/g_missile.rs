@@ -14,11 +14,12 @@ use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_TempEntity};
 use crate::prelude::*;
 use crate::trap;
 
+use crate::g_weapon::SnapVectorTowards;
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, AngleVectors,
     VectorLength, VectorNormalize,
 };
-use crate::w_saber::RandFloat;
+use crate::w_saber::{RandFloat, WP_SaberBlockNonRandom};
 use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
@@ -681,7 +682,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 && unsafe { (*ctx.entity(otherOwner).client).ps.weaponTime } <= 0
             {
                 let co = ctx.entity(ent).r.currentOrigin;
-                crate::w_saber::WP_SaberBlockNonRandom(ctx.entity(otherOwner), co, qtrue);
+                WP_SaberBlockNonRandom(ctx.entity(otherOwner), co, qtrue);
             }
             let co = ctx.entity(ent).r.currentOrigin;
             let te_ptr = G_TempEntity(ctx, co, EV_SABER_BLOCK as c_int);
@@ -945,7 +946,7 @@ fn missile_kill_proj(
 
     // save net bandwidth
     let trbase = ctx.entity(ent).s.pos.trBase;
-    tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, trbase);
+    tr.endpos = SnapVectorTowards(tr.endpos, trbase);
     G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
 
     ctx.entity_mut(ent).takedamage = qfalse;
@@ -1001,13 +1002,13 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
     let mut groundSpot: vec3_t = [0.0; 3];
     let mut tr: trace_t = unsafe { std::mem::zeroed() };
     let mut passent: c_int;
-    let mut isKnockedSaber = qfalse;
+    let mut isKnockedSaber = false;
 
     if ctx.entity(ent).neverFree != 0
         && ctx.entity(ent).s.weapon == WP_SABER
         && (ctx.entity(ent).flags & FL_BOUNCE_HALF) != 0
     {
-        isKnockedSaber = qtrue;
+        isKnockedSaber = true;
         ctx.entity_mut(ent).s.pos.trType = TR_GRAVITY;
     }
 
@@ -1097,13 +1098,13 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
         );
         tr.fraction = 0.0;
     } else {
-        crate::q_math::_VectorCopy(tr.endpos, &mut ctx.entity_mut(ent).r.currentOrigin);
+        ctx.entity_mut(ent).r.currentOrigin = tr.endpos;
     }
 
     if ctx.entity(ent).passThroughNum != 0
         && tr.entityNum as u32 == (ctx.entity(ent).passThroughNum - 1) as u32
     {
-        crate::q_math::_VectorCopy(origin, &mut ctx.entity_mut(ent).r.currentOrigin);
+        ctx.entity_mut(ent).r.currentOrigin = origin;
         trap::LinkEntity(
             ctx.engine,
             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
@@ -1123,8 +1124,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
             let mut lowerOrg: vec3_t = [0.0; 3];
             let mut trG: trace_t = unsafe { std::mem::zeroed() };
 
-            let co = ctx.entity(ent).r.currentOrigin;
-            crate::q_math::_VectorCopy(co, &mut lowerOrg);
+            lowerOrg = ctx.entity(ent).r.currentOrigin;
             lowerOrg[2] -= 1.0;
             let clipmask = ctx.entity(ent).clipmask;
             trap::Trace(
@@ -1140,7 +1140,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
                 ),
             );
 
-            crate::q_math::_VectorCopy(trG.endpos, &mut groundSpot);
+            groundSpot = trG.endpos;
 
             if trG.startsolid == 0
                 && trG.allsolid == 0
@@ -1169,7 +1169,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
                 }
 
                 if (ctx.entity(ent).s.weapon == WP_SABER && ctx.entity(ent).isSaberEntity != 0)
-                    || isKnockedSaber != 0
+                    || isKnockedSaber
                 {
                     G_RunThink(ctx, ent);
                     return;
@@ -1185,8 +1185,8 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
                 && ((tr.entityNum as usize) < MAX_CLIENTS
                     || ctx.entity(EntityId(tr.entityNum as u32)).s.eType == ET_NPC as c_int)
             {
-                let co = ctx.entity(ent).r.currentOrigin;
-                crate::q_math::_VectorCopy(co, &mut ctx.entity_mut(ent).s.origin);
+                let m = ctx.entity_mut(ent);
+                m.s.origin = m.r.currentOrigin;
                 let pos = ctx.entity(ent).s.pos;
                 let time = ctx.world.level.time;
                 mp_bg::bg_misc::BG_EvaluateTrajectory(
@@ -1225,19 +1225,21 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
 
     if ctx.entity(ent).s.weapon == G2_MODEL_PART {
         if ctx.entity(ent).s.groundEntityNum == ENTITYNUM_WORLD as c_int {
-            ctx.entity_mut(ent).s.pos.trType = TR_LINEAR;
-            crate::q_math::VectorClear(&mut ctx.entity_mut(ent).s.pos.trDelta);
-            ctx.entity_mut(ent).s.pos.trTime = ctx.world.level.time;
+            let level_time = ctx.world.level.time;
+            let m = ctx.entity_mut(ent);
+            m.s.pos.trType = TR_LINEAR;
+            m.s.pos.trDelta = [0.0; 3];
+            m.s.pos.trTime = level_time;
 
-            crate::q_math::_VectorCopy(groundSpot, &mut ctx.entity_mut(ent).s.pos.trBase);
-            crate::q_math::_VectorCopy(groundSpot, &mut ctx.entity_mut(ent).r.currentOrigin);
+            m.s.pos.trBase = groundSpot;
+            m.r.currentOrigin = groundSpot;
 
-            if ctx.entity(ent).s.apos.trType != TR_STATIONARY {
-                ctx.entity_mut(ent).s.apos.trType = TR_STATIONARY;
-                ctx.entity_mut(ent).s.apos.trTime = ctx.world.level.time;
+            if m.s.apos.trType != TR_STATIONARY {
+                m.s.apos.trType = TR_STATIONARY;
+                m.s.apos.trTime = level_time;
 
-                ctx.entity_mut(ent).s.apos.trBase[ROLL as usize] = 0.0;
-                ctx.entity_mut(ent).s.apos.trBase[PITCH as usize] = 0.0;
+                m.s.apos.trBase[ROLL as usize] = 0.0;
+                m.s.apos.trBase[PITCH as usize] = 0.0;
             }
         }
     }
