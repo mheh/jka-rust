@@ -1871,6 +1871,81 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `G_Damage` — the momentum add, applied even when the damage
+/// won't be taken: saber-knockback scaling (per-saber knockbackScale flags),
+/// the velocity kick, and the PMF_TIME_KNOCKBACK timer with its
+/// saber-scale-zero exception.
+/// Source: `oracle/codemp/game/g_combat.c:4812-4874`
+unsafe fn g_damage_apply_knockback(
+    ctx: &mut GameContext,
+    targ: *mut gentity_t,
+    attacker: *mut gentity_t,
+    dir_val: vec3_t,
+    knockback: c_int,
+    dflags: c_int,
+    r#mod: c_int,
+) {
+    // figure momentum add, even if the damage won't be taken
+    if knockback != 0 && !(*targ).client.is_null() {
+        let mut kvel: vec3_t = [0.0; 3];
+        let mass: f32 = 200.0;
+        let tc = (*targ).client;
+        let g_knockback = ctx.world.cvars.g_knockback.value;
+
+        if r#mod == meansOfDeath_t::MOD_SABER as c_int {
+            let mut saberKnockbackScale = ctx.world.cvars.g_saberDmgVelocityScale.value;
+            if (dflags & DAMAGE_SABER_KNOCKBACK1) != 0 || (dflags & DAMAGE_SABER_KNOCKBACK2) != 0 {
+                if saberKnockbackScale == 0.0 {
+                    saberKnockbackScale = 1.0;
+                }
+                if !attacker.is_null() && !(*attacker).client.is_null() {
+                    let ac = (*attacker).client;
+                    if (dflags & DAMAGE_SABER_KNOCKBACK1) != 0 {
+                        saberKnockbackScale *= (*ac).saber[0].knockbackScale;
+                    }
+                    if (dflags & DAMAGE_SABER_KNOCKBACK1_B2) != 0 {
+                        saberKnockbackScale *= (*ac).saber[0].knockbackScale2;
+                    }
+                    if (dflags & DAMAGE_SABER_KNOCKBACK2) != 0 {
+                        saberKnockbackScale *= (*ac).saber[1].knockbackScale;
+                    }
+                    if (dflags & DAMAGE_SABER_KNOCKBACK2_B2) != 0 {
+                        saberKnockbackScale *= (*ac).saber[1].knockbackScale2;
+                    }
+                }
+            }
+            _VectorScale(
+                dir_val,
+                (g_knockback * knockback as f32 / mass) * saberKnockbackScale,
+                &mut kvel,
+            );
+        } else {
+            _VectorScale(dir_val, g_knockback * knockback as f32 / mass, &mut kvel);
+        }
+        _VectorAdd((*tc).ps.velocity, kvel, &mut (*tc).ps.velocity);
+
+        // set the timer so that the other client can't cancel out the movement immediately
+        if (*tc).ps.pm_time == 0
+            && (ctx.world.cvars.g_saberDmgVelocityScale.integer != 0
+                || r#mod != meansOfDeath_t::MOD_SABER as c_int
+                || (dflags & DAMAGE_SABER_KNOCKBACK1) != 0
+                || (dflags & DAMAGE_SABER_KNOCKBACK2) != 0
+                || (dflags & DAMAGE_SABER_KNOCKBACK1_B2) != 0
+                || (dflags & DAMAGE_SABER_KNOCKBACK2_B2) != 0)
+        {
+            let mut t = knockback * 2;
+            if t < 50 {
+                t = 50;
+            }
+            if t > 200 {
+                t = 200;
+            }
+            (*tc).ps.pm_time = t;
+            (*tc).ps.pm_flags |= PMF_TIME_KNOCKBACK;
+        }
+    }
+}
+
 /// Split from `player_die` — kill credit and per-gametype scoring: the
 /// PERS_KILLED bump, suicide count, victory script, the droid/collision
 /// no-credit picks, self/team-kill penalties (duel opponent credit, TK
@@ -5018,67 +5093,7 @@ pub fn G_Damage(
             knockback = 0;
         }
 
-        // figure momentum add, even if the damage won't be taken
-        if knockback != 0 && !(*targ).client.is_null() {
-            let mut kvel: vec3_t = [0.0; 3];
-            let mass: f32 = 200.0;
-            let tc = (*targ).client;
-            let g_knockback = ctx.world.cvars.g_knockback.value;
-
-            if r#mod == meansOfDeath_t::MOD_SABER as c_int {
-                let mut saberKnockbackScale = ctx.world.cvars.g_saberDmgVelocityScale.value;
-                if (dflags & DAMAGE_SABER_KNOCKBACK1) != 0
-                    || (dflags & DAMAGE_SABER_KNOCKBACK2) != 0
-                {
-                    if saberKnockbackScale == 0.0 {
-                        saberKnockbackScale = 1.0;
-                    }
-                    if !attacker.is_null() && !(*attacker).client.is_null() {
-                        let ac = (*attacker).client;
-                        if (dflags & DAMAGE_SABER_KNOCKBACK1) != 0 {
-                            saberKnockbackScale *= (*ac).saber[0].knockbackScale;
-                        }
-                        if (dflags & DAMAGE_SABER_KNOCKBACK1_B2) != 0 {
-                            saberKnockbackScale *= (*ac).saber[0].knockbackScale2;
-                        }
-                        if (dflags & DAMAGE_SABER_KNOCKBACK2) != 0 {
-                            saberKnockbackScale *= (*ac).saber[1].knockbackScale;
-                        }
-                        if (dflags & DAMAGE_SABER_KNOCKBACK2_B2) != 0 {
-                            saberKnockbackScale *= (*ac).saber[1].knockbackScale2;
-                        }
-                    }
-                }
-                _VectorScale(
-                    dir_val,
-                    (g_knockback * knockback as f32 / mass) * saberKnockbackScale,
-                    &mut kvel,
-                );
-            } else {
-                _VectorScale(dir_val, g_knockback * knockback as f32 / mass, &mut kvel);
-            }
-            _VectorAdd((*tc).ps.velocity, kvel, &mut (*tc).ps.velocity);
-
-            // set the timer so that the other client can't cancel out the movement immediately
-            if (*tc).ps.pm_time == 0
-                && (ctx.world.cvars.g_saberDmgVelocityScale.integer != 0
-                    || r#mod != meansOfDeath_t::MOD_SABER as c_int
-                    || (dflags & DAMAGE_SABER_KNOCKBACK1) != 0
-                    || (dflags & DAMAGE_SABER_KNOCKBACK2) != 0
-                    || (dflags & DAMAGE_SABER_KNOCKBACK1_B2) != 0
-                    || (dflags & DAMAGE_SABER_KNOCKBACK2_B2) != 0)
-            {
-                let mut t = knockback * 2;
-                if t < 50 {
-                    t = 50;
-                }
-                if t > 200 {
-                    t = 200;
-                }
-                (*tc).ps.pm_time = t;
-                (*tc).ps.pm_flags |= PMF_TIME_KNOCKBACK;
-            }
-        }
+        g_damage_apply_knockback(ctx, targ, attacker, dir_val, knockback, dflags, r#mod);
 
         if (ctx.world.cvars.g_trueJedi.integer != 0
             || ctx.world.cvars.g_gametype.integer == GT_SIEGE)
