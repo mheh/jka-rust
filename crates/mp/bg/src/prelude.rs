@@ -39,6 +39,7 @@ pub use crate::public::entity_event::{entity_event_t, entity_event_t::*};
 pub use crate::public::entity_type::{entityType_t, entityType_t::*};
 pub use crate::public::force_hand_anims::{forceHandAnims_t, forceHandAnims_t::*};
 pub use crate::public::g2_model_parts::{g2ModelParts_t, g2ModelParts_t::*, G2_MODEL_PART};
+pub use crate::public::g_item::GItem;
 pub use crate::public::gametype::{
     gametype_t, GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_MAX_GAME_TYPE,
     GT_POWERDUEL, GT_SIEGE, GT_SINGLE_PLAYER, GT_TEAM,
@@ -48,6 +49,8 @@ pub use crate::public::holdable::{
     HI_MEDPAC, HI_MEDPAC_BIG, HI_NONE, HI_NUM_HOLDABLE, HI_SEEKER, HI_SENTRY_GUN, HI_SHIELD,
 };
 pub use crate::public::hyperspace::{HYPERSPACE_TELEPORT_FRAC, HYPERSPACE_TIME};
+pub use crate::public::item_id::ItemId;
+pub use crate::public::item_kind::ItemKind;
 pub use crate::public::item_type::*;
 pub use crate::public::means_of_death::{meansOfDeath_t, meansOfDeath_t::*};
 pub use crate::public::pd_sounds::{pdSounds_t, pdSounds_t::*};

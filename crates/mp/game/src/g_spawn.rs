@@ -245,30 +245,30 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
             }
         }
 
-        let mut item: *mut gitem_t = std::ptr::null_mut();
+        let mut item: Option<ItemId> = None;
         let targetname_ptr = ctx.entity(id).targetname;
         if !targetname_ptr.is_null() && *targetname_ptr != 0 {
             let targetname = CStr::from_ptr(targetname_ptr).to_string_lossy();
             if team != -1 {
                 if targetname.contains("flag") {
                     item = if team == TEAM_RED {
-                        BG_FindItem(c"team_CTF_redflag".as_ptr())
+                        BG_FindItem("team_CTF_redflag")
                     } else {
                         // blue
-                        BG_FindItem(c"team_CTF_blueflag".as_ptr())
+                        BG_FindItem("team_CTF_blueflag")
                     };
                 }
             } else if targetname.contains("red_flag") {
-                item = BG_FindItem(c"team_CTF_redflag".as_ptr());
+                item = BG_FindItem("team_CTF_redflag");
             } else if targetname.contains("blue_flag") {
-                item = BG_FindItem(c"team_CTF_blueflag".as_ptr());
+                item = BG_FindItem("team_CTF_blueflag");
             } else {
-                item = std::ptr::null_mut();
+                item = None;
             }
 
-            if !item.is_null() {
+            if let Some(item) = item {
                 ctx.entity_mut(id).targetname = std::ptr::null_mut();
-                ctx.entity_mut(id).classname = (*item).classname;
+                ctx.entity_mut(id).classname = item.classname_cstr() as *mut c_char;
                 G_SpawnItem(ctx, id, item);
             }
         }
@@ -290,14 +290,16 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
         }
 
         // check item spawn functions
-        let mut item = (bg_itemlist.as_ptr() as *mut gitem_t).add(1);
-        while !(*item).classname.is_null() {
+        let ent_classname = CStr::from_ptr(ctx.entity(id).classname);
+        let mut i: c_int = 1;
+        while i < bg_numItems {
+            let item = ItemId::from_modelindex(i).unwrap();
             // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
-            if CStr::from_ptr((*item).classname) == CStr::from_ptr(ctx.entity(id).classname) {
+            if item.item().classname.as_bytes() == ent_classname.to_bytes() {
                 G_SpawnItem(ctx, id, item);
                 return qtrue;
             }
-            item = item.add(1);
+            i += 1;
         }
 
         // check normal spawn functions

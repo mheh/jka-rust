@@ -561,18 +561,15 @@ pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
 
         // spawn a specific item right on the player
         if !give_all {
-            let it = mp_bg::bg_misc::BG_FindItem(name.as_ptr());
-            if it.is_null() {
+            let Some(it) = mp_bg::bg_misc::BG_FindItem(&name_str) else {
                 return;
-            }
+            };
 
             let it_ent = crate::g_utils::G_Spawn(ctx);
             let it_id = ctx.entity_id_of(it_ent).unwrap();
             let origin = ctx.world.entity(ent).r.currentOrigin;
             crate::q_math::_VectorCopy(origin, &mut ctx.world.entity_mut(it_id).s.origin);
-            // FLAG: `it` is a raw `*gitem_t` (BG item table, not an entity/client
-            // arena); its deref stays raw per recipe 2c.
-            let classname = (*it).classname;
+            let classname = it.classname_cstr() as *mut c_char;
             ctx.world.entity_mut(it_id).classname = classname;
             crate::g_items::G_SpawnItem(ctx, it_id, it);
             crate::g_items::FinishSpawningItem(ctx, it_id);
@@ -3702,7 +3699,7 @@ pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_
         }
 
         if forcedUse == 0 {
-            forcedUse = bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+            forcedUse = bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag();
         }
 
         if mp_bg::bg_misc::BG_IsItemSelectable(ps, forcedUse) == qfalse {

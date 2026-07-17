@@ -37,11 +37,14 @@ pub use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
 pub use mp_bg::public::configstring::*;
 pub use mp_bg::public::dm_flags::*;
 pub use mp_bg::public::entity_effects::*;
+pub use mp_bg::public::g_item::GItem;
 pub use mp_bg::public::gametype::{
     gametype_t, GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_MAX_GAME_TYPE,
     GT_POWERDUEL, GT_SIEGE, GT_SINGLE_PLAYER, GT_TEAM,
 };
 pub use mp_bg::public::hyperspace::{HYPERSPACE_TELEPORT_FRAC, HYPERSPACE_TIME};
+pub use mp_bg::public::item_id::ItemId;
+pub use mp_bg::public::item_kind::ItemKind;
 pub use mp_bg::public::item_type::*;
 pub use mp_bg::public::powerup::*;
 pub use mp_bg::public::saber_move_name::*;

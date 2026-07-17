@@ -678,7 +678,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
 
             ctx.entity_mut(shield).s.eType = ET_SPECIAL as c_int;
             ctx.entity_mut(shield).s.modelindex = HI_SHIELD as c_int; // this'll be used in CG_Useable() for rendering.
-            let classname = unsafe { (*shieldItem).classname };
+            let classname = shieldItem.classname_cstr() as *mut c_char;
             ctx.entity_mut(shield).classname = classname;
 
             ctx.entity_mut(shield).r.contents = CONTENTS_TRIGGER;
@@ -1745,10 +1745,9 @@ pub fn SpecialItemThink(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `G_SpecialSpawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1295-1331`
-pub fn G_SpecialSpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
-    // `item` is a `gitem_t*` (bg_itemlist entry), not an entity — stays raw.
+pub fn G_SpecialSpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
     RegisterItem(ctx, item);
-    ctx.entity_mut(ent).item = item;
+    ctx.entity_mut(ent).item = Some(item);
 
     // go away if no one wants me
     ctx.entity_mut(ent).genericValue5 = ctx.world.level.time + TOSSED_ITEM_STAY_PERIOD;
@@ -1762,8 +1761,7 @@ pub fn G_SpecialSpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem
 
     ctx.entity_mut(ent).s.eType = ET_ITEM as c_int;
     // store item number in modelindex
-    // FLAG: `item - bg_itemlist` pointer arithmetic on the raw `gitem_t*`.
-    let modelindex = unsafe { item.offset_from(bg_itemlist.as_ptr()) } as c_int;
+    let modelindex = item.modelindex();
     ctx.entity_mut(ent).s.modelindex = modelindex;
 
     ctx.entity_mut(ent).r.contents = CONTENTS_TRIGGER;
@@ -1790,13 +1788,11 @@ pub fn G_SpecialSpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem
 ///
 /// Source: `oracle/codemp/game/g_items.c:1336-1351`
 pub fn G_PrecacheDispensers(ctx: &mut GameContext) {
-    let mut item = BG_FindItem(c"item_medpak_instant".as_ptr());
-    if !item.is_null() {
+    if let Some(item) = BG_FindItem("item_medpak_instant") {
         crate::g_items::RegisterItem(ctx, item);
     }
 
-    item = BG_FindItem(c"ammo_all".as_ptr());
-    if !item.is_null() {
+    if let Some(item) = BG_FindItem("ammo_all") {
         crate::g_items::RegisterItem(ctx, item);
     }
 }
@@ -1826,16 +1822,16 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
     }
 
     let item = if r#type == HI_HEALTHDISP as c_int {
-        BG_FindItem(c"item_medpak_instant".as_ptr())
+        BG_FindItem("item_medpak_instant")
     } else {
-        BG_FindItem(c"ammo_all".as_ptr())
+        BG_FindItem("ammo_all")
     };
 
-    if !item.is_null() {
+    if let Some(item) = item {
         let eItem_ptr = G_Spawn(ctx);
         let eItem = ctx.entity_id_of(eItem_ptr).unwrap();
         ctx.entity_mut(eItem).r.ownerNum = ctx.entity(ent).s.number;
-        let classname = unsafe { (*item).classname };
+        let classname = item.classname_cstr() as *mut c_char;
         ctx.entity_mut(eItem).classname = classname;
 
         let mut pos = unsafe { (*cl).ps.origin };
@@ -1955,8 +1951,8 @@ pub fn EWebDie(
 
             let hi = unsafe { (*owner_client).ps.stats[STAT_HOLDABLE_ITEM as usize] };
             if hi > 0
-                && bg_itemlist[hi as usize].giType == IT_HOLDABLE
-                && bg_itemlist[hi as usize].giTag == HI_EWEB
+                && bg_itemlist[hi as usize].giType() == IT_HOLDABLE
+                && bg_itemlist[hi as usize].giTag() == HI_EWEB
             {
                 //he has it selected so deselect it and select the first thing available
                 unsafe {
@@ -2747,9 +2743,8 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
     // Raven `PLAYEREVENT_DENIEDREWARD` (`bg_public.h:716`) — not yet ported; transcribed locally.
     pub const PLAYEREVENT_DENIEDREWARD: c_int = 0x0001;
 
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
-    let giTag = unsafe { (*item).giTag };
+    let item = ctx.entity(ent).item.unwrap();
+    let giTag = unsafe { item.item().giTag() };
     // FLAG: picker-upper client pointer (`gclient_t*`); the toucher may be an NPC
     // with a pool client, so deref stays raw (recipe 2b).
     let other_client = ctx.entity(other).client;
@@ -2768,7 +2763,7 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
     let quantity = if ctx.entity(ent).count != 0 {
         ctx.entity(ent).count
     } else {
-        unsafe { (*item).quantity }
+        unsafe { item.item().quantity }
     };
 
     unsafe {
@@ -2859,24 +2854,23 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
 ///
 /// Source: `oracle/codemp/game/g_items.c:2104-2113`
 pub fn Pickup_Holdable(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_int {
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
     // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
     // so deref stays raw (recipe 2b).
     let other_client = ctx.entity(other).client;
     unsafe {
-        (*other_client).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
-            item.offset_from(bg_itemlist.as_ptr()) as c_int;
+        (*other_client).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] = item.modelindex();
 
-        (*other_client).ps.stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] |= 1 << (*item).giTag;
+        (*other_client).ps.stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] |=
+            1 << item.item().giTag();
     }
 
     let number = ctx.entity(other).s.number;
-    let giTag = unsafe { (*item).giTag };
+    let giTag = unsafe { item.item().giTag() };
     G_LogWeaponItem(ctx, number, giTag);
 
-    let giType = unsafe { (*item).giType } as c_int;
-    let giTag = unsafe { (*item).giTag };
+    let giType = unsafe { item.item().giType() } as c_int;
+    let giTag = unsafe { item.item().giTag() };
     adjustRespawnTime(ctx, RESPAWN_HOLDABLE, giType, giTag)
 }
 
@@ -2904,16 +2898,15 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
     // Raven `#define RESPAWN_AMMO 40` (`g_items.c:26`).
     const RESPAWN_AMMO: f32 = 40.0;
 
-    // `ent.item` is a raw `gitem_t*`; deref stays raw. The `Add_Ammo` calls
     // below take `other` as a handle.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
     let quantity = if ctx.entity(ent).count != 0 {
         ctx.entity(ent).count
     } else {
-        unsafe { (*item).quantity }
+        unsafe { item.item().quantity }
     };
 
-    if unsafe { (*item).giTag } == -1 {
+    if unsafe { item.item().giTag() } == -1 {
         // an ammo_all, give them a bit of everything
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool
@@ -2949,12 +2942,12 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
             Add_Ammo(ctx, other, AMMO_ROCKETS as c_int, 2);
         }
     } else {
-        let giTag = unsafe { (*item).giTag };
+        let giTag = unsafe { item.item().giTag() };
         Add_Ammo(ctx, other, giTag, quantity);
     }
 
-    let giType = unsafe { (*item).giType } as c_int;
-    let giTag = unsafe { (*item).giTag };
+    let giType = unsafe { item.item().giType() } as c_int;
+    let giTag = unsafe { item.item().giTag() };
     adjustRespawnTime(ctx, RESPAWN_AMMO, giType, giTag)
 }
 
@@ -2962,13 +2955,12 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
 ///
 /// Source: `oracle/codemp/game/g_items.c:2180-2232`
 pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_int {
-    // `ent.item` is a raw `gitem_t*`; deref stays raw. `other` is passed as a
     // handle to `Add_Ammo`.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
     // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
     // so deref stays raw (recipe 2b).
     let other_client = ctx.entity(other).client;
-    let giTag = unsafe { (*item).giTag };
+    let giTag = unsafe { item.item().giTag() };
     let mut quantity: c_int;
 
     if ctx.entity(ent).count < 0 {
@@ -2977,7 +2969,7 @@ pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
         quantity = if ctx.entity(ent).count != 0 {
             ctx.entity(ent).count
         } else {
-            unsafe { (*item).quantity }
+            unsafe { item.item().quantity }
         };
 
         // dropped items and teamplay weapons always have full ammo
@@ -3007,7 +2999,7 @@ pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
     let number = ctx.entity(other).s.number;
     G_LogWeaponPickup(ctx, number, giTag);
 
-    let giType = unsafe { (*item).giType } as c_int;
+    let giType = unsafe { item.item().giType() } as c_int;
 
     // team deathmatch has slow weapon respawns
     if ctx.world.cvars.g_gametype.integer == GT_TEAM {
@@ -3026,15 +3018,14 @@ pub fn Pickup_Health(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
     pub const RESPAWN_HEALTH: f32 = 30.0;
     pub const RESPAWN_MEGAHEALTH: c_int = 120;
 
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
     // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
     // so deref stays raw (recipe 2b).
     let other_client = ctx.entity(other).client;
 
     // small and mega healths will go over the max
     let maxHealth = unsafe { (*other_client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] };
-    let max = if unsafe { (*item).quantity } != 5 && unsafe { (*item).quantity } != 100 {
+    let max = if unsafe { item.item().quantity } != 5 && unsafe { item.item().quantity } != 100 {
         maxHealth
     } else {
         maxHealth * 2
@@ -3043,7 +3034,7 @@ pub fn Pickup_Health(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
     let quantity = if ctx.entity(ent).count != 0 {
         ctx.entity(ent).count
     } else {
-        unsafe { (*item).quantity }
+        unsafe { item.item().quantity }
     };
 
     ctx.entity_mut(other).health += quantity;
@@ -3056,13 +3047,13 @@ pub fn Pickup_Health(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
         (*other_client).ps.stats[statIndex_t::STAT_HEALTH as usize] = health;
     }
 
-    if unsafe { (*item).quantity } == 100 {
+    if unsafe { item.item().quantity } == 100 {
         // mega health respawns slow
         return RESPAWN_MEGAHEALTH;
     }
 
-    let giType = unsafe { (*item).giType } as c_int;
-    let giTag = unsafe { (*item).giTag };
+    let giType = unsafe { item.item().giType() } as c_int;
+    let giTag = unsafe { item.item().giTag() };
     adjustRespawnTime(ctx, RESPAWN_HEALTH, giType, giTag)
 }
 
@@ -3073,22 +3064,21 @@ pub fn Pickup_Armor(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_
     // Raven local `#define` (`g_items.c:21`).
     pub const RESPAWN_ARMOR: f32 = 20.0;
 
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
     // FLAG: picker-upper client pointer (`gclient_t*`); may be an NPC pool client,
     // so deref stays raw (recipe 2b).
     let cl = ctx.entity(other).client;
 
     unsafe {
-        (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] += (*item).quantity;
-        let cap = (*cl).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * (*item).giTag;
+        (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] += item.item().quantity;
+        let cap = (*cl).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * item.item().giTag();
         if (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] > cap {
             (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] = cap;
         }
     }
 
-    let giType = unsafe { (*item).giType } as c_int;
-    let giTag = unsafe { (*item).giTag };
+    let giType = unsafe { item.item().giType() } as c_int;
+    let giTag = unsafe { item.item().giTag() };
     adjustRespawnTime(ctx, RESPAWN_ARMOR, giType, giTag)
 }
 
@@ -3131,9 +3121,8 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
         GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(ent)).cast()),
     );
 
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
-    if unsafe { (*item).giType } == IT_POWERUP {
+    let item = ctx.entity(ent).item.unwrap();
+    if unsafe { item.item().giType() } == IT_POWERUP {
         // play powerup spawn sound to all clients
         let trBase = ctx.entity(ent).s.pos.trBase;
 
@@ -3223,10 +3212,9 @@ pub fn Touch_Item(
         return;
     }
 
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
 
-    if unsafe { (*item).giType } == IT_WEAPON
+    if unsafe { item.item().giType() } == IT_WEAPON
         && ctx.entity(ent).s.powerups != 0
         && ctx.entity(ent).s.powerups < ctx.world.level.time
     {
@@ -3245,11 +3233,11 @@ pub fn Touch_Item(
         return; // dead people can't pickup
     }
 
-    if unsafe { (*item).giType } == IT_POWERUP
-        && (unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
-            || unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_DARK as c_int)
+    if unsafe { item.item().giType() } == IT_POWERUP
+        && (unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
+            || unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_DARK as c_int)
     {
-        if unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_LIGHT as c_int {
+        if unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_LIGHT as c_int {
             if unsafe { (*other_client).ps.fd.forceSide } != FORCE_LIGHTSIDE as c_int {
                 return;
             }
@@ -3313,8 +3301,8 @@ pub fn Touch_Item(
             // FLAG: `other.m_pVehicle` (`Vehicle_t*`)/`m_pVehicleInfo` derefs stay
             // raw (recipe 2b — vehicle structs have no accessor).
             let veh = ctx.entity(other).m_pVehicle;
-            if unsafe { (*item).giType } == IT_AMMO
-                && unsafe { (*item).giTag } == -1
+            if unsafe { item.item().giType() } == IT_AMMO
+                && unsafe { item.item().giTag() } == -1
                 && ctx.entity(other).s.NPC_class == CLASS_VEHICLE as c_int
                 && !veh.is_null()
                 && unsafe { (*(*veh).m_pVehicleInfo).r#type } == VH_WALKER
@@ -3341,7 +3329,7 @@ pub fn Touch_Item(
 
     let other_number = ctx.entity(other).s.number;
     let logmsg = format!("Item: {} {}\n", other_number, unsafe {
-        cstr_to_str((*item).classname)
+        item.item().classname.to_string()
     });
     G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
 
@@ -3349,22 +3337,22 @@ pub fn Touch_Item(
 
     // call the item-specific pickup function
     let mut respawn: c_int;
-    match unsafe { (*item).giType } {
+    match unsafe { item.item().giType() } {
         x if x == IT_WEAPON => {
             respawn = Pickup_Weapon(ctx, ent, other);
             predict = qtrue;
         }
         x if x == IT_AMMO => {
             respawn = Pickup_Ammo(ctx, ent, other);
-            if unsafe { (*item).giTag } == AMMO_THERMAL as c_int
-                || unsafe { (*item).giTag } == AMMO_TRIPMINE as c_int
-                || unsafe { (*item).giTag } == AMMO_DETPACK as c_int
+            if unsafe { item.item().giTag() } == AMMO_THERMAL as c_int
+                || unsafe { item.item().giTag() } == AMMO_TRIPMINE as c_int
+                || unsafe { item.item().giTag() } == AMMO_DETPACK as c_int
             {
                 let mut weapForAmmo: c_int = 0;
 
-                if unsafe { (*item).giTag } == AMMO_THERMAL as c_int {
+                if unsafe { item.item().giTag() } == AMMO_THERMAL as c_int {
                     weapForAmmo = WP_THERMAL as c_int;
-                } else if unsafe { (*item).giTag } == AMMO_TRIPMINE as c_int {
+                } else if unsafe { item.item().giTag() } == AMMO_TRIPMINE as c_int {
                     weapForAmmo = WP_TRIP_MINE as c_int;
                 } else {
                     weapForAmmo = WP_DET_PACK as c_int;
@@ -3435,7 +3423,7 @@ pub fn Touch_Item(
     // powerup pickups are global broadcasts
     if
     /*(*(*ent).item).giType == IT_POWERUP ||*/
-    unsafe { (*item).giType } == IT_TEAM {
+    unsafe { item.item().giType() } == IT_TEAM {
         // if we want the global sound to play
         let trBase = ctx.entity(ent).s.pos.trBase;
         if ctx.entity(ent).speed == 0.0 {
@@ -3490,7 +3478,8 @@ pub fn Touch_Item(
     // draw anything.  This allows respawnable items
     // to be placed on movers.
     if (ctx.entity(ent).flags & FL_DROPPED_ITEM) == 0
-        && (unsafe { (*item).giType } == IT_WEAPON || unsafe { (*item).giType } == IT_POWERUP)
+        && (unsafe { item.item().giType() } == IT_WEAPON
+            || unsafe { item.item().giType() } == IT_POWERUP)
     {
         ctx.entity_mut(ent).s.eFlags |= EF_ITEMPLACEHOLDER;
         ctx.entity_mut(ent).s.eFlags &= !EF_NODRAW;
@@ -3529,26 +3518,26 @@ pub fn Touch_Item(
 /// Source: `oracle/codemp/game/g_items.c:2658-2733`
 pub fn LaunchItem(
     ctx: &mut GameContext,
-    item: *mut gitem_t,
+    item: ItemId,
     origin: vec3_t,
     velocity: vec3_t,
 ) -> *mut gentity_t {
-    // `item` is a raw `gitem_t*`; deref stays raw. The `*mut gentity_t` return
-    // keeps its raw shape (reused from the spawn pointer).
+    // The `*mut gentity_t` return keeps its raw shape (reused from the spawn
+    // pointer).
     let dropped_ptr = G_Spawn(ctx);
     let dropped = ctx.entity_id_of(dropped_ptr).unwrap();
 
     ctx.entity_mut(dropped).s.eType = ET_ITEM as c_int;
-    let modelindex = unsafe { item.offset_from(bg_itemlist.as_ptr()) } as c_int; // store item number in modelindex
+    let modelindex = item.modelindex(); // store item number in modelindex
     ctx.entity_mut(dropped).s.modelindex = modelindex;
     if ctx.entity(dropped).s.modelindex < 0 {
         ctx.entity_mut(dropped).s.modelindex = 0;
     }
     ctx.entity_mut(dropped).s.modelindex2 = 1; // This is non-zero is it's a dropped item
 
-    let classname = unsafe { (*item).classname };
+    let classname = item.classname_cstr() as *mut c_char;
     ctx.entity_mut(dropped).classname = classname;
-    ctx.entity_mut(dropped).item = item;
+    ctx.entity_mut(dropped).item = Some(item);
     ctx.entity_mut(dropped).r.mins = [-ITEM_RADIUS, -ITEM_RADIUS, -ITEM_RADIUS];
     ctx.entity_mut(dropped).r.maxs = [ITEM_RADIUS, ITEM_RADIUS, ITEM_RADIUS];
 
@@ -3564,7 +3553,7 @@ pub fn LaunchItem(
     ctx.entity_mut(dropped).flags |= FL_BOUNCE_HALF;
     if (ctx.world.cvars.g_gametype.integer == GT_CTF
         || ctx.world.cvars.g_gametype.integer == GT_CTY)
-        && unsafe { (*item).giType } == IT_TEAM
+        && item.item().giType() == IT_TEAM
     {
         // Special case for CTF flags
         ctx.entity_mut(dropped).think = Some(EntThink::Team_DroppedFlagThink).into();
@@ -3586,22 +3575,20 @@ pub fn LaunchItem(
 
     ctx.entity_mut(dropped).flags = FL_DROPPED_ITEM;
 
-    if unsafe { (*item).giType } == IT_WEAPON || unsafe { (*item).giType } == IT_POWERUP {
+    if item.item().giType() == IT_WEAPON || item.item().giType() == IT_POWERUP {
         ctx.entity_mut(dropped).s.eFlags |= EF_DROPPEDWEAPON;
     }
 
     vectoangles(velocity, &mut ctx.entity_mut(dropped).s.angles);
     ctx.entity_mut(dropped).s.angles[PITCH] = 0.0;
 
-    if unsafe { (*item).giTag } == WP_TRIP_MINE as c_int
-        || unsafe { (*item).giTag } == WP_DET_PACK as c_int
-    {
+    if item.item().giTag() == WP_TRIP_MINE as c_int || item.item().giTag() == WP_DET_PACK as c_int {
         ctx.entity_mut(dropped).s.angles[PITCH] = -90.0;
     }
 
-    if unsafe { (*item).giTag } != WP_BOWCASTER as c_int
-        && unsafe { (*item).giTag } != WP_DET_PACK as c_int
-        && unsafe { (*item).giTag } != WP_THERMAL as c_int
+    if item.item().giTag() != WP_BOWCASTER as c_int
+        && item.item().giTag() != WP_DET_PACK as c_int
+        && item.item().giTag() != WP_THERMAL as c_int
     {
         ctx.entity_mut(dropped).s.angles[ROLL] = -90.0;
     }
@@ -3619,13 +3606,8 @@ pub fn LaunchItem(
 /// Raven `Drop_Item`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2742-2755`
-pub fn Drop_Item(
-    ctx: &mut GameContext,
-    ent: EntityId,
-    item: *mut gitem_t,
-    angle: f32,
-) -> *mut gentity_t {
-    // `item` is a raw `gitem_t*`; the `*mut gentity_t` return rides `LaunchItem`.
+pub fn Drop_Item(ctx: &mut GameContext, ent: EntityId, item: ItemId, angle: f32) -> *mut gentity_t {
+    // The `*mut gentity_t` return rides `LaunchItem`.
     let mut angles = ctx.entity(ent).s.apos.trBase;
     angles[YAW] += angle;
     angles[PITCH] = 0.0; // always forward
@@ -3659,11 +3641,10 @@ pub fn Use_Item(
 ///
 /// Source: `oracle/codemp/game/g_items.c:2779-2963`
 pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
-    // `ent.item` is a raw `gitem_t*`; deref stays raw.
-    let item = ctx.entity(ent).item;
+    let item = ctx.entity(ent).item.unwrap();
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
         // in siege remove all powerups
-        if unsafe { (*item).giType } == IT_POWERUP {
+        if unsafe { item.item().giType() } == IT_POWERUP {
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -3671,15 +3652,15 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 
     if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
         if HasSetSaberOnly(ctx) != 0 {
-            if unsafe { (*item).giType } == IT_AMMO {
+            if unsafe { item.item().giType() } == IT_AMMO {
                 G_FreeEntity(ctx, Some(ent));
                 return;
             }
 
-            if unsafe { (*item).giType } == IT_HOLDABLE {
-                if unsafe { (*item).giTag } == HI_SEEKER as c_int
-                    || unsafe { (*item).giTag } == HI_SHIELD as c_int
-                    || unsafe { (*item).giTag } == HI_SENTRY_GUN as c_int
+            if unsafe { item.item().giType() } == IT_HOLDABLE {
+                if unsafe { item.item().giTag() } == HI_SEEKER as c_int
+                    || unsafe { item.item().giTag() } == HI_SHIELD as c_int
+                    || unsafe { item.item().giTag() } == HI_SENTRY_GUN as c_int
                 {
                     G_FreeEntity(ctx, Some(ent));
                     return;
@@ -3688,16 +3669,16 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
         }
     } else {
         // no powerups in jedi master
-        if unsafe { (*item).giType } == IT_POWERUP {
+        if unsafe { item.item().giType() } == IT_POWERUP {
             G_FreeEntity(ctx, Some(ent));
             return;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer == GT_HOLOCRON {
-        if unsafe { (*item).giType } == IT_POWERUP {
-            if unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
-                || unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_DARK as c_int
+        if unsafe { item.item().giType() } == IT_POWERUP {
+            if unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
+                || unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_DARK as c_int
             {
                 G_FreeEntity(ctx, Some(ent));
                 return;
@@ -3707,10 +3688,10 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 
     if ctx.world.cvars.g_forcePowerDisable.integer != 0 {
         // if force powers disabled, don't add force powerups
-        if unsafe { (*item).giType } == IT_POWERUP {
-            if unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
-                || unsafe { (*item).giTag } == PW_FORCE_ENLIGHTENED_DARK as c_int
-                || unsafe { (*item).giTag } == PW_FORCE_BOON as c_int
+        if unsafe { item.item().giType() } == IT_POWERUP {
+            if unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
+                || unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_DARK as c_int
+                || unsafe { item.item().giTag() } == PW_FORCE_BOON as c_int
             {
                 G_FreeEntity(ctx, Some(ent));
                 return;
@@ -3721,11 +3702,11 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
     if ctx.world.cvars.g_gametype.integer == GT_DUEL
         || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
     {
-        if unsafe { (*item).giType } == IT_ARMOR
-            || unsafe { (*item).giType } == IT_HEALTH
-            || (unsafe { (*item).giType } == IT_HOLDABLE
-                && (unsafe { (*item).giTag } == HI_MEDPAC as c_int
-                    || unsafe { (*item).giTag } == HI_MEDPAC_BIG as c_int))
+        if unsafe { item.item().giType() } == IT_ARMOR
+            || unsafe { item.item().giType() } == IT_HEALTH
+            || (unsafe { item.item().giType() } == IT_HOLDABLE
+                && (unsafe { item.item().giTag() } == HI_MEDPAC as c_int
+                    || unsafe { item.item().giTag() } == HI_MEDPAC_BIG as c_int))
         {
             G_FreeEntity(ctx, Some(ent));
             return;
@@ -3734,11 +3715,11 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 
     if ctx.world.cvars.g_gametype.integer != GT_CTF
         && ctx.world.cvars.g_gametype.integer != GT_CTY
-        && unsafe { (*item).giType } == IT_TEAM
+        && unsafe { item.item().giType() } == IT_TEAM
     {
         let mut killMe = false;
 
-        match unsafe { (*item).giTag } {
+        match unsafe { item.item().giTag() } {
             x if x == PW_REDFLAG as c_int => killMe = true,
             x if x == PW_BLUEFLAG as c_int => killMe = true,
             x if x == PW_NEUTRALFLAG as c_int => killMe = true,
@@ -3755,7 +3736,7 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.maxs = [8.0, 8.0, 16.0];
 
     ctx.entity_mut(ent).s.eType = ET_ITEM as c_int;
-    let modelindex = unsafe { item.offset_from(bg_itemlist.as_ptr()) } as c_int; // store item number in modelindex
+    let modelindex = item.modelindex(); // store item number in modelindex
     ctx.entity_mut(ent).s.modelindex = modelindex;
     ctx.entity_mut(ent).s.modelindex2 = 0; // zero indicates this isn't a dropped item
 
@@ -3834,19 +3815,15 @@ pub fn G_CheckTeamItems(ctx: &mut GameContext) {
             || ctx.world.cvars.g_gametype.integer == GT_CTY
         {
             // check for the two flags
-            let mut item = BG_FindItem(c"team_CTF_redflag".as_ptr());
-            if item.is_null()
-                || ctx.world.globals.itemRegistered.0
-                    [item.offset_from(bg_itemlist.as_ptr()) as usize]
-                    == 0
+            let mut item = BG_FindItem("team_CTF_redflag");
+            if item.is_none()
+                || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
             {
                 G_Printf(ctx, c"WARNING: No team_CTF_redflag in map".as_ptr());
             }
-            item = BG_FindItem(c"team_CTF_blueflag".as_ptr());
-            if item.is_null()
-                || ctx.world.globals.itemRegistered.0
-                    [item.offset_from(bg_itemlist.as_ptr()) as usize]
-                    == 0
+            item = BG_FindItem("team_CTF_blueflag");
+            if item.is_none()
+                || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
             {
                 G_Printf(ctx, c"WARNING: No team_CTF_blueflag in map".as_ptr());
             }
@@ -3875,13 +3852,10 @@ pub fn ClearRegisteredItems(ctx: &mut GameContext) {
 /// Raven `RegisterItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3020-3025`
-pub fn RegisterItem(ctx: &mut GameContext, item: *mut gitem_t) {
-    unsafe {
-        if item.is_null() {
-            G_Error(ctx, c"RegisterItem: NULL".as_ptr());
-        }
-        ctx.world.globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] = qtrue;
-    }
+pub fn RegisterItem(ctx: &mut GameContext, item: ItemId) {
+    // Raven's `if (!item) Com_Error(...)` NULL guard is unreachable: `ItemId` is
+    // non-null by construction (callers pass `Some` after a find).
+    ctx.world.globals.itemRegistered.0[item.modelindex() as usize] = qtrue;
 }
 
 /// Raven `SaveRegisteredItems`.
@@ -3913,22 +3887,22 @@ pub fn SaveRegisteredItems(ctx: &mut GameContext) {
 /// Raven `G_ItemDisabled`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3061-3067`
-pub fn G_ItemDisabled(ctx: &mut GameContext, item: *mut gitem_t) -> c_int {
-    unsafe {
-        let classname = core::ffi::CStr::from_ptr((*item).classname);
-        let name =
-            std::ffi::CString::new(format!("disable_{}", classname.to_string_lossy())).unwrap();
-        trap::Cvar_VariableIntegerValue(ctx.engine, mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(name))
-    }
+pub fn G_ItemDisabled(ctx: &mut GameContext, item: ItemId) -> c_int {
+    let name = std::ffi::CString::new(format!("disable_{}", item.item().classname)).unwrap();
+    trap::Cvar_VariableIntegerValue(
+        ctx.engine,
+        mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(
+            name,
+        ),
+    )
 }
 
 /// Raven `G_SpawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3079-3121`
-pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
-    // `item` is a raw `gitem_t*`; deref stays raw. `G_SpawnFloat` writes an
-    // out-param into the entity field: form the raw pointer (ending the arena
-    // borrow) before threading `ctx` into the call.
+pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
+    // `G_SpawnFloat` writes an out-param into the entity field: form the raw
+    // pointer (ending the arena borrow) before threading `ctx` into the call.
     let random_ptr = core::ptr::addr_of_mut!(ctx.world.g_entities[ent.index()].random);
     G_SpawnFloat(ctx, c"random".as_ptr(), c"0".as_ptr(), random_ptr);
     let wait_ptr = core::ptr::addr_of_mut!(ctx.world.g_entities[ent.index()].wait);
@@ -3942,9 +3916,9 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
         ctx.world.cvars.g_weaponDisable.integer
     };
 
-    if unsafe { (*item).giType } == IT_WEAPON
+    if item.item().giType() == IT_WEAPON
         && wDisable != 0
-        && (wDisable & (1 << unsafe { (*item).giTag })) != 0
+        && (wDisable & (1 << item.item().giTag())) != 0
     {
         if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
             G_FreeEntity(ctx, Some(ent));
@@ -3957,7 +3931,7 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
         return;
     }
 
-    ctx.entity_mut(ent).item = item;
+    ctx.entity_mut(ent).item = Some(item);
     // some movers spawn on the second frame, so delay item
     // spawns until the third frame so they can ride trains
     ctx.entity_mut(ent).nextthink = ctx.world.level.time + FRAMETIME * 2;
@@ -3965,7 +3939,7 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
 
     ctx.entity_mut(ent).physicsBounce = 0.50; // items are bouncy
 
-    if unsafe { (*item).giType } == IT_POWERUP {
+    if item.item().giType() == IT_POWERUP {
         G_SoundIndex(c"sound/items/respawn1".as_ptr());
         let speed_ptr = core::ptr::addr_of_mut!(ctx.world.g_entities[ent.index()].speed);
         G_SpawnFloat(ctx, c"noglobalsound".as_ptr(), c"0".as_ptr(), speed_ptr);
@@ -4132,9 +4106,8 @@ pub fn G_RunItem(ctx: &mut GameContext, ent: EntityId) {
         ),
     );
     if (contents & CONTENTS_NODROP) != 0 {
-        // `ent.item` is a raw `gitem_t*`; deref stays raw.
         let item = ctx.entity(ent).item;
-        if !item.is_null() && unsafe { (*item).giType } == IT_TEAM {
+        if item.is_some_and(|it| it.item().giType() == IT_TEAM) {
             Team_FreeEntity(ctx, ent);
         } else {
             G_FreeEntity(ctx, Some(ent));

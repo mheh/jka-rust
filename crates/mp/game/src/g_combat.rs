@@ -461,7 +461,7 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
             .quantity;
 
     if ammoSub < 0 {
-        let mut ammoQuan = unsafe { (*item).quantity };
+        let mut ammoQuan = item.item().quantity;
         ammoQuan -= -ammoSub;
 
         if ammoQuan <= 0 {
@@ -610,9 +610,9 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
                 let item = mp_bg::bg_misc::BG_FindItemForPowerup(unsafe {
                     core::mem::transmute::<c_int, powerup_t>(i)
                 });
-                if item.is_null() {
+                let Some(item) = item else {
                     continue;
-                }
+                };
                 let drop = crate::g_items::Drop_Item(ctx, self_, item, angle);
                 let drop = ctx.entity_id_of(drop).unwrap();
                 // decide how many seconds it has left

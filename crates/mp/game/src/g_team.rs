@@ -386,10 +386,8 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
 ///
 /// Source: `oracle/codemp/game/g_team.c:320-330`
 pub fn Team_CheckDroppedItem(ctx: &mut GameContext, dropped: EntityId) {
-    // FLAG (task #7): `.item` is a `*mut gitem_t` (bg item table), no accessor;
-    // read the pointer via the safe entity borrow and deref it raw. (recipe 2c)
     let item = ctx.world.entity(dropped).item;
-    let giTag = unsafe { (*item).giTag };
+    let giTag = item.unwrap().item().giTag();
     if giTag == PW_REDFLAG {
         Team_SetFlagStatus(ctx, TEAM_RED, FLAG_DROPPED);
     } else if giTag == PW_BLUEFLAG {
@@ -891,10 +889,8 @@ pub fn Team_ReturnFlag(ctx: &mut GameContext, team: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_team.c:693-703`
 pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG (task #7): `.item` is a `*mut gitem_t` (bg item table), no accessor;
-    // read the pointer via the safe entity borrow and deref it raw. (recipe 2c)
     let item = ctx.world.entity(ent).item;
-    let giTag = unsafe { (*item).giTag };
+    let giTag = item.unwrap().item().giTag();
     if giTag == PW_REDFLAG {
         Team_ReturnFlag(ctx, TEAM_RED);
     } else if giTag == PW_BLUEFLAG {
@@ -912,10 +908,8 @@ pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
 /// wiring for the assignment site is separate from this body.
 /// Source: `oracle/codemp/game/g_team.c:714-729`
 pub fn Team_DroppedFlagThink(ctx: &mut GameContext, ent: EntityId) {
-    // FLAG (task #7): `.item` is a `*mut gitem_t` (bg item table), no accessor;
-    // read the pointer via the safe entity borrow and deref it raw. (recipe 2c)
     let item = ctx.world.entity(ent).item;
-    let giTag = unsafe { (*item).giTag };
+    let giTag = item.unwrap().item().giTag();
     let team = if giTag == PW_REDFLAG {
         TEAM_RED
     } else if giTag == PW_BLUEFLAG {

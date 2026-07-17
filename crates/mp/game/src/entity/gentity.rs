@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use mp_bg::public::item_id::ItemId;
 use mp_bg::vehicles::vehicle_s::Vehicle_t;
 use mp_qshared::common::mp::ent_fn_ids::{
     EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse, FnId,
@@ -15,7 +16,7 @@ use mp_qshared::common::mp::entity_id::EntityId;
 use mp_qshared::common::mp::gentity::{
     material_t, moverState_t, HL_MAX, MAX_FAILED_NODES, NUM_BSETS, NUM_TIDS,
 };
-use mp_qshared::common::mp::qcommon::{entityState_t, gitem_t, parms_t, playerState_t};
+use mp_qshared::common::mp::qcommon::{entityState_t, parms_t, playerState_t};
 use mp_qshared::shared::{entityShared_t, qboolean, vec3_t};
 
 use crate::client::gclient::gclient_t;
@@ -393,9 +394,11 @@ pub struct gentity_t {
     pub epVelocity: vec3_t,
     /// Raven field source: `oracle/codemp/game/g_local.h:356`
     pub epGravFactor: f32,
-    /// For bonus items.
+    /// For bonus items. Raven `gitem_t *item` — only the table index is ever
+    /// needed, so this holds the [`ItemId`] (`Option` for the C NULL), following
+    /// the `FnId<EntThink>` precedent (private tail, no ABI pin).
     /// Raven field source: `oracle/codemp/game/g_local.h:358`
-    pub item: *mut gitem_t,
+    pub item: Option<ItemId>,
 }
 
 // Layout parity contract. `gentity_t` carries pointers, so its layout is
