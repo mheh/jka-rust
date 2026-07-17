@@ -466,8 +466,8 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
     // access field read so no read crosses a mutation.
     let tr: &mut trace_t = trace;
     let other = EntityId(tr.entityNum as u32);
-    let mut hitClient = qfalse;
-    let mut isKnockedSaber = qfalse;
+    let mut hitClient = false;
+    let mut isKnockedSaber = false;
 
     // Check for bounce
     if ctx.entity(other).takedamage == 0
@@ -487,7 +487,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             G_AddEvent(ctx.entity_mut(ent), EV_GRENADE_BOUNCE as c_int, 0);
             return;
         }
-        isKnockedSaber = qtrue;
+        isKnockedSaber = true;
     }
 
     // Bounce shrapnel and force field handling
@@ -507,7 +507,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
     }
 
     // Saber block checks
-    if (ctx.entity(other).r.contents & CONTENTS_LIGHTSABER) != 0 && isKnockedSaber == 0 {
+    if (ctx.entity(other).r.contents & CONTENTS_LIGHTSABER) != 0 && !isKnockedSaber {
         let otherOwner = EntityId(ctx.entity(other).r.ownerNum as u32);
         if ctx.entity(otherOwner).takedamage != 0
             && !ctx.entity(otherOwner).client.is_null()
@@ -515,150 +515,18 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             && unsafe { (*ctx.entity(otherOwner).client).ps.duelIndex }
                 != ctx.entity(ent).r.ownerNum
         {
-            // Jump to killProj label
-            let mut dir: vec3_t = [0.0, 0.0, 1.0];
-            if ctx.entity(other).takedamage != 0
-                && !ctx.entity(other).client.is_null()
-                && isKnockedSaber == 0
-            {
-                G_AddEvent(
-                    ctx.entity_mut(ent),
-                    EV_MISSILE_HIT as c_int,
-                    DirToByte(tr.plane.normal),
-                );
-                let n = ctx.entity(other).s.number;
-                ctx.entity_mut(ent).s.otherEntityNum = n;
-            } else if (tr.surfaceFlags & SURF_METALSTEPS) != 0 {
-                G_AddEvent(
-                    ctx.entity_mut(ent),
-                    EV_MISSILE_MISS_METAL as c_int,
-                    DirToByte(tr.plane.normal),
-                );
-            } else if ctx.entity(ent).s.weapon != G2_MODEL_PART && isKnockedSaber == 0 {
-                G_AddEvent(
-                    ctx.entity_mut(ent),
-                    EV_MISSILE_MISS as c_int,
-                    DirToByte(tr.plane.normal),
-                );
-            }
-            if isKnockedSaber == 0 {
-                ctx.entity_mut(ent).freeAfterEvent = qtrue;
-                ctx.entity_mut(ent).s.eType = ET_GENERAL as c_int;
-            }
-            let trbase = ctx.entity(ent).s.pos.trBase;
-            tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, trbase);
-            G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
-            ctx.entity_mut(ent).takedamage = qfalse;
-            if ctx.entity(ent).splashDamage != 0 {
-                let parent_id = ctx.entity(ent).parent;
-                let splashDamage = ctx.entity(ent).splashDamage as f32;
-                let splashRadius = ctx.entity(ent).splashRadius as f32;
-                let splashMod = ctx.entity(ent).splashMethodOfDeath;
-                if G_RadiusDamage(
-                    ctx,
-                    tr.endpos,
-                    parent_id,
-                    splashDamage,
-                    splashRadius,
-                    Some(other),
-                    Some(ent),
-                    splashMod,
-                ) != 0
-                {
-                    let owner_num = ctx.entity(ent).r.ownerNum as u32;
-                    let owner_client = ctx.entity(EntityId(owner_num)).client;
-                    if hitClient == 0 && !owner_client.is_null() {
-                        unsafe {
-                            (*owner_client).accuracy_hits += 1;
-                        }
-                    }
-                }
-            }
-            if ctx.entity(ent).s.weapon == G2_MODEL_PART {
-                ctx.entity_mut(ent).freeAfterEvent = qfalse;
-            }
-            trap::LinkEntity(
-                ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
-                    core::ptr::from_mut(ctx.entity_mut(ent)).cast(),
-                ),
-            );
+            // Raven: `goto killProj`.
+            missile_kill_proj(ctx, ent, other, tr, hitClient, isKnockedSaber);
             return;
         }
-    } else if isKnockedSaber == 0 {
+    } else if !isKnockedSaber {
         if ctx.entity(other).takedamage != 0
             && !ctx.entity(other).client.is_null()
             && unsafe { (*ctx.entity(other).client).ps.duelInProgress } != 0
             && unsafe { (*ctx.entity(other).client).ps.duelIndex } != ctx.entity(ent).r.ownerNum
         {
-            // Jump to killProj label
-            let mut dir: vec3_t = [0.0, 0.0, 1.0];
-            if ctx.entity(other).takedamage != 0
-                && !ctx.entity(other).client.is_null()
-                && isKnockedSaber == 0
-            {
-                G_AddEvent(
-                    ctx.entity_mut(ent),
-                    EV_MISSILE_HIT as c_int,
-                    DirToByte(tr.plane.normal),
-                );
-                let n = ctx.entity(other).s.number;
-                ctx.entity_mut(ent).s.otherEntityNum = n;
-            } else if (tr.surfaceFlags & SURF_METALSTEPS) != 0 {
-                G_AddEvent(
-                    ctx.entity_mut(ent),
-                    EV_MISSILE_MISS_METAL as c_int,
-                    DirToByte(tr.plane.normal),
-                );
-            } else if ctx.entity(ent).s.weapon != G2_MODEL_PART && isKnockedSaber == 0 {
-                G_AddEvent(
-                    ctx.entity_mut(ent),
-                    EV_MISSILE_MISS as c_int,
-                    DirToByte(tr.plane.normal),
-                );
-            }
-            if isKnockedSaber == 0 {
-                ctx.entity_mut(ent).freeAfterEvent = qtrue;
-                ctx.entity_mut(ent).s.eType = ET_GENERAL as c_int;
-            }
-            let trbase = ctx.entity(ent).s.pos.trBase;
-            tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, trbase);
-            G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
-            ctx.entity_mut(ent).takedamage = qfalse;
-            if ctx.entity(ent).splashDamage != 0 {
-                let parent_id = ctx.entity(ent).parent;
-                let splashDamage = ctx.entity(ent).splashDamage as f32;
-                let splashRadius = ctx.entity(ent).splashRadius as f32;
-                let splashMod = ctx.entity(ent).splashMethodOfDeath;
-                if G_RadiusDamage(
-                    ctx,
-                    tr.endpos,
-                    parent_id,
-                    splashDamage,
-                    splashRadius,
-                    Some(other),
-                    Some(ent),
-                    splashMod,
-                ) != 0
-                {
-                    let owner_num = ctx.entity(ent).r.ownerNum as u32;
-                    let owner_client = ctx.entity(EntityId(owner_num)).client;
-                    if hitClient == 0 && !owner_client.is_null() {
-                        unsafe {
-                            (*owner_client).accuracy_hits += 1;
-                        }
-                    }
-                }
-            }
-            if ctx.entity(ent).s.weapon == G2_MODEL_PART {
-                ctx.entity_mut(ent).freeAfterEvent = qfalse;
-            }
-            trap::LinkEntity(
-                ctx.engine,
-                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
-                    core::ptr::from_mut(ctx.entity_mut(ent)).cast(),
-                ),
-            );
+            // Raven: `goto killProj`.
+            missile_kill_proj(ctx, ent, other, tr, hitClient, isKnockedSaber);
             return;
         }
     }
@@ -681,10 +549,9 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             && ctx.entity(ent).methodOfDeath != MOD_TURBLAST as c_int
             && ctx.entity(ent).methodOfDeath != MOD_TARGET_LASER as c_int
         {
-            let mut fwd: vec3_t = [0.0; 3];
             // `trace` is a non-null `&mut` reference here; Raven's `!trace` else
             // branch (AngleVectors on other's angles) is dead.
-            crate::q_math::_VectorCopy(tr.plane.normal, &mut fwd);
+            let fwd: vec3_t = tr.plane.normal;
             G_DeflectMissile(ctx, other, ent, fwd);
             let co = ctx.entity(ent).r.currentOrigin;
             G_MissileBounceEffect(ctx, ent, co, fwd);
@@ -712,10 +579,10 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         let mut fwd: vec3_t = [0.0; 3];
         if !ctx.entity(other).client.is_null() {
             let viewangles = unsafe { (*ctx.entity(other).client).ps.viewangles };
-            crate::q_math::AngleVectors(viewangles, Some(&mut fwd), None, None);
+            AngleVectors(viewangles, Some(&mut fwd), None, None);
         } else {
             let ca = ctx.entity(other).r.currentAngles;
-            crate::q_math::AngleVectors(ca, Some(&mut fwd), None, None);
+            AngleVectors(ca, Some(&mut fwd), None, None);
         }
         G_DeflectMissile(ctx, other, ent, fwd);
         let co = ctx.entity(ent).r.currentOrigin;
@@ -736,7 +603,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         && ctx.entity(ent).methodOfDeath != MOD_CONC as c_int
         && ctx.entity(ent).methodOfDeath != MOD_CONC_ALT as c_int
         && unsafe { (*ctx.entity(other).client).ps.saberBlockTime } < ctx.world.level.time
-        && isKnockedSaber == 0
+        && !isKnockedSaber
         && {
             let ent_origin = ctx.entity(ent).r.currentOrigin;
             WP_SaberCanBlock(ctx, Some(other), ent_origin, 0, 0, qtrue, 0)
@@ -747,13 +614,14 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             unsafe { (*ctx.entity(other).client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] };
 
         let ent_origin = ctx.entity(ent).r.currentOrigin;
-        let te = G_TempEntity(ctx, ent_origin, EV_SABER_BLOCK as c_int);
-        let te_id = ctx.entity_id_of(te).unwrap();
-        crate::q_math::_VectorCopy(ent_origin, &mut ctx.entity_mut(te_id).s.origin);
-        crate::q_math::_VectorCopy(tr.plane.normal, &mut ctx.entity_mut(te_id).s.angles);
-        ctx.entity_mut(te_id).s.eventParm = 0;
-        ctx.entity_mut(te_id).s.weapon = 0;
-        ctx.entity_mut(te_id).s.legsAnim = 0;
+        let te_ptr = G_TempEntity(ctx, ent_origin, EV_SABER_BLOCK as c_int);
+        let te_id = ctx.entity_id_of(te_ptr).unwrap();
+        let te = ctx.entity_mut(te_id);
+        te.s.origin = ent_origin;
+        te.s.angles = tr.plane.normal;
+        te.s.eventParm = 0;
+        te.s.weapon = 0;
+        te.s.legsAnim = 0;
 
         let mut adjusted_def_level = otherDefLevel;
         if unsafe { (*ctx.entity(other).client).ps.velocity[2] } > 0.0
@@ -766,7 +634,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         }
 
         let viewangles = unsafe { (*ctx.entity(other).client).ps.viewangles };
-        crate::q_math::AngleVectors(viewangles, Some(&mut fwd), None, None);
+        AngleVectors(viewangles, Some(&mut fwd), None, None);
         if adjusted_def_level == FORCE_LEVEL_1 as c_int {
             // Kill the projectile
         } else if adjusted_def_level == FORCE_LEVEL_2 as c_int {
@@ -786,12 +654,13 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             }
         }
 
+        // Raven: FORCE_LEVEL_1 is `goto killProj` — it skips the sticky-missile
+        // and impact-damage sections. Source: `oracle/codemp/game/g_missile.c:563-567`
         if adjusted_def_level == FORCE_LEVEL_1 as c_int {
-            // Fall through to killProj
-        } else {
-            return;
+            missile_kill_proj(ctx, ent, other, tr, hitClient, isKnockedSaber);
         }
-    } else if (ctx.entity(other).r.contents & CONTENTS_LIGHTSABER) != 0 && isKnockedSaber == 0 {
+        return;
+    } else if (ctx.entity(other).r.contents & CONTENTS_LIGHTSABER) != 0 && !isKnockedSaber {
         let otherOwner = EntityId(ctx.entity(other).r.ownerNum as u32);
         if ctx.entity(otherOwner).takedamage != 0
             && !ctx.entity(otherOwner).client.is_null()
@@ -815,13 +684,14 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 crate::w_saber::WP_SaberBlockNonRandom(ctx.entity(otherOwner), co, qtrue);
             }
             let co = ctx.entity(ent).r.currentOrigin;
-            let te = G_TempEntity(ctx, co, EV_SABER_BLOCK as c_int);
-            let te_id = ctx.entity_id_of(te).unwrap();
-            crate::q_math::_VectorCopy(co, &mut ctx.entity_mut(te_id).s.origin);
-            crate::q_math::_VectorCopy(tr.plane.normal, &mut ctx.entity_mut(te_id).s.angles);
-            ctx.entity_mut(te_id).s.eventParm = 0;
-            ctx.entity_mut(te_id).s.weapon = 0;
-            ctx.entity_mut(te_id).s.legsAnim = 0;
+            let te_ptr = G_TempEntity(ctx, co, EV_SABER_BLOCK as c_int);
+            let te_id = ctx.entity_id_of(te_ptr).unwrap();
+            let te = ctx.entity_mut(te_id);
+            te.s.origin = co;
+            te.s.angles = tr.plane.normal;
+            te.s.eventParm = 0;
+            te.s.weapon = 0;
+            te.s.legsAnim = 0;
 
             let mut other_def_level = unsafe {
                 (*ctx.entity(otherOwner).client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize]
@@ -836,7 +706,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             }
 
             let viewangles = unsafe { (*ctx.entity(otherOwner).client).ps.viewangles };
-            crate::q_math::AngleVectors(viewangles, Some(&mut fwd), None, None);
+            AngleVectors(viewangles, Some(&mut fwd), None, None);
 
             if other_def_level == FORCE_LEVEL_1 as c_int {
                 // Kill projectile
@@ -857,11 +727,12 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 }
             }
 
+            // Raven: FORCE_LEVEL_1 is `goto killProj` — it skips the sticky-missile
+            // and impact-damage sections. Source: `oracle/codemp/game/g_missile.c:640-644`
             if other_def_level == FORCE_LEVEL_1 as c_int {
-                // Fall through to killProj
-            } else {
-                return;
+                missile_kill_proj(ctx, ent, other, tr, hitClient, isKnockedSaber);
             }
+            return;
         }
     }
 
@@ -873,10 +744,10 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
     }
 
     // Impact damage
-    if ctx.entity(other).takedamage != 0 && isKnockedSaber == 0 {
+    if ctx.entity(other).takedamage != 0 && !isKnockedSaber {
         if ctx.entity(ent).damage != 0 {
             let mut velocity: vec3_t = [0.0; 3];
-            let mut didDmg = qfalse;
+            let mut didDmg = false;
 
             let owner_num = ctx.entity(ent).r.ownerNum as u32;
             if LogAccuracyHit(ctx, other, Some(EntityId(owner_num))) != 0 {
@@ -884,13 +755,13 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 unsafe {
                     (*owner_client).accuracy_hits += 1;
                 }
-                hitClient = qtrue;
+                hitClient = true;
             }
 
             let pos = ctx.entity(ent).s.pos;
             let time = ctx.world.level.time;
             mp_bg::bg_misc::BG_EvaluateTrajectoryDelta(&pos, time, &mut velocity);
-            if crate::q_math::VectorLength(velocity) == 0.0 {
+            if VectorLength(velocity) == 0.0 {
                 velocity[2] = 1.0;
             }
 
@@ -925,7 +796,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                         DAMAGE_HALF_ABSORB as c_int,
                         mod_,
                     );
-                    didDmg = qtrue;
+                    didDmg = true;
                 }
             } else {
                 let owner = EntityId::from_num(ctx.entity(ent).r.ownerNum);
@@ -943,10 +814,10 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                     0,
                     mod_,
                 );
-                didDmg = qtrue;
+                didDmg = true;
             }
 
-            if didDmg != 0 && !ctx.entity(other).client.is_null() {
+            if didDmg && !ctx.entity(other).client.is_null() {
                 let npc_class = unsafe { (*ctx.entity(other).client).NPC_class };
                 if npc_class == CLASS_SEEKER
                     || npc_class == CLASS_PROBE
@@ -1025,12 +896,25 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         }
     }
 
-    // killProj label - generate impact event
-    let mut dir: vec3_t = [0.0, 0.0, 1.0];
-    if ctx.entity(other).takedamage != 0
-        && !ctx.entity(other).client.is_null()
-        && isKnockedSaber == 0
-    {
+    missile_kill_proj(ctx, ent, other, tr, hitClient, isKnockedSaber);
+}
+
+/// Split from `G_MissileImpact` — Raven's `killProj` label tail: impact event,
+/// endpos snap + origin set, splash damage with accuracy credit, G2-part
+/// unfree, and relink. Reached by `goto` from the duel-isolation and
+/// FORCE_LEVEL_1 saber-block arms, and by fall-through after impact damage.
+/// Source: `oracle/codemp/game/g_missile.c:758-800`
+fn missile_kill_proj(
+    ctx: &mut GameContext,
+    ent: EntityId,
+    other: EntityId,
+    tr: &mut trace_t,
+    hitClient: bool,
+    isKnockedSaber: bool,
+) {
+    // Raven: is it cheaper in bandwidth to just remove this ent and create a
+    // new one, rather than changing the missile into the explosion?
+    if ctx.entity(other).takedamage != 0 && !ctx.entity(other).client.is_null() && !isKnockedSaber {
         G_AddEvent(
             ctx.entity_mut(ent),
             EV_MISSILE_HIT as c_int,
@@ -1044,7 +928,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             EV_MISSILE_MISS_METAL as c_int,
             DirToByte(tr.plane.normal),
         );
-    } else if ctx.entity(ent).s.weapon != G2_MODEL_PART && isKnockedSaber == 0 {
+    } else if ctx.entity(ent).s.weapon != G2_MODEL_PART && !isKnockedSaber {
         G_AddEvent(
             ctx.entity_mut(ent),
             EV_MISSILE_MISS as c_int,
@@ -1052,17 +936,20 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         );
     }
 
-    if isKnockedSaber == 0 {
-        ctx.entity_mut(ent).freeAfterEvent = qtrue;
-        ctx.entity_mut(ent).s.eType = ET_GENERAL as c_int;
+    if !isKnockedSaber {
+        let m = ctx.entity_mut(ent);
+        m.freeAfterEvent = qtrue;
+        // change over to a normal entity right at the point of impact
+        m.s.eType = ET_GENERAL as c_int;
     }
 
+    // save net bandwidth
     let trbase = ctx.entity(ent).s.pos.trBase;
     tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, trbase);
     G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
 
     ctx.entity_mut(ent).takedamage = qfalse;
-    // Splash damage
+    // splash damage (doesn't apply to person directly hit)
     if ctx.entity(ent).splashDamage != 0 {
         let parent_id = ctx.entity(ent).parent;
         let splashDamage = ctx.entity(ent).splashDamage as f32;
@@ -1081,7 +968,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         {
             let owner_num = ctx.entity(ent).r.ownerNum as u32;
             let owner_client = ctx.entity(EntityId(owner_num)).client;
-            if hitClient == 0 && !owner_client.is_null() {
+            if !hitClient && !owner_client.is_null() {
                 unsafe {
                     (*owner_client).accuracy_hits += 1;
                 }
@@ -1090,6 +977,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
     }
 
     if ctx.entity(ent).s.weapon == G2_MODEL_PART {
+        // it will free itself
         ctx.entity_mut(ent).freeAfterEvent = qfalse;
     }
 
