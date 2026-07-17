@@ -84,16 +84,13 @@ pub use crate::common::opaque_slots::RenderModels;
 /// Ruling: opaque-slot (user, 2026-07-12, option A).
 pub use crate::common::opaque_slots::RmManager;
 
-// PORT-NOTE(rmg-terrain): `CCMLandScape` is the rmg-terrain.md §F design's
-// class (porting-rules §F) — not the type rosetta. Referenced opaquely here
-// (raw pointer only, per the frozen §F seam) exactly as the packet resolves
-// it; the finisher wires the real import once rmg-terrain.md's crate lands.
+// Unused opaque placeholder; the real port of Raven's `CCMLandScape` is
+// `crate::cm_terrain::CmLandScape`, used directly elsewhere in this crate.
 #[allow(dead_code)]
 pub struct CCMLandScape;
 
-// PORT-NOTE(rmg-terrain): `CRMManager` is likewise the rmg-terrain.md §F
-// class (`TheRandomMissionManager` global) — opaque placeholder pending that
-// crate landing.
+// Opaque placeholder for Raven's `CRMManager`/`TheRandomMissionManager`; the
+// real port is `mp_engine_rmg::rm_manager::RmManager`, not yet wired into qcommon.
 #[allow(dead_code)]
 pub struct CRMManager;
 
@@ -122,9 +119,6 @@ use native_platform::Sys_LowPhysicalMemory;
 pub fn CM_BoundBrush(b: *mut cbrush_t) {
     unsafe {
         (*b).bounds[0][0] = -(*(*b).sides).plane.as_ref().unwrap().dist;
-        // PORT-NOTE(sides-indexing): Raven indexes `b->sides[N]` (an array of
-        // 6 `cbrushside_t`); `cbrush_t::sides` is `*mut cbrushside_t`, so the
-        // per-side accesses below use pointer offset arithmetic to match.
         let sides = (*b).sides;
         (*b).bounds[0][0] = -(*(*sides.offset(0)).plane).dist;
         (*b).bounds[1][0] = (*(*sides.offset(1)).plane).dist;
@@ -316,18 +310,11 @@ pub fn CM_FindSubBSP(cm: &mut CollisionWorld, modelIndex: c_int) -> c_int {
 /// Raven `CM_GetWorldBounds`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1132-1136`
-pub fn CM_GetWorldBounds(cm: &mut CollisionWorld, mins: vec3_t, maxs: vec3_t) {
-    let mins;
-    let maxs;
+pub fn CM_GetWorldBounds(cm: &mut CollisionWorld, mins: &mut vec3_t, maxs: &mut vec3_t) {
     unsafe {
-        mins = (*cm.cmg.cmodels.offset(0)).mins;
-        maxs = (*cm.cmg.cmodels.offset(0)).maxs;
+        *mins = (*cm.cmg.cmodels.offset(0)).mins;
+        *maxs = (*cm.cmg.cmodels.offset(0)).maxs;
     }
-    let _ = (mins, maxs);
-    // PORT-NOTE(shape-mismatch): `mins`/`maxs` are plain `vec3_t` (by value)
-    // per the mechanically-resolved out-param convention already established
-    // elsewhere in this crate; the write does not propagate to the caller in
-    // this shape (reported in shape_mismatches).
 }
 
 /// Raven `CM_ClearMap`.

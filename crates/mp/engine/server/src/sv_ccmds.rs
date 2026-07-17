@@ -8,12 +8,6 @@
 
 use core::ffi::{c_char, c_int};
 
-// PORT-NOTE(engine-host-state): `CollisionWorld`/`Common`/`EngineHost` exist;
-// `RenderModels`/`RmManager`/`Ghoul2System` do not exist anywhere in the tree
-// yet (grepped: no hits) — these packets were generated ahead of those state
-// structs landing (same situation as sv_game.rs's identical note). Imported
-// below by their preamble-table decl-home crate; genuinely missing, escalated
-// in missing_symbols rather than stubbed (ZERO-PARK).
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
 use mp_engine_qcommon::cmd::Cmd_AddCommand;
@@ -532,29 +526,25 @@ pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
 /// Raven `forceToggleNamePrints[]` — file-scope const table (fork-3 kind 1).
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:789-810`
-// PORT-NOTE(force-toggle-names): the full name list is not reproduced in the
-// packet's verbatim source slice (only "HEAL"/"JUMP" shown before elision);
-// transcribed against `NUM_FORCE_POWERS`'s FP_* order as best-effort. Escalate
-// if this drifts from the oracle's full array at review.
 const FORCE_TOGGLE_NAME_PRINTS: [&str; NUM_FORCE_POWERS as usize] = [
-    "HEAL",
-    "JUMP",
-    "SPEED",
-    "PUSH",
-    "PULL",
-    "MINDTRICK",
-    "GRIP",
-    "LIGHTNING",
-    "DARK_RAGE",
-    "PROTECT",
-    "ABSORB",
-    "TEAM_HEAL",
-    "TEAM_FORCE",
-    "DRAIN",
-    "SEE",
-    "SABERTHROW",
-    "SABER_OFFENSE",
-    "SABER_DEFENSE",
+    "HEAL",           // FP_HEAL
+    "JUMP",           // FP_LEVITATION
+    "SPEED",          // FP_SPEED
+    "PUSH",           // FP_PUSH
+    "PULL",           // FP_PULL
+    "MINDTRICK",      // FP_TELEPATHY
+    "GRIP",           // FP_GRIP
+    "LIGHTNING",      // FP_LIGHTNING
+    "DARK RAGE",      // FP_RAGE
+    "PROTECT",        // FP_PROTECT
+    "ABSORB",         // FP_ABSORB
+    "TEAM HEAL",      // FP_TEAM_HEAL
+    "TEAM REPLENISH", // FP_TEAM_FORCE
+    "DRAIN",          // FP_DRAIN
+    "SEEING",         // FP_SEE
+    "SABER OFFENSE",  // FP_SABER_OFFENSE
+    "SABER DEFENSE",  // FP_SABER_DEFENSE
+    "SABER THROW",    // FP_SABERTHROW
 ];
 
 /// Raven `SV_KillServer_f`.

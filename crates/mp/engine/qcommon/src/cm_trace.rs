@@ -3,16 +3,6 @@
 //! (brush/patch/terrain/tree walk + capsule-vs-capsule primitives).
 //!
 //! Source: `oracle/codemp/qcommon/cm_trace.cpp`
-//!
-//! PORT-NOTE(vector-math): Raven's `DotProduct`/`VectorAdd`/`VectorSubtract`/
-//! `VectorCopy`/`VectorScale`/`VectorMA`/`VectorSet`/`VectorClear`/`VectorAdvance`/
-//! `Square` (macros) and `VectorLength`/`VectorLengthSquared`/`VectorNormalize`/
-//! `VectorInverse`/`AngleVectors` (free fns) are q_math primitives with no
-//! reachable home in this crate's dependency graph yet (their only Rust port
-//! lives in `mp_game`, a tier above the engine). Called here by their exact
-//! Raven names/shapes (out-params as `&mut vec3_t`) per the no-stub rule;
-//! reported as missing symbols for the finisher to wire to a q_math home
-//! reachable from `mp_engine_qcommon` (e.g. relocated into `mp_qshared`).
 
 use core::ffi::c_int;
 
@@ -22,17 +12,14 @@ use mp_qshared::shared::{
     clipHandle_t, qfalse, qtrue, vec3_t, vec3pair_t, CONTENTS_BODY, CONTENTS_TERRAIN,
     CONTENTS_WATER,
 };
-// PORT-NOTE(vector-math): the file-level PORT-NOTE's q_math primitives now have a
-// reachable home — the NAV-D3/RULING 39d migration relocated Raven's `q_math.c`
-// vec3 helpers into `mp_qshared::shared::q_math` (the single engine-reachable,
-// referee-compared definition). Raven's `Vector*`/`DotProduct`/`Square` MACRO
-// names bind here to the reshaped `_`-prefixed / plain fns (inputs by value,
-// outputs `&mut`) per the rosetta vec3 stanza.
+// Raven's `Vector*`/`DotProduct`/`Square` MACRO names bind to the reshaped
+// `_`-prefixed / plain q_math fns (inputs by value, outputs `&mut`) per the
+// rosetta vec3 stanza.
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
     _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse, VectorLengthSquared,
-    VectorNormalize, VectorSet,
+    vec3_origin, AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse,
+    VectorLengthSquared, VectorNormalize, VectorSet,
 };
 
 use crate::cm::c_leaf_t::cLeaf_t;
@@ -54,34 +41,18 @@ use crate::collision_world::CollisionWorld;
 use crate::common::engine_host_view::EngineHostView;
 use crate::common_fns::Com_Memset;
 
-// PORT-NOTE(rm-types): `RmManager`/`RenderModels` are the state-receiver types
-// pinned by the engine-fork-discovery preamble's receiver order (rmg-terrain.md
-// / tr-model.md own their shape); neither has landed in the tree yet. Referenced
-// by name only, per the no-stub rule — reported as missing symbols.
-// PORT-NOTE(landscape): `CCMLandScape` is the rmg-terrain.md §F type owning
-// `cmg.landScape` (currently a `*mut c_void` placeholder on `clipMap_t`);
-// referenced by name only, reported as a missing symbol.
-
 /// Raven `RotatePoint` — rotate `point` in place by `matrix` (row-major 3x3).
 ///
 /// Raven: bk: FIXME.
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:43-50`
-///
-/// PORT-NOTE(signature-shape): the resolved signature takes `point: vec3_t` BY
-/// VALUE (array), but Raven's C mutates the caller's array in place through the
-/// decayed pointer — a real out-param the printed signature doesn't carry.
-/// Transcribed literally against the LAW signature (mutates the local copy
-/// only); flagged as a shape mismatch for the finisher (retype to `&mut vec3_t`
-/// or `*mut vec3_t` to restore write-through).
-pub fn RotatePoint(mut point: vec3_t, matrix: *mut vec3_t) {
+pub fn RotatePoint(point: &mut vec3_t, matrix: *mut vec3_t) {
     let mut tvec: vec3_t = [0.0; 3];
-    VectorCopy(point, &mut tvec);
+    VectorCopy(*point, &mut tvec);
     unsafe {
         point[0] = DotProduct(*matrix.add(0), tvec);
         point[1] = DotProduct(*matrix.add(1), tvec);
         point[2] = DotProduct(*matrix.add(2), tvec);
     }
-    let _ = point;
 }
 
 /// Raven `TransposeMatrix` — transpose a 3x3 matrix.
@@ -513,17 +484,9 @@ pub fn CM_HandlePatchCollision(
     }
 }
 
-// PORT-NOTE(traceWork_s-alias): the packet resolves `CM_HandlePatchCollision`'s
-// tw param as `*mut traceWork_s` (the C struct tag), same layout as `traceWork_t`,
-// imported at the top of the file.
-
-// PORT-NOTE(rmg-type): `CCMPatch` is a §F type owned by `docs/subsystems/rmg-terrain.md`
-// (ruling 16/41); not yet ported into this crate. Referenced by name only.
-// PORT-NOTE(brush-checkcount-width): `cbrush_t::checkcount` is `u16`; the packet's
-// `checkcount: c_int` param is compared/assigned directly against it here exactly as
-// Raven's C implicit conversion would — flagged as a shape mismatch (brush.checkcount
-// vs c_int) for the referee if the widths ever diverge in practice (Raven's own
-// checkcount counters can exceed u16 range over a long session).
+// `cbrush_t::checkcount` is `u16`; `checkcount: c_int` is compared/assigned
+// against it directly here per Raven's C implicit conversion — could diverge
+// if Raven's own counter ever exceeds u16 range over a long session.
 
 /// Raven `CM_TraceThroughSphere`.
 ///
@@ -705,11 +668,6 @@ pub fn CM_TraceThroughTerrain(
 ) {
     unsafe {
         // At this point we know we may be colliding with a terrain brush (and we know we have a valid terrain structure)
-        // PORT-NOTE(landscape-receiver): the packet's `cmg.landScape->Method(...)`
-        // calls resolve through `CollisionWorld::terrain_*` (ruling 38's
-        // receiver-shape repair — `CmLandScape` lives at `cm.land_scape`, not a
-        // raw `cmg.landScape` pointer); see `cm_terrain.rs`'s `impl CollisionWorld`
-        // block.
 
         // Check for absolutely no connection
         if !CM_GenericBoxCollide((*tw).bounds, *view.cm.terrain_bounds()) {
@@ -883,12 +841,6 @@ pub fn CM_TestInLeaf(
         }
     }
 }
-
-// PORT-NOTE(cvar-fields): `cm_noCurves`/`com_terrainPhysics` are `cvar_t*` globals
-// (`cm_local.h:224`, `cm_landscape.h:267`); referenced here as plain integer fields
-// (`cm.cm_noCurves`/`cm.cm_terrainPhysics`) on the `cm: &mut CollisionWorld` receiver
-// per ruling 2 (spelled by their Raven name), standing in for `->integer` reads —
-// exact field/cvar-handle shape is CollisionWorld's own (STATE-D2), not decided here.
 
 /// Raven `CM_PositionTest`.
 ///
@@ -1579,9 +1531,8 @@ pub fn CM_Trace(
             return; // map not loaded, shouldn't happen
         }
 
-        // allow NULL to be passed in for 0,0,0 — PORT-NOTE(null-vec3): the resolved
-        // signature takes `mins`/`maxs` by value (never a raw pointer), so the "was
-        // NULL" branch is unreachable here; kept as a no-op mirror of Raven's guard.
+        // allow NULL to be passed in for 0,0,0 — mins/maxs are by value here, so
+        // the "was NULL" branch is unreachable; kept as a no-op mirror of Raven's guard.
         let _ = &mut mins;
         let _ = &mut maxs;
 
@@ -1797,18 +1748,12 @@ pub fn CM_BoxTrace(
         mins,
         maxs,
         model,
-        VEC3_ORIGIN,
+        vec3_origin,
         brushmask,
         capsule,
         core::ptr::null_mut(),
     )
 }
-
-// PORT-NOTE(vec3_origin): `vec3_origin` (`q_shared.h:1179`) is a qshared global
-// with no reachable home in this crate yet; referenced as a local `VEC3_ORIGIN`
-// const standing in for it (reported as a missing symbol for the finisher to
-// retarget once the real global lands on `Common`/`mp_qshared`).
-const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
 
 /// Raven `CM_TransformedBoxTrace`.
 ///
@@ -1835,8 +1780,8 @@ pub fn CM_TransformedBoxTrace(
         let mut transpose: [vec3_t; 3] = [[0.0; 3]; 3];
         let mut sphere: sphere_t = core::mem::zeroed();
 
-        // PORT-NOTE(null-vec3): see CM_Trace — `mins`/`maxs` are by-value params here
-        // too, so the "was NULL" substitution is unreachable; kept as a no-op mirror.
+        // mins/maxs are by-value params here too (see CM_Trace), so the "was
+        // NULL" substitution is unreachable; kept as a no-op mirror.
         let _ = &mut mins;
         let _ = &mut maxs;
 
@@ -1879,8 +1824,8 @@ pub fn CM_TransformedBoxTrace(
             //		 bevels invalid.
             //		 However this is correct for capsules since a capsule itself is rotated too.
             CreateRotationMatrix(angles, matrix.as_mut_ptr());
-            RotatePoint(start_l, matrix.as_mut_ptr());
-            RotatePoint(end_l, matrix.as_mut_ptr());
+            RotatePoint(&mut start_l, matrix.as_mut_ptr());
+            RotatePoint(&mut end_l, matrix.as_mut_ptr());
             // rotated sphere offset for capsule
             sphere.offset[0] = matrix[0][2] * t;
             sphere.offset[1] = -matrix[1][2] * t;
@@ -1908,7 +1853,7 @@ pub fn CM_TransformedBoxTrace(
         if rotated && (*trace).fraction != 1.0 {
             // rotation of bmodel collision plane
             TransposeMatrix(matrix.as_mut_ptr(), transpose.as_mut_ptr());
-            RotatePoint((*trace).plane.normal, transpose.as_mut_ptr());
+            RotatePoint(&mut (*trace).plane.normal, transpose.as_mut_ptr());
         }
 
         // re-calculate the end position of the trace because the trace.endpos
@@ -1918,16 +1863,3 @@ pub fn CM_TransformedBoxTrace(
         (*trace).endpos[2] = start[2] + (*trace).fraction * (end[2] - start[2]);
     }
 }
-
-// PORT-NOTE(missing-symbols): the following are referenced by their exact Raven
-// names/shapes per the no-stub rule but are NOT declared/imported in this file —
-// none has a reachable home in `mp_engine_qcommon`'s current dependency graph
-// (see the file-level PORT-NOTE and per-callsite notes above). Reported in
-// `missing_symbols`, not stubbed:
-//   math primitives: DotProduct, VectorAdd, VectorSubtract, VectorCopy,
-//     VectorScale, VectorMA, VectorSet, VectorClear, VectorAdvance, VectorLength,
-//     VectorLengthSquared, VectorNormalize, VectorInverse, AngleVectors, Square
-//   in-engine callees not yet landed in this wave: CM_ModelBounds,
-//     CM_ClipHandleToModel, CM_TempBoxModel, CM_BoxLeafnums_r, CM_StoreLeafs,
-//     CM_PositionTestInPatchCollide, CM_TraceThroughPatchCollide, Com_Memset
-//   receiver/§F types: RmManager, RenderModels, CCMLandScape, CCMPatch

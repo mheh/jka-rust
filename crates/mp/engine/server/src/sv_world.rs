@@ -24,7 +24,7 @@ use mp_qshared::common::mp::game::g_public::{
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES};
-use mp_qshared::shared::q_math::RadiusFromBounds;
+use mp_qshared::shared::q_math::{vec3_origin, RadiusFromBounds};
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LIGHTSABER, CONTENTS_NOSHOT, CONTENTS_SOLID, MASK_SHOT, SOLID_BMODEL,
 };
@@ -531,7 +531,7 @@ pub fn SV_PointContents(
             let clipHandle = SV_ClipHandleForEntity(cm, hit);
             let mut angles = (*hit).s.angles;
             if (*hit).r.bmodel == 0 {
-                angles = VEC3_ORIGIN; // boxes don't rotate
+                angles = vec3_origin; // boxes don't rotate
             }
 
             let c2 = mp_engine_qcommon::cm_test::CM_TransformedPointContents(
@@ -549,11 +549,6 @@ pub fn SV_PointContents(
 
     contents
 }
-
-// PORT-NOTE(vec3_origin): `vec3_origin` (`q_shared.h:1179`) has no reachable
-// qshared/Common home yet (same gap `cm_trace.rs` already notes); stood in
-// with a local const, escalated in missing_symbols.
-const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
 
 /// Raven `SV_ClipToEntity`.
 ///
@@ -594,7 +589,7 @@ pub fn SV_ClipToEntity(
         let mut angles = (*touch).r.currentAngles;
 
         if (*touch).r.bmodel == 0 {
-            angles = VEC3_ORIGIN; // boxes don't rotate
+            angles = vec3_origin; // boxes don't rotate
         }
 
         mp_engine_qcommon::cm_trace::CM_TransformedBoxTrace(
@@ -621,9 +616,8 @@ pub fn SV_ClipToEntity(
 ///
 /// Source: `oracle/codemp/server/sv_world.cpp:522-789`
 ///
-/// PORT-NOTE(g2-if0): Raven's body has a dead `#if 0` Ghoul2-collision block
-/// (lines 643-687 of the cite) superseded by the live `#else` arm below it
-/// (line 688 on); only the live arm is transcribed, per C preprocessing.
+/// Dead `#if 0` Ghoul2-collision block (643-687) dropped; only the live
+/// `#else` arm (688+) is transcribed.
 #[allow(clippy::too_many_arguments)]
 pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *mut moveclip_t) {
     unsafe {
@@ -714,7 +708,7 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
             let mut angles = (*touch).r.currentAngles;
 
             if (*touch).r.bmodel == 0 {
-                angles = VEC3_ORIGIN; // boxes don't rotate
+                angles = vec3_origin; // boxes don't rotate
             }
 
             let mut trace = trace_t {
@@ -806,10 +800,8 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                 angles2[mp_qshared::shared::q_math::ROLL as usize] = 0.0;
                 angles2[mp_qshared::shared::q_math::PITCH as usize] = 0.0;
 
-                // PORT-NOTE(FINAL_BUILD): Raven guards this Com_Printf debug
-                // line with `#ifndef FINAL_BUILD`; FINAL_BUILD is undefined
-                // for this build per plan appendix, so the guard is always
-                // true and the print is unconditional here.
+                // Raven guards this Com_Printf with `#ifndef FINAL_BUILD`; FINAL_BUILD
+                // is undefined for this build, so the print is unconditional here.
                 if view.cvar_integer("sv_showghoultraces") != 0 {
                     mp_engine_qcommon::common::common::com_printf(
                         view.common,
@@ -817,9 +809,9 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                             "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
                             (*clip).useLod,
                             VectorDistance((*clip).start, (*clip).end),
-                            "" // PORT-NOTE(mFileName): CGhoul2Info_v indexing/mFileName
-                               // string extraction is a Ghoul2System-owned accessor not
-                               // yet reachable from this crate — escalated.
+                            (&*((*touch).ghoul2 as *mut CGhoul2Info_v))
+                                .get(&*(view.g2.as_raw() as *mut Ghoul2System), 0)
+                                .file_name
                         ),
                     );
                 }
@@ -928,11 +920,8 @@ pub fn SV_Trace(
     traceFlags: c_int,
     useLod: c_int,
 ) {
-    // PORT-NOTE(nullable-vec3): Raven's `!mins`/`!maxs` → vec3_origin guard
-    // tests possibly-NULL `const vec3_t` pointers; the resolved signature takes
-    // `mins`/`maxs` by value, so the substitution moved to the G_TRACE/
-    // G_G2TRACE/G_TRACECAPSULE syscall arms (`sv_game.rs vma_vec3_or_origin`),
-    // where the game module's NULL word still arrives (bot-AI trap_Trace).
+    // Raven's NULL-`mins`/`maxs` -> vec3_origin guard moved to the G_TRACE/
+    // G_G2TRACE/G_TRACECAPSULE syscall arms (`sv_game.rs` `vma_vec3_or_origin`).
 
     unsafe {
         let mut clip: moveclip_t = core::mem::zeroed();

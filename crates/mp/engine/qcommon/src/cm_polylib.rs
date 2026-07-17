@@ -4,22 +4,6 @@
 //! convex-hull accumulator.
 //!
 //! Source: `oracle/codemp/qcommon/cm_polylib.cpp`
-//!
-//! PORT-NOTE(vector-math): Raven's `VectorSubtract`/`VectorAdd`/`VectorCopy`/
-//! `VectorScale`/`VectorMA`/`CrossProduct`/`DotProduct`/`VectorNormalize2`/
-//! `VectorLength` (q_math primitives) have no reachable home in this crate's
-//! dependency graph yet (cm_trace.rs precedent — their only Rust port lives in
-//! `mp_game`, a tier above the engine). Called here by their exact Raven names
-//! per the no-stub rule; reported as missing symbols for the finisher to wire
-//! to a q_math home reachable from `mp_engine_qcommon` (e.g. relocated into
-//! `mp_qshared` per NAV-D6 precedent).
-//!
-//! PORT-NOTE(rm-types): `RenderModels`/`RmManager` are state-receiver types
-//! pinned by the engine-fork-discovery preamble's receiver order
-//! (rmg-terrain.md/tr-model.md own their real shape); neither has landed in
-//! this crate yet. Referenced by their exact resolved-signature names per the
-//! no-stub rule (common_fns.rs/vm_x86.rs precedent); reported as missing
-//! symbols for the finisher to replace with the real imports once they land.
 
 use core::ffi::c_int;
 
@@ -41,13 +25,10 @@ use crate::common::com_error;
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 
-// PORT-NOTE(on-epsilon): the packet's rosetta row points `ON_EPSILON` at
-// `mp_engine_botlib`'s `be_aas_bspq3_cpp_consts` (0.005) — but `mp_engine_botlib`
-// depends on `mp_engine_qcommon` (Cargo.toml), so importing it here would be a
-// crate cycle. `cm_polylib.h`'s own `#ifndef ON_EPSILON` definition (0.1) is
-// already ported in this crate at `cm::cm_polylib_consts::ON_EPSILON` and is
-// the value that actually governs this TU; used instead, escalated as a shape
-// mismatch for the finisher/rosetta to reconcile.
+// `mp_engine_botlib`'s `ON_EPSILON` (0.005) can't be imported here — it
+// depends on this crate, so importing it back would be a cycle. This TU is
+// governed by `cm_polylib.h`'s own `#ifndef ON_EPSILON` value (0.1), ported
+// at `cm::cm_polylib_consts::ON_EPSILON` below.
 use crate::cm::cm_polylib_consts::ON_EPSILON;
 
 // Sweep: extern forward-declare eliminated — libc provides `printf` (rule 3,
@@ -79,23 +60,16 @@ pub fn pw(w: *mut winding_t) {
 /// first three points.
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:100-110`
-///
-/// PORT-NOTE(signature-shape): the resolved signature takes `normal: vec3_t`
-/// BY VALUE (array), but Raven's C writes through the decayed pointer — a
-/// real out-param the printed signature doesn't carry (cm_trace.rs
-/// `RotatePoint` precedent). Transcribed literally against the LAW signature
-/// (mutates the local copy only); flagged as a shape mismatch for the
-/// finisher (retype to `&mut vec3_t`).
-pub fn WindingPlane(w: *mut winding_t, mut normal: vec3_t, dist: *mut vec_t) {
+pub fn WindingPlane(w: *mut winding_t, normal: &mut vec3_t, dist: *mut vec_t) {
     unsafe {
         let mut v1: vec3_t = [0.0; 3];
         let mut v2: vec3_t = [0.0; 3];
 
         VectorSubtract(*winding_p(w, 1), *winding_p(w, 0), &mut v1);
         VectorSubtract(*winding_p(w, 2), *winding_p(w, 0), &mut v2);
-        CrossProduct(v2, v1, &mut normal);
-        VectorNormalize2(normal, &mut normal);
-        *dist = DotProduct(*winding_p(w, 0), normal);
+        CrossProduct(v2, v1, normal);
+        VectorNormalize2(*normal, normal);
+        *dist = DotProduct(*winding_p(w, 0), *normal);
     }
 }
 
@@ -121,10 +95,7 @@ pub fn WindingArea(w: *mut winding_t) -> vec_t {
 /// Raven `WindingBounds`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:134-153`
-///
-/// PORT-NOTE(signature-shape): `mins`/`maxs` are BY-VALUE `vec3_t` out-params
-/// per the same shape mismatch as `WindingPlane`; flagged for the finisher.
-pub fn WindingBounds(w: *mut winding_t, mut mins: vec3_t, mut maxs: vec3_t) {
+pub fn WindingBounds(w: *mut winding_t, mins: &mut vec3_t, maxs: &mut vec3_t) {
     mins[0] = MAX_MAP_BOUNDS as vec_t;
     mins[1] = MAX_MAP_BOUNDS as vec_t;
     mins[2] = MAX_MAP_BOUNDS as vec_t;
@@ -150,18 +121,15 @@ pub fn WindingBounds(w: *mut winding_t, mut mins: vec3_t, mut maxs: vec3_t) {
 /// Raven `WindingCenter`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:160-171`
-///
-/// PORT-NOTE(signature-shape): `center` is a BY-VALUE `vec3_t` out-param per
-/// the same shape mismatch as `WindingPlane`; flagged for the finisher.
-pub fn WindingCenter(_common: &mut Common, w: *mut winding_t, mut center: vec3_t) {
-    VectorCopy(vec3_origin, &mut center);
+pub fn WindingCenter(_common: &mut Common, w: *mut winding_t, center: &mut vec3_t) {
+    VectorCopy(vec3_origin, center);
     unsafe {
         for i in 0..(*w).numpoints {
             let p = *winding_p(w, i as usize);
-            VectorAdd(p, center, &mut center);
+            VectorAdd(p, *center, center);
         }
         let scale: vec_t = 1.0 / (*w).numpoints as vec_t;
-        VectorScale(center, scale, &mut center);
+        VectorScale(*center, scale, center);
     }
 }
 
@@ -205,9 +173,6 @@ pub fn WindingOnPlaneSide(w: *mut winding_t, normal: vec3_t, dist: vec_t) -> c_i
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:64-93`
 pub fn RemoveColinearPoints(cm: &mut CollisionWorld, w: *mut winding_t) {
-    // PORT-NOTE(missing-field): `c_removed` (`cm_polylib.cpp:62`) is a
-    // file-scope global with no home field on `CollisionWorld` yet;
-    // referenced as `cm.c_removed`, reported as a missing symbol.
     let mut nump: c_int = 0;
     // §19: `p` is a local scratch array Raven writes before reading (never
     // read uninitialized) — zero-init is not load-bearing but keeps the
@@ -281,9 +246,6 @@ pub fn AllocWinding(view: &mut EngineHostView, points: c_int) -> *mut winding_t 
 
     let s = core::mem::size_of::<vec_t>() as c_int * 3 * points
         + core::mem::size_of::<c_int>() as c_int;
-    // PORT-NOTE(missing-callee): `Z_Malloc` is part of the still-unlanded
-    // z_memman unit; called with the exact resolved receivers and reported
-    // as a missing symbol (cm_trace.rs/vm_x86.rs precedent).
     let w = Z_Malloc(view, s, memtag_t::TAG_BSP, mp_qshared::shared::qtrue, 4) as *mut winding_t;
     // Raven: qtrue param in Z_Malloc does this (Com_Memset commented out).
     w
@@ -304,9 +266,6 @@ pub fn FreeWinding(common: &mut Common, cm: &mut CollisionWorld, w: *mut winding
     }
 
     cm.c_active_windings -= 1;
-    // PORT-NOTE(missing-callee): `Z_Free` is part of the still-unlanded
-    // z_memman unit; called with the exact resolved receivers and reported
-    // as a missing symbol.
     Z_Free(common, w as *mut ());
 }
 
@@ -330,9 +289,9 @@ pub fn CheckWinding(w: *mut winding_t) {
             );
         }
 
-        let facenormal: vec3_t = [0.0; 3];
+        let mut facenormal: vec3_t = [0.0; 3];
         let mut facedist: vec_t = 0.0;
-        WindingPlane(w, facenormal, &mut facedist);
+        WindingPlane(w, &mut facenormal, &mut facedist);
 
         for i in 0..(*w).numpoints {
             let p1 = *winding_p(w, i as usize);
@@ -420,7 +379,6 @@ pub fn BaseWindingForPlane(
         );
     }
 
-    // PORT-NOTE(missing-field): `vec3_origin` — see `WindingCenter`'s note.
     let mut vup: vec3_t = [0.0; 3];
     VectorCopy(vec3_origin, &mut vup);
     match x {

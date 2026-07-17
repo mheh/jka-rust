@@ -1145,10 +1145,9 @@ pub fn BotResetLastAvoidReach(bot: &mut BotLib, movestate: c_int) {
         }
         if latesttime != 0.0 {
             (*ms).avoidreachtimes[latest] = 0.0;
-            // PORT-NOTE(raven-bug): Raven indexes `avoidreachtries[i]` here with the
-            // loop-terminal `i == MAX_AVOIDREACH` (OOB read), not `latest`; transcribed
-            // faithfully.
-            if (*ms).avoidreachtries[i] > 0 {
+            // §19: Raven reads `avoidreachtries[i]` with loop-terminal
+            // `i == MAX_AVOIDREACH` (OOB, garbage guard); defined pick: `latest`.
+            if (*ms).avoidreachtries[latest] > 0 {
                 (*ms).avoidreachtries[latest] -= 1;
             }
         }
