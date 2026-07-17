@@ -794,7 +794,7 @@ pub fn pas_fire(ctx: &mut GameContext, ent: EntityId) {
         target,
         myOrg,
         fwd,
-        qfalse,
+        false,
         10,
         2300,
         MOD_SENTRY as c_int,

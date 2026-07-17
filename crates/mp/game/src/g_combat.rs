@@ -6083,7 +6083,7 @@ pub fn G_DamageFromKiller(
 ///
 /// `origin` is read-only (a trace start point), so it stays by-value.
 /// Source: `oracle/codemp/game/g_combat.c:5768-5815`
-pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> qboolean {
+pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> bool {
     // `core::mem::zeroed` keeps a tight unsafe scope; the trap Trace macro and
     // entity reads route through the accessor.
     unsafe {
@@ -6120,7 +6120,7 @@ pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> qbool
         let mut dest = midpoint;
         trace_to!(dest);
         if tr.fraction == 1.0 || tr.entityNum as c_int == ctx.entity(targ).s.number {
-            return qtrue;
+            return true;
         }
 
         // this should probably check in the plane of projection, rather than in
@@ -6130,7 +6130,7 @@ pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> qbool
         dest[1] += 15.0;
         trace_to!(dest);
         if tr.fraction == 1.0 {
-            return qtrue;
+            return true;
         }
 
         dest = midpoint;
@@ -6138,7 +6138,7 @@ pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> qbool
         dest[1] -= 15.0;
         trace_to!(dest);
         if tr.fraction == 1.0 {
-            return qtrue;
+            return true;
         }
 
         dest = midpoint;
@@ -6146,7 +6146,7 @@ pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> qbool
         dest[1] += 15.0;
         trace_to!(dest);
         if tr.fraction == 1.0 {
-            return qtrue;
+            return true;
         }
 
         dest = midpoint;
@@ -6154,10 +6154,10 @@ pub fn CanDamage(ctx: &mut GameContext, targ: EntityId, origin: vec3_t) -> qbool
         dest[1] -= 15.0;
         trace_to!(dest);
         if tr.fraction == 1.0 {
-            return qtrue;
+            return true;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -6173,14 +6173,14 @@ pub fn G_RadiusDamage(
     ignore: Option<EntityId>,
     missile: Option<EntityId>,
     r#mod: c_int,
-) -> qboolean {
+) -> bool {
     let mut entityList: [c_int; MAX_GENTITIES as usize] = [0; MAX_GENTITIES as usize];
     let mut mins: vec3_t = [0.0; 3];
     let mut maxs: vec3_t = [0.0; 3];
     let mut v: vec3_t = [0.0; 3];
     let mut dir: vec3_t = [0.0; 3];
-    let mut hitClient: qboolean = qfalse;
-    let roastPeople: qboolean = qfalse;
+    let mut hitClient = false;
+    let roastPeople = false;
 
     // (missile burn-mark selection block is #if 0'd out in Raven)
 
@@ -6233,9 +6233,9 @@ pub fn G_RadiusDamage(
         // f64 (narrowed at the store); `dist / radius` is still an f32 divide.
         let points = (damage as f64 * (1.0 - (dist / radius) as f64)) as f32;
 
-        if CanDamage(ctx, ent, origin) != qfalse {
-            if LogAccuracyHit(ctx, ent, attacker) != qfalse {
-                hitClient = qtrue;
+        if CanDamage(ctx, ent, origin) {
+            if LogAccuracyHit(ctx, ent, attacker) {
+                hitClient = true;
             }
             let currentOrigin = ctx.entity(ent).r.currentOrigin;
             _VectorSubtract(currentOrigin, origin, &mut dir);
@@ -6288,7 +6288,7 @@ pub fn G_RadiusDamage(
             }
 
             let roast = !ctx.entity(ent).client.is_null()
-                && roastPeople != qfalse
+                && roastPeople
                 && missile.is_some_and(|missile_id| {
                     VectorCompare(
                         ctx.entity(ent).r.currentOrigin,

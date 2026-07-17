@@ -5321,7 +5321,7 @@ pub fn SeekerDroneUpdate(ctx: &mut GameContext, self_: EntityId) {
                         self_,
                         org,
                         endir,
-                        0,
+                        false,
                         15,
                         2000,
                         MOD_BLASTER as c_int,

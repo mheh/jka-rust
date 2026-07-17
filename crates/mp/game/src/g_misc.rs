@@ -1359,7 +1359,7 @@ pub fn Use_Shooter(
     match ctx.world.entity(ent).s.weapon {
         w if w == mp_bg::weapons::weapon_t::WP_BLASTER => {
             let ent_origin = ctx.world.entity(ent).s.origin;
-            crate::g_weapon::WP_FireBlasterMissile(ctx, ent, ent_origin, dir, qfalse);
+            crate::g_weapon::WP_FireBlasterMissile(ctx, ent, ent_origin, dir, false);
         }
         _ => {}
     }
@@ -3633,7 +3633,7 @@ pub fn misc_weapon_shooter_fire(ctx: &mut GameContext, self_: EntityId) {
     use crate::g_weapon::FireWeapon;
 
     let spawnflags = ctx.world.entity(self_).spawnflags;
-    FireWeapon(ctx, Some(self_), ((spawnflags & 1) != 0) as qboolean);
+    FireWeapon(ctx, Some(self_), (spawnflags & 1) != 0);
     if ctx.world.entity(self_).spawnflags & 2 != 0 {
         let level_time = ctx.world.level.time;
         let wait = ctx.world.entity(self_).wait;

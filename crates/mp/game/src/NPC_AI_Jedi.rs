@@ -4593,11 +4593,7 @@ pub fn Jedi_FaceEnemy(ctx: &mut GameContext, doPitch: qboolean) {
                 //lead
                 let missileSpeed = crate::g_weapon::WP_SpeedOfMissileForWeapon(
                     (*npc).s.weapon,
-                    if (*npc_info).scriptFlags & SCF_ALT_FIRE != 0 {
-                        qtrue
-                    } else {
-                        qfalse
-                    },
+                    (*npc_info).scriptFlags & SCF_ALT_FIRE != 0,
                 );
                 if missileSpeed != 0.0 {
                     let mut eDist = crate::q_math::Distance(eyes, enemy_eyes);
