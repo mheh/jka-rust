@@ -567,7 +567,6 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
             b.damage = ent_damage;
             b.alliedTeam = ent_alliedTeam;
             b.teamnodmg = ent_teamnodmg;
-            // PORT-NOTE(damage-flags): DAMAGE_NO_KNOCKBACK and DAMAGE_HEAVY_WEAP_CLASS are game constants used by Raven
             b.dflags = DAMAGE_NO_KNOCKBACK | DAMAGE_HEAVY_WEAP_CLASS;
             b.splashDamage = ent_splashDamage;
             b.splashRadius = ent_splashDamage;

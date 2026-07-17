@@ -319,13 +319,9 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
     let mut vright: vec3_t = [0.0; 3];
     let mut up: vec3_t = [0.0; 3];
 
-    // PORT-NOTE(static-vec3-locals): the oracle's `static vec3_t forward, vright, up`
-    // / `muzzle` carry no meaningful cross-call state — `forward/vright/up` are fully
-    // rewritten by `AngleVectors` every call and `muzzle` is unused — so plain locals
-    // are byte-faithful. `enemy_org1` is a plain local in the oracle too (not static).
-    // The oracle calls `CalcEntitySpot(NPC->enemy, ...)` unconditionally; `CalcEntitySpot`
-    // early-returns on a null `ent`, leaving `enemy_org1` untouched, so mirror that by
-    // passing the enemy handle (`None` when there is no enemy).
+    // Oracle's `static vec3_t forward/vright/up`/`muzzle` carry no cross-call
+    // state (rewritten every call / unused), so plain locals are byte-faithful
+    // (§B3); `enemy_id: Option` mirrors CalcEntitySpot's null-ent early return.
     let enemy_id = ctx.world.entity(npc_id).enemy;
     crate::NPC_utils::CalcEntitySpot(ctx, enemy_id, SPOT_HEAD, &mut enemy_org1);
 

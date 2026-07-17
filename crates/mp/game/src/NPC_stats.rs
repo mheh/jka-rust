@@ -2618,13 +2618,8 @@ pub fn NPC_LoadParms(ctx: &mut GameContext) {
     use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
 
     unsafe {
-        // PORT-NOTE(unported-global): `NPCParms`/`npcParseBuffer`
-        // (`NPC_stats.c:3236-3238`) and `MAX_NPC_DATA_SIZE` are not real
-        // `GameGlobals` fields yet — `npcParseBuffer` is still a `()`
-        // placeholder and `NPCParms` doesn't exist at all. Referenced through
-        // the globals path pending backfill; see
-        // missing_symbols. The `_XBOX` malloc/free of `npcParseBuffer` is
-        // dead on this platform and is dropped per porting-rules §20.
+        // The `_XBOX` malloc/free of `npcParseBuffer` is dead on this platform
+        // and is dropped per porting-rules §20.
         let mut totallen: c_int = 0;
         let mainblocklen: c_int = 0;
         let _ = mainblocklen;

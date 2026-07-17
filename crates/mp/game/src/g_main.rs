@@ -7,16 +7,13 @@
 //! EntityId/fn-enum idioms) — see `tools/closure-prototype/out/pass3/packets/
 //! g_main.md`.
 //!
-//! Pass-3 status: every previously-parked fn now has a real body. Remaining
-//! open items are called out inline as `// PORT-NOTE(<topic>): …` (never
-//! `PORT-NOTE`/`todo!()`) — notably: the `GAME_CVAR_TABLE` per-row
-//! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) use a mechanical
-//! `field_mut` dispatch + `resolve_cvar_flags` string-to-int folding standing
-//! in for the field reflection Rust has none of; a handful of ctx-free fn-ptr
-//! boundary fns
-//! (`Com_Error`/`Com_Printf`/`BG_GetTime`) approximate their missing
-//! `GameContext` channel (panic / stderr / `0`) pending `GameCallbacks`/
-//! `BgState` wiring.
+//! Pass-3 status: every previously-parked fn now has a real body. The
+//! `GAME_CVAR_TABLE` per-row register/update loops (`G_RegisterCvars`/
+//! `G_UpdateCvars`) use a mechanical `field_mut` dispatch + `resolve_cvar_flags`
+//! string-to-int folding standing in for the field reflection Rust has none
+//! of; the ctx-free fn-ptr boundary fns `Com_Error`/`Com_Printf` route through
+//! a print/error sink registered at `dllEntry`, falling back to panic/stderr
+//! when unregistered (in-process tests).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -68,11 +65,6 @@ use mp_qshared::shared::MAX_CLIENTS;
 // were dropped here (SEAM-D8 / slice-0).
 // Source: `oracle/codemp/game/g_main.c:515-696,897,1128`
 
-// PORT-NOTE(variadic-c-abi): G_Printf takes C varargs (`...`); the
-// skeleton itself flags "seam decision pending" — what Rust shape represents
-// a variadic printf-style entry point at the ABI seam? Additionally reaches
-// no GameWorld handle to thread `com_developer`/etc. through
-// (raw-ptr-skeleton-no-world-handle).
 /// Raven `G_Printf`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:703-712`
@@ -81,9 +73,6 @@ pub fn G_Printf(
     fmt: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(variadic-c-abi): Raven's `...` is resolved this way — every
-    // call site pre-formats with `format!` and passes the finished string as
-    // `fmt`; this fn just forwards it to `trap_Printf`.
     unsafe {
         let text = cstr_to_str(fmt);
         trap::Printf(
@@ -93,8 +82,6 @@ pub fn G_Printf(
     }
 }
 
-// PORT-NOTE(variadic-c-abi): same as G_Printf — variadic + no world
-// handle to reach `trap_Error`/level state through.
 /// Raven `G_Error`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:714-723`
@@ -103,7 +90,6 @@ pub fn G_Error(
     fmt: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(variadic-c-abi): see G_Printf — `fmt` arrives pre-formatted.
     unsafe {
         let text = cstr_to_str(fmt);
         trap::Error(
@@ -488,8 +474,6 @@ pub fn G_UpdateCvars(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(variadic-c-abi): variadic + no world/engine handle to route
-// through `trap_Error`.
 /// Raven `Com_Error`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1208-1217`
@@ -498,11 +482,8 @@ pub fn Com_Error(
     error: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(ctx-free-boundary): resolved — the shell registers a print-sink
-    // fn pointer at `dllEntry` (`com_boundary::set_com_error_sink`) that routes
-    // through `trap_Error`; `level` is dropped, matching Raven's `G_Error("%s",
-    // text)` call which never passes it on. Unregistered (in-process tests that
-    // never call `dllEntry`) keeps the frozen Group A panic fallback.
+    // `level` is dropped on the sink path, matching Raven's `G_Error("%s", text)`
+    // call site, which never passes it on.
     unsafe {
         if let Some(sink) = com_error_sink() {
             sink(error);
@@ -513,8 +494,6 @@ pub fn Com_Error(
     }
 }
 
-// PORT-NOTE(variadic-c-abi): variadic + no world/engine handle to route
-// through `trap_Print`.
 /// Raven `Com_Printf`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1219-1228`
@@ -522,11 +501,6 @@ pub fn Com_Printf(
     msg: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(ctx-free-boundary): resolved — the shell registers a print-sink
-    // fn pointer at `dllEntry` (`com_boundary::set_com_print_sink`) that routes
-    // through `trap_Printf` (`G_PRINT`), matching Raven's `G_Printf("%s", text)`
-    // call. Unregistered (in-process tests that never call `dllEntry`) keeps
-    // the `eprint!` fallback.
     unsafe {
         if let Some(sink) = com_print_sink() {
             sink(msg);
@@ -850,12 +824,6 @@ pub fn RemoveTournamentWinner(ctx: &mut GameContext) {
     SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
 }
 
-// PORT-NOTE(unported-dep): calls `ClientUserinfoChanged` (no ported
-// definition anywhere in the crate — g_client.c is not yet a landed module)
-// and writes `CS_CLIENT_DUELWINNER` through `trap_SetConfigstring`, but the
-// `CS_*` configstring-index constants (`bg_public.h`) have no ported table —
-// fabricating either would be inventing behavior (porting-rules §A2/unported
-// markers).
 /// Raven `AdjustTournamentScores`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1541-1616`
@@ -1104,9 +1072,6 @@ pub fn G_CanResetDuelists(ctx: &mut GameContext) -> qboolean {
     qtrue
 }
 
-// PORT-NOTE(unported-dep): `ClientSpawn` has no ported definition
-// anywhere in the crate (g_client.c is not yet a landed module) — the fn
-// cannot be transcribed without inventing that call.
 /// Raven `G_ResetDuelists`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1718-1740`
@@ -1450,11 +1415,6 @@ pub fn MoveClientToIntermission(ctx: &mut GameContext, id: EntityId) {
     e.r.contents = 0;
 }
 
-// PORT-NOTE(unported-dep): `SelectSpawnPoint` has no ported definition
-// anywhere in the crate (g_client.c is not yet a landed module) — the
-// map-forgot-an-intermission-point fallback branch cannot be transcribed
-// without inventing that call. `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2` (siege
-// team enum) are also not yet ported anywhere.
 /// Raven `FindIntermissionPoint`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1979-2026`
@@ -1538,9 +1498,6 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(unported-const): needs `CS_CLIENT_DUELWINNER` (no ported
-// CS_* table) and calls the unported `respawn`/`FindIntermissionPoint`
-// (itself parked on `SelectSpawnPoint`).
 /// Raven `BeginIntermission`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2035-2092`
@@ -1646,11 +1603,6 @@ pub fn DuelResetWinsLosses(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(unported-dep): `trap_SendConsoleCommand`'s `EXEC_APPEND`
-// engine constant and `g_siegePersistant.beatingTime` (siege-persistent
-// struct — `GameGlobals::g_siegePersistant` is still a `()` placeholder, no
-// backfilled type) block this fn; `G_WriteSessionData`/`SiegeDoTeamAssign`/
-// `DuelLimitHit`/`DuelResetWinsLosses` are all available.
 /// Raven `ExitLevel`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2141-2204`
@@ -1735,8 +1687,6 @@ pub fn ExitLevel(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(variadic-c-abi): variadic + no world handle to reach the
-// `g_log`/level.time-stamped log file through.
 /// Raven `G_LogPrintf`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2213-2240`
@@ -1745,7 +1695,6 @@ pub fn G_LogPrintf(
     fmt: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(variadic-c-abi): `fmt` arrives pre-formatted.
     unsafe {
         let msg = cstr_to_str(fmt);
 
@@ -1776,8 +1725,6 @@ pub fn G_LogPrintf(
     }
 }
 
-// PORT-NOTE(unported-const): `CS_INTERMISSION` (no ported CS_* table)
-// blocks `trap_SetConfigstring( CS_INTERMISSION, "1" )`.
 /// Raven `LogExit`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2249-2303`
@@ -1849,10 +1796,6 @@ pub fn LogExit(ctx: &mut GameContext, string: *const c_char) {
     }
 }
 
-// PORT-NOTE(unported-const): `d_powerDuelPrint`-gated `Com_Printf`
-// diagnostics are fine (parked stubs), but `CS_CLIENT_DUELISTS`/
-// `CS_CLIENT_DUELWINNER` (no ported CS_* table) and `ExitLevel` (itself
-// parked on `EXEC_APPEND`) block this fn.
 /// Raven `CheckIntermissionExit`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2317-2554`
@@ -2224,10 +2167,6 @@ pub fn ScoreIsTied(ctx: &mut GameContext) -> qboolean {
     (a == b) as qboolean
 }
 
-// PORT-NOTE(unported-dep): `LogExit` (parked on `CS_INTERMISSION`) and
-// `G_GetStringEdString` (parked in this same file on its `va`/`Com_sprintf`
-// dependency) are called throughout; `CS_CLIENT_DUELISTS`/`CS_CAPTURELIMIT`-
-// adjacent `CS_*` indices are also unported.
 /// Raven `CheckExitRules`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2588-2911`
@@ -2876,8 +2815,6 @@ pub fn CheckTournament(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): walks `g_entities`/
-// `level.clients` dropping bot clients; no world handle.
 /// Raven `G_KickAllBots`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3218-3239`
@@ -2910,8 +2847,6 @@ pub fn G_KickAllBots(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): the map/kick/ban vote
-// timeout/tally reads `level`; no world handle.
 /// Raven `CheckVote`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3246-3326`
@@ -3079,8 +3014,6 @@ pub fn CheckVote(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): walks `level.clients`
-// filtering by `sess.sessionTeam`; no world handle.
 /// Raven `PrintTeam`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3333-3341`
@@ -3105,9 +3038,6 @@ pub fn PrintTeam(ctx: &mut GameContext, team: c_int, message: *mut c_char) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes
-// `level.clients[..].sess.teamLeader`, calls `PrintTeam`/`ClientUserinfoChanged`
-// (also unported in this crate); no world handle.
 /// Raven `SetLeader`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3348-3370`
@@ -3163,8 +3093,6 @@ pub fn SetLeader(ctx: &mut GameContext, team: c_int, client: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): walks `level.clients`/
-// `g_entities` looking for a team leader; no world handle.
 /// Raven `CheckTeamLeader`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3377-3402`
@@ -3205,9 +3133,6 @@ pub fn CheckTeamLeader(ctx: &mut GameContext, team: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes
-// `level.teamVoteTime`/`teamVoteYes`/`teamVoteNo`/`teamVoteString`; no world
-// handle.
 /// Raven `CheckTeamVote`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3409-3447`
@@ -3302,10 +3227,6 @@ pub fn CheckTeamVote(ctx: &mut GameContext, team: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `GameCvars`
-// (`g_password`) and a function-scope static (`lastMod`, a
-// genuine cross-frame static, which itself wants a GameWorld field); no world
-// handle.
 /// Raven `CheckCvars`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3455-3480`
@@ -3349,10 +3270,6 @@ pub fn CheckCvars(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// dispatches through the `EntThink` fn-ID enum; the raw `ent`
-// param is fine but there is no world handle to compare `level.time` through,
-// and the think dispatch needs the central match table's threaded shape.
 /// Raven `G_RunThink`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3489-3512`
@@ -3388,9 +3305,6 @@ pub fn G_RunThink(ctx: &mut GameContext, id: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// file-static `navCalcPathTime` (a genuine cross-frame static
-// wanting a GameWorld field) and `level.time`; no world handle.
 /// Raven `NAV_CheckCalcPaths`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3522-3555`
@@ -3477,11 +3391,6 @@ pub fn level_time(ctx: &mut GameContext) -> c_int {
     ctx.world.level.time
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): the whole-frame driver —
-// walks `g_entities`, dispatches `ent->think`/`ent->s.eType`-keyed subsystem
-// calls, updates `level`/`GameCvars`/several g_main.c file-scope globals
-// (`gDoSlowMoDuel`, `g_LastFrameTime`, `g_siegeRespawnCheck`, …); no world
-// handle.
 /// Raven `G_RunFrame`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:3582-4102`
@@ -4035,11 +3944,6 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): the C body's
-// `static char text[1024]` rotating scratch return buffer (va/vtos idiom →
-// owned return value) plus its `Com_sprintf` call is itself
-// unported (`q_shared.rs::Com_sprintf`, parked `variadic-c-abi`) — this
-// function cannot be finished until that seam lands.
 /// Raven `G_GetStringEdString`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:4104-4120`
@@ -4054,10 +3958,8 @@ pub fn G_GetStringEdString(
     // to the client, and when it goes to print it will get scanned for the
     // stringed reference indication and dealt with properly.
     //
-    // PORT-NOTE(static-scratch-buffer): Raven's `static char text[1024]` is a
-    // single reused rotating buffer; no GameWorld field is cited for it, so
-    // this leaks a fresh `'static` allocation per call (an owned-return
-    // divergence, not a rotating-buffer aliasing bug).
+    // Raven's `static char text[1024]` is a single reused rotating buffer;
+    // ported as an owned, leaked `'static` allocation per call instead.
     unsafe {
         let name = cstr_to_str(refName);
         let text = format!("@@@{}", name);

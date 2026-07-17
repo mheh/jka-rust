@@ -49,7 +49,6 @@ const TURN_OFF: c_int = 0x00000100;
 /// Raven: Front 'eye' lense animation.
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:24-46`
 pub fn R2D2_PartsMove(ctx: &mut GameContext) {
-    // PORT-NOTE(globals-access): NPC accessed as ctx.world.globals.NPC per threading digest
     let npc = ctx.world.globals.NPC;
     if npc.is_null() {
         return;

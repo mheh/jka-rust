@@ -606,9 +606,6 @@ pub fn G_MoverPush(
     }
 }
 
-// PORT-NOTE(bg-boundary): `BG_EvaluateTrajectory` (`bg_misc.rs`) is
-// itself still parked (call surface: PARKED); called faithfully here and
-// will panic until that lands.
 /// Raven `G_MoverTeam`.
 ///
 /// Source: `oracle/codemp/game/g_mover.c:416-471`

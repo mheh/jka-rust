@@ -32,9 +32,8 @@ pub fn Debug_Printf(
     fmt: *mut c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(varargs): C varargs cannot be captured in safe Rust functions.
-    // In actual Rust call sites (NPC_combat.rs), this is called with a
-    // pre-formatted message string; the variadic arguments are not used.
+    // C varargs cannot be captured in safe Rust; call sites (NPC_combat.rs)
+    // pre-format the message and pass it here.
 
     unsafe {
         // Check if cvar value is less than debug level; if so, don't print
@@ -75,8 +74,8 @@ pub fn Debug_NPCPrintf(
     fmt: *mut c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    // PORT-NOTE(varargs): C varargs cannot be captured in safe Rust functions.
-    // In actual Rust call sites, this is called with pre-formatted strings.
+    // C varargs cannot be captured in safe Rust; call sites pre-format the
+    // message and pass it here.
 
     unsafe {
         // Check if cvar value is less than debug level; if so, don't print

@@ -1,10 +1,8 @@
 // PORT-COMPLETE: g_team.c 36/36 (PrintMsg dropped — dead, zero live callers)
 //! FAITHFUL port of `oracle/codemp/game/g_team.c`.
 //!
-//! Filled by the jampgame mega-pass. Functions that reach file-scope game state
-//! (`level`, `teamgame`, `g_entities`, cvars) or an engine trap cannot be
-//! threaded against the staged raw-pointer signatures (no `GameWorld`/engine
-//! handle) and are parked; see PORT-NOTE markers.
+//! Functions that reach file-scope game state (`level`, `teamgame`,
+//! `g_entities`, cvars) or an engine trap thread the `GameContext` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

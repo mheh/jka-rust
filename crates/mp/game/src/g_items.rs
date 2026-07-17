@@ -1,13 +1,7 @@
 // PORT-COMPLETE: g_items.c 12/55
 //! FAITHFUL port of `oracle/codemp/game/g_items.c`.
 //!
-//! Filled by the jampgame mega-pass. Functions that reach file-scope game state
-//! (`level`, `g_entities`, cvars, sound/effect-index statics, `bg_itemlist`,
-//! …) or an engine trap cannot be threaded against the staged raw-pointer
-//! signatures (no `GameWorld`/engine handle) and are parked; likewise
-//! functions whose vec3 out-param helpers (`AngleVectors`/`vectoangles`)
-//! resolve to by-value `vec3_t` signatures that cannot express the C
-//! out-param mutation. See PORT-NOTE markers.
+//! Filled by the jampgame mega-pass.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -144,9 +138,6 @@ pub const PLAYEREVENT_GAUNTLETREWARD: c_int = 0x0002;
 pub const TURRET_DEATH_DELAY: c_int = 2000;
 pub const TURRET_LIFETIME: c_int = 60000;
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_adaptRespawn`
-// (cvar) and `level.numPlayingClients` — no world handle on the staged
-// raw-pointer signature.
 /// Raven `adjustRespawnTime`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:47-88`
@@ -207,8 +198,6 @@ pub fn adjustRespawnTime(
     respawnTime as c_int
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// the file-static `shieldDeactivateSound` — no world handle.
 /// Raven `ShieldRemove`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:108-119`
@@ -227,8 +216,6 @@ pub fn ShieldRemove(ctx: &mut GameContext, self_: EntityId) {
     ctx.entity_mut(self_).s.loopIsSoundset = qfalse;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` and
-// `level.time` — no world handle.
 /// Raven `ShieldThink`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:123-141`
@@ -250,8 +237,6 @@ pub fn ShieldThink(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the file-static
-// `shieldDamageSound` — no world handle.
 /// Raven `ShieldDie`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:145-151`
@@ -274,8 +259,6 @@ pub fn ShieldDie(
     ShieldRemove(ctx, self_);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// the file-static `shieldDamageSound` — no world handle.
 /// Raven `ShieldPain`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:155-167`
@@ -300,9 +283,6 @@ pub fn ShieldPain(
     ctx.entity_mut(self_).s.trickedentindex = 1;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
-// `trap_Trace` (need `&Engine`) and reads `level`/sound statics — no world
-// or engine handle on the staged raw-pointer signature.
 /// Raven `ShieldGoSolid`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:171-207`
@@ -361,8 +341,6 @@ pub fn ShieldGoSolid(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// and reads `level.time`/`shieldDeactivateSound` — no world/engine handle.
 /// Raven `ShieldGoNotSolid`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:211-226`
@@ -390,8 +368,6 @@ pub fn ShieldGoNotSolid(ctx: &mut GameContext, self_: EntityId) {
     ctx.entity_mut(self_).s.loopIsSoundset = qfalse;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
-// world handle.
 /// Raven `ShieldTouch`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:230-250`
@@ -425,9 +401,6 @@ pub fn ShieldTouch(
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
-// `trap_Trace`, reads `g_gametype`/`level`/sound statics, and holds the
-// `shieldID` fn-scope static — no world/engine handle to host it.
 /// Raven `CreateShield`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:254-380`
@@ -611,10 +584,6 @@ pub fn CreateShield(ctx: &mut GameContext, ent: EntityId) {
     ShieldGoSolid(ctx, ent);
 }
 
-// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors(angles,
-// forward, right, up)` takes each `vec3_t` by value, so the out-params it
-// must write cannot be received; also calls `trap_LinkEntity`/`trap_Trace`
-// and reads `g_gametype`/`level`, none reachable from this signature.
 /// Raven `PlaceShield`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:382-470`
@@ -755,8 +724,6 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
     qfalse
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `ItemUse_Binoculars`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:472-502`
@@ -803,8 +770,6 @@ pub fn SentryTouch(ent: EntityId, other: Option<EntityId>, trace: *mut trace_t) 
     return;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): indexes `g_entities` —
-// no world handle.
 /// Raven `pas_fire`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:521-542`
@@ -848,8 +813,6 @@ pub fn pas_fire(ctx: &mut GameContext, ent: EntityId) {
     G_RunObject(ctx, ent);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_InPVS`/
-// `trap_Trace` and reads `level` — no world/engine handle.
 /// Raven `pas_find_enemies`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:547-639`
@@ -990,8 +953,6 @@ pub fn pas_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
     found
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` and
-// reads `level` — no world/engine handle.
 /// Raven `pas_adjust_enemy`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:642-695`
@@ -1067,9 +1028,6 @@ pub fn pas_adjust_enemy(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(missing-const): calls `turret_die(self, self, self, 1000,
-// MOD_UNKNOWN)` — `MOD_UNKNOWN` (meansOfDeath_t) is not yet ported anywhere
-// in the crate graph and its value is not in the packet.
 /// Raven `sentryExpire`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:702-705`
@@ -1084,9 +1042,6 @@ pub fn sentryExpire(ctx: &mut GameContext, self_: EntityId) {
     );
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
-// `trap_EntitiesInBox` and reads `g_entities`/`level` — no world/engine
-// handle.
 /// Raven `pas_think`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:708-937`
@@ -1321,8 +1276,6 @@ pub fn pas_think(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes `g_entities` —
-// no world handle.
 /// Raven `turret_die`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:940-973`
@@ -1384,8 +1337,6 @@ pub fn turret_die(
     G_FreeEntity(ctx, Some(self_));
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `SP_PAS`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:978-1011`
@@ -1428,8 +1379,6 @@ pub fn SP_PAS(ctx: &mut GameContext, base: EntityId) {
     );
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// and reads `g_gametype`/`level` — no world/engine handle.
 /// Raven `ItemUse_Sentry`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1014-1093`
@@ -1521,8 +1470,6 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
     SP_PAS(ctx, sentry);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads
-// `d_siegeSeekerNPC`/`g_gametype`/`level` — no world handle.
 /// Raven `ItemUse_Seeker`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1096-1125`
@@ -1640,8 +1587,6 @@ pub fn Jetpack_Off(ent: &mut gentity_t) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `Jetpack_On`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1177-1199`
@@ -1680,8 +1625,6 @@ pub fn Jetpack_On(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `ItemUse_Jetpack`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1201-1234`
@@ -1725,8 +1668,6 @@ pub fn ItemUse_Jetpack(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `ItemUse_UseCloak`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1239-1272`
@@ -1772,8 +1713,6 @@ pub fn ItemUse_UseCloak(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `SpecialItemThink`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1277-1293`
@@ -1803,15 +1742,9 @@ pub fn SpecialItemThink(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).nextthink = ctx.world.level.time + 50;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
-// `level` — no world handle.
 /// Raven `G_SpecialSpawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1295-1331`
-// PORT-NOTE(unported-global): `item - bg_itemlist` needs the
-// bg-owned `bg_itemlist` table (not ported anywhere in the crate graph —
-// even `BG_FindItem`/`BG_FindItemForWeapon` etc. are themselves parked on
-// it; see `bg_misc.rs`). Not decidable from this packet.
 pub fn G_SpecialSpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
     // `item` is a `gitem_t*` (bg_itemlist entry), not an entity — stays raw.
     RegisterItem(ctx, item);
@@ -1853,11 +1786,6 @@ pub fn G_SpecialSpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem
     ctx.entity_mut(ent).s.eFlags |= EF_CLIENTSMOOTH;
 }
 
-// PORT-NOTE(missing-const): `TOSSED_ITEM_STAY_PERIOD`/
-// `TOSSED_ITEM_OWNER_NOTOUCH_DUR` (`g_items.c` #defines) are not in this
-// packet's cited source slice/call surface — referenced above by name,
-// undefined here; reported as missing symbols rather than guessed.
-
 /// Raven `G_PrecacheDispensers`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1336-1351`
@@ -1873,9 +1801,6 @@ pub fn G_PrecacheDispensers(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors` takes
-// `vec3_t` by value, so its out-params cannot be received; also calls
-// `trap_LinkEntity` and reads `level` — no world/engine handle.
 /// Raven `ItemUse_UseDisp`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1353-1410`
@@ -1944,8 +1869,6 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle.
 /// Raven `EWebDisattach`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1417-1431`
@@ -1980,8 +1903,6 @@ pub fn EWebPrecache(ctx: &mut GameContext) {
     G_EffectIndex(c"turret/muzzle_flash.efx".as_ptr());
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
-// `g_entities` — no world handle.
 /// Raven `EWebDie`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1449-1481`
@@ -2047,8 +1968,6 @@ pub fn EWebDie(
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities` — no
-// world handle.
 /// Raven `EWebPain`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1484-1496`
@@ -2068,9 +1987,6 @@ pub fn EWebPain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
-// `trap_G2API_SetBoneAngles` and reads `level.time` — no world/engine
-// handle.
 /// Raven `EWeb_SetBoneAngles`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1499-1598`
@@ -2163,8 +2079,6 @@ pub fn EWeb_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_cha
     );
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
-// `trap_G2API_SetBoneAnim` and reads `level.time` — no world/engine handle.
 /// Raven `EWeb_SetBoneAnim`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1601-1620`
@@ -2207,9 +2121,6 @@ pub fn EWeb_SetBoneAnim(ctx: &mut GameContext, eweb: EntityId, startFrame: c_int
     );
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
-// `trap_G2API_GetBoltMatrix` and reads `level.time` — no world/engine
-// handle.
 /// Raven `EWebFire`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1624-1664`
@@ -2281,10 +2192,6 @@ pub fn EWebFire(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
     G_PlayEffectID(G_EffectIndex(c"turret/muzzle_flash.efx".as_ptr()), p, dAng);
 }
 
-// PORT-NOTE(vec3-outparam-seam): resolved `vectoangles`/
-// `BG_GiveMeVectorFromMatrix` write out-param `vec3_t`s taken by value here;
-// also calls `trap_G2API_GetBoltMatrix`/`trap_Trace` and reads `level` — no
-// world/engine handle.
 /// Raven `EWebPositionUser`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1667-1732`
@@ -2463,9 +2370,6 @@ pub fn EWebUpdateBoneAngles(ctx: &mut GameContext, owner: EntityId, eweb: Entity
     EWeb_SetBoneAngles(ctx, eweb, c"cannon_Xrot".as_ptr() as *mut c_char, yAng2);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `BG_EmplacedView`
-// / `trap_*` transitively via callees and reads `g_entities`/`level` — no
-// world/engine handle.
 /// Raven `EWebThink`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1776-1854`
@@ -2575,9 +2479,6 @@ pub fn EWebThink(ctx: &mut GameContext, self_: EntityId) {
     ctx.entity_mut(self_).nextthink = ctx.world.level.time;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level`/
-// `vec3_origin`, calls `trap_G2API_AddBolt`/`trap_G2API_InitGhoul2Model`/
-// `trap_LinkEntity`/`trap_Trace` — no world/engine handle.
 /// Raven `EWeb_Create`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1859-1980`
@@ -2785,8 +2686,6 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
     core::ptr::from_mut(ctx.entity_mut(ent))
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
-// `level` — no world handle.
 /// Raven `ItemUse_UseEWeb`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:1984-2018`
@@ -2839,9 +2738,6 @@ pub fn ItemUse_UseEWeb(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors` takes
-// `vec3_t` by value; also calls `trap_Trace` and reads `g_gametype`/`level`
-// — no world/engine handle.
 /// Raven `Pickup_Powerup`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2024-2100`
@@ -2959,8 +2855,6 @@ pub fn Pickup_Powerup(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> 
     RESPAWN_POWERUP
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist` —
-// no world handle.
 /// Raven `Pickup_Holdable`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2104-2113`
@@ -2986,11 +2880,6 @@ pub fn Pickup_Holdable(ctx: &mut GameContext, ent: EntityId, other: EntityId) ->
     adjustRespawnTime(ctx, RESPAWN_HOLDABLE, giType, giTag)
 }
 
-// PORT-NOTE(missing-const): `RESPAWN_HOLDABLE` (`g_items.c` #define) is
-// not in this packet's cited source slice; referenced above, undefined here.
-
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `ammoData`
-// table — no world handle.
 /// Raven `Add_Ammo`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2118-2128`
@@ -3008,8 +2897,6 @@ pub fn Add_Ammo(ctx: &mut GameContext, ent: EntityId, weapon: c_int, count: c_in
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
-// world handle.
 /// Raven `Pickup_Ammo`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2130-2175`
@@ -3071,8 +2958,6 @@ pub fn Pickup_Ammo(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_i
     adjustRespawnTime(ctx, RESPAWN_AMMO, giType, giTag)
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
-// `g_weaponRespawn`/`weaponData` — no world handle.
 /// Raven `Pickup_Weapon`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2180-2232`
@@ -3132,9 +3017,6 @@ pub fn Pickup_Weapon(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c
     let weapon_respawn = ctx.world.cvars.g_weaponRespawn.integer as f32;
     adjustRespawnTime(ctx, weapon_respawn, giType, giTag)
 }
-
-// PORT-NOTE(missing-const): `RESPAWN_TEAM_WEAPON` (`g_items.c` #define)
-// is not in this packet's cited source slice; referenced above, undefined here.
 
 /// Raven `Pickup_Health`.
 ///
@@ -3210,9 +3092,6 @@ pub fn Pickup_Armor(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_
     adjustRespawnTime(ctx, RESPAWN_ARMOR, giType, giTag)
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// (needs `&Engine`) and calls `G_Error`/`G_AddEvent`/`rand` — no world/
-// engine handle to host the trap.
 /// Raven `RespawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2288-2334`
@@ -3279,8 +3158,6 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).nextthink = 0;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
-// `level` — no world handle.
 /// Raven `CheckItemCanBePickedUpByNPC`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2336-2355`
@@ -3319,8 +3196,6 @@ pub fn CheckItemCanBePickedUpByNPC(
     qfalse
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// and reads `g_gametype`/`level`/`weaponData` — no world/engine handle.
 /// Raven `Touch_Item`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2362-2646`
@@ -3649,9 +3524,6 @@ pub fn Touch_Item(
     );
 }
 
-// PORT-NOTE(vec3-outparam-seam): resolved `vectoangles` writes an
-// out-param `vec3_t` taken by value; also calls `trap_LinkEntity` and reads
-// `bg_itemlist`/`g_gametype`/`level` — no world/engine handle.
 /// Raven `LaunchItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2658-2733`
@@ -3744,13 +3616,6 @@ pub fn LaunchItem(
     dropped_ptr
 }
 
-// PORT-NOTE(missing-const): `EF_DROPPEDWEAPON`/`FL_BOUNCE_HALF`
-// (`bg_public.h`/`g_local.h` #defines) are not in this packet's cited source
-// slice; referenced above, undefined here.
-
-// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors` takes
-// `vec3_t` by value, so its `forward`/`right` out-params (used to compute
-// the drop velocity) cannot be received.
 /// Raven `Drop_Item`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2742-2755`
@@ -3790,9 +3655,6 @@ pub fn Use_Item(
     RespawnItem(ctx, ent);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// / `trap_Trace` and reads `bg_itemlist`/`g_forcePowerDisable`/`g_gametype`
-// — no world/engine handle.
 /// Raven `FinishSpawningItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2779-2963`
@@ -3960,8 +3822,6 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
     );
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
-// `g_gametype`/`itemRegistered` — no world handle.
 /// Raven `G_CheckTeamItems`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2973-2991`
@@ -3994,9 +3854,6 @@ pub fn G_CheckTeamItems(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
-// `itemRegistered` (cross-frame global) — no world handle to host
-// `itemRegistered`.
 /// Raven `ClearRegisteredItems`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2998-3011`
@@ -4015,9 +3872,6 @@ pub fn ClearRegisteredItems(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes the
-// `itemRegistered` cross-frame global and reads `bg_itemlist` — no
-// world handle.
 /// Raven `RegisterItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3020-3025`
@@ -4030,9 +3884,6 @@ pub fn RegisterItem(ctx: &mut GameContext, item: *mut gitem_t) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
-// `trap_SetConfigstring` and reads `bg_numItems`/`itemRegistered` — no
-// world/engine handle.
 /// Raven `SaveRegisteredItems`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3036-3054`
@@ -4059,8 +3910,6 @@ pub fn SaveRegisteredItems(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
-// `trap_Cvar_VariableIntegerValue` (needs `&Engine`) — no engine handle.
 /// Raven `G_ItemDisabled`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3061-3067`
@@ -4073,9 +3922,6 @@ pub fn G_ItemDisabled(ctx: &mut GameContext, item: *mut gitem_t) -> c_int {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads
-// `g_duelWeaponDisable`/`g_gametype`/`g_weaponDisable`/`level` — no world
-// handle.
 /// Raven `G_SpawnItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3079-3121`
@@ -4126,8 +3972,6 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: *mut gitem_t) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
-// `level` — no world handle.
 /// Raven `G_BounceItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3130-3174`
@@ -4215,9 +4059,6 @@ pub fn G_BounceItem(ctx: &mut GameContext, ent: EntityId, trace: *mut trace_t) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// / `trap_PointContents` / `trap_Trace` and reads `level` — no world/engine
-// handle.
 /// Raven `G_RunItem`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3183-3242`

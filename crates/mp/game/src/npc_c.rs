@@ -4,8 +4,8 @@
 //! Filled by the jampgame mega-pass; all bodies are live. Functions that reach
 //! file-scope NPC-AI state (the `NPC`/`NPCInfo`/`client`/`ucmd` file-scope
 //! globals, `level`, `g_entities`, cvars) read it through `ctx.world.globals`
-//! and keep raw-pointer internals — see the `PORT-NOTE(raw-ptr-skeleton-…)`
-//! markers (Stage-2 debt), matching the g_utils.c precedent.
+//! and keep raw-pointer internals (Stage-2 debt), matching the g_utils.c
+//! precedent.
 //!
 //! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
@@ -310,9 +310,6 @@ pub fn BodyRemovalPadTime(ent: &gentity_t) -> c_int {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the file-scope
-// `NPC` global directly (function is `void` with zero params in the
-// oracle); no GameWorld/engine handle to reach it from.
 /// Raven `NPC_RemoveBodyEffect`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:323-378`
@@ -333,9 +330,6 @@ pub fn NPC_RemoveBodyEffect(ctx: &mut GameContext) {
     // the switch itself has no live behavior beyond the guard above.
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Trace`/
-// `trap_LinkEntity`, which need an `&Engine` the fixed signature doesn't
-// carry.
 /// Raven `pitch_roll_for_slope`.
 ///
 /// `pass_slope` is NULL-able (`!pass_slope` guard: NULL from `NPC_Pain`,
@@ -473,10 +467,6 @@ pub fn pitch_roll_for_slope(
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// file-scope `NPC`/`NPCInfo` globals and `level`, calls
-// `trap_ICARUS_IsRunning`/`trap_PointContents`/`trap_Trace` — none
-// reachable from the zero-param signature.
 /// Raven `DeadThink`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:478-607`
@@ -675,9 +665,6 @@ pub fn DeadThink(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes the file-scope
-// `NPC`/`NPCInfo`/`client`/`ucmd` globals — the skeleton has no
-// GameWorld/engine handle through which to reach them.
 /// Raven `SetNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:617-623`
@@ -694,8 +681,6 @@ pub fn SetNPCGlobals(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.globals.ucmd = usercmd_t::default();
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): same file-scope
-// globals as `SetNPCGlobals`, plus the `_saved_*` shadow globals.
 /// Raven `SaveNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:630-636`
@@ -706,7 +691,6 @@ pub fn SaveNPCGlobals(ctx: &mut GameContext) {
     ctx.world.globals._saved_ucmd = ctx.world.globals.ucmd;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): see `SaveNPCGlobals`.
 /// Raven `RestoreNPCGlobals`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:638-644`
@@ -717,7 +701,6 @@ pub fn RestoreNPCGlobals(ctx: &mut GameContext) {
     ctx.world.globals.ucmd = ctx.world.globals._saved_ucmd;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): see `SetNPCGlobals`.
 /// Raven `ClearNPCGlobals`.
 ///
 /// Raven: "We MUST do this, other funcs were using NPC illegally when
@@ -729,9 +712,6 @@ pub fn ClearNPCGlobals(ctx: &mut GameContext) {
     ctx.world.globals.client = core::ptr::null_mut();
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `showBBoxes`/
-// `g_entities` globals and calls `trap_InPVS` (needs `&Engine`) — none
-// reachable from the zero-param signature.
 /// Raven `NPC_ShowDebugInfo`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:664-681`
@@ -780,9 +760,6 @@ pub fn NPC_ShowDebugInfo(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `NPCInfo`/`level`/`ucmd` file-scope globals — none reachable from the
-// zero-param signature.
 /// Raven `NPC_ApplyScriptFlags`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:683-735`
@@ -844,9 +821,6 @@ pub fn NPC_ApplyScriptFlags(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `NPC`/`NPCInfo`/`d_patched`/`level` file-scope globals — none reachable
-// from the zero-param signature.
 /// Raven `NPC_HandleAIFlags`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:738-833`
@@ -915,9 +889,6 @@ pub fn NPC_HandleAIFlags(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC.c:835-838`
 pub fn NPC_AvoidWallsAndCliffs() {}
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `NPC`/`ucmd`
-// file-scope globals and calls `G_ActivateBehavior(NPC, ...)` — `NPC`
-// itself isn't reachable from the zero-param signature.
 /// Raven `NPC_CheckAttackScript`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:840-848`
@@ -931,9 +902,6 @@ pub fn NPC_CheckAttackScript(ctx: &mut GameContext) {
     crate::NPC_utils::G_ActivateBehavior(ctx, npc_id, bSet_t::BSET_ATTACK as c_int);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `NPC`/`NPCInfo`/`level`/`ucmd` file-scope globals — none reachable from
-// the zero-param signature.
 /// Raven `NPC_CheckAttackHold`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:851-913`
@@ -980,9 +948,6 @@ pub fn NPC_CheckAttackHold(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `client`/`ucmd` file-scope globals — none reachable from the zero-param
-// signature.
 /// Raven `NPC_KeepCurrentFacing`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:920-931`
@@ -1300,10 +1265,6 @@ pub fn NPC_BehaviorSet_Rancor(ctx: &mut GameContext, bState: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `NPC`/
-// `NPCInfo`/`level` file-scope globals and calls `trap_ICARUS_TaskIDPending`
-// (needs `&Engine`) — `NPC` itself is what drives the whole dispatch and
-// isn't reachable from the `(team, bState)` signature.
 /// Raven `NPC_RunBehavior`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1384-1564`
@@ -1477,9 +1438,6 @@ pub fn NPC_RunBehavior(ctx: &mut GameContext, team: c_int, bState: c_int) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `NPC`/`NPCInfo`/`client`/`ucmd`/`level` file-scope globals throughout —
-// none reachable from the fixed `(*mut gentity_t)` signature.
 /// Raven `NPC_ExecuteBState`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1576-1762`
@@ -1647,10 +1605,6 @@ pub fn NPC_ExecuteBState(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `NPC`/`NPCInfo` file-scope globals and calls `trap_Trace`/
-// `trap_LinkEntity` (need `&Engine`) — none reachable from the zero-param
-// signature.
 /// Raven `NPC_CheckInSolid`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1764-1785`
@@ -1749,10 +1703,6 @@ pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
-// `NPC`/`NPCInfo`/`ucmd`/`level`/`debugNPCFreeze`/`g_spskill`/`g_entities`
-// file-scope globals and calls `trap_ICARUS_MaintainTaskManager` (needs
-// `&Engine`) — none reachable from the fixed `(*mut gentity_t)` signature.
 /// Raven `NPC_Think`.
 ///
 /// Source: `oracle/codemp/game/NPC.c:1826-1979`

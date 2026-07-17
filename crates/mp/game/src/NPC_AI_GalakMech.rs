@@ -747,14 +747,6 @@ pub fn GM_CheckMoveState(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(unresolved-callee-type): calls `NPC_ShotEntity`/
-// `CalcEntitySpot`/`trap_Trace` with `trace_t`/`SPOT_HEAD` shapes plus this
-// file's own `enemyCS4`/`hitAlly4`/`impactPos4`/`faceEnemy4`/`shoot4` scratch
-// (GameWorld cross-frame state) — the packet's call surface resolves the callee
-// signatures, but `impactPos4` is grouped as a "bg-owned/const" global
-// (packet's own STATE FIELDS section, not a `ctx.world.globals` field),
-// leaving its owning placement unsettled; guessing would risk silently
-// wrong parity across every caller. Deferred rather than guessed per §A2.
 /// Raven `GM_CheckFireState`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:468-556`

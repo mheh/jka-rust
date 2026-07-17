@@ -309,10 +309,8 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
 
 /// Raven `COM_ParseError`.
 ///
-/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
-/// The Raven implementation uses va_start/va_end/vsprintf. This implementation formats
-/// the available data (format string as placeholder) via Com_Printf; true format-arg expansion
-/// requires a seam decision (vsprintf FFI wrapper or pre-formatted String caller convention).
+// Format args are not expanded: the message prints the format string as-is
+// rather than through the `FmtArg`/`c_vsprintf` channel `Com_sprintf`/`va` use.
 /// Source: `oracle/codemp/game/q_shared.c:300-310`
 pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
@@ -327,9 +325,7 @@ pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
 
 /// Raven `COM_ParseWarning`.
 ///
-/// PORT-NOTE(variadic-c-abi): same as COM_ParseError — Rust cannot express varargs without
-/// external C FFI. The format string and parse-session globals are available; actual arg
-/// formatting requires a seam decision.
+// Same gap as COM_ParseError: format args are not expanded.
 /// Source: `oracle/codemp/game/q_shared.c:312-322`
 pub fn COM_ParseWarning(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
@@ -956,12 +952,8 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
 
 /// Raven `Com_sprintf`.
 ///
-/// PORT-NOTE(variadic-c-abi): Raven's `...` becomes an explicit `&[FmtArg]`
-/// channel formatted by `c_format::c_vsprintf` (native-libc `vsprintf` parity);
-/// see `c_format` for the seam rationale. The 32000-byte `bigbuffer`, the
-/// `ERR_FATAL` on `len >= sizeof(bigbuffer)` (→ panic, frozen Group A), the
-/// `Com_Printf` overflow-of warning on `len >= size`, and the closing
-/// `Q_strncpyz(dest, bigbuffer, size)` are reproduced exactly.
+/// Raven's `...` is an explicit `&[FmtArg]` channel formatted by `c_format::c_vsprintf`.
+/// The `ERR_FATAL` bigbuffer overflow (→ panic, frozen Group A) is reproduced exactly.
 /// Source: `oracle/codemp/game/q_shared.c:985-1005`
 pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[FmtArg]) {
     unsafe {
@@ -986,12 +978,8 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[F
 
 /// Raven `va`.
 ///
-/// PORT-NOTE(variadic-c-abi): Raven's `...` becomes an explicit `&[FmtArg]`
-/// channel formatted by `c_format::c_vsprintf` (native-libc `vsprintf` parity).
-/// The 2-slot rotating `static char string[2][32000]` return buffer and the
-/// `index & 1` alternation are reproduced by the module statics. Raven's own
-/// `// FIXME: make this buffer size safe someday` means a `>= 32000`-byte result
-/// overruns in C; the port instead truncates into the 31999-usable-byte slot.
+/// Raven's `...` is an explicit `&[FmtArg]` channel (`c_format::c_vsprintf`), 2-slot rotating
+/// buffer reproduced; Raven overruns past 32000 bytes (its own FIXME), the port truncates instead (§19).
 /// Source: `oracle/codemp/game/q_shared.c:1017-1031`
 pub fn va(qs: &mut QSharedScratch, format: *const c_char, args: &[FmtArg]) -> *mut c_char {
     unsafe {

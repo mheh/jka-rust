@@ -4,32 +4,7 @@
 //! FAITHFUL port of `oracle/codemp/game/g_client.c` — client functions
 //! that don't happen every frame.
 //!
-//! Filled by the jampgame mega-pass (settled fork rulings,
-//! `docs/handoffs/jampgame-fork-discovery.md`).
-//!
-//! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`, precedent
-//! `w_force.rs`): logic fns that reach `level`/cvars/`g_entities`/traps thread
-//! the `GameContext<'_>` receiver (`.world: *mut GameWorld`, `.engine`). Globals
-//! are `GameWorld` fields (fork 1): `level` → `ctx.world.level`, cvars →
-//! `ctx.world.cvars`, `g_entities[i]` → `ctx.world.g_entities[i]`. Traps go
-//! through `trap::X(ctx.engine, <Name>Args::new(…))`. Cross-file callees are
-//! invoked with the packet's resolved raw-pointer signatures verbatim (their
-//! own porters thread the spine). Raw `gentity_t*`/`gclient_t*` chains are
-//! transcribed as `unsafe` raw-pointer field access mirroring the C exactly.
-//!
-//! Constant spellings the packet does not enumerate (`FL_*`, `DEFAULT_*`,
-//! `Q_COLOR_ESCAPE`, …) are transcribed by their faithful Raven names and
-//! resolved at integration (same convention as `w_force.rs`).
-//!
-//! PARKED (see PORT-NOTE markers): functions that STORE an entity
-//! fn-pointer (`gentity_t.{think,touch,use_,die}` are still raw
-//! `extern "C" fn` pointers on the struct, NOT the `EntXxx` enums — the enum
-//! dispatch is not yet wired into the layout, so a plain `pub fn` target cannot
-//! be assigned faithfully); ghoul2 `trap_G2API_*` users (handle threading +
-//! Args constructors not in this packet); `va(fmt, …)` varargs sites (the
-//! resolved `va` drops the C varargs); and the large ghoul2/bg-entangled
-//! `Client*`/body-queue functions. `random()` (`q_shared.h:1591`) is reached
-//! via `ctx.world.bg_state.rng.random()` (ruling 15).
+//! Filled by the jampgame mega-pass.
 //!
 //! Safe-state migration **Stage 1**. Entity params crossing this file's ABI
 //! seam are `EntityId`/`Option<EntityId>` handles (§B5) instead of raw
@@ -279,11 +254,6 @@ pub fn SiegePointUse(self_: &mut gentity_t, other: Option<EntityId>, activator: 
 /// Raven `SP_info_player_siegeteam1` — siege start point, team1.
 ///
 /// Source: `oracle/codemp/game/g_client.c:164-187`
-// PORT-NOTE(fn-ptr-store-shape-mismatch): stores `ent->use = SiegePointUse`,
-// but `gentity_t.use_` is still a raw `extern "C" fn` pointer (not the `EntUse`
-// enum) and the target is a plain `pub fn` — cannot assign faithfully until the
-// fn-ID enum dispatch (ruling 2) is wired into the struct layout. Also reads
-// `g_gametype`.
 pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
     let mut soff: c_int = 0;
     if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
@@ -313,9 +283,6 @@ pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `SP_info_player_siegeteam2` — siege start point, team2.
 ///
 /// Source: `oracle/codemp/game/g_client.c:200-223`
-// PORT-NOTE(fn-ptr-store-shape-mismatch): stores `ent->use = SiegePointUse`
-// into the still-raw `gentity_t.use_` fn pointer (see siegeteam1). Also reads
-// `g_gametype`.
 pub fn SP_info_player_siegeteam2(ctx: &mut GameContext, ent: EntityId) {
     let mut soff: c_int = 0;
     if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
@@ -529,10 +496,6 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `JMSaberTouch` — pick up the JM saber, become the Jedi Master.
 ///
 /// Source: `oracle/codemp/game/g_client.c:385-469`
-// PORT-NOTE(traps-va-plus-fn-ptr-store): calls `trap_SetConfigstring`/
-// `trap_SendServerCommand` with `va(...)` varargs, `G_KillG2Queue`, reads
-// `g_spawnInvulnerability`/`level`; stored as a `touch` fn-pointer (raw
-// `extern "C" fn`, not the `EntTouch` enum).
 pub fn JMSaberTouch(
     ctx: &mut GameContext,
     self_: EntityId,
@@ -643,8 +606,8 @@ pub fn JMSaberTouch(
         s.s.eType = ET_GENERAL as c_int;
     }
 
-    // PORT-NOTE(dead-code): the `te = G_TempEntity(...)` broadcast block is
-    // commented out in the oracle (g_client.c:461-465) — dropped per §20.
+    // The `te = G_TempEntity(...)` broadcast block is commented out in the
+    // oracle (g_client.c:461-465); dropped per §20.
     let self_number = ctx.world.entity(self_).s.number;
     crate::g_utils::G_KillG2Queue(ctx, self_number);
 }
@@ -652,9 +615,6 @@ pub fn JMSaberTouch(
 /// Raven `SP_info_jedimaster_start` — the JM saber spawn point.
 ///
 /// Source: `oracle/codemp/game/g_client.c:476-516`
-// PORT-NOTE(fn-ptr-store-shape-mismatch): stores `ent->touch = JMSaberTouch`
-// and `ent->think = JMSaberThink` into the still-raw `gentity_t` fn pointers,
-// writes `gJMSaberEnt`, reads `g_gametype`/`level`, calls `trap_LinkEntity`.
 pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
     if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
         ctx.world.globals.gJMSaberEnt = None;
@@ -1247,10 +1207,6 @@ pub fn BodySink(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `CopyToBodyQue` — copy a dead client into the body queue.
 ///
 /// Source: `oracle/codemp/game/g_client.c:996-1105`
-// PORT-NOTE(fn-ptr-store-plus-traps): stores `think = BodySink`,
-// `die = body_die` (still-raw fn pointers), reads `g_entities`, writes `level`,
-// calls `trap_LinkEntity`/`trap_UnlinkEntity`/`trap_PointContents`/
-// `trap_SendServerCommand`.
 pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -1379,8 +1335,6 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
 /// Raven `MaintainBodyQueue`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:1130-1159`
-// PORT-NOTE(traps-plus-body-queue): calls `CopyToBodyQue` (parked), reads
-// `level`, sends `va(...)`-formatted server commands via `trap_SendServerCommand`.
 pub fn MaintainBodyQueue(ctx: &mut GameContext, ent: EntityId) {
     // do whatever should be done taking ragdoll and dismemberment states into account.
     let mut do_rcg = qfalse;
@@ -1679,10 +1633,6 @@ pub fn ClientCleanName(
 /// Raven `G_SaberModelSetup`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:1423-1499`
-// PORT-NOTE(g2-ghoul2-traps): builds the saber ghoul2 models via
-// `trap_G2API_*` (AddBolt/CleanGhoul2Models/CopySpecificGhoul2Model/
-// InitGhoul2Model/SetBoltInfo/SetSkin); the ghoul2 handle threading + Args
-// constructors are not resolved in this packet.
 pub fn G_SaberModelSetup(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
     use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
@@ -1822,11 +1772,6 @@ pub fn G_SaberModelSetup(ctx: &mut GameContext, ent: EntityId) -> qboolean {
 /// Raven `ClientConnect`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:2258-2373`
-// PORT-NOTE(multi-global-trap-va-cluster): `trap_GetUserinfo`/
-// `trap_SendServerCommand` + `va(...)`, session/bot init, reads
-// `g_entities`/`g_gametype`/`g_needpass`/`g_password`/`level`; returns a raw
-// `*mut c_char` into a fn-scope static buffer (fork 5) that the raw-ptr
-// signature cannot own.
 pub fn ClientConnect(
     ctx: &mut GameContext,
     clientNum: c_int,
@@ -1874,8 +1819,8 @@ pub fn ClientConnect(
                 && !g_password.eq_ignore_ascii_case("none")
                 && g_password != value
             {
-                // PORT-NOTE(static-buffer): Raven returns a `static char sTemp[1024]`;
-                // returning a leaked/owned buffer is the faithful-behavior stand-in.
+                // Raven returns a `static char sTemp[1024]` here; a leaked owned buffer
+                // is the defined-behavior stand-in. Source: oracle/codemp/game/g_client.c:2285
                 let s = cstr_to_str(G_GetStringEdString(
                     ctx,
                     c"MP_SVGAME".as_ptr() as *mut c_char,
@@ -1992,10 +1937,6 @@ pub fn ClientConnect(
 /// Raven `ClientBegin`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:2393-2593`
-// PORT-NOTE(multi-global-trap-va-cluster): traps
-// (`trap_GetUserinfo`/`trap_SetUserinfo`/`trap_SendServerCommand`/
-// `trap_UnlinkEntity`), `va(...)`, `ClientSpawn`/`SetTeam`/`SetupGameGhoul2Model`
-// (parked), reads `gSiegeRound*`/`g_entities`/`g_gametype`/`level`.
 pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboolean) {
     unsafe {
         let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
@@ -2302,9 +2243,6 @@ pub fn AllForceDisabled(force: c_int) -> qboolean {
 /// Raven `G_BreakArm` — set up a broken-limb state and pain animation.
 ///
 /// Source: `oracle/codemp/game/g_client.c:2616-2674`
-// PORT-NOTE(va-varargs-plus-rng): builds a sound name with `va(...)` +
-// `Q_irand(1,3)` (the resolved `va` drops the C varargs, and `Q_irand` is part
-// of the threaded-RNG surface, fork ruling 3).
 pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
     let mut anim: c_int = -1;
 
@@ -2394,16 +2332,13 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
 /// Raven `G_UpdateClientAnims`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:2681-2926`
-// PORT-NOTE(g2-trap-plus-bg): drives torso/legs bone anims via
-// `trap_G2API_SetBoneAnim` and `BG_SaberStartTransAnim`, reads
-// `bgAllAnims`/`level`; ghoul2 handle threading unresolved here.
 pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeedScale: f32) {
     use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs as GG2SetboneanimArgs;
 
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
-    // PORT-NOTE(dead-code): the `#if 0` broken-limb bone block (g_client.c:2804-2925)
-    // is disabled in the oracle itself — dropped per §20.
+    // The `#if 0` broken-limb bone block (g_client.c:2804-2925) is disabled in
+    // the oracle itself; dropped per §20.
     unsafe {
         let torso_anim = ((*self_).client).as_ref().unwrap().ps.torsoAnim;
         let legs_anim = (*((*self_).client)).ps.legsAnim;
@@ -2630,13 +2565,6 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
 /// Raven `ClientSpawn` — spawn/respawn a client into the world (864 LOC).
 ///
 /// Source: `oracle/codemp/game/g_client.c:2938-3801`
-// PORT-NOTE(mega-fn-globals-traps-bg-fnptr): the largest function in the
-// file — ~18 cvars, `g_entities`/`level`/`playerMins`/`playerMaxs`/`ammoData`/
-// `weaponData`/`WeaponReadyAnim`/`bgSiegeClasses` globals, many traps
-// (`trap_Cvar_Set`/`trap_GetUsercmd`/`trap_GetUserinfo`/`trap_SetUserinfo`/
-// `trap_ICARUS_*`/`trap_LinkEntity`), `BG_*`/`WP_*` calls, `va(...)`, and stores
-// `die = player_die` (still-raw fn pointer). Beyond safe single-porter
-// transcription without compilation; integration to thread the spine.
 pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
@@ -3470,9 +3398,6 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `ClientDisconnect`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:3816-3938`
-// PORT-NOTE(multi-global-trap-g2): `trap_G2API_CleanGhoul2Models`/
-// `trap_G2_HaveWeGhoul2Models`/`trap_SetConfigstring`/`trap_UnlinkEntity`,
-// bot/log/follow teardown, reads `g_entities`/`g_gametype`, writes `level`.
 pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
     use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
     use mp_abi::game::syscalls::G_G2_HAVEWEGHOULMODELS::GG2HaveweghoulmodelsArgs as GG2Haveweghoul2ModelsArgs;
@@ -3750,8 +3675,6 @@ pub fn SetupGameGhoul2Model(
                 let mut p: *mut c_char = core::ptr::null_mut();
 
                 // If this is a vehicle, get its model name.
-                // PORT-NOTE(vehicle-pointer-overlay): ruling 14 uses the bgEntity_t -> *mut gentity_t
-                // overlay pattern; m_pVehicle is accessed safely through the overlay cast in this context.
                 if !(*ent).client.is_null() && (*((*ent).client)).NPC_class == CLASS_VEHICLE {
                     write_cstr_field(&mut vehicleName, &cstr_to_str(modelname));
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {

@@ -3,7 +3,7 @@
 // Update, G_FlyVehicleImpactDir, G_SetVehDamageFlags, G_FlyVehicleDestroySurface)
 // carry no ctx/bg channel in their fixed vtable/fn-ptr slot signatures yet reach
 // world/engine/rng — those references are transcribed against the game channel
-// (`ctx`) and flagged with PORT-NOTEs pending the vtable-dispatch retrofit.
+// (`ctx`) pending the vtable-dispatch retrofit.
 //! FAITHFUL port of `oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
@@ -309,9 +309,6 @@ pub fn G_AttachToVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>, ucmd: *m
                 0,
                 crotchBolt,
                 &mut boltMatrix as *mut mdxaBone_t,
-                // `m_vOrientation` is a `*mut f32` (see its PORT-NOTE below); the
-                // pointer itself reinterprets as `*const vec3_t` — don't take a
-                // reference to the pointer field.
                 (*vp).m_vOrientation as *const vec3_t,
                 &veh_origin as *const vec3_t,
                 level_time,
@@ -456,10 +453,6 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
         let ent_id = ctx.entity_id_of(ent).unwrap();
         let parent_id = ctx.entity_id_of(parent).unwrap();
         let entClient = ctx.world.entity(ent_id).client;
-        // PORT-NOTE(m_vOrientation): Vehicle_t::m_vOrientation is transcribed as a
-        // `vec3_t` value field (VectorClear/VectorCopy/VectorSet usage throughout
-        // this TU treats it as a 3-float array). If the type port modeled it as a
-        // `*mut f32` a fixer adjusts the copy sites here and in Update/Initialize.
         if ctx.world.entity(parent_id).health <= 0
             || (*pVeh).m_iBoarding > 0
             || (*entClient).ps.m_iVehicleNum != 0
@@ -1054,14 +1047,6 @@ pub fn Initialize(ctx: &mut GameContext, pVeh: *mut Vehicle_t) -> qboolean {
 
 /// Raven `Update`.
 ///
-/// PORT-NOTE(bg-boundary): `Update` is stored as the `vehicleInfo_t`
-/// `Update` vtable slot and dispatched from the bg/vehicle-update path, so its LAW
-/// signature carries no channel. Its body nonetheless reads `level.time`/`g_entities`,
-/// draws from the RNG, and calls ctx-requiring fns (`VEH_TurretThink`,
-/// `G_VehicleDamageBoxSizing`, `BG_UnrestrainedPitchRoll`). Those are transcribed
-/// against the game channel `ctx`, which must be threaded in by the
-/// vtable-dispatch retrofit (see shape_mismatch). All other logic is faithful MP+QAGAME.
-///
 /// Source: `oracle/codemp/game/g_vehicles.c:1763-2334`
 pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_t) -> qboolean {
     unsafe {
@@ -1354,9 +1339,8 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
                     }
                 } else if ((*pVeh).m_ucmd.buttons & BUTTON_USE_HOLDABLE) != 0 {
                     // pilot pressed the "weapon link" toggle button
-                    // PORT-NOTE(PM_BGEntForNum): MP computes `rider`/`pilotPS` here via
-                    // PM_BGEntForNum(parent->s.owner) but never reads pilotPS in this
-                    // path; the pure lookup has no side effects, so it is elided.
+                    // Raven's PM_BGEntForNum(parent->s.owner) lookup here is pure
+                    // (pilotPS is never read) and is elided.
                     if (*pVeh).linkWeaponToggleHeld == qfalse {
                         // okay to toggle
                         if (*vi).weapon[iu].linkable == 1 {
@@ -2038,11 +2022,6 @@ pub fn G_VehicleDamageBoxSizing(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
 /// Raven `G_FlyVehicleImpactDir`.
 ///
-/// PORT-NOTE(bg-boundary): the LAW signature is ctx-free (its caller
-/// `G_FlyVehicleSurfaceDestruction` invokes it ctx-free), yet the body needs
-/// `trap_Trace` (engine). The trap calls are transcribed against the game channel
-/// `ctx`, which must be threaded in by the dispatch retrofit (see shape_mismatch).
-///
 /// Source: `oracle/codemp/game/g_vehicles.c:2843-2924`
 pub fn G_FlyVehicleImpactDir(ctx: &mut GameContext, veh: EntityId, trace: *mut trace_t) -> c_int {
     // `veh` is an `EntityId`; entity fields go through the accessor.
@@ -2190,12 +2169,6 @@ pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
 }
 
 /// Raven `G_SetVehDamageFlags`.
-///
-/// PORT-NOTE(bg-boundary): the LAW signature is ctx-free. Only the
-/// destroyed-droid sub-branch (`damageLevel==3`, `SHIPSURF_BACK`) needs the world
-/// (to resolve `veh->enemy: Option<EntityId>` to a `*mut gentity_t` for G_Damage);
-/// that resolution is transcribed against the game channel `ctx`, threaded in by
-/// the dispatch retrofit (see shape_mismatch). The bit flag bulk is faithful.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2961-3039`
 pub fn G_SetVehDamageFlags(
@@ -2379,12 +2352,6 @@ pub fn G_VehicleSetDamageLocFlags(
 }
 
 /// Raven `G_FlyVehicleDestroySurface`.
-///
-/// PORT-NOTE(bg-boundary): the LAW signature is ctx-free (caller
-/// `G_FlyVehicleSurfaceDestruction` invokes it ctx-free), yet the body reads
-/// `level.time` and calls ctx-requiring fns (`NPC_SetSurfaceOnOff`, `G_RadiusDamage`,
-/// `G_EntitySound`). Those are transcribed against the game channel `ctx`, threaded
-/// in by the dispatch retrofit (see shape_mismatch).
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:3102-3188`
 pub fn G_FlyVehicleDestroySurface(

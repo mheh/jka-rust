@@ -1413,11 +1413,9 @@ pub fn NPC_PickEnemy(
                                 } else {
                                     let vtos_str =
                                         vtos(ctx, (*newenemy_client).hiddenDir) as *const c_char;
-                                    // PORT-NOTE(varargs-seam): Debug_Printf's ported signature has no
                                     let name_str = cstr_to_str(vtos_str);
                                     let vtos_str_2 = vtos(ctx, normDiff) as *const c_char;
                                     let name_str_2 = cstr_to_str(vtos_str_2);
-                                    // variadic slot; pre-format via format! and pass as fmt.
                                     let npc_targetname = ctx.world.entity(npc_id).targetname;
                                     let newenemy_targetname =
                                         ctx.world.entity(newenemy_id).targetname;
@@ -1822,7 +1820,8 @@ pub fn NPC_CheckEnemy(
         }
 
         // if ( NPC->svFlags & SVF_IGNORE_ENEMIES )
-        // PORT-NOTE(SVF_IGNORE_ENEMIES): flag not yet ported; oracle-commented `if(0)` faithfully skips this branch.
+        // Oracle-commented dead branch (`NPC_combat.c:1922`), matching NPC_utils.rs.
+        // Source: oracle/codemp/game/NPC_combat.c:1922
 
         if !ctx.world.entity(npc_id).enemy.is_none() {
             let enemy_id = ctx.world.entity(npc_id).enemy.unwrap();

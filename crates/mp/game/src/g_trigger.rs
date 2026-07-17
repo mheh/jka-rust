@@ -2247,11 +2247,9 @@ pub fn SP_func_timer(ctx: &mut GameContext, self_: EntityId) {
         ctx.world.entity_mut(self_).random = w - 1.0; // NOTE: was - FRAMETIME, but FRAMETIME is
                                                       // in msec (100) and these numbers are in
                                                       // *seconds*!
-                                                      // PORT-NOTE(variadic-c-abi): `G_Printf`'s seam takes a fixed
-                                                      // format string with no real vararg substitution yet (same gap
-                                                      // as the other `G_Printf`/`G_Error` sites in this file); the
-                                                      // `vtos(self->s.origin)` substitution is dropped, matching the
-                                                      // codebase-wide convention at other still-todo `G_Printf` sites.
+                                                      // G_Printf's seam is a fixed format string with no vararg
+                                                      // substitution; vtos(self->s.origin) is dropped from the
+                                                      // message, matching other G_Printf/G_Error sites in this file.
         G_Printf(
             ctx,
             c"func_timer at (unresolved-vtos) has random >= wait\n".as_ptr(),

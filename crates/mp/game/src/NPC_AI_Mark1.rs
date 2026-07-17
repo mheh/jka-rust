@@ -1,20 +1,9 @@
 // PORT-COMPLETE: NPC_AI_Mark1.c 1/15
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Mark1.c`.
 //!
-//! Landed from the `fnskel.py` signature skeleton. One function is
-//! transcribed faithfully from packet + prelude alone; the remaining 15 are
-//! parked (see the `PORT-NOTE` topics below), because this file is
-//! almost entirely ambient-state driven and the faithful context-free
-//! signatures have no channel to reach it, matching the precedent set in
-//! `NPC_AI_GalakMech.rs`/`NPC_AI_Jedi.rs`/`NPC_AI_Stormtrooper.rs`:
-//!
-//! - `ambient-state` — nearly every body reaches the file-scope AI globals
-//!   (`NPC`, `NPCInfo`, `ucmd`, `level`, `gPainHitLoc`) or calls a `trap_*`
-//!   (needs `&Engine`). The AI globals become `GameWorld`/
-//!   `GameContext` state, but these faithful signatures carry no
-//!   `GameContext`/`&Engine` and the resolved cross-file signatures are
-//!   equally context-free. How ambient state + engine thread into
-//!   context-free faithful logic fns is not settled by the packet.
+//! Filled by the jampgame mega-pass; all bodies are live. The file-scope AI
+//! globals (`NPC`, `NPCInfo`, `ucmd`, `gPainHitLoc`) are reached through
+//! `ctx.world.globals`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::hit_location::*;
@@ -65,9 +54,6 @@ pub const LSTATE_FIRED4: c_int = 7;
 // copies caused a glob-glob ambiguity with the canonical import at every call site
 // through `crate::prelude::*`; porting-rules §E dedupe-at-import rule).
 
-// PORT-NOTE(ambient-state): needs `level.time` (via
-// `trap_G2API_GetBoltMatrix`); no channel from this context-free faithful
-// signature.
 /// Raven `NPC_Mark1_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:50-74`
@@ -108,9 +94,6 @@ pub fn NPC_Mark1_Precache(ctx: &mut GameContext) {
     );
 }
 
-// PORT-NOTE(ambient-state): reads `level.time` (via
-// `trap_G2API_GetBoltMatrix`); no channel from this context-free faithful
-// signature.
 /// Raven `NPC_Mark1_Part_Explode`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:81-102`
@@ -158,8 +141,6 @@ pub fn NPC_Mark1_Part_Explode(ctx: &mut GameContext, self_: EntityId, bolt: c_in
     }
 }
 
-// PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
-// globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_Idle`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:109-115`
@@ -177,9 +158,6 @@ pub fn Mark1_Idle(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
-// `level.time` (via `trap_G2API_AddBolt`/`trap_G2API_GetBoltMatrix`); no
-// channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireRocket`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:123-163`
@@ -269,9 +247,6 @@ pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
-// `level.time` (via `trap_G2API_AddBolt`/`trap_G2API_GetBoltMatrix`); no
-// channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:171-202`
@@ -342,12 +317,6 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(variadic-c-abi): the live body's only non-trivial call is
-// `G_SoundIndex(va("...death%d.wav", ctx.world.bg_state.rng.Q_irand(1,2)))` — `va`'s packet-resolved
-// signature is the parked `fn va(format: *const c_char) -> *mut c_char`
-// stub with C varargs dropped (seam decision pending, see `q_shared.rs`), so
-// there is no channel to pass the `ctx.world.bg_state.rng.Q_irand(1,2)` substitution argument
-// through it.
 /// Raven `Mark1_die`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:209-243`
@@ -394,10 +363,6 @@ pub fn Mark1_die(
     }
 }
 
-// PORT-NOTE(client-cast): reads `self->client->ps.torsoTimer`; `client`
-// is untyped `*mut c_void` on `gentity_t` (unported field) with no resolved
-// accessor to `gclient_t` fields in this packet — casting it here would
-// invent a shape the packet doesn't sanction.
 /// Raven `Mark1_dying`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:250-312`
@@ -493,9 +458,6 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `gPainHitLoc` ambient global; no
-// channel from this context-free faithful signature. Also stored as a fn
-// pointer (needs an EntXxx enum variant).
 /// Raven `NPC_Mark1_Pain`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:320-396`
@@ -652,8 +614,6 @@ pub fn NPC_Mark1_Pain(
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
-// writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Hunt`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:404-416`
@@ -682,11 +642,6 @@ pub fn Mark1_Hunt(ctx: &mut GameContext) {
     crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
 }
 
-// PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
-// globals, `level.time`, and this file's own fn-scope statics
-// (`forward`/`vright`/`up`/`muzzle` — genuine cross-frame state, a
-// GameWorld field); no channel from this context-free faithful
-// signature.
 /// Raven `Mark1_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:424-488`
@@ -834,8 +789,6 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
-// globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_BlasterAttack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:495-548`
@@ -910,9 +863,6 @@ pub fn Mark1_BlasterAttack(ctx: &mut GameContext, advance: qboolean) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global, `level.time`,
-// and this file's own fn-scope statics (`forward`/`vright`/`up` — genuine
-// cross-frame state); no channel from this context-free faithful signature.
 /// Raven `Mark1_FireRocket`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:555-599`
@@ -1013,8 +963,6 @@ pub fn Mark1_FireRocket(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global; no channel
-// from this context-free faithful signature.
 /// Raven `Mark1_RocketAttack`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:606-618`
@@ -1041,9 +989,6 @@ pub fn Mark1_RocketAttack(ctx: &mut GameContext, advance: qboolean) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads/writes the `NPC` ambient global and
-// calls `trap_G2API_GetSurfaceRenderStatus` (needs `&Engine`); no channel
-// from this context-free faithful signature.
 /// Raven `Mark1_AttackDecision`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:625-704`
@@ -1153,8 +1098,6 @@ pub fn Mark1_AttackDecision(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global and writes
-// `ucmd`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Patrol`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:711-739`
@@ -1187,8 +1130,6 @@ pub fn Mark1_Patrol(ctx: &mut GameContext) {
     }
 }
 
-// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
-// writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `NPC_BSMark1_Default`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:747-764`

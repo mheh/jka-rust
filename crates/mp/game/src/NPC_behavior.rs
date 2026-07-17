@@ -1134,9 +1134,8 @@ pub fn NPC_BSNoClip(ctx: &mut GameContext) {
     let NPCInfo = ctx.world.globals.NPCInfo;
     unsafe {
         if !UpdateGoal(ctx).is_null() {
-            // PORT-NOTE(goal-invariant): Raven's `if (UpdateGoal())` implies
-            // `NPCInfo->goalEntity` is non-NULL on this branch; `NPC_UpdateAngles`
-            // still runs at the tail either way, matching Raven's fall-through.
+            // Raven's `if (UpdateGoal())` implies `goalEntity` is non-NULL here;
+            // `.expect()` encodes that invariant.
             let goal_id = (*NPCInfo).goalEntity.expect("UpdateGoal() set goalEntity");
             let mut dir = [0.0f32; 3];
             let mut forward = [0.0f32; 3];

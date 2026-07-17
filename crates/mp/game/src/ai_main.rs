@@ -183,9 +183,6 @@ pub fn BotReportStatus(ctx: &mut GameContext, bs: *mut bot_state_t) {
     unsafe {
         let gt = ctx.world.cvars.g_gametype.integer;
         if gt == GT_TEAM {
-            // PORT-NOTE(StateDescriptions): the {teamplay,siege,ctf}StateDescriptions
-            // C string tables have no ported home yet; referenced as cited and
-            // reported as missing symbols.
             let s = cstr_to_str(teamplayStateDescriptions[(*bs).teamplayState as usize].as_ptr());
             trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
         } else if gt == GT_SIEGE {
@@ -398,7 +395,6 @@ pub fn BotAI_GetEntityState(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld — how is state threaded in?
 /// Raven `BotAI_GetSnapshotEntity`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:388-400`
@@ -783,9 +779,7 @@ pub fn RemoveColorEscapeSequences(text: *mut c_char) {
 ///
 /// Source: `oracle/codemp/game/ai_main.c:696-771`
 pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
-    // PORT-NOTE(botstates/PRT_FATAL/SHORT2ANGLE): `globals.botstates` is a `()`
-    // placeholder (indexed as intended); `PRT_FATAL` and `SHORT2ANGLE` have no
-    // ported home yet; the `_DEBUG` timing block is dropped (undefined here).
+    // The `#ifdef _DEBUG` timing block is dropped (§20, debug-only).
     unsafe {
         trap::EA_ResetInput(ctx.engine, BotlibEaResetInputArgs::new(client));
         let bs = (&ctx.world.globals.botstates)[client as usize];
@@ -898,8 +892,6 @@ pub fn BotAISetupClient(
     settings: *mut bot_settings_t,
     restart: qboolean,
 ) -> c_int {
-    // PORT-NOTE(botstates/PRT_FATAL): `globals.botstates` is a `()`
-    // placeholder (indexed as intended); `PRT_FATAL` has no ported home yet.
     unsafe {
         if (&ctx.world.globals.botstates)[client as usize].is_null() {
             // `bot_state_t` holds `*mut wpobject_t` fields (align 8); pad the pool
@@ -1398,8 +1390,8 @@ pub fn TotalTrailDistance(
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1263-1349`
 pub fn CheckForShorterRoutes(ctx: &mut GameContext, bs: *mut bot_state_t, newwpindex: c_int) {
-    // PORT-NOTE(FORCEJUMP_INSTANTMETHOD): undefined in this build; the
-    // non-instant force-jump branch is ported.
+    // FORCEJUMP_INSTANTMETHOD is undefined in this build; the non-instant
+    // force-jump branch is ported.
     unsafe {
         let mut i: c_int = 0;
         let mut fj: c_int = 0;
@@ -1477,9 +1469,8 @@ pub fn CheckForShorterRoutes(ctx: &mut GameContext, bs: *mut bot_state_t, newwpi
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1353-1429`
 pub fn WPConstantRoutine(ctx: &mut GameContext, bs: *mut bot_state_t) {
-    // PORT-NOTE(forceJumpStrength/FORCEJUMP_INSTANTMETHOD): `forceJumpStrength`
-    // has no ported home yet (reported missing); the instant-method macro is
-    // undefined here, so the non-instant branches are ported.
+    // FORCEJUMP_INSTANTMETHOD is undefined in this build; the non-instant
+    // branches are ported.
     unsafe {
         let lt = ctx.world.level.time;
         if (*bs).wpCurrent.is_null() {
@@ -1578,7 +1569,7 @@ pub fn BotCTFGuardDuty(ctx: &mut GameContext, bs: *mut bot_state_t) -> qboolean 
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1452-1539`
 pub fn WPTouchRoutine(ctx: &mut GameContext, bs: *mut bot_state_t) {
-    // PORT-NOTE(FORCEJUMP_INSTANTMETHOD): instant-method macro undefined here.
+    // FORCEJUMP_INSTANTMETHOD is undefined in this build.
     unsafe {
         let lt = ctx.world.level.time;
 
@@ -2085,8 +2076,6 @@ pub fn PassStandardEnemyChecks(
 ///
 /// Source: `oracle/codemp/game/ai_main.c:1861-1941`
 pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Option<EntityId>) {
-    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder
-    // (indexed as intended).
     unsafe {
         // `bot` is the hurt entity's raw `gclient_t*` (Raven's `bot`; may be an NPC
         // pool client — recipe 2b), dereffed raw. `attacker` reads through the
@@ -6505,10 +6494,8 @@ pub fn Bot_SetForcedMovement(
 /// Raven `StandardBotAI`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:5931-7483`
-// PORT-NOTE(preproc): FORCEJUMP_INSTANTMETHOD undefined (`ai_main.h:5` keeps it
-// commented out); BOT_STRAFE_AVOIDANCE IS defined (`ai_main.c:1548`) and its
-// gated block is ported (see `BotTrace_Strafe` call below). FINAL_BUILD
-// undefined (the `bot_getinthecarrr` debug block is ported, matching
+// Build config: FORCEJUMP_INSTANTMETHOD undefined (`ai_main.h:5`), BOT_STRAFE_AVOIDANCE
+// defined (`ai_main.c:1548`), FINAL_BUILD undefined — matching gated blocks ported/dropped.
 pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32) {
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
@@ -7344,8 +7331,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                 && (*ctx.world.globals.gWPArray.0[goalWPIndex as usize]).inuse != 0
                 && (ctx.world.globals.gLevelFlags & LEVELFLAG_NOPOINTPREDICTION) == 0
             {
-                // PORT-NOTE(gWPArray-oob §S19): Raven indexes gWPArray[goalWPIndex]
-                // (which may be -1) before any bounds check; guarded here.
+                // Raven indexes gWPArray[goalWPIndex] (which may be -1) before
+                // any bounds check; guarded here (§S19).
                 _VectorSubtract(
                     (*ctx.world.globals.gWPArray.0[goalWPIndex as usize]).origin,
                     (*bs).origin,
@@ -7396,8 +7383,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     desiredIndex = (*(*bs).wpCurrent).index - 1;
                 }
 
-                // PORT-NOTE(gWPArray-oob §S19): Raven derefs gWPArray[desiredIndex]
-                // before its own range check; guarded here.
+                // Raven derefs gWPArray[desiredIndex] before its own range
+                // check; guarded here (§S19).
                 if desiredIndex >= 0
                     && (desiredIndex as usize) < ctx.world.globals.gWPArray.0.len()
                     && !ctx.world.globals.gWPArray.0[desiredIndex as usize].is_null()
@@ -7541,8 +7528,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                 _VectorCopy((*ce_cl).ps.origin, &mut headlevel);
                 headlevel[2] += (*ce_cl).ps.viewheight as f32;
             } else {
-                // PORT-NOTE(§S19): Raven's else derefs the (here-NULL) client;
-                // substitute s.origin for the defined behavior.
+                // Raven's else derefs the (here-NULL) client; substitute
+                // s.origin for the defined behavior (§S19).
                 _VectorCopy((*currentEnemy).s.origin, &mut headlevel);
             }
 
@@ -7558,8 +7545,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                         && (*bs).currentEnemy.is_some()
                         && !(*currentEnemy).client.is_null()
                     {
-                        // PORT-NOTE(mLen-quirk): Raven stores a bool compare into the
-                        // float `mLen`, making the guard below unreachable; preserved.
+                        // Raven stores a bool compare into the float `mLen`,
+                        // making the guard below unreachable; preserved.
                         mLen = (VectorLength(a) > 128.0) as c_int as f32;
                         if mLen > 128.0 && mLen < 1024.0 {
                             _VectorSubtract(
@@ -8108,10 +8095,8 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
 /// Raven `BotAIStartFrame`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:7492-7568`
-// PORT-NOTE(fn-statics): Raven's function-local `static int local_time`/
-// `lastbotthink_time`/`botlib_residual` persist across calls; they
-// home on GameGlobals (`local_time`/`lastbotthink_time`; `botlib_residual` is
-// dead in Raven and dropped).
+// Raven's fn-local statics `local_time`/`lastbotthink_time` home on
+// GameGlobals; `botlib_residual` is dead in Raven and dropped (§20).
 pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
@@ -8228,10 +8213,8 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
 /// Raven `BotAISetup`.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:7575-7616`
-// PORT-NOTE(bot-cvars): the `bot_forcepowers`/`bot_forgimmick`/
-// `bot_honorableduelacceptance`/`bot_pvstype`/`bot_getinthecarrr` file-scope cvars
-// home on GameCvars (fields not yet present). The `#ifdef _DEBUG`
-// bot_nogoals/bot_debugmessages registrations are dropped (§20, debug-only).
+// The `#ifdef _DEBUG` bot_nogoals/bot_debugmessages registrations are
+// dropped (§20, debug-only).
 pub fn BotAISetup(ctx: &mut GameContext, restart: c_int) -> c_int {
     //rww - new bot cvars..
     trap::Cvar_Register(

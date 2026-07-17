@@ -283,8 +283,6 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         );
         write_cstr_field(&mut forcePowers, &cstr_to_str(val));
 
-        // PORT-NOTE(bot-forcepowers): `(*ent).r.svFlags & SVF_BOT` + `botstates`
-        // branch overwrites `forcePowers` from the bot's personality file.
         if ent_svflags & SVF_BOT != 0
             && !(&ctx.world.globals.botstates)[ent_number as usize].is_null()
         {
@@ -735,9 +733,7 @@ pub fn ForcePowerUsableOn(
         }
 
         if forcePower == FP_GRIP {
-            if !other_cl.is_null()
-                && (*other_cl).ps.fd.forcePowersActive & (1 << FP_ABSORB) != 0
-            {
+            if !other_cl.is_null() && (*other_cl).ps.fd.forcePowersActive & (1 << FP_ABSORB) != 0 {
                 //don't allow gripping to begin with if they are absorbing
                 //play sound indicating that attack was absorbed
                 if (*other_cl).forcePowerSoundDebounce < level_time {
@@ -1606,11 +1602,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
                 FP_GRIP,
             ) != 0
             && (ctx.world.cvars.g_friendlyFire.integer != 0
-                || OnSameTeam(
-                    ctx,
-                    Some(self_),
-                    EntityId::from_num(tr.entityNum as c_int),
-                ) == 0)
+                || OnSameTeam(ctx, Some(self_), EntityId::from_num(tr.entityNum as c_int)) == 0)
         //don't grip someone who's still crippled
         {
             let target_id = EntityId(tr.entityNum as u32);
@@ -1618,8 +1610,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
             // client, recipe 2b).
             let tcl = ctx.entity(target_id).client;
 
-            if ctx.entity(target_id).s.number < MAX_CLIENTS as c_int
-                && (*tcl).ps.m_iVehicleNum != 0
+            if ctx.entity(target_id).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0
             {
                 //a player on a vehicle
                 let veh_id = EntityId((*tcl).ps.m_iVehicleNum as u32);
@@ -1862,7 +1853,12 @@ pub fn ForceRage(ctx: &mut GameContext, self_: EntityId) {
         WP_ForcePowerStart(ctx, self_, FP_RAGE, 0);
 
         let snd = std::ffi::CString::new("sound/weapons/force/rage.wav").unwrap();
-        G_Sound(ctx, Some(self_), TRACK_CHANNEL_4 as c_int, G_SoundIndex(snd.as_ptr()));
+        G_Sound(
+            ctx,
+            Some(self_),
+            TRACK_CHANNEL_4 as c_int,
+            G_SoundIndex(snd.as_ptr()),
+        );
         let loop_sound = ctx.world.rageLoopSound;
         G_Sound(ctx, Some(self_), TRACK_CHANNEL_3 as c_int, loop_sound);
     }
@@ -1880,9 +1876,7 @@ pub fn ForceLightning(ctx: &mut GameContext, self_: EntityId) {
         if ctx.entity(self_).health <= 0 {
             return;
         }
-        if (*cl).ps.fd.forcePower < 25
-            || WP_ForcePowerUsable(ctx, self_, FP_LIGHTNING) == 0
-        {
+        if (*cl).ps.fd.forcePower < 25 || WP_ForcePowerUsable(ctx, self_, FP_LIGHTNING) == 0 {
             return;
         }
         if (*cl).ps.fd.forcePowerDebounce[FP_LIGHTNING as usize] > level_time {
@@ -2242,9 +2236,7 @@ pub fn ForceDrain(ctx: &mut GameContext, self_: EntityId) {
             return;
         }
 
-        if (*cl).ps.fd.forcePower < 25
-            || WP_ForcePowerUsable(ctx, self_, FP_DRAIN) == 0
-        {
+        if (*cl).ps.fd.forcePower < 25 || WP_ForcePowerUsable(ctx, self_, FP_DRAIN) == 0 {
             return;
         }
         if (*cl).ps.fd.forcePowerDebounce[FP_DRAIN as usize] > level_time {
@@ -2612,7 +2604,12 @@ pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercm
         //need to play sound
         if (*cl).ps.fd.forceJumpCharge == 0.0 {
             let s = cstr("sound/weapons/force/jumpbuild.wav");
-            G_Sound(ctx, Some(self_), TRACK_CHANNEL_1 as c_int, G_SoundIndex(s.as_ptr()));
+            G_Sound(
+                ctx,
+                Some(self_),
+                TRACK_CHANNEL_1 as c_int,
+                G_SoundIndex(s.as_ptr()),
+            );
         }
 
         //Increment
@@ -2904,8 +2901,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                 //activated a script on him
                 //FIXME: do the visual sparkles effect on their heads, still?
                 WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 0);
-            } else if (self_npc != std::ptr::null_mut()
-                && (*tcl).playerTeam != (*cl).playerTeam)
+            } else if (self_npc != std::ptr::null_mut() && (*tcl).playerTeam != (*cl).playerTeam)
                 || (self_npc == std::ptr::null_mut()
                     && (*tcl).playerTeam != (*cl).sess.sessionTeam as c_int)
             {
@@ -3017,22 +3013,8 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                     (*tr).plane.normal,
                 );
                 //FIXME: these events don't seem to always be picked up...?
-                AddSoundEvent(
-                    ctx,
-                    Some(self_),
-                    (*tr).endpos,
-                    512.0,
-                    AEL_SUSPICIOUS,
-                    qtrue,
-                ); //, qtrue );
-                AddSightEvent(
-                    ctx,
-                    Some(self_),
-                    (*tr).endpos,
-                    512.0,
-                    AEL_SUSPICIOUS,
-                    50.0,
-                );
+                AddSoundEvent(ctx, Some(self_), (*tr).endpos, 512.0, AEL_SUSPICIOUS, qtrue); //, qtrue );
+                AddSightEvent(ctx, Some(self_), (*tr).endpos, 512.0, AEL_SUSPICIOUS, 50.0);
                 WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 0);
                 *tookPower = qtrue;
             }
@@ -3184,7 +3166,8 @@ pub fn ForceTelepathy(ctx: &mut GameContext, self_: EntityId) {
                     } else if InFieldOfVision((*cl).ps.viewangles, visionArc, a) == 0 {
                         //only bother with arc rules if the victim is a client
                         entityList[e as usize] = ENTITYNUM_NONE;
-                    } else if ForcePowerUsableOn(ctx, Some(self_), Some(ent_id2), FP_TELEPATHY) == 0 {
+                    } else if ForcePowerUsableOn(ctx, Some(self_), Some(ent_id2), FP_TELEPATHY) == 0
+                    {
                         entityList[e as usize] = ENTITYNUM_NONE;
                     } else if OnSameTeam(ctx, Some(self_), Some(ent_id2)) != 0 {
                         entityList[e as usize] = ENTITYNUM_NONE;
@@ -3392,12 +3375,6 @@ pub fn G_LetGoOfWall(ctx: &mut GameContext, ent: Option<EntityId>) {
 /// Raven `ForceThrow`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:3054-3820`
-// PORT-NOTE(unported-global-and-vehicle-vtable): reads the un-ported
-// `forcePowerNeeded` table, calls the vehicle vtable
-// (`vehEnt->m_pVehicle->m_pVehicleInfo->Eject`, not in the resolved call surface),
-// and uses `VectorCompare` (marked unresolved in the packet). Multiple genuinely
-// un-ported deps — parked.
-// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
     unsafe {
         // FLAG: gclient_t derefs stay raw (recipe 2b; `self_`/targets can be NPC
@@ -4383,10 +4360,6 @@ pub fn WP_ForcePowerStop(ctx: &mut GameContext, self_: EntityId, forcePower: for
 /// Raven `DoGripAction`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:3948-4162`
-// PORT-NOTE(unported-global-table): reads `forcePowerNeeded[level][power]`
-// (const table not yet ported; values absent from packet). Parked like
-// the other `forcePowerNeeded` consumers.
-// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn DoGripAction(ctx: &mut GameContext, self_: EntityId, forcePower: forcePowers_t) {
     unsafe {
         // FLAG: gclient_t derefs stay raw (recipe 2b); read pointer values via the
@@ -5618,15 +5591,6 @@ pub fn G_SpecialRollGetup(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 /// Raven `WP_ForcePowersUpdate`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:5094-5671`
-// PORT-NOTE(unported-global-table): the siege force-regen branch reads
-// `bgSiegeClasses[...].classflags` (saga class data, not yet ported;
-// values absent from packet) and `forcePowerDarkLight` (currently a private
-// `const` in `bg_misc.rs`, not exported). Faithful port of those two branches is
-// blocked, so the whole fn is parked with its pass-1 siblings.
-// MISSING-SYMBOL: `bgSiegeClasses`, `forcePowerDarkLight`.
-// MISSING-SYMBOL: `WP_ForcePowerRun` — not yet ported anywhere in the crate
-// (resolved call surface lists it as "ported: w_force.rs" but no definition
-// exists yet); called exactly as the packet cites it.
 pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd: *mut usercmd_t) {
     unsafe {
         let mut usingForce = qfalse;
@@ -6052,11 +6016,11 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                         || ctx.world.cvars.g_MaxHolocronCarry.value != 0.0
                     {
                         if (*cl).ps.powerups[PW_FORCE_BOON as usize] != 0 {
-                            WP_ForcePowerRegenerate(ctx.entity(self_),6);
+                            WP_ForcePowerRegenerate(ctx.entity(self_), 6);
                         } else if (*cl).ps.isJediMaster != 0 && gametype == GT_JEDIMASTER as c_int {
-                            WP_ForcePowerRegenerate(ctx.entity(self_),4); //jedi master regenerates 4 times as fast
+                            WP_ForcePowerRegenerate(ctx.entity(self_), 4); //jedi master regenerates 4 times as fast
                         } else {
-                            WP_ForcePowerRegenerate(ctx.entity(self_),0);
+                            WP_ForcePowerRegenerate(ctx.entity(self_), 0);
                         }
                     } else {
                         //regenerate based on the number of holocrons carried
@@ -6067,7 +6031,7 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                             }
                         }
 
-                        WP_ForcePowerRegenerate(ctx.entity(self_),holoregen);
+                        WP_ForcePowerRegenerate(ctx.entity(self_), holoregen);
                     }
 
                     if gametype == GT_SIEGE as c_int {

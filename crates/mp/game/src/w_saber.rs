@@ -251,10 +251,6 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
 /// Raven `G_CanBeEnemy`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:82-115`
-// PORT-NOTE(bg-boundary): the LAW signature is ctx-free (ctx-free boundary set),
-// but the body reads `g_gametype`/`g_friendlyFire` cvars and calls `OnSameTeam`,
-// which require world state — `ctx` is referenced here and reported as a
-// shape_mismatch so integration can thread state into the boundary.
 pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> qboolean {
     let (sc, ec, self_number, enemy_number) = {
         let se = ctx.world.entity(self_);
@@ -994,9 +990,8 @@ pub fn G_G2NPCAngles(
             || (*sc).NPC_class == CLASS_R5D2
             || (*sc).NPC_class == CLASS_ATST
         {
-            // PORT-NOTE(trailingLegsAngles): Raven leaves this local uninitialized
-            // (CG_ATSTLegsYaw call is commented out); zero-init is the chosen
-            // defined behavior (porting-rules §19).
+            // Raven leaves this local uninitialized (the CG_ATSTLegsYaw call is
+            // commented out); zero-init is the chosen defined behavior (§19).
             let mut trailingLegsAngles: vec3_t = [0.0; 3];
 
             if (*ent).s.eType == ET_NPC as c_int
@@ -2576,10 +2571,6 @@ pub fn WP_GetSaberDeflectionAngle(
             {
                 // bounce straight back
                 let attMove = (*ac).ps.saberMove;
-                // PORT-NOTE(PM_SaberBounceForAttack): LAW resolves this to a
-                // `PmoveContext` method, but this game-tier fn holds only
-                // `GameContext`; called as a free fn against `bg_panimate`
-                // (reported as shape_mismatch for the integrator to bridge).
                 (*ac).ps.saberMove =
                     crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 if ctx.world.cvars.g_saberDebugPrint.integer != 0 {
@@ -2635,8 +2626,6 @@ pub fn WP_GetSaberDeflectionAngle(
                 if newQuad == defQuad {
                     // bounce straight back
                     let attMove = (*ac).ps.saberMove;
-                    // PORT-NOTE(PM_SaberBounceForAttack): PmoveContext method reached
-                    // as a free fn from the game tier (see above; shape_mismatch).
                     (*ac).ps.saberMove =
                         crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                     if ctx.world.cvars.g_saberDebugPrint.integer != 0 {
@@ -3128,10 +3117,8 @@ pub fn G_BuildSaberFaces(
     fList: *mut *mut saberFace_t,
 ) {
     unsafe {
-        // PORT-NOTE(faces): Raven's `static saberFace_t faces[12]` is a
-        // function-local static returned by pointer; now owned by
-        // `GameWorld.scratch` (safe-state Stage 3, §B3) to preserve that
-        // persistent-buffer behavior without a `static mut`.
+        // Raven's function-local `static saberFace_t faces[12]` is returned by
+        // pointer; `GameWorld.scratch` owns it (§B3), same persistent-buffer behavior.
         let faces = &mut ctx.world.scratch.faces;
         let mut i: usize = 0;
         let mut invFwd: vec3_t = [0.0; 3];
@@ -3833,8 +3820,6 @@ pub fn WP_SabersIntersect(
 /// Raven `G_PowerLevelForSaberAnim`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2987-3501`
-// PORT-NOTE(BG_AnimLength): resolved as the game-tier free-function form taking
-// `&BgState` (BG_AnimLength precedent in NPC_AI_Jedi), not the PmoveContext method.
 pub fn G_PowerLevelForSaberAnim(
     ctx: &mut GameContext,
     ent: Option<EntityId>,
@@ -4245,11 +4230,6 @@ pub fn G_PowerLevelForSaberAnim(
 /// Raven `WP_SaberClearDamage`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:3512-3526`
-// PORT-NOTE(missing-global-field): the `dmgDir`/`dmgSpot`/`totalDmg`/
-// `dismemberDmg`/`saberKnockbackFlags`/`victimEntityNum`/`victimHitEffectDone`
-// accumulators are `()`/absent placeholders on `GameGlobals`; the bodies below
-// reference them as their Raven array types (`[..; MAX_SABER_VICTIMS]`) —
-// integration must give the fields concrete array types.
 pub fn WP_SaberClearDamage(ctx: &mut GameContext) {
     let g = &mut ctx.world.globals;
     for ven in 0..MAX_SABER_VICTIMS as usize {
@@ -4610,8 +4590,6 @@ pub fn WP_SaberRadiusDamage(
 /// Raven `WP_SaberDoClash`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:3798-3810`
-// PORT-NOTE(missing-global-field): `saberClashPos`/`saberClashNorm` are absent
-// `vec3_t` globals; referenced on `GameGlobals` for integration to add.
 pub fn WP_SaberDoClash(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bladeNum: c_int) {
     if ctx.world.globals.saberDoClashEffect != 0 {
         let clash_pos = ctx.world.globals.saberClashPos;
@@ -4692,13 +4670,6 @@ pub fn WP_SaberBounceSound(
 /// Raven `CheckSaberDamage`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:3857-5273`
-// PORT-NOTE(saberClashPos/saberClashNorm): these w_saber.c file-statics are not
-// yet fields on `GameGlobals` (siblings `saberDoClashEffect`/`saberClashEventParm`
-// are); referenced here as `ctx.world.globals.saberClash{Pos,Norm}` per ruling
-// 8b — integration must add the two `vec3_t` fields.
-// PORT-NOTE(BG_BrokenParryForAttack/BG_InKnockDownOnGround): called via the
-// game-tier free-function form (BG_AnimLength precedent); the free forms are not
-// yet present (only `PmoveContext` methods) — reported as missing symbols.
 pub fn CheckSaberDamage(
     ctx: &mut GameContext,
     self_: EntityId,
@@ -8049,9 +8020,6 @@ pub fn saberKnockDown(
 /// Raven `WP_SaberRemoveG2Model`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:6589-6595`
-// PORT-NOTE(g2-seam-argshape): oracle passes `&saberent->ghoul2` (void**) but the
-// resolved `GG2Removeghoul2ModelsArgs::new` takes a single `*mut c_void`; the
-// address-of is cast to match (reported as a shape_mismatch).
 pub fn WP_SaberRemoveG2Model(ctx: &mut GameContext, saberent: EntityId) {
     if !ctx.entity(saberent).ghoul2.is_null() {
         // `ghoul2` is never dereferenced here — its address is handed to the
@@ -8067,9 +8035,6 @@ pub fn WP_SaberRemoveG2Model(ctx: &mut GameContext, saberent: EntityId) {
 /// Raven `WP_SaberAddG2Model`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:6597-6610`
-// PORT-NOTE(g2-seam-argshape): the resolved `GG2Initghoul2ModelArgs::new` wants an
-// owned `CString` for the model name (null → empty) and `*mut *mut c_void` for the
-// ghoul2 handle; the `*const c_char` model is decoded here.
 pub fn WP_SaberAddG2Model(
     ctx: &mut GameContext,
     saberent: EntityId,
@@ -9370,10 +9335,8 @@ pub fn G_KickTrace(
         let kickMaxs: vec3_t = [2.0f32, 2.0f32, 2.0f32];
 
         //FIXME: variable kick height?
-        // PORT-NOTE(kickEnd-null): Raven's `if ( kickEnd && !VectorCompare(...) )`
-        // null-checked the C array param; the LAW-by-value `kickEnd` can't be NULL,
-        // so the caller passes vec3_origin for Raven NULL — which `VectorCompare`
-        // reports equal, taking the same else/extrude branch. Drop the null test.
+        // Raven null-checks the `kickEnd` array param; by-value `vec3_t` can't be
+        // NULL, so callers pass `vec3_origin` for Raven NULL (same branch taken).
         if VectorCompare(kickEnd, vec3_origin) == 0 {
             //they passed us the end point of the trace, just use that
             //this makes the trace flat
@@ -9557,10 +9520,6 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
         let mut kickDir: vec3_t = [0.0; 3];
         let mut kickEnd: vec3_t = [0.0; 3];
         let mut fwdAngs: vec3_t = [0.0; 3];
-        // PORT-NOTE(BG_AnimLength-shape): the RESOLVED CALL SURFACE lists only the
-        // PmoveContext method form, but this is a game-tier fn with no
-        // PmoveContext; use the landed game-tier free-function form that takes
-        // `&BgState` (bg_panimate.rs:1603).
         let animLength = crate::bg_panimate::BG_AnimLength(
             &ctx.world.bg_state,
             (*ent).localAnimIndex,
@@ -9941,9 +9900,8 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
 
         if doKick != 0 {
             //		G_KickTrace( ent, kickDir, kickDist, kickEnd, kickDamage, kickPush );
-            // PORT-NOTE(kickEnd-null): Raven passes NULL for the by-value `kickEnd`
-            // param; the LAW signature is `kickEnd: vec3_t`, so pass vec3_origin —
-            // G_KickTrace treats it identically to Raven's NULL (see its note).
+            // Raven passes NULL for `kickEnd`; the by-value signature takes
+            // `vec3_origin`, which G_KickTrace treats identically (see its note).
             G_KickTrace(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),
@@ -11031,8 +10989,8 @@ pub fn WP_SaberPositionUpdate(
                         // don't do saber 1 if the left arm is broken
                         break;
                     }
-                    // PORT-NOTE(array-decay): Raven's `self->client->saber[1].model` operand is an
-                    // array address (always non-NULL), so only the `model[0]` byte test is load-bearing.
+                    // Raven's `self->client->saber[1].model` operand is an array address
+                    // (always non-NULL); only the `model[0]` byte test is load-bearing.
                     if rSaberNum > 0
                         && (*client).saber[1].model[0] != 0
                         && (*client).ps.saberHolstered == 1
@@ -11055,8 +11013,8 @@ pub fn WP_SaberPositionUpdate(
                                 .muzzleDirOld,
                         );
 
-                        // PORT-NOTE(array-decay): the `!saber[1].model` operand is an always-false
-                        // array-address test; only `!saber[1].model[0]` is load-bearing.
+                        // Raven's `!saber[1].model` operand is an always-false array-address
+                        // test; only `!saber[1].model[0]` is load-bearing.
                         if rBladeNum > 0
                             && (*client).saber[1].model[0] == 0
                             && (*client).saber[rSaberNum as usize].numBlades > 1

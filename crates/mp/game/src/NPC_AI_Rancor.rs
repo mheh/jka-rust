@@ -1,16 +1,6 @@
 // PORT-COMPLETE: NPC_AI_Rancor.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Rancor.c`.
 //!
-//! Landed from the `fnskel.py` signature skeleton. 4 functions are transcribed
-//! faithfully from packet + prelude alone; the remaining 12 are parked (see
-//! the `PORT-NOTE` topics below), matching the precedent set in
-//! `NPC_AI_Jedi.rs`/`NPC_AI_Stormtrooper.rs`/`NPC_AI_GalakMech.rs`: almost
-//! every body in this file reaches the file-scope AI globals (`NPC`,
-//! `NPCInfo`, `ucmd`, `level`, `g_entities`) or a `trap_*` seam call, and the
-//! faithful context-free signatures have no channel to reach either (the AI
-//! globals become `GameWorld`/`GameContext` state, but these resolved
-//! cross-file signatures are equally context-free).
-//!
 //! Safe-state migration **Campaign 2c** (deref regime): entity access is a
 //! checked `ctx.world.entity(id)`/`entity_mut(id)` borrow at the point of use.
 //! The gNPC_t (`NPCInfo`/`gentity_t.NPC`) and BG_Alloc'd pool-client

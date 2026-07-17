@@ -25,21 +25,6 @@
 //! enumerate are transcribed as local consts by their faithful Raven values
 //! (same convention as `g_team.rs`'s local `TEAM_RED`/`TEAM_BLUE`), resolved
 //! at integration.
-//!
-//! PARKED (see PORT-NOTE markers): `G_CallSpawn` (the ~180-entry
-//! `spawns[]` classname->`SP_*` dispatch table lives in other porters'
-//! not-yet-resolved files — none of those `SP_*` targets are in this
-//! packet's out-of-file call surface, so the table can't be built without
-//! exploring the tree, forbidden by the porter contract); `SP_worldspawn`
-//! (reads `BGPAFtextLoaded`/`bgHumanoidAnimations` — the same file-scope
-//! `bg_panimate.c` globals that block `BG_ParseAnimationFile` itself and
-//! every other caller in this codebase, e.g. `NPC_reactions.rs`/
-//! `g_combat.rs`: "no channel to reach them"); `G_SpawnEntitiesFromString`
-//! (stores `script_runner->think = scriptrunner_run` — the same
-//! fn-ptr-store-shape-mismatch parked in `g_client.rs`'s
-//! `SP_info_jedimaster_start`: `gentity_t.think` is still a raw
-//! `extern "C" fn` pointer, not the `EntThink` enum, and `scriptrunner_run`
-//! is an out-of-file target with no such pointer to assign).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::q_shared::Q_strlen as strlen;
@@ -1206,8 +1191,6 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
 
         // The server will precache the standard model and animations, so that there is no hit
         // when the first client connects.
-        // PORT-NOTE(bg-panimate-method): BG_ParseAnimationFile is a PmoveContext method in the ported codebase,
-        // but needs to be called from game-tier SP_worldspawn; using the resolved freestanding signature.
         if ctx.world.bg_state.BGPAFtextLoaded == qfalse {
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
@@ -1394,7 +1377,6 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         );
 
         for i in 1..LS_NUM_STYLES {
-            // PORT-NOTE(string-formatting): Com_sprintf is variadic; use format! + write to buffer
             let red_key = format!("ls_{}r", i);
             let red_key_c = CString::new(red_key).unwrap();
             G_SpawnString(

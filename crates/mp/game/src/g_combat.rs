@@ -1886,9 +1886,8 @@ pub fn player_die(
     damage: c_int,
     meansOfDeath: c_int,
 ) {
-    // PORT-NOTE(static-death-anim-counter): Raven's function-`static int i`
-    // rotates the EV_DEATH1 event 0..2 across calls; §B3 bans `static mut`, so
-    // the counter lives in one atomic (behavior-preserving).
+    // Raven's function-`static int i` rotates EV_DEATH1 0..2 across calls; §B3
+    // bans `static mut`, so the counter lives in one atomic (behavior-preserving).
     static DEATH_ANIM_I: core::sync::atomic::AtomicI32 = core::sync::atomic::AtomicI32::new(0);
     // STAGE-1: EntityId/Option params (body null-checks inflictor/attacker), raw
     // re-derived verbatim (Stage-2 debt); mega-fn.
@@ -3182,10 +3181,6 @@ pub fn G_GetDismemberLoc(self_: &gentity_t, boltPoint: &mut vec3_t, limbType: c_
 
 /// Raven `G_GetDismemberBolt`.
 ///
-/// PORT-NOTE(boltPoint-outparam): Raven writes the bolt origin back through
-/// `boltPoint` (an out-param), so this takes `&mut vec3_t` to match the
-/// already-ported sibling `G_GetDismemberLoc`; the packet's LAW by-value
-/// `vec3_t` would drop the writes — see shape_mismatches.
 /// Source: `oracle/codemp/game/g_combat.c:3264-3385`
 pub fn G_GetDismemberBolt(
     ctx: &mut GameContext,
@@ -3392,9 +3387,6 @@ pub fn LimbThink(ctx: &mut GameContext, ent: EntityId) {
 
 /// Raven `G_Dismember`.
 ///
-/// PORT-NOTE(bg-traps-handle): `BG_GetRootSurfNameWithVariant` is a bg-tier fn
-/// taking `&BgState` + `&dyn BgTraps`; the game-tier `&dyn BgTraps` handle is
-/// passed as `&GameBgTraps::new(ctx.engine)` (provisional — the fn itself is OPEN).
 /// Source: `oracle/codemp/game/g_combat.c:3436-3620`
 pub fn G_Dismember(
     ctx: &mut GameContext,
@@ -4750,10 +4742,6 @@ pub fn G_CheckVehicleNPCTeamDamage(ent: Option<&gentity_t>) -> qboolean {
 
 /// Raven `G_Damage`.
 ///
-/// PORT-NOTE(ctx-and-dir): the LAW block gives no `ctx`; `ctx` is threaded here
-/// because the body calls ~20 ctx-threaded fns. Raven's NULL-able
-/// `dir` out-param is `Option<&mut vec3_t>`, so the `if (!dir)` branches are
-/// restored as `is_none()` checks and NULL callers pass `None`.
 /// Source: `oracle/codemp/game/g_combat.c:4577-5715`
 pub fn G_Damage(
     ctx: &mut GameContext,
@@ -6038,8 +6026,6 @@ pub fn G_Damage(
 
 /// Raven `G_DamageFromKiller`.
 ///
-/// PORT-NOTE(ctx-and-dir): threaded `ctx` (needed to reach `G_Damage`); Raven
-/// passes NULL `dir` to `G_Damage`, which the port carries as `None`.
 /// Source: `oracle/codemp/game/g_combat.c:5717-5758`
 pub fn G_DamageFromKiller(
     ctx: &mut GameContext,

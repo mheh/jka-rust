@@ -999,8 +999,6 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
             }
         }
         CLASS_R2D2 => {
-            // PORT-NOTE(va-formatting): droid sound paths use va() for dynamic formatting
-            // ported to format!() with Rust string construction
             let sound_path = format!(
                 "sound/chars/r2d2/misc/r2d2talk0{}.wav",
                 ctx.world.bg_state.rng.Q_irand(1, 3)

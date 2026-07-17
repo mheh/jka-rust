@@ -3,11 +3,7 @@
 //! Pass-3 transcription: `ctx: GameContext` threads the ai_main globals
 //! (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) via `ctx.world`, RNG
 //! routes to the one `BgState.rng`, and stored `enemy`/`goalEntity`/
-//! `activator`/`lastEnemy` fields are `Option<EntityId>`. See `PORT-NOTE`s
-//! for the two open items:
-//! the `jediSpeechDebounceTime` global is still a `()` placeholder in
-//! `game_globals.rs`, and `BG_AnimLength` resolved as a `PmoveContext` method
-//! with no game-tier receiver at its single call site.
+//! `activator`/`lastEnemy` fields are `Option<EntityId>`.
 //!
 //! Safe-state migration **Stage 2b** (body sweep): every world reach is a
 //! checked `ctx.world.…` borrow — the transitional `(*ctx.world_raw())` raw-deref
@@ -1262,8 +1258,6 @@ pub fn Jedi_BattleTaunt(ctx: &mut GameContext) -> qboolean {
     // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
     // via the safe entity borrow, per trap 2b.
     let client = ctx.world.entity(npc_id).client;
-    // PORT-NOTE(jediSpeechDebounceTime): field is a `()` placeholder in
-    // game_globals.rs; needs porting to `[c_int; TEAM_NUM_TEAMS]`.
     if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"chatter".as_ptr()) != qfalse
         && ctx.world.bg_state.rng.Q_irand(0, 3) == 0
         && unsafe { (*npc_info).blockedSpeechDebounceTime } < ctx.world.level.time
@@ -2051,7 +2045,6 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                 }
             }
             if enemy_dist > 384 {
-                // PORT-NOTE(jediSpeechDebounceTime): `()` placeholder field indexed by team.
                 if ctx.world.bg_state.rng.Q_irand(0, 10) == 0
                     && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
                     && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
@@ -2549,8 +2542,6 @@ pub fn Jedi_CheckFlipEvasions(
             let fwdAngles: vec3_t = [0.0, (*client).ps.viewangles[YAW as usize], 0.0];
             crate::q_math::AngleVectors(fwdAngles, None, Some(&mut right), None);
 
-            // PORT-NOTE(BG_AnimLength): resolved as a free-function that takes
-            // a reference to the BgState from GameWorld.
             animLength = crate::bg_panimate::BG_AnimLength(
                 &ctx.world.bg_state,
                 ctx.world.entity(self_).localAnimIndex,
@@ -5035,7 +5026,6 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
                 //we hit our enemy last time we swung, drop our aggression
                 if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
                     Jedi_Aggression(&*npc, -1);
-                    // PORT-NOTE(jediSpeechDebounceTime): `()` placeholder field indexed by team.
                     if ctx.world.bg_state.rng.Q_irand(0, 3) == 0
                         && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time
                         && ctx.world.globals.jediSpeechDebounceTime[(*client).playerTeam as usize]
@@ -6226,7 +6216,6 @@ pub fn Jedi_Combat(ctx: &mut GameContext) {
                 }
                 if Jedi_Hunt(ctx) != qfalse && ((*npc_info).aiFlags & NPCAI_BLOCKED) == 0 {
                     //can macro-navigate to him
-                    // PORT-NOTE(jediSpeechDebounceTime): `()` placeholder field indexed by team.
                     if enemy_dist < 384.0
                         && ctx.world.bg_state.rng.Q_irand(0, 10) == 0
                         && (*npc_info).blockedSpeechDebounceTime < ctx.world.level.time

@@ -135,8 +135,6 @@ pub fn NPC_Blocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<Entit
     }
 
     // Attempt to run any blocked scripts
-    // PORT-NOTE(missing-const): BSET_BLOCKED (bset_t enum value) not
-    // resolved anywhere in the crate graph; written as cited.
     if G_ActivateBehavior(ctx, Some(self_), BSET_BLOCKED as c_int) != 0 {
         return;
     }
@@ -155,10 +153,8 @@ pub fn NPC_Blocked(ctx: &mut GameContext, self_: EntityId, blocker: Option<Entit
         }
     }
 
-    // PORT-NOTE(dead-oracle-code): the player-blocked voice-event branch's
-    // body is entirely commented out in the oracle (`//G_AddVoiceEvent(...)`)
-    // — no live behavior to transcribe beyond the (side-effect-free) guard.
-
+    // Raven's player-blocked voice-event branch body is entirely commented out
+    // (`//G_AddVoiceEvent(...)`) — no live behavior beyond the guard.
     let new_time = ctx.world.level.time
         + MIN_BLOCKED_SPEECH_TIME
         + (ctx.world.bg_state.rng.random() * 4000.0) as c_int;
@@ -2296,9 +2292,8 @@ pub fn NAV_GetStoredWaypoint(ctx: &mut GameContext, targetname: *mut c_char) -> 
     -1
 }
 
-// PORT-NOTE(ifdef-elided): the oracle's `#if _HARD_CONNECT` block is compiled
-// in on the reference build; ported unconditionally per §C10 (behavior, not
-// preprocessor shape).
+// Oracle's `#if _HARD_CONNECT` is compiled in on the reference build; ported
+// unconditionally per §C10 (behavior, not preprocessor shape).
 /// Raven `NAV_CalculatePaths`.
 ///
 /// Source: `oracle/codemp/game/g_nav.c:1734-1838`

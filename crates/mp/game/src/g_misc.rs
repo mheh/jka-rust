@@ -455,7 +455,6 @@ pub fn SP_misc_portal_surface(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`.
 /// Raven `SP_misc_portal_camera`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:375-385`
@@ -564,8 +563,6 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(unported-const): `MAX_INFO_STRING` has no ported home; the 1024
-// literal below is the oracle's value, used only for local scratch-buffer sizing.
 /// Raven `SP_terrain`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:484-631`
@@ -775,9 +772,6 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): indexes `g_entities`,
-// calls `trap_InPVS`/`trap_Trace`; also a fn-pointer write
-// (`think = G_FreeEntity`).
 /// Raven `G_PortalifyEntities`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:638-667`
@@ -910,9 +904,6 @@ pub fn HolocronPopOut(ctx: &mut GameContext, self_: EntityId) {
     ctx.world.entity_mut(self_).s.pos.trDelta[2] = 150.0 + v;
 }
 
-// PORT-NOTE(unported-const): `HOLOCRON_RESPAWN_TIME` (`g_local.h`) has no
-// ported home anywhere in the crate graph; referenced verbatim per the
-// zero-park policy — a fixer ports the const.
 /// Raven `HolocronTouch`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:786-905`
@@ -1043,9 +1034,8 @@ pub fn HolocronTouch(
     //G_Printf("DON'T TOUCH ME\n");
 }
 
-// PORT-NOTE(control-flow): Raven's `goto justthink;` is ported as an early
-// `return` after inlining the shared tail (porting-rules §C10 — preserve
-// behavior, not shape).
+// Raven's `goto justthink;` is ported as an early return after inlining the
+// shared tail (porting-rules §C10 — preserve behavior, not shape).
 /// Raven `HolocronThink`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:907-991`
@@ -1443,7 +1433,6 @@ pub fn SP_shooter_blaster(ctx: &mut GameContext, ent: EntityId) {
     InitShooter(ctx, ent, mp_bg::weapons::weapon_t::WP_BLASTER);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `check_recharge`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1176-1206`
@@ -1493,8 +1482,6 @@ pub fn check_recharge(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `EnergyShieldStationSettings`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1213-1223`
-// PORT-NOTE(unported-const): `STATION_RECHARGE_TIME` (`g_local.h`) has no
-// ported home anywhere in the crate graph; referenced verbatim.
 pub fn EnergyShieldStationSettings(ctx: &mut GameContext, ent: EntityId) {
     let mut count: c_int = 0;
     G_SpawnInt(ctx, c"count".as_ptr(), c"200".as_ptr(), &mut count);
@@ -2082,9 +2069,6 @@ pub fn SP_misc_model_shield_power_converter(ctx: &mut GameContext, ent: EntityId
 /// Raven `EnergyAmmoStationSettings`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1743-1746`
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
-// how is state threaded in?
 pub fn EnergyAmmoStationSettings(ctx: &mut GameContext, ent: EntityId) {
     let mut count: c_int = 0;
     G_SpawnInt(ctx, c"count".as_ptr(), c"200".as_ptr(), &mut count);
@@ -2239,16 +2223,12 @@ pub fn SP_misc_model_ammo_power_converter(ctx: &mut GameContext, ent: EntityId) 
 /// Raven `EnergyHealthStationSettings`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1911-1914`
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
-// how is state threaded in?
 pub fn EnergyHealthStationSettings(ctx: &mut GameContext, ent: EntityId) {
     let mut count: c_int = 0;
     G_SpawnInt(ctx, c"count".as_ptr(), c"200".as_ptr(), &mut count);
     ctx.world.entity_mut(ent).count = count;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `health_power_converter_use`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1921-1972`
@@ -2767,10 +2747,6 @@ pub fn Use_Target_Screenshake(
     G_ScreenShake(ctx, origin, None, speed, gv5, bGlobal);
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): faithful body has no
-// trap/level dependency itself, but is a fn-pointer write
-// (`use_ = Use_Target_Screenshake`) the `gentity_t` field type
-// cannot yet express.
 /// Raven `SP_target_screenshake`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2555-2565`
@@ -2793,8 +2769,6 @@ pub fn SP_target_screenshake(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.entity_mut(ent).use_ = Some(EntUse::Use_Target_Screenshake).into();
 }
 
-// PORT-NOTE(unported-const): `PMF_FOLLOW` (`bg_public.h` pmove flags) has no
-// ported home anywhere in the crate graph; referenced verbatim.
 /// Raven `Use_Target_Escapetrig`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2569-2597`
@@ -2847,8 +2821,6 @@ pub fn Use_Target_Escapetrig(
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`; also
-// a fn-pointer write (`use_ = Use_Target_Escapetrig`).
 /// Raven `SP_target_escapetrig`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2599-2613`
@@ -2900,8 +2872,6 @@ pub fn maglock_die(
     G_UseTargets(ctx, Some(self_), attacker);
 }
 
-// PORT-NOTE(unported-const): `START_TIME_FIND_LINKS` has no ported home;
-// referenced verbatim.
 /// Raven `SP_misc_maglock`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2645-2658`
@@ -3027,7 +2997,6 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
     trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ep.cast()));
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `faller_touch`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2730-2756`
@@ -3065,8 +3034,6 @@ pub fn faller_touch(
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
-// a fn-pointer write (`think = G_FreeEntity`).
 /// Raven `faller_think`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2758-2787`
@@ -3182,7 +3149,6 @@ pub fn misc_faller_create(
     trap::LinkEntity(ctx.engine, GLinkentityArgs::new(fp.cast()));
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `misc_faller_think`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2830-2834`
@@ -3195,8 +3161,6 @@ pub fn misc_faller_think(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.entity_mut(ent).nextthink = level_time + gv1 + r;
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
-// fn-pointer writes (`think = misc_faller_think`, `use_ = misc_faller_create`).
 /// Raven `SP_misc_faller`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2844-2865`
@@ -3529,7 +3493,6 @@ pub fn TAG_GetAngles(
     1
 }
 
-// PORT-NOTE(bg-dep): depends on `TAG_Find`/`tagOwner_t` (unported).
 /// Raven `TAG_GetRadius`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3174-3185`
@@ -3543,7 +3506,6 @@ pub fn TAG_GetRadius(ctx: &mut GameContext, owner: *const c_char, name: *const c
     unsafe { (*tag).radius }
 }
 
-// PORT-NOTE(bg-dep): depends on `TAG_Find`/`tagOwner_t` (unported).
 /// Raven `TAG_GetFlags`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3193-3204`
@@ -3609,8 +3571,6 @@ pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
     G_FreeEntity(ctx, Some(ent));
 }
 
-// PORT-NOTE(unported-const): `START_TIME_LINK_ENTS` has no ported home;
-// referenced verbatim.
 /// Raven `SP_reference_tag`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3300-3312`
@@ -3670,8 +3630,6 @@ pub fn G_FreeClientForShooter(ctx: &mut GameContext, cl: *mut gclient_t) {
     }
 }
 
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
-// a fn-pointer write (`think = misc_weapon_shooter_fire`).
 /// Raven `misc_weapon_shooter_fire`.
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3391-3399`

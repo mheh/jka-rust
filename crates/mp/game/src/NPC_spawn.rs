@@ -67,20 +67,6 @@ pub const SFB_NOTSOLID: c_int = 64;
 /// Source: `oracle/codemp/game/b_local.h:149`
 pub const SFB_STARTINSOLID: c_int = 128;
 
-// PORT-NOTE(packet-contract): this packet's manifest rows list callee
-// names (in-module callees / bg_ callees / traps / globals) but never give the
-// resolved Rust signature of any out-of-file symbol (no `## RESOLVED` /
-// `prelude` section), unlike what the task brief promises. Nearly every
-// function in this file (NPC_Begin, NPC_Spawn_Do, the ~60 SP_NPC_* spawn-field
-// setters, vehicle/precache plumbing, Cmd_NPC_f, …) reaches `level`,
-// `g_entities`, `G_Spawn`/`G_FreeEntity`, NPC.cfg parsing, ICARUS, vehicle
-// vtables, and ~213 fn-pointer targets whose concrete Rust
-// shapes/signatures are not given here and this protocol forbids exploring
-// the tree to find them. Parking those bodies rather than inventing
-// signatures. Only the handful of functions below are fully self-contained
-// (pure arithmetic / string compares / no external state) and are ported
-// faithfully.
-
 /// Raven `WP_SetSaberModel`.
 ///
 /// Raven: rwwFIXMEFIXME: Do something here, need to let the client know.
@@ -509,9 +495,6 @@ pub fn NPC_SetWeapons(ctx: &mut GameContext, ent: EntityId) {
         while curWeap < WP_NUM_WEAPONS {
             if weapons & (1 << curWeap) != 0 {
                 (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << curWeap;
-                // PORT-NOTE(weaponData): `weaponData` global table isn't resolved
-                // in this packet; ammoIndex lookup left as the literal Raven
-                // subject until that global lands.
                 let ammo_index = weaponData[curWeap as usize].ammoIndex;
                 (*client).ps.ammo[ammo_index as usize] = 100;
                 (*npc).currentAmmo = 100;

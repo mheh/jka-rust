@@ -1,7 +1,4 @@
-// PORT-COMPLETE: ai_wpnav.c 42/42 (pass 3 — zero-park, see file for
-// PORT-NOTE/missing_symbols on unhomed `bot_wp_*`/`bot_normgpath` cvars and
-// the `botGlobalNavWeaponWeights`/`LEVELFLAG_NOPOINTPREDICTION`/`CVAR_*` bit
-// constants; those compile only once a fixer lands their homes).
+// PORT-COMPLETE: ai_wpnav.c 42/42 (pass 3 — zero-park).
 //! FAITHFUL port of `oracle/codemp/game/ai_wpnav.c`.
 //!
 //! Filled by the jampgame mega-pass.
@@ -10,14 +7,6 @@
 //! `GameGlobals` — `gWPArray: WpArray([*mut wpobject_t; 4096])` (raw-pointer
 //! array into the `B_Alloc` bump arena), `nodetable: NodeTable(Box<[nodeobject_t;
 //! 16384]>)`, `gSpawnPoints: SpawnPointArray([*mut gentity_t; 64])`.
-//!
-//! A handful of Raven file-scope `vmCvar_t` handles (`bot_wp_info`,
-//! `bot_wp_distconnect`/`bot_wp_visconnect`, `bot_wp_clearweight`,
-//! `bot_wp_edit`, `bot_normgpath`) and free globals/consts
-//! (`botGlobalNavWeaponWeights`, `LEVELFLAG_NOPOINTPREDICTION`,
-//! `CVAR_SERVERINFO`/`CVAR_ROM`/`CVAR_CHEAT`) have no ported home yet; every
-//! site referencing them carries a `PORT-NOTE(cvar-placement)` /
-//! `PORT-NOTE(missing-const)` /`PORT-NOTE(missing-global)` tag.
 //!
 //! Safe-state migration **Stage 2** (campaign 2c): entity-pointer params are
 //! `EntityId` / `Option<EntityId>` handles (§B5), not raw `gentity_t*`, and
@@ -347,10 +336,6 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 }
             }
 
-            // PORT-NOTE(cvar-placement): `bot_wp_info` is an `ai_wpnav.c`
-            // file-scope `vmCvar_t` with no home in `GameCvars`/`GameGlobals`
-            // yet; reached the same way `bot_wp_*` handles are referenced
-            // elsewhere in this file (missing_symbols).
             if ctx.world.cvars.bot_wp_info.value == 0.0 {
                 return;
             }
@@ -1564,9 +1549,6 @@ pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
 
         let mut i: c_int = 0;
 
-        // PORT-NOTE(cvar-placement): `bot_wp_distconnect`/`bot_wp_visconnect`
-        // are `ai_wpnav.c` file-scope `vmCvar_t` handles with no home in
-        // `GameCvars` yet (missing_symbols).
         trap::Cvar_Update(
             ctx.engine,
             GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_distconnect as *mut vmCvar_t),
@@ -1962,8 +1944,6 @@ pub fn GetNearestVisibleWPToItem(ctx: &mut GameContext, org: vec3_t, ignore: c_i
 pub fn CalculateWeightGoals(ctx: &mut GameContext) {
     // set waypoint weights depending on weapon and item placement
     unsafe {
-        // PORT-NOTE(cvar-placement): `bot_wp_clearweight` has no home in
-        // `GameCvars` yet (missing_symbols).
         trap::Cvar_Update(
             ctx.engine,
             GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_clearweight as *mut vmCvar_t),
@@ -2510,11 +2490,8 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             (*p0).origin[2] as f64,
         );
 
-        // PORT-NOTE(bg-0143): Raven builds `storeString` here for waypoint 0's
-        // neighbor list but never concatenates it into `fileString` (only the
-        // direct `Com_sprintf` above touches `fileString`) — a genuine Raven
-        // bug that silently drops waypoint 0's neighbor list from the saved
-        // file. Preserved faithfully per §19/rule 2 (no speculative fixes).
+        // Raven builds `storeString` for waypoint 0's neighbor list but never
+        // concatenates it into `fileString` — a genuine Raven bug, preserved per §19.
         let mut n: c_int = 0;
         let mut store_string = String::new();
         while n < (*p0).neighbornum {
@@ -2603,11 +2580,6 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             GFsWriteArgs::new(file_bytes.as_ptr(), file_bytes.len() as c_int, f),
         );
 
-        // PORT-NOTE(bg-temp-alloc): Raven's `fileString`/`storeString` are
-        // `B_TempAlloc`'d scratch buffers, freed here via `B_TempFree`. We use
-        // owned `String`s instead (no B_TempAlloc call), so there is no
-        // matching temp-arena allocation to pop — omitting the frees keeps
-        // the bump-allocator stack balanced.
         trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
 
         G_Printf(
@@ -3216,9 +3188,6 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
         let mut i: c_int = 0;
 
         let mut mapname: vmCvar_t = vmCvar_t::zeroed();
-        // PORT-NOTE(missing-const): `CVAR_SERVERINFO`/`CVAR_ROM`/`CVAR_CHEAT`
-        // bit constants have no ported home yet (same class of gap noted at
-        // `g_bot.rs:361`; missing_symbols).
         trap::Cvar_Register(
             ctx.engine,
             GCvarRegisterArgs::new(
@@ -3231,10 +3200,6 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
 
         if ctx.world.cvars.g_RMG.integer != 0 {
             // If RMG, generate the path on-the-fly
-            // PORT-NOTE(cvar-placement): `bot_normgpath` is an `ai_wpnav.c`
-            // file-scope `vmCvar_t` with no home in `GameCvars` yet
-            // (missing_symbols); this is disabled for now per the oracle
-            // comment (standard bot nav on premade terrain levels).
             trap::Cvar_Register(
                 ctx.engine,
                 GCvarRegisterArgs::new(
@@ -3262,8 +3227,6 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
             }
         }
 
-        // PORT-NOTE(cvar-placement): `bot_wp_edit` has no home in
-        // `GameCvars` yet (missing_symbols).
         trap::Cvar_Update(
             ctx.engine,
             GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_edit as *mut vmCvar_t),
@@ -3638,8 +3601,6 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         if Q_stricmp(cmd, c"bot_wp_save".as_ptr()) == 0 {
             ctx.world.globals.gDeactivated = 0.0;
             let mut mapname: vmCvar_t = vmCvar_t::zeroed();
-            // PORT-NOTE(missing-const): `CVAR_SERVERINFO`/`CVAR_ROM` bit
-            // constants have no ported home yet (missing_symbols).
             trap::Cvar_Register(
                 ctx.engine,
                 GCvarRegisterArgs::new(

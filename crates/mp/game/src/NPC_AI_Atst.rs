@@ -104,8 +104,6 @@ pub fn NPC_ATST_Pain(
 /// Hunt down the enemy. Set goal to enemy and move toward it.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:130-142`
 pub fn ATST_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
-    // PORT-NOTE(ai-context): NPC via the entity accessor; NPCInfo (gNPC_t) has no
-    // safe pool accessor yet, so its deref stays unsafe (NPC_AI_Default precedent).
     let npc = ctx.world.globals.NPC;
     // SAFETY: NPCInfo points into the module-owned gNPC pool (no aliasing accessor).
     let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
@@ -131,7 +129,6 @@ pub fn ATST_Ranged(
     advance: qboolean,
     altAttack: qboolean,
 ) {
-    // PORT-NOTE(ai-context): NPC/ucmd via ctx.world; NPCInfo (gNPC_t) deref stays unsafe.
     let npc = ctx.world.globals.NPC;
 
     if TIMER_Done(
@@ -165,7 +162,6 @@ pub fn ATST_Ranged(
 /// check visibility, and decide weapon type based on distance.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:177-264`
 pub fn ATST_Attack(ctx: &mut GameContext) {
-    // PORT-NOTE(ai-context): NPC via the entity accessor; NPCInfo (gNPC_t) deref stays unsafe.
     let npc = ctx.world.globals.NPC;
 
     let mut alt_attack: qboolean = qfalse;
@@ -279,7 +275,6 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
 /// and move toward goal.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:271-290`
 pub fn ATST_Patrol(ctx: &mut GameContext) {
-    // PORT-NOTE(ai-context): NPC/ucmd via ctx.world.
     let npc = ctx.world.globals.NPC;
 
     if NPC_CheckPlayerTeamStealth(ctx) != qfalse {
@@ -303,7 +298,6 @@ pub fn ATST_Patrol(ctx: &mut GameContext) {
 /// ATST in idle state. Play idle behavior and set stand animation.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:297-303`
 pub fn ATST_Idle(ctx: &mut GameContext) {
-    // PORT-NOTE(ai-context): NPC accessed via ctx.world.globals
     let npc = ctx.world.globals.NPC;
 
     NPC_BSIdle(ctx);
@@ -323,7 +317,6 @@ pub fn ATST_Idle(ctx: &mut GameContext) {
 /// and idle based on NPC state.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:310-328`
 pub fn NPC_BSATST_Default(ctx: &mut GameContext) {
-    // PORT-NOTE(ai-context): NPC via the entity accessor; NPCInfo (gNPC_t) deref stays unsafe.
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
     // SAFETY: NPCInfo points into the module-owned gNPC pool (no aliasing accessor).

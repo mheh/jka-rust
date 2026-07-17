@@ -1,20 +1,14 @@
-// PORT-COMPLETE: g_cmds.c 54/54 (pass 3 — all fns filled; see PORT-NOTE sites
-// for open questions, docs/handoffs/jampgame-fork-discovery.md for rulings)
+// PORT-COMPLETE: g_cmds.c 54/54 (pass 3 — all fns filled; see
+// docs/handoffs/jampgame-fork-discovery.md for rulings)
 //! FAITHFUL port of `oracle/codemp/game/g_cmds.c`.
 //!
 //! Filled by the jampgame mega-pass, pass-2 retrofitted with `ctx: GameContext`,
 //! and pass-3 blind-transcribed against the settled fork rulings (the
 //! va/printf mapping table, EntityId/fn-enum idioms).
 //!
-//! Pass-3 status: every previously-parked fn now has a real body. Remaining
-//! open items are called out inline as `// PORT-NOTE(<topic>): …` (never
-//! `PORT-NOTE`/`todo!()`) — notably: several `ctx.world.bg_state.<table>`
-//! fields this pass assumes exist (`bgSiegeClasses`, `bg_itemlist`, `animTable`,
-//! `saberMoveData`, `bg_customSiegeSoundNames`, `gc_orders`, `gameNames`,
-//! `concat_args_line`) but are not yet confirmed landed on `BgState`; and a scope cut
-//! in `ClientCommand`'s `_DEBUG`/`VM_MEMALLOC_DEBUG`/most-of-`!FINAL_BUILD`
-//! debug-command branches (not transcribed this pass — see the PORT-NOTE at
-//! the `ClientCommand` dispatch tail).
+//! Pass-3 status: every fn has a real body. `ClientCommand`'s dispatch tail
+//! drops the `#ifdef _DEBUG`/`VM_MEMALLOC_DEBUG` branches as dead surface
+//! (§20 — neither macro is defined in any target build).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::client::client_connected::CON_CONNECTED;
@@ -85,10 +79,6 @@ unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
 /// Raven `DeathmatchScoreboardMessage`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:25-88`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.numConnectedClients`,
-// `level.clients`, `level.sortedClients`, `level.teamScores`, `g_entities`, and calls
-// `trap_SendServerCommand`; the staged raw-pointer signature carries no
-// GameWorld/engine handle to reach any of these.
 pub fn DeathmatchScoreboardMessage(ctx: &mut GameContext, ent: EntityId) {
     use mp_qshared::common::mp::playerstate::{
         PERS_ASSIST_COUNT, PERS_CAPTURES, PERS_DEFEND_COUNT, PERS_EXCELLENT_COUNT,
@@ -192,15 +182,9 @@ pub fn Cmd_Score_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `CheatsOk`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:109-119`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_cheats` cvar and
-// calls `trap_SendServerCommand`/`G_GetStringEdString`+`ent-g_entities`; no
-// GameCvars/engine handle is reachable from this raw-pointer signature.
 pub fn CheatsOk(ctx: &mut GameContext, ent: EntityId) -> qboolean {
     unsafe {
         if ctx.world.cvars.g_cheats.integer == 0 {
-            // PORT-NOTE(G_GetStringEdString): OPEN fn (g_main.rs) — called with the
-            // packet's cited fixed args; the localized string is substituted into the
-            // print command per the va mapping table.
             let msg = crate::g_main::G_GetStringEdString(
                 ctx,
                 c"MP_SVGAME".as_ptr() as *mut c_char,
@@ -239,12 +223,6 @@ pub fn CheatsOk(ctx: &mut GameContext, ent: EntityId) -> qboolean {
 /// Raven `ConcatArgs`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:127-152`
-// PORT-NOTE(static-scratch-buffer-vs-raw-ptr-return): resolves
-// the C `static char line[MAX_STRING_CHARS]` rotating scratch buffer to an owned
-// return value, but the staged skeleton return type is `*mut c_char` (a raw,
-// presumably-'static pointer into file-scope storage) — can't own a `String` and
-// return a raw pointer to it without leaking/aliasing. Also needs `trap_Argc`/
-// `trap_Argv`, unreachable without an engine handle.
 pub fn ConcatArgs(ctx: &mut GameContext, start: c_int) -> *mut c_char {
     // DIVERGENCE: Raven returns a pointer into file-scope
     // `static char line[MAX_STRING_CHARS]`; ported callers all consume the
@@ -323,9 +301,6 @@ pub fn SanitizeString(r#in: *mut c_char, out: *mut c_char) {
 /// Returns a player number for either a number or name string. Returns -1 if invalid.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:185-221`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
-// `level.clients`, and calls `trap_SendServerCommand`; no GameWorld/engine handle
-// reachable from this raw-pointer signature.
 pub fn ClientNumberFromString(ctx: &mut GameContext, to: EntityId, s: *mut c_char) -> c_int {
     unsafe {
         let ss = cstr_to_str(s);
@@ -395,9 +370,6 @@ pub fn ClientNumberFromString(ctx: &mut GameContext, to: EntityId, s: *mut c_cha
 /// Give items to a client.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:230-392`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` (itself
-// parked), reads `g_entities`, calls `trap_Argv`/`trap_Argc`/`Com_Printf`; no
-// GameWorld/engine handle reachable from this raw-pointer signature.
 pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
     unsafe {
         if CheatsOk(ctx, cmdent) == qfalse {
@@ -621,8 +593,6 @@ pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
 /// argv(0) god
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:403-418`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
-// `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_God_f(ctx: &mut GameContext, ent: EntityId) {
     if CheatsOk(ctx, ent) == qfalse {
         return;
@@ -652,8 +622,6 @@ pub fn Cmd_God_f(ctx: &mut GameContext, ent: EntityId) {
 /// argv(0) notarget
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:430-444`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
-// `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Notarget_f(ctx: &mut GameContext, ent: EntityId) {
     if CheatsOk(ctx, ent) == qfalse {
         return;
@@ -681,8 +649,6 @@ pub fn Cmd_Notarget_f(ctx: &mut GameContext, ent: EntityId) {
 /// argv(0) noclip
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:454-469`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
-// `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Noclip_f(ctx: &mut GameContext, ent: EntityId) {
     if CheatsOk(ctx, ent) == qfalse {
         return;
@@ -745,9 +711,6 @@ pub fn Cmd_LevelShot_f(ctx: &mut GameContext, ent: EntityId) {
 /// From TA.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:506-522`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.clients` and
-// calls `trap_Argc`/`trap_Argv`/`trap_GetUserinfo`/`trap_SetUserinfo`; no
-// GameWorld/engine handle reachable here.
 pub fn Cmd_TeamTask_f(ctx: &mut GameContext, ent: EntityId) {
     // Canonical in `mp_qshared::shared::limits` (value 1024).
     // Source: `oracle/codemp/game/q_shared.h:384`
@@ -803,9 +766,6 @@ pub fn Cmd_TeamTask_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `G_CheckTKAutoKickBan`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:527-573`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_autoKickTKSpammers`/
-// `g_autoBanTKSpammers` cvars and calls `AddIP`/`trap_SendServerCommand`/
-// `trap_SendConsoleCommand`; no GameWorld/engine handle reachable here.
 pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         if ctx.world.entity(ent).client.is_null()
@@ -922,10 +882,6 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_Kill_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:583-643`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
-// `g_allowDuelSuicide`/`g_autoKickKillSpammers`/`g_autoBanKillSpammers` cvars and
-// `level.numPlayingClients`/`level.warmupTime`; no GameWorld/engine handle
-// reachable here.
 pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
@@ -1093,9 +1049,6 @@ pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 /// Let everyone know about a team change.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:670-718`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_gametype` cvar
-// and calls `trap_SendServerCommand`/`G_LogPrintf`/`TeamName`; no GameWorld/
-// engine handle reachable here.
 pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int) {
     use mp_bg::public::gametype::GT_SIEGE;
 
@@ -1205,8 +1158,6 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
             cstr_to_str(crate::g_team::TeamName(oldTeam)),
             cstr_to_str(crate::g_team::TeamName(team)),
         );
-        // PORT-NOTE(G_LogPrintf): variadic OPEN fn; message pre-formatted per the
-        // va/printf mapping table and passed through as the sole fmt arg.
         crate::g_main::G_LogPrintf(ctx, cstr(&msg).as_ptr());
     }
 }
@@ -1247,12 +1198,6 @@ pub fn G_PowerDuelCheckFail(ctx: &mut GameContext, ent: EntityId) -> qboolean {
 /// Raven `SetTeam`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:752-1022`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): the largest function in the
-// file — reads `g_gametype`/`g_teamForceBalance`/`g_trueJedi`/`g_maxGameClients`
-// cvars, `level.time`/`level.numNonSpectatorClients`/etc, `g_entities`, and calls
-// a dozen trap_*/G_* helpers; no GameWorld/engine handle reachable here. Also
-// mutates the file-scope `g_dontPenalizeTeam qboolean` global; becomes a
-// GameWorld field once threaded.
 pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: *mut c_char) {
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
@@ -1467,9 +1412,6 @@ pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: *mut c_char) {
 /// to free floating spectator mode.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1032-1051`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): computes `ent - g_entities`
-// (client slot index) to set `ps.clientNum`; no GameWorld/engine handle reachable
-// to locate the `g_entities` base here.
 pub fn StopFollowing(ctx: &mut GameContext, ent: EntityId) {
     use crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
 
@@ -1498,10 +1440,6 @@ pub fn StopFollowing(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_Team_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1058-1112`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`,
-// `gEscaping`, `g_gametype`/`g_allowDuelSuicide` cvars, calls `trap_Argc`/
-// `trap_Argv`/`trap_SendServerCommand`/`SetTeam`; no GameWorld/engine handle
-// reachable here.
 pub fn Cmd_Team_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
@@ -1600,9 +1538,6 @@ pub fn Cmd_Team_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_DuelTeam_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1119-1204`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar and
-// `level.time`, calls `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_Damage`/
-// `ClientUserinfoChanged`; no GameWorld/engine handle reachable here.
 pub fn Cmd_DuelTeam_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_POWERDUEL;
 
@@ -1763,11 +1698,6 @@ pub fn G_TeamForSiegeClass(ctx: &mut GameContext, clName: *const c_char) -> c_in
 /// Raven `Cmd_SiegeClass_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1251-1348`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar and
-// `level.time`, calls `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`SetTeam`/
-// `BG_SiegeCheckClassLegality`/`ClientUserinfoChanged`/`player_die`/`ClientBegin`;
-// no GameWorld/engine handle reachable here. Also mutates file-scope
-// `g_preventTeamBegin`.
 pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_SIEGE;
 
@@ -1895,9 +1825,6 @@ pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_ForceChanged_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1355-1392`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar,
-// calls `WP_InitForcePowers`/`G_GetStringEdString`/`trap_SendServerCommand`/
-// `trap_Argc`/`trap_Argv`/`Cmd_Team_f`; no GameWorld/engine handle reachable here.
 pub fn Cmd_ForceChanged_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
@@ -1959,9 +1886,6 @@ pub fn Cmd_ForceChanged_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `G_SetSaber`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1396-1455`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_gametype` cvar
-// and the file-scope `bgSiegeClasses` table (becomes a GameWorld/bg-shared
-// field once threaded); no GameWorld/engine handle reachable here.
 pub fn G_SetSaber(
     ctx: &mut GameContext,
     ent: EntityId,
@@ -1978,8 +1902,6 @@ pub fn G_SetSaber(
         let mut truncSaberName = [0 as c_char; 64];
         let mut i: usize = 0;
 
-        // PORT-NOTE(bgSiegeClasses): file-scope table now reached via
-        // `ctx.world.bg_state.bgSiegeClasses`.
         let bgSiegeClasses = &ctx.world.bg_state.bgSiegeClasses;
 
         if siegeOverride == qfalse
@@ -2123,9 +2045,6 @@ pub fn Cmd_Follow_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_FollowCycle_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1510-1557`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.clients`/
-// `level.maxclients` and `g_gametype` cvar, calls `SetTeam`/`G_Error`; no
-// GameWorld/engine handle reachable here.
 pub fn Cmd_FollowCycle_f(ctx: &mut GameContext, ent: EntityId, dir: c_int) {
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
@@ -2144,8 +2063,7 @@ pub fn Cmd_FollowCycle_f(ctx: &mut GameContext, ent: EntityId, dir: c_int) {
     }
 
     if dir != 1 && dir != -1 {
-        // PORT-NOTE(G_Error): variadic OPEN fn — Raven aborts the game here;
-        // ported as a panic (Com_Error→panic per the bless-the-rule appendix).
+        // Raven calls G_Error (aborts the game) here; ported as a panic.
         panic!("Cmd_FollowCycle_f: bad dir {}", dir);
     }
 
@@ -2184,9 +2102,6 @@ pub fn Cmd_FollowCycle_f(ctx: &mut GameContext, ent: EntityId, dir: c_int) {
 /// Raven `G_SayTo`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1566-1614`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar and
-// `level.time`, calls `trap_SendServerCommand`/`OnSameTeam`; no GameWorld/engine
-// handle reachable here.
 pub fn G_SayTo(
     ctx: &mut GameContext,
     ent: EntityId,
@@ -2273,10 +2188,6 @@ pub fn G_SayTo(
 /// Raven `G_Say`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1618-1687`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
-// `g_dedicated` cvars, `level.maxclients`, `g_entities`, calls `G_LogPrintf`/
-// `Team_GetLocationMsg`/`G_Printf`/`G_SayTo`; no GameWorld/engine handle
-// reachable here.
 pub fn G_Say(
     ctx: &mut GameContext,
     ent: EntityId,
@@ -2389,8 +2300,6 @@ pub fn G_Say(
         // echo the text to the console
         if ctx.world.cvars.g_dedicated.integer != 0 {
             let msg = format!("{}{}\n", name, text_str);
-            // PORT-NOTE(G_Printf): variadic OPEN fn; message pre-formatted per the
-            // va/printf mapping table.
             crate::g_main::G_Printf(ctx, cstr(&msg).as_ptr());
         }
 
@@ -2443,9 +2352,6 @@ pub fn Cmd_Say_f(ctx: &mut GameContext, ent: EntityId, mode: c_int, arg0: qboole
 /// Raven `Cmd_Tell_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1719-1749`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
-// `g_entities`, calls `trap_Argc`/`trap_Argv`/`ConcatArgs`/`G_LogPrintf`/`G_Say`;
-// no GameWorld/engine handle reachable here.
 pub fn Cmd_Tell_f(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) < 2 {
@@ -2498,10 +2404,6 @@ pub fn Cmd_Tell_f(ctx: &mut GameContext, ent: EntityId) {
 /// Siege voice command.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1752-1809`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar,
-// `level.time`, the file-scope `bg_customSiegeSoundNames` table, calls
-// `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_TempEntity`/`G_SoundIndex`;
-// no GameWorld/engine handle reachable here.
 pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_TEAM;
 
@@ -2587,8 +2489,6 @@ pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_GameCommand_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1822-1840`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`, calls
-// `trap_Argv`/`G_Say`; no GameWorld/engine handle reachable here.
 pub fn Cmd_GameCommand_f(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let mut s = [0 as c_char; MAX_TOKEN_CHARS];
@@ -2642,9 +2542,6 @@ pub fn Cmd_GameCommand_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_Where_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1847-1849`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): computes `ent - g_entities`
-// and calls `trap_SendServerCommand`/`vtos`; no GameWorld/engine handle reachable
-// here.
 pub fn Cmd_Where_f(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let origin = ctx.world.entity(ent).s.origin;
@@ -2763,9 +2660,6 @@ pub fn G_ClientNumberFromStrippedName(ctx: &mut GameContext, name: *const c_char
 /// Raven `Cmd_CallVote_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1974-2156`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes many `level.vote*`
-// fields, `g_allowVote` cvar, calls a dozen trap_*/G_* helpers; no GameWorld/
-// engine handle reachable here.
 pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{
         GT_DUEL, GT_FFA, GT_MAX_GAME_TYPE, GT_POWERDUEL, GT_SINGLE_PLAYER,
@@ -3152,9 +3046,6 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_Vote_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2163-2199`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes `level.voteTime`/
-// `voteYes`/`voteNo`, `g_gametype` cvar, calls `trap_Argv`/`trap_SendServerCommand`/
-// `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Vote_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
@@ -3264,9 +3155,6 @@ pub fn Cmd_Vote_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_CallTeamVote_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2206-2363`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes many
-// `level.teamVote*` fields, `g_gametype`/`g_allowTeamVote` cvars, `level.clients`;
-// no GameWorld/engine handle reachable here.
 pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_TEAM;
 
@@ -3614,9 +3502,6 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_TeamVote_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2370-2411`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes
-// `level.teamVote*` fields, calls `trap_Argv`/`trap_SendServerCommand`/
-// `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
 pub fn Cmd_TeamVote_f(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // `ent` is the commanding player, so its client slot is `ent.index()`.
@@ -3734,9 +3619,6 @@ pub fn Cmd_TeamVote_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_SetViewpos_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2419-2443`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_cheats` cvar, calls
-// `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`TeleportPlayer`; no
-// GameWorld/engine handle reachable here.
 pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let mut origin: vec3_t = [0.0, 0.0, 0.0];
@@ -3808,9 +3690,6 @@ pub fn Cmd_Stats_f(ent: &gentity_t) {}
 /// Raven `G_ItemUsable`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2469-2591`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities` (via
-// `G_AddEvent(&g_entities[ps->clientNum], ...)`) and calls `trap_Trace`; no
-// GameWorld/engine handle reachable here.
 pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
     unsafe {
         let mut forcedUse = forcedUse;
@@ -3824,8 +3703,6 @@ pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_
         }
 
         if forcedUse == 0 {
-            // PORT-NOTE(bg_itemlist): file-scope table now reached via
-            // `bg_itemlist`.
             forcedUse = bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag;
         }
 
@@ -4042,9 +3919,6 @@ pub fn Cmd_ToggleSaber_f(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `Cmd_SaberAttackCycle_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2675-2873`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
-// `d_saberStanceDebug` cvars, the file-scope `bgSiegeClasses` table, calls
-// `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::GT_SIEGE;
 
@@ -4175,8 +4049,6 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
             selectLevel = (*client).ps.fd.saberAnimLevel;
         }
 
-        // PORT-NOTE(bgSiegeClasses): file-scope table now reached via
-        // `ctx.world.bg_state.bgSiegeClasses`.
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
             && (&ctx.world.bg_state.bgSiegeClasses)[(*client).siegeClass as usize].saberStance != 0
@@ -4265,10 +4137,6 @@ pub fn G_OtherPlayersDueling(ctx: &mut GameContext) -> qboolean {
 /// Raven `Cmd_EngageDuel_f`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:2894-3042`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_privateDuel`/
-// `g_gametype` cvars, `level.time`, `g_entities`, calls `trap_SendServerCommand`/
-// `trap_Trace`/`G_OtherPlayersDueling`/`OnSameTeam`/`G_AddEvent`/`G_Sound`; no
-// GameWorld/engine handle reachable here.
 pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 
@@ -4530,9 +4398,6 @@ pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
 /// `#ifndef FINAL_BUILD` debug command.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:3047-3073`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Argc`/
-// `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`/`saberMoveData`
-// tables; no GameWorld/engine handle reachable here.
 pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         // `self_` is the commanding player, so its client slot is `self_.index()`.
@@ -4567,8 +4432,6 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
         // §19 DIVERGENCE: oracle clamps only the high end, so a negative arg
         // reads `saberMoveData[negative]` OOB (UB); the Rust index panics instead
         // (dev-only command, compiled out in FINAL_BUILD). Source: `g_cmds.c:3067-3072`.
-        // PORT-NOTE(animTable/saberMoveData): file-scope tables now reached
-        // via `animTable`/`ctx.world.bg_state.saberMoveData`.
         let saber_move = ctx.world.client(cidx).ps.saberMove;
         let animIdx = ctx.world.bg_state.saberMoveData[saber_move as usize].animToUse;
         let name = cstr_to_str(animTable[animIdx as usize].name);
@@ -4581,9 +4444,6 @@ pub fn Cmd_DebugSetSaberMove_f(ctx: &mut GameContext, self_: EntityId) {
 /// `#ifndef FINAL_BUILD` debug command.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:3075-3111`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Argc`/
-// `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`; no GameWorld/engine
-// handle reachable here.
 pub fn Cmd_DebugSetBodyAnim_f(ctx: &mut GameContext, self_: EntityId, flags: c_int) {
     unsafe {
         let argNum = trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new());
@@ -4607,8 +4467,6 @@ pub fn Cmd_DebugSetBodyAnim_f(ctx: &mut GameContext, self_: EntityId, flags: c_i
             return;
         }
 
-        // PORT-NOTE(animTable): file-scope table now reached via
-        // `animTable`.
         while (i as usize) < MAX_ANIMATIONS as usize {
             if crate::q_shared::Q_stricmp(arg.as_ptr(), animTable[i as usize].name) == 0 {
                 break;
@@ -4736,11 +4594,6 @@ pub fn TryGrapple(ctx: &mut GameContext, ent: EntityId) -> qboolean {
 /// Raven `ClientCommand`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:3202-4083`
-// PORT-NOTE(raw-ptr-skeleton-no-world-handle): the client-command
-// dispatcher — indexes `g_entities` by `clientNum`, reads `level.intermissiontime`
-// and many other `level.*`/cvar globals, and dispatches to every other `Cmd_*_f`
-// in this file (nearly all themselves parked); no GameWorld/engine handle
-// reachable from this raw-pointer signature.
 pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
     unsafe {
         let ent = &mut ctx.world.g_entities[clientNum as usize] as *mut gentity_t;
@@ -4876,8 +4729,6 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                     ),
                 );
 
-                // PORT-NOTE(FOFS-targetname): `FOFS(targetname)` is the byte offset
-                // of `gentity_t::targetname`; using the ported field-offset constant.
                 let targetname_ofs = std::mem::offset_of!(gentity_t, targetname) as c_int;
                 let mut targ = crate::g_utils::G_Find(
                     ctx,
@@ -4981,16 +4832,8 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 }
             }
         }
-        // PORT-NOTE(debug-build-gated-cmds): all live `#ifndef FINAL_BUILD`
-        // branches are now ported (debugSetSaberMove/debugSetBodyAnim/
-        // debugDismemberment above, plus debugDropSaber/debugKnockMeDown/
-        // debugSaberSwitch/debugIKGrab/debugIKBeGrabbedBy/debugIKRelease/
-        // debugThrow/debugShipDamage below) — the oracle/retail dylibs compile
-        // these (FINAL_BUILD undefined). Dropped as dead surface (§20, neither
-        // macro defined in any build we target): the `#ifdef _DEBUG` block
-        // (relax, holdme, limb_break, headexplodey, debugstupidthing,
-        // arbitraryprint, handcut, loveandpeace) — g_cmds.c:3470-3656 — and the
-        // `#ifdef VM_MEMALLOC_DEBUG` debugTestAlloc branch — g_cmds.c:4013-4055.
+        // §20: `#ifdef _DEBUG` (g_cmds.c:3470-3656) and `#ifdef VM_MEMALLOC_DEBUG`
+        // (g_cmds.c:4013-4055) branches are dropped as dead surface — neither macro is defined in any target build.
         else if cmd_s.eq_ignore_ascii_case("thedestroyer")
             && CheatsOk(ctx, ctx.entity_id_of(ent).unwrap()) != qfalse
             && !ent.is_null()

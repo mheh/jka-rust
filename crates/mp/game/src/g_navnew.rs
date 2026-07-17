@@ -26,19 +26,6 @@
 //! signature), so per §C7 (out-params -> return values / mutable refs) they
 //! are declared `movedir: &mut vec3_t` here instead of parking.
 //!
-//! PARKED (see PORT-NOTE markers): `NPC_SetBlocked`,
-//! `NAVNEW_PushBlocker`, `NAVNEW_SidestepBlocker`, `NAVNEW_Bypass`,
-//! `NAVNEW_ResolveEntityCollision`, `NAVNEW_AvoidCollision`,
-//! `NAVNEW_TestNodeConnectionBlocked`, `NAVNEW_MoveToGoal` all read JKA-added
-//! `CONTENTS_*`/`MASK_NPCSOLID` collision-mask bits, `NIF_*`/`EDGE_*`/`NODE_*`
-//! debug-draw enum values, or magic-number defines (`MIN_BLOCKED_SPEECH_TIME`,
-//! `MIN_DOOR_BLOCK_DIST_SQR`, `DEFAULT_MINS_2`/`DEFAULT_MAXS_2`,
-//! `NPCAI_BLOCKED`) that are not resolved anywhere in this packet and are not
-//! confidently re-derivable the way `ENTITYNUM_NONE`/`STEPSIZE` are (topic
-//! `const-value`); `NAVNEW_MoveToGoal` additionally reaches the ambient
-//! "current NPC" global `NPCInfo` with no `GameContext` channel (topic
-//! `ai-context`, matching `NPC_reactions.rs`/`NPC_utils.rs`).
-//!
 //! Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 //! `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
 //! take `&mut`/`&gentity_t`.
