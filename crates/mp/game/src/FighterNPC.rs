@@ -24,6 +24,7 @@ use crate::prelude::*;
 // staged skeleton had faithfully transcribed them as an `extern "C" { .. }`
 // block (as if resolved at link time), which cannot work for plain-Rust
 // intra-crate functions. Wired via ordinary `use` instead.
+use crate::bg_channel::GameBgTraps;
 use crate::bg_pmove::{BG_UnrestrainedPitchRoll, BG_VehicleTurnRateForSpeed};
 use crate::bg_vehicleLoad::BG_VehicleGetIndex;
 use crate::g_combat::G_DamageFromKiller;
@@ -1405,10 +1406,7 @@ pub fn ProcessOrientCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 /// Raven `AnimateVehicle` — sync the fighter's wing/gear/hyperspace anim state to
 /// its flight state.
 ///
-/// Raven: MP (`_JK2MP` + `QAGAME`) build; `curTime` is `level.time`. The final
-/// `BG_SetAnim` dispatch needs a `PmoveContext` (`bgAllAnims`) that this ctx-only
-/// dispatch entry does not thread, so — as in `SpeederNPC::AnimateRiders` — the
-/// state-flag mutations are ported and the client-anim dispatch is a `PORT-NOTE`.
+/// Raven: MP (`_JK2MP` + `QAGAME`) build; `curTime` is `level.time`.
 /// Source: `oracle/codemp/game/FighterNPC.c:1836-1937`
 pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
@@ -1465,13 +1463,29 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         }
 
         if Anim != -1 {
-            // PORT-NOTE(bg-anim-dispatch): the oracle calls
-            //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
-            //     bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
-            //     SETANIM_BOTH, Anim, SETANIM_FLAG_NORMAL, 300);
-            // which needs a `PmoveContext` (`bgAllAnims`) this ctx-only dispatch
-            // entry does not thread — matching `SpeederNPC::AnimateRiders`.
-            let _ = Anim;
+            // `BG_SetAnim` is a `PmoveContext` method; build a pm-null per-call
+            // context from `ctx` (the `g_vehicles::Vehicle_SetAnim` precedent).
+            let idx = ctx.world.entity(parent_id).localAnimIndex as usize;
+            let anims = ctx.world.bg_state.bgAllAnims[idx].anims;
+            let traps = GameBgTraps::new(ctx.engine);
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a `*mut GameWorld` bg-seam field; a raw store is required.
+                world: ctx.world_raw(),
+                engine: ctx.engine,
+            };
+            let mut pmc = crate::bg_channel::PmoveContext::new(
+                &mut ctx.world.bg_state,
+                &traps,
+                &mut callbacks,
+            );
+            pmc.BG_SetAnim(
+                parentPS,
+                anims,
+                SETANIM_BOTH,
+                Anim,
+                SETANIM_FLAG_NORMAL,
+                300,
+            );
         }
     }
 }

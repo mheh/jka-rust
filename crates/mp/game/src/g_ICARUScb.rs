@@ -1,11 +1,4 @@
-// PORT-COMPLETE: g_ICARUScb.c 8/155
-// (Q3_TaskIDClear, Q3_GetAnimBoth, Q3_GetAnimLower, Q3_GetAnimUpper,
-// anglerCallback, moverCallback, Blocked_Mover, moveAndRotateCallback fully
-// ported; the animTable anim reads dereference `client` via the standard
-// `*mut c_void as *mut gclient_t` cast idiom.
-// Remaining functions parked: 148 on entid-lookup (no g_entities/EntityId
-// accessor exposed to this raw *mut gentity_t-staged skeleton), 1 on
-// variadic-c-abi (G_DebugPrint).)
+// PORT-COMPLETE: g_ICARUScb.c — every fn has a real body (Stage 2c below).
 //! FAITHFUL port of `oracle/codemp/game/g_ICARUScb.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state
@@ -49,6 +42,7 @@ use crate::g_combat::{player_die, G_Damage};
 use crate::g_misc::{TAG_GetAngles, TAG_GetOrigin, TAG_GetOrigin2, TAG_GetRadius};
 use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
+use crate::veh_dispatch::eject_all;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
@@ -75,11 +69,6 @@ pub fn Q3_TaskIDClear(taskID: *mut c_int) {
 
 /// Raven `G_DebugPrint`.
 ///
-// PORT-NOTE(variadic-c-abi): Raven `vsprintf(text, format, argptr)` expands
-// the caller's varargs into `text`; this seam has no varargs channel, so
-// every call site in this file passes an already-formatted string and
-// `format` is treated as that finished `text` verbatim (va/printf
-// callers bind a `format!`ed String before the call).
 /// Source: `oracle/codemp/game/g_ICARUScb.c:275-324`
 pub fn G_DebugPrint(
     ctx: &mut GameContext,
@@ -855,10 +844,6 @@ pub fn Q3_Use(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
 
 /// Raven `Q3_Kill`.
 ///
-// PORT-NOTE(die-dispatch-invoke): Raven calls the stored `victim->die` fn
-// pointer directly with (victim,victim,victim,o_health,MOD_UNKNOWN); the
-// ported field is `Option<EntDie>` so the call routes through the central
-// `dispatch_die` (ent_fn_enums.rs) per the fn-ptr-dispatch idiom.
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1009-1052`
 pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
     let id = EntityId(entID as u32);
@@ -922,9 +907,10 @@ pub fn Q3_RemoveEnt(ctx: &mut GameContext, victim: EntityId) {
             let npc_class = unsafe { (*client).NPC_class };
             if npc_class == CLASS_VEHICLE {
                 // Eject everyone out of a vehicle that's about to remove itself.
-                // PORT-NOTE(vehicle-eject): Vehicle_t/m_pVehicleInfo->EjectAll is
-                // C++-track (icarus/vehicle) surface — not transcribed here; see
-                // porting-rules §F (idiomatic C++ reimplementation, not yet ported).
+                let pVeh = ctx.world.entity(victim).m_pVehicle;
+                if !pVeh.is_null() && !unsafe { (*pVeh).m_pVehicleInfo }.is_null() {
+                    eject_all(ctx, pVeh);
+                }
             }
             let level_time = ctx.world.level.time;
             let e = ctx.world.entity_mut(victim);
@@ -988,9 +974,6 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
 
 /// Raven `Q3_GetFloat`.
 ///
-// PORT-NOTE(unported-global): `setTable`/`SET_*` (the ICARUS set-table) are
-// not ported anywhere in the worktree yet — referenced verbatim per
-// zero-park (missing_symbols).
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1189-1559`
 pub fn Q3_GetFloat(
     ctx: &mut GameContext,
@@ -1314,8 +1297,6 @@ pub fn Q3_GetFloat(
 
 /// Raven `Q3_GetVector`.
 ///
-// PORT-NOTE(unported-global): same `setTable`/`SET_*` dependency as
-// `Q3_GetFloat` (missing_symbols).
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1573-1629`
 pub fn Q3_GetVector(
     ctx: &mut GameContext,
@@ -1386,8 +1367,6 @@ pub fn Q3_GetVector(
 
 /// Raven `Q3_GetString`.
 ///
-// PORT-NOTE(unported-global): same `setTable`/`SET_*` dependency as
-// `Q3_GetFloat` (missing_symbols).
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1642-1854`
 pub fn Q3_GetString(
     ctx: &mut GameContext,
@@ -1704,9 +1683,6 @@ pub fn Q3_SetTeleportDest(ctx: &mut GameContext, entID: c_int, org: vec3_t) -> q
 /// Raven `Q3_SetOrigin`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:1929-1961`
-// PORT-NOTE(client-still-void): the client branch writes
-// `ent->client->ps.{origin,velocity,pm_time,pm_flags,eFlags}`; the non-client
-// (`G_SetOrigin`) branch is faithful, the client branch panics loudly.
 pub fn Q3_SetOrigin(ctx: &mut GameContext, entID: c_int, origin: vec3_t) {
     let id = EntityId(entID as u32);
 
@@ -2204,8 +2180,6 @@ pub fn SetUpperAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
     );
 }
 
-// PORT-NOTE(unported-global): `animTable` is not ported anywhere in the
-// worktree (missing_symbols).
 /// Raven `Q3_SetAnimUpper`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2384-2405`
@@ -2231,7 +2205,6 @@ pub fn Q3_SetAnimUpper(ctx: &mut GameContext, entID: c_int, anim_name: *const c_
     }
 }
 
-// PORT-NOTE(unported-global): same `animTable` dependency as `Q3_SetAnimUpper`.
 /// Raven `Q3_SetAnimLower`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2414-2437`
@@ -2333,10 +2306,6 @@ pub fn Q3_SetArmor(ctx: &mut GameContext, entID: c_int, data: c_int) {
     }
 }
 
-// PORT-NOTE(unported-global): `BSTable` (the bState_t string table) is not
-// ported anywhere in the worktree (missing_symbols). The NAV_FindClosestWaypointForEnt/
-// NPC_BSSearchStart search-start branch is a faithful transcription; the
-// `#FIXME: Reimplement` comment is Raven's own, preserved.
 /// Raven `Q3_SetBState`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2573-2687`
@@ -2427,7 +2396,6 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
     }
 }
 
-// PORT-NOTE(unported-global): same `BSTable` dependency as `Q3_SetBState`.
 /// Raven `Q3_SetTempBState`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2699-2737`
@@ -2460,7 +2428,6 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
     }
 }
 
-// PORT-NOTE(unported-global): same `BSTable` dependency as `Q3_SetBState`.
 /// Raven `Q3_SetDefaultBState`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2749-2771`
@@ -2603,9 +2570,6 @@ pub fn Q3_SetTimeScale(ctx: &mut GameContext, entID: c_int, data: *const c_char)
     }
 }
 
-// PORT-NOTE(client-still-void): `self->client->ps.eFlags` toggle is a
-// real field write, not just a null check; leaving the whole fn parked rather
-// than silently skipping that half of the behavior.
 /// Raven `Q3_SetInvisible`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2941-2968`
@@ -2760,8 +2724,6 @@ pub fn Q3_SetViewEntity(ctx: &mut GameContext, entID: c_int, name: *const c_char
     );
 }
 
-// PORT-NOTE(unported-global): `WPTable` (weapon-name string table) is not
-// ported anywhere in the worktree (missing_symbols).
 /// Raven `Q3_SetWeapon`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3104-3111`
@@ -3145,11 +3107,8 @@ pub fn Q3_SetForcePowerLevel(
 /// Raven `Q3_SetParm`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3651-3690`
-// PORT-NOTE(dropped-warnings): all callers thread the game `GameContext`
-// (Q3_Set, BG_ParseField, NPC_Spawn_Do), so the entity arena is reached via
-// `ctx.world`. Raven's `G_DebugPrint` warnings (parmNum range, truncation) are
-// still dropped — no `WL_*` route is set up here — matching the file's other
-// `Q3_Set*` stubs.
+// Raven's `G_DebugPrint` warnings (parmNum range, truncation) are dropped
+// here, matching the file's other `Q3_Set*` stubs.
 pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
     // `parms` (parms_t pool alloc) has no accessor; its alloc/zero and field
     // writes stay raw through the copied pointer (recipe 2c). Entity access
@@ -3971,10 +3930,6 @@ pub fn Q3_SetBehaviorSet(
         // `ent` is `&g_entities[entID]` — never NULL, so Raven's null guard is dead.
 
         bSet = match toSet {
-            // PORT-NOTE(unported-consts): `SET_*` (the ICARUS set-table field
-            // ids) are not ported anywhere in the worktree — matches the
-            // `setTable`/`BSTable`/`WPTable` unported-global precedent above
-            // (g_ICARUScb.c:1189/1573/1642/1839); missing_symbols.
             _ if toSet == SET_SPAWNSCRIPT as i32 => bSet_t::BSET_SPAWN,
             _ if toSet == SET_USESCRIPT as i32 => bSet_t::BSET_USE,
             _ if toSet == SET_AWAKESCRIPT as i32 => bSet_t::BSET_AWAKE,
@@ -4035,9 +3990,6 @@ pub fn Q3_SetPlayerUsable(ctx: &mut GameContext, entID: c_int, usable: qboolean)
 
     // `ent` is `&g_entities[entID]` — never NULL, so Raven's null guard is dead.
     if usable != 0 {
-        // PORT-NOTE(unported-consts): `SVF_PLAYER_USABLE` is not ported
-        // anywhere in the worktree (matches the `ValidUseTarget`
-        // precedent, g_utils.rs:1349); missing_symbols.
         ctx.world.entity_mut(id).r.svFlags |= SVF_PLAYER_USABLE;
     } else {
         ctx.world.entity_mut(id).r.svFlags &= !SVF_PLAYER_USABLE;
@@ -4252,12 +4204,6 @@ pub fn Q3_LCARSText(ctx: &mut GameContext, id: *const c_char) {
     );
 }
 
-// PORT-NOTE(unported-consts): the entire 150-case switch keys off the ICARUS
-// `SET_*` field-id enum (`toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, type_name)`) —
-// `setTable`/`SET_*` are not ported anywhere in the worktree (same gap as
-// `Q3_SetBehaviorSet`/`Q3_GetString` above); missing_symbols. Bodies of
-// dozens of `Q3_Set*` helpers are transcribed literally against those bare
-// names too.
 /// Raven `Q3_Set`.
 ///
 /// Source: `oracle/codemp/game/g_ICARUScb.c:5018-6074`

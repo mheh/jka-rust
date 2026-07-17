@@ -6,9 +6,12 @@
 //! `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_utils::G_PlayEffectID;
 use crate::g_vehicles::{VEH_MOUNT_THROW_LEFT, VEH_MOUNT_THROW_RIGHT};
 use crate::prelude::*;
+use crate::trap;
 use core::ffi::c_int;
+use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
 
 // Vehicle flags (`vehFlags_t`), buttons (`BUTTON_*`), weapons (`weapon_t`),
 // entity effects (`EF_*`), set-anim flags (`SETANIM_FLAG_*`), and orientation
@@ -88,7 +91,6 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
         let curTime: c_int;
 
         // Get player states from parent and pilot
-        // PORT-NOTE(vtable-access): m_pParentEntity.playerState access requires entity dereferencing
         parentPS = (*(*pVeh).m_pParentEntity).playerState;
         if !(*pVeh).m_pPilot.is_null() {
             pilotPS = (*(*pVeh).m_pPilot).playerState;
@@ -166,7 +168,56 @@ pub fn ProcessMoveCommands(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                         while (i as usize) < MAX_VEHICLE_EXHAUSTS
                             && (*pVeh).m_iExhaustTag[i as usize] != -1
                         {
-                            // PORT-NOTE(trap-access): G_PlayEffectID requires ctx/trap access
+                            let parent = (*pVeh).m_pParentEntity;
+                            if !parent.is_null()
+                                && !(*parent).ghoul2.is_null()
+                                && !(*parent).playerState.is_null()
+                            {
+                                // Raven: fine, I'll use a tempent for this, but only because
+                                // it's played only once at the start of a turbo.
+                                let mut boltOrg: vec3_t = [0.0; 3];
+                                let mut boltDir: vec3_t =
+                                    [0.0, (*(*parent).playerState).viewangles[YAW], 0.0];
+                                let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+                                let ps_origin = (*(*parent).playerState).origin;
+                                let model_scale = (*parent).modelScale;
+                                let level_time = ctx.world.level.time;
+                                trap::G2API_GetBoltMatrix(
+                                    ctx.engine,
+                                    GG2GetboltArgs::new(
+                                        (*parent).ghoul2,
+                                        0,
+                                        (*pVeh).m_iExhaustTag[i as usize],
+                                        &mut boltMatrix as *mut mdxaBone_t,
+                                        &boltDir as *const vec3_t,
+                                        &ps_origin as *const vec3_t,
+                                        level_time,
+                                        core::ptr::null_mut(),
+                                        &model_scale as *const vec3_t,
+                                    ),
+                                );
+                                BG_GiveMeVectorFromMatrix(
+                                    &boltMatrix,
+                                    Eorientations::ORIGIN as c_int,
+                                    &mut boltOrg,
+                                );
+                                // Raven fills boltDir from ORIGIN too (not a direction);
+                                // preserved. Source: oracle/codemp/game/SpeederNPC.c:366-367
+                                BG_GiveMeVectorFromMatrix(
+                                    &boltMatrix,
+                                    Eorientations::ORIGIN as c_int,
+                                    &mut boltDir,
+                                );
+                                G_PlayEffectID(
+                                    (*pVeh)
+                                        .m_pVehicleInfo
+                                        .as_ref()
+                                        .map(|vi| vi.iTurboStartFX)
+                                        .unwrap_or(0),
+                                    boltOrg,
+                                    boltDir,
+                                );
+                            }
                             i += 1;
                         }
                     }

@@ -11,8 +11,7 @@
 //! wire-index chain; `SVF_PLAYER_USABLE`; the LCG `rand()`/`Rng` seam;
 //! the `g_vehiclePool` storage field; the scratch-buffer-return
 //! idiom (`tv`/`vtos`/`BuildShaderStateConfig`); or fn-pointer dispatch (`TryUse`'s
-//! touch-pointer comparison) per the fn-ID-enum ruling. See
-//! PORT-NOTE markers.
+//! touch-pointer comparison) per the fn-ID-enum ruling.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -794,8 +793,7 @@ pub fn G_UseTargets2(
 /// Raven `G_UseTargets`.
 ///
 /// Thin wrapper: null-checks `ent` then forwards to `G_UseTargets2` with
-/// `ent->target` as the search string (itself parked pending a GameWorld
-/// handle — see its PORT-NOTE note).
+/// `ent->target` as the search string.
 /// Source: `oracle/codemp/game/g_utils.c:609-616`
 pub fn G_UseTargets(ctx: &mut GameContext, ent: Option<EntityId>, activator: Option<EntityId>) {
     // Safe-state 2c: Option handles; `ent->target` read via the accessor.
@@ -2160,12 +2158,18 @@ pub fn TryUse(ctx: &mut GameContext, ent: Option<EntityId>) {
             }
             (*client).ps.weaponTime = (*client).ps.torsoTimer;
 
-            // PORT-NOTE(fn-pointer-dispatch): target->touch is a raw function pointer that should
-            // be dispatched through the enum system. The comparison and call patterns are incomplete.
-            // if ((*target).touch == Touch_Button) { (*target).touch(target, ent, NULL); }
-            // else { GlobalUse(target, ent, ent); }
-            // For now, calling GlobalUse directly if use is set.
-            if !(*target).use_.is_none() {
+            let target_id = ctx.entity_id_of(target).unwrap();
+            if ctx.world.entity(target_id).touch.get() == Some(EntTouch::Touch_Button) {
+                // Raven: pretend we touched it (NULL trace).
+                let target_ptr = ctx.world.entity_mut(target_id) as *mut gentity_t;
+                crate::ent_fn_enums::dispatch_touch(
+                    ctx,
+                    EntTouch::Touch_Button,
+                    target_ptr,
+                    ent,
+                    core::ptr::null_mut(),
+                );
+            } else if !(*target).use_.is_none() {
                 GlobalUse(
                     ctx,
                     ctx.entity_id_of(target),
@@ -2512,8 +2516,6 @@ pub fn G_ROFF_NotetrackCallback(
     }
 }
 
-// PORT-NOTE(unported-callee): `G_AddEvent` (its only call) is itself
-// parked (bg-boundary — no `ctx` in its own signature).
 /// Raven `G_SpeechEvent`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:2082-2085`
