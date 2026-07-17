@@ -482,3 +482,21 @@ the remainder:
 
 `#![deny(unsafe_code)]` holds where files went fully clean (prelude,
 g_arenas); broad deny-lint completeness waits on the deferred classes above.
+
+## DEC-30 — Bot AI stays oracle-faithful; OpenJK bot improvements rejected (2026-07-16)
+
+Live five-lane A/B (2026-07-16, mp/ffa1, 8 bots) showed bot combat quality
+splits cleanly by game module, not engine: our module and the compiled
+oracle dylib produce identically weak bots (poor aim, weak target
+commitment) on every engine, while OpenJK's basejka module produces
+noticeably better bots on every engine. Our port is faithful — the referee's
+byte-identical duel1 verdict and targeted spot-checks (.jkb personality
+parsing incl. CRLF handling, ScanForEnemies, BotAimOffsetGoalAngles,
+BotChangeViewAngles) all confirm parity with the oracle source.
+
+**Ruling (user, 2026-07-16): keep bot behavior oracle-faithful. Do not
+adopt OpenJK's bot-AI changes.** The observed "bad" bot feel is retail-SDK
+behavior, not a defect; no bot-quality hunt should be reopened against the
+oracle baseline. Reference if ever revisited: local OpenJK checkout at
+`~/Developer/Milo/OpenJK` (game/ai_*.c, g_bot.c); note OpenJK server lanes
+also differ environmentally (sv_fps 40, g_maxForceRank 7).
