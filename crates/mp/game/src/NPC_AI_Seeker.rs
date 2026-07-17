@@ -14,6 +14,7 @@
 //! other entities' `->client` in this AI) is dereffed raw exactly as Raven does.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_missile::CreateMissile;
 use crate::npc::script_flags::SCF_CHASE_ENEMIES;
 use crate::prelude::*;
 use mp_qshared::shared::{CONTENTS_LIGHTSABER, MASK_SHOT};
@@ -493,9 +494,7 @@ pub fn Seeker_Fire(ctx: &mut GameContext) {
         muzzle[i] = npc_org[i] + 15.0f32 * dir[i];
     }
 
-    let missile_ptr =
-        crate::g_missile::CreateMissile(ctx, muzzle, dir, 1000.0f32, 10000, npc_id, qfalse);
-    let missile_id = ctx.entity_id_of(missile_ptr).unwrap();
+    let missile_id = CreateMissile(ctx, muzzle, dir, 1000.0f32, 10000, npc_id, false);
 
     crate::g_utils::G_PlayEffectID(
         crate::g_utils::G_EffectIndex(c"blaster/muzzle_flash".as_ptr()),

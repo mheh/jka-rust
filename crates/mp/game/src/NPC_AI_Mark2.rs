@@ -9,6 +9,7 @@
 use crate::entity::hit_location::HL_GENERIC1;
 use crate::g_combat::G_Damage;
 use crate::g_items::RegisterItem;
+use crate::g_missile::CreateMissile;
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_Sound, G_SoundIndex};
 use crate::level::damage_flags::DAMAGE_NO_PROTECTION;
 use crate::prelude::*;
@@ -276,9 +277,7 @@ pub fn Mark2_FireBlaster(ctx: &mut GameContext, advance: qboolean) {
         G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
     );
 
-    let missile =
-        crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, qfalse);
-    let missile_id = ctx.entity_id_of(missile).unwrap();
+    let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
     let m = ctx.world.entity_mut(missile_id);
     m.classname = b"bryar_proj\0".as_ptr() as *mut c_char;
     m.s.weapon = WP_BRYAR_PISTOL as c_int;

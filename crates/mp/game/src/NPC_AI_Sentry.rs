@@ -6,6 +6,7 @@
 //! Source: `oracle/codemp/game/NPC_AI_Sentry.c`
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_missile::CreateMissile;
 use crate::prelude::*;
 // Explicit imports to dedupe E0659 glob ambiguities (known MASK_*/CONTENTS_* debt,
 // the SFL_*/SVF_* pattern extended to surface-flag consts): several game-tier
@@ -248,9 +249,7 @@ pub fn Sentry_Fire(ctx: &mut GameContext) {
             forward,
         );
 
-        let missile =
-            crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, npc_id, qfalse);
-        let missile_id = ctx.entity_id_of(missile).unwrap();
+        let missile_id = CreateMissile(ctx, muzzle, forward, 1600.0, 10000, npc_id, false);
 
         ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
         ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL;
