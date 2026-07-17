@@ -7,7 +7,10 @@
 //! BgTraps/GameCallbacks bg-tier channel, va/printf mapping).
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_items::{Drop_Item, LaunchItem};
 use crate::prelude::*;
+use crate::q_math::{_VectorAdd, _VectorScale};
+use mp_bg::bg_misc::{BG_FindItemForPowerup, BG_FindItemForWeapon};
 
 use crate::bg_channel::GameBgTraps;
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch};
@@ -352,25 +355,24 @@ pub fn G_GetHitLocation(ctx: &mut GameContext, target: EntityId, ppoint: vec3_t)
 pub fn ExplodeDeath(ctx: &mut GameContext, self_: EntityId) {
     let mut forward: vec3_t = [0.0; 3];
 
-    ctx.entity_mut(self_).takedamage = qfalse; // stop chain reaction runaway loops
+    let e = ctx.entity_mut(self_);
+    e.takedamage = qfalse; // stop chain reaction runaway loops
 
-    ctx.entity_mut(self_).s.loopSound = 0;
-    ctx.entity_mut(self_).s.loopIsSoundset = qfalse;
+    e.s.loopSound = 0;
+    e.s.loopIsSoundset = qfalse;
 
-    let currentOrigin = ctx.entity(self_).r.currentOrigin;
-    ctx.entity_mut(self_).s.pos.trBase = currentOrigin;
+    e.s.pos.trBase = e.r.currentOrigin;
 
-    let angles = ctx.entity(self_).s.angles;
-    AngleVectors(angles, Some(&mut forward), None, None);
+    AngleVectors(e.s.angles, Some(&mut forward), None, None);
 
-    if ctx.entity(self_).splashDamage > 0 && ctx.entity(self_).splashRadius > 0 {
-        let mut attacker = Some(self_);
-        if !ctx.entity(self_).parent.is_none() {
-            attacker = ctx.entity(self_).parent;
-        }
-        let origin = ctx.entity(self_).r.currentOrigin;
-        let splashDamage = ctx.entity(self_).splashDamage as f32;
-        let splashRadius = ctx.entity(self_).splashRadius as f32;
+    if e.splashDamage > 0 && e.splashRadius > 0 {
+        let attacker = match e.parent {
+            Some(parent) => Some(parent),
+            None => Some(self_),
+        };
+        let origin = e.r.currentOrigin;
+        let splashDamage = e.splashDamage as f32;
+        let splashRadius = e.splashRadius as f32;
         G_RadiusDamage(
             ctx,
             origin,
@@ -390,15 +392,16 @@ pub fn ExplodeDeath(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_combat.c:417-427`
 pub fn ScorePlum(ctx: &mut GameContext, ent: EntityId, origin: vec3_t, score: c_int) {
-    let plum = G_TempEntity(ctx, origin, entity_event_t::EV_SCOREPLUM as c_int);
-    let plum = ctx.entity_id_of(plum).unwrap();
+    let plum_ptr = G_TempEntity(ctx, origin, entity_event_t::EV_SCOREPLUM as c_int);
+    let plum_id = ctx.entity_id_of(plum_ptr).unwrap();
     let number = ctx.entity(ent).s.number;
+    let plum = ctx.entity_mut(plum_id);
     // only send this temp entity to a single client
-    ctx.entity_mut(plum).r.svFlags |= SVF_SINGLECLIENT;
-    ctx.entity_mut(plum).r.singleClient = number;
+    plum.r.svFlags |= SVF_SINGLECLIENT;
+    plum.r.singleClient = number;
     //
-    ctx.entity_mut(plum).s.otherEntityNum = number;
-    ctx.entity_mut(plum).s.time = score;
+    plum.s.otherEntityNum = number;
+    plum.s.time = score;
 }
 
 /// Raven `AddScore`.
@@ -452,16 +455,16 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
     }
 
     // find the item type for this weapon
-    let item = mp_bg::bg_misc::BG_FindItemForWeapon(unsafe {
-        core::mem::transmute::<c_int, weapon_t>(weapon)
-    });
+    let item = BG_FindItemForWeapon(weapon);
+    // Raven re-looks the same entry up via `BG_GetItemIndexByTag(weapon,
+    // IT_WEAPON)` at three sites below; it is this item's quantity.
+    let weap_quantity = item.item().quantity;
 
-    let mut ammoSub = unsafe { (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] }
-        - bg_itemlist[mp_bg::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
-            .quantity;
+    let ammoSub = unsafe { (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] }
+        - weap_quantity;
 
     if ammoSub < 0 {
-        let mut ammoQuan = item.item().quantity;
+        let mut ammoQuan = weap_quantity;
         ammoQuan -= -ammoSub;
 
         if ammoQuan <= 0 {
@@ -475,21 +478,18 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
     vel[2] = direction[2] * speed;
 
     let ps_origin = unsafe { (*client).ps.origin };
-    let launched = crate::g_items::LaunchItem(ctx, item, ps_origin, vel);
-    let launched = ctx.entity_id_of(launched).unwrap();
+    let launched = LaunchItem(ctx, item, ps_origin, vel);
 
     let number = ctx.entity(self_).s.number;
-    ctx.entity_mut(launched).s.generic1 = number;
-    ctx.entity_mut(launched).s.powerups = ctx.world.level.time + 1500;
+    let level_time = ctx.world.level.time;
+    let e = ctx.entity_mut(launched);
+    e.s.generic1 = number;
+    e.s.powerups = level_time + 1500;
 
-    ctx.entity_mut(launched).count = bg_itemlist
-        [mp_bg::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
-        .quantity;
+    e.count = weap_quantity;
 
     unsafe {
-        (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -= bg_itemlist
-            [mp_bg::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
-            .quantity;
+        (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -= weap_quantity;
 
         if (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] < 0 {
             let ammo = (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize];
@@ -581,9 +581,7 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
         && unsafe { (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] != 0 }
     {
         // find the item type for this weapon
-        let item = mp_bg::bg_misc::BG_FindItemForWeapon(unsafe {
-            core::mem::transmute::<c_int, weapon_t>(weapon)
-        });
+        let item = BG_FindItemForWeapon(weapon);
 
         // tell all clients to remove the weapon model on this guy until he respawns
         let te = G_TempEntity(
@@ -597,7 +595,7 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
         ctx.entity_mut(te).s.eventParm = number;
 
         // spawn the item
-        crate::g_items::Drop_Item(ctx, self_, item, 0.0);
+        Drop_Item(ctx, self_, item, 0.0);
     }
 
     // drop all the powerups if not in teamplay
@@ -607,14 +605,10 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
         let mut angle: f32 = 45.0;
         for i in 1..PW_NUM_POWERUPS as c_int {
             if unsafe { (*client).ps.powerups[i as usize] } > ctx.world.level.time {
-                let item = mp_bg::bg_misc::BG_FindItemForPowerup(unsafe {
-                    core::mem::transmute::<c_int, powerup_t>(i)
-                });
-                let Some(item) = item else {
+                let Some(item) = BG_FindItemForPowerup(i) else {
                     continue;
                 };
-                let drop = crate::g_items::Drop_Item(ctx, self_, item, angle);
-                let drop = ctx.entity_id_of(drop).unwrap();
+                let drop = Drop_Item(ctx, self_, item, angle);
                 // decide how many seconds it has left
                 let count =
                     (unsafe { (*client).ps.powerups[i as usize] } - ctx.world.level.time) / 1000;
@@ -705,7 +699,7 @@ pub fn body_die(
     damage: c_int,
     meansOfDeath: c_int,
 ) {
-    let mut doDisint: qboolean = qfalse;
+    let mut doDisint = false;
 
     if ctx.entity(self_).s.eType == entityType_t::ET_NPC as c_int {
         // well, just rem it then, so long as it's done with its death anim and it's not a standard weapon.
@@ -734,11 +728,8 @@ pub fn body_die(
         ctx.entity_mut(self_).health = GIB_HEALTH + 1;
 
         let client = ctx.entity(self_).client;
-        if !client.is_null() && (ctx.world.level.time - unsafe { (*client).respawnTime }) < 2000 {
-            doDisint = qfalse;
-        } else {
-            doDisint = qtrue;
-        }
+        doDisint = !(!client.is_null()
+            && (ctx.world.level.time - unsafe { (*client).respawnTime }) < 2000);
     }
 
     let client = ctx.entity(self_).client;
@@ -748,20 +739,21 @@ pub fn body_die(
         return;
     }
 
-    if doDisint != qfalse {
+    if doDisint {
         if !client.is_null() {
             unsafe {
                 (*client).ps.eFlags |= EF_DISINTEGRATION;
-                crate::q_math::_VectorCopy((*client).ps.origin, &mut (*client).ps.lastHitLoc);
+                (*client).ps.lastHitLoc = (*client).ps.origin;
             }
         } else {
-            ctx.entity_mut(self_).s.eFlags |= EF_DISINTEGRATION;
-            let currentOrigin = ctx.entity(self_).r.currentOrigin;
-            crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(self_).s.origin2);
+            let level_time = ctx.world.level.time;
+            let e = ctx.entity_mut(self_);
+            e.s.eFlags |= EF_DISINTEGRATION;
+            e.s.origin2 = e.r.currentOrigin;
 
             // since it's the corpse entity, tell it to "remove" itself
-            ctx.entity_mut(self_).think = Some(EntThink::BodyRid).into();
-            ctx.entity_mut(self_).nextthink = ctx.world.level.time + 1000;
+            e.think = Some(EntThink::BodyRid).into();
+            e.nextthink = level_time + 1000;
         }
         return;
     }
@@ -3020,32 +3012,32 @@ pub fn G_ApplyKnockback(ctx: &mut GameContext, targ: EntityId, newDir: vec3_t, k
 
     let g_knockback = ctx.world.cvars.g_knockback.value;
     if ctx.world.cvars.g_gravity.value > 0.0 {
-        crate::q_math::_VectorScale(
+        _VectorScale(
             newDir,
             ((g_knockback * knockback / mass) as f64 * 0.8) as f32,
             &mut kvel,
         );
         kvel[2] = ((newDir[2] * g_knockback * knockback / mass) as f64 * 1.5) as f32;
     } else {
-        crate::q_math::_VectorScale(newDir, g_knockback * knockback / mass, &mut kvel);
+        _VectorScale(newDir, g_knockback * knockback / mass, &mut kvel);
     }
 
     // targ may be an NPC — `.client` is a pool client, deref stays raw (2b).
     let client = ctx.entity(targ).client;
     if !client.is_null() {
         unsafe {
-            crate::q_math::_VectorAdd((*client).ps.velocity, kvel, &mut (*client).ps.velocity);
+            _VectorAdd((*client).ps.velocity, kvel, &mut (*client).ps.velocity);
         }
     } else if ctx.entity(targ).s.pos.trType != trType_t::TR_STATIONARY
         && ctx.entity(targ).s.pos.trType != trType_t::TR_LINEAR_STOP
         && ctx.entity(targ).s.pos.trType != trType_t::TR_NONLINEAR_STOP
     {
-        let trDelta = ctx.entity(targ).s.pos.trDelta;
-        crate::q_math::_VectorAdd(trDelta, kvel, &mut ctx.entity_mut(targ).s.pos.trDelta);
-        let currentOrigin = ctx.entity(targ).r.currentOrigin;
-        crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(targ).s.pos.trBase);
-        let time = ctx.world.level.time;
-        ctx.entity_mut(targ).s.pos.trTime = time;
+        let level_time = ctx.world.level.time;
+        let e = ctx.entity_mut(targ);
+        let trDelta = e.s.pos.trDelta;
+        _VectorAdd(trDelta, kvel, &mut e.s.pos.trDelta);
+        e.s.pos.trBase = e.r.currentOrigin;
+        e.s.pos.trTime = level_time;
     }
 
     // set the timer so that the other client can't cancel out the movement immediately
@@ -6247,7 +6239,7 @@ pub fn G_RadiusDamage(
             }
         }
 
-        let dist = crate::q_math::VectorLength(v);
+        let dist = VectorLength(v);
         if dist >= radius {
             continue;
         }
@@ -6257,11 +6249,11 @@ pub fn G_RadiusDamage(
         let points = (damage as f64 * (1.0 - (dist / radius) as f64)) as f32;
 
         if CanDamage(ctx, ent, origin) != qfalse {
-            if crate::g_weapon::LogAccuracyHit(ctx, ent, attacker) != qfalse {
+            if LogAccuracyHit(ctx, ent, attacker) != qfalse {
                 hitClient = qtrue;
             }
             let currentOrigin = ctx.entity(ent).r.currentOrigin;
-            crate::q_math::_VectorSubtract(currentOrigin, origin, &mut dir);
+            _VectorSubtract(currentOrigin, origin, &mut dir);
             // push the center of mass higher than the origin so players get knocked into the air more
             dir[2] += 24.0;
             // Match the oracle's short-circuit ordering: `attacker->m_pVehicle`
@@ -6313,7 +6305,7 @@ pub fn G_RadiusDamage(
             let roast = !ctx.entity(ent).client.is_null()
                 && roastPeople != qfalse
                 && missile.is_some_and(|missile_id| {
-                    crate::q_math::VectorCompare(
+                    VectorCompare(
                         ctx.entity(ent).r.currentOrigin,
                         ctx.entity(missile_id).r.currentOrigin,
                     ) == qfalse
@@ -6322,24 +6314,25 @@ pub fn G_RadiusDamage(
                 let missile_id = missile.unwrap();
                 // the thing calling this function can create burn marks on people
                 let ent_origin = ctx.entity(ent).r.currentOrigin;
-                let evEnt = G_TempEntity(ctx, ent_origin, entity_event_t::EV_GHOUL2_MARK as c_int);
-                let evEnt = ctx.entity_id_of(evEnt).unwrap();
+                let ev_ptr = G_TempEntity(ctx, ent_origin, entity_event_t::EV_GHOUL2_MARK as c_int);
+                let ev_id = ctx.entity_id_of(ev_ptr).unwrap();
 
                 let ent_number = ctx.entity(ent).s.number;
-                ctx.entity_mut(evEnt).s.otherEntityNum = ent_number;
-                ctx.entity_mut(evEnt).s.weapon = WP_ROCKET_LAUNCHER as c_int;
-
                 let missile_origin = ctx.entity(missile_id).r.currentOrigin;
-                crate::q_math::_VectorCopy(missile_origin, &mut ctx.entity_mut(evEnt).s.origin);
-                crate::q_math::_VectorCopy(ent_origin, &mut ctx.entity_mut(evEnt).s.origin2);
+                let evEnt = ctx.entity_mut(ev_id);
+                evEnt.s.otherEntityNum = ent_number;
+                evEnt.s.weapon = WP_ROCKET_LAUNCHER as c_int;
 
-                if ctx.entity(missile_id).r.currentOrigin[2] < ctx.entity(ent).r.currentOrigin[2] {
-                    ctx.entity_mut(evEnt).s.origin2[2] += 8.0;
+                evEnt.s.origin = missile_origin;
+                evEnt.s.origin2 = ent_origin;
+
+                if missile_origin[2] < ent_origin[2] {
+                    evEnt.s.origin2[2] += 8.0;
                 } else {
-                    ctx.entity_mut(evEnt).s.origin2[2] += 24.0;
+                    evEnt.s.origin2[2] += 24.0;
                 }
 
-                ctx.entity_mut(evEnt).s.eventParm = 1;
+                evEnt.s.eventParm = 1;
             }
         }
     }

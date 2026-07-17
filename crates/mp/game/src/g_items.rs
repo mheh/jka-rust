@@ -3509,9 +3509,7 @@ pub fn LaunchItem(
     item: ItemId,
     origin: vec3_t,
     velocity: vec3_t,
-) -> *mut gentity_t {
-    // The `*mut gentity_t` return keeps its raw shape (reused from the spawn
-    // pointer).
+) -> EntityId {
     let dropped_ptr = G_Spawn(ctx);
     let dropped = ctx.entity_id_of(dropped_ptr).unwrap();
     let it = item.item();
@@ -3551,11 +3549,12 @@ pub fn LaunchItem(
         e.nextthink = level_time + 30000;
         Team_CheckDroppedItem(ctx, dropped);
 
-        // rww - so bots know
+        // rww - so bots know (`droppedRedFlag`/`droppedBlueFlag` are raw seam
+        // globals; derive the pointer at the write).
         if it.classname == "team_CTF_redflag" {
-            ctx.world.globals.droppedRedFlag = dropped_ptr;
+            ctx.world.globals.droppedRedFlag = ctx.entity_mut(dropped) as *mut gentity_t;
         } else if it.classname == "team_CTF_blueflag" {
-            ctx.world.globals.droppedBlueFlag = dropped_ptr;
+            ctx.world.globals.droppedBlueFlag = ctx.entity_mut(dropped) as *mut gentity_t;
         }
     } else {
         // auto-remove after 30 seconds
@@ -3601,14 +3600,13 @@ pub fn LaunchItem(
         GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(dropped)).cast()),
     );
 
-    dropped_ptr
+    dropped
 }
 
 /// Raven `Drop_Item`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:2742-2755`
-pub fn Drop_Item(ctx: &mut GameContext, ent: EntityId, item: ItemId, angle: f32) -> *mut gentity_t {
-    // The `*mut gentity_t` return rides `LaunchItem`.
+pub fn Drop_Item(ctx: &mut GameContext, ent: EntityId, item: ItemId, angle: f32) -> EntityId {
     let mut angles = ctx.entity(ent).s.apos.trBase;
     angles[YAW] += angle;
     angles[PITCH] = 0.0; // always forward
