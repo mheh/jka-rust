@@ -3876,26 +3876,26 @@ pub fn BotHasAssociated(ctx: &mut GameContext, bs: *mut bot_state_t, wp: *mut wp
         };
         let item = item.item();
 
-        if item.giType() == IT_WEAPON {
-            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << item.giTag()) != 0 {
+        if let ItemKind::Weapon(tag) = item.kind {
+            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << tag) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if item.giType() == IT_HOLDABLE {
-            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag()) != 0 {
+        } else if let ItemKind::Holdable(tag) = item.kind {
+            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << tag) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if item.giType() == IT_POWERUP {
-            if (*bs).cur_ps.powerups[item.giTag() as usize] != 0 {
+        } else if let ItemKind::Powerup(tag) = item.kind {
+            if (*bs).cur_ps.powerups[tag as usize] != 0 {
                 return 1;
             }
 
             return 0;
-        } else if item.giType() == IT_AMMO {
-            if (*bs).cur_ps.ammo[item.giTag() as usize] > 10 {
+        } else if let ItemKind::Ammo(tag) = item.kind {
+            if (*bs).cur_ps.ammo[tag as usize] > 10 {
                 // hack
                 return 1;
             }

@@ -1994,8 +1994,11 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
                 } else if c_str_eq(classname, b"item_ysalimari") {
                     weight = 2.0;
                 } else if c_str_contains(classname, b"weapon_") && item.is_some() {
-                    weight = botGlobalNavWeaponWeights[item.unwrap().item().giTag() as usize];
-                } else if item.is_some() && item.unwrap().item().giType() == IT_AMMO {
+                    let ItemKind::Weapon(tag) = item.unwrap().item().kind else {
+                        unreachable!("weapon_-classnamed item is not a Weapon");
+                    };
+                    weight = botGlobalNavWeaponWeights[tag as usize];
+                } else if item.is_some_and(|it| matches!(it.item().kind, ItemKind::Ammo(_))) {
                     weight = 3.0;
                 }
             }
@@ -3061,13 +3064,13 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
                 let sp1_inuse = ctx.entity(sp1_id).inuse;
                 let sp1_item = ctx.entity(sp1_id).item;
                 if sp1_inuse != 0
-                    && sp1_item.is_some()
-                    && sp1_item.unwrap().item().giType() == IT_TEAM
+                    && sp1_item.is_some_and(|it| matches!(it.item().kind, ItemKind::Team(_)))
                 {
                     // This point is actually a CTF flag.
-                    if sp1_item.unwrap().item().giTag() == PW_REDFLAG
-                        || sp1_item.unwrap().item().giTag() == PW_BLUEFLAG
-                    {
+                    if matches!(
+                        sp1_item.unwrap().item().kind,
+                        ItemKind::Team(PW_REDFLAG | PW_BLUEFLAG)
+                    ) {
                         // Place a waypoint on the flag next in the trail, so the nearest grid point will link to it.
                         let sp1_origin = ctx.entity(sp1_id).s.origin;
                         CreateNewWP_InsertUnder(
@@ -3124,10 +3127,9 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
                     ctx.world.globals.gSpawnPointNum += 1;
                 }
             } else if inuse != 0
-                && item.is_some()
-                && item.unwrap().item().giType() == IT_TEAM
-                && (item.unwrap().item().giTag() == PW_REDFLAG
-                    || item.unwrap().item().giTag() == PW_BLUEFLAG)
+                && item.is_some_and(|it| {
+                    matches!(it.item().kind, ItemKind::Team(PW_REDFLAG | PW_BLUEFLAG))
+                })
             {
                 // also make it path to flags in CTF.
                 let sp_ptr = ent_ptr(ctx, Some(ent_id));

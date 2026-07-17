@@ -387,7 +387,10 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
 /// Source: `oracle/codemp/game/g_team.c:320-330`
 pub fn Team_CheckDroppedItem(ctx: &mut GameContext, dropped: EntityId) {
     let item = ctx.world.entity(dropped).item;
-    let giTag = item.unwrap().item().giTag();
+    // Only flag items reach here (LaunchItem's CTF branch).
+    let ItemKind::Team(giTag) = item.unwrap().item().kind else {
+        unreachable!("Team_CheckDroppedItem on non-flag item");
+    };
     if giTag == PW_REDFLAG {
         Team_SetFlagStatus(ctx, TEAM_RED, FLAG_DROPPED);
     } else if giTag == PW_BLUEFLAG {
@@ -890,7 +893,10 @@ pub fn Team_ReturnFlag(ctx: &mut GameContext, team: c_int) {
 /// Source: `oracle/codemp/game/g_team.c:693-703`
 pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
     let item = ctx.world.entity(ent).item;
-    let giTag = item.unwrap().item().giTag();
+    // Only flag items reach here (G_RunItem's nodrop branch Team match).
+    let ItemKind::Team(giTag) = item.unwrap().item().kind else {
+        unreachable!("Team_FreeEntity on non-flag item");
+    };
     if giTag == PW_REDFLAG {
         Team_ReturnFlag(ctx, TEAM_RED);
     } else if giTag == PW_BLUEFLAG {
@@ -909,7 +915,10 @@ pub fn Team_FreeEntity(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_team.c:714-729`
 pub fn Team_DroppedFlagThink(ctx: &mut GameContext, ent: EntityId) {
     let item = ctx.world.entity(ent).item;
-    let giTag = item.unwrap().item().giTag();
+    // Only flag items carry this think (LaunchItem's CTF branch).
+    let ItemKind::Team(giTag) = item.unwrap().item().kind else {
+        unreachable!("Team_DroppedFlagThink on non-flag item");
+    };
     let team = if giTag == PW_REDFLAG {
         TEAM_RED
     } else if giTag == PW_BLUEFLAG {

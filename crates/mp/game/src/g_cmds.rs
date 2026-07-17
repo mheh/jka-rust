@@ -15,6 +15,7 @@ use crate::client::player_team_state::playerTeamStateState_t;
 use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
 use crate::prelude::*;
 use crate::trap;
+use mp_bg::bg_misc::selected_holdable_tag;
 
 /// Raven `SAY_ALL`/`SAY_TEAM`/`SAY_TELL` chat-mode `#define`s.
 ///
@@ -3699,7 +3700,7 @@ pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_
         }
 
         if forcedUse == 0 {
-            forcedUse = bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag();
+            forcedUse = selected_holdable_tag(ps);
         }
 
         if mp_bg::bg_misc::BG_IsItemSelectable(ps, forcedUse) == qfalse {

@@ -2995,7 +2995,7 @@ pub fn NPC_SearchForWeapons(ctx: &mut GameContext) -> *mut gentity_t {
                 continue;
             }
             let found_item = ctx.world.entity(found_id).item;
-            if found_item.unwrap().item().giType() != IT_WEAPON {
+            if !matches!(found_item.unwrap().item().kind, ItemKind::Weapon(_)) {
                 continue;
             }
             if (ctx.world.entity(found_id).s.eFlags & EF_NODRAW) != 0 {
