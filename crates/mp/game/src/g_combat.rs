@@ -1871,6 +1871,129 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `player_die` — the kill log: killer number/name and obituary
+/// resolution (with the §19 NULL-modName pick), the "Kill:" log line, the
+/// g_austrian duel-details block, and the weapon kill/death/frag logs.
+/// Returns the resolved killer entity number for the obit broadcast.
+/// Source: `oracle/codemp/game/g_combat.c:2510-2562`
+unsafe fn player_die_log_kill(
+    ctx: &mut GameContext,
+    self_: *mut gentity_t,
+    attacker: *mut gentity_t,
+    meansOfDeath: c_int,
+) -> c_int {
+    let cl = (*self_).client;
+    let mut killer: c_int;
+    let mut killer_name: String;
+    if !attacker.is_null() {
+        killer = (*attacker).s.number;
+        if !(*attacker).client.is_null() {
+            killer_name = cstr_to_str((*((*attacker).client)).pers.netname.as_ptr());
+        } else {
+            killer_name = "<non-client>".to_string();
+        }
+    } else {
+        killer = ENTITYNUM_WORLD;
+        killer_name = "<world>".to_string();
+    }
+
+    if killer < 0 || killer >= MAX_CLIENTS as c_int {
+        killer = ENTITYNUM_WORLD;
+        killer_name = "<world>".to_string();
+    }
+
+    let obit: String;
+    if meansOfDeath < 0 || meansOfDeath as usize >= modNames.len() {
+        obit = "<bad obituary>".to_string();
+    } else if modNames[meansOfDeath as usize].is_null() {
+        // §19: C's `G_LogPrintf("%s", NULL)` for the three trailing NULL
+        // modNames slots (42-44) is UB; glibc renders NULL as "(null)".
+        obit = "(null)".to_string();
+    } else {
+        obit = cstr_to_str(modNames[meansOfDeath as usize]);
+    }
+
+    let s = format!(
+        "Kill: {} {} {}: {} killed {} by {}\n",
+        killer,
+        (*self_).s.number,
+        meansOfDeath,
+        killer_name,
+        cstr_to_str((*cl).pers.netname.as_ptr()),
+        obit
+    );
+    crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+
+    if ctx.world.cvars.g_austrian.integer != 0
+        && ctx.world.cvars.g_gametype.integer == GT_DUEL
+        && ctx.world.level.numPlayingClients >= 2
+    {
+        let spawnTime = if (*ctx
+            .world
+            .level
+            .clients
+            .add(ctx.world.level.sortedClients[0] as usize))
+        .respawnTime
+            > (*ctx
+                .world
+                .level
+                .clients
+                .add(ctx.world.level.sortedClients[1] as usize))
+            .respawnTime
+        {
+            (*ctx
+                .world
+                .level
+                .clients
+                .add(ctx.world.level.sortedClients[0] as usize))
+            .respawnTime
+        } else {
+            (*ctx
+                .world
+                .level
+                .clients
+                .add(ctx.world.level.sortedClients[1] as usize))
+            .respawnTime
+        };
+        crate::g_main::G_LogPrintf(ctx, cstr("Duel Kill Details:\n").as_ptr());
+        let s = format!("Kill Time: {}\n", ctx.world.level.time - spawnTime);
+        crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+        let s = format!(
+            "victim: {}, hits on enemy {}\n",
+            cstr_to_str((*cl).pers.netname.as_ptr()),
+            (*cl).ps.persistant[persEnum_t::PERS_HITS as usize]
+        );
+        crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+        if !attacker.is_null() && !(*attacker).client.is_null() {
+            let acl = (*attacker).client;
+            let s = format!(
+                "killer: {}, hits on enemy {}, health: {}\n",
+                cstr_to_str((*acl).pers.netname.as_ptr()),
+                (*acl).ps.persistant[persEnum_t::PERS_HITS as usize],
+                (*attacker).health
+            );
+            crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+            // also - if MOD_SABER, list the animation and saber style
+            if meansOfDeath == meansOfDeath_t::MOD_SABER as c_int {
+                let s = format!(
+                    "killer saber style: {}, killer saber anim {}\n",
+                    (*acl).ps.fd.saberAnimLevel,
+                    cstr_to_str(animTable[(*acl).ps.torsoAnim as usize].name)
+                );
+                crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+            }
+        }
+    }
+
+    crate::g_log::G_LogWeaponKill(ctx, killer, meansOfDeath);
+    crate::g_log::G_LogWeaponDeath(ctx, (*self_).s.number, (*self_).s.weapon);
+    if !attacker.is_null() && !(*attacker).client.is_null() && (*attacker).inuse != qfalse {
+        crate::g_log::G_LogWeaponFrag(ctx, killer, (*self_).s.number);
+    }
+
+    killer
+}
+
 /// Split from `player_die` — the normal-death animation phase: draw the
 /// death anim (world-owned `death_anim_i` rotation + `G_PickDeathAnim`),
 /// play it with pm_type shielded, saber/heavy-melee dismemberment check,
@@ -2541,113 +2664,7 @@ pub fn player_die(
         (*cl).ps.pm_type = pmtype_t::PM_DEAD as c_int;
         (*cl).ps.pm_flags &= !PMF_STUCK_TO_WALL;
 
-        let mut killer: c_int;
-        let mut killer_name: String;
-        if !attacker.is_null() {
-            killer = (*attacker).s.number;
-            if !(*attacker).client.is_null() {
-                killer_name = cstr_to_str((*((*attacker).client)).pers.netname.as_ptr());
-            } else {
-                killer_name = "<non-client>".to_string();
-            }
-        } else {
-            killer = ENTITYNUM_WORLD;
-            killer_name = "<world>".to_string();
-        }
-
-        if killer < 0 || killer >= MAX_CLIENTS as c_int {
-            killer = ENTITYNUM_WORLD;
-            killer_name = "<world>".to_string();
-        }
-
-        let obit: String;
-        if meansOfDeath < 0 || meansOfDeath as usize >= modNames.len() {
-            obit = "<bad obituary>".to_string();
-        } else if modNames[meansOfDeath as usize].is_null() {
-            // §19: C's `G_LogPrintf("%s", NULL)` for the three trailing NULL
-            // modNames slots (42-44) is UB; glibc renders NULL as "(null)".
-            obit = "(null)".to_string();
-        } else {
-            obit = cstr_to_str(modNames[meansOfDeath as usize]);
-        }
-
-        let s = format!(
-            "Kill: {} {} {}: {} killed {} by {}\n",
-            killer,
-            (*self_).s.number,
-            meansOfDeath,
-            killer_name,
-            cstr_to_str((*cl).pers.netname.as_ptr()),
-            obit
-        );
-        crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
-
-        if ctx.world.cvars.g_austrian.integer != 0
-            && ctx.world.cvars.g_gametype.integer == GT_DUEL
-            && ctx.world.level.numPlayingClients >= 2
-        {
-            let spawnTime = if (*ctx
-                .world
-                .level
-                .clients
-                .add(ctx.world.level.sortedClients[0] as usize))
-            .respawnTime
-                > (*ctx
-                    .world
-                    .level
-                    .clients
-                    .add(ctx.world.level.sortedClients[1] as usize))
-                .respawnTime
-            {
-                (*ctx
-                    .world
-                    .level
-                    .clients
-                    .add(ctx.world.level.sortedClients[0] as usize))
-                .respawnTime
-            } else {
-                (*ctx
-                    .world
-                    .level
-                    .clients
-                    .add(ctx.world.level.sortedClients[1] as usize))
-                .respawnTime
-            };
-            crate::g_main::G_LogPrintf(ctx, cstr("Duel Kill Details:\n").as_ptr());
-            let s = format!("Kill Time: {}\n", ctx.world.level.time - spawnTime);
-            crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
-            let s = format!(
-                "victim: {}, hits on enemy {}\n",
-                cstr_to_str((*cl).pers.netname.as_ptr()),
-                (*cl).ps.persistant[persEnum_t::PERS_HITS as usize]
-            );
-            crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
-            if !attacker.is_null() && !(*attacker).client.is_null() {
-                let acl = (*attacker).client;
-                let s = format!(
-                    "killer: {}, hits on enemy {}, health: {}\n",
-                    cstr_to_str((*acl).pers.netname.as_ptr()),
-                    (*acl).ps.persistant[persEnum_t::PERS_HITS as usize],
-                    (*attacker).health
-                );
-                crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
-                // also - if MOD_SABER, list the animation and saber style
-                if meansOfDeath == meansOfDeath_t::MOD_SABER as c_int {
-                    let s = format!(
-                        "killer saber style: {}, killer saber anim {}\n",
-                        (*acl).ps.fd.saberAnimLevel,
-                        cstr_to_str(animTable[(*acl).ps.torsoAnim as usize].name)
-                    );
-                    crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
-                }
-            }
-        }
-
-        crate::g_log::G_LogWeaponKill(ctx, killer, meansOfDeath);
-        crate::g_log::G_LogWeaponDeath(ctx, (*self_).s.number, (*self_).s.weapon);
-        if !attacker.is_null() && !(*attacker).client.is_null() && (*attacker).inuse != qfalse {
-            crate::g_log::G_LogWeaponFrag(ctx, killer, (*self_).s.number);
-        }
+        let killer = player_die_log_kill(ctx, self_, attacker, meansOfDeath);
 
         G_BroadcastObit(
             ctx,
