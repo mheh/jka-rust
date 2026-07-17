@@ -3576,15 +3576,21 @@ pub fn LaunchItem(
 
     // Raven compares the raw giTag with NO giType check, so the WP_* values pun
     // against every kind's tag space (e.g. ammo_thermal's AMMO_THERMAL == 7 ==
-    // WP_BOWCASTER skips the roll below) — the bridge accessor keeps that.
-    if it.giTag() == WP_TRIP_MINE as c_int || it.giTag() == WP_DET_PACK as c_int {
+    // WP_BOWCASTER skips the roll below) — extract the raw tag per that.
+    let tag = match it.kind {
+        ItemKind::Bad | ItemKind::Health => 0,
+        ItemKind::Armor { rating } => rating,
+        ItemKind::Holdable(t)
+        | ItemKind::Powerup(t)
+        | ItemKind::Weapon(t)
+        | ItemKind::Ammo(t)
+        | ItemKind::Team(t) => t,
+    };
+    if tag == WP_TRIP_MINE as c_int || tag == WP_DET_PACK as c_int {
         e.s.angles[PITCH] = -90.0;
     }
 
-    if it.giTag() != WP_BOWCASTER as c_int
-        && it.giTag() != WP_DET_PACK as c_int
-        && it.giTag() != WP_THERMAL as c_int
-    {
+    if tag != WP_BOWCASTER as c_int && tag != WP_DET_PACK as c_int && tag != WP_THERMAL as c_int {
         e.s.angles[ROLL] = -90.0;
     }
 

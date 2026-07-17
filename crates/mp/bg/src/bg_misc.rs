@@ -869,11 +869,15 @@ pub fn BG_GetItemIndexByTag(tag: c_int, r#type: c_int) -> c_int {
 
 /// Tag of the holdable selected in `STAT_HOLDABLE_ITEM` — the raw
 /// `bg_itemlist[ps->stats[STAT_HOLDABLE_ITEM]].giTag` read Raven spells at
-/// three sites (`BG_CycleInven`, `PM_ItemUsable`, `PM_Weapon`). The slot may
-/// hold sentinel 0 (nothing selected), so the raw tag read is the honest shape.
+/// three sites (`BG_CycleInven`, `PM_ItemUsable`, `PM_Weapon`). The slot only
+/// ever holds a holdable's index or sentinel 0 (nothing selected, tag 0).
 pub fn selected_holdable_tag(ps: *const playerState_t) -> c_int {
     let slot = unsafe { (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] };
-    bg_itemlist[slot as usize].giTag()
+    match bg_itemlist[slot as usize].kind {
+        ItemKind::Holdable(tag) => tag,
+        ItemKind::Bad => 0,
+        k => unreachable!("STAT_HOLDABLE_ITEM slot {slot} holds non-holdable {k:?}"),
+    }
 }
 
 /// Raven `BG_IsItemSelectable`.
