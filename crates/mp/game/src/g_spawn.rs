@@ -34,8 +34,6 @@ use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
-use crate::bg_misc::{BG_FindItem, BG_ParseField};
-use crate::bg_panimate::BG_ParseAnimationFile;
 use crate::g_items::G_SpawnItem;
 use crate::g_main::{G_Error, G_Printf};
 use crate::g_mem::G_Alloc;
@@ -43,6 +41,8 @@ use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};
 use crate::q_shared::{Q_stricmp, Q_strncmp};
 use crate::NPC_utils::G_ActivateBehavior;
+use mp_bg::bg_misc::{BG_FindItem, BG_ParseField};
+use mp_bg::bg_panimate::BG_ParseAnimationFile;
 
 use crate::ent_fn_enums::EntThink;
 use mp_abi::game::syscalls::G_GET_ENTITY_TOKEN::GGetEntityTokenArgs;
@@ -191,7 +191,7 @@ pub fn G_SpawnVector(
 // Local helpers mirroring libc semantics used throughout this file
 // (`atoi`/`sscanf("%f %f %f", ...)` — house rule: libc/other symbols use the
 // Rust std equivalent, no resolved signature needed). `atof` itself now
-// routes through `crate::bg_lib::atof` (verified faithful to the oracle DLL's
+// routes through `mp_bg::bg_lib::atof` (verified faithful to the oracle DLL's
 // linked Raven `atof`, `bg_lib.c:774-839`); `sscanf_3f`/`sscanf_1f` route
 // through the shared libc-`%f` scanner `cstr_util::sscanf_f32s`.
 // ---------------------------------------------------------------------

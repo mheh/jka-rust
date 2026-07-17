@@ -357,7 +357,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                 {
                     crate::g_utils::G_Throw(ctx, radius_id, pushDir, 65.0);
                     let knockdownable = unsafe {
-                        crate::bg_pmove::BG_KnockDownable(&mut (*radius_client).ps as *mut _)
+                        mp_bg::bg_pmove::BG_KnockDownable(&mut (*radius_client).ps as *mut _)
                     };
                     if knockdownable != 0
                         && ctx.world.entity(radius_id).health > 0

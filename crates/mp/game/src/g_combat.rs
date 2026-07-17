@@ -10,9 +10,6 @@
 use crate::prelude::*;
 
 use crate::bg_channel::GameBgTraps;
-use crate::bg_misc::vectoyaw;
-use crate::bg_panimate::{BG_HasAnimation, BG_PickAnim};
-use crate::bg_pmove::BG_KnockDownable;
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch};
 use crate::entity::hit_location::*;
 use crate::g_main::CalculateRanks;
@@ -26,6 +23,9 @@ use crate::NPC_utils::G_ActivateBehavior;
 use core::ffi::CStr;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+use mp_bg::bg_misc::vectoyaw;
+use mp_bg::bg_panimate::{BG_HasAnimation, BG_PickAnim};
+use mp_bg::bg_pmove::BG_KnockDownable;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
 use mp_bg::public::entity_event::entity_event_t;
@@ -452,12 +452,12 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
     }
 
     // find the item type for this weapon
-    let item = crate::bg_misc::BG_FindItemForWeapon(unsafe {
+    let item = mp_bg::bg_misc::BG_FindItemForWeapon(unsafe {
         core::mem::transmute::<c_int, weapon_t>(weapon)
     });
 
     let mut ammoSub = unsafe { (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] }
-        - bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
+        - bg_itemlist[mp_bg::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
             .quantity;
 
     if ammoSub < 0 {
@@ -483,12 +483,12 @@ pub fn TossClientWeapon(ctx: &mut GameContext, self_: EntityId, direction: vec3_
     ctx.entity_mut(launched).s.powerups = ctx.world.level.time + 1500;
 
     ctx.entity_mut(launched).count = bg_itemlist
-        [crate::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
+        [mp_bg::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
         .quantity;
 
     unsafe {
         (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -= bg_itemlist
-            [crate::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
+            [mp_bg::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
             .quantity;
 
         if (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] < 0 {
@@ -581,7 +581,7 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
         && unsafe { (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] != 0 }
     {
         // find the item type for this weapon
-        let item = crate::bg_misc::BG_FindItemForWeapon(unsafe {
+        let item = mp_bg::bg_misc::BG_FindItemForWeapon(unsafe {
             core::mem::transmute::<c_int, weapon_t>(weapon)
         });
 
@@ -607,7 +607,7 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
         let mut angle: f32 = 45.0;
         for i in 1..PW_NUM_POWERUPS as c_int {
             if unsafe { (*client).ps.powerups[i as usize] } > ctx.world.level.time {
-                let item = crate::bg_misc::BG_FindItemForPowerup(unsafe {
+                let item = mp_bg::bg_misc::BG_FindItemForPowerup(unsafe {
                     core::mem::transmute::<c_int, powerup_t>(i)
                 });
                 if item.is_null() {
@@ -846,13 +846,13 @@ pub fn G_CheckSpecialDeathAnim(
         };
 
         let legs_anim_for_roll = (*client).ps.legsAnim;
-        if crate::bg_panimate::BG_InRoll(
+        if mp_bg::bg_panimate::BG_InRoll(
             &mut (*client).ps as *mut playerState_t,
             legs_anim_for_roll,
         ) != qfalse
         {
             deathAnim = BOTH_DEATH_ROLL as c_int; //# Death anim from a roll
-        } else if crate::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) != qfalse {
+        } else if mp_bg::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) != qfalse {
             deathAnim = BOTH_DEATH_FLIP as c_int; //# Death anim from a flip
         } else if G_InKnockDown(&mut (*client).ps as *mut playerState_t) != qfalse {
             // since these happen a lot, let's handle them case by case
@@ -2264,7 +2264,7 @@ pub fn player_die(
         (*cl).ps.heldByClient = 0;
         (*cl).beingThrown = 0;
         (*cl).doingThrow = 0;
-        crate::bg_pmove::BG_ClearRocketLock(&mut (*cl).ps as *mut playerState_t);
+        mp_bg::bg_pmove::BG_ClearRocketLock(&mut (*cl).ps as *mut playerState_t);
         (*cl).isHacking = 0;
         (*cl).ps.hackingTime = 0;
 
@@ -3419,7 +3419,7 @@ pub fn G_Dismember(
             write_cstr_field(&mut limbName, "torso");
             write_cstr_field(&mut stubCapName, "hips_cap_torso");
         } else if limbType == G2_MODELPART_LARM as c_int {
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"l_arm".as_ptr(),
                 limbName.as_mut_ptr(),
@@ -3427,7 +3427,7 @@ pub fn G_Dismember(
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"torso".as_ptr(),
                 stubName.as_mut_ptr(),
@@ -3440,7 +3440,7 @@ pub fn G_Dismember(
                 &format!("{}_cap_l_arm", cstr_to_str(stubName.as_ptr())),
             );
         } else if limbType == G2_MODELPART_RARM as c_int {
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"r_arm".as_ptr(),
                 limbName.as_mut_ptr(),
@@ -3448,7 +3448,7 @@ pub fn G_Dismember(
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"torso".as_ptr(),
                 stubName.as_mut_ptr(),
@@ -3461,7 +3461,7 @@ pub fn G_Dismember(
                 &format!("{}_cap_r_arm", cstr_to_str(stubName.as_ptr())),
             );
         } else if limbType == G2_MODELPART_RHAND as c_int {
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"r_hand".as_ptr(),
                 limbName.as_mut_ptr(),
@@ -3469,7 +3469,7 @@ pub fn G_Dismember(
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"r_arm".as_ptr(),
                 stubName.as_mut_ptr(),
@@ -3482,7 +3482,7 @@ pub fn G_Dismember(
                 &format!("{}_cap_r_hand", cstr_to_str(stubName.as_ptr())),
             );
         } else if limbType == G2_MODELPART_LLEG as c_int {
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"l_leg".as_ptr(),
                 limbName.as_mut_ptr(),
@@ -3490,7 +3490,7 @@ pub fn G_Dismember(
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"hips".as_ptr(),
                 stubName.as_mut_ptr(),
@@ -3503,7 +3503,7 @@ pub fn G_Dismember(
                 &format!("{}_cap_l_leg", cstr_to_str(stubName.as_ptr())),
             );
         } else if limbType == G2_MODELPART_RLEG as c_int {
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"r_leg".as_ptr(),
                 limbName.as_mut_ptr(),
@@ -3511,7 +3511,7 @@ pub fn G_Dismember(
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"hips".as_ptr(),
                 stubName.as_mut_ptr(),
@@ -3525,7 +3525,7 @@ pub fn G_Dismember(
             );
         } else {
             // umm... just default to the right leg, I guess (same as on client)
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"r_leg".as_ptr(),
                 limbName.as_mut_ptr(),
@@ -3533,7 +3533,7 @@ pub fn G_Dismember(
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
+            mp_bg::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 ghoul2,
                 c"hips".as_ptr(),
                 stubName.as_mut_ptr(),
@@ -3665,7 +3665,7 @@ pub fn G_Dismember(
 
             if !ent_client.is_null()
                 && (unsafe { (*ent_client).ps.torsoTimer } > 0
-                    || crate::bg_panimate::BG_InDeathAnim(unsafe { (*ent_client).ps.torsoAnim })
+                    || mp_bg::bg_panimate::BG_InDeathAnim(unsafe { (*ent_client).ps.torsoAnim })
                         == qfalse)
             {
                 // if he's done with his death anim we don't actually want the limbs going far

@@ -13,7 +13,6 @@ use mp_qshared::shared::MAX_GENTITIES;
 
 use crate::ai_main::BotAIShutdown;
 use crate::ai_util::B_CleanupAlloc;
-use crate::bg_panimate::BG_ClearAnimsets;
 use crate::g_log::G_LogWeaponOutput;
 use crate::g_main::G_LogPrintf;
 use crate::g_misc::TAG_Init;
@@ -22,6 +21,7 @@ use crate::g_svcmds::G_SaveBanIP;
 use crate::g_utils::G_CleanAllFakeClients;
 use crate::prelude::*;
 use crate::trap;
+use mp_bg::bg_panimate::BG_ClearAnimsets;
 
 /// Raven `void G_ShutdownGame( int restart )` (`g_main.c:1128`).
 ///

@@ -56,7 +56,7 @@ pub fn NPC_Sentry_Precache(ctx: &mut GameContext) {
     crate::g_utils::G_EffectIndex(cstr("bryar/muzzle_flash").as_ptr());
     crate::g_utils::G_EffectIndex(cstr("env/med_explode").as_ptr());
 
-    if let Some(item) = unsafe { crate::bg_misc::BG_FindItemForAmmo(AMMO_BLASTER).as_mut() } {
+    if let Some(item) = unsafe { mp_bg::bg_misc::BG_FindItemForAmmo(AMMO_BLASTER).as_mut() } {
         crate::g_items::RegisterItem(ctx, item);
     }
 }

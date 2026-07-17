@@ -29,8 +29,8 @@ use mp_bg::public::entity_event::entity_event_t;
 // imported here so call sites keep the bare Raven spelling. `SOLID_BMODEL`
 // (`q_shared.h:2642`) reaches this file via the prelude's
 // `mp_qshared::shared::surface_flags::*` glob.
-use crate::bg_slidemove::STEPSIZE;
 use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
+use mp_bg::bg_slidemove::STEPSIZE;
 // Explicit import to dedupe an E0659 glob ambiguity (known SFL_*/SVF_* debt);
 // canonical path per crate::saber::saber_flags.
 use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
@@ -65,7 +65,7 @@ pub fn G_StartMatrixEffect(ent: &gentity_t) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:103-108`
 pub fn NPC_ShadowTrooper_Precache(ctx: &mut GameContext) {
-    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
+    crate::g_items::RegisterItem(ctx, mp_bg::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
     crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/cloak.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/decloak.wav".as_ptr());
 }
@@ -263,11 +263,11 @@ pub fn WP_ResistForcePush(
         }
         if runningResist == qfalse
             && (*client).ps.groundEntityNum != ENTITYNUM_NONE
-            && crate::bg_panimate::BG_SpinningSaberAnim((*client).ps.legsAnim) == qfalse
-            && crate::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) == qfalse
-            && crate::bg_pmove::PM_RollingAnim((*client).ps.legsAnim) == qfalse
-            && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
-            && crate::bg_panimate::BG_CrouchAnim((*client).ps.legsAnim) == qfalse
+            && mp_bg::bg_panimate::BG_SpinningSaberAnim((*client).ps.legsAnim) == qfalse
+            && mp_bg::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) == qfalse
+            && mp_bg::bg_pmove::PM_RollingAnim((*client).ps.legsAnim) == qfalse
+            && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+            && mp_bg::bg_panimate::BG_CrouchAnim((*client).ps.legsAnim) == qfalse
         {
             //if on a surface and not in a spin or flip, play full body resist
             parts = SETANIM_BOTH;
@@ -295,7 +295,7 @@ pub fn WP_ResistForcePush(
                 ),
             );
 
-            tFVal = crate::bg_lib::atof(buf.as_ptr()) as f32;
+            tFVal = mp_bg::bg_lib::atof(buf.as_ptr()) as f32;
 
             if runningResist == qfalse {
                 (*client).ps.velocity = [0.0, 0.0, 0.0];
@@ -678,7 +678,7 @@ pub fn Boba_FireDecide(ctx: &mut GameContext) {
 
         if (*client).ps.groundEntityNum == ENTITYNUM_NONE
             && (*client).ps.fd.forceJumpZStart != 0.0
-            && crate::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) == qfalse
+            && mp_bg::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) == qfalse
             && ctx.world.bg_state.rng.Q_irand(0, 10) == 0
         {
             //take off
@@ -1865,7 +1865,7 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                 Jedi_Advance(ctx);
             }
         } else if (*client).ps.saberInFlight != qfalse
-            && crate::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) == qfalse
+            && mp_bg::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) == qfalse
             && (*client).ps.saberBlocked != BLOCKED_PARRY_BROKEN as c_int
         {
             //maintain distance
@@ -2542,7 +2542,7 @@ pub fn Jedi_CheckFlipEvasions(
             let fwdAngles: vec3_t = [0.0, (*client).ps.viewangles[YAW as usize], 0.0];
             crate::q_math::AngleVectors(fwdAngles, None, Some(&mut right), None);
 
-            animLength = crate::bg_panimate::BG_AnimLength(
+            animLength = mp_bg::bg_panimate::BG_AnimLength(
                 &ctx.world.bg_state,
                 ctx.world.entity(self_).localAnimIndex,
                 (*client).ps.legsAnim as c_int,
@@ -2597,9 +2597,9 @@ pub fn Jedi_CheckFlipEvasions(
             && ((*snpc).rank as c_int == RANK_CREWMAN as c_int
                 || (*snpc).rank as c_int >= RANK_LT as c_int)
             && ctx.world.bg_state.rng.Q_irand(0, 1) != 0
-            && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim) == qfalse
-            && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
-            && crate::bg_panimate::BG_SaberInSpecialAttack((*client).ps.torsoAnim) == qfalse
+            && mp_bg::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim) == qfalse
+            && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+            && mp_bg::bg_panimate::BG_SaberInSpecialAttack((*client).ps.torsoAnim) == qfalse
         {
             let mut fwd: vec3_t = [0.0; 3];
             let mut right: vec3_t = [0.0; 3];
@@ -2647,8 +2647,8 @@ pub fn Jedi_CheckFlipEvasions(
 
             crate::q_math::AngleVectors(fwdAngles, Some(&mut fwd), Some(&mut right), None);
 
-            parts = if crate::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) != qfalse
-                || crate::bg_panimate::PM_SaberInStart((*client).ps.saberMove) != qfalse
+            parts = if mp_bg::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) != qfalse
+                || mp_bg::bg_panimate::PM_SaberInStart((*client).ps.saberMove) != qfalse
             {
                 SETANIM_LEGS
             } else {
@@ -3069,13 +3069,13 @@ pub fn Jedi_SaberBusy(self_: &gentity_t) -> qboolean {
     let client = self_.client;
     unsafe {
         if (*client).ps.torsoTimer > 300
-            && ((crate::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) != qfalse
+            && ((mp_bg::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) != qfalse
                 && (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_3)
-                || crate::bg_panimate::BG_SpinningSaberAnim((*client).ps.torsoAnim) != qfalse
-                || crate::bg_panimate::BG_SaberInSpecialAttack((*client).ps.torsoAnim) != qfalse
-                || crate::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) != qfalse
-                || crate::bg_panimate::BG_FlippingAnim((*client).ps.torsoAnim) != qfalse
-                || crate::bg_pmove::PM_RollingAnim((*client).ps.torsoAnim) != qfalse)
+                || mp_bg::bg_panimate::BG_SpinningSaberAnim((*client).ps.torsoAnim) != qfalse
+                || mp_bg::bg_panimate::BG_SaberInSpecialAttack((*client).ps.torsoAnim) != qfalse
+                || mp_bg::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) != qfalse
+                || mp_bg::bg_panimate::BG_FlippingAnim((*client).ps.torsoAnim) != qfalse
+                || mp_bg::bg_pmove::PM_RollingAnim((*client).ps.torsoAnim) != qfalse)
         {
             //my saber is not in a parrying position
             return qtrue;
@@ -3155,7 +3155,7 @@ pub fn Jedi_SaberBlockGo(
         //see if we can dodge if need-be
         if (dist > 16.0 && (ctx.world.bg_state.rng.Q_irand(0, 2) != 0 || saberBusy != qfalse))
             || (*client).ps.saberInFlight != qfalse
-            || crate::bg_pmove::BG_SabersOff(&mut (*client).ps) != qfalse
+            || mp_bg::bg_pmove::BG_SabersOff(&mut (*client).ps) != qfalse
             || (*client).NPC_class == CLASS_BOBAFETT
         {
             let snpc = ctx.world.entity(self_).NPC;
@@ -3167,17 +3167,17 @@ pub fn Jedi_SaberBlockGo(
                     && ((*client).ps.pm_flags & PMF_DUCKED) == 0
                     && (*cmd).upmove >= 0
                     && crate::g_timer::TIMER_Done(ctx, Some(self_), c"duck".as_ptr()) != qfalse
-                    && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
+                    && mp_bg::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
                         == qfalse
-                    && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                    && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
                     && ((*client).ps.saberInFlight != qfalse
                         || (*client).NPC_class == CLASS_BOBAFETT
-                        || (crate::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) == qfalse
-                            && crate::bg_panimate::PM_SaberInStart((*client).ps.saberMove)
+                        || (mp_bg::bg_panimate::BG_SaberInAttack((*client).ps.saberMove) == qfalse
+                            && mp_bg::bg_panimate::PM_SaberInStart((*client).ps.saberMove)
                                 == qfalse
-                            && crate::bg_panimate::BG_SpinningSaberAnim((*client).ps.torsoAnim)
+                            && mp_bg::bg_panimate::BG_SpinningSaberAnim((*client).ps.torsoAnim)
                                 == qfalse
-                            && crate::bg_panimate::BG_SaberInSpecialAttack((*client).ps.torsoAnim)
+                            && mp_bg::bg_panimate::BG_SaberInSpecialAttack((*client).ps.torsoAnim)
                                 == qfalse))
                 {
                     doDodge = qtrue;
@@ -3458,7 +3458,7 @@ pub fn Jedi_SaberBlockGo(
                         && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) == 0
                         && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
                         && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
-                        && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                        && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
                     {
                         (*client).ps.fd.forceJumpCharge = 320.0;
                         evasionType = evasionType_t::EVASION_FJUMP;
@@ -3527,16 +3527,16 @@ pub fn Jedi_SaberBlockGo(
                             && (*client).ps.groundEntityNum < ENTITYNUM_NONE
                             && ctx.world.bg_state.rng.Q_irand(0, 2) == 0
                         {
-                            if crate::bg_panimate::BG_SaberInAttack((*client).ps.saberMove)
+                            if mp_bg::bg_panimate::BG_SaberInAttack((*client).ps.saberMove)
                                 == qfalse
-                                && crate::bg_panimate::PM_SaberInStart((*client).ps.saberMove)
+                                && mp_bg::bg_panimate::PM_SaberInStart((*client).ps.saberMove)
                                     == qfalse
-                                && crate::bg_panimate::BG_InRoll(
+                                && mp_bg::bg_panimate::BG_InRoll(
                                     &mut (*client).ps,
                                     (*client).ps.legsAnim,
                                 ) == qfalse
-                                && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
-                                && crate::bg_panimate::BG_SaberInSpecialAttack(
+                                && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                                && mp_bg::bg_panimate::BG_SaberInSpecialAttack(
                                     (*client).ps.torsoAnim,
                                 ) == qfalse
                             {
@@ -3648,7 +3648,7 @@ pub fn Jedi_SaberBlockGo(
                             && ((*snpc).scriptFlags & SCF_NO_ACROBATICS) == 0
                             && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
                             && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
-                            && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                            && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
                         {
                             (*client).ps.fd.forceJumpCharge = 320.0;
                             evasionType = evasionType_t::EVASION_FJUMP;
@@ -4275,7 +4275,7 @@ pub fn Jedi_EvasionSaber(
                                         && (*client).ps.fd.forceRageRecoveryTime
                                             < ctx.world.level.time
                                         && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
-                                        && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps)
+                                        && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps)
                                             == qfalse
                                     {
                                         (*client).ps.fd.forceJumpCharge = 480.0;
@@ -4315,7 +4315,7 @@ pub fn Jedi_EvasionSaber(
                                 && ((*client).ps.fd.forcePowersActive & (1 << FP_RAGE)) == 0
                                 && ((*npc_info).rank as c_int == RANK_CREWMAN as c_int
                                     || (*npc_info).rank as c_int > RANK_LT_JG as c_int)
-                                && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                                && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
                                 && ctx.world.bg_state.rng.Q_irand(0, 5) == 0
                             {
                                 if (*client).NPC_class == CLASS_BOBAFETT {
@@ -4937,7 +4937,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
                 match (*enemy_client).ps.weapon {
                     w if w == WP_SABER as c_int => {
                         //If enemy has a lightsaber, always close in
-                        if crate::bg_pmove::BG_SabersOff(&mut (*enemy_client).ps) != qfalse {
+                        if mp_bg::bg_pmove::BG_SabersOff(&mut (*enemy_client).ps) != qfalse {
                             Jedi_Aggression(&*npc, 2);
                         } else {
                             Jedi_Aggression(&*npc, 1);
@@ -4996,7 +4996,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
                 //parried
                 crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr(), -1);
                 if !enemy.is_null()
-                    && crate::bg_panimate::PM_SaberInKnockaway((*enemy_client).ps.saberMove)
+                    && mp_bg::bg_panimate::PM_SaberInKnockaway((*enemy_client).ps.saberMove)
                         != qfalse
                 {
                     //advance!
@@ -5058,7 +5058,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
             }
             if (*client).ps.saberEventFlags & SEF_BLOCKED as c_int != 0 {
                 //was blocked whilst attacking
-                if crate::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) != qfalse
+                if mp_bg::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) != qfalse
                     || (*client).ps.saberBlocked == BLOCKED_PARRY_BROKEN as c_int
                 {
                     if (*client).ps.saberInFlight != qfalse {
@@ -5263,8 +5263,8 @@ pub fn Jedi_AttackDecide(ctx: &mut GameContext, enemy_dist: c_int) -> qboolean {
             || ((*client).NPC_class == CLASS_JEDI
                 && (*npc_info).rank as c_int == RANK_COMMANDER as c_int)
         {
-            if (crate::bg_panimate::PM_SaberInParry((*client).ps.saberMove) != qfalse
-                || crate::bg_panimate::PM_SaberInKnockaway((*client).ps.saberMove) != qfalse)
+            if (mp_bg::bg_panimate::PM_SaberInParry((*client).ps.saberMove) != qfalse
+                || mp_bg::bg_panimate::PM_SaberInKnockaway((*client).ps.saberMove) != qfalse)
                 && (*client).ps.saberBlocked != BLOCKED_PARRY_BROKEN as c_int
             {
                 //try to attack straight from a parry
@@ -5395,7 +5395,7 @@ pub fn Jedi_Jump(ctx: &mut GameContext, dest: vec3_t, goalEntNum: c_int) -> qboo
                             //cap it
                             elapsedTime = travelTime.floor() as c_int;
                         }
-                        crate::bg_misc::BG_EvaluateTrajectory(
+                        mp_bg::bg_misc::BG_EvaluateTrajectory(
                             &tr,
                             ctx.world.level.time + elapsedTime,
                             &mut testPos,
@@ -5543,8 +5543,8 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
             if ctx.world.entity(goal_id).client.is_null()
                 || (*goal_client).ps.groundEntityNum != ENTITYNUM_NONE
             {
-                if crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
-                    && crate::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
+                if mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                    && mp_bg::bg_panimate::BG_InRoll(&mut (*client).ps, (*client).ps.legsAnim)
                         == qfalse
                 {
                     //enemy is on terra firma
@@ -6050,7 +6050,7 @@ pub fn Jedi_CheckJumps(ctx: &mut GameContext) {
         let unsafe_jump = 'check: {
             elapsedTime = 500;
             while elapsedTime <= 4000 {
-                crate::bg_misc::BG_EvaluateTrajectory(
+                mp_bg::bg_misc::BG_EvaluateTrajectory(
                     &tr,
                     ctx.world.level.time + elapsedTime,
                     &mut testPos,
@@ -7286,7 +7286,7 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
                     if (*client).ps.saberHolstered == 0 && (*client).ps.saberInFlight != qfalse {
                         //saber is still on, count down erosion and keep facing the enemy
                         Jedi_AggressionErosion(ctx, -3);
-                        if crate::bg_pmove::BG_SabersOff(&mut (*client).ps) != qfalse
+                        if mp_bg::bg_pmove::BG_SabersOff(&mut (*client).ps) != qfalse
                             && (*client).ps.saberInFlight == qfalse
                         {
                             //turned off saber (in hand), gloat
@@ -7425,7 +7425,7 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
         }
 
         if (*client).NPC_class != CLASS_BOBAFETT {
-            if crate::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) != qfalse
+            if mp_bg::bg_saber::PM_SaberInBrokenParry((*client).ps.saberMove) != qfalse
                 || (*client).ps.saberBlocked == BLOCKED_PARRY_BROKEN as c_int
             {
                 ctx.world.globals.ucmd.buttons &= !BUTTON_ATTACK;

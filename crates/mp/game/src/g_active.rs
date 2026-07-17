@@ -72,17 +72,6 @@ pub const TAUNT_GLOAT: c_int = 4;
 
 // Resolved cross-module fns (verbatim post-retrofit signatures — call surface).
 use crate::ai_main::InFieldOfVision;
-use crate::bg_g2_utils::BG_AttachToRancor;
-use crate::bg_misc::BG_PlayerTouchesItem;
-use crate::bg_misc::{
-    vectoyaw, BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate,
-};
-use crate::bg_panimate::{
-    BG_AnimLength, BG_SaberInAttack, PM_SaberInReturn, PM_SaberInStart, PM_SaberInTransition,
-};
-use crate::bg_pmove::BG_KnockDownable;
-use crate::bg_pmove::Pmove;
-use crate::bg_saberLoad::WP_SaberStyleValidForSaber;
 use crate::g_client::{respawn, ClientBegin, SetClientViewAngle};
 use crate::g_cmds::{
     Cmd_FollowCycle_f, Cmd_SaberAttackCycle_f, G_ItemUsable, SetTeam, StopFollowing,
@@ -113,6 +102,17 @@ use crate::w_force::{
 };
 use crate::w_saber::saberCheckKnockdown_DuelLoss;
 use crate::NPC_AI_Jedi::Jedi_Cloak;
+use mp_bg::bg_g2_utils::BG_AttachToRancor;
+use mp_bg::bg_misc::BG_PlayerTouchesItem;
+use mp_bg::bg_misc::{
+    vectoyaw, BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate,
+};
+use mp_bg::bg_panimate::{
+    BG_AnimLength, BG_SaberInAttack, PM_SaberInReturn, PM_SaberInStart, PM_SaberInTransition,
+};
+use mp_bg::bg_pmove::BG_KnockDownable;
+use mp_bg::bg_pmove::Pmove;
+use mp_bg::bg_saberLoad::WP_SaberStyleValidForSaber;
 
 use crate::bg_channel::{GameBgTraps, GameCallbacksImpl};
 use crate::ent_fn_enums::EntTouch;
@@ -2175,7 +2175,7 @@ pub fn G_SetTauntAnim(ctx: &mut GameContext, ent: EntityId, taunt: c_int) {
                     (*cl).ps.forceDodgeAnim = anim;
                     let local_anim_index = ctx.world.entity(ent).localAnimIndex;
                     (*cl).ps.forceHandExtendTime = level_time
-                        + crate::bg_panimate::BG_AnimLength(
+                        + mp_bg::bg_panimate::BG_AnimLength(
                             &ctx.world.bg_state,
                             local_anim_index,
                             anim,

@@ -725,7 +725,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"texturescale".as_ptr(),
-            cstr(&format!("{:.6}", crate::bg_lib::atof(value))).as_ptr(),
+            cstr(&format!("{:.6}", mp_bg::bg_lib::atof(value))).as_ptr(),
         );
 
         // Initialise the common aspects of the terrain
@@ -840,7 +840,7 @@ pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
 
     let mut fov: *mut c_char = core::ptr::null_mut();
     G_SpawnString(ctx, c"fov".as_ptr(), c"80".as_ptr(), &mut fov);
-    let fov_x = crate::bg_lib::atof(fov) as f32;
+    let fov_x = mp_bg::bg_lib::atof(fov) as f32;
 
     let mut fogv: vec3_t = [0.0, 0.0, 0.0];
     let mut isfog: c_int = 0;
@@ -1285,7 +1285,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             e.s.trickedentindex4 = count;
         }
 
-        let dark_light = crate::bg_misc::forcePowerDarkLight[count as usize];
+        let dark_light = mp_bg::bg_misc::forcePowerDarkLight[count as usize];
         if dark_light == FORCE_DARKSIDE {
             ctx.world.entity_mut(ent).s.trickedentindex3 = 1;
         } else if dark_light == FORCE_LIGHTSIDE {
@@ -1394,7 +1394,7 @@ pub fn InitShooter(ctx: &mut GameContext, ent: EntityId, weapon: c_int) {
         e.s.weapon = weapon;
     }
 
-    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon(weapon));
+    crate::g_items::RegisterItem(ctx, mp_bg::bg_misc::BG_FindItemForWeapon(weapon));
 
     let mut angles = ctx.world.entity(ent).s.angles;
     let mut movedir = ctx.world.entity(ent).movedir;
@@ -2363,13 +2363,13 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
 pub fn fx_runner_think(ctx: &mut GameContext, ent: EntityId) {
     let pos = ctx.world.entity(ent).s.pos;
     let level_time = ctx.world.level.time;
-    crate::bg_misc::BG_EvaluateTrajectory(
+    mp_bg::bg_misc::BG_EvaluateTrajectory(
         &pos,
         level_time,
         &mut ctx.world.entity_mut(ent).r.currentOrigin,
     );
     let apos = ctx.world.entity(ent).s.apos;
-    crate::bg_misc::BG_EvaluateTrajectory(
+    mp_bg::bg_misc::BG_EvaluateTrajectory(
         &apos,
         level_time,
         &mut ctx.world.entity_mut(ent).r.currentAngles,
@@ -3741,7 +3741,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
     }
 
     let weapon = ctx.world.entity(self_).s.weapon;
-    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon(weapon));
+    crate::g_items::RegisterItem(ctx, mp_bg::bg_misc::BG_FindItemForWeapon(weapon));
 
     // set where our muzzle is
     let origin = ctx.world.entity(self_).s.origin;

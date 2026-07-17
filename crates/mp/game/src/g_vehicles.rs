@@ -1409,7 +1409,7 @@ pub fn Update(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pUmcd: *const usercmd
         if !(*pVeh).m_pPilot.is_null() {
             // MP
             let pilotPS = (*(*pVeh).m_pPilot).playerState;
-            if crate::bg_pmove::BG_UnrestrainedPitchRoll(pilotPS, pVeh, &ctx.world.bg_state)
+            if mp_bg::bg_pmove::BG_UnrestrainedPitchRoll(pilotPS, pVeh, &ctx.world.bg_state)
                 == qfalse
             {
                 let mut newVAngle: vec3_t = [0.0; 3];
@@ -1589,7 +1589,7 @@ pub fn UpdateRider(
                         // dispatch chain (game-tier free-function form off `bg_state`).
                         let lai = ctx.world.entity(rider_id).localAnimIndex;
                         let iAnimLen: c_int =
-                            crate::bg_panimate::BG_AnimLength(&ctx.world.bg_state, lai, Anim);
+                            mp_bg::bg_panimate::BG_AnimLength(&ctx.world.bg_state, lai, Anim);
                         (*pVeh).m_iBoarding = ctx.world.level.time + iAnimLen;
                         // reuse flags: this should never be set in an entity
                         ctx.world.entity_mut(rider_id).flags |= FL_VEH_BOARDING; // MP
@@ -1707,7 +1707,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut i: c_int = 0;
 
-        crate::bg_vehicleLoad::AttachRidersGeneric(
+        mp_bg::bg_vehicleLoad::AttachRidersGeneric(
             pVeh,
             &ctx.world.bg_state,
             &GameBgTraps::new(ctx.engine),
@@ -2121,7 +2121,7 @@ pub fn G_FlyVehicleImpactDir(ctx: &mut GameContext, veh: EntityId, trace: *mut t
         }
 
         // try to use the trace plane normal
-        let impactAngle = crate::bg_misc::vectoyaw((*trace).plane.normal);
+        let impactAngle = mp_bg::bg_misc::vectoyaw((*trace).plane.normal);
         let relativeAngle = AngleSubtract(impactAngle, (*vcl).ps.viewangles[YAW]);
 
         if relativeAngle > 130.0 || relativeAngle < -130.0 {
@@ -2863,8 +2863,8 @@ pub fn Eject(
         // logic are all `#ifndef _JK2MP` or commented-out in Raven — MP does nothing
         // in the weapon `if/else` here.
 
-        crate::bg_panimate::BG_SetLegsAnimTimer(&mut (*ec).ps, 0);
-        crate::bg_panimate::BG_SetTorsoAnimTimer(&mut (*ec).ps, 0);
+        mp_bg::bg_panimate::BG_SetLegsAnimTimer(&mut (*ec).ps, 0);
+        mp_bg::bg_panimate::BG_SetTorsoAnimTimer(&mut (*ec).ps, 0);
 
         // Set how long until this vehicle can be boarded again.
         (*pVeh).m_iBoarding = ctx.world.level.time + 1000;

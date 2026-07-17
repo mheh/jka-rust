@@ -626,12 +626,12 @@ pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
             let mut origin: vec3_t = [0.0; 3];
             let mut angles: vec3_t = [0.0; 3];
             let time = ctx.world.level.time;
-            crate::bg_misc::BG_EvaluateTrajectory(
+            mp_bg::bg_misc::BG_EvaluateTrajectory(
                 &(*part).s.pos as *const trajectory_t,
                 time,
                 &mut origin,
             );
-            crate::bg_misc::BG_EvaluateTrajectory(
+            mp_bg::bg_misc::BG_EvaluateTrajectory(
                 &(*part).s.apos as *const trajectory_t,
                 time,
                 &mut angles,
@@ -672,12 +672,12 @@ pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
                 let time = ctx.world.level.time;
                 let mut cur_origin = (*p).r.currentOrigin;
                 let mut cur_angles = (*p).r.currentAngles;
-                crate::bg_misc::BG_EvaluateTrajectory(
+                mp_bg::bg_misc::BG_EvaluateTrajectory(
                     &(*p).s.pos as *const trajectory_t,
                     time,
                     &mut cur_origin,
                 );
-                crate::bg_misc::BG_EvaluateTrajectory(
+                mp_bg::bg_misc::BG_EvaluateTrajectory(
                     &(*p).s.apos as *const trajectory_t,
                     time,
                     &mut cur_angles,
@@ -824,7 +824,7 @@ pub fn SetMoverState(ctx: &mut GameContext, ent: EntityId, moverState: moverStat
     }
     let time = ctx.world.level.time;
     let mut cur_origin = ctx.entity(ent).r.currentOrigin;
-    crate::bg_misc::BG_EvaluateTrajectory(
+    mp_bg::bg_misc::BG_EvaluateTrajectory(
         core::ptr::from_ref(&ctx.entity(ent).s.pos),
         time,
         &mut cur_origin,

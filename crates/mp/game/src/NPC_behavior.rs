@@ -15,8 +15,6 @@
 //! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_misc::vectoyaw;
-use crate::bg_panimate::PM_InKnockDown;
 use crate::ent_fn_enums::EntThink;
 use crate::g_nav::NPC_SetMoveGoal;
 use crate::g_nav::{NAV_FindClosestWaypointForEnt, NAV_GetNearestNode};
@@ -57,6 +55,8 @@ use mp_abi::game::syscalls::G_NAV_GETNODEEDGE::GNavGetnodeedgeArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODENUMEDGES::GNavGetnodenumedgesArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_bg::bg_misc::vectoyaw;
+use mp_bg::bg_panimate::PM_InKnockDown;
 use mp_qshared::shared::MASK_SHOT;
 
 // Combat point search flags: `crate::npc::combat_point_flags`

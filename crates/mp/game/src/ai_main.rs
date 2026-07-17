@@ -24,13 +24,13 @@
 use crate::prelude::*;
 // Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
 // define it): the canonical home is g_public_consts, per house convention.
-use crate::bg_misc::BG_GetItemIndexByTag;
-use crate::bg_panimate::{BG_SaberInKata, BG_SaberInSpecial};
 use crate::g_bot::G_CheckBotSpawn;
 use crate::g_public_consts::SVF_NOCLIENT;
 use crate::g_utils::G_Find;
 use crate::game_globals::BotStates;
 use crate::w_force::ForcePowerUsableOn;
+use mp_bg::bg_misc::BG_GetItemIndexByTag;
+use mp_bg::bg_panimate::{BG_SaberInKata, BG_SaberInSpecial};
 // Weapon-id constants (Raven `weapon_t` values) used by the ported
 // pure-logic functions below; prelude re-exports only the type.
 use mp_bg::weapons::weapon_t::{
@@ -897,7 +897,7 @@ pub fn BotAISetupClient(
             // `bot_state_t` holds `*mut wpobject_t` fields (align 8); pad the pool
             // to an 8-byte boundary first (see `BG_AllocPad8`) so every later
             // `(*bs).field` access is safely dereferenceable.
-            crate::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
+            mp_bg::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
             (&mut ctx.world.globals.botstates)[client as usize] =
                 crate::ai_util::B_Alloc(ctx, core::mem::size_of::<bot_state_t>() as c_int)
                     as *mut bot_state_t;

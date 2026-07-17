@@ -68,14 +68,13 @@ pub use mp_qshared::shared::surface_flags::*;
 
 // Pass-3 symbol backfill: game-crate-local const families that were ported
 // but never wired into the prelude glob (see `docs/porting-rules.md` §E13).
-pub use crate::bg_misc::{
+pub use mp_bg::bg_misc::{
     bgForcePowerCost, bgForcePowerCostSaberThrow, forceMasteryPoints, forcePowerDarkLight,
     forcePowerSorted,
 };
 // Canonical seam string helpers (porting-rules pass-3 packet primer contract).
 pub use crate::ai_main_consts::*;
 pub use crate::anim_table::animTable;
-pub use crate::bg_vehicleLoad_tables::*;
 pub use crate::cstr_util::{
     atoi_str, cstr, cstr_from_chars, cstr_to_str, cstr_to_string, sscanf_f32s, write_cstr_field,
 };
@@ -99,13 +98,14 @@ pub use crate::q_math::{
 };
 pub use crate::q_shared_cvar_flags::*;
 pub use crate::w_force::mindTrickTime;
+pub use mp_bg::bg_vehicleLoad_tables::*;
 pub use mp_bg::vehicles::{vehFieldType_t, vehFieldType_t::*, vehField_t};
 pub use mp_qshared::shared::q_math_rand::RAND_MAX;
 // `BG_GiveMeVectorFromMatrix` lives in `bg_misc` (its oracle home,
 // `bg_misc.c:736`); the canonical export for bare-use sites.
-pub use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 pub use crate::saber::w_saber_consts::*;
 pub use crate::teams::npcteam::*;
+pub use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
 
 // Enum types transcribed as `#[repr(i32)] enum` per porting-rules'
 // enum-vs-alias fidelity rule; the fnskel packets carry their bare Raven
@@ -302,10 +302,6 @@ pub use mp_qshared::shared::{
 // Pass-3 prep C1 (agenda B6/B10): batch re-export of game-crate-local fns
 // spelled bare in pass-2 porter bodies but never wired into the prelude.
 // Each resolves to a single `pub fn`/`const` definition (scripted).
-pub use crate::bg_lib::atof;
-pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
-pub use crate::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
-pub use crate::bg_pmove::BG_SabersOff;
 pub use crate::cstr_util::atoi;
 pub use crate::g_client::SpotWouldTelefrag2;
 pub use crate::g_combat::{G_CheckVehicleNPCTeamDamage, G_Damage, G_RadiusDamage};
@@ -362,20 +358,16 @@ pub use crate::NPC_senses::{InFOV3, NPC_CheckAlertEvents, NPC_CheckForDanger};
 pub use crate::NPC_utils::{
     CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_UpdateAngles,
 };
+pub use mp_bg::bg_lib::atof;
+pub use mp_bg::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
+pub use mp_bg::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
+pub use mp_bg::bg_pmove::BG_SabersOff;
 
 // preflight.py: file-level symbol re-exports (aggregate re-export plan)
 pub use crate::ai::consts::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/consts.rs
 pub use crate::ai::distance::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/distance.rs
 pub use crate::ai::rank::*;
 pub use crate::ai_wpnav::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai_wpnav.rs
-pub use crate::bg_misc::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_misc.rs
-pub use crate::bg_pmove::MIN_WALK_NORMAL; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
-pub use crate::bg_pmove::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
-pub use crate::bg_saber::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saber.rs
-pub use crate::bg_saberLoad::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saberLoad.rs
-pub use crate::bg_saga::{WPTable, SIEGECHAR_TAB}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saga.rs
-pub use crate::bg_slidemove::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_slidemove.rs
-pub use crate::bg_vehicleLoad::BG_VehicleGetIndex;
 pub use crate::botai::bweaponrange::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/botai/bweaponrange.rs
 pub use crate::client::client_connected::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_connected.rs
 pub use crate::client::client_persistant::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_persistant.rs
@@ -426,6 +418,14 @@ pub use crate::NPC_senses::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crate
 pub use crate::NPC_spawn::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_spawn.rs
 pub use crate::NPC_stats::BSTable; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_stats.rs
 pub use crate::NPC_utils::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_utils.rs
+pub use mp_bg::bg_misc::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_misc.rs
+pub use mp_bg::bg_pmove::MIN_WALK_NORMAL; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
+pub use mp_bg::bg_pmove::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
+pub use mp_bg::bg_saber::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saber.rs
+pub use mp_bg::bg_saberLoad::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saberLoad.rs
+pub use mp_bg::bg_saga::{WPTable, SIEGECHAR_TAB}; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saga.rs
+pub use mp_bg::bg_slidemove::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_slidemove.rs
+pub use mp_bg::bg_vehicleLoad::BG_VehicleGetIndex;
 pub use mp_bg::local::bg_toggleable_surfaces::bgToggleableSurfaces; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/bg_toggleable_surfaces.rs
 pub use mp_bg::local::force_levels::forceJumpStrength; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_levels.rs
 pub use mp_bg::local::force_levels::*; // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_levels.rs

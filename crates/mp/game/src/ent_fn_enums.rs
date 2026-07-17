@@ -17,16 +17,6 @@
 use crate::ai_main::*;
 use crate::ai_util::*;
 use crate::ai_wpnav::*;
-use crate::bg_g2_utils::*;
-use crate::bg_lib::*;
-use crate::bg_misc::*;
-use crate::bg_panimate::*;
-use crate::bg_pmove::*;
-use crate::bg_saber::*;
-use crate::bg_saberLoad::*;
-use crate::bg_saga::*;
-use crate::bg_slidemove::*;
-use crate::bg_vehicleLoad::*;
 use crate::g_ICARUScb::*;
 use crate::g_active::*;
 use crate::g_arenas::*;
@@ -102,6 +92,16 @@ use crate::NPC_stats::*;
 use crate::NPC_utils::*;
 use crate::SpeederNPC::*;
 use crate::WalkerNPC::*;
+use mp_bg::bg_g2_utils::*;
+use mp_bg::bg_lib::*;
+use mp_bg::bg_misc::*;
+use mp_bg::bg_panimate::*;
+use mp_bg::bg_pmove::*;
+use mp_bg::bg_saber::*;
+use mp_bg::bg_saberLoad::*;
+use mp_bg::bg_saga::*;
+use mp_bg::bg_slidemove::*;
+use mp_bg::bg_vehicleLoad::*;
 
 // fn-ID enums hoisted to `mp_qshared` (below `mp_game`) so
 // `gentity_t`'s dispatch fields can name them; the central match dispatch

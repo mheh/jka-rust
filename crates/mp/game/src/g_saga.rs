@@ -16,12 +16,6 @@
 
 use crate::prelude::*;
 
-use crate::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
-use crate::bg_saga::{
-    BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
-    BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeLoadClasses, BG_SiegeLoadTeams,
-    BG_SiegeSetTeamTheme,
-};
 use crate::client::gclient::gclient_t;
 use crate::client::player_team_state::playerTeamStateState_t;
 use crate::client::spectator_state::spectatorState_t;
@@ -37,6 +31,12 @@ use crate::g_utils::{
 };
 use crate::q_shared::Info_SetValueForKey;
 use crate::q_shared::Q_strcat;
+use mp_bg::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
+use mp_bg::bg_saga::{
+    BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
+    BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeLoadClasses, BG_SiegeLoadTeams,
+    BG_SiegeSetTeamTheme,
+};
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;

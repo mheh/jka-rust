@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use core::ffi::{c_char, c_int};
 
-use mp_game::bg_misc::{
+use mp_bg::bg_misc::{
     BG_CanItemBeGrabbed, BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem,
     BG_FindItemForAmmo, BG_FindItemForHoldable, BG_FindItemForPowerup, BG_FindItemForWeapon,
     BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate,

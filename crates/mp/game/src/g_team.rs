@@ -9,13 +9,13 @@ use crate::prelude::*;
 
 use core::ffi::CStr;
 
-use crate::bg_lib::qsort;
 use crate::ent_id::resolve;
 use crate::entity::flags::{FL_DROPPED_ITEM, FL_FORCE_GESTURE};
 use crate::g_combat::AddScore;
 use crate::g_items::RespawnItem;
 use crate::g_main::CalculateRanks;
 use crate::g_utils::{G_Find, G_FreeEntity, G_TempEntity};
+use mp_bg::bg_lib::qsort;
 use mp_bg::public::ctf_msg::ctfMsg_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::global_team_sound::global_team_sound_t;

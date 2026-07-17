@@ -25,14 +25,14 @@ use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
 ///
 /// Source: `oracle/codemp/game/ai_util.c:14-17`
 pub fn B_TempAlloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
-    crate::bg_misc::BG_TempAlloc(size, &mut ctx.world.bg_state)
+    mp_bg::bg_misc::BG_TempAlloc(size, &mut ctx.world.bg_state)
 }
 
 /// Raven `B_TempFree`.
 ///
 /// Source: `oracle/codemp/game/ai_util.c:19-22`
 pub fn B_TempFree(ctx: &mut GameContext, size: c_int) {
-    crate::bg_misc::BG_TempFree(size, &mut ctx.world.bg_state)
+    mp_bg::bg_misc::BG_TempFree(size, &mut ctx.world.bg_state)
 }
 
 /// Raven `B_Alloc`.
@@ -41,7 +41,7 @@ pub fn B_TempFree(ctx: &mut GameContext, size: c_int) {
 /// `return BG_Alloc(size);` branch (`ai_util.c:77`) is live.
 /// Source: `oracle/codemp/game/ai_util.c:25-80`
 pub fn B_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
-    crate::bg_misc::BG_Alloc(size, &mut ctx.world.bg_state)
+    mp_bg::bg_misc::BG_Alloc(size, &mut ctx.world.bg_state)
 }
 
 /// Raven `B_Free`.

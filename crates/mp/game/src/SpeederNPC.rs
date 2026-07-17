@@ -451,7 +451,7 @@ pub fn AnimateRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
             // Set the delay time (40% of animation time). `ctx` now threads the bg
             // channel into this dispatch chain, so BG_AnimLength is reachable
             // (game-tier free-function form off `bg_state`).
-            iAnimLen = (crate::bg_panimate::BG_AnimLength(
+            iAnimLen = (mp_bg::bg_panimate::BG_AnimLength(
                 &ctx.world.bg_state,
                 (*(*pVeh).m_pPilot).localAnimIndex,
                 Anim as c_int,

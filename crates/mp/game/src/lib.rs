@@ -66,13 +66,6 @@ pub mod ai_util;
 pub mod ai_wpnav;
 pub mod anim_table;
 pub mod bg_channel;
-// safe-state S5-6: the bg function modules moved down to `mp_bg`; re-exported
-// here under their old `crate::bg_*` paths so game importers and the prelude
-// glob keep resolving unchanged.
-pub use mp_bg::{
-    bg_g2_utils, bg_lib, bg_misc, bg_panimate, bg_pmove, bg_saber, bg_saberLoad, bg_saga,
-    bg_slidemove, bg_vehicleLoad, bg_vehicleLoad_tables,
-};
 pub mod c_format;
 pub mod com_boundary;
 pub mod cstr_util;

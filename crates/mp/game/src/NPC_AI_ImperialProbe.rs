@@ -4,8 +4,6 @@
 //! Imperial Probe droid AI behavior: idle, patrol, hunt, strafe, ranged attack.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_misc::BG_GiveMeVectorFromMatrix;
-use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 use crate::g_combat::G_Damage;
 use crate::g_items::RegisterItem;
 use crate::g_missile::CreateMissile;
@@ -29,6 +27,8 @@ use crate::NPC_utils::{
     CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_UpdateAngles,
 };
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
+use mp_bg::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 
 // Local state enums
 // Source: oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17

@@ -72,7 +72,7 @@ pub fn trap_Cvar_VariableValue(ctx: &mut GameContext, var_name: *const c_char) -
                 buf.len() as c_int,
             ),
         );
-        crate::bg_lib::atof(buf.as_ptr()) as f32
+        mp_bg::bg_lib::atof(buf.as_ptr()) as f32
     }
 }
 
@@ -777,7 +777,7 @@ pub fn G_BotConnect(ctx: &mut GameContext, clientNum: c_int, restart: qboolean) 
                 cstr("personality").as_ptr(),
             )),
         );
-        settings.skill = crate::bg_lib::atof(Info_ValueForKey(
+        settings.skill = mp_bg::bg_lib::atof(Info_ValueForKey(
             &mut ctx.world.bg_state.qs,
             userinfo.as_ptr(),
             cstr("skill").as_ptr(),
@@ -1148,7 +1148,7 @@ pub fn Svcmd_AddBot_f(ctx: &mut GameContext) {
     let skill: f32 = if string[0] == 0 {
         4.0
     } else {
-        crate::bg_lib::atof(string.as_ptr()) as f32
+        mp_bg::bg_lib::atof(string.as_ptr()) as f32
     };
 
     // team

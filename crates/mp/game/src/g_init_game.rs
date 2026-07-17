@@ -6,8 +6,6 @@ use crate::prelude::*;
 use crate::ai_main::{BotAILoadMap, BotAISetup};
 use crate::ai_util::B_InitAlloc;
 use crate::bg_channel::{GameBgTraps, GameCallbacksImpl};
-use crate::bg_saberLoad::WP_SaberLoadParms;
-use crate::bg_vehicleLoad::BG_VehicleLoadParms;
 use crate::g_bot::G_InitBots;
 use crate::g_client::InitBodyQue;
 use crate::g_items::{ClearRegisteredItems, G_CheckTeamItems, SaveRegisteredItems};
@@ -24,6 +22,8 @@ use crate::g_utils::{G_ModelIndex, G_SoundIndex};
 use crate::level::level_locals::level_locals_t;
 use crate::npc_c::NPC_InitGame;
 use crate::NPC_combat::CP_FindCombatPointWaypoints;
+use mp_bg::bg_saberLoad::WP_SaberLoadParms;
+use mp_bg::bg_vehicleLoad::BG_VehicleLoadParms;
 
 // Explicit import: `mp_bg::public::configstring::*` and `crate::g_client::*`
 // both glob-export `CS_CLIENT_JEDIMASTER` (prelude ambiguous-glob-reexports

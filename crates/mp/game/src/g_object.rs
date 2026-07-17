@@ -24,7 +24,7 @@ pub fn G_BounceObject(ctx: &mut GameContext, id: EntityId, trace: &trace_t) {
     let hit_time = ctx.world.level.previousTime as c_int
         + ((ctx.world.level.time - ctx.world.level.previousTime) as f32 * trace.fraction) as c_int;
 
-    crate::bg_misc::BG_EvaluateTrajectoryDelta(
+    mp_bg::bg_misc::BG_EvaluateTrajectoryDelta(
         core::ptr::from_ref(&ctx.entity(id).s.pos),
         hit_time,
         &mut velocity,
@@ -108,7 +108,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
 
     crate::q_math::_VectorCopy(ctx.entity(id).r.currentOrigin, &mut old_org);
     // get current position
-    crate::bg_misc::BG_EvaluateTrajectory(
+    mp_bg::bg_misc::BG_EvaluateTrajectory(
         core::ptr::from_ref(&ctx.entity(id).s.pos),
         ctx.world.level.time,
         &mut origin,
@@ -118,7 +118,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
     // write target (Raven aliases them through one `gentity_t*`; the snapshot is
     // behavior-identical because `s.apos` is not mutated by the eval).
     let apos = ctx.entity(id).s.apos;
-    crate::bg_misc::BG_EvaluateTrajectory(
+    mp_bg::bg_misc::BG_EvaluateTrajectory(
         core::ptr::from_ref(&apos),
         ctx.world.level.time,
         &mut ctx.entity_mut(id).r.currentAngles,

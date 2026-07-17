@@ -25,8 +25,6 @@ use crate::prelude::*;
 // block (as if resolved at link time), which cannot work for plain-Rust
 // intra-crate functions. Wired via ordinary `use` instead.
 use crate::bg_channel::GameBgTraps;
-use crate::bg_pmove::{BG_UnrestrainedPitchRoll, BG_VehicleTurnRateForSpeed};
-use crate::bg_vehicleLoad::BG_VehicleGetIndex;
 use crate::g_combat::G_DamageFromKiller;
 use crate::g_main::Com_Error;
 use crate::g_utils::G_AllocateVehicleObject;
@@ -39,6 +37,8 @@ use crate::q_math::{
 };
 use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
 use crate::veh_dispatch;
+use mp_bg::bg_pmove::{BG_UnrestrainedPitchRoll, BG_VehicleTurnRateForSpeed};
+use mp_bg::bg_vehicleLoad::BG_VehicleGetIndex;
 
 // Constants used by the vehicle move/orient/animate bodies below. Values from the
 // oracle; defined locally (mirroring `SpeederNPC.rs`) so the flight bodies don't

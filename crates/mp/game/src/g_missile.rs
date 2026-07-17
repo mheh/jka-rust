@@ -34,7 +34,7 @@ unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
     ctx.world.g_entities.as_ptr()
 }
 
-use crate::bg_misc::snap_vector;
+use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
 
@@ -203,7 +203,7 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
         (level.previousTime, level.time)
     };
     let hitTime = prev_time as c_float + (time - prev_time) as c_float * tr.fraction;
-    crate::bg_misc::BG_EvaluateTrajectoryDelta(
+    mp_bg::bg_misc::BG_EvaluateTrajectoryDelta(
         &ctx.entity(ent).s.pos,
         hitTime as c_int,
         &mut velocity,
@@ -298,7 +298,7 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
     let mut origin: vec3_t = [0.0; 3];
 
     let time = ctx.world.level.time;
-    crate::bg_misc::BG_EvaluateTrajectory(&ctx.entity(ent).s.pos, time, &mut origin);
+    mp_bg::bg_misc::BG_EvaluateTrajectory(&ctx.entity(ent).s.pos, time, &mut origin);
     snap_vector(&mut origin);
     G_SetOrigin(ctx.entity_mut(ent), origin);
 
@@ -948,7 +948,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
 
             let pos = ctx.entity(ent).s.pos;
             let time = ctx.world.level.time;
-            crate::bg_misc::BG_EvaluateTrajectoryDelta(&pos, time, &mut velocity);
+            mp_bg::bg_misc::BG_EvaluateTrajectoryDelta(&pos, time, &mut velocity);
             if crate::q_math::VectorLength(velocity) == 0.0 {
                 velocity[2] = 1.0;
             }
@@ -1184,7 +1184,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
 
     // Get current position
     let time = ctx.world.level.time;
-    crate::bg_misc::BG_EvaluateTrajectory(&ctx.entity(ent).s.pos, time, &mut origin);
+    mp_bg::bg_misc::BG_EvaluateTrajectory(&ctx.entity(ent).s.pos, time, &mut origin);
 
     // Determine entity to pass (not collide with)
     if let Some(target_id) = ctx.entity(ent).target_ent {
@@ -1360,7 +1360,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
                 crate::q_math::_VectorCopy(co, &mut ctx.entity_mut(ent).s.origin);
                 let pos = ctx.entity(ent).s.pos;
                 let time = ctx.world.level.time;
-                crate::bg_misc::BG_EvaluateTrajectory(
+                mp_bg::bg_misc::BG_EvaluateTrajectory(
                     &pos,
                     time,
                     &mut ctx.entity_mut(ent).s.origin2,

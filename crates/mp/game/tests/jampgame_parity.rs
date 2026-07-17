@@ -1,7 +1,7 @@
 //! Differential parity test for the jampgame `q_math` + `bg_lib` ports against
 //! the Raven oracle. Reproduces `tools/jampgame-oracle/`'s canonical bit-exact
 //! dumps by calling the PORTED functions (`mp_game::q_math`,
-//! `mp_game::bg_lib`, `mp_game::bg_channel::Rng`) and byte-compares to the
+//! `mp_bg::bg_lib`, `mp_game::bg_channel::Rng`) and byte-compares to the
 //! committed goldens under `tests/oracle/golden/`.
 //!
 //! Single-threaded by construction: the oracle keeps its RNG in file statics
@@ -14,8 +14,8 @@ use core::ffi::{c_char, c_int, c_void};
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
+use mp_bg::bg_lib::{__builtin___memmove_chk, _atof, atof, atoi, qsort};
 use mp_game::bg_channel::Rng;
-use mp_game::bg_lib::{__builtin___memmove_chk, _atof, atof, atoi, qsort};
 use mp_game::q_math::*;
 use mp_game::shared::cplane_t;
 
@@ -729,12 +729,12 @@ mod saberload {
     use std::sync::OnceLock;
 
     use mp_abi::game::imports::MpGameImport;
+    use mp_bg::bg_saberLoad::{
+        saber_snd_tape_drain, saber_snd_tape_enable, WP_SaberLoadParms, WP_SaberParseParms,
+    };
     use mp_engine_qcommon::vm::{arm_game_slot, game_syscall_trampoline};
     use mp_engine_select::Engine;
     use mp_game::bg_channel::{BgState, BgTraps, GameCallbacksImpl};
-    use mp_game::bg_saberLoad::{
-        saber_snd_tape_drain, saber_snd_tape_enable, WP_SaberLoadParms, WP_SaberParseParms,
-    };
     use mp_game::g_strap::init_strap_engine;
     use mp_game::prelude::*;
 

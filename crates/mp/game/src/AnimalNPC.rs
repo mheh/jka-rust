@@ -261,7 +261,7 @@ pub fn AnimateVehicle(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                 }
 
                 let local_anim_index = ctx.world.entity(parent_id).localAnimIndex;
-                iAnimLen = (crate::bg_panimate::BG_AnimLength(
+                iAnimLen = (mp_bg::bg_panimate::BG_AnimLength(
                     &ctx.world.bg_state,
                     local_anim_index,
                     anim as c_int,
@@ -545,7 +545,7 @@ pub fn G_CreateAnimalNPC(
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
-        let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
+        let veh_index = mp_bg::bg_vehicleLoad::BG_VehicleGetIndex(
             strAnimalType,
             &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),

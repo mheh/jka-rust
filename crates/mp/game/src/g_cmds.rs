@@ -561,7 +561,7 @@ pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
 
         // spawn a specific item right on the player
         if !give_all {
-            let it = crate::bg_misc::BG_FindItem(name.as_ptr());
+            let it = mp_bg::bg_misc::BG_FindItem(name.as_ptr());
             if it.is_null() {
                 return;
             }
@@ -1664,7 +1664,7 @@ pub fn G_TeamForSiegeClass(ctx: &mut GameContext, clName: *const c_char) -> c_in
         let bg = &ctx.world.bg_state;
         let mut team = SIEGETEAM_TEAM1;
         let mut i: c_int = 0;
-        let mut stm = crate::bg_saga::BG_SiegeFindThemeForTeam(team, bg);
+        let mut stm = mp_bg::bg_saga::BG_SiegeFindThemeForTeam(team, bg);
 
         if stm.is_null() {
             return 0;
@@ -1685,7 +1685,7 @@ pub fn G_TeamForSiegeClass(ctx: &mut GameContext, clName: *const c_char) -> c_in
                     break;
                 }
                 team = SIEGETEAM_TEAM2;
-                stm = crate::bg_saga::BG_SiegeFindThemeForTeam(team, bg);
+                stm = mp_bg::bg_saga::BG_SiegeFindThemeForTeam(team, bg);
                 i = 0;
             }
         }
@@ -1784,7 +1784,7 @@ pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
 
         let preScore = ctx.world.client(cidx).ps.persistant[PERS_SCORE as usize];
 
-        crate::bg_saga::BG_SiegeCheckClassLegality(
+        mp_bg::bg_saga::BG_SiegeCheckClassLegality(
             team,
             className.as_mut_ptr(),
             &mut ctx.world.bg_state,
@@ -1932,7 +1932,7 @@ pub fn G_SetSaber(
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
-        crate::bg_saberLoad::WP_SetSaber(
+        mp_bg::bg_saberLoad::WP_SetSaber(
             (*ent).s.number,
             (*client).saber.as_mut_ptr(),
             saberNum,
@@ -1961,14 +1961,14 @@ pub fn G_SetSaber(
             );
         }
 
-        if crate::bg_saberLoad::WP_SaberStyleValidForSaber(
+        if mp_bg::bg_saberLoad::WP_SaberStyleValidForSaber(
             &mut (*client).saber[0],
             &mut (*client).saber[1],
             (*client).ps.saberHolstered,
             (*client).ps.fd.saberAnimLevel,
         ) == qfalse
         {
-            crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
+            mp_bg::bg_saberLoad::WP_UseFirstValidSaberStyle(
                 &mut (*client).saber[0],
                 &mut (*client).saber[1],
                 (*client).ps.saberHolstered,
@@ -3660,7 +3660,7 @@ pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
                     MAX_TOKEN_CHARS as c_int,
                 ),
             );
-            origin[i] = crate::bg_lib::atof(buffer.as_ptr()) as f32;
+            origin[i] = mp_bg::bg_lib::atof(buffer.as_ptr()) as f32;
         }
 
         trap::Argv(
@@ -3671,7 +3671,7 @@ pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
                 MAX_TOKEN_CHARS as c_int,
             ),
         );
-        angles[YAW as usize] = crate::bg_lib::atof(buffer.as_ptr()) as f32;
+        angles[YAW as usize] = mp_bg::bg_lib::atof(buffer.as_ptr()) as f32;
 
         crate::g_misc::TeleportPlayer(ctx, ent, origin, angles);
     }
@@ -3705,7 +3705,7 @@ pub fn G_ItemUsable(ctx: &mut GameContext, ps: *mut playerState_t, forcedUse: c_
             forcedUse = bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag;
         }
 
-        if crate::bg_misc::BG_IsItemSelectable(ps, forcedUse) == qfalse {
+        if mp_bg::bg_misc::BG_IsItemSelectable(ps, forcedUse) == qfalse {
             return 0;
         }
 
@@ -3939,7 +3939,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
 
         if (*client).saber[0].model[0] != 0 && (*client).saber[1].model[0] != 0 {
             // no cycling for akimbo
-            if crate::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[1]) != qfalse
+            if mp_bg::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[1]) != qfalse
             {
                 if (*client).ps.saberHolstered == 1 {
                     crate::g_utils::G_Sound(
@@ -3975,7 +3975,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
                 return;
             }
         } else if (*client).saber[0].numBlades > 1
-            && crate::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[0]) != qfalse
+            && mp_bg::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[0]) != qfalse
         {
             if (*client).ps.saberHolstered == 1 {
                 if (*client).ps.saberInFlight != qfalse {
@@ -3992,7 +3992,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
                 );
                 (*client).ps.saberHolstered = 0;
                 if (*client).saber[0].stylesForbidden != 0 {
-                    crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
+                    mp_bg::bg_saberLoad::WP_UseFirstValidSaberStyle(
                         &mut (*client).saber[0],
                         &mut (*client).saber[1],
                         (*client).ps.saberHolstered,
@@ -4098,7 +4098,7 @@ pub fn Cmd_SaberAttackCycle_f(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if usingSiegeStyle == qfalse {
-            crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
+            mp_bg::bg_saberLoad::WP_UseFirstValidSaberStyle(
                 &mut (*client).saber[0],
                 &mut (*client).saber[1],
                 (*client).ps.saberHolstered,
@@ -4961,7 +4961,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
             }
         } else if cmd_s.eq_ignore_ascii_case("debugKnockMeDown") {
             let client = (*ent).client;
-            if crate::bg_pmove::BG_KnockDownable(&mut (*client).ps) != qfalse {
+            if mp_bg::bg_pmove::BG_KnockDownable(&mut (*client).ps) != qfalse {
                 (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
                 (*client).ps.forceDodgeAnim = 0;
                 if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {

@@ -12,12 +12,12 @@
 //! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_panimate::PM_InKnockDown;
 use crate::g_nav::{NAV_AvoidCollision, NAV_CheckAhead, NAV_MoveToGoal};
 use crate::g_navnew::{NAVNEW_AvoidCollision, NAVNEW_MoveToGoal};
 use crate::prelude::*;
 use crate::q_math::{_VectorCopy, vectoangles, AngleNormalize360, AngleVectors, VectorNormalize};
 use crate::trap;
+use mp_bg::bg_panimate::PM_InKnockDown;
 use std::ffi::c_int;
 
 /// Raven `NPC_ClearPathToGoal`.

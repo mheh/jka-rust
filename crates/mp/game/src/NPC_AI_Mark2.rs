@@ -6,7 +6,6 @@
 //! `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 use crate::entity::hit_location::HL_GENERIC1;
 use crate::g_combat::G_Damage;
 use crate::g_items::RegisterItem;
@@ -17,6 +16,7 @@ use crate::q_shared::va;
 use crate::trap;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
+use mp_bg::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 
 /// Raven ammo pod health.
 /// Source: `oracle/codemp/game/NPC_AI_Mark2.c:4-5`

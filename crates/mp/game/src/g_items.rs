@@ -6,12 +6,12 @@
 
 use crate::prelude::*;
 
-use crate::bg_misc::{
+use crate::client::gclient::gclient_t;
+use mp_bg::bg_misc::{
     BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_CycleInven, BG_EmplacedView,
     BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem, BG_FindItemForHoldable,
     BG_FindItemForWeapon,
 };
-use crate::client::gclient::gclient_t;
 
 // Raven `#define ITMSF_*` item spawnflags.
 // Source: `oracle/codemp/game/g_items.c:30-35`
@@ -116,7 +116,7 @@ use crate::g_public_consts::{SVF_BROADCAST, SVF_NOCLIENT, SVF_SINGLECLIENT};
 // Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`,
 // canonical in `mp_bg::public::entity_flags`.
 // Source: `oracle/codemp/game/bg_public.h:560,601,607`
-use crate::bg_misc::snap_vector;
+use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_flags::{EF_CLIENTSMOOTH, EF_G2ANIMATING, EF_ITEMPLACEHOLDER};
 
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).

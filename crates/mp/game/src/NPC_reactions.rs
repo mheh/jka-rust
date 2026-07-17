@@ -320,12 +320,12 @@ pub fn NPC_ChoosePainAnimation(
             let torso_anim = unsafe { (*client).ps.torsoAnim };
 
             let can_anim = unsafe {
-                crate::bg_panimate::PM_SpinningAnim(legs_anim) == qfalse
-                    && crate::bg_panimate::BG_SaberInSpecialAttack(torso_anim) == qfalse
-                    && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
-                    && crate::bg_pmove::PM_RollingAnim(legs_anim) == qfalse
-                    && !(crate::bg_panimate::BG_FlippingAnim(legs_anim) != qfalse
-                        && crate::bg_panimate::PM_InCartwheel(legs_anim) == qfalse)
+                mp_bg::bg_panimate::PM_SpinningAnim(legs_anim) == qfalse
+                    && mp_bg::bg_panimate::BG_SaberInSpecialAttack(torso_anim) == qfalse
+                    && mp_bg::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                    && mp_bg::bg_pmove::PM_RollingAnim(legs_anim) == qfalse
+                    && !(mp_bg::bg_panimate::BG_FlippingAnim(legs_anim) != qfalse
+                        && mp_bg::bg_panimate::PM_InCartwheel(legs_anim) == qfalse)
             };
             if can_anim {
                 // Play an anim
@@ -334,7 +334,7 @@ pub fn NPC_ChoosePainAnimation(
                 if !client.is_null() && unsafe { (*client).NPC_class } == CLASS_GALAKMECH {
                     pain_anim = BOTH_PAIN1;
                 } else if r#mod == MOD_MELEE {
-                    pain_anim = crate::bg_panimate::BG_PickAnim(
+                    pain_anim = mp_bg::bg_panimate::BG_PickAnim(
                         &mut ctx.world.bg_state,
                         local_anim_index,
                         BOTH_PAIN2,
@@ -342,7 +342,7 @@ pub fn NPC_ChoosePainAnimation(
                     );
                 } else if ctx.world.entity(self_).s.weapon == WP_SABER {
                     // These are the only 2 pain anims that look good when holding a saber
-                    pain_anim = crate::bg_panimate::BG_PickAnim(
+                    pain_anim = mp_bg::bg_panimate::BG_PickAnim(
                         &mut ctx.world.bg_state,
                         local_anim_index,
                         BOTH_PAIN2,
@@ -351,7 +351,7 @@ pub fn NPC_ChoosePainAnimation(
                 }
 
                 if pain_anim == -1 {
-                    pain_anim = crate::bg_panimate::BG_PickAnim(
+                    pain_anim = mp_bg::bg_panimate::BG_PickAnim(
                         &mut ctx.world.bg_state,
                         local_anim_index,
                         BOTH_PAIN1,
@@ -366,8 +366,8 @@ pub fn NPC_ChoosePainAnimation(
 
                 let mut parts = SETANIM_BOTH;
                 let legs2 = unsafe { (*client).ps.legsAnim };
-                if crate::bg_panimate::BG_CrouchAnim(legs2) != qfalse
-                    || crate::bg_panimate::PM_InCartwheel(legs2) != qfalse
+                if mp_bg::bg_panimate::BG_CrouchAnim(legs2) != qfalse
+                    || mp_bg::bg_panimate::PM_InCartwheel(legs2) != qfalse
                 {
                     parts = SETANIM_LEGS;
                 }

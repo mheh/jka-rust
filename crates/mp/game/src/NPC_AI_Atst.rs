@@ -6,12 +6,12 @@
 //! `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_misc::BG_FindItemForWeapon;
 use crate::g_items::RegisterItem;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex, G_SoundOnEnt};
 use crate::prelude::*;
 use crate::NPC_AI_Default::NPC_BSIdle;
 use crate::NPC_reactions::NPC_Pain;
+use mp_bg::bg_misc::BG_FindItemForWeapon;
 
 /// Min melee attack range.
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:3`

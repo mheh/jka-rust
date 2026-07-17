@@ -20,11 +20,6 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::BotAIShutdownClient;
-use crate::bg_misc::{
-    BG_IsValidCharacterModel, BG_PlayerStateToEntityState, BG_ValidateSkinForTeam, WeaponReadyAnim,
-};
-use crate::bg_saga::{BG_SiegeCheckClassLegality, BG_SiegeFindClassIndexByName};
-use crate::bg_vehicleLoad::BG_GetVehicleModelName;
 use crate::entity::flags::{FL_NO_BOTS, FL_NO_HUMANS};
 use crate::g_bot::G_RemoveQueuedBotBegin;
 use crate::g_cmds::{BroadcastTeamChange, G_SetSaber, SetTeam, StopFollowing};
@@ -40,6 +35,11 @@ use crate::trap;
 use crate::w_force::{WP_ForcePowerStop, WP_HasForcePowers, WP_InitForcePowers};
 use crate::w_saber::HasSetSaberOnly;
 use crate::world::GameContext;
+use mp_bg::bg_misc::{
+    BG_IsValidCharacterModel, BG_PlayerStateToEntityState, BG_ValidateSkinForTeam, WeaponReadyAnim,
+};
+use mp_bg::bg_saga::{BG_SiegeCheckClassLegality, BG_SiegeFindClassIndexByName};
+use mp_bg::bg_vehicleLoad::BG_GetVehicleModelName;
 use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_FREE, DUELTEAM_LONE, DUELTEAM_SINGLE};
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
@@ -2473,7 +2473,7 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
         {
             let mut f = torso_anim;
 
-            crate::bg_panimate::BG_SaberStartTransAnim(
+            mp_bg::bg_panimate::BG_SaberStartTransAnim(
                 (*self_).s.number,
                 (*((*self_).client)).ps.fd.saberAnimLevel,
                 (*((*self_).client)).ps.weapon,
@@ -2700,14 +2700,14 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             }
             if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
                 // let's just make sure the styles we chose are cool
-                if crate::bg_saberLoad::WP_SaberStyleValidForSaber(
+                if mp_bg::bg_saberLoad::WP_SaberStyleValidForSaber(
                     &mut (*client).saber[0],
                     &mut (*client).saber[1],
                     (*client).ps.saberHolstered,
                     (*client).ps.fd.saberAnimLevel,
                 ) == qfalse
                 {
-                    crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
+                    mp_bg::bg_saberLoad::WP_UseFirstValidSaberStyle(
                         &mut (*client).saber[0],
                         &mut (*client).saber[1],
                         (*client).ps.saberHolstered,
@@ -3925,7 +3925,7 @@ pub fn SetupGameGhoul2Model(
 
         if ctx.world.bg_state.BGPAFtextLoaded == qfalse {
             let humanoid_anims = ctx.world.bg_state.bgHumanoidAnimations.as_mut_ptr();
-            if crate::bg_panimate::BG_ParseAnimationFile(
+            if mp_bg::bg_panimate::BG_ParseAnimationFile(
                 // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
                 // adapter holds a raw `*mut GameWorld`, so `bg_state` is read raw
                 // to coexist with the `world:` field it fills in the same call.
@@ -3975,7 +3975,7 @@ pub fn SetupGameGhoul2Model(
                         *slash.add(k) = c as c_char;
                     }
 
-                    (*ent).localAnimIndex = crate::bg_panimate::BG_ParseAnimationFile(
+                    (*ent).localAnimIndex = mp_bg::bg_panimate::BG_ParseAnimationFile(
                         // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
                         // adapter holds a raw `*mut GameWorld`, so `bg_state` is read raw
                         // to coexist with the `world:` field it fills in the same call.

@@ -383,7 +383,7 @@ pub fn NAVNEW_SidestepBlocker(
         mins[2] += STEPSIZE;
 
         //Get the blocked direction
-        let yaw = crate::bg_misc::vectoyaw(blocked_dir);
+        let yaw = mp_bg::bg_misc::vectoyaw(blocked_dir);
 
         //Get the avoid radius
         // Raven: `sqrt(a) + sqrt(b)` — the f32 products promote to f64 for libm

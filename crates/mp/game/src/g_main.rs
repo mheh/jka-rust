@@ -19,7 +19,6 @@
 use crate::prelude::*;
 use std::ffi::CString;
 
-use crate::bg_lib::qsort;
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
 use crate::com_boundary::{com_error_sink, com_print_sink};
@@ -47,6 +46,7 @@ use crate::world::GameWorld;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
 use crate::NPC_AI_Utils::AI_UpdateGroups;
 use crate::NPC_senses::ClearPlayerAlertEvents;
+use mp_bg::bg_lib::qsort;
 use mp_bg::public::configstring::{
     CS_CLIENT_DUELHEALTHS, CS_CLIENT_DUELISTS, CS_CLIENT_DUELWINNER, CS_INTERMISSION, CS_SCORES1,
     CS_SCORES2, CS_TEAMVOTE_TIME, CS_VOTE_TIME, CS_WARMUP, RANK_TIED_FLAG, SCORE_NOT_PRESENT,

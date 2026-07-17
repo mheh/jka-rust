@@ -1,6 +1,6 @@
 //! Pmove single-step differential parity test against the Raven oracle.
 //!
-//! Drives the ported `mp_game::bg_pmove::Pmove` over the same fixtures and the
+//! Drives the ported `mp_bg::bg_pmove::Pmove` over the same fixtures and the
 //! same synthetic `animation.cfg` as the C dumpers in `tools/jampgame-oracle/`
 //! and byte-compares to the committed goldens. Two goldens:
 //!
@@ -19,9 +19,9 @@ use std::cell::Cell;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
+use mp_bg::bg_panimate::BG_ParseAnimationFile;
+use mp_bg::bg_pmove::Pmove;
 use mp_game::bg_channel::{BgState, BgTraps, GameCallbacks};
-use mp_game::bg_panimate::BG_ParseAnimationFile;
-use mp_game::bg_pmove::Pmove;
 use mp_game::prelude::*;
 
 fn oracle_dir() -> PathBuf {

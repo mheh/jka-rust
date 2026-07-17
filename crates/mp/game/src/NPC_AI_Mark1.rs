@@ -78,19 +78,19 @@ pub fn NPC_Mark1_Precache(ctx: &mut GameContext) {
 
     crate::g_items::RegisterItem(
         ctx,
-        crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_METAL_BOLTS),
+        mp_bg::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_METAL_BOLTS),
     );
     crate::g_items::RegisterItem(
         ctx,
-        crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_BLASTER),
+        mp_bg::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_BLASTER),
     );
     crate::g_items::RegisterItem(
         ctx,
-        crate::bg_misc::BG_FindItemForWeapon(mp_bg::weapons::weapon_t::WP_BOWCASTER),
+        mp_bg::bg_misc::BG_FindItemForWeapon(mp_bg::weapons::weapon_t::WP_BOWCASTER),
     );
     crate::g_items::RegisterItem(
         ctx,
-        crate::bg_misc::BG_FindItemForWeapon(mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL),
+        mp_bg::bg_misc::BG_FindItemForWeapon(mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL),
     );
 }
 

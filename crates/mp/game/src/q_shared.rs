@@ -309,8 +309,8 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
 
 /// Raven `COM_ParseError`.
 ///
-// Format args are not expanded: the message prints the format string as-is
-// rather than through the `FmtArg`/`c_vsprintf` channel `Com_sprintf`/`va` use.
+// Varargs not threaded (prints the format string as-is): zero callers in the
+// entire MP oracle, so no call site ever supplies args to expand.
 /// Source: `oracle/codemp/game/q_shared.c:300-310`
 pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
@@ -325,7 +325,7 @@ pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
 
 /// Raven `COM_ParseWarning`.
 ///
-// Same gap as COM_ParseError: format args are not expanded.
+// Varargs not threaded — zero oracle callers, same as COM_ParseError.
 /// Source: `oracle/codemp/game/q_shared.c:312-322`
 pub fn COM_ParseWarning(qs: &QSharedScratch, format: *mut c_char) {
     unsafe {
@@ -470,7 +470,7 @@ pub fn COM_ParseFloat(qs: &mut QSharedScratch, data: *mut *const c_char, f: *mut
             com_printf_lit("unexpected EOF\n");
             return qtrue;
         }
-        *f = crate::bg_lib::atof(token as *const c_char) as f32;
+        *f = mp_bg::bg_lib::atof(token as *const c_char) as f32;
         qfalse
     }
 }
@@ -518,7 +518,7 @@ pub fn Parse1DMatrix(qs: &mut QSharedScratch, buf_p: *mut *const c_char, x: c_in
         crate::q_shared::COM_MatchToken(qs, buf_p, c"(".as_ptr() as *mut c_char);
         for i in 0..x {
             let token = crate::q_shared::COM_Parse(qs, buf_p);
-            *m.offset(i as isize) = crate::bg_lib::atof(token as *const c_char) as f32;
+            *m.offset(i as isize) = mp_bg::bg_lib::atof(token as *const c_char) as f32;
         }
         crate::q_shared::COM_MatchToken(qs, buf_p, c")".as_ptr() as *mut c_char);
     }

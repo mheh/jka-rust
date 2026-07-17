@@ -369,7 +369,7 @@ impl Dispatch<GameNavFindcombatpointwaypoints> for GameContext<'_> {
 /// (`g_main.c:690-691`).
 impl Dispatch<GameGetitemindexbytag> for GameContext<'_> {
     fn dispatch(&mut self, args: GameGetitemindexbytagArgs) -> c_int {
-        crate::bg_misc::BG_GetItemIndexByTag(args.tag(), args.type_())
+        mp_bg::bg_misc::BG_GetItemIndexByTag(args.tag(), args.type_())
     }
 }
 

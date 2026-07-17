@@ -65,8 +65,8 @@ use std::ffi::{CStr, CString};
 // `crate::g_public_consts` (`=0x0000_0020`); the earlier local shadow consts
 // (which claimed no canonical existed) are dropped in favor of those.
 // Source: `oracle/codemp/game/bg_public.h:409`, `g_local.h`
-use crate::bg_misc::snap_vector;
 use crate::game_globals::MAX_SHADER_REMAPS;
+use mp_bg::bg_misc::snap_vector;
 
 /// Raven `strcpy(dest, src)` into a fixed-size `[c_char; N]` field — copies
 /// bytes up to (and including) the NUL or the buffer capacity, whichever is
@@ -566,8 +566,8 @@ pub fn G_CreateFakeClient(ctx: &mut GameContext, entNum: c_int, cl: *mut *mut gc
             // `gclient_t` holds pointer fields (align 8); pad to an 8-byte
             // boundary first (see `BG_AllocPad8`) so every `(*client).field`
             // access downstream is safely dereferenceable.
-            crate::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
-            ctx.world.globals.gClPtrs.0[entNum as usize] = crate::bg_misc::BG_Alloc(
+            mp_bg::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
+            ctx.world.globals.gClPtrs.0[entNum as usize] = mp_bg::bg_misc::BG_Alloc(
                 core::mem::size_of::<gclient_t>() as c_int,
                 &mut ctx.world.bg_state,
             ) as *mut gclient_t;
@@ -1427,7 +1427,7 @@ pub fn G_AddPredictableEvent(ent: Option<&mut gentity_t>, event: c_int, eventPar
         return;
     }
     unsafe {
-        crate::bg_misc::BG_AddPredictableEventToPlayerstate(event, eventParm, &mut (*client).ps);
+        mp_bg::bg_misc::BG_AddPredictableEventToPlayerstate(event, eventParm, &mut (*client).ps);
     }
 }
 

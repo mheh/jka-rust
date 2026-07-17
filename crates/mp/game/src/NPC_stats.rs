@@ -419,7 +419,7 @@ pub fn G_ParseAnimFileSet(
             world: ctx.world_raw(),
             engine: ctx.engine,
         };
-        *animFileIndex = crate::bg_panimate::BG_ParseAnimationFile(
+        *animFileIndex = mp_bg::bg_panimate::BG_ParseAnimationFile(
             &mut ctx.world.bg_state,
             &traps,
             &mut callbacks,
@@ -463,7 +463,7 @@ pub fn NPC_PrecacheWeapons(
     let mut curWeap = WP_SABER;
     while curWeap < WP_NUM_WEAPONS {
         if weapons & (1 << curWeap) != 0 {
-            let item = crate::bg_misc::BG_FindItemForWeapon(curWeap);
+            let item = mp_bg::bg_misc::BG_FindItemForWeapon(curWeap);
             crate::g_items::RegisterItem(ctx, item);
         }
         curWeap += 1;
@@ -529,7 +529,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
             return;
         }
 
-        if crate::bg_saberLoad::BG_ParseLiteral(
+        if mp_bg::bg_saberLoad::BG_ParseLiteral(
             &mut ctx.world.bg_state.qs,
             &mut p as *mut *const c_char,
             cstr("{").as_ptr(),
@@ -771,13 +771,13 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     continue;
                 }
                 let cur_weap = crate::q_shared::GetIDForString(
-                    crate::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
+                    mp_bg::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
                     value,
                 );
                 if cur_weap > WP_NONE && cur_weap < WP_NUM_WEAPONS {
                     crate::g_items::RegisterItem(
                         ctx,
-                        crate::bg_misc::BG_FindItemForWeapon(cur_weap as weapon_t),
+                        mp_bg::bg_misc::BG_FindItemForWeapon(cur_weap as weapon_t),
                     );
                 }
                 continue;
@@ -967,7 +967,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             return 0;
         }
 
-        if crate::bg_saberLoad::BG_ParseLiteral(
+        if mp_bg::bg_saberLoad::BG_ParseLiteral(
             &mut ctx.world.bg_state.qs,
             &mut p as *mut *const c_char,
             cstr("{").as_ptr(),
@@ -2010,7 +2010,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 }
                 //FIXME: need to precache the weapon, too?  (in above func)
                 let weap = crate::q_shared::GetIDForString(
-                    crate::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
+                    mp_bg::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
                     value,
                 );
                 if weap >= WP_NONE && weap <= (WP_NUM_WEAPONS as c_int) {
@@ -2055,7 +2055,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
 
             //force powers
             let fp = crate::q_shared::GetIDForString(
-                crate::bg_saga::FPTable.as_ptr() as *mut stringID_table_t,
+                mp_bg::bg_saga::FPTable.as_ptr() as *mut stringID_table_t,
                 token,
             );
             if fp >= FP_FIRST && fp < mp_qshared::shared::force_powers::NUM_FORCE_POWERS {
@@ -2163,7 +2163,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 }
 
                 let bg = &mut ctx.world.bg_state;
-                let saber_name = crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
+                let saber_name = mp_bg::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
                 crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
@@ -2172,7 +2172,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     world: ctx.world_raw(),
                     engine: ctx.engine,
                 };
-                crate::bg_saberLoad::WP_SaberParseParms(
+                mp_bg::bg_saberLoad::WP_SaberParseParms(
                     saber_name,
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut ctx.world.bg_state,
@@ -2182,7 +2182,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 let idx_s = format!("@{}", cstr_to_str(saber_name));
                 npcSaber1 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
 
-                crate::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
+                mp_bg::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
                 continue;
             }
 
@@ -2201,7 +2201,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 if (*client_ptr).saber[0].saberFlags & SFL_TWO_HANDED == 0 {
                     //can't use a second saber if first one is a two-handed saber...?
                     let bg = &mut ctx.world.bg_state;
-                    let saber_name = crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
+                    let saber_name = mp_bg::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
                     crate::q_shared::Q_strncpyz(saber_name, value, 4096);
 
                     let mut callbacks = crate::bg_channel::GameCallbacksImpl {
@@ -2210,7 +2210,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         world: ctx.world_raw(),
                         engine: ctx.engine,
                     };
-                    crate::bg_saberLoad::WP_SaberParseParms(
+                    mp_bg::bg_saberLoad::WP_SaberParseParms(
                         saber_name,
                         &mut (*client_ptr).saber[1] as *mut saberInfo_t,
                         &mut ctx.world.bg_state,
@@ -2219,7 +2219,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     );
                     if (*client_ptr).saber[1].saberFlags & SFL_TWO_HANDED != 0 {
                         //tsk tsk, can't use a twoHanded saber as second saber
-                        crate::bg_saberLoad::WP_RemoveSaber(
+                        mp_bg::bg_saberLoad::WP_RemoveSaber(
                             (*client_ptr).saber.as_mut_ptr(),
                             1,
                             &mut callbacks,
@@ -2229,7 +2229,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let idx_s = format!("@{}", cstr_to_str(saber_name));
                         npcSaber2 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
                     }
-                    crate::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
+                    mp_bg::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
                 }
                 continue;
             }
@@ -2248,7 +2248,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 }
                 if !client_ptr.is_null() {
                     let color =
-                        crate::bg_saberLoad::TranslateSaberColor(value, &mut ctx.world.bg_state);
+                        mp_bg::bg_saberLoad::TranslateSaberColor(value, &mut ctx.world.bg_state);
                     for bi in 0..MAX_BLADES {
                         (*client_ptr).saber[0].blade[bi].color = color;
                     }
@@ -2269,7 +2269,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         }
                         if !client_ptr.is_null() {
                             (*client_ptr).saber[$saber_idx].blade[$blade_idx].color =
-                                crate::bg_saberLoad::TranslateSaberColor(
+                                mp_bg::bg_saberLoad::TranslateSaberColor(
                                     value,
                                     &mut ctx.world.bg_state,
                                 );
@@ -2297,7 +2297,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 }
                 if !client_ptr.is_null() {
                     let color =
-                        crate::bg_saberLoad::TranslateSaberColor(value, &mut ctx.world.bg_state);
+                        mp_bg::bg_saberLoad::TranslateSaberColor(value, &mut ctx.world.bg_state);
                     for bi in 0..MAX_BLADES {
                         (*client_ptr).saber[1].blade[bi].color = color;
                     }
@@ -2544,7 +2544,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     world: ctx.world_raw(),
                     engine: ctx.engine,
                 };
-                crate::bg_saberLoad::WP_SaberParseParms(
+                mp_bg::bg_saberLoad::WP_SaberParseParms(
                     cstr("Kyle").as_ptr(),
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut ctx.world.bg_state,

@@ -53,8 +53,6 @@ use mp_qshared::shared::CHAN_WEAPON;
 // (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
 // preserves the Raven spelling; their exact enum-qualification / module path is
 // resolved at integration (the mega-pass tree is not compiled per porter).
-use crate::bg_pmove::{BG_InKnockDown, BG_KnockDownable};
-use crate::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
 use crate::client::render_info::renderInfo_t;
 use crate::g_combat::{G_Damage, G_Knockdown};
 use crate::g_mover::G_EntIsBreakable;
@@ -69,6 +67,8 @@ use mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_bg::bg_pmove::{BG_InKnockDown, BG_KnockDownable};
+use mp_bg::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 use mp_bg::public::gametype::{GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL};
@@ -82,24 +82,6 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
 use mp_qshared::shared::q_math_rand::RAND_MAX;
 // --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
 use crate::ai_wpnav::G_TestLine;
-use crate::bg_misc::BG_EvaluateTrajectory;
-use crate::bg_misc::BG_GiveMeVectorFromMatrix;
-use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
-use crate::bg_panimate::{
-    BG_BrokenParryForParry, BG_InSpecialJump, BG_KnockawayForParry, BG_SaberInAttackPure,
-    BG_SaberInReturn, BG_SaberInSpecialAttack, BG_SpinningSaberAnim, BG_StabDownAnim,
-    PM_InKnockDown, PM_SaberInDeflect, PM_SaberInParry, PM_SaberInReflect,
-};
-use crate::bg_panimate::{BG_InExtraDefenseSaberMove, BG_SuperBreakLoseAnim};
-use crate::bg_panimate::{
-    BG_InGrappleMove, BG_InSaberLock, BG_KickingAnim, BG_SaberInAttack, BG_SaberInKata,
-    BG_SaberInSpecial, BG_SaberInTransitionAny, BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
-    PM_InSaberAnim, PM_SaberInTransition,
-};
-use crate::bg_pmove::BG_SabersOff;
-use crate::bg_saber::PM_SaberInBounce;
-use crate::bg_saber::PM_SaberInBrokenParry;
-use crate::bg_saberLoad::WP_SaberBladeDoTransitionDamage;
 use crate::g_client::{G_UpdateClientAnims, SetClientViewAngle};
 use crate::g_team::OnSameTeam;
 use crate::g_timer::TIMER_Set;
@@ -115,6 +97,24 @@ use crate::tri_coll_test::tri_tri_intersect;
 use crate::w_force::{ForceThrow, WP_ForcePowerUsable};
 use crate::NPC_AI_Jedi::{Jedi_Ambush, Jedi_SaberBlockGo, Jedi_WaitingAmbush};
 use crate::NPC_senses::InFront;
+use mp_bg::bg_misc::BG_EvaluateTrajectory;
+use mp_bg::bg_misc::BG_GiveMeVectorFromMatrix;
+use mp_bg::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
+use mp_bg::bg_panimate::{
+    BG_BrokenParryForParry, BG_InSpecialJump, BG_KnockawayForParry, BG_SaberInAttackPure,
+    BG_SaberInReturn, BG_SaberInSpecialAttack, BG_SpinningSaberAnim, BG_StabDownAnim,
+    PM_InKnockDown, PM_SaberInDeflect, PM_SaberInParry, PM_SaberInReflect,
+};
+use mp_bg::bg_panimate::{BG_InExtraDefenseSaberMove, BG_SuperBreakLoseAnim};
+use mp_bg::bg_panimate::{
+    BG_InGrappleMove, BG_InSaberLock, BG_KickingAnim, BG_SaberInAttack, BG_SaberInKata,
+    BG_SaberInSpecial, BG_SaberInTransitionAny, BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
+    PM_InSaberAnim, PM_SaberInTransition,
+};
+use mp_bg::bg_pmove::BG_SabersOff;
+use mp_bg::bg_saber::PM_SaberInBounce;
+use mp_bg::bg_saber::PM_SaberInBrokenParry;
+use mp_bg::bg_saberLoad::WP_SaberBladeDoTransitionDamage;
 use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
 // --- pass-3 shard-2 body-fill imports (resolved owning modules per packet) ---
@@ -1191,7 +1191,7 @@ pub fn G_G2PlayerAngles(
                     as *mut entityState_t;
             }
 
-            crate::bg_pmove::BG_G2PlayerAngles(
+            mp_bg::bg_pmove::BG_G2PlayerAngles(
                 (*ent).ghoul2,
                 (*sc).renderInfo.motionBolt,
                 &mut (*ent).s as *mut entityState_t,
@@ -1273,7 +1273,7 @@ pub fn G_G2PlayerAngles(
                     boltOrg[1] = boltMatrix.matrix[1][3];
                     boltOrg[2] = boltMatrix.matrix[2][3];
 
-                    crate::bg_pmove::BG_IK_MoveArm(
+                    mp_bg::bg_pmove::BG_IK_MoveArm(
                         (*ent).ghoul2,
                         lHandBolt,
                         ctx.world.level.time,
@@ -1313,7 +1313,7 @@ pub fn G_G2PlayerAngles(
                 }
 
                 if lHandBolt != 0 {
-                    crate::bg_pmove::BG_IK_MoveArm(
+                    mp_bg::bg_pmove::BG_IK_MoveArm(
                         (*ent).ghoul2,
                         lHandBolt,
                         ctx.world.level.time,
@@ -1347,7 +1347,7 @@ pub fn G_G2PlayerAngles(
             lookAngles[YAW as usize] = 0.0;
             lookAngles[ROLL as usize] = 0.0;
 
-            crate::bg_pmove::BG_G2ATSTAngles(
+            mp_bg::bg_pmove::BG_G2ATSTAngles(
                 (*ent).ghoul2,
                 ctx.world.level.time,
                 lookAngles,
@@ -1383,23 +1383,23 @@ pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
         let ps = &(*client).ps;
         (ps.saberMove, ps.weaponstate, ps.saberBlocked)
     };
-    if crate::bg_panimate::PM_SaberInParry(saberMove) != 0 {
+    if mp_bg::bg_panimate::PM_SaberInParry(saberMove) != 0 {
         return 0;
     }
-    if crate::bg_saber::PM_SaberInBrokenParry(saberMove) != 0 {
+    if mp_bg::bg_saber::PM_SaberInBrokenParry(saberMove) != 0 {
         return 0;
     }
-    if crate::bg_panimate::PM_SaberInDeflect(saberMove) != 0 {
+    if mp_bg::bg_panimate::PM_SaberInDeflect(saberMove) != 0 {
         return 0;
     }
-    if crate::bg_saber::PM_SaberInBounce(saberMove) != 0 {
+    if mp_bg::bg_saber::PM_SaberInBounce(saberMove) != 0 {
         return 0;
     }
-    if crate::bg_panimate::PM_SaberInKnockaway(saberMove) != 0 {
+    if mp_bg::bg_panimate::PM_SaberInKnockaway(saberMove) != 0 {
         return 0;
     }
 
-    if crate::bg_panimate::BG_SaberInAttack(saberMove) != 0
+    if mp_bg::bg_panimate::BG_SaberInAttack(saberMove) != 0
         && weaponstate == WEAPON_FIRING as c_int
         && saberBlocked == BLOCKED_NONE as c_int
     {
@@ -1407,7 +1407,7 @@ pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
         return 1;
     }
 
-    if crate::bg_panimate::BG_SaberInSpecial(saberMove) != 0 {
+    if mp_bg::bg_panimate::BG_SaberInSpecial(saberMove) != 0 {
         return 1;
     }
 
@@ -1677,12 +1677,12 @@ pub fn WP_SabersCheckLock2(
                         SABERLOCK_LOCK,
                         SABERLOCK_LOSE,
                     );
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
                         attStart = 0.85f32;
                     } else {
                         attStart = 0.15f32;
                     }
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
                         defStart = 0.85f32;
                     } else {
                         defStart = 0.15f32;
@@ -1702,12 +1702,12 @@ pub fn WP_SabersCheckLock2(
                         SABERLOCK_LOCK,
                         SABERLOCK_WIN,
                     );
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
                         attStart = 0.85f32;
                     } else {
                         attStart = 0.15f32;
                     }
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
                         defStart = 0.85f32;
                     } else {
                         defStart = 0.15f32;
@@ -1727,12 +1727,12 @@ pub fn WP_SabersCheckLock2(
                         SABERLOCK_LOCK,
                         SABERLOCK_WIN,
                     );
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
                         attStart = 0.75f32;
                     } else {
                         attStart = 0.25f32;
                     }
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
                         defStart = 0.75f32;
                     } else {
                         defStart = 0.25f32;
@@ -1753,12 +1753,12 @@ pub fn WP_SabersCheckLock2(
                         SABERLOCK_LOSE,
                     );
                     // attacker starts with advantage
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(attAnim, SABERLOCK_WIN) != 0 {
                         attStart = 0.75f32;
                     } else {
                         attStart = 0.25f32;
                     }
-                    if crate::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
+                    if mp_bg::bg_saber::BG_CheckIncrementLockAnim(defAnim, SABERLOCK_LOSE) != 0 {
                         defStart = 0.75f32;
                     } else {
                         defStart = 0.25f32;
@@ -1825,7 +1825,7 @@ pub fn WP_SabersCheckLock2(
             &mut defDir,
         );
         _VectorCopy((*ac).ps.viewangles, &mut attAngles);
-        attAngles[YAW as usize] = crate::bg_misc::vectoyaw(defDir);
+        attAngles[YAW as usize] = mp_bg::bg_misc::vectoyaw(defDir);
         SetClientViewAngle(&mut *attacker, attAngles);
         defAngles[PITCH as usize] = attAngles[PITCH as usize] * -1.0;
         defAngles[YAW as usize] = AngleNormalize180(attAngles[YAW as usize] + 180.0);
@@ -1975,19 +1975,19 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             return qfalse;
         }
 
-        if crate::bg_panimate::BG_InSpecialJump((*c1).ps.legsAnim) != 0 {
+        if mp_bg::bg_panimate::BG_InSpecialJump((*c1).ps.legsAnim) != 0 {
             return qfalse;
         }
-        if crate::bg_panimate::BG_InSpecialJump((*c2).ps.legsAnim) != 0 {
+        if mp_bg::bg_panimate::BG_InSpecialJump((*c2).ps.legsAnim) != 0 {
             return qfalse;
         }
 
-        if crate::bg_panimate::BG_InRoll(&mut (*c1).ps as *mut playerState_t, (*c1).ps.legsAnim)
+        if mp_bg::bg_panimate::BG_InRoll(&mut (*c1).ps as *mut playerState_t, (*c1).ps.legsAnim)
             != 0
         {
             return qfalse;
         }
-        if crate::bg_panimate::BG_InRoll(&mut (*c2).ps as *mut playerState_t, (*c2).ps.legsAnim)
+        if mp_bg::bg_panimate::BG_InRoll(&mut (*c2).ps as *mut playerState_t, (*c2).ps.legsAnim)
             != 0
         {
             return qfalse;
@@ -2572,7 +2572,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 // bounce straight back
                 let attMove = (*ac).ps.saberMove;
                 (*ac).ps.saberMove =
-                    crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
+                    mp_bg::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 if ctx.world.cvars.g_saberDebugPrint.integer != 0 {
                     let s = format!(
                         "attack {} vs. parry {} bounced to {}\n",
@@ -2627,7 +2627,7 @@ pub fn WP_GetSaberDeflectionAngle(
                     // bounce straight back
                     let attMove = (*ac).ps.saberMove;
                     (*ac).ps.saberMove =
-                        crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
+                        mp_bg::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                     if ctx.world.cvars.g_saberDebugPrint.integer != 0 {
                         let s = format!(
                             "attack {} vs. parry {} bounced to {}\n",
@@ -2656,7 +2656,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 } else {
                     // else, pick a deflection
                     let attMove = (*ac).ps.saberMove;
-                    (*ac).ps.saberMove = crate::bg_panimate::PM_SaberDeflectionForQuad(newQuad);
+                    (*ac).ps.saberMove = mp_bg::bg_panimate::PM_SaberDeflectionForQuad(newQuad);
                     if ctx.world.cvars.g_saberDebugPrint.integer != 0 {
                         let s = format!(
                             "attack {} vs. parry {} deflected to {}\n",
@@ -2707,7 +2707,7 @@ pub fn WP_GetSaberDeflectionAngle(
             if hitDot < 0.25f32 && hitDot > -0.25f32 {
                 // hit pretty much perpendicular, pop straight back
                 (*ac).ps.saberMove =
-                    crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
+                    mp_bg::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                 return qfalse;
             } else {
@@ -3837,7 +3837,7 @@ pub fn G_PowerLevelForSaberAnim(
         let anim: c_int = (*ec).ps.torsoAnim;
         let animTimer: c_int = (*ec).ps.torsoTimer;
         let animTimeElapsed: c_int =
-            crate::bg_panimate::BG_AnimLength(&ctx.world.bg_state, (*ent).localAnimIndex, anim)
+            mp_bg::bg_panimate::BG_AnimLength(&ctx.world.bg_state, (*ent).localAnimIndex, anim)
                 - animTimer;
         let saber = &(*ec).saber[saberNum as usize];
 
@@ -5432,7 +5432,7 @@ pub fn CheckSaberDamage(
             {
                 let mut te: *mut gentity_t = core::ptr::null_mut();
 
-                (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                (*sc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                     &ctx.world.bg_state,
                     (*sc).ps.saberMove,
                 );
@@ -5534,7 +5534,7 @@ pub fn CheckSaberDamage(
 
             if BG_StabDownAnim((*sc).ps.torsoAnim) != 0
                 && !(*trEnt).client.is_null()
-                && crate::bg_panimate::BG_InKnockDownOnGround(
+                && mp_bg::bg_panimate::BG_InKnockDownOnGround(
                     &ctx.world.bg_state,
                     &mut (*trc).ps as *mut playerState_t,
                 ) == 0
@@ -5979,7 +5979,7 @@ pub fn CheckSaberDamage(
                 }
 
                 //make them (me) go into a broken parry
-                (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                (*sc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                     &ctx.world.bg_state,
                     (*sc).ps.saberMove,
                 );
@@ -6136,7 +6136,7 @@ pub fn CheckSaberDamage(
 
                     if attackAdv > 1 {
                         //I won, he should knockaway
-                        (*ooc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                        (*ooc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                             &ctx.world.bg_state,
                             (*ooc).ps.saberMove,
                         );
@@ -6146,7 +6146,7 @@ pub fn CheckSaberDamage(
                         (*ooc).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                     } else if attackAdv < 1 {
                         //I lost, I get knocked away
-                        (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                        (*sc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                             &ctx.world.bg_state,
                             (*sc).ps.saberMove,
                         );
@@ -6282,7 +6282,7 @@ pub fn CheckSaberDamage(
                             && unblockable == 0
                         {
                             //They are higher, this means they can actually smash us into a broken parry
-                            (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                            (*sc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                                 &ctx.world.bg_state,
                                 (*sc).ps.saberMove,
                             );
@@ -9520,7 +9520,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
         let mut kickDir: vec3_t = [0.0; 3];
         let mut kickEnd: vec3_t = [0.0; 3];
         let mut fwdAngs: vec3_t = [0.0; 3];
-        let animLength = crate::bg_panimate::BG_AnimLength(
+        let animLength = mp_bg::bg_panimate::BG_AnimLength(
             &ctx.world.bg_state,
             (*ent).localAnimIndex,
             (*client).ps.legsAnim,

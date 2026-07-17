@@ -15,8 +15,6 @@
 //! `m_pVehicleInfo` (no accessor), and C-string byte checks.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_misc::snap_vector;
-use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::ent_fn_enums::{EntDie, EntPain, EntThink, EntUse};
 use crate::entity::flags::FL_NOTARGET;
 use crate::g_combat::{G_RadiusDamage, ObjectDie};
@@ -35,6 +33,8 @@ use crate::q_math::{
 use crate::q_shared::Q_stricmp;
 use crate::trap;
 use crate::NPC_combat::G_SetEnemy;
+use mp_bg::bg_misc::snap_vector;
+use mp_bg::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use mp_bg::public::effect_types::effectTypes_t::{EFFECT_EXPLOSION_TURRET, EFFECT_SPARKS};
 use mp_bg::public::means_of_death::meansOfDeath_t::{MOD_TARGET_LASER, MOD_UNKNOWN};
 use mp_qshared::common::mp::gentity::MAT_METAL;

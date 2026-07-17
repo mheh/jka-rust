@@ -47,7 +47,6 @@
 //! the safe entity borrow.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::bg_lib::atof;
 use crate::g_target::Q3_SCRIPT_DIR;
 use crate::g_utils::{G_BoneIndex, GetAnglesForDirection};
 use crate::level::alert_event::{alertEventLevel_e::AEL_DISCOVERED, alertEvent_t};
@@ -66,6 +65,7 @@ use crate::NPC_senses::{
     G_ClearLOS, G_ClearLOS2, G_ClearLOS3, G_ClearLOS4, G_ClearLOS5, InFOV, NPC_CheckAlertEvents,
 };
 use crate::NPC_sounds::G_AddVoiceEvent;
+use mp_bg::bg_lib::atof;
 use mp_qshared::shared::force_powers::FP_SPEED;
 
 use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;

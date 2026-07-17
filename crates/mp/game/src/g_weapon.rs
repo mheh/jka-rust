@@ -14,12 +14,12 @@ use mp_qshared::probe;
 
 // Pass-2: entity fn-pointer dispatch as fn-ID enums and the
 // `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
-use crate::bg_misc::snap_vector;
 use crate::ent_fn_enums::EntThink;
 use crate::entity::hit_location::*;
 use crate::level::damage_flags::{
     DAMAGE_DEATH_KNOCKBACK, DAMAGE_HEAVY_WEAP_CLASS, DAMAGE_NORMAL, DAMAGE_NO_KNOCKBACK,
 };
+use mp_bg::bg_misc::snap_vector;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 
@@ -2354,7 +2354,7 @@ pub fn thermalDetonatorExplode(ctx: &mut GameContext, ent: EntityId) {
 
         let now = ctx.world.level.time;
         let pos = ctx.world.entity(ent).s.pos;
-        crate::bg_misc::BG_EvaluateTrajectory(&pos, now, &mut origin);
+        mp_bg::bg_misc::BG_EvaluateTrajectory(&pos, now, &mut origin);
         origin[2] += 8.0;
         snap_vector(&mut origin);
         crate::g_utils::G_SetOrigin(ctx.world.entity_mut(ent), origin);
@@ -2620,7 +2620,7 @@ pub fn WP_LobFire(
                         // cap it
                         elapsedTime = travelTime.floor() as c_int;
                     }
-                    crate::bg_misc::BG_EvaluateTrajectory(
+                    mp_bg::bg_misc::BG_EvaluateTrajectory(
                         &tr,
                         ctx.world.level.time + elapsedTime,
                         &mut testPos,
@@ -3940,7 +3940,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                                     && ctx.world.entity(traceEnt_id).localAnimIndex == 0
                                     && (*traceEnt_client).ps.forceHandExtend
                                         != (HANDEXTEND_KNOCKDOWN) as i32
-                                    && crate::bg_pmove::BG_KnockDownable(&mut (*traceEnt_client).ps)
+                                    && mp_bg::bg_pmove::BG_KnockDownable(&mut (*traceEnt_client).ps)
                                         != qfalse
                                 {
                                     // knock-downable
@@ -5171,7 +5171,7 @@ pub fn WP_VehCheckTraceFromCamPos(
                 // `&dyn BgTraps`); its `WP_GetVehicleCamPos` upcall needs game
                 // state, so it also takes `&mut dyn GameCallbacks`. This
                 // game-tier caller builds both adapters from `ctx`.
-                let camTraceEntNum = crate::bg_pmove::BG_VehTraceFromCamPos(
+                let camTraceEntNum = mp_bg::bg_pmove::BG_VehTraceFromCamPos(
                     &mut extraTrace,
                     // S5-6 seam cast: the bg fn now takes `mp_bg`'s narrow
                     // `bgEntity_t`; the game's `gentity_t` head is layout-identical.

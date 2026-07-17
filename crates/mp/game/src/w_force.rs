@@ -64,12 +64,6 @@ pub const FORCE_MASTERY_JEDI_KNIGHT: c_int = 6;
 pub const FORCE_MASTERY_JEDI_MASTER: c_int = 7;
 pub const NUM_FORCE_MASTERY_LEVELS: c_int = 8;
 use crate::ai_main::{InFieldOfVision, OrgVisible};
-use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri, BG_LegalizedForcePowers};
-use crate::bg_panimate::{
-    BG_FullBodyTauntAnim, BG_InReboundHold, BG_InReboundJump, BG_SaberInSpecial,
-};
-use crate::bg_pmove::BG_InKnockDown;
-use crate::bg_saber::BG_ForcePowerDrain;
 use crate::g_cmds::Cmd_ToggleSaber_f;
 use crate::g_combat::{G_Damage, TossClientWeapon};
 use crate::g_missile::G_ReflectMissile;
@@ -88,6 +82,12 @@ use crate::w_saber::HasSetSaberOnly;
 use crate::world::GameContext;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
 use crate::NPC_senses::InFront;
+use mp_bg::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri, BG_LegalizedForcePowers};
+use mp_bg::bg_panimate::{
+    BG_FullBodyTauntAnim, BG_InReboundHold, BG_InReboundJump, BG_SaberInSpecial,
+};
+use mp_bg::bg_pmove::BG_InKnockDown;
+use mp_bg::bg_saber::BG_ForcePowerDrain;
 
 // vec3 origin (`{0,0,0}`), the all-zero trace mins/maxs sentinel.
 use crate::q_math::vec3_origin;

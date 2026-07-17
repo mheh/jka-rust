@@ -1022,7 +1022,7 @@ pub fn New_NPC_t(ctx: &mut GameContext, entNum: c_int) -> *mut gNPC_t {
             // `gNPC_t` holds a `*mut AIGroupInfo_t` field (align 8); pad to an
             // 8-byte boundary first (see `BG_AllocPad8`) so every `(*ptr).field`
             // access downstream is safely dereferenceable.
-            crate::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
+            mp_bg::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
             (&mut ctx.world.globals.gNPCPtrs)[entNum as usize] = BG_Alloc(
                 core::mem::size_of::<gNPC_t>() as c_int,
                 &mut ctx.world.bg_state,
@@ -1708,7 +1708,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
                             world: ctx.world_raw(),
                             engine: ctx.engine,
                         };
-                        crate::bg_panimate::BG_ParseAnimationFile(
+                        mp_bg::bg_panimate::BG_ParseAnimationFile(
                             &mut ctx.world.bg_state,
                             &traps,
                             &mut callbacks,

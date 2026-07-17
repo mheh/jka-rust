@@ -1,10 +1,9 @@
-//! Seam string helpers for the C ABI boundary (bg-tier subset).
+//! Seam string helpers for the C ABI boundary — the canonical copy.
 //!
-//! The canonical copy is `mp_game::cstr_util`; this is the subset the moved bg
-//! modules consume (`sscanf_f32s`, `atoi`/`atoi_str`, `cstr`, `cstr_to_str`/
-//! `cstr_to_string`, `write_cstr_field`) plus their private helpers. Bodies are
-//! copied verbatim from that twin — internal seam utilities, not ported Raven
-//! items. `cstr_from_chars` is omitted (no bg consumer).
+//! Internal utilities, not ported Raven items: they bridge the
+//! `*const c_char`/`CString` seam wherever a port calls a `trap_*` syscall or
+//! crosses `va`/`Com_sprintf` string territory. `mp_game::cstr_util`
+//! re-exports this set and adds the game-only `cstr_from_chars`.
 
 use core::ffi::{c_char, c_int};
 use std::ffi::CStr;

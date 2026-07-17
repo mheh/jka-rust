@@ -17,7 +17,7 @@ use crate::trap;
 pub fn RegisterAssets(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
     unsafe {
         // atst uses turret weapon (#ifdef _JK2MP path — both MP/SP port to same)
-        let weapon = crate::bg_misc::BG_FindItemForWeapon(WP_TURRET);
+        let weapon = mp_bg::bg_misc::BG_FindItemForWeapon(WP_TURRET);
         crate::g_items::RegisterItem(ctx, weapon);
 
         // The generic base RegisterAssets body (empty).
@@ -428,7 +428,7 @@ pub fn G_CreateWalkerNPC(
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
-            let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
+            let veh_index = mp_bg::bg_vehicleLoad::BG_VehicleGetIndex(
                 strAnimalType,
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
