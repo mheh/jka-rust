@@ -1871,6 +1871,90 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `player_die` — post-obit scoring: team frag bonuses, the
+/// suicide/nodrop CTF flag returns, item drops (non-NPC, outside nodrop),
+/// the MOD_TEAM_CHANGE score refund vs score display, and the
+/// following-spectator score refresh.
+/// Source: `oracle/codemp/game/g_combat.c:2745-2810`
+unsafe fn player_die_scoring_and_drops(
+    ctx: &mut GameContext,
+    self_: *mut gentity_t,
+    inflictor: *mut gentity_t,
+    attacker: *mut gentity_t,
+    meansOfDeath: c_int,
+) {
+    let cl = (*self_).client;
+    // Add team bonuses
+    crate::g_team::Team_FragBonuses(
+        ctx,
+        ctx.entity_id_of(self_).unwrap(),
+        ctx.entity_id_of(inflictor),
+        ctx.entity_id_of(attacker),
+    );
+
+    // if I committed suicide, the flag does not fall, it returns.
+    if meansOfDeath == meansOfDeath_t::MOD_SUICIDE as c_int {
+        if (*cl).ps.powerups[PW_NEUTRALFLAG as usize] != 0 {
+            crate::g_team::Team_ReturnFlag(ctx, TEAM_FREE as c_int);
+            (*cl).ps.powerups[PW_NEUTRALFLAG as usize] = 0;
+        } else if (*cl).ps.powerups[PW_REDFLAG as usize] != 0 {
+            crate::g_team::Team_ReturnFlag(ctx, TEAM_RED as c_int);
+            (*cl).ps.powerups[PW_REDFLAG as usize] = 0;
+        } else if (*cl).ps.powerups[PW_BLUEFLAG as usize] != 0 {
+            crate::g_team::Team_ReturnFlag(ctx, TEAM_BLUE as c_int);
+            (*cl).ps.powerups[PW_BLUEFLAG as usize] = 0;
+        }
+    }
+
+    // if client is in a nodrop area, don't drop anything (but return CTF flags!)
+    let contents = trap::PointContents(
+        ctx.engine,
+        mp_abi::game::syscalls::G_POINTCONTENTS::GPointcontentsArgs::new(
+            &(*self_).r.currentOrigin as *const vec3_t,
+            -1,
+        ),
+    );
+    if (contents & CONTENTS_NODROP) == 0 && (*cl).ps.fallingToDeath == qfalse {
+        if (*self_).s.eType != entityType_t::ET_NPC as c_int {
+            TossClientItems(ctx, ctx.entity_id_of(self_).unwrap());
+        }
+    } else {
+        if (*cl).ps.powerups[PW_NEUTRALFLAG as usize] != 0 {
+            crate::g_team::Team_ReturnFlag(ctx, TEAM_FREE as c_int);
+        } else if (*cl).ps.powerups[PW_REDFLAG as usize] != 0 {
+            crate::g_team::Team_ReturnFlag(ctx, TEAM_RED as c_int);
+        } else if (*cl).ps.powerups[PW_BLUEFLAG as usize] != 0 {
+            crate::g_team::Team_ReturnFlag(ctx, TEAM_BLUE as c_int);
+        }
+    }
+
+    if meansOfDeath_t::MOD_TEAM_CHANGE as c_int == meansOfDeath {
+        // Give them back a point since they didn't really die.
+        AddScore(
+            ctx,
+            ctx.entity_id_of(self_).unwrap(),
+            (*self_).r.currentOrigin,
+            1,
+        );
+    } else {
+        crate::g_cmds::Cmd_Score_f(ctx, ctx.entity_id_of(self_).unwrap()); // show scores
+    }
+
+    // send updated scores to any clients that are following this one
+    for i in 0..ctx.world.level.maxclients {
+        let client = ctx.world.level.clients.add(i as usize);
+        if (*client).pers.connected != CON_CONNECTED {
+            continue;
+        }
+        if (*client).sess.sessionTeam != TEAM_SPECTATOR {
+            continue;
+        }
+        if (*client).sess.spectatorClient == (*self_).s.number {
+            crate::g_cmds::Cmd_Score_f(ctx, EntityId(i as u32));
+        }
+    }
+}
+
 /// Split from `player_die` — the vehicle-explosion cascade: when a no-delay
 /// vehicle dies with riders, credit a murderer (last attacker, attacking
 /// vehicle's pilot, or own pilot), kill the hidden pilot and eject+kill the
@@ -2659,75 +2743,7 @@ pub fn player_die(
             }
         }
 
-        // Add team bonuses
-        crate::g_team::Team_FragBonuses(
-            ctx,
-            ctx.entity_id_of(self_).unwrap(),
-            ctx.entity_id_of(inflictor),
-            ctx.entity_id_of(attacker),
-        );
-
-        // if I committed suicide, the flag does not fall, it returns.
-        if meansOfDeath == meansOfDeath_t::MOD_SUICIDE as c_int {
-            if (*cl).ps.powerups[PW_NEUTRALFLAG as usize] != 0 {
-                crate::g_team::Team_ReturnFlag(ctx, TEAM_FREE as c_int);
-                (*cl).ps.powerups[PW_NEUTRALFLAG as usize] = 0;
-            } else if (*cl).ps.powerups[PW_REDFLAG as usize] != 0 {
-                crate::g_team::Team_ReturnFlag(ctx, TEAM_RED as c_int);
-                (*cl).ps.powerups[PW_REDFLAG as usize] = 0;
-            } else if (*cl).ps.powerups[PW_BLUEFLAG as usize] != 0 {
-                crate::g_team::Team_ReturnFlag(ctx, TEAM_BLUE as c_int);
-                (*cl).ps.powerups[PW_BLUEFLAG as usize] = 0;
-            }
-        }
-
-        // if client is in a nodrop area, don't drop anything (but return CTF flags!)
-        let contents = trap::PointContents(
-            ctx.engine,
-            mp_abi::game::syscalls::G_POINTCONTENTS::GPointcontentsArgs::new(
-                &(*self_).r.currentOrigin as *const vec3_t,
-                -1,
-            ),
-        );
-        if (contents & CONTENTS_NODROP) == 0 && (*cl).ps.fallingToDeath == qfalse {
-            if (*self_).s.eType != entityType_t::ET_NPC as c_int {
-                TossClientItems(ctx, ctx.entity_id_of(self_).unwrap());
-            }
-        } else {
-            if (*cl).ps.powerups[PW_NEUTRALFLAG as usize] != 0 {
-                crate::g_team::Team_ReturnFlag(ctx, TEAM_FREE as c_int);
-            } else if (*cl).ps.powerups[PW_REDFLAG as usize] != 0 {
-                crate::g_team::Team_ReturnFlag(ctx, TEAM_RED as c_int);
-            } else if (*cl).ps.powerups[PW_BLUEFLAG as usize] != 0 {
-                crate::g_team::Team_ReturnFlag(ctx, TEAM_BLUE as c_int);
-            }
-        }
-
-        if meansOfDeath_t::MOD_TEAM_CHANGE as c_int == meansOfDeath {
-            // Give them back a point since they didn't really die.
-            AddScore(
-                ctx,
-                ctx.entity_id_of(self_).unwrap(),
-                (*self_).r.currentOrigin,
-                1,
-            );
-        } else {
-            crate::g_cmds::Cmd_Score_f(ctx, ctx.entity_id_of(self_).unwrap()); // show scores
-        }
-
-        // send updated scores to any clients that are following this one
-        for i in 0..ctx.world.level.maxclients {
-            let client = ctx.world.level.clients.add(i as usize);
-            if (*client).pers.connected != CON_CONNECTED {
-                continue;
-            }
-            if (*client).sess.sessionTeam != TEAM_SPECTATOR {
-                continue;
-            }
-            if (*client).sess.spectatorClient == (*self_).s.number {
-                crate::g_cmds::Cmd_Score_f(ctx, EntityId(i as u32));
-            }
-        }
+        player_die_scoring_and_drops(ctx, self_, inflictor, attacker, meansOfDeath);
 
         (*self_).takedamage = qtrue; // can still be gibbed
 
