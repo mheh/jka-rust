@@ -3111,17 +3111,20 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
         ent = e.unwrap();
     }
 
-    ctx.entity_mut(ent).r.contents = CONTENTS_TRIGGER;
-    //ent->s.eFlags &= ~EF_NODRAW;
-    ctx.entity_mut(ent).s.eFlags &= !(EF_NODRAW | EF_ITEMPLACEHOLDER);
-    ctx.entity_mut(ent).r.svFlags &= !SVF_NOCLIENT;
+    {
+        let e = ctx.entity_mut(ent);
+        e.r.contents = CONTENTS_TRIGGER;
+        //ent->s.eFlags &= ~EF_NODRAW;
+        e.s.eFlags &= !(EF_NODRAW | EF_ITEMPLACEHOLDER);
+        e.r.svFlags &= !SVF_NOCLIENT;
+    }
     trap::LinkEntity(
         ctx.engine,
         GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(ent)).cast()),
     );
 
-    let item = ctx.entity(ent).item.unwrap();
-    if unsafe { item.item().giType() } == IT_POWERUP {
+    let it = ctx.entity(ent).item.unwrap().item();
+    if matches!(it.kind, ItemKind::Powerup(_)) {
         // play powerup spawn sound to all clients
         let trBase = ctx.entity(ent).s.pos.trBase;
 
@@ -3633,9 +3636,10 @@ pub fn Use_Item(
 /// Source: `oracle/codemp/game/g_items.c:2779-2963`
 pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
     let item = ctx.entity(ent).item.unwrap();
+    let it = item.item();
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
         // in siege remove all powerups
-        if unsafe { item.item().giType() } == IT_POWERUP {
+        if matches!(it.kind, ItemKind::Powerup(_)) {
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -3643,98 +3647,91 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 
     if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
         if HasSetSaberOnly(ctx) != 0 {
-            if unsafe { item.item().giType() } == IT_AMMO {
+            if matches!(it.kind, ItemKind::Ammo(_)) {
                 G_FreeEntity(ctx, Some(ent));
                 return;
             }
 
-            if unsafe { item.item().giType() } == IT_HOLDABLE {
-                if unsafe { item.item().giTag() } == HI_SEEKER as c_int
-                    || unsafe { item.item().giTag() } == HI_SHIELD as c_int
-                    || unsafe { item.item().giTag() } == HI_SENTRY_GUN as c_int
-                {
-                    G_FreeEntity(ctx, Some(ent));
-                    return;
-                }
+            if matches!(
+                it.kind,
+                ItemKind::Holdable(HI_SEEKER | HI_SHIELD | HI_SENTRY_GUN)
+            ) {
+                G_FreeEntity(ctx, Some(ent));
+                return;
             }
         }
     } else {
         // no powerups in jedi master
-        if unsafe { item.item().giType() } == IT_POWERUP {
+        if matches!(it.kind, ItemKind::Powerup(_)) {
             G_FreeEntity(ctx, Some(ent));
             return;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer == GT_HOLOCRON {
-        if unsafe { item.item().giType() } == IT_POWERUP {
-            if unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
-                || unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_DARK as c_int
-            {
-                G_FreeEntity(ctx, Some(ent));
-                return;
-            }
+        if matches!(
+            it.kind,
+            ItemKind::Powerup(PW_FORCE_ENLIGHTENED_LIGHT | PW_FORCE_ENLIGHTENED_DARK)
+        ) {
+            G_FreeEntity(ctx, Some(ent));
+            return;
         }
     }
 
     if ctx.world.cvars.g_forcePowerDisable.integer != 0 {
         // if force powers disabled, don't add force powerups
-        if unsafe { item.item().giType() } == IT_POWERUP {
-            if unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_LIGHT as c_int
-                || unsafe { item.item().giTag() } == PW_FORCE_ENLIGHTENED_DARK as c_int
-                || unsafe { item.item().giTag() } == PW_FORCE_BOON as c_int
-            {
-                G_FreeEntity(ctx, Some(ent));
-                return;
-            }
+        if matches!(
+            it.kind,
+            ItemKind::Powerup(
+                PW_FORCE_ENLIGHTENED_LIGHT | PW_FORCE_ENLIGHTENED_DARK | PW_FORCE_BOON
+            )
+        ) {
+            G_FreeEntity(ctx, Some(ent));
+            return;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer == GT_DUEL
         || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
     {
-        if unsafe { item.item().giType() } == IT_ARMOR
-            || unsafe { item.item().giType() } == IT_HEALTH
-            || (unsafe { item.item().giType() } == IT_HOLDABLE
-                && (unsafe { item.item().giTag() } == HI_MEDPAC as c_int
-                    || unsafe { item.item().giTag() } == HI_MEDPAC_BIG as c_int))
-        {
+        if matches!(
+            it.kind,
+            ItemKind::Armor { .. }
+                | ItemKind::Health
+                | ItemKind::Holdable(HI_MEDPAC | HI_MEDPAC_BIG)
+        ) {
             G_FreeEntity(ctx, Some(ent));
             return;
         }
     }
 
+    // Raven kills only the three flags here; the IT_TEAM red/blue cubes
+    // (giTag 0) survive outside CTF/CTY.
     if ctx.world.cvars.g_gametype.integer != GT_CTF
         && ctx.world.cvars.g_gametype.integer != GT_CTY
-        && unsafe { item.item().giType() } == IT_TEAM
+        && matches!(
+            it.kind,
+            ItemKind::Team(PW_REDFLAG | PW_BLUEFLAG | PW_NEUTRALFLAG)
+        )
     {
-        let mut killMe = false;
-
-        match unsafe { item.item().giTag() } {
-            x if x == PW_REDFLAG as c_int => killMe = true,
-            x if x == PW_BLUEFLAG as c_int => killMe = true,
-            x if x == PW_NEUTRALFLAG as c_int => killMe = true,
-            _ => {}
-        }
-
-        if killMe {
-            G_FreeEntity(ctx, Some(ent));
-            return;
-        }
+        G_FreeEntity(ctx, Some(ent));
+        return;
     }
 
-    ctx.entity_mut(ent).r.mins = [-8.0, -8.0, 0.0];
-    ctx.entity_mut(ent).r.maxs = [8.0, 8.0, 16.0];
+    {
+        let e = ctx.entity_mut(ent);
+        e.r.mins = [-8.0, -8.0, 0.0];
+        e.r.maxs = [8.0, 8.0, 16.0];
 
-    ctx.entity_mut(ent).s.eType = ET_ITEM as c_int;
-    let modelindex = item.modelindex(); // store item number in modelindex
-    ctx.entity_mut(ent).s.modelindex = modelindex;
-    ctx.entity_mut(ent).s.modelindex2 = 0; // zero indicates this isn't a dropped item
+        e.s.eType = ET_ITEM as c_int;
+        e.s.modelindex = item.modelindex(); // store item number in modelindex
+        e.s.modelindex2 = 0; // zero indicates this isn't a dropped item
 
-    ctx.entity_mut(ent).r.contents = CONTENTS_TRIGGER;
-    ctx.entity_mut(ent).touch = Some(EntTouch::Touch_Item).into();
-    // useing an item causes it to respawn
-    ctx.entity_mut(ent).use_ = Some(EntUse::Use_Item).into();
+        e.r.contents = CONTENTS_TRIGGER;
+        e.touch = Some(EntTouch::Touch_Item).into();
+        // useing an item causes it to respawn
+        e.use_ = Some(EntUse::Use_Item).into();
+    }
 
     if (ctx.entity(ent).spawnflags & ITMSF_SUSPEND) != 0 {
         // suspended
@@ -3745,14 +3742,12 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 
         // if it is directly even with the floor it will return startsolid, so raise up by 0.1
         // and temporarily subtract 0.1 from the z maxs so that going up doesn't push into the ceiling
-        ctx.entity_mut(ent).s.origin[2] += 0.1;
-        ctx.entity_mut(ent).r.maxs[2] -= 0.1;
-
-        let dest: vec3_t = [
-            ctx.entity(ent).s.origin[0],
-            ctx.entity(ent).s.origin[1],
-            ctx.entity(ent).s.origin[2] - 4096.0,
-        ];
+        let dest: vec3_t = {
+            let e = ctx.entity_mut(ent);
+            e.s.origin[2] += 0.1;
+            e.r.maxs[2] -= 0.1;
+            [e.s.origin[0], e.s.origin[1], e.s.origin[2] - 4096.0]
+        };
         let mut tr: trace_t = unsafe { core::mem::zeroed() };
         trap::Trace(
             ctx.engine,
@@ -3772,20 +3767,24 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
+        let e = ctx.entity_mut(ent);
         // add the 0.1 back after the trace
-        ctx.entity_mut(ent).r.maxs[2] += 0.1;
+        e.r.maxs[2] += 0.1;
 
         // allow to ride movers
-        ctx.entity_mut(ent).s.groundEntityNum = tr.entityNum as c_int;
+        e.s.groundEntityNum = tr.entityNum as c_int;
 
-        G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
+        G_SetOrigin(e, tr.endpos);
     }
 
     // team slaves and targeted items aren't present at start
-    if (ctx.entity(ent).flags & FL_TEAMSLAVE) != 0 || !ctx.entity(ent).targetname.is_null() {
-        ctx.entity_mut(ent).s.eFlags |= EF_NODRAW;
-        ctx.entity_mut(ent).r.contents = 0;
-        return;
+    {
+        let e = ctx.entity_mut(ent);
+        if (e.flags & FL_TEAMSLAVE) != 0 || !e.targetname.is_null() {
+            e.s.eFlags |= EF_NODRAW;
+            e.r.contents = 0;
+            return;
+        }
     }
 
     trap::LinkEntity(
@@ -3798,26 +3797,23 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:2973-2991`
 pub fn G_CheckTeamItems(ctx: &mut GameContext) {
-    unsafe {
-        // Set up team stuff
-        Team_InitGame(ctx);
+    // Set up team stuff
+    Team_InitGame(ctx);
 
-        if ctx.world.cvars.g_gametype.integer == GT_CTF
-            || ctx.world.cvars.g_gametype.integer == GT_CTY
+    if ctx.world.cvars.g_gametype.integer == GT_CTF || ctx.world.cvars.g_gametype.integer == GT_CTY
+    {
+        // check for the two flags
+        let mut item = BG_FindItem("team_CTF_redflag");
+        if item.is_none()
+            || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
         {
-            // check for the two flags
-            let mut item = BG_FindItem("team_CTF_redflag");
-            if item.is_none()
-                || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
-            {
-                G_Printf(ctx, c"WARNING: No team_CTF_redflag in map".as_ptr());
-            }
-            item = BG_FindItem("team_CTF_blueflag");
-            if item.is_none()
-                || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
-            {
-                G_Printf(ctx, c"WARNING: No team_CTF_blueflag in map".as_ptr());
-            }
+            G_Printf(ctx, c"WARNING: No team_CTF_redflag in map".as_ptr());
+        }
+        item = BG_FindItem("team_CTF_blueflag");
+        if item.is_none()
+            || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
+        {
+            G_Printf(ctx, c"WARNING: No team_CTF_blueflag in map".as_ptr());
         }
     }
 }
@@ -3853,26 +3849,24 @@ pub fn RegisterItem(ctx: &mut GameContext, item: ItemId) {
 ///
 /// Source: `oracle/codemp/game/g_items.c:3036-3054`
 pub fn SaveRegisteredItems(ctx: &mut GameContext) {
-    unsafe {
-        let mut string: Vec<c_char> = vec![0; crate::game_globals::MAX_ITEMS + 1];
-        let mut count = 0;
-        for i in 0..bg_numItems {
-            if ctx.world.globals.itemRegistered.0[i as usize] != 0 {
-                count += 1;
-                string[i as usize] = b'1' as c_char;
-            } else {
-                string[i as usize] = b'0' as c_char;
-            }
+    let mut string: Vec<c_char> = vec![0; crate::game_globals::MAX_ITEMS + 1];
+    let mut count = 0;
+    for i in 0..bg_numItems {
+        if ctx.world.globals.itemRegistered.0[i as usize] != 0 {
+            count += 1;
+            string[i as usize] = b'1' as c_char;
+        } else {
+            string[i as usize] = b'0' as c_char;
         }
-        string[bg_numItems as usize] = 0;
-
-        //	G_Printf( "%i items registered\n", count );
-        let s = cstr_from_chars(&string).to_owned();
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s),
-        );
     }
+    string[bg_numItems as usize] = 0;
+
+    //	G_Printf( "%i items registered\n", count );
+    let s = cstr_from_chars(&string).to_owned();
+    trap::SetConfigstring(
+        ctx.engine,
+        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s),
+    );
 }
 
 /// Raven `G_ItemDisabled`.
@@ -3907,11 +3901,12 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
         ctx.world.cvars.g_weaponDisable.integer
     };
 
-    if item.item().giType() == IT_WEAPON
-        && wDisable != 0
-        && (wDisable & (1 << item.item().giTag())) != 0
-    {
-        if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
+    let it = item.item();
+    if let ItemKind::Weapon(weapon) = it.kind {
+        if wDisable != 0
+            && (wDisable & (1 << weapon)) != 0
+            && ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER
+        {
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -3922,15 +3917,19 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
         return;
     }
 
-    ctx.entity_mut(ent).item = Some(item);
-    // some movers spawn on the second frame, so delay item
-    // spawns until the third frame so they can ride trains
-    ctx.entity_mut(ent).nextthink = ctx.world.level.time + FRAMETIME * 2;
-    ctx.entity_mut(ent).think = Some(EntThink::FinishSpawningItem).into();
+    let level_time = ctx.world.level.time;
+    {
+        let e = ctx.entity_mut(ent);
+        e.item = Some(item);
+        // some movers spawn on the second frame, so delay item
+        // spawns until the third frame so they can ride trains
+        e.nextthink = level_time + FRAMETIME * 2;
+        e.think = Some(EntThink::FinishSpawningItem).into();
 
-    ctx.entity_mut(ent).physicsBounce = 0.50; // items are bouncy
+        e.physicsBounce = 0.50; // items are bouncy
+    }
 
-    if item.item().giType() == IT_POWERUP {
+    if matches!(it.kind, ItemKind::Powerup(_)) {
         G_SoundIndex(c"sound/items/respawn1".as_ptr());
         let speed_ptr = core::ptr::addr_of_mut!(ctx.world.g_entities[ent.index()].speed);
         G_SpawnFloat(ctx, c"noglobalsound".as_ptr(), c"0".as_ptr(), speed_ptr);
