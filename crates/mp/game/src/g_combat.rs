@@ -1871,6 +1871,160 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `G_Damage` — the full-exemption checks: friendly fire and
+/// emplaced/allied/turret-owner team rules, the Jedi Master no-bystander rule,
+/// godmode, EF_INVULNERABLE (clearing it on expiry), and the siege
+/// teamnodmg object rules. Returns true when the target takes no damage at
+/// all (Raven's early returns).
+/// Source: `oracle/codemp/game/g_combat.c:4884-4966`
+unsafe fn g_damage_check_exempt(
+    ctx: &mut GameContext,
+    targ: *mut gentity_t,
+    attacker: *mut gentity_t,
+    dflags: c_int,
+) -> bool {
+    // check for completely getting out of the damage
+    if (dflags & DAMAGE_NO_PROTECTION) == 0 {
+        if targ != attacker {
+            if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(attacker))
+                != qfalse
+            {
+                if ctx.world.cvars.g_friendlyFire.integer == 0 {
+                    return true;
+                }
+            } else if !attacker.is_null()
+                && (*attacker).inuse != qfalse
+                && (*attacker).client.is_null()
+                && (*attacker).activator.is_some()
+                && {
+                    let act = &mut ctx.world.g_entities[(*attacker).activator.unwrap().0 as usize]
+                        as *mut gentity_t;
+                    targ != act && (*act).inuse != qfalse && !(*act).client.is_null()
+                }
+            {
+                // emplaced guns don't hurt teammates of user
+                let act = &mut ctx.world.g_entities[(*attacker).activator.unwrap().0 as usize]
+                    as *mut gentity_t;
+                if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(act))
+                    != qfalse
+                {
+                    if ctx.world.cvars.g_friendlyFire.integer == 0 {
+                        return true;
+                    }
+                }
+            } else if (*targ).inuse != qfalse
+                && !(*targ).client.is_null()
+                && ctx.world.cvars.g_gametype.integer >= GT_TEAM
+                && (*attacker).s.number >= MAX_CLIENTS as c_int
+                && (*attacker).alliedTeam != 0
+                && (*((*targ).client)).sess.sessionTeam == (*attacker).alliedTeam
+                && ctx.world.cvars.g_friendlyFire.integer == 0
+            {
+                // things allied with my team shouldn't hurt me
+                return true;
+            }
+        }
+
+        if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER
+            && ctx.world.cvars.g_friendlyFire.integer == 0
+            && !targ.is_null()
+            && !(*targ).client.is_null()
+            && !attacker.is_null()
+            && !(*attacker).client.is_null()
+            && targ != attacker
+            && (*((*targ).client)).ps.isJediMaster == qfalse
+            && (*((*attacker).client)).ps.isJediMaster == qfalse
+            && G_ThereIsAMaster(ctx) != qfalse
+        {
+            return true;
+        }
+
+        if (*targ).s.number >= MAX_CLIENTS as c_int
+            && !(*targ).client.is_null()
+            && (*targ).s.shouldtarget != qfalse
+            && (*targ).s.teamowner != 0
+            && !attacker.is_null()
+            && (*attacker).inuse != qfalse
+            && !(*attacker).client.is_null()
+            && (*targ).s.owner >= 0
+            && (*targ).s.owner < MAX_CLIENTS as c_int
+        {
+            let targown = &mut ctx.world.g_entities[(*targ).s.owner as usize] as *mut gentity_t;
+
+            if !targown.is_null()
+                && (*targown).inuse != qfalse
+                && !(*targown).client.is_null()
+                && crate::g_team::OnSameTeam(
+                    ctx,
+                    ctx.entity_id_of(targown),
+                    ctx.entity_id_of(attacker),
+                ) != qfalse
+            {
+                if ctx.world.cvars.g_friendlyFire.integer == 0 {
+                    return true;
+                }
+            }
+        }
+
+        // check for godmode
+        if ((*targ).flags & FL_GODMODE) != 0 && (*targ).s.eType != entityType_t::ET_NPC as c_int {
+            return true;
+        }
+
+        if !targ.is_null()
+            && !(*targ).client.is_null()
+            && ((*((*targ).client)).ps.eFlags & EF_INVULNERABLE) != 0
+            && !attacker.is_null()
+            && !(*attacker).client.is_null()
+            && targ != attacker
+        {
+            let tc = (*targ).client;
+            if (*tc).invulnerableTimer <= ctx.world.level.time {
+                (*tc).ps.eFlags &= !EF_INVULNERABLE;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    // check for teamnodmg
+    if !attacker.is_null() && (*targ).client.is_null() {
+        // attacker hit a non-client
+        if ctx.world.cvars.g_gametype.integer == GT_SIEGE
+            && ctx.world.cvars.g_ff_objectives.integer == 0
+        {
+            if (*targ).teamnodmg != 0 {
+                // targ shouldn't take damage from a certain team
+                if !(*attacker).client.is_null() {
+                    // a client hit a non-client object
+                    if (*targ).teamnodmg == (*((*attacker).client)).sess.sessionTeam {
+                        return true;
+                    }
+                } else if (*attacker).teamnodmg != 0 {
+                    // a non-client hit a non-client object
+                    if (*targ).teamnodmg == (*attacker).teamnodmg {
+                        if (*attacker).activator.is_some() && {
+                            let a = &mut ctx.world.g_entities
+                                [(*attacker).activator.unwrap().0 as usize]
+                                as *mut gentity_t;
+                            (*a).inuse != qfalse
+                                && (*a).s.number < MAX_CLIENTS as c_int
+                                && !(*a).client.is_null()
+                                && (*((*a).client)).sess.sessionTeam != (*targ).teamnodmg
+                        } {
+                            // uh, let them damage it I guess.
+                        } else {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
 /// Split from `G_Damage` — the momentum add, applied even when the damage
 /// won't be taken: saber-knockback scaling (per-saber knockbackScale flags),
 /// the velocity kick, and the PMF_TIME_KNOCKBACK timer with its
@@ -5151,148 +5305,8 @@ pub fn G_Damage(
             damage = (damage as f64 * 0.5) as c_int;
         }
 
-        // check for completely getting out of the damage
-        if (dflags & DAMAGE_NO_PROTECTION) == 0 {
-            if targ != attacker {
-                if crate::g_team::OnSameTeam(
-                    ctx,
-                    ctx.entity_id_of(targ),
-                    ctx.entity_id_of(attacker),
-                ) != qfalse
-                {
-                    if ctx.world.cvars.g_friendlyFire.integer == 0 {
-                        return;
-                    }
-                } else if !attacker.is_null()
-                    && (*attacker).inuse != qfalse
-                    && (*attacker).client.is_null()
-                    && (*attacker).activator.is_some()
-                    && {
-                        let act = &mut ctx.world.g_entities
-                            [(*attacker).activator.unwrap().0 as usize]
-                            as *mut gentity_t;
-                        targ != act && (*act).inuse != qfalse && !(*act).client.is_null()
-                    }
-                {
-                    // emplaced guns don't hurt teammates of user
-                    let act = &mut ctx.world.g_entities[(*attacker).activator.unwrap().0 as usize]
-                        as *mut gentity_t;
-                    if crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(targ), ctx.entity_id_of(act))
-                        != qfalse
-                    {
-                        if ctx.world.cvars.g_friendlyFire.integer == 0 {
-                            return;
-                        }
-                    }
-                } else if (*targ).inuse != qfalse
-                    && !(*targ).client.is_null()
-                    && ctx.world.cvars.g_gametype.integer >= GT_TEAM
-                    && (*attacker).s.number >= MAX_CLIENTS as c_int
-                    && (*attacker).alliedTeam != 0
-                    && (*((*targ).client)).sess.sessionTeam == (*attacker).alliedTeam
-                    && ctx.world.cvars.g_friendlyFire.integer == 0
-                {
-                    // things allied with my team shouldn't hurt me
-                    return;
-                }
-            }
-
-            if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER
-                && ctx.world.cvars.g_friendlyFire.integer == 0
-                && !targ.is_null()
-                && !(*targ).client.is_null()
-                && !attacker.is_null()
-                && !(*attacker).client.is_null()
-                && targ != attacker
-                && (*((*targ).client)).ps.isJediMaster == qfalse
-                && (*((*attacker).client)).ps.isJediMaster == qfalse
-                && G_ThereIsAMaster(ctx) != qfalse
-            {
-                return;
-            }
-
-            if (*targ).s.number >= MAX_CLIENTS as c_int
-                && !(*targ).client.is_null()
-                && (*targ).s.shouldtarget != qfalse
-                && (*targ).s.teamowner != 0
-                && !attacker.is_null()
-                && (*attacker).inuse != qfalse
-                && !(*attacker).client.is_null()
-                && (*targ).s.owner >= 0
-                && (*targ).s.owner < MAX_CLIENTS as c_int
-            {
-                let targown = &mut ctx.world.g_entities[(*targ).s.owner as usize] as *mut gentity_t;
-
-                if !targown.is_null()
-                    && (*targown).inuse != qfalse
-                    && !(*targown).client.is_null()
-                    && crate::g_team::OnSameTeam(
-                        ctx,
-                        ctx.entity_id_of(targown),
-                        ctx.entity_id_of(attacker),
-                    ) != qfalse
-                {
-                    if ctx.world.cvars.g_friendlyFire.integer == 0 {
-                        return;
-                    }
-                }
-            }
-
-            // check for godmode
-            if ((*targ).flags & FL_GODMODE) != 0 && (*targ).s.eType != entityType_t::ET_NPC as c_int
-            {
-                return;
-            }
-
-            if !targ.is_null()
-                && !(*targ).client.is_null()
-                && ((*((*targ).client)).ps.eFlags & EF_INVULNERABLE) != 0
-                && !attacker.is_null()
-                && !(*attacker).client.is_null()
-                && targ != attacker
-            {
-                let tc = (*targ).client;
-                if (*tc).invulnerableTimer <= ctx.world.level.time {
-                    (*tc).ps.eFlags &= !EF_INVULNERABLE;
-                } else {
-                    return;
-                }
-            }
-        }
-
-        // check for teamnodmg
-        if !attacker.is_null() && (*targ).client.is_null() {
-            // attacker hit a non-client
-            if ctx.world.cvars.g_gametype.integer == GT_SIEGE
-                && ctx.world.cvars.g_ff_objectives.integer == 0
-            {
-                if (*targ).teamnodmg != 0 {
-                    // targ shouldn't take damage from a certain team
-                    if !(*attacker).client.is_null() {
-                        // a client hit a non-client object
-                        if (*targ).teamnodmg == (*((*attacker).client)).sess.sessionTeam {
-                            return;
-                        }
-                    } else if (*attacker).teamnodmg != 0 {
-                        // a non-client hit a non-client object
-                        if (*targ).teamnodmg == (*attacker).teamnodmg {
-                            if (*attacker).activator.is_some() && {
-                                let a = &mut ctx.world.g_entities
-                                    [(*attacker).activator.unwrap().0 as usize]
-                                    as *mut gentity_t;
-                                (*a).inuse != qfalse
-                                    && (*a).s.number < MAX_CLIENTS as c_int
-                                    && !(*a).client.is_null()
-                                    && (*((*a).client)).sess.sessionTeam != (*targ).teamnodmg
-                            } {
-                                // uh, let them damage it I guess.
-                            } else {
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
+        if g_damage_check_exempt(ctx, targ, attacker, dflags) {
+            return;
         }
 
         // battlesuit protects from all radius damage (but takes knockback) and 50% against all damage
