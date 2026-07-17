@@ -129,8 +129,8 @@ pub const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 ///
 /// Source: `oracle/codemp/game/w_force.c:40-49`
 pub fn G_PreDefSound(ctx: &mut GameContext, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
-    let te = G_TempEntity(ctx, org, EV_PREDEFSOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, org, EV_PREDEFSOUND as c_int);
+    let te = ctx.entity_mut(te_id) as *mut gentity_t;
     let e = ctx.world.entity_mut(te_id);
     e.s.eventParm = pdSound;
     e.s.origin = org; // VectorCopy(org, te->s.origin)
@@ -450,28 +450,24 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         if ent_etype != ET_NPC as c_int {
             if HasSetSaberOnly(ctx) != 0 {
-                let te = G_TempEntity(ctx, vec3_origin, EV_SET_FREE_SABER as c_int);
-                let te_id = ctx.entity_id_of(te).unwrap();
+                let te_id = G_TempEntity(ctx, vec3_origin, EV_SET_FREE_SABER as c_int);
                 let e = ctx.world.entity_mut(te_id);
                 e.r.svFlags |= SVF_BROADCAST;
                 e.s.eventParm = 1;
             } else {
-                let te = G_TempEntity(ctx, vec3_origin, EV_SET_FREE_SABER as c_int);
-                let te_id = ctx.entity_id_of(te).unwrap();
+                let te_id = G_TempEntity(ctx, vec3_origin, EV_SET_FREE_SABER as c_int);
                 let e = ctx.world.entity_mut(te_id);
                 e.r.svFlags |= SVF_BROADCAST;
                 e.s.eventParm = 0;
             }
 
             if ctx.world.cvars.g_forcePowerDisable.integer != 0 {
-                let te = G_TempEntity(ctx, vec3_origin, EV_SET_FORCE_DISABLE as c_int);
-                let te_id = ctx.entity_id_of(te).unwrap();
+                let te_id = G_TempEntity(ctx, vec3_origin, EV_SET_FORCE_DISABLE as c_int);
                 let e = ctx.world.entity_mut(te_id);
                 e.r.svFlags |= SVF_BROADCAST;
                 e.s.eventParm = 1;
             } else {
-                let te = G_TempEntity(ctx, vec3_origin, EV_SET_FORCE_DISABLE as c_int);
-                let te_id = ctx.entity_id_of(te).unwrap();
+                let te_id = G_TempEntity(ctx, vec3_origin, EV_SET_FORCE_DISABLE as c_int);
                 let e = ctx.world.entity_mut(te_id);
                 e.r.svFlags |= SVF_BROADCAST;
                 e.s.eventParm = 0;
@@ -1393,7 +1389,8 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
 
                 //At this point we know we got one, so add him into the collective event client bitflag
                 if te.is_null() {
-                    te = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
+                    let __teid17 = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
+                    te = ctx.entity_mut(__teid17);
                     let te_id = ctx.entity_id_of(te).unwrap();
                     ctx.world.entity_mut(te_id).s.eventParm = 1; //eventParm 1 is heal, eventParm 2 is force regen
 
@@ -1508,7 +1505,8 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
 
             //At this point we know we got one, so add him into the collective event client bitflag
             if te.is_null() {
-                te = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
+                let __teid18 = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
+                te = ctx.entity_mut(__teid18);
                 let te_id = ctx.entity_id_of(te).unwrap();
                 ctx.world.entity_mut(te_id).s.eventParm = 2; //eventParm 1 is heal, eventParm 2 is force regen
             }
@@ -2342,8 +2340,7 @@ pub fn ForceDrainDamage(
                 (*tcl).ps.fd.forcePowerRegenDebounceTime = level_time + 800;
 
                 if (*tcl).forcePowerSoundDebounce < level_time {
-                    let tent = G_TempEntity(ctx, impactPoint, EV_FORCE_DRAINED as c_int);
-                    let tent_id = ctx.entity_id_of(tent).unwrap();
+                    let tent_id = G_TempEntity(ctx, impactPoint, EV_FORCE_DRAINED as c_int);
                     let dir_byte = DirToByte(dir);
                     let te_number = ctx.entity(te).s.number;
                     let e = ctx.world.entity_mut(tent_id);

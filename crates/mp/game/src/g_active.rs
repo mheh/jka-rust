@@ -1357,7 +1357,8 @@ pub fn SendPendingPredictableEvents(ctx: &mut GameContext, ps: *mut playerState_
             let extEvent = (*ps).externalEvent;
             (*ps).externalEvent = 0;
             // create temporary entity for event
-            let t = G_TempEntity(ctx, (*ps).origin, event);
+            let t_eid = G_TempEntity(ctx, (*ps).origin, event);
+            let t = ctx.entity_mut(t_eid) as *mut gentity_t;
             let number = (*t).s.number;
             BG_PlayerStateToEntityState(ps, &mut (*t).s, qtrue);
             (*t).s.number = number;

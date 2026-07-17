@@ -268,8 +268,7 @@ pub fn GetFlagStr(ctx: &mut GameContext, flags: c_int) -> *mut c_char {
 pub fn G_TestLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     let ev_testline = mp_bg::public::entity_event::entity_event_t::EV_TESTLINE as c_int;
     // `SVF_BROADCAST` comes from the prelude (`crate::g_public_consts`).
-    let te = G_TempEntity(ctx, start, ev_testline);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, start, ev_testline);
     ctx.entity_mut(te_id).s.origin = start;
     ctx.entity_mut(te_id).s.origin2 = end;
     ctx.entity_mut(te_id).s.time2 = time;
@@ -301,8 +300,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 while i < ctx.world.globals.gWPNum {
                     let p = ctx.world.globals.gWPArray.0[i as usize];
                     if !p.is_null() && (*p).inuse != 0 {
-                        let plum = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
-                        let plum_id = ctx.entity_id_of(plum).unwrap();
+                        let plum_id = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
                         ctx.entity_mut(plum_id).r.svFlags |= SVF_BROADCAST;
                         ctx.entity_mut(plum_id).s.time = i;
 
@@ -395,8 +393,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                 // GetFlagStr allocates 128 bytes for this, if it's changed then obviously this must be as well
                 B_TempFree(ctx, 128); // flagstr
 
-                let plum = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
-                let plum_id = ctx.entity_id_of(plum).unwrap();
+                let plum_id = G_TempEntity(ctx, (*p).origin, ev_scoreplum);
                 ctx.entity_mut(plum_id).r.svFlags |= SVF_BROADCAST;
                 ctx.entity_mut(plum_id).s.time = bestindex; // render it once
             } else if !gotbestindex {

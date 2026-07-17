@@ -566,8 +566,7 @@ pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
                 return;
             };
 
-            let it_ent = crate::g_utils::G_Spawn(ctx);
-            let it_id = ctx.entity_id_of(it_ent).unwrap();
+            let it_id = crate::g_utils::G_Spawn(ctx);
             let origin = ctx.world.entity(ent).r.currentOrigin;
             crate::q_math::_VectorCopy(origin, &mut ctx.world.entity_mut(it_id).s.origin);
             let classname = it.classname_cstr() as *mut c_char;
@@ -1390,8 +1389,8 @@ pub fn SetTeam(ctx: &mut GameContext, ent: EntityId, s: *mut c_char) {
 
         if oldTeam != TEAM_SPECTATOR {
             let origin = ctx.world.client(cidx).ps.origin;
-            let tent = crate::g_utils::G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_OUT as c_int);
-            let tent_id = ctx.entity_id_of(tent).unwrap();
+            let tent_id =
+                crate::g_utils::G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_OUT as c_int);
             ctx.world.entity_mut(tent_id).s.clientNum = clientNum;
         }
 
@@ -2474,8 +2473,8 @@ pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        let te = crate::g_utils::G_TempEntity(ctx, [0.0f32, 0.0, 0.0], EV_VOICECMD_SOUND as c_int);
-        let te_id = ctx.entity_id_of(te).unwrap();
+        let te_id =
+            crate::g_utils::G_TempEntity(ctx, [0.0f32, 0.0, 0.0], EV_VOICECMD_SOUND as c_int);
         ctx.world.entity_mut(te_id).s.groundEntityNum = ent.index() as c_int;
         ctx.world.entity_mut(te_id).s.eventParm =
             crate::g_utils::G_SoundIndex(names[i].unwrap().as_ptr());

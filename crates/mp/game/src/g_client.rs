@@ -1172,7 +1172,8 @@ pub fn InitBodyQue(ctx: &mut GameContext) {
     unsafe {
         ctx.world.level.bodyQueIndex = 0;
         for i in 0..BODY_QUEUE_SIZE {
-            let ent = crate::g_utils::G_Spawn(ctx);
+            let ent_eid = crate::g_utils::G_Spawn(ctx);
+            let ent = ctx.entity_mut(ent_eid) as *mut gentity_t;
             (*ent).classname = b"bodyque\0".as_ptr() as *mut c_char;
             (*ent).neverFree = qtrue;
             ctx.world.level.bodyQue[i] = ent;
@@ -1427,11 +1428,12 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
                 // Respawn time.
                 if ctx.world.entity(ent).s.number < MAX_CLIENTS as c_int {
                     let origin = unsafe { (*client).ps.origin };
-                    let te = crate::g_utils::G_TempEntity(
+                    let te_eid = crate::g_utils::G_TempEntity(
                         ctx,
                         origin,
                         entity_event_t::EV_SIEGESPEC as c_int,
                     );
+                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                     unsafe {
                         (*te).s.time = ctx.world.globals.g_siegeRespawnCheck;
                         (*te).s.owner = ctx.world.entity(ent).s.number;
@@ -1447,11 +1449,12 @@ pub fn respawn(ctx: &mut GameContext, ent: EntityId) {
 
         // add a teleportation effect
         let origin = unsafe { (*client).ps.origin };
-        let tent = crate::g_utils::G_TempEntity(
+        let tent_eid = crate::g_utils::G_TempEntity(
             ctx,
             origin,
             entity_event_t::EV_PLAYER_TELEPORT_IN as c_int,
         );
+        let tent = ctx.entity_mut(tent_eid) as *mut gentity_t;
         let client_num = ctx.world.entity(ent).s.clientNum;
         unsafe {
             (*tent).s.clientNum = client_num;
@@ -1924,7 +1927,8 @@ pub fn ClientConnect(
         // count current clients and rank for scoreboard
         CalculateRanks(ctx);
 
-        let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], (EV_CLIENTJOIN) as i32);
+        let te_eid = G_TempEntity(ctx, [0.0, 0.0, 0.0], (EV_CLIENTJOIN) as i32);
+        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
         (*te).r.svFlags |= SVF_BROADCAST;
         (*te).s.eventParm = clientNum;
 
@@ -2194,7 +2198,8 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
 
         if (*client).sess.sessionTeam != TEAM_SPECTATOR {
             // send event
-            let tent = G_TempEntity(ctx, (*client).ps.origin, (EV_PLAYER_TELEPORT_IN) as i32);
+            let tent_eid = G_TempEntity(ctx, (*client).ps.origin, (EV_PLAYER_TELEPORT_IN) as i32);
+            let tent = ctx.entity_mut(tent_eid) as *mut gentity_t;
             (*tent).s.clientNum = (*ent).s.clientNum;
 
             if ctx.world.cvars.g_gametype.integer != GT_DUEL
@@ -3467,11 +3472,12 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
         if (*((*ent).client)).pers.connected == CON_CONNECTED as _
             && (*((*ent).client)).sess.sessionTeam != TEAM_SPECTATOR
         {
-            let tent = G_TempEntity(
+            let tent_eid = G_TempEntity(
                 ctx,
                 (*((*ent).client)).ps.origin,
                 (EV_PLAYER_TELEPORT_OUT) as i32,
             );
+            let tent = ctx.entity_mut(tent_eid) as *mut gentity_t;
             (*tent).s.clientNum = (*ent).s.clientNum;
 
             // They don't get to take powerups with them!

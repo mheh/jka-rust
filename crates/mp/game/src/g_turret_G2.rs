@@ -545,8 +545,7 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
     } else {
         // Regular blaster turret: fire standard missile
         G_PlayEffectID(G_EffectIndex(c"blaster/muzzle_flash".as_ptr()), org, ang);
-        let bolt = G_Spawn(ctx);
-        let bolt_id = ctx.entity_id_of(bolt).unwrap();
+        let bolt_id = G_Spawn(ctx);
 
         let ent_number = ctx.world.entity(ent).s.number;
         let ent_damage = ctx.world.entity(ent).damage;

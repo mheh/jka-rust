@@ -503,11 +503,7 @@ pub fn NAV_FindClosestWaypointForPoint(
     point: vec3_t,
 ) -> c_int {
     // FIXME (Raven): can we make this a static ent?
-    let marker = G_Spawn(ctx);
-    if marker.is_null() {
-        return WAYPOINT_NONE;
-    }
-    let marker_id = ctx.entity_id_of(marker).unwrap();
+    let marker_id = G_Spawn(ctx);
 
     G_SetOrigin(ctx.entity_mut(marker_id), point);
 
@@ -536,11 +532,7 @@ pub fn NAV_FindClosestWaypointForPoint(
 /// Source: `oracle/codemp/game/g_nav.c:384-408`
 pub fn NAV_FindClosestWaypointForPoint2(ctx: &mut GameContext, point: vec3_t) -> c_int {
     // FIXME (Raven): can we make this a static ent?
-    let marker = G_Spawn(ctx);
-    if marker.is_null() {
-        return WAYPOINT_NONE;
-    }
-    let marker_id = ctx.entity_id_of(marker).unwrap();
+    let marker_id = G_Spawn(ctx);
 
     G_SetOrigin(ctx.entity_mut(marker_id), point);
 

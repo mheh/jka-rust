@@ -649,8 +649,7 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
         );
         if tr.startsolid == 0 && tr.allsolid == 0 {
             // got enough room so place the portable shield
-            let shield_ptr = G_Spawn(ctx);
-            let shield = ctx.entity_id_of(shield_ptr).unwrap();
+            let shield = G_Spawn(ctx);
 
             // Figure out what direction the shield is facing.
             if fwd[0].abs() > fwd[1].abs() {
@@ -1404,8 +1403,7 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
     fwdorg[1] = origin[1] + fwd[1] * 64.0;
     fwdorg[2] = origin[2] + fwd[2] * 64.0;
 
-    let sentry_ptr = G_Spawn(ctx);
-    let sentry = ctx.entity_id_of(sentry_ptr).unwrap();
+    let sentry = G_Spawn(ctx);
 
     ctx.entity_mut(sentry).classname = c"sentryGun".as_ptr() as *mut c_char;
     ctx.entity_mut(sentry).s.modelindex = G_ModelIndex(c"models/items/psgun.glm".as_ptr()); // replace ASAP
@@ -1820,8 +1818,7 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
     };
 
     if let Some(item) = item {
-        let eItem_ptr = G_Spawn(ctx);
-        let eItem = ctx.entity_id_of(eItem_ptr).unwrap();
+        let eItem = G_Spawn(ctx);
         ctx.entity_mut(eItem).r.ownerNum = ctx.entity(ent).s.number;
         let classname = item.classname_cstr() as *mut c_char;
         ctx.entity_mut(eItem).classname = classname;
@@ -1848,8 +1845,7 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
         //	G_SetAnim( ent, NULL, SETANIM_TORSO, BOTH_THERMAL_THROW, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0 );
 
         let origin = unsafe { (*cl).ps.origin };
-        let te_ptr = G_TempEntity(ctx, origin, entity_event_t::EV_LOCALTIMER as c_int);
-        let te = ctx.entity_id_of(te_ptr).unwrap();
+        let te = G_TempEntity(ctx, origin, entity_event_t::EV_LOCALTIMER as c_int);
         ctx.entity_mut(te).s.time = ctx.world.level.time;
         ctx.entity_mut(te).s.time2 = TOSS_DEBOUNCE_TIME;
         let clientNum = unsafe { (*cl).ps.clientNum };
@@ -2514,8 +2510,7 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         return core::ptr::null_mut();
     }
 
-    let ent_ptr = G_Spawn(ctx);
-    let ent = ctx.entity_id_of(ent_ptr).unwrap();
+    let ent = G_Spawn(ctx);
 
     ctx.entity_mut(ent).clipmask = MASK_PLAYERSOLID;
     ctx.entity_mut(ent).r.contents = MASK_PLAYERSOLID;
@@ -3128,7 +3123,7 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
         } else {
             G_TempEntity(ctx, trBase, entity_event_t::EV_GLOBAL_SOUND as c_int)
         };
-        let te = ctx.entity_id_of(te_ptr).unwrap();
+        let te = te_ptr;
         ctx.entity_mut(te).s.eventParm = G_SoundIndex(c"sound/items/respawn1".as_ptr());
         ctx.entity_mut(te).r.svFlags |= SVF_BROADCAST;
     }
@@ -3412,13 +3407,11 @@ pub fn Touch_Item(
         // if we want the global sound to play
         let trBase = ctx.entity(ent).s.pos.trBase;
         if ctx.entity(ent).speed == 0.0 {
-            let te_ptr = G_TempEntity(ctx, trBase, entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int);
-            let te = ctx.entity_id_of(te_ptr).unwrap();
+            let te = G_TempEntity(ctx, trBase, entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int);
             ctx.entity_mut(te).s.eventParm = ctx.entity(ent).s.modelindex;
             ctx.entity_mut(te).r.svFlags |= SVF_BROADCAST;
         } else {
-            let te_ptr = G_TempEntity(ctx, trBase, entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int);
-            let te = ctx.entity_id_of(te_ptr).unwrap();
+            let te = G_TempEntity(ctx, trBase, entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int);
             ctx.entity_mut(te).s.eventParm = ctx.entity(ent).s.modelindex;
             // only send this temp entity to a single client
             ctx.entity_mut(te).r.svFlags |= SVF_SINGLECLIENT;
@@ -3510,8 +3503,7 @@ pub fn LaunchItem(
     origin: vec3_t,
     velocity: vec3_t,
 ) -> EntityId {
-    let dropped_ptr = G_Spawn(ctx);
-    let dropped = ctx.entity_id_of(dropped_ptr).unwrap();
+    let dropped = G_Spawn(ctx);
     let it = item.item();
 
     let e = ctx.entity_mut(dropped);

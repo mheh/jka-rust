@@ -393,8 +393,7 @@ pub fn CreateMissile(
     owner: EntityId,
     altFire: bool,
 ) -> EntityId {
-    let missile_ptr = G_Spawn(ctx);
-    let missile = ctx.entity_id_of(missile_ptr).unwrap();
+    let missile = G_Spawn(ctx);
 
     let level_time = ctx.world.level.time;
     let owner_number = ctx.entity(owner).s.number;
@@ -442,8 +441,7 @@ pub fn G_MissileBounceEffect(ctx: &mut GameContext, ent: EntityId, org: vec3_t, 
             G_PlayEffectID(fx, currentOrigin, dir);
         }
         _ => {
-            let te_ptr = G_TempEntity(ctx, org, EV_SABER_BLOCK as c_int);
-            let te = ctx.entity_id_of(te_ptr).unwrap();
+            let te = G_TempEntity(ctx, org, EV_SABER_BLOCK as c_int);
             let te = ctx.entity_mut(te);
             te.s.origin = org;
             te.s.angles = dir;
@@ -615,8 +613,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
             unsafe { (*ctx.entity(other).client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] };
 
         let ent_origin = ctx.entity(ent).r.currentOrigin;
-        let te_ptr = G_TempEntity(ctx, ent_origin, EV_SABER_BLOCK as c_int);
-        let te_id = ctx.entity_id_of(te_ptr).unwrap();
+        let te_id = G_TempEntity(ctx, ent_origin, EV_SABER_BLOCK as c_int);
         let te = ctx.entity_mut(te_id);
         te.s.origin = ent_origin;
         te.s.angles = tr.plane.normal;
@@ -685,8 +682,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                 WP_SaberBlockNonRandom(ctx.entity(otherOwner), co, qtrue);
             }
             let co = ctx.entity(ent).r.currentOrigin;
-            let te_ptr = G_TempEntity(ctx, co, EV_SABER_BLOCK as c_int);
-            let te_id = ctx.entity_id_of(te_ptr).unwrap();
+            let te_id = G_TempEntity(ctx, co, EV_SABER_BLOCK as c_int);
             let te = ctx.entity_mut(te_id);
             te.s.origin = co;
             te.s.angles = tr.plane.normal;

@@ -822,7 +822,7 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
         None => {
             // ok, make one then
             let sp = G_Spawn(ctx);
-            ctx.entity_id_of(sp).unwrap()
+            sp
         }
     };
 
@@ -4397,7 +4397,8 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
                 }
             }
 
-            let te = G_TempEntity(ctx, dmg_spot, EV_SABER_HIT as c_int);
+            let te_eid = G_TempEntity(ctx, dmg_spot, EV_SABER_HIT as c_int);
+            let te = ctx.entity_mut(te_eid) as *mut gentity_t;
             if !te.is_null() {
                 (*te).s.otherEntityNum = ctx.world.globals.victimEntityNum[iu];
                 (*te).s.otherEntityNum2 = ctx.world.entity(self_).s.number;
@@ -4441,8 +4442,9 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
                         // don't do clash flare
                     } else {
                         if ctx.world.globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE as f32 {
-                            let teS =
+                            let teS_id =
                                 G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
+                            let teS = ctx.entity_mut(teS_id) as *mut gentity_t;
                             (*teS).s.origin = (*te).s.origin;
                         }
                         (*te).s.eventParm = 0;
@@ -4595,7 +4597,7 @@ pub fn WP_SaberDoClash(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, 
         let clash_pos = ctx.world.globals.saberClashPos;
         let te = G_TempEntity(ctx, clash_pos, EV_SABER_BLOCK as c_int);
         // G_TempEntity always returns a live temp entity (Raven derefs it unchecked).
-        let te_id = ctx.entity_id_of(te).unwrap();
+        let te_id = te;
         let self_number = ctx.world.entity(self_).s.number;
         let origin = ctx.world.globals.saberClashPos;
         let angles = ctx.world.globals.saberClashNorm;
@@ -5455,7 +5457,8 @@ pub fn CheckSaberDamage(
                 //do bounce sound & force feedback
                 WP_SaberBounceSound(ctx, ctx.entity_id_of(self_), rSaberNum, rBladeNum);
                 //do hit effect
-                te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                let __teid11 = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                te = ctx.entity_mut(__teid11);
                 (*te).s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
                 (*te).s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
                 (*te).s.weapon = rSaberNum;
@@ -7174,7 +7177,8 @@ pub fn CheckThrownSaberDamaged(
                         // they blocked it
                         WP_SaberBlockNonRandom(&*(ent), tr.endpos, qfalse);
 
-                        te = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
+                        let __teid12 = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
+                        te = ctx.entity_mut(__teid12);
                         (*te).s.origin = tr.endpos;
                         (*te).s.angles = tr.plane.normal;
                         if (*te).s.angles[0] == 0.0
@@ -7263,7 +7267,8 @@ pub fn CheckThrownSaberDamaged(
                             );
                         }
 
-                        te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                        let __teid13 = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                        te = ctx.entity_mut(__teid13);
                         (*te).s.otherEntityNum = (*ent).s.number;
                         (*te).s.otherEntityNum2 = (*saberOwner).s.number;
                         (*te).s.weapon = 0;
@@ -7394,7 +7399,8 @@ pub fn CheckThrownSaberDamaged(
                         );
                     }
 
-                    let te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                    let te_eid = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                     (*te).s.otherEntityNum = ENTITYNUM_NONE;
                     (*te).s.otherEntityNum2 = (*saberOwner).s.number;
                     (*te).s.weapon = 0;
@@ -7414,10 +7420,11 @@ pub fn CheckThrownSaberDamaged(
                             && ((*soc).saber[0].saberFlags2 & SFL2_NO_CLASH_FLARE) != 0
                         {
                             // don't do clash flare
-                            G_FreeEntity(ctx, ctx.entity_id_of(te));
+                            G_FreeEntity(ctx, Some(te_eid));
                         } else {
-                            let teS =
+                            let teS_id =
                                 G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
+                            let teS = ctx.entity_mut(teS_id) as *mut gentity_t;
                             (*teS).s.origin = (*te).s.origin;
                             (*te).s.eventParm = 0;
                         }
@@ -7624,7 +7631,6 @@ pub fn MakeDeadSaber(ctx: &mut GameContext, ent: EntityId) {
     }
 
     let saberent = G_Spawn(ctx);
-    let saberent = ctx.entity_id_of(saberent).unwrap();
 
     let startorg: vec3_t = ctx.world.entity(ent).r.currentOrigin;
     let startang: vec3_t = ctx.world.entity(ent).r.currentAngles;
@@ -10902,7 +10908,8 @@ pub fn WP_SaberPositionUpdate(
                 {
                     if (*client).ps.saberIdleWound < ctx.world.level.time {
                         let saber_org = ctx.world.g_entities[saberNum as usize].r.currentOrigin;
-                        let te = G_TempEntity(ctx, saber_org, EV_SABER_BLOCK as c_int);
+                        let te_eid = G_TempEntity(ctx, saber_org, EV_SABER_BLOCK as c_int);
+                        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                         let mut dir: vec3_t = [0.0; 3];
                         crate::q_math::VectorSet(&mut dir, 0.0, 1.0, 0.0);
                         crate::q_math::_VectorCopy(

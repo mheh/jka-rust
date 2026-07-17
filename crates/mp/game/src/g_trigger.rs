@@ -2443,9 +2443,10 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
 
     if num_asteroids < ctx.world.entity(self_id).count {
         // need to spawn a new asteroid
-        let new_asteroid = G_Spawn(ctx);
+        let new_asteroid_eid = G_Spawn(ctx);
+        let new_asteroid = ctx.entity_mut(new_asteroid_eid) as *mut gentity_t;
         if !new_asteroid.is_null() {
-            let new_id = ctx.entity_id_of(new_asteroid).unwrap();
+            let new_id = new_asteroid_eid;
             let copy_asteroid = asteroid_pick_random_asteroid(ctx, self_id);
             if !copy_asteroid.is_null() {
                 let copy_id = ctx.entity_id_of(copy_asteroid).unwrap();

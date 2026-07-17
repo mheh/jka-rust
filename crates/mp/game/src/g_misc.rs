@@ -281,12 +281,12 @@ pub fn TeleportPlayer(ctx: &mut GameContext, player: EntityId, origin: vec3_t, a
             let cl_origin = (*client).ps.origin;
             let tent = G_TempEntity(ctx, cl_origin, EV_PLAYER_TELEPORT_OUT as c_int);
             let cnum = ctx.world.entity(player).s.clientNum;
-            let tid = ctx.entity_id_of(tent).unwrap();
+            let tid = tent;
             ctx.world.entity_mut(tid).s.clientNum = cnum;
 
             let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
             let cnum = ctx.world.entity(player).s.clientNum;
-            let tid = ctx.entity_id_of(tent).unwrap();
+            let tid = tent;
             ctx.world.entity_mut(tid).s.clientNum = cnum;
         }
 
@@ -3085,8 +3085,7 @@ pub fn misc_faller_create(
     other: Option<EntityId>,
     activator: Option<EntityId>,
 ) {
-    let faller = G_Spawn(ctx);
-    let faller_id = ctx.entity_id_of(faller).unwrap();
+    let faller_id = G_Spawn(ctx);
 
     let s10 = G_SoundIndex(c"sound/player/fallsplat".as_ptr());
     ctx.world.entity_mut(faller_id).genericValue10 = s10;

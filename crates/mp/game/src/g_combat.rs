@@ -396,8 +396,7 @@ pub fn ExplodeDeath(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_combat.c:417-427`
 pub fn ScorePlum(ctx: &mut GameContext, ent: EntityId, origin: vec3_t, score: c_int) {
-    let plum_ptr = G_TempEntity(ctx, origin, entity_event_t::EV_SCOREPLUM as c_int);
-    let plum_id = ctx.entity_id_of(plum_ptr).unwrap();
+    let plum_id = G_TempEntity(ctx, origin, entity_event_t::EV_SCOREPLUM as c_int);
     let number = ctx.entity(ent).s.number;
     let plum = ctx.entity_mut(plum_id);
     // only send this temp entity to a single client
@@ -593,7 +592,7 @@ pub fn TossClientItems(ctx: &mut GameContext, self_: EntityId) {
             [0.0; 3],
             entity_event_t::EV_DESTROY_WEAPON_MODEL as c_int,
         );
-        let te = ctx.entity_id_of(te).unwrap();
+        let te = te;
         let number = ctx.entity(self_).s.number;
         ctx.entity_mut(te).r.svFlags |= SVF_BROADCAST;
         ctx.entity_mut(te).s.eventParm = number;
@@ -1820,7 +1819,6 @@ pub fn G_BroadcastObit(
     {
         let currentOrigin = ctx.entity(self_).r.currentOrigin;
         let ent = G_TempEntity(ctx, currentOrigin, entity_event_t::EV_OBITUARY as c_int);
-        let ent = ctx.entity_id_of(ent).unwrap();
         ctx.entity_mut(ent).s.eventParm = meansOfDeath;
         let self_number = ctx.entity(self_).s.number;
         ctx.entity_mut(ent).s.otherEntityNum = self_number;
@@ -2706,7 +2704,8 @@ unsafe fn player_die_vehicle_cascade(
                         murderer = murderPilot;
                         actualMOD = (*cl).otherKillerMOD;
                         if (*cl).otherKillerVehWeapon > 0 {
-                            tempInflictorEnt = crate::g_utils::G_Spawn(ctx);
+                            let __teid14 = crate::g_utils::G_Spawn(ctx);
+                            tempInflictorEnt = ctx.entity_mut(__teid14);
                             if !tempInflictorEnt.is_null() {
                                 // fake up the inflictor
                                 tempInflictor = qtrue;
@@ -3093,7 +3092,8 @@ pub fn player_die(
                 actualMOD = (*cl).otherKillerMOD;
             }
             if (*cl).otherKillerVehWeapon > 0 {
-                tempInflictorEnt = crate::g_utils::G_Spawn(ctx);
+                let __teid15 = crate::g_utils::G_Spawn(ctx);
+                tempInflictorEnt = ctx.entity_mut(__teid15);
                 if !tempInflictorEnt.is_null() {
                     tempInflictor = qtrue;
                     (*tempInflictorEnt).classname = c"vehicle_proj".as_ptr() as *mut c_char;
@@ -3602,7 +3602,6 @@ pub fn G_GetDismemberBolt(
         boltAngles[2] = -boltMatrix.matrix[2][1];
 
         let te = G_TempEntity(ctx, *boltPoint, entity_event_t::EV_SABER_HIT as c_int);
-        let te = ctx.entity_id_of(te).unwrap();
         let self_number = ctx.entity(self_).s.number;
         ctx.entity_mut(te).s.otherEntityNum = self_number;
         ctx.entity_mut(te).s.otherEntityNum2 = ENTITYNUM_NONE;
@@ -3761,8 +3760,7 @@ pub fn G_Dismember(
         }
 
         newPoint = point;
-        let limb_ptr = crate::g_utils::G_Spawn(ctx);
-        let limb = ctx.entity_id_of(limb_ptr).unwrap();
+        let limb = crate::g_utils::G_Spawn(ctx);
 
         let speed = (ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(8000, 16000)) as f32;
         let nextthink = ctx.world.level.time + FRAMETIME;
@@ -5757,11 +5755,12 @@ pub fn G_Damage(
         }
 
         if shieldAbsorbed != 0.0 {
-            let evEnt = G_TempEntity(
+            let evEnt_eid = G_TempEntity(
                 ctx,
                 (*targ).r.currentOrigin,
                 entity_event_t::EV_SHIELD_HIT as c_int,
             );
+            let evEnt = ctx.entity_mut(evEnt_eid) as *mut gentity_t;
             (*evEnt).s.otherEntityNum = (*targ).s.number;
             // Raven passes `dir` here even when it may be NULL
             // (would UB-deref); `dir_val` is the zero vector when absent.
@@ -6037,7 +6036,7 @@ pub fn G_DamageFromKiller(
             inflictor = killer;
             if unsafe { (*vc).otherKillerVehWeapon } > 0 {
                 let inflictor_ptr = crate::g_utils::G_Spawn(ctx);
-                inflictor = ctx.entity_id_of(inflictor_ptr);
+                inflictor = Some(inflictor_ptr);
                 if let Some(inflictor_id) = inflictor {
                     // fake up the inflictor
                     tempInflictor = qtrue;
@@ -6300,8 +6299,7 @@ pub fn G_RadiusDamage(
                 let missile_id = missile.unwrap();
                 // the thing calling this function can create burn marks on people
                 let ent_origin = ctx.entity(ent).r.currentOrigin;
-                let ev_ptr = G_TempEntity(ctx, ent_origin, entity_event_t::EV_GHOUL2_MARK as c_int);
-                let ev_id = ctx.entity_id_of(ev_ptr).unwrap();
+                let ev_id = G_TempEntity(ctx, ent_origin, entity_event_t::EV_GHOUL2_MARK as c_int);
 
                 let ent_number = ctx.entity(ent).s.number;
                 let missile_origin = ctx.entity(missile_id).r.currentOrigin;

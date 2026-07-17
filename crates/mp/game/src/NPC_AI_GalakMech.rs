@@ -1015,9 +1015,9 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                     ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
                     if (*npc_info).coverTarg.is_none() {
                         // for moving looping sound at end of trace
-                        let cover_ent = crate::g_utils::G_Spawn(ctx);
-                        if !cover_ent.is_null() {
-                            let cover_id = ctx.entity_id_of(cover_ent).unwrap();
+                        let cover_ent_eid = crate::g_utils::G_Spawn(ctx);
+                        {
+                            let cover_id = cover_ent_eid;
                             (*npc_info).coverTarg = Some(cover_id);
                             let muzzle = (*client).renderInfo.muzzlePoint;
                             crate::g_utils::G_SetOrigin(ctx.world.entity_mut(cover_id), muzzle);
