@@ -14,27 +14,11 @@ use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_TempEntity};
 use crate::prelude::*;
 use crate::trap;
 
-// Seam helpers (local to this file): `gentity_t*` stored fields
-// (`parent`/`target_ent`/`activator`/`hook`) are `Option<EntityId>`; these
-// resolve an id back to the live pointer needed at raw-pointer call sites
-// (`G_RadiusDamage`, `G_Damage`, …) and build the id at assignment sites.
-#[inline]
-unsafe fn ent_resolve(ctx: &mut GameContext, id: EntityId) -> *mut gentity_t {
-    &mut ctx.world.g_entities[id.index()] as *mut gentity_t
-}
-#[inline]
-unsafe fn ent_resolve_opt(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => unsafe { ent_resolve(ctx, i) },
-        None => core::ptr::null_mut(),
-    }
-}
-#[inline]
-unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
-    ctx.world.g_entities.as_ptr()
-}
-
-use crate::q_math::_VectorScale;
+use crate::q_math::{
+    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin, AngleVectors,
+    VectorLength, VectorNormalize,
+};
+use crate::w_saber::RandFloat;
 use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
@@ -45,88 +29,72 @@ use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
 /// Source: `oracle/codemp/game/g_missile.c:24-89`
 pub fn G_ReflectMissile(ctx: &mut GameContext, ent: EntityId, missile: EntityId, forward: vec3_t) {
     let mut bounce_dir: vec3_t = [0.0; 3];
-    let mut isowner = 0;
 
-    // Find the owner. `owner` is only null-tested below (never dereferenced) and
-    // is always a live entity, so the test stays vacuously true, as in Raven.
-    let mut owner: *mut gentity_t = ctx.entity_mut(ent);
-    let ent_owner_num = ctx.entity(ent).r.ownerNum;
-    if ent_owner_num != 0 {
-        owner = ctx.entity_mut(EntityId(ent_owner_num as u32));
-    }
+    // Raven resolves an `owner` pointer here only to null-test it below; the
+    // test is vacuously true (always a live entity), so the walk is dropped.
 
     // Check if original owner is bouncing the missile
-    if ctx.entity(missile).r.ownerNum == ctx.entity(ent).s.number {
-        isowner = 1;
-    }
+    let ent_number = ctx.entity(ent).s.number;
+    let isowner = ctx.entity(missile).r.ownerNum == ent_number;
 
     // Save the original speed
-    let mut speed = crate::q_math::VectorNormalize(&mut ctx.entity_mut(missile).s.pos.trDelta);
+    let mut speed = VectorNormalize(&mut ctx.entity_mut(missile).s.pos.trDelta);
 
     let missile_weapon = ctx.entity(missile).s.weapon;
 
     // Determine bounce direction
-    if !owner.is_null()
-        && missile_weapon != WP_SABER
-        && missile_weapon != G2_MODEL_PART
-        && isowner == 0
-    {
+    if missile_weapon != WP_SABER && missile_weapon != G2_MODEL_PART && !isowner {
         // Bounce back at them if you can
-        let mut missile_to_owner: vec3_t = [0.0; 3];
         let missile_owner_num = ctx.entity(missile).r.ownerNum;
         let missile_owner_origin = ctx
             .entity(EntityId(missile_owner_num as u32))
             .r
             .currentOrigin;
         let missile_origin = ctx.entity(missile).r.currentOrigin;
-        crate::q_math::_VectorSubtract(missile_owner_origin, missile_origin, &mut missile_to_owner);
-        crate::q_math::VectorNormalize(&mut missile_to_owner);
-        bounce_dir = missile_to_owner;
-    } else if isowner != 0 {
+        _VectorSubtract(missile_owner_origin, missile_origin, &mut bounce_dir);
+        VectorNormalize(&mut bounce_dir);
+    } else if isowner {
         // Push the missile away from owner with boost — up the velocity.
         let mut missile_dir: vec3_t = [0.0; 3];
         speed *= 1.5;
         let missile_origin = ctx.entity(missile).r.currentOrigin;
         let ent_origin = ctx.entity(ent).r.currentOrigin;
-        crate::q_math::_VectorSubtract(missile_origin, ent_origin, &mut missile_dir);
-        crate::q_math::_VectorCopy(ctx.entity(missile).s.pos.trDelta, &mut bounce_dir);
-        let dot = crate::q_math::_DotProduct(forward, missile_dir);
-        crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
-        crate::q_math::VectorNormalize(&mut bounce_dir);
+        _VectorSubtract(missile_origin, ent_origin, &mut missile_dir);
+        bounce_dir = ctx.entity(missile).s.pos.trDelta;
+        let dot = _DotProduct(forward, missile_dir);
+        _VectorScale(bounce_dir, dot, &mut bounce_dir);
+        VectorNormalize(&mut bounce_dir);
     } else {
         // Default deflection
         let mut missile_dir: vec3_t = [0.0; 3];
         let ent_origin = ctx.entity(ent).r.currentOrigin;
         let missile_origin = ctx.entity(missile).r.currentOrigin;
-        crate::q_math::_VectorSubtract(ent_origin, missile_origin, &mut missile_dir);
-        crate::q_math::_VectorCopy(ctx.entity(missile).s.pos.trDelta, &mut bounce_dir);
-        let dot = crate::q_math::_DotProduct(forward, missile_dir);
-        crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
-        crate::q_math::VectorNormalize(&mut bounce_dir);
+        _VectorSubtract(ent_origin, missile_origin, &mut missile_dir);
+        bounce_dir = ctx.entity(missile).s.pos.trDelta;
+        let dot = _DotProduct(forward, missile_dir);
+        _VectorScale(bounce_dir, dot, &mut bounce_dir);
+        VectorNormalize(&mut bounce_dir);
     }
 
     // Add randomness
     for i in 0..3 {
-        bounce_dir[i] += crate::w_saber::RandFloat(ctx, -0.2, 0.2);
+        bounce_dir[i] += RandFloat(ctx, -0.2, 0.2);
     }
 
-    crate::q_math::VectorNormalize(&mut bounce_dir);
-    crate::q_math::_VectorScale(
-        bounce_dir,
-        speed,
-        &mut ctx.entity_mut(missile).s.pos.trDelta,
-    );
-    ctx.entity_mut(missile).s.pos.trTime = ctx.world.level.time;
-    let missile_origin = ctx.entity(missile).r.currentOrigin;
-    crate::q_math::_VectorCopy(missile_origin, &mut ctx.entity_mut(missile).s.pos.trBase);
+    VectorNormalize(&mut bounce_dir);
+    let level_time = ctx.world.level.time;
+    let m = ctx.entity_mut(missile);
+    _VectorScale(bounce_dir, speed, &mut m.s.pos.trDelta);
+    m.s.pos.trTime = level_time;
+    m.s.pos.trBase = m.r.currentOrigin;
 
     if missile_weapon != WP_SABER && missile_weapon != G2_MODEL_PART {
-        ctx.entity_mut(missile).r.ownerNum = ctx.entity(ent).s.number;
+        m.r.ownerNum = ent_number;
     }
 
     if missile_weapon == WP_ROCKET_LAUNCHER {
-        ctx.entity_mut(missile).think = FnId::NONE;
-        ctx.entity_mut(missile).nextthink = 0;
+        m.think = FnId::NONE;
+        m.nextthink = 0;
     }
 }
 
@@ -136,58 +104,53 @@ pub fn G_ReflectMissile(ctx: &mut GameContext, ent: EntityId, missile: EntityId,
 pub fn G_DeflectMissile(ctx: &mut GameContext, ent: EntityId, missile: EntityId, forward: vec3_t) {
     let mut bounce_dir: vec3_t = [0.0; 3];
     let mut missile_dir: vec3_t = [0.0; 3];
-    let mut isowner = 0;
 
-    // Check if original owner is bouncing the missile
-    if ctx.entity(missile).r.ownerNum == ctx.entity(ent).s.number {
-        isowner = 1;
-    }
+    // Raven computes the owner check here but never uses it in this fn.
+    let _isowner = ctx.entity(missile).r.ownerNum == ctx.entity(ent).s.number;
 
     // Save the original speed
-    let speed = crate::q_math::VectorNormalize(&mut ctx.entity_mut(missile).s.pos.trDelta);
+    let speed = VectorNormalize(&mut ctx.entity_mut(missile).s.pos.trDelta);
 
     // `client` is a raw `gentity_t*` seam field (§D5) — the gclient deref stays
     // unsafe; the entity walk is by handle.
     let ent_client = ctx.entity(ent).client;
     if !ent_client.is_null() {
-        crate::q_math::AngleVectors(
+        AngleVectors(
             unsafe { (*(ent_client as *mut gclient_t)).ps.viewangles },
             Some(&mut missile_dir),
             None,
             None,
         );
-        crate::q_math::_VectorCopy(missile_dir, &mut bounce_dir);
-        let dot = crate::q_math::_DotProduct(forward, missile_dir);
-        crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
-        crate::q_math::VectorNormalize(&mut bounce_dir);
+        bounce_dir = missile_dir;
+        let dot = _DotProduct(forward, missile_dir);
+        _VectorScale(bounce_dir, dot, &mut bounce_dir);
+        VectorNormalize(&mut bounce_dir);
     } else {
-        crate::q_math::_VectorCopy(forward, &mut bounce_dir);
-        crate::q_math::VectorNormalize(&mut bounce_dir);
+        bounce_dir = forward;
+        VectorNormalize(&mut bounce_dir);
     }
 
     // Add randomness
     for i in 0..3 {
-        bounce_dir[i] += crate::w_saber::RandFloat(ctx, -1.0, 1.0);
+        bounce_dir[i] += RandFloat(ctx, -1.0, 1.0);
     }
 
-    crate::q_math::VectorNormalize(&mut bounce_dir);
-    crate::q_math::_VectorScale(
-        bounce_dir,
-        speed,
-        &mut ctx.entity_mut(missile).s.pos.trDelta,
-    );
-    ctx.entity_mut(missile).s.pos.trTime = ctx.world.level.time;
-    let missile_origin = ctx.entity(missile).r.currentOrigin;
-    crate::q_math::_VectorCopy(missile_origin, &mut ctx.entity_mut(missile).s.pos.trBase);
+    VectorNormalize(&mut bounce_dir);
+    let level_time = ctx.world.level.time;
+    let ent_number = ctx.entity(ent).s.number;
+    let m = ctx.entity_mut(missile);
+    _VectorScale(bounce_dir, speed, &mut m.s.pos.trDelta);
+    m.s.pos.trTime = level_time;
+    m.s.pos.trBase = m.r.currentOrigin;
 
-    let missile_weapon = ctx.entity(missile).s.weapon;
+    let missile_weapon = m.s.weapon;
     if missile_weapon != WP_SABER && missile_weapon != G2_MODEL_PART {
-        ctx.entity_mut(missile).r.ownerNum = ctx.entity(ent).s.number;
+        m.r.ownerNum = ent_number;
     }
 
     if missile_weapon == WP_ROCKET_LAUNCHER {
-        ctx.entity_mut(missile).think = FnId::NONE;
-        ctx.entity_mut(missile).nextthink = 0;
+        m.think = FnId::NONE;
+        m.nextthink = 0;
     }
 }
 
@@ -209,8 +172,8 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
         hitTime as c_int,
         &mut velocity,
     );
-    let dot = crate::q_math::_DotProduct(velocity, tr.plane.normal);
-    crate::q_math::_VectorMA(
+    let dot = _DotProduct(velocity, tr.plane.normal);
+    _VectorMA(
         velocity,
         -2.0 * dot,
         tr.plane.normal,
@@ -218,9 +181,10 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
     );
 
     if (ctx.entity(ent).flags & FL_BOUNCE_SHRAPNEL) != 0 {
-        let trdelta = ctx.entity(ent).s.pos.trDelta;
-        crate::q_math::_VectorScale(trdelta, 0.25, &mut ctx.entity_mut(ent).s.pos.trDelta);
-        ctx.entity_mut(ent).s.pos.trType = TR_GRAVITY;
+        let m = ctx.entity_mut(ent);
+        let trdelta = m.s.pos.trDelta;
+        _VectorScale(trdelta, 0.25, &mut m.s.pos.trDelta);
+        m.s.pos.trType = TR_GRAVITY;
 
         // Check for stop. C promotes `normal[2]` to double against the
         // unsuffixed `0.7`.
@@ -242,7 +206,7 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
         // against the unsuffixed `0.2`/`40` in C; the f32-nearest 0.2 exceeds
         // double 0.2, so evaluate in f64 to keep the branch decision.
         if (tr.plane.normal[2] as f64) > 0.2
-            && (crate::q_math::VectorLength(ctx.entity(ent).s.pos.trDelta) as f64) < 40.0
+            && (VectorLength(ctx.entity(ent).s.pos.trDelta) as f64) < 40.0
         {
             G_SetOrigin(ctx.entity_mut(ent), tr.endpos);
             return;
@@ -275,18 +239,15 @@ pub fn G_BounceMissile(ctx: &mut GameContext, ent: EntityId, trace: &trace_t) {
         );
     }
 
-    let currentOrigin = ctx.entity(ent).r.currentOrigin;
-    crate::q_math::_VectorAdd(
-        currentOrigin,
-        tr.plane.normal,
-        &mut ctx.entity_mut(ent).r.currentOrigin,
-    );
-    let currentOrigin = ctx.entity(ent).r.currentOrigin;
-    crate::q_math::_VectorCopy(currentOrigin, &mut ctx.entity_mut(ent).s.pos.trBase);
-    ctx.entity_mut(ent).s.pos.trTime = ctx.world.level.time;
+    let level_time = ctx.world.level.time;
+    let m = ctx.entity_mut(ent);
+    let current_origin = m.r.currentOrigin;
+    _VectorAdd(current_origin, tr.plane.normal, &mut m.r.currentOrigin);
+    m.s.pos.trBase = m.r.currentOrigin;
+    m.s.pos.trTime = level_time;
 
-    if ctx.entity(ent).bounceCount != -5 {
-        ctx.entity_mut(ent).bounceCount -= 1;
+    if m.bounceCount != -5 {
+        m.bounceCount -= 1;
     }
 }
 
@@ -303,15 +264,13 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
     snap_vector(&mut origin);
     G_SetOrigin(ctx.entity_mut(ent), origin);
 
-    ctx.entity_mut(ent).s.eType = ET_GENERAL as c_int;
-    G_AddEvent(
-        ctx.entity_mut(ent),
-        EV_MISSILE_MISS as c_int,
-        DirToByte(dir),
-    );
+    let m = ctx.entity_mut(ent);
+    m.s.eType = ET_GENERAL as c_int;
+    G_AddEvent(m, EV_MISSILE_MISS as c_int, DirToByte(dir));
 
-    ctx.entity_mut(ent).freeAfterEvent = qtrue;
-    ctx.entity_mut(ent).takedamage = qfalse;
+    let m = ctx.entity_mut(ent);
+    m.freeAfterEvent = qtrue;
+    m.takedamage = qfalse;
 
     // Splash damage
     if ctx.entity(ent).splashDamage != 0 {
@@ -322,9 +281,8 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
             && ((ctx.entity(ent).s.eFlags & EF_JETPACK_ACTIVE) != 0)
             && (ctx.entity(ent).r.ownerNum as usize) < MAX_CLIENTS
         {
-            let owner_num = ctx.entity(ent).r.ownerNum as usize;
-            ctx.entity_mut(ent).parent =
-                Some(unsafe { ent_id(ent_base(ctx), &ctx.world.g_entities[owner_num]) });
+            let owner_num = ctx.entity(ent).r.ownerNum;
+            ctx.entity_mut(ent).parent = Some(EntityId(owner_num as u32));
         }
 
         let parent = ctx.entity(ent).parent;
@@ -332,22 +290,14 @@ pub fn G_ExplodeMissile(ctx: &mut GameContext, ent: EntityId) {
         let splashDamage = ctx.entity(ent).splashDamage;
         let splashRadius = ctx.entity(ent).splashRadius;
         let splashMod = ctx.entity(ent).splashMethodOfDeath;
-        let parent_ptr = unsafe { ent_resolve_opt(ctx, parent) };
-        // Raw-pointer temps end `entity_mut`'s borrow of `ctx` at the coercion
-        // (raw pointers carry no borrowck lifetime), so the follow-up
-        // `entity_id_of` (which needs `&ctx`) doesn't conflict.
-        let ignore_ptr = ctx.entity_mut(ent) as *mut gentity_t;
-        let ignore_eid = ctx.entity_id_of(ignore_ptr);
-        let missile_ptr = ctx.entity_mut(ent) as *mut gentity_t;
-        let missile_eid = ctx.entity_id_of(missile_ptr);
         if G_RadiusDamage(
             ctx,
             currentOrigin,
-            ctx.entity_id_of(parent_ptr),
+            parent,
             splashDamage as f32,
             splashRadius as f32,
-            ignore_eid,
-            missile_eid,
+            Some(ent),
+            Some(ent),
             splashMod,
         ) != 0
         {
@@ -389,31 +339,20 @@ pub fn G_RunStuckMissile(ctx: &mut GameContext, ent: EntityId) {
         if ground >= 0 && (ground as usize) < ENTITYNUM_WORLD as usize {
             let other = EntityId(ground as u32);
 
-            let delta_moving =
-                VectorCompare(crate::q_math::vec3_origin, ctx.entity(other).s.pos.trDelta) == 0
-                    && ctx.entity(other).s.pos.trType != TR_STATIONARY;
-            let apos_moving =
-                VectorCompare(crate::q_math::vec3_origin, ctx.entity(other).s.apos.trDelta) == 0
-                    && ctx.entity(other).s.apos.trType != TR_STATIONARY;
+            let delta_moving = VectorCompare(vec3_origin, ctx.entity(other).s.pos.trDelta) == 0
+                && ctx.entity(other).s.pos.trType != TR_STATIONARY;
+            let apos_moving = VectorCompare(vec3_origin, ctx.entity(other).s.apos.trDelta) == 0
+                && ctx.entity(other).s.apos.trType != TR_STATIONARY;
 
             if delta_moving || apos_moving {
-                // Raw-pointer temps end each `entity_mut` borrow of `ctx` at the
-                // coercion, so the follow-up `entity_id_of` (which needs `&ctx`)
-                // doesn't conflict.
-                let ent_ptr = ctx.entity_mut(ent) as *mut gentity_t;
-                let targ_eid = ctx.entity_id_of(ent_ptr);
-                let inflictor_ptr = ctx.entity_mut(other) as *mut gentity_t;
-                let inflictor_eid = ctx.entity_id_of(inflictor_ptr);
-                let attacker_ptr = ctx.entity_mut(other) as *mut gentity_t;
-                let attacker_eid = ctx.entity_id_of(attacker_ptr);
                 // Thing I stuck to is moving or rotating now, kill me
                 G_Damage(
                     ctx,
-                    targ_eid,
-                    inflictor_eid,
-                    attacker_eid,
+                    Some(ent),
+                    Some(other),
+                    Some(other),
                     None,
-                    crate::q_math::vec3_origin,
+                    vec3_origin,
                     99999,
                     0,
                     MOD_CRUSH as c_int,
@@ -433,12 +372,12 @@ pub fn G_BounceProjectile(start: vec3_t, impact: vec3_t, dir: vec3_t, endout: &m
     let mut v: vec3_t = [0.0; 3];
     let mut newv: vec3_t = [0.0; 3];
 
-    crate::q_math::_VectorSubtract(impact, start, &mut v);
-    let dot = crate::q_math::_DotProduct(v, dir);
-    crate::q_math::_VectorMA(v, -2.0 * dot, dir, &mut newv);
+    _VectorSubtract(impact, start, &mut v);
+    let dot = _DotProduct(v, dir);
+    _VectorMA(v, -2.0 * dot, dir, &mut newv);
 
-    crate::q_math::VectorNormalize(&mut newv);
-    crate::q_math::_VectorMA(impact, 8192.0, newv, endout);
+    VectorNormalize(&mut newv);
+    _VectorMA(impact, 8192.0, newv, endout);
 }
 
 /// Raven `CreateMissile`.
