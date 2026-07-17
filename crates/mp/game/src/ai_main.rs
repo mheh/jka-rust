@@ -3862,40 +3862,40 @@ pub fn BotHasAssociated(ctx: &mut GameContext, bs: *mut bot_state_t, wp: *mut wp
             return 1;
         }
 
-        // `as_ent`'s only field read is its `*mut gitem_t` `item` (Copy); the
-        // arena entity is borrowed momentarily to fetch it, and the pointer is
-        // dereffed raw (gitem_t has no accessor). The original `as_ent.is_null()`
-        // guard was dead (`&g_entities[i]` is never NULL), so only `item.is_null()`
-        // survives.
+        // `as_ent`'s only field read is its `.item` ([`ItemId`], Copy); the arena
+        // entity is borrowed momentarily to fetch it. The original
+        // `as_ent.is_null()` guard was dead (`&g_entities[i]` is never NULL), so
+        // only the `item.is_none()` guard survives.
         let item = ctx
             .world
             .entity(EntityId((*wp).associated_entity as u32))
             .item;
 
-        if item.is_null() {
+        let Some(item) = item else {
             return 0;
-        }
+        };
+        let item = item.item();
 
-        if (*item).giType == IT_WEAPON {
-            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << (*item).giTag) != 0 {
+        if item.giType() == IT_WEAPON {
+            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << item.giTag()) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*item).giType == IT_HOLDABLE {
-            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << (*item).giTag) != 0 {
+        } else if item.giType() == IT_HOLDABLE {
+            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag()) != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*item).giType == IT_POWERUP {
-            if (*bs).cur_ps.powerups[(*item).giTag as usize] != 0 {
+        } else if item.giType() == IT_POWERUP {
+            if (*bs).cur_ps.powerups[item.giTag() as usize] != 0 {
                 return 1;
             }
 
             return 0;
-        } else if (*item).giType == IT_AMMO {
-            if (*bs).cur_ps.ammo[(*item).giTag as usize] > 10 {
+        } else if item.giType() == IT_AMMO {
+            if (*bs).cur_ps.ammo[item.giTag() as usize] > 10 {
                 // hack
                 return 1;
             }

@@ -2,7 +2,7 @@
 
 use core::ffi::c_void;
 
-use mp_qshared::common::mp::qcommon::MAX_ITEM_MODELS;
+use mp_bg::public::g_item::MAX_ITEM_MODELS;
 use mp_qshared::shared::qboolean;
 use mp_qshared::shared::qhandle_t;
 

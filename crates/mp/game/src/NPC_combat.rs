@@ -2994,9 +2994,8 @@ pub fn NPC_SearchForWeapons(ctx: &mut GameContext) -> *mut gentity_t {
             if ctx.world.entity(found_id).s.eType != ET_ITEM as c_int {
                 continue;
             }
-            // FLAG: gitem_t is an external item table; deref of `.item` stays raw.
             let found_item = ctx.world.entity(found_id).item;
-            if (*found_item).giType != IT_WEAPON {
+            if found_item.unwrap().item().giType() != IT_WEAPON {
                 continue;
             }
             if (ctx.world.entity(found_id).s.eFlags & EF_NODRAW) != 0 {

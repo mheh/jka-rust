@@ -6130,10 +6130,7 @@ pub fn emplaced_gun_die(
 pub fn SP_emplaced_gun(ctx: &mut GameContext, ent: EntityId) {
     let name = c"models/map_objects/mp/turret_chair.glm";
 
-    let item = BG_FindItemForWeapon(WP_EMPLACED_GUN);
-    if !item.is_null() {
-        RegisterItem(ctx, item);
-    }
+    RegisterItem(ctx, BG_FindItemForWeapon(WP_EMPLACED_GUN));
 
     {
         let e = ctx.world.entity_mut(ent);

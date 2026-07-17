@@ -11,11 +11,10 @@
 //! f32-vs-f64 reconciliation notes.
 #![allow(non_snake_case)]
 
-use std::ffi::CStr;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 
 use mp_bg::bg_misc::{
     BG_CanItemBeGrabbed, BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem,
@@ -77,15 +76,6 @@ fn pi(t: &str) -> i32 {
 fn read_lines(name: &str) -> String {
     let p = fixtures_dir().join(name);
     std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()))
-}
-
-// C `%s` with `(null)` for a NULL pointer (mirrors main_bgmisc.c pS).
-fn cs(p: *mut c_char) -> String {
-    if p.is_null() {
-        "(null)".to_string()
-    } else {
-        unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
-    }
 }
 
 // ----------------------------- ps / es setters -----------------------------
@@ -199,8 +189,13 @@ fn pV(o: &mut String, tag: &str, v: &[f32; 3]) {
         v[2].to_bits()
     );
 }
-fn pS(o: &mut String, tag: &str, p: *mut c_char) {
-    let _ = writeln!(o, "{tag} {}", cs(p));
+// New `GItem` string fields: `None` (Raven NULL) prints C `%s`'s `(null)`,
+// `Some(s)` prints the string; a plain `&str` field prints as-is.
+fn os(o: &mut String, tag: &str, s: Option<&str>) {
+    let _ = writeln!(o, "{tag} {}", s.unwrap_or("(null)"));
+}
+fn ss(o: &mut String, tag: &str, s: &str) {
+    let _ = writeln!(o, "{tag} {s}");
 }
 
 // ------------------------------- sections ----------------------------------
@@ -251,32 +246,73 @@ fn sec_trajectory(o: &mut String) {
 
 fn sec_itemlist(o: &mut String) {
     o.push_str("== itemlist ==\n");
+    // The oracle dumps `ARRAY_LEN(bg_itemlist)` entries: the `bg_numItems` the
+    // port keeps plus the trailing `{NULL}` end-of-list terminator the port
+    // dropped (porting-rules §20). Slot 0 is the "leave index 0 alone" sentinel
+    // the oracle stored as `{NULL.., "", "", ""}`. Both structural slots are
+    // reproduced from their fixed oracle values so the committed golden stays
+    // byte-identical; slots `1..bg_numItems` map straight from the new `GItem`
+    // representation (Raven NULL == `None`).
     for i in 0..=bg_numItems as usize {
-        let it = &bg_itemlist[i];
         let _ = writeln!(o, "item {i}");
-        pS(o, " classname", it.classname);
-        pS(o, " pickup_sound", it.pickup_sound);
-        for m in 0..4 {
-            // Raven MAX_ITEM_MODELS
-            let _ = writeln!(o, " world_model{m} {}", cs(it.world_model[m]));
+        if i == bg_numItems as usize {
+            // dropped `{NULL}` terminator: every field NULL / 0.
+            for f in [
+                " classname",
+                " pickup_sound",
+                " world_model0",
+                " world_model1",
+                " world_model2",
+                " world_model3",
+                " view_model",
+                " icon",
+            ] {
+                os(o, f, None);
+            }
+            pI(o, " quantity", 0);
+            pI(o, " giType", 0);
+            pI(o, " giTag", 0);
+            os(o, " precaches", None);
+            os(o, " sounds", None);
+            os(o, " description", None);
+            continue;
         }
-        pS(o, " view_model", it.view_model);
-        pS(o, " icon", it.icon);
+        let it = &bg_itemlist[i];
+        // Sentinel slot 0: the oracle's classname was NULL and its description "".
+        os(
+            o,
+            " classname",
+            if i == 0 { None } else { Some(it.classname) },
+        );
+        os(o, " pickup_sound", it.pickup_sound);
+        for m in 0..4 {
+            // Raven MAX_ITEM_MODELS; null-padded past the real entries.
+            os(
+                o,
+                &format!(" world_model{m}"),
+                it.world_model.get(m).copied(),
+            );
+        }
+        os(o, " view_model", it.view_model);
+        os(o, " icon", it.icon);
         pI(o, " quantity", it.quantity);
-        pI(o, " giType", it.giType as c_int);
-        pI(o, " giTag", it.giTag);
-        pS(o, " precaches", it.precaches);
-        pS(o, " sounds", it.sounds);
-        pS(o, " description", it.description);
+        pI(o, " giType", it.giType() as c_int);
+        pI(o, " giTag", it.giTag());
+        ss(o, " precaches", it.precaches);
+        ss(o, " sounds", it.sounds);
+        os(
+            o,
+            " description",
+            if i == 0 { Some("") } else { it.description },
+        );
     }
 }
 
-fn itemidx(it: *mut gitem_t) -> i32 {
-    if it.is_null() {
-        -1
-    } else {
-        unsafe { it.offset_from(bg_itemlist.as_ptr()) as i32 }
-    }
+fn idx_of(id: ItemId) -> i32 {
+    id.modelindex()
+}
+fn idx_opt(id: Option<ItemId>) -> i32 {
+    id.map_or(-1, |x| x.modelindex())
 }
 
 fn sec_findid(o: &mut String) {
@@ -284,7 +320,7 @@ fn sec_findid(o: &mut String) {
     // BG_FindItemForWeapon / ForAmmo / ForHoldable Com_Error (port panic) on a
     // tag with no item, so only existing tags are queried (see main_bgmisc.c).
     for w in 1..WP_NUM_WEAPONS {
-        let _ = writeln!(o, "weapon {w} {}", itemidx(BG_FindItemForWeapon(w)));
+        let _ = writeln!(o, "weapon {w} {}", idx_of(BG_FindItemForWeapon(w)));
     }
     // ammo_t is a non-Copy enum; build a fresh variant per call from its int.
     fn ammo_of(n: i32) -> ammo_t {
@@ -301,15 +337,15 @@ fn sec_findid(o: &mut String) {
         }
     }
     for a in [1, 2, 3, 4, 5, 7, 8, 9] {
-        let _ = writeln!(o, "ammo {a} {}", itemidx(BG_FindItemForAmmo(ammo_of(a))));
+        let _ = writeln!(o, "ammo {a} {}", idx_of(BG_FindItemForAmmo(ammo_of(a))));
     }
     for h in 1..12 {
-        let _ = writeln!(o, "holdable {h} {}", itemidx(BG_FindItemForHoldable(h)));
+        let _ = writeln!(o, "holdable {h} {}", idx_of(BG_FindItemForHoldable(h)));
     }
     for p in 0..=PW_NUM_POWERUPS {
-        let _ = writeln!(o, "powerup {p} {}", itemidx(BG_FindItemForPowerup(p)));
+        let _ = writeln!(o, "powerup {p} {}", idx_opt(BG_FindItemForPowerup(p)));
     }
-    let _ = writeln!(o, "powerup 999 {}", itemidx(BG_FindItemForPowerup(999)));
+    let _ = writeln!(o, "powerup 999 {}", idx_opt(BG_FindItemForPowerup(999)));
     let names = [
         "weapon_saber",
         "weapon_blaster",
@@ -323,8 +359,7 @@ fn sec_findid(o: &mut String) {
         "",
     ];
     for n in names {
-        let c = std::ffi::CString::new(n).unwrap();
-        let _ = writeln!(o, "find \"{n}\" {}", itemidx(BG_FindItem(c.as_ptr())));
+        let _ = writeln!(o, "find \"{n}\" {}", idx_opt(BG_FindItem(n)));
     }
 }
 

@@ -72,7 +72,7 @@ pub fn Use_Target_Give(
             break;
         }
         let t_id = ctx.entity_id_of(t).unwrap();
-        if ctx.entity(t_id).item.is_null() {
+        if ctx.entity(t_id).item.is_none() {
             continue;
         }
         Touch_Item(ctx, t_id, Some(activator), &mut trace);

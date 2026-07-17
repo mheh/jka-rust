@@ -6657,7 +6657,7 @@ impl PmoveContext<'_> {
             if forcedUse == 0 {
                 forcedUse = bg_itemlist
                     [(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize]
-                    .giTag;
+                    .giTag();
             }
 
             if BG_IsItemSelectable(ps, forcedUse) == qfalse {
@@ -7344,7 +7344,7 @@ impl PmoveContext<'_> {
                     } else {
                         let giTag = bg_itemlist
                             [(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize]
-                            .giTag;
+                            .giTag();
                         if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << giTag)
                             != 0
                         {

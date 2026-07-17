@@ -682,82 +682,61 @@ pub fn BG_CanUseFPNow(
     }
 }
 
-/// Raven `BG_FindItemForPowerup`.
+/// Raven `BG_FindItemForPowerup` — returns `None` on miss (Raven NULL).
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:1881-1893`
-pub fn BG_FindItemForPowerup(pw: powerup_t) -> *mut gitem_t {
-    for i in 0..bg_numItems {
-        if (bg_itemlist[i as usize].giType == IT_POWERUP
-            || bg_itemlist[i as usize].giType == IT_TEAM)
-            && bg_itemlist[i as usize].giTag == pw
-        {
-            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
-        }
-    }
-    std::ptr::null_mut()
+pub fn BG_FindItemForPowerup(pw: powerup_t) -> Option<ItemId> {
+    bg_itemlist
+        .iter()
+        .position(|it| matches!(it.kind, ItemKind::Powerup(t) | ItemKind::Team(t) if t == pw))
+        .and_then(|i| ItemId::from_modelindex(i as c_int))
 }
 
-/// Raven `BG_FindItemForHoldable`.
+/// Raven `BG_FindItemForHoldable` — panics on miss (Raven `Com_Error`).
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:1901-1913`
-pub fn BG_FindItemForHoldable(pw: holdable_t) -> *mut gitem_t {
-    for i in 0..bg_numItems {
-        if bg_itemlist[i as usize].giType == IT_HOLDABLE && bg_itemlist[i as usize].giTag == pw {
-            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
-        }
-    }
-    panic!("HoldableItem not found");
+pub fn BG_FindItemForHoldable(pw: holdable_t) -> ItemId {
+    bg_itemlist
+        .iter()
+        .position(|it| it.kind == ItemKind::Holdable(pw))
+        .and_then(|i| ItemId::from_modelindex(i as c_int))
+        .unwrap_or_else(|| panic!("HoldableItem not found"))
 }
 
-/// Raven `BG_FindItemForWeapon`.
+/// Raven `BG_FindItemForWeapon` — panics on miss (Raven `Com_Error`).
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:1922-1933`
-pub fn BG_FindItemForWeapon(weapon: weapon_t) -> *mut gitem_t {
-    let mut i: c_int = 1;
-    while i < bg_numItems {
-        if !bg_itemlist[i as usize].classname.is_null()
-            && bg_itemlist[i as usize].giType == IT_WEAPON
-            && bg_itemlist[i as usize].giTag == weapon
-        {
-            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
-        }
-        i += 1;
-    }
-    panic!("Couldn't find item for weapon {}", weapon as c_int);
+pub fn BG_FindItemForWeapon(weapon: weapon_t) -> ItemId {
+    // Raven starts at 1 and guards on a non-NULL classname; the slot-0 sentinel
+    // is `ItemKind::Bad`, so a full-table kind match is equivalent.
+    bg_itemlist
+        .iter()
+        .position(|it| it.kind == ItemKind::Weapon(weapon))
+        .and_then(|i| ItemId::from_modelindex(i as c_int))
+        .unwrap_or_else(|| panic!("Couldn't find item for weapon {weapon}"))
 }
 
-/// Raven `BG_FindItemForAmmo`.
+/// Raven `BG_FindItemForAmmo` — panics on miss (Raven `Com_Error`).
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:1941-1952`
-pub fn BG_FindItemForAmmo(ammo: ammo_t) -> *mut gitem_t {
+pub fn BG_FindItemForAmmo(ammo: ammo_t) -> ItemId {
     let ammo = ammo as c_int;
-    let mut i: c_int = 1;
-    while i < bg_numItems {
-        if !bg_itemlist[i as usize].classname.is_null()
-            && bg_itemlist[i as usize].giType == IT_AMMO
-            && bg_itemlist[i as usize].giTag == ammo
-        {
-            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
-        }
-        i += 1;
-    }
-    panic!("Couldn't find item for ammo {}", ammo);
+    bg_itemlist
+        .iter()
+        .position(|it| it.kind == ItemKind::Ammo(ammo))
+        .and_then(|i| ItemId::from_modelindex(i as c_int))
+        .unwrap_or_else(|| panic!("Couldn't find item for ammo {ammo}"))
 }
 
-/// Raven `BG_FindItem`.
+/// Raven `BG_FindItem` — returns `None` on miss (Raven NULL). Raven's
+/// `Q_stricmp` is ASCII case-insensitive: `eq_ignore_ascii_case`.
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:1960-1969`
-pub fn BG_FindItem(classname: *const c_char) -> *mut gitem_t {
-    let mut i: c_int = 1;
-    while i < bg_numItems {
-        if !bg_itemlist[i as usize].classname.is_null()
-            && Q_stricmp(bg_itemlist[i as usize].classname, classname) == 0
-        {
-            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
-        }
-        i += 1;
-    }
-    std::ptr::null_mut()
+pub fn BG_FindItem(classname: &str) -> Option<ItemId> {
+    bg_itemlist
+        .iter()
+        .position(|it| !it.classname.is_empty() && it.classname.eq_ignore_ascii_case(classname))
+        .and_then(|i| ItemId::from_modelindex(i as c_int))
 }
 
 /// Raven `BG_PlayerTouchesItem`.
@@ -883,7 +862,8 @@ pub fn BG_CycleForce(ps: *mut playerState_t, direction: c_int) {
 pub fn BG_GetItemIndexByTag(tag: c_int, r#type: c_int) -> c_int {
     let mut i: c_int = 0;
     while i < bg_numItems {
-        if bg_itemlist[i as usize].giTag == tag && bg_itemlist[i as usize].giType == r#type {
+        let it = &bg_itemlist[i as usize];
+        if it.giTag() == tag && it.giType() == r#type {
             return i;
         }
         i += 1;
@@ -907,7 +887,7 @@ pub fn BG_IsItemSelectable(ps: *mut playerState_t, item: c_int) -> qboolean {
 pub fn BG_CycleInven(ps: *mut playerState_t, direction: c_int) {
     unsafe {
         let mut i =
-            bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+            bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag();
         let original = i;
         if direction == 1 {
             i += 1;
@@ -959,29 +939,29 @@ pub fn BG_CanItemBeGrabbed(
     ps: *const playerState_t,
 ) -> qboolean {
     unsafe {
-        if (*ent).modelindex < 1 || (*ent).modelindex >= bg_numItems {
-            panic!("BG_CanItemBeGrabbed: index out of range");
-        }
-        let item = &bg_itemlist[(*ent).modelindex as usize];
+        let item = match ItemId::from_modelindex((*ent).modelindex) {
+            Some(id) => id.item(),
+            None => panic!("BG_CanItemBeGrabbed: index out of range"),
+        };
         if !ps.is_null() {
             if (*ps).trueJedi != 0 {
-                if item.giType != IT_TEAM
-                    && item.giType != IT_ARMOR
-                    && (item.giType != IT_WEAPON || item.giTag != WP_SABER)
-                    && (item.giType != IT_HOLDABLE || item.giTag != HI_SEEKER)
-                    && (item.giType != IT_POWERUP || item.giTag == PW_YSALAMIRI)
+                if item.giType() != IT_TEAM
+                    && item.giType() != IT_ARMOR
+                    && (item.giType() != IT_WEAPON || item.giTag() != WP_SABER)
+                    && (item.giType() != IT_HOLDABLE || item.giTag() != HI_SEEKER)
+                    && (item.giType() != IT_POWERUP || item.giTag() == PW_YSALAMIRI)
                 {
                     return qfalse;
                 }
             } else if (*ps).trueNonJedi != 0 {
-                if (item.giType == IT_POWERUP && item.giTag != PW_YSALAMIRI)
-                    || (item.giType == IT_HOLDABLE && item.giTag == HI_SEEKER)
-                    || (item.giType == IT_WEAPON && item.giTag == WP_SABER)
+                if (item.giType() == IT_POWERUP && item.giTag() != PW_YSALAMIRI)
+                    || (item.giType() == IT_HOLDABLE && item.giTag() == HI_SEEKER)
+                    || (item.giType() == IT_WEAPON && item.giTag() == WP_SABER)
                 {
                     return qfalse;
                 }
             }
-            if (*ps).isJediMaster != 0 && (item.giType == IT_WEAPON || item.giType == IT_AMMO) {
+            if (*ps).isJediMaster != 0 && (item.giType() == IT_WEAPON || item.giType() == IT_AMMO) {
                 return qfalse;
             }
             if (*ps).duelInProgress != 0 {
@@ -990,24 +970,24 @@ pub fn BG_CanItemBeGrabbed(
         } else {
             return qfalse;
         }
-        match item.giType {
+        match item.giType() {
             IT_WEAPON => {
                 if (*ent).generic1 == (*ps).clientNum && (*ent).powerups != 0 {
                     return qfalse;
                 }
                 if ((*ent).eFlags & EF_DROPPEDWEAPON) == 0
-                    && ((*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << item.giTag)) != 0
-                    && item.giTag != WP_THERMAL
-                    && item.giTag != WP_TRIP_MINE
-                    && item.giTag != WP_DET_PACK
+                    && ((*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << item.giTag())) != 0
+                    && item.giTag() != WP_THERMAL
+                    && item.giTag() != WP_TRIP_MINE
+                    && item.giTag() != WP_DET_PACK
                 {
                     return qfalse;
                 }
-                if item.giTag == WP_THERMAL
-                    || item.giTag == WP_TRIP_MINE
-                    || item.giTag == WP_DET_PACK
+                if item.giTag() == WP_THERMAL
+                    || item.giTag() == WP_TRIP_MINE
+                    || item.giTag() == WP_DET_PACK
                 {
-                    let ammoIndex = weaponData[item.giTag as usize].ammoIndex;
+                    let ammoIndex = weaponData[item.giTag() as usize].ammoIndex;
                     if (*ps).ammo[ammoIndex as usize] >= ammoData[ammoIndex as usize].max {
                         return qfalse;
                     }
@@ -1015,10 +995,10 @@ pub fn BG_CanItemBeGrabbed(
                 qtrue
             }
             IT_AMMO => {
-                if item.giTag == -1 {
+                if item.giTag() == -1 {
                     return qtrue;
                 }
-                if (*ps).ammo[item.giTag as usize] >= ammoData[item.giTag as usize].max {
+                if (*ps).ammo[item.giTag() as usize] >= ammoData[item.giTag() as usize].max {
                     return qfalse;
                 }
                 qtrue
@@ -1052,7 +1032,7 @@ pub fn BG_CanItemBeGrabbed(
             }
             IT_POWERUP => {
                 if !ps.is_null() && ((*ps).powerups[PW_YSALAMIRI as usize] != 0) {
-                    if item.giTag != PW_YSALAMIRI {
+                    if item.giTag() != PW_YSALAMIRI {
                         return qfalse;
                     }
                 }
@@ -1061,17 +1041,17 @@ pub fn BG_CanItemBeGrabbed(
             IT_TEAM => {
                 if gametype == GT_CTF || gametype == GT_CTY {
                     if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_RED {
-                        if item.giTag == PW_BLUEFLAG
-                            || (item.giTag == PW_REDFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag == PW_REDFLAG
+                        if item.giTag() == PW_BLUEFLAG
+                            || (item.giTag() == PW_REDFLAG && (*ent).modelindex2 != 0)
+                            || (item.giTag() == PW_REDFLAG
                                 && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
                         {
                             return qtrue;
                         }
                     } else if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_BLUE {
-                        if item.giTag == PW_REDFLAG
-                            || (item.giTag == PW_BLUEFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag == PW_BLUEFLAG
+                        if item.giTag() == PW_REDFLAG
+                            || (item.giTag() == PW_BLUEFLAG && (*ent).modelindex2 != 0)
+                            || (item.giTag() == PW_BLUEFLAG
                                 && (*ps).powerups[PW_REDFLAG as usize] != 0)
                         {
                             return qtrue;
@@ -1081,7 +1061,8 @@ pub fn BG_CanItemBeGrabbed(
                 qfalse
             }
             IT_HOLDABLE => {
-                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag)) != 0
+                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag()))
+                    != 0
                 {
                     return qfalse;
                 }
