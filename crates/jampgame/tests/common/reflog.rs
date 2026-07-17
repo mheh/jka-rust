@@ -549,3 +549,103 @@ pub fn gen_real_duel1_combat() -> Scenario {
         cmds,
     }
 }
+
+/// `real-ffa1-items.reflog` (idiom-era gate prep, DEC-31): map `mp/ffa1`, 6
+/// clients, 2500 frames. The duel1-combat phase pattern (LCG walk sweeps +
+/// attack bursts) on ffa1's dense item field, plus a weapon-select cycle at
+/// each phase boundary. Long roaming walks stumble clients over pickups
+/// (health/shield/ammo/weapons), bursts produce deaths -> dropped-item tosses
+/// and respawn gives — the g_items surface under load. Cycling `cmd.weapon`
+/// through [`ITEM_WEAPON_POOL`] makes picked-up guns actually fire and drain
+/// ammo (a not-yet-owned selection is a safe no-op: `PM_BeginWeaponChange`
+/// rejects weapons missing from `stats[STAT_WEAPONS]`).
+pub fn gen_real_ffa1_items() -> Scenario {
+    let models = [
+        "kyle/default",
+        "jan/default",
+        "luke/default",
+        "desann/default",
+        "tavion/default",
+        "reborn/default",
+    ];
+    let mut userinfos = BTreeMap::new();
+    for c in 0..6i32 {
+        userinfos.insert(c, userinfo_for(c, models[c as usize]));
+    }
+
+    const BUTTON_ATTACK: i32 = 1;
+    // `bg_weapons.h` weapon_t values present on mp/ffa1 (plus the spawn set):
+    // saber 3, bryar 4, blaster 5, repeater 8, thermal 12.
+    const ITEM_WEAPON_POOL: [u8; 5] = [WP_SABER, 4, 5, 8, 12];
+    let frames = 2500;
+    let mut cmds = BTreeMap::new();
+    // Independent input streams per client, each seeded distinctly.
+    for client in 0..6i32 {
+        let mut rng = Lcg(0x17E4_0000u32.wrapping_add((client as u32).wrapping_mul(0x9E37_79B9)));
+        let mut yaw: i32 = rng.range(0, 65535);
+        let mut in_burst = false;
+        let mut weapon = WP_SABER;
+        // Frames left in the current phase; a WALK phase always starts first,
+        // and runs longer than duel1-combat's so clients roam the item field.
+        let mut phase_left = rng.range(120, 300);
+        for frame in 0..frames {
+            if phase_left <= 0 {
+                in_burst = !in_burst;
+                phase_left = if in_burst {
+                    rng.range(25, 70)
+                } else {
+                    rng.range(120, 300)
+                };
+                // Re-pick the selected weapon at each phase boundary so
+                // picked-up guns get used (and their ammo drained).
+                weapon = ITEM_WEAPON_POOL[rng.range(0, 4) as usize];
+            }
+            phase_left -= 1;
+
+            yaw = if in_burst {
+                (yaw + rng.range(-3500, 3500)).rem_euclid(65536)
+            } else {
+                (yaw + rng.range(-700, 700)).rem_euclid(65536)
+            };
+
+            let mut buttons = 0;
+            let mut upmove: i8 = 0;
+            let (forwardmove, rightmove) = if in_burst {
+                buttons |= BUTTON_ATTACK;
+                (rng.range(-30, 100) as i8, rng.range(-80, 80) as i8)
+            } else {
+                if rng.chance(4) {
+                    upmove = 127; // occasional jump
+                } else if rng.chance(3) {
+                    upmove = -127; // occasional crouch
+                }
+                (127, 0)
+            };
+
+            cmds.insert(
+                (frame, client),
+                CmdInput {
+                    angles: [0, yaw, 0],
+                    buttons,
+                    forwardmove,
+                    rightmove,
+                    upmove,
+                    weapon,
+                    forcesel: 0,
+                },
+            );
+        }
+    }
+
+    Scenario {
+        name: "real-ffa1-items".into(),
+        map: "mp/ffa1".into(),
+        seed: 4004,
+        clients: 6,
+        msec: 50,
+        starttime: 600,
+        frames,
+        userinfos,
+        cmds,
+    }
+}

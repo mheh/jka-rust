@@ -925,6 +925,7 @@ fn reflog_roundtrip() {
         reflog::gen_real_duel1_idle(),
         reflog::gen_real_duel1_walk(),
         reflog::gen_real_duel1_combat(),
+        reflog::gen_real_ffa1_items(),
     ] {
         let text = reflog::to_text(&sc);
         let reparsed = reflog::parse(&text);
@@ -966,6 +967,7 @@ fn regenerate_logs() {
         reflog::gen_real_duel1_idle(),
         reflog::gen_real_duel1_walk(),
         reflog::gen_real_duel1_combat(),
+        reflog::gen_real_ffa1_items(),
     ] {
         let path = dir.join(format!("{}.reflog", sc.name));
         std::fs::write(&path, reflog::to_text(&sc)).unwrap();
@@ -1042,4 +1044,22 @@ fn referee_real_duel1_combat() {
         return;
     }
     run_referee("referee_real_duel1_combat", reflog::gen_real_duel1_combat());
+}
+
+/// Real-map item-surface scenario on `mp/ffa1` (idiom-era gate prep, DEC-31):
+/// 6 clients roam the dense ffa1 item field with weapon-select cycling —
+/// pickups, respawns, death drops, and ammo drain exercise `g_items` under
+/// load ahead of idiom slice one. Self-skips when assets are missing.
+#[test]
+#[ignore = "requires retail assets (JKA_REF_BASEPATH) + oracle dylib + cargo build; run with --ignored"]
+fn referee_real_ffa1_items() {
+    if !real_assets_present() {
+        eprintln!(
+            "[referee] SKIP referee_real_ffa1_items: real-map assets missing at {} \
+             (set JKA_REF_BASEPATH; its base/ must hold assets0.pk3)",
+            ref_basepath().display()
+        );
+        return;
+    }
+    run_referee("referee_real_ffa1_items", reflog::gen_real_ffa1_items());
 }
