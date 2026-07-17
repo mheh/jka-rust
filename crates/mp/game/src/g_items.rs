@@ -1942,10 +1942,7 @@ pub fn EWebDie(
             }
 
             let hi = unsafe { (*owner_client).ps.stats[STAT_HOLDABLE_ITEM as usize] };
-            if hi > 0
-                && bg_itemlist[hi as usize].giType() == IT_HOLDABLE
-                && bg_itemlist[hi as usize].giTag() == HI_EWEB
-            {
+            if hi > 0 && bg_itemlist[hi as usize].kind == ItemKind::Holdable(HI_EWEB) {
                 //he has it selected so deselect it and select the first thing available
                 unsafe {
                     (*owner_client).ps.stats[STAT_HOLDABLE_ITEM as usize] = 0;
@@ -3111,13 +3108,11 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
         ent = e.unwrap();
     }
 
-    {
-        let e = ctx.entity_mut(ent);
-        e.r.contents = CONTENTS_TRIGGER;
-        //ent->s.eFlags &= ~EF_NODRAW;
-        e.s.eFlags &= !(EF_NODRAW | EF_ITEMPLACEHOLDER);
-        e.r.svFlags &= !SVF_NOCLIENT;
-    }
+    let e = ctx.entity_mut(ent);
+    e.r.contents = CONTENTS_TRIGGER;
+    //ent->s.eFlags &= ~EF_NODRAW;
+    e.s.eFlags &= !(EF_NODRAW | EF_ITEMPLACEHOLDER);
+    e.r.svFlags &= !SVF_NOCLIENT;
     trap::LinkEntity(
         ctx.engine,
         GLinkentityArgs::new(core::ptr::from_mut(ctx.entity_mut(ent)).cast()),
@@ -3520,74 +3515,81 @@ pub fn LaunchItem(
     // pointer).
     let dropped_ptr = G_Spawn(ctx);
     let dropped = ctx.entity_id_of(dropped_ptr).unwrap();
+    let it = item.item();
 
-    ctx.entity_mut(dropped).s.eType = ET_ITEM as c_int;
-    let modelindex = item.modelindex(); // store item number in modelindex
-    ctx.entity_mut(dropped).s.modelindex = modelindex;
-    if ctx.entity(dropped).s.modelindex < 0 {
-        ctx.entity_mut(dropped).s.modelindex = 0;
+    let e = ctx.entity_mut(dropped);
+    e.s.eType = ET_ITEM as c_int;
+    e.s.modelindex = item.modelindex(); // store item number in modelindex
+    if e.s.modelindex < 0 {
+        e.s.modelindex = 0;
     }
-    ctx.entity_mut(dropped).s.modelindex2 = 1; // This is non-zero is it's a dropped item
+    e.s.modelindex2 = 1; // This is non-zero is it's a dropped item
 
-    let classname = item.classname_cstr() as *mut c_char;
-    ctx.entity_mut(dropped).classname = classname;
-    ctx.entity_mut(dropped).item = Some(item);
-    ctx.entity_mut(dropped).r.mins = [-ITEM_RADIUS, -ITEM_RADIUS, -ITEM_RADIUS];
-    ctx.entity_mut(dropped).r.maxs = [ITEM_RADIUS, ITEM_RADIUS, ITEM_RADIUS];
+    e.classname = item.classname_cstr() as *mut c_char;
+    e.item = Some(item);
+    e.r.mins = [-ITEM_RADIUS, -ITEM_RADIUS, -ITEM_RADIUS];
+    e.r.maxs = [ITEM_RADIUS, ITEM_RADIUS, ITEM_RADIUS];
 
-    ctx.entity_mut(dropped).r.contents = CONTENTS_TRIGGER;
+    e.r.contents = CONTENTS_TRIGGER;
 
-    ctx.entity_mut(dropped).touch = Some(EntTouch::Touch_Item).into();
+    e.touch = Some(EntTouch::Touch_Item).into();
 
     G_SetOrigin(ctx.entity_mut(dropped), origin);
-    ctx.entity_mut(dropped).s.pos.trType = trType_t::TR_GRAVITY;
-    ctx.entity_mut(dropped).s.pos.trTime = ctx.world.level.time;
-    ctx.entity_mut(dropped).s.pos.trDelta = velocity;
+    let level_time = ctx.world.level.time;
+    let e = ctx.entity_mut(dropped);
+    e.s.pos.trType = trType_t::TR_GRAVITY;
+    e.s.pos.trTime = level_time;
+    e.s.pos.trDelta = velocity;
 
-    ctx.entity_mut(dropped).flags |= FL_BOUNCE_HALF;
+    e.flags |= FL_BOUNCE_HALF;
     if (ctx.world.cvars.g_gametype.integer == GT_CTF
         || ctx.world.cvars.g_gametype.integer == GT_CTY)
-        && item.item().giType() == IT_TEAM
+        && matches!(it.kind, ItemKind::Team(_))
     {
         // Special case for CTF flags
-        ctx.entity_mut(dropped).think = Some(EntThink::Team_DroppedFlagThink).into();
-        ctx.entity_mut(dropped).nextthink = ctx.world.level.time + 30000;
+        let e = ctx.entity_mut(dropped);
+        e.think = Some(EntThink::Team_DroppedFlagThink).into();
+        e.nextthink = level_time + 30000;
         Team_CheckDroppedItem(ctx, dropped);
 
         // rww - so bots know
-        let classname = unsafe { core::ffi::CStr::from_ptr(ctx.entity(dropped).classname) };
-        if classname.to_bytes() == b"team_CTF_redflag" {
+        if it.classname == "team_CTF_redflag" {
             ctx.world.globals.droppedRedFlag = dropped_ptr;
-        } else if classname.to_bytes() == b"team_CTF_blueflag" {
+        } else if it.classname == "team_CTF_blueflag" {
             ctx.world.globals.droppedBlueFlag = dropped_ptr;
         }
     } else {
         // auto-remove after 30 seconds
-        ctx.entity_mut(dropped).think = Some(EntThink::G_FreeEntity).into();
-        ctx.entity_mut(dropped).nextthink = ctx.world.level.time + 30000;
+        let e = ctx.entity_mut(dropped);
+        e.think = Some(EntThink::G_FreeEntity).into();
+        e.nextthink = level_time + 30000;
     }
 
-    ctx.entity_mut(dropped).flags = FL_DROPPED_ITEM;
+    let e = ctx.entity_mut(dropped);
+    e.flags = FL_DROPPED_ITEM;
 
-    if item.item().giType() == IT_WEAPON || item.item().giType() == IT_POWERUP {
-        ctx.entity_mut(dropped).s.eFlags |= EF_DROPPEDWEAPON;
+    if matches!(it.kind, ItemKind::Weapon(_) | ItemKind::Powerup(_)) {
+        e.s.eFlags |= EF_DROPPEDWEAPON;
     }
 
-    vectoangles(velocity, &mut ctx.entity_mut(dropped).s.angles);
-    ctx.entity_mut(dropped).s.angles[PITCH] = 0.0;
+    vectoangles(velocity, &mut e.s.angles);
+    e.s.angles[PITCH] = 0.0;
 
-    if item.item().giTag() == WP_TRIP_MINE as c_int || item.item().giTag() == WP_DET_PACK as c_int {
-        ctx.entity_mut(dropped).s.angles[PITCH] = -90.0;
+    // Raven compares the raw giTag with NO giType check, so the WP_* values pun
+    // against every kind's tag space (e.g. ammo_thermal's AMMO_THERMAL == 7 ==
+    // WP_BOWCASTER skips the roll below) — the bridge accessor keeps that.
+    if it.giTag() == WP_TRIP_MINE as c_int || it.giTag() == WP_DET_PACK as c_int {
+        e.s.angles[PITCH] = -90.0;
     }
 
-    if item.item().giTag() != WP_BOWCASTER as c_int
-        && item.item().giTag() != WP_DET_PACK as c_int
-        && item.item().giTag() != WP_THERMAL as c_int
+    if it.giTag() != WP_BOWCASTER as c_int
+        && it.giTag() != WP_DET_PACK as c_int
+        && it.giTag() != WP_THERMAL as c_int
     {
-        ctx.entity_mut(dropped).s.angles[ROLL] = -90.0;
+        e.s.angles[ROLL] = -90.0;
     }
 
-    ctx.entity_mut(dropped).physicsObject = qtrue;
+    e.physicsObject = qtrue;
 
     trap::LinkEntity(
         ctx.engine,
@@ -3718,20 +3720,18 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
         return;
     }
 
-    {
-        let e = ctx.entity_mut(ent);
-        e.r.mins = [-8.0, -8.0, 0.0];
-        e.r.maxs = [8.0, 8.0, 16.0];
+    let e = ctx.entity_mut(ent);
+    e.r.mins = [-8.0, -8.0, 0.0];
+    e.r.maxs = [8.0, 8.0, 16.0];
 
-        e.s.eType = ET_ITEM as c_int;
-        e.s.modelindex = item.modelindex(); // store item number in modelindex
-        e.s.modelindex2 = 0; // zero indicates this isn't a dropped item
+    e.s.eType = ET_ITEM as c_int;
+    e.s.modelindex = item.modelindex(); // store item number in modelindex
+    e.s.modelindex2 = 0; // zero indicates this isn't a dropped item
 
-        e.r.contents = CONTENTS_TRIGGER;
-        e.touch = Some(EntTouch::Touch_Item).into();
-        // useing an item causes it to respawn
-        e.use_ = Some(EntUse::Use_Item).into();
-    }
+    e.r.contents = CONTENTS_TRIGGER;
+    e.touch = Some(EntTouch::Touch_Item).into();
+    // useing an item causes it to respawn
+    e.use_ = Some(EntUse::Use_Item).into();
 
     if (ctx.entity(ent).spawnflags & ITMSF_SUSPEND) != 0 {
         // suspended
@@ -3778,13 +3778,11 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
     }
 
     // team slaves and targeted items aren't present at start
-    {
-        let e = ctx.entity_mut(ent);
-        if (e.flags & FL_TEAMSLAVE) != 0 || !e.targetname.is_null() {
-            e.s.eFlags |= EF_NODRAW;
-            e.r.contents = 0;
-            return;
-        }
+    let e = ctx.entity_mut(ent);
+    if (e.flags & FL_TEAMSLAVE) != 0 || !e.targetname.is_null() {
+        e.s.eFlags |= EF_NODRAW;
+        e.r.contents = 0;
+        return;
     }
 
     trap::LinkEntity(
@@ -3918,16 +3916,14 @@ pub fn G_SpawnItem(ctx: &mut GameContext, ent: EntityId, item: ItemId) {
     }
 
     let level_time = ctx.world.level.time;
-    {
-        let e = ctx.entity_mut(ent);
-        e.item = Some(item);
-        // some movers spawn on the second frame, so delay item
-        // spawns until the third frame so they can ride trains
-        e.nextthink = level_time + FRAMETIME * 2;
-        e.think = Some(EntThink::FinishSpawningItem).into();
+    let e = ctx.entity_mut(ent);
+    e.item = Some(item);
+    // some movers spawn on the second frame, so delay item
+    // spawns until the third frame so they can ride trains
+    e.nextthink = level_time + FRAMETIME * 2;
+    e.think = Some(EntThink::FinishSpawningItem).into();
 
-        e.physicsBounce = 0.50; // items are bouncy
-    }
+    e.physicsBounce = 0.50; // items are bouncy
 
     if matches!(it.kind, ItemKind::Powerup(_)) {
         G_SoundIndex(c"sound/items/respawn1".as_ptr());
@@ -4097,7 +4093,7 @@ pub fn G_RunItem(ctx: &mut GameContext, ent: EntityId) {
     );
     if (contents & CONTENTS_NODROP) != 0 {
         let item = ctx.entity(ent).item;
-        if item.is_some_and(|it| it.item().giType() == IT_TEAM) {
+        if item.is_some_and(|it| matches!(it.item().kind, ItemKind::Team(_))) {
             Team_FreeEntity(ctx, ent);
         } else {
             G_FreeEntity(ctx, Some(ent));
