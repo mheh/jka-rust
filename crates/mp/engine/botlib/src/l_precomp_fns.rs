@@ -11,11 +11,10 @@
 //!
 //! Source: `oracle/codemp/botlib/l_precomp.cpp`
 //!
-//! PORT-NOTE(DEFINEHASHING): Raven's `DEFINEHASHING` is a compile-time `1`
-//! (`l_precomp.cpp:83`), so every `#if DEFINEHASHING` branch is live and the
-//! `#else`/`#if !DEFINEHASHING` branches are dead — dropped per porting-rules
-//! §C10 (control-flow behavior, not shape). Likewise `BOTLIB` is defined and
-//! `MEQCC`/`BSPC`/`QUAKE`/`QUAKEC`/`SCREWUP`/`NUMBERVALUE`/`DEBUG_EVAL` are not.
+//! `DEFINEHASHING` (`l_precomp.cpp:83`) and `BOTLIB` are compile-time-defined
+//! in this build; `MEQCC`/`BSPC`/`QUAKE`/`QUAKEC`/`SCREWUP`/`NUMBERVALUE`/
+//! `DEBUG_EVAL` are not — the corresponding dead `#if`/`#else` arms are
+//! dropped per §C10.
 
 use core::ffi::{c_char, c_int, c_long, c_ulong};
 
@@ -100,12 +99,6 @@ use mp_qshared::shared::q_string::Q_stricmp;
 /// script file and line.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:117-134`
-///
-/// PORT-NOTE(variadic): Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam
-/// cannot be a non-extern Rust fn `...`. Resolved at integration (mirrors the
-/// `Com_Printf`/`G_Printf` precedent in `mp_game`): the fn now takes an
-/// already-rendered message; the `source_error!` macro below reproduces the
-/// original `vsprintf`-into-buffer step at each call site.
 pub fn SourceError(bot: &mut BotLib, source: *mut source_t, text: *const c_char) {
     unsafe {
         // #ifdef BOTLIB (defined)
@@ -123,8 +116,6 @@ pub fn SourceError(bot: &mut BotLib, source: *mut source_t, text: *const c_char)
 /// script file and line.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:141-158`
-///
-/// PORT-NOTE(variadic): see `SourceError` — same `va_list` seam.
 pub fn SourceWarning(bot: &mut BotLib, source: *mut source_t, text: *const c_char) {
     unsafe {
         // #ifdef BOTLIB (defined)
@@ -138,9 +129,9 @@ pub fn SourceWarning(bot: &mut BotLib, source: *mut source_t, text: *const c_cha
     }
 }
 
-// PORT-NOTE(variadic): reproduces Raven's `vsprintf(text, str, ap)` step at
-// each `SourceError`/`SourceWarning` call site (the C variadic seam resolved
-// above), then forwards the rendered buffer.
+// Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam has no stable-Rust
+// equivalent; this macro reproduces the `vsprintf(text, str, ap)` step at
+// each `SourceError`/`SourceWarning` call site, then forwards the buffer.
 macro_rules! source_error {
     ($bot:expr, $source:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let mut __se_text = [0 as ::core::ffi::c_char; 1024];
@@ -761,10 +752,9 @@ pub fn PC_OperatorPriority(op: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:1730-2177`
 ///
-/// PORT-NOTE(eval-switch): the C `switch(t->type)`/`switch(t->subtype)` with
-/// fallthrough is transcribed with labeled blocks (`'sw`/`'subsw`) so a C
-/// `break` out of a case maps to `break '<label>`; the `AllocValue`/
-/// `AllocOperator`/`FreeValue`/`FreeOperator` file-macros are inlined.
+/// The C `switch(t->type)`/`switch(t->subtype)` fallthrough is transcribed
+/// with labeled blocks (`'sw`/`'subsw`) so a C `break` out of a case maps to
+/// `break '<label>`.
 pub fn PC_EvaluateTokens(
     bot: &mut BotLib,
     source: *mut source_t,
@@ -2524,12 +2514,6 @@ const dollardirectives: [directive_t; 3] = [
 /// Raven `PC_ReadDirective` — dispatch a `#`-directive to its handler.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2554-2586`
-///
-/// PORT-NOTE(directives): `directives[]` is Raven's file-scope dispatch table
-/// (`directive_t {char*, int (*)(source_t*)}`, l_precomp.cpp:2535); per ruling 5
-/// it becomes a const `fn`-item table populated at the same init site. Neither
-/// `directive_t` nor the table is in the type rosetta yet — referenced as
-/// resolved and escalated.
 pub fn PC_ReadDirective(bot: &mut BotLib, source: *mut source_t) -> c_int {
     unsafe {
         let mut token: token_t = core::mem::zeroed();
@@ -2573,9 +2557,6 @@ pub fn PC_ReadDirective(bot: &mut BotLib, source: *mut source_t) -> c_int {
 /// Raven `PC_ReadDollarDirective` — dispatch a `$`-directive to its handler.
 ///
 /// Source: `oracle/codemp/botlib/l_precomp.cpp:2655-2688`
-///
-/// PORT-NOTE(directives): see `PC_ReadDirective` — `dollardirectives[]`
-/// (l_precomp.cpp:2648) is the same const dispatch-table shape, escalated.
 pub fn PC_ReadDollarDirective(bot: &mut BotLib, source: *mut source_t) -> c_int {
     unsafe {
         let mut token: token_t = core::mem::zeroed();

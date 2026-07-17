@@ -16,13 +16,6 @@ use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
 use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_STRING_CHARS};
 use mp_qshared::shared::qboolean;
 
-// PORT-NOTE(engine-host-state): `CollisionWorld`/`Common`/`EngineHost` exist;
-// `RenderModels`/`RmManager`/`Ghoul2System`/`BotLib` do not exist anywhere in
-// the tree yet (grepped, no hits) — this packet shard was generated ahead of
-// those state structs landing (same situation sv_game.rs/sv_ccmds.rs already
-// note). Imported below by their preamble-table decl-home crate where one
-// exists; genuinely missing types are escalated in missing_symbols rather
-// than stubbed (ZERO-PARK), following the sibling files' precedent exactly.
 use mp_engine_ghoul2::api_collision::g2api_set_time;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::common::common::{com_printf, Common};
@@ -76,18 +69,6 @@ use crate::sv_world::SV_ClearWorld;
 use mp_engine_qcommon::cm_load::{CM_ClearMap, CM_LoadMap};
 
 use mp_engine_botlib::BotLib;
-
-// PORT-NOTE(cvar-globals): `sv_maxclients`/`sv_gametype`/`sv_pure`/`sv_*`/
-// `com_dedicated`/`gvm`/`cvar_modifiedFlags` are file-scope `cvar_t*`/scalar
-// globals (server.h:232-262, qcommon.h:481,690,719) with no `EngineCvars`/
-// `Common` home yet (grepped: `Common` has no cvar sub-struct, `Server` has
-// no `gvm`/`sv_maxclients` field). Every reference below is written as the
-// exact bare Raven identifier as a field access off `common`/`sv`
-// (`common.com_dedicated`, `sv.sv_maxclients`, `sv.gvm`,
-// `common.cvar_modifiedFlags`) — matching sv_ccmds.rs/sv_game.rs's existing
-// identical precedent in this same crate — rather than inventing an
-// accessor shim. Escalated in missing_symbols for the finisher to wire once
-// `EngineCvars` lands.
 
 /// Raven `SV_InitSV`.
 ///
@@ -224,12 +205,8 @@ pub fn SV_SetConfigstring(
 /// Source: `oracle/codemp/server/sv_init.cpp:101-114`
 pub fn SV_GetConfigstring(sv: &mut Server, index: c_int, buffer: *mut c_char, bufferSize: c_int) {
     if bufferSize < 1 {
-        // PORT-NOTE(host-unavailable): this fn's resolved signature carries
-        // no `host`/`common` receiver (only `sv`), yet Raven calls
-        // `Com_Error` here — the resolved signature is LAW, so the panic
-        // path can't reach `host.error`. Transcribed as a direct `panic!`
-        // carrying the same message (ruling 1: `Com_Error` is already a
-        // longjmp/panic-shaped unwind).
+        // Resolved signature carries no `host`/`common` receiver, so Raven's
+        // `Com_Error` becomes a direct `panic!` (ruling 1: already unwind-shaped).
         panic!("SV_GetConfigstring: bufferSize == {}", bufferSize);
     }
     if index < 0 || index >= MAX_CONFIGSTRINGS as c_int {
@@ -255,7 +232,7 @@ pub fn SV_GetUserinfo(
     bufferSize: c_int,
 ) {
     if bufferSize < 1 {
-        // PORT-NOTE(host-unavailable): see SV_GetConfigstring above.
+        // Same `Com_Error` -> `panic!` divergence as SV_GetConfigstring above.
         panic!("SV_GetUserinfo: bufferSize == {}", bufferSize);
     }
     unsafe {
@@ -359,12 +336,12 @@ pub fn SV_TouchCGame(view: &mut EngineHostView) {
     }
 }
 
-// PORT-NOTE(com_sprintf-shape): `Com_sprintf(filename, sizeof(filename), "vm/%s.qvm", "cgame")`
-// is transcribed as a plain `format!` helper — `Com_sprintf` itself is not
-// found in the tree at either qshared or engine tier (missing_symbols); the
-// helper keeps the exact literal shape Raven builds.
+/// Raven `Com_sprintf(filename, sizeof(filename), "vm/%s.qvm", "cgame")`
+/// (`SV_TouchCGame`, `sv_init.cpp:402`) — `filename` is a `MAX_QPATH` buffer.
 fn Com_sprintf_vm_qvm(sub: &str) -> String {
-    format!("vm/{}.qvm", sub)
+    // The only caller passes "cgame" (13 bytes), far under the MAX_QPATH
+    // buffer, so the direct format is byte-identical to Raven's sprintf.
+    format!("vm/{sub}.qvm")
 }
 
 /// Raven `SV_AddConfigstring`.

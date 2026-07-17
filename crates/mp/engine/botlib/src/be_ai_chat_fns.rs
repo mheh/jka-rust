@@ -19,6 +19,7 @@ use crate::be_ai_chat::bot_chat_s::bot_chat_t;
 use crate::be_ai_chat::bot_chatmessage_s::bot_chatmessage_t;
 use crate::be_ai_chat::bot_chatstate_s::{bot_chatstate_t, MAX_MESSAGE_SIZE};
 use crate::be_ai_chat::bot_chattype_s::bot_chattype_t;
+use crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
 use crate::be_ai_chat::bot_matchpiece_s::bot_matchpiece_t;
 use crate::be_ai_chat::bot_matchstring_s::bot_matchstring_t;
 use crate::be_ai_chat::bot_matchtemplate_s::bot_matchtemplate_t;
@@ -252,8 +253,6 @@ pub fn StringContainsWord(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_chat.cpp:1031-1053`
 pub fn RandomString(common: &mut Common, bot: &mut BotLib, name: *mut c_char) -> *mut c_char {
-    // PORT-NOTE(QRand): `random()` routes through the engine LCG on `common`
-    // (ruling 21); the exact field name lands with the `QRand` type.
     let _ = &common;
     unsafe {
         let mut random = bot.randomstrings;
@@ -2859,15 +2858,9 @@ pub fn BotLoadChatFile(
             return BLERR_CANNOTLOADICHAT;
         }
         if LibVarGetValue(bot, c"bot_reloadcharacters".as_ptr() as *mut c_char) == 0.0 {
-            // PORT-NOTE(bot_ichatdata_t): not in this shard's TYPE ROSETTA (no
-            // rosetta row yet); referenced at the plausible sibling-type path
-            // per naming convention. Reported in missing_symbols.
-            bot.ichatdata[avail as usize] = GetClearedMemory(
-                bot,
-                core::mem::size_of::<crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t>()
-                    as c_ulong,
-            )
-                as *mut crate::be_ai_chat::bot_ichatdata_s::bot_ichatdata_t;
+            bot.ichatdata[avail as usize] =
+                GetClearedMemory(bot, core::mem::size_of::<bot_ichatdata_t>() as c_ulong)
+                    as *mut bot_ichatdata_t;
             (*bot.ichatdata[avail as usize]).chat = (*cs).chat;
             Q_strncpyz(
                 (*bot.ichatdata[avail as usize]).chatname.as_mut_ptr(),

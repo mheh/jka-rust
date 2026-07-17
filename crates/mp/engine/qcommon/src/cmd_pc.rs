@@ -92,8 +92,6 @@ pub fn Cmd_RemoveCommand(common: &mut Common, cmd_name: *const c_char) {
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:75-81`
 pub fn Cmd_CommandCompletion(common: &mut Common, callback: extern "C" fn(*const c_char)) {
-    // PORT-NOTE(cmd_functions): `common.cmd_functions` — the `cmd_function_t*`
-    // list head — is not yet a `Common` field (missing symbol, see above).
     let mut cmd: *mut cmd_function_t = common.cmd_functions;
     while !cmd.is_null() {
         unsafe {
@@ -114,7 +112,6 @@ pub fn Cmd_List_f(common: &mut Common) {
     };
 
     let mut i: c_int = 0;
-    // PORT-NOTE(cmd_functions): see `Cmd_CommandCompletion` above.
     let mut cmd: *mut cmd_function_t = common.cmd_functions;
     while !cmd.is_null() {
         unsafe {
@@ -123,12 +120,8 @@ pub fn Cmd_List_f(common: &mut Common) {
                 continue;
             }
 
-            // PORT-NOTE(Com_Printf): the qcommon-side `Com_Printf` (routes
-            // through the engine print sink / console) has no landed symbol
-            // in this crate yet (escalated as missing, resolution packet
-            // `qcommon__1592_CM_DeleteCachedMap.md`); narrowed to a single
-            // `*const c_char` (no safe C-variadic fn defs) — pre-format the
-            // name here, matching the `cmd_common.rs` `Cmd_Echo_f` precedent.
+            // No safe C-variadic fn defs — pre-format the name here, matching
+            // the `cmd_common.rs` `Cmd_Echo_f` precedent.
             let name = core::ffi::CStr::from_ptr((*cmd).name).to_string_lossy();
             com_printf(common, &format!("{}\n", name));
             i += 1;
@@ -149,9 +142,8 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     }
 
     // check registered command functions
-    // PORT-NOTE(cmd_functions): see `Cmd_CommandCompletion` above; the
-    // `prev`/`cmd` double-pointer walk is transcribed with raw pointers to
-    // match Raven's link-rearrangement exactly.
+    // The `prev`/`cmd` double-pointer walk is transcribed with raw pointers
+    // to match Raven's link-rearrangement exactly.
     unsafe {
         let mut prev: *mut *mut cmd_function_t = &mut view.common.cmd_functions as *mut _;
         while !(*prev).is_null() {
@@ -182,9 +174,6 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     }
 
     // check client game commands
-    // PORT-NOTE(com_cl_running/com_sv_running): `Common`'s `cvar_t*` handle
-    // fields aren't landed yet (the cvar sub-struct TODO in `common/common.rs`);
-    // referenced verbatim as missing symbols.
     let cl_game_command = view
         .common
         .hooks

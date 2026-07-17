@@ -15,11 +15,6 @@
 //! `crates/mp/engine/botlib/src/be_aas_cluster.rs`, but `be_aas_cluster`
 //! already exists as a directory module (`be_aas_cluster/mod.rs`,
 //! constants-only) — `_fns` escape per `_PREAMBLE.md`'s destination rule.
-//!
-//! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers
-//! (`aasworld.*`); bodies deref explicitly inside `unsafe` per
-//! porting-rules §D11, matching the sibling `be_aas_reach_fns.rs`/
-//! `be_aas_route_fns.rs` convention.
 
 use core::ffi::c_char;
 use core::ffi::c_int;
@@ -973,9 +968,8 @@ pub fn AAS_InitClustering(bot: &mut BotLib) {
         }
         //if there are clusters
         if bot.aasworld.numclusters >= 1 {
-            // PORT-NOTE(BSPC): Raven's `#ifndef BSPC` early-out reads the
-            // "forceclustering"/"forcereachability" libvars; BSPC is not
-            // built here, so the check always applies.
+            // Raven's `#ifndef BSPC` early-out reads the "forceclustering"/
+            // "forcereachability" libvars; BSPC is not built here, so it always applies.
             let force_clustering =
                 LibVarGetValue(bot, c"forceclustering".as_ptr() as *mut c_char) as c_int;
             let force_reachability =

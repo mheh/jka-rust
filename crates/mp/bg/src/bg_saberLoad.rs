@@ -6,12 +6,7 @@
 //! porting-rules §20 ("drop dead surface").
 //!
 //! Several fns reach `SaberParms`/`bgSaberParseTBuffer` through `BgState`
-//! and the engine surface through `BgTraps`. Some
-//! `SFL2_` saberFlags bitflag consts (e.g. `SFL2_NO_MANUAL_DEACTIVATE`) and the
-//! `SaberTable`/`SaberMoveTable`/`FPTable`/`animTable` lookup statics are not
-//! yet ported into the Rust tree; those sites reference the Raven names
-//! directly per the pass-3 zero-park policy and are reported as missing
-//! symbols rather than parked.
+//! and the engine surface through `BgTraps`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -337,9 +332,6 @@ pub static SaberMoveTable: [stringID_table_t; 60] = [
     },
 ];
 
-// PORT-NOTE(missing-symbol): `MAX_ANIMATIONS` is an `animNumber_t` enum
-// terminator (anims.h), not yet exposed as a bare const; referenced through
-// the enum per zero-park policy.
 use crate::public::anim_number::animNumber_t;
 use mp_qshared::shared::limits::MAX_CLIENTS_I32;
 
@@ -750,9 +742,6 @@ pub fn WP_SaberStyleValidForSaber(
     }
 }
 
-// PORT-NOTE(missing-const): `SFL2_NO_MANUAL_DEACTIVATE`/
-// `SFL2_NO_MANUAL_DEACTIVATE2` are not yet ported (bare bitflag consts);
-// referenced by name per zero-park policy, reported as missing symbols.
 /// Raven `WP_SaberCanTurnOffSomeBlades`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:466-486`
@@ -920,12 +909,6 @@ const DEFAULT_SABER: &std::ffi::CStr = c"Kyle";
 /// Raven `WP_SaberParseParms`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:617-2572`
-// PORT-NOTE(missing-symbols): `SFL_*`/`SFL2_*` bitflag consts beyond
-// `SFL_TWO_HANDED` and the `SaberTable`/`SaberMoveTable`/`FPTable`/
-// `animTable` lookup statics are not yet ported; referenced by name per
-// zero-park policy (reported as missing symbols). `trap_R_RegisterSkin` is
-// not in `BgTraps`; called here as `traps.r_register_skin(...)` matching the
-// trait's naming convention, also reported missing.
 pub fn WP_SaberParseParms(
     SaberName: *const c_char,
     saber: *mut saberInfo_t,
@@ -1071,9 +1054,6 @@ pub fn WP_SaberParseParms(
 
             if qstricmp_eq(tok, c"customSkin") {
                 let value = parse_string_field!();
-                // PORT-NOTE(missing-trait-method): `trap_R_RegisterSkin` is
-                // not in `BgTraps`; called as `r_register_skin` matching the
-                // trait's naming convention (reported as missing symbol).
                 s.skin = traps.r_register_skin(value);
                 continue;
             }
@@ -2364,9 +2344,8 @@ pub fn WP_SetSaber(
 /// Raven `WP_SaberSetColor`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:2727-2734`
-// PORT-NOTE(rng-cascade): gained `bg: &mut BgState` so its `TranslateSaberColor`
-// call reaches the shared `Rng` (the `"random"` color branch). This fn has no
-// callers in-tree, so no call site propagates the added param.
+// `bg: &mut BgState` threads the shared `Rng` into `TranslateSaberColor`'s
+// `"random"` color branch; no in-tree callers yet.
 pub fn WP_SaberSetColor(
     sabers: *mut saberInfo_t,
     saberNum: c_int,
@@ -2387,11 +2366,9 @@ pub fn WP_SaberSetColor(
 /// Raven `WP_SaberLoadParms`.
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:2738-2790`
-// PORT-NOTE(vec-as-fixed-buffer): Raven's `SaberParms`/`bgSaberParseTBuffer`
-// are fixed `char[MAX_SABER_DATA_SIZE]` statics; `BgState` owns them as
-// growable `Vec<u8>`. Pre-sized here to `MAX_SABER_DATA_SIZE`
-// so the pointer-arithmetic parse below (raw `*mut c_char` into the backing
-// storage) stays faithful to Raven's fixed-buffer indexing.
+// Raven's fixed `char[MAX_SABER_DATA_SIZE]` statics are `Vec<u8>` fields on
+// `BgState`, pre-sized here so the raw pointer arithmetic below stays
+// faithful to Raven's fixed-buffer indexing.
 pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
     unsafe {
         if bg.SaberParms.len() < MAX_SABER_DATA_SIZE {

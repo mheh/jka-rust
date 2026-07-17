@@ -3,11 +3,7 @@
 //!
 //! Source: `oracle/codemp/server/NPCNav/gameCallbacks.cpp`
 //!
-//! PORT-NOTE(duplicate-reconciliation): this file and
-//! `crate::npcnav::callbacks` both transcribed the same oracle TU. The
-//! `npcnav::callbacks` copy is the canonical one — it calls through the
-//! settled `EngineHost::vm_call` seam (ruling 24/33b, `VmSlot::Gvm`) instead
-//! of this file's stale guessed `mp_engine_qcommon::vm::VM_Call` free
-//! function, which was never landed. Re-exporting rather than keeping two
-//! divergent bodies for the same Raven functions.
+//! This file and `crate::npcnav::callbacks` both transcribed the same oracle
+//! TU; `npcnav::callbacks` is canonical (settled `EngineHost::vm_call` seam,
+//! ruling 24/33b), so this file re-exports it rather than keeping two bodies.
 pub use crate::npcnav::callbacks::*;

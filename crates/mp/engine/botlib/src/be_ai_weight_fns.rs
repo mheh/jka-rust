@@ -3,11 +3,6 @@
 //! MP botlib `be_ai_weight.cpp` — fuzzy-logic inventory weight configs.
 //!
 //! Source: `oracle/codemp/botlib/be_ai_weight.cpp`
-//!
-//! PORT-NOTE(fns-collision): destination is `be_ai_weight_fns.rs`, not
-//! `be_ai_weight.rs` — the oracle stem collides with the existing
-//! `be_ai_weight/` type directory; DESTINATION line from the packet already
-//! reflects the `_fns` escape.
 
 use core::ffi::{c_char, c_int, c_ulong};
 
@@ -98,9 +93,8 @@ pub fn EvolveFuzzySeperator_r(common: &mut Common, fs: *mut fuzzyseperator_t) {
             EvolveFuzzySeperator_r(common, (*fs).child);
         } else if (*fs).r#type == WT_BALANCE {
             // every once in a while an evolution leap occurs, mutation
-            // PORT-NOTE(QRand): `random()`/`crandom()` route through the
-            // engine LCG on `common` (ruling 21); `random()` = flrand(0,1),
-            // `crandom()` = flrand(-1,1).
+            // `random()`/`crandom()` route through the engine LCG on `common`:
+            // `random()` = flrand(0,1), `crandom()` = flrand(-1,1).
             if common.qrand.flrand(0.0, 1.0) < 0.01 {
                 (*fs).weight +=
                     common.qrand.flrand(-1.0, 1.0) * ((*fs).maxweight - (*fs).minweight);
@@ -257,8 +251,7 @@ pub fn FuzzyWeightUndecided_r(
             if !(*fs).child.is_null() {
                 return FuzzyWeightUndecided_r(common, inventory, (*fs).child);
             } else {
-                // PORT-NOTE(QRand): `random()` routes through the engine LCG
-                // on `common` (ruling 21) — `flrand(0,1)`.
+                // `random()` routes through the engine LCG on `common` — `flrand(0,1)`.
                 return (*fs).minweight
                     + common.qrand.flrand(0.0, 1.0) * ((*fs).maxweight - (*fs).minweight);
             }
@@ -713,9 +706,8 @@ pub fn ReadFuzzySeperators_r(bot: &mut BotLib, source: *mut source_t) -> *mut fu
 ///
 /// Source: `oracle/codemp/botlib/be_ai_weight.cpp:262-420`
 ///
-/// PORT-NOTE(DEBUG): unresolved const, not defined by the oracle build (no
-/// rosetta row) — the `#ifdef DEBUG` timing-print arms are dropped per
-/// porting-rules §C10.
+/// `DEBUG` is not defined in this build; the `#ifdef DEBUG` timing-print arms
+/// are dropped per §C10.
 pub fn ReadWeightConfig(bot: &mut BotLib, filename: *mut c_char) -> *mut weightconfig_t {
     unsafe {
         let mut newindent;

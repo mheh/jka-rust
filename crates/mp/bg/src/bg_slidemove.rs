@@ -640,9 +640,6 @@ impl PmoveContext<'_> {
                     .client_check_impact_bbrush((*self.pm_entSelf).s.number, otherEntityNum);
             }
 
-            // PORT-NOTE(bg-tier-gap): `traceEnt->r.contents` is a `gentity_t`-only
-            // field not on the bg-visible `bgEntity_t` overlay; referenced
-            // literally and reported as a missing symbol.
             let traceEnt = self.PM_BGEntForNum(otherEntityNum);
             if traceEnt.is_null() || ((*traceEnt).r.contents & (*self.pm).tracemask) == 0 {
                 // it's dead or not in my way anymore, don't clip against it

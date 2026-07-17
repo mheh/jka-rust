@@ -15,12 +15,6 @@
 //! core the reachability/jump code predicts through).
 //!
 //! Source: `oracle/codemp/botlib/be_aas_move.cpp`
-//!
-//! PORT-NOTE(macros): Raven's vector `#define`s (`DotProduct`/`VectorCopy`/
-//! `VectorAdd`/`VectorSubtract`/`VectorScale`/`VectorMA`) are ported as local
-//! private helpers below (`be_aas_sample_fns.rs` convention); `VectorClear`/
-//! `VectorCompare`/`VectorNormalize`/`VectorLength`/`AngleVectors` are the
-//! genuine q_math functions already ported in `mp_game::q_math`.
 
 use core::ffi::{c_char, c_int};
 
@@ -56,9 +50,9 @@ use crate::aasfile::face_flags::FACE_LADDER;
 use crate::aasfile::presence_type::{PRESENCE_CROUCH, PRESENCE_NORMAL};
 use crate::BotLib;
 
-// PORT-NOTE(macros): Raven's `DotProduct`/`VectorCopy`/`VectorAdd`/
-// `VectorSubtract`/`VectorScale`/`VectorMA` are `#define`s; ported as local
-// private helpers (matches `be_aas_sample_fns.rs`'s `DotProduct` precedent).
+// Raven's vector `#define`s are ported as local private helpers below;
+// `VectorClear`/`VectorCompare`/`VectorNormalize`/`VectorLength`/`AngleVectors`
+// are the genuine q_math functions, imported from `mp_game::q_math`.
 fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
@@ -100,12 +94,8 @@ use mp_engine_qcommon::common_fns::Com_Memset;
 /// Raven `AAS_SetMovedir`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_move.cpp:218-232`
-// PORT-NOTE(consts): the packet resolves `MOVEDIR_DOWN`/`MOVEDIR_UP`/
-// `VEC_DOWN`/`VEC_UP` to `crates/mp/game/src/g_utils.rs`, but there they are
-// private consts local to that file's own `AAS_SetMovedir` fn body (not
-// module-level `pub const`s) — not actually importable. Reported in
-// shape_mismatches; values transcribed inline from the same oracle cite in
-// the interim.
+// `MOVEDIR_DOWN`/`MOVEDIR_UP`/`VEC_DOWN`/`VEC_UP` are private consts local to
+// `g_utils.rs`'s own `AAS_SetMovedir`, not importable; redefined here inline.
 pub fn AAS_SetMovedir(bot: &mut BotLib, angles: vec3_t, movedir: *mut vec3_t) {
     const VEC_UP: vec3_t = [0.0, -1.0, 0.0];
     const MOVEDIR_UP: vec3_t = [0.0, 0.0, 1.0];
@@ -539,11 +529,9 @@ pub fn AAS_InitSettings(bot: &mut BotLib) {
     }
 }
 
-// PORT-NOTE(cstr-helper): `LibVarValue` takes `char *` in Raven for both the
-// name and default-value string literals; this local shim builds the
-// null-terminated buffers and calls `LibVarValue` so `AAS_InitSettings`'s
-// 36 call sites stay a 1:1 transcription of the Raven source rather than
-// manual `CString` plumbing at every line.
+// `LibVarValue` takes `char *` in Raven for both the name and default-value
+// string literals; this shim builds the null-terminated buffers so
+// `AAS_InitSettings`'s 36 call sites stay a 1:1 transcription.
 fn LibVarValue_str(bot: &mut BotLib, name: &str, default: &str) -> f32 {
     let name_c = std::ffi::CString::new(name).unwrap();
     let default_c = std::ffi::CString::new(default).unwrap();

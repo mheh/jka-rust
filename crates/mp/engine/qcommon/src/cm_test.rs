@@ -3,15 +3,6 @@
 //! and area-portal flood-fill state.
 //!
 //! Source: `oracle/codemp/qcommon/cm_test.cpp`
-//!
-//! PORT-NOTE(vector-math): `DotProduct`/`VectorCopy`/`VectorSubtract` route
-//! through `mp_qshared::shared::q_math`'s reachable `_DotProduct`/
-//! `_VectorCopy`/`_VectorSubtract` (rosetta vec3/q_math mapping).
-//! `AngleVectors`/`BoxOnPlaneSide` still have no reachable home in this
-//! crate's dependency graph (their only Rust port lives in `mp_game`, a tier
-//! above the engine) — forward-declared below; escalated as missing symbols
-//! for the finisher to wire to a q_math home reachable from
-//! `mp_engine_qcommon`.
 
 use core::ffi::c_int;
 
@@ -32,9 +23,6 @@ use crate::collision_world::CollisionWorld;
 use crate::common_fns::Com_Memset;
 use mp_qshared::shared::q_math::{_DotProduct, _VectorCopy, _VectorSubtract};
 
-// Real q_shared math helper imported (sweep: extern forward-declares
-// eliminated). `BoxOnPlaneSide` is not yet in qshared — referenced at its
-// canonical q_math home; reported.
 use mp_qshared::shared::q_math::{AngleVectors, BoxOnPlaneSide};
 
 /// Raven `byte`.
@@ -286,8 +274,8 @@ pub fn CM_AreasConnected(cm: &mut CollisionWorld, area1: c_int, area2: c_int) ->
 pub fn CM_WriteAreaBits(cm: &mut CollisionWorld, buffer: *mut byte, area: c_int) -> c_int {
     let bytes = (cm.cmg.numAreas + 7) >> 3;
 
-    // PORT-NOTE(bspc): `#ifndef BSPC` retail arm kept; `BSPC` has no rosetta row
-    // (bsp-compiler-only build, not part of the engine port surface).
+    // `#ifndef BSPC` retail arm kept; the BSPC (bsp-compiler-only) arm is
+    // dropped — out of the engine port surface.
     if unsafe { (*cm.cm_noAreas).integer } != 0 || area == -1 {
         // for debugging, send everything
         Com_Memset(buffer as *mut (), 255, bytes as usize);

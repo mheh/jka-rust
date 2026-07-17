@@ -33,10 +33,6 @@ use crate::z_memman_pc::{Z_Free, Z_Malloc};
 /// Raven: save the stack to allow recursive VM entry.
 /// Source: `oracle/codemp/qcommon/vm_x86.cpp:159-165`
 pub extern "C" fn callAsmCall(common: &mut Common) {
-    // PORT-NOTE(vm-x86-statics): `callOpStack`/`callProgramStack`/
-    // `callSyscallNum` are vm_x86.cpp file-scope globals/statics (ruling 3,
-    // genuine cross-frame state) with no home field on `Common` yet; referenced
-    // by their obvious snake_case names and reported as missing symbols.
     // DoSyscall dereferences the real `currentVM` global (`common.currentVM`);
     // `savedVM` (`common.current_vm`) is only the save/restore guard.
     unsafe {
@@ -66,10 +62,10 @@ pub extern "C" fn callAsmCall(common: &mut Common) {
 // fn does not hit.
 #[allow(named_asm_labels)]
 pub extern "C" fn AsmCall(common: &mut Common) {
-    // PORT-NOTE(vm-x86-asm): GNU inline asm syntax differs from Rust's; the
-    // operand/clobber list is transcribed 1:1 from the oracle block. `callMask`
-    // is an oracle asm-local symbol with no rosetta row — reported as a missing
-    // symbol.
+    // GNU inline asm syntax differs from Rust's; the operand/clobber list is
+    // transcribed 1:1 from the oracle block.
+    //TODO: Port callMask
+    // Source: oracle/codemp/qcommon/vm_x86.cpp:70,1084
     unsafe {
         core::arch::asm!(
             "doAsmCall:",

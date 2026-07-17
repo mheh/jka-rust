@@ -54,8 +54,8 @@ impl QSharedScratch {
 
 /// Raven `COM_BeginParseSession`.
 ///
-/// PORT-NOTE(variadic-c-abi): Raven calls Com_sprintf with "%s" format; since Com_sprintf
-/// cannot accept varargs in Rust, this implementation directly copies the name via Q_strncpyz.
+/// Raven calls `Com_sprintf` with a `"%s"` format; since Rust has no varargs,
+/// this copies the name directly via `Q_strncpyz` (same result).
 /// Source: `oracle/codemp/game/q_shared.c:284-288`
 pub fn COM_BeginParseSession(qs: &mut QSharedScratch, name: *const c_char) {
     // (Redundant `unsafe` wrapper dropped vs. the game copy — `Q_strncpyz` is a

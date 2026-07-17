@@ -250,11 +250,6 @@ pub fn BG_FileExists(fileName: *const c_char, bg: &BgState, traps: &dyn BgTraps)
 /// whatever the hell you want.
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:358-423`
-// PORT-NOTE(callbacks-cascade): the `F_LSTRING`/`F_PARM*` branches forward to the
-// game-tier `G_NewString`/`Q3_SetParm` through the `GameCallbacks` seam
-// (`new_string`/`q3_set_parm`), keeping bg free of a direct `crate::g_*` reach;
-// both call sites (`G_SpawnGEntityFromSpawnVars`, `SP_worldspawn`) build the
-// handle from their `ctx`.
 pub fn BG_ParseField(
     callbacks: &mut dyn GameCallbacks,
     l_fields: *mut BG_field_t,
@@ -1791,9 +1786,8 @@ pub fn BG_ModelCache(
     bg: &BgState,
     traps: &dyn BgTraps,
 ) -> c_int {
-    // PORT-NOTE(qagame-cfg): jampgame is the `QAGAME` build, so this ports the
-    // `#ifdef QAGAME` branch (the `#else` path's `trap_R_RegisterModel` has no
-    // game syscall). Precache the ghoul2 model, then discard it; return 0.
+    // jampgame is the `QAGAME` build, so this ports the `#ifdef QAGAME` branch;
+    // the `#else` path's `trap_R_RegisterModel` has no game syscall (dropped, §20).
     unsafe {
         let mut g2: *mut c_void = core::ptr::null_mut();
 

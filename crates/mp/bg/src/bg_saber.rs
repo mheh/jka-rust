@@ -487,12 +487,9 @@ impl PmoveContext<'_> {
             {
                 retmove = newmove;
             } else {
-                // PORT-NOTE(saber-move-name-coverage): the full "transitioning
-                // from an attack/return/bounce/parry/reflection/knockaway"
-                // curmove set from the oracle switch; transcribed as an
-                // inclusive numeric range check over the same LS_* identifiers
-                // the oracle lists (attacks..knockaways are numerically
-                // contiguous in bg_public.h's saberMoveName_t enum).
+                // Oracle's attack/return/bounce/parry/reflection/knockaway `switch`
+                // case set is transcribed as range checks (contiguous in
+                // `saberMoveName_t`, bg_public.h).
                 if (curmove >= LS_A_TL2BR && curmove <= LS_A_T2B)
                     || (curmove >= LS_D1_BR && curmove <= LS_D1_B_)
                     || (curmove >= LS_R_TL2BR && curmove <= LS_R_T2B)
@@ -1581,9 +1578,8 @@ impl PmoveContext<'_> {
                         overrideJumpLeftAttackMove = LS_NONE;
                     }
                 } else if !saber2.is_null() && (*saber2).jumpAtkLeftMove != LS_INVALID {
-                    // PORT-NOTE(faithful-oracle-bug): the oracle reads `saber1`
-                    // here (bg_saber.c:2297), not `saber2`, in this branch — a
-                    // likely upstream copy-paste bug. Preserved faithfully.
+                    // Raven bug: reads `saber1` here (bg_saber.c:2297), not `saber2`
+                    // as the branch condition tests. Preserved.
                     overrideJumpLeftAttackMove = (*saber1).jumpAtkLeftMove;
                 }
 
@@ -1956,14 +1952,9 @@ impl PmoveContext<'_> {
     /// Raven `PM_WeaponLightsaber`.
     ///
     /// Raven: the main per-frame saber weapon state machine (965 LOC).
-    /// PORT-NOTE(scope): transcribed as faithfully as the packet's resolved
-    /// call surface allows; several referenced helpers (`PM_GetSaberStance`,
-    /// `PM_BeginWeaponChange`, `PM_FinishWeaponChange`, `PM_SaberBounceForAttack`,
-    /// `BG_HasYsalamiri`, `BG_CanUseFPNow`, weaponData) are called exactly as
-    /// their resolved (possibly still-parked) free-fn signatures — not this
-    /// packet's job to fix. The single `goto weapChecks;` is transcribed as a
-    /// `checkOnlyWeap` early-return split (both goto sites jump to the same
-    /// point the fallthrough path reaches next).
+    /// The single `goto weapChecks;` is transcribed as a `checkOnlyWeap`
+    /// early-return split (both goto sites jump to the same point the
+    /// fallthrough path reaches next).
     /// Source: `oracle/codemp/game/bg_saber.c:2836-3800`
     pub fn PM_WeaponLightsaber(&mut self) {
         unsafe {

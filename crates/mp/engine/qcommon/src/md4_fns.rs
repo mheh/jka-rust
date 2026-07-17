@@ -12,11 +12,6 @@ use crate::md4::md4_cpp_consts::{S11, S12, S13, S14, S21, S22, S23, S24, S31, S3
 use crate::md4::md4_ctx::MD4_CTX;
 use crate::md4::uint4::UINT4;
 
-// PORT-NOTE(POINTER): Raven's `POINTER` is `typedef unsigned char *POINTER` — a generic
-// pointer-cast alias used only at `Com_Memset`/`Com_Memcpy` call sites; those callees
-// already resolve to `*mut ()`/`*const ()`, so `POINTER` casts are absorbed by the `as`
-// casts at each call site and no standalone item is needed.
-
 /// Raven `PADDING` — MD4 padding buffer (first byte 0x80, rest zero).
 ///
 /// Source: `oracle/codemp/qcommon/md4.cpp:78-80`

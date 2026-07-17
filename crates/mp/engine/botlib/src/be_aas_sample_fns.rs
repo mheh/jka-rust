@@ -33,10 +33,9 @@ use crate::be_aas_def::aas_link_s::aas_link_t;
 use crate::be_aas_sample::be_aas_sample_cpp_consts::{BBOX_NORMAL_EPSILON, TRACEPLANE_EPSILON};
 use crate::BotLib;
 
-// PORT-NOTE(macros): Raven's `DotProduct`/`VectorCopy`/`VectorSubtract`/
-// `VectorClear`/`VectorMA`/`AAS_OrthogonalToVectors` are `#define`s; they
-// expand inline here, faithful to the preprocessor (matching the
-// `be_aas_reach_fns.rs` convention).
+// Raven's `DotProduct`/`VectorCopy`/`VectorSubtract`/`VectorClear`/`VectorMA`/
+// `AAS_OrthogonalToVectors` are `#define`s; they expand inline here, faithful
+// to the preprocessor.
 #[inline]
 fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]

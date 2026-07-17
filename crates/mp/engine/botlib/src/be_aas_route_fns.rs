@@ -2109,8 +2109,6 @@ pub fn AAS_RandomGoalArea(
         }
         // `random()` (libc, [0,1) via ruling 21's rand family): the engine LCG
         // on `common`.
-        // PORT-NOTE(qrand-field): the `QRand` field name on `Common` is
-        // pinned when the type lands (ruling 21); `common.qrand` stands in.
         let mut n = (bot.aasworld.numareas as f32 * common.qrand.flrand(0.0, 1.0)) as c_int;
         for _ in 0..bot.aasworld.numareas {
             if n <= 0 {

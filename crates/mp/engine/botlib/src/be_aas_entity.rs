@@ -11,11 +11,6 @@
 //!
 //! Ported per the engine C-track packets (`botlib__0422`..`botlib__1466`).
 //! Source: `oracle/codemp/botlib/be_aas_entity.cpp`.
-//!
-//! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers
-//! (`aasworld.*`); bodies deref explicitly inside `unsafe` per
-//! porting-rules §D11, matching the sibling `be_aas_cluster_fns.rs`/
-//! `be_aas_sample_fns.rs`/`be_aas_reach_fns.rs` convention.
 
 use core::ffi::c_char;
 use core::ffi::c_int;

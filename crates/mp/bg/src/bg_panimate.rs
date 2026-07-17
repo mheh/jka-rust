@@ -4,13 +4,11 @@
 //! Filled by the jampgame mega-pass.
 //!
 //! Pure anim-number/`playerState_t`-only predicates are ported below.
-//! Functions that touch this file's own file-static globals
-//! (`bgAllAnims`, `bgNumAllAnims`, `BGPAFtextLoaded`, `bgHumanoidAnimations`)
-//! with no world handle in the staged skeleton signature are parked with
-//! `PORT-NOTE(own-file-static-no-world-handle)`, matching the
-//! `pmove-working-state` / `raw-ptr-skeleton-no-world-handle` precedent
-//! already established in `bg_saber.rs` / `g_combat.rs` for the file-static
-//! `pmove_t *pm` and the bare `g_entities` global respectively.
+//! Functions that touch this file's own file-static globals (`bgAllAnims`,
+//! `bgNumAllAnims`, `BGPAFtextLoaded`, `bgHumanoidAnimations`) reach them
+//! through `self.bg`/`bg_state` (`BgState` fields), matching the
+//! `pmove_t *pm` / `g_entities` state-threading precedent in `bg_saber.rs` /
+//! `g_combat.rs`.
 //!
 //! Dropped dead surface (porting-rules §20): the animation-*event* parser —
 //! `CheckAnimFrameForEventType`, `ParseAnimationEvtBlock`,

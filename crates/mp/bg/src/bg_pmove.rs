@@ -220,10 +220,8 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_pitch_roll_for_slope`.
     /// Source: `oracle/codemp/game/bg_pmove.c:346-439`
-    // PORT-NOTE: `storeAngles` is a `vec3_t` out-param in C; ported as `&mut vec3_t`.
-    // The Raven `if (storeAngles)` NULL test is always-true here (only live caller
-    // PM_SetVehicleAngles passes a non-NULL buffer), so the else (viewangles) branch
-    // is unreachable and not ported. Early returns leave the buffer untouched, matching C.
+    // `storeAngles` out-param ported as `&mut vec3_t`; Raven's `if (storeAngles)`
+    // NULL test is always-true here, so the viewangles else-branch is dead and dropped.
     pub fn PM_pitch_roll_for_slope(
         &mut self,
         forwhom: *mut bgEntity_t,
@@ -1159,9 +1157,8 @@ impl PmoveContext<'_> {
                         }
                     }
                     if (*ps).torsoAnim == BOTH_MEDITATE as c_int {
-                        // PORT-NOTE(meditate-timer-quirk): Raven sets `legsTimer`
-                        // (not `torsoTimer`) inside this `torsoTimer < 100` guard;
-                        // preserved faithfully. Source: bg_pmove.c:10349-10352.
+                        // Raven bug: sets `legsTimer` (not `torsoTimer`) inside this
+                        // `torsoTimer < 100` guard; preserved. Source: bg_pmove.c:10349-10352.
                         if (*ps).torsoTimer < 100 {
                             (*ps).legsTimer = 100;
                         }
@@ -1766,10 +1763,8 @@ impl PmoveContext<'_> {
             if (*pm).cmd.forcesel as c_int != -1
                 && (*ps).fd.forcePowersKnown & 1i32.wrapping_shl((*pm).cmd.forcesel as u32) != 0
             {
-                // PORT-NOTE(byte-select-shift): Raven's `cmd.forcesel`/`invensel` are
-                // `byte`, so `!= -1` is always true and `1 << sel` is x86 shift-masked
-                // when `sel` is the 255 "none" sentinel; `wrapping_shl` reproduces that
-                // masked shift faithfully (porting-rules §19).
+                // `cmd.forcesel` is `byte`, so `1 << sel` is x86 shift-masked at the 255
+                // "none" sentinel; `wrapping_shl` reproduces that masked shift (§19).
                 (*ps).fd.forcePowerSelected = (*pm).cmd.forcesel as c_int;
             }
             if (*pm).cmd.invensel as c_int != -1
@@ -4808,11 +4803,10 @@ impl PmoveContext<'_> {
                     // S5-2: the boardable gate (inuse/client/eType/NPC_class/
                     // m_iVehicleNum/m_pVehicle type) and the team gate (alliedTeam/
                     // sess.sessionTeam) are game-side reads folded into one upcall.
-                    // gametype stays a bg-side read (`pm->gametype`) passed in, per
-                    // PORT-NOTE(g_gametype) (same value as g_gametype.integer). The
-                    // bg-side gate (BG_SaberInSpecial/forceHandExtend/weaponTime)
-                    // stays here; its pure reads now follow the game gate with no
-                    // observable change.
+                    // gametype stays a bg-side read (`pm->gametype`, same value as
+                    // `g_gametype.integer`) passed in. The bg-side gate
+                    // (BG_SaberInSpecial/forceHandExtend/weaponTime) stays here; its
+                    // pure reads now follow the game gate with no observable change.
                     let trEntNum = trace.entityNum as c_int;
                     if self.callbacks.landed_vehicle_boardable(
                         trEntNum,

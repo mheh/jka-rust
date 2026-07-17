@@ -10,18 +10,6 @@
 //! with the `l_script/` type directory, so this lands as `l_script_fns.rs`.
 //!
 //! Source: `oracle/codemp/botlib/l_script.cpp`
-//!
-//! PORT-NOTE(BotLib): `BotLib` is the synthesized botlib aggregate (per
-//! `_PREAMBLE.md`'s state-receiver table) — not yet defined anywhere in the
-//! tree, matching every sibling `*_fns.rs` file in this crate that already
-//! references `bot: &mut BotLib` / `bot.botimport` / `bot.basefolder` ahead
-//! of its landing. Reported in missing_symbols.
-//!
-//! PORT-NOTE(variadic): `ScriptError`/`ScriptWarning` use Raven's
-//! `va_start`/`vsprintf`/`va_end` C-variadic seam; a plain Rust fn cannot read
-//! `...`, so the `va_list` plumbing is resolved at integration (same seam as
-//! `SourceError`/`SourceWarning` in `l_precomp_fns.rs`). The body is
-//! transcribed line-for-line against that seam.
 
 use core::ffi::{c_char, c_int, c_long, c_ulong, c_void};
 
@@ -74,12 +62,6 @@ pub fn PunctuationFromNum(script: *mut script_t, num: c_int) -> *mut c_char {
 /// script file and line.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:216-235`
-///
-/// PORT-NOTE(variadic): Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam
-/// cannot be a non-extern Rust fn `...`. Resolved at integration (same seam as
-/// `SourceError`/`SourceWarning` in `l_precomp_fns.rs`): the fn now takes an
-/// already-rendered message; the `script_error!` macro below reproduces the
-/// original `vsprintf`-into-buffer step at each call site.
 pub fn ScriptError(bot: &mut BotLib, script: *mut script_t, text: *const c_char) {
     unsafe {
         if (*script).flags & SCFL_NOERRORS != 0 {
@@ -101,8 +83,6 @@ pub fn ScriptError(bot: &mut BotLib, script: *mut script_t, text: *const c_char)
 /// script file and line.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:242-261`
-///
-/// PORT-NOTE(variadic): see `ScriptError` — same `va_list` seam.
 pub fn ScriptWarning(bot: &mut BotLib, script: *mut script_t, text: *const c_char) {
     unsafe {
         if (*script).flags & SCFL_NOWARNINGS != 0 {
@@ -120,9 +100,9 @@ pub fn ScriptWarning(bot: &mut BotLib, script: *mut script_t, text: *const c_cha
     }
 }
 
-// PORT-NOTE(variadic): reproduces Raven's `vsprintf(text, str, ap)` step at
-// each `ScriptError`/`ScriptWarning` call site (the C variadic seam resolved
-// above), then forwards the rendered buffer.
+// Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam has no stable-Rust
+// equivalent; this macro reproduces the `vsprintf(text, str, ap)` step at
+// each `ScriptError`/`ScriptWarning` call site, then forwards the buffer.
 macro_rules! script_error {
     ($bot:expr, $script:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
         let mut __se_text = [0 as c_char; 1024];
@@ -213,10 +193,6 @@ pub fn PS_ReadWhiteSpace(script: *mut script_t) -> c_int {
 /// of its string form.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:541-606`
-///
-/// PORT-NOTE(long_double): Raven's `long double *floatvalue` param has no
-/// rosetta entry (`long double` is unresolved — see missing_symbols); written
-/// verbatim per the packet's resolved signature.
 pub fn NumberValue(
     mut string: *mut c_char,
     subtype: c_int,
@@ -417,9 +393,8 @@ pub fn NumLinesCrossed(script: *mut script_t) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:1411-1418`
 ///
-/// PORT-NOTE(BSPC): the `#ifdef BSPC` `sprintf` arm is dropped per §C10 —
-/// `BSPC` is not defined in this tree, matching `PC_SetBaseFolder`'s existing
-/// call site (`l_precomp_fns.rs`) which already forwards here.
+/// `BSPC` is not defined in this build; the `#ifdef BSPC` `sprintf` arm is
+/// dropped per §C10.
 pub fn PS_SetBaseFolder(bot: &mut BotLib, path: *mut c_char) {
     unsafe {
         let path_str = core::ffi::CStr::from_ptr(path).to_string_lossy();
@@ -617,10 +592,6 @@ pub fn PS_ReadName(bot: &mut BotLib, script: *mut script_t, token: *mut token_t)
 /// Raven `PS_ReadNumber` — read a number token (hex/decimal/octal/float).
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:613-714`
-///
-/// PORT-NOTE(BINARYNUMBERS/NUMBERVALUE): both guards are unconditionally
-/// defined in this tree (`l_script/consts.rs`'s `BINARYNUMBERS`/`NUMBERVALUE`
-/// doc comments), so both `#ifdef` arms are live per §C10.
 pub fn PS_ReadNumber(bot: &mut BotLib, script: *mut script_t, token: *mut token_t) -> c_int {
     unsafe {
         let mut len: usize = 0;
@@ -744,11 +715,6 @@ pub fn PS_ReadNumber(bot: &mut BotLib, script: *mut script_t, token: *mut token_
             }
         }
         (*token).string[len] = 0;
-        // PORT-NOTE(long_double-mismatch): `NumberValue`'s resolved signature
-        // takes `*mut long_double` (unresolved rosetta type — see
-        // missing_symbols); `token_t::floatvalue` is `f64` here. Cast through
-        // the pointer per the LAW callee signature; flagged in
-        // shape_mismatches.
         NumberValue(
             (*token).string.as_mut_ptr(),
             (*token).subtype,
@@ -860,9 +826,8 @@ pub fn ScriptSkipTo(script: *mut script_t, value: *mut c_char) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:1398-1404`
 ///
-/// PORT-NOTE(PUNCTABLE): `#ifdef PUNCTABLE` is not defined in this tree (see
-/// `PS_ReadPunctuation`'s note); the punctuationtable free arm is dropped
-/// per §C10.
+/// This build always takes the linear-scan `PS_ReadPunctuation` path (see its
+/// note), so the `#ifdef PUNCTABLE` punctuationtable free arm is dropped per §C10.
 pub fn FreeScript(bot: &mut BotLib, script: *mut script_t) {
     FreeMemory(bot, script as *mut ());
 }
@@ -872,14 +837,8 @@ pub fn FreeScript(bot: &mut BotLib, script: *mut script_t) {
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:268-276`
 ///
-/// PORT-NOTE(PUNCTABLE): `#ifdef PUNCTABLE` is not defined in this tree (see
-/// `PS_ReadPunctuation`'s note) — the `PS_CreatePunctuationTable` calls are
-/// dropped per §C10, matching the linear-scan `PS_ReadPunctuation`.
-///
-/// PORT-NOTE(default_punctuations): `bot.default_punctuations` is the
-/// `Engine`-threaded home for the file-scope `default_punctuations[]` table
-/// (ruling 2); referenced per the state-receiver convention ahead of its
-/// field landing.
+/// `PS_CreatePunctuationTable` calls are dropped per §C10, matching the
+/// linear-scan `PS_ReadPunctuation` (`PUNCTABLE` is not built here).
 pub fn SetScriptPunctuations(bot: &mut BotLib, script: *mut script_t, p: *mut punctuation_t) {
     unsafe {
         if !p.is_null() {
@@ -1054,9 +1013,9 @@ pub fn PS_ReadLiteral(bot: &mut BotLib, script: *mut script_t, token: *mut token
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:835-902`
 ///
-/// PORT-NOTE(PS_ReadLiteral): Raven's own commented-out
-/// `PS_ReadLiteral(script, token)` call (l_script.cpp:870) is preserved as a
-/// comment; the live call is `PS_ReadString(script, token, '\'')`.
+/// Raven's own commented-out `PS_ReadLiteral(script, token)` call
+/// (l_script.cpp:870) is preserved as a comment; the live call is
+/// `PS_ReadString(script, token, '\'')`.
 pub fn PS_ReadToken(bot: &mut BotLib, script: *mut script_t, token: *mut token_t) -> c_int {
     unsafe {
         // if there is a token available (from UnreadToken)
@@ -1146,9 +1105,8 @@ pub fn PS_ReadToken(bot: &mut BotLib, script: *mut script_t, token: *mut token_t
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:1293-1355`
 ///
-/// PORT-NOTE(BOTLIB): `#ifdef BOTLIB` is defined in this tree (see
-/// `PC_SetBaseFolder`'s precedent) — the `botimport.FS_*` arm is transcribed,
-/// the standalone-`fopen` `#else` arm is dropped per §C10.
+/// `BOTLIB` is defined in this build, so the `botimport.FS_*` arm is
+/// transcribed; the standalone-`fopen` `#else` arm is dropped per §C10.
 pub fn LoadScriptFile(bot: &mut BotLib, filename: *const c_char) -> *mut script_t {
     unsafe {
         let mut pathname = [0 as c_char; MAX_QPATH];
@@ -1471,10 +1429,6 @@ pub fn PS_SkipUntilString(bot: &mut BotLib, script: *mut script_t, string: *mut 
 /// Raven `ReadSignedFloat` — read an optionally `-`-signed float value token.
 ///
 /// Source: `oracle/codemp/botlib/l_script.cpp:1136-1152`
-///
-/// PORT-NOTE(long_double): return type is Raven's unresolved `long double`
-/// (see missing_symbols); `token.floatvalue` is `f64` here, cast at the
-/// return per the LAW resolved signature.
 pub fn ReadSignedFloat(bot: &mut BotLib, script: *mut script_t) -> long_double {
     unsafe {
         let mut token = core::mem::zeroed::<token_t>();

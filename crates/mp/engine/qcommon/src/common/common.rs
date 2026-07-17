@@ -148,10 +148,10 @@ pub struct Common {
     //TODO: Port Common cvars/cmd/cbuf/fs/net sub-structs + com_printf print state
     // Source: oracle/codemp/qcommon/common.cpp:32-72,128,137-171
     /// Raven `msg.cpp` file-scope statics/globals (ruling 2/3): `msgInit`,
-    /// `msgHuff`, `oldsize`, `cl_shownet` (collapsed cvar-int read —
-    /// PORT-NOTE below), the three `MSG_Read*String*` rotating scratch
-    /// buffers, and the `entityStateFields`/`playerStateFields` net-field
-    /// tables.
+    /// `msgHuff`, `oldsize`, `cl_shownet` (collapsed cvar-int read, see the
+    /// `cl_shownet` field below), the three `MSG_Read*String*` rotating
+    /// scratch buffers, and the `entityStateFields`/`playerStateFields`
+    /// net-field tables.
     ///
     /// Source: `oracle/codemp/qcommon/msg.cpp:12,19,21,37`
     pub msg_init: qboolean,
@@ -165,10 +165,6 @@ pub struct Common {
     pub g_nOverrideChecked: bool,
     //TODO: Port cl_shownet
     // Source: oracle/codemp/qcommon/msg.cpp:12
-    // PORT-NOTE(cvar): `cl_shownet` is a `cvar_t*` in Raven; `Common`'s
-    // cvar sub-struct isn't landed yet (see the TODO above), so its
-    // `->integer` reads collapse to a plain `i32` field here pending the
-    // cvar-registry wave.
     pub cl_shownet: i32,
     /// Raven `MSG_ReadString`'s `static char string[MAX_STRING_CHARS]`.
     ///
@@ -465,9 +461,9 @@ pub struct Common {
     pub fs_referenced_pak_pure_checksums_info: [c_char; BIG_INFO_STRING],
 
     // ---- networking (`net_chan.cpp`) ----
-    /// Raven `showpackets`/`showdrop` (`cvar_t*` in Raven; collapsed to the
-    /// cached `->integer` per the module's net-cvar PORT-NOTE) and
-    /// `net_qport`/`net_killdroppedfragments` (same collapse).
+    /// Raven `showpackets`/`showdrop` (`cvar_t*` in Raven, collapsed to the
+    /// cached `->integer`) and `net_qport`/`net_killdroppedfragments` (same
+    /// collapse).
     ///
     /// Source: `oracle/codemp/qcommon/net_chan.cpp:40-43`
     pub showpackets: c_int,
@@ -583,8 +579,8 @@ pub struct Common {
     pub loopbacks: [loopback_t; 2],
 
     // ---- server bot glue (`sv_bot.cpp`) ----
-    /// Raven `bot_enable` — cached `bot_enable` cvar integer (mirrors the
-    /// `cl_shownet` PORT-NOTE collapse above pending the cvar-registry wave).
+    /// Raven `bot_enable` — cached `bot_enable` cvar integer (same
+    /// cvar-`->integer` collapse as `cl_shownet` above).
     ///
     /// Source: `oracle/codemp/server/sv_bot.cpp:20`
     pub bot_enable: c_int,

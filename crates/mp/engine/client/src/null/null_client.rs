@@ -132,10 +132,6 @@ pub fn CL_StartHunkUsers() {}
 /// Raven: registers the `cl_shownet` cvar.
 /// Source: `oracle/codemp/null/null_client.cpp:12-14`
 pub fn CL_Init() {
-    // PORT-NOTE(CL_Init): Raven writes `cl_shownet = Cvar_Get("cl_shownet",
-    // "0", CVAR_TEMP)` here (oracle/codemp/null/null_client.cpp:7,13).
-    // Cvar_Get and the owning Engine.cl cvar-handle field are not yet ported
-    // (outside this null-shard's scope) — wiring lands with the qcommon cvar
-    // wave + Client state threading (STATE THREADED table, packet
-    // null__1974_CL_Init.md).
+    // This no-arg signature can't reach `Cvar_Get`; the real `cl_shownet`
+    // registration is wired through `mp_engine_qcommon::common::engine_hooks::CL_Init_null`.
 }

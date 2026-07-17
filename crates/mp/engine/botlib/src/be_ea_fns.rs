@@ -27,8 +27,7 @@ use crate::BotLib;
 
 use mp_engine_qcommon::common_fns::Com_Memcpy;
 
-// PORT-NOTE(macros): Raven's `VectorCopy`/`VectorClear` are `#define`s;
-// ported as local private helpers (matches `be_aas_move.rs`'s precedent).
+// Raven's `VectorCopy`/`VectorClear` are `#define`s; ported as local private helpers.
 fn VectorCopy(src: vec3_t, dst: &mut vec3_t) {
     *dst = src;
 }

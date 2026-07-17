@@ -57,11 +57,9 @@ pub fn Log_Close(bot: &mut BotLib) {
 ///
 /// Source: `oracle/codemp/botlib/l_log.cpp:96-106`
 ///
-/// PORT-NOTE(variadic): stable Rust cannot define a C-variadic fn (only
-/// `extern "C"` may use `...`); per the established `Com_OPrintf` precedent
+/// Stable Rust cannot define a C-variadic fn; per the `Com_OPrintf` precedent
 /// (`crates/mp/engine/qcommon/src/common_fns.rs`), the `va_list`/`vfprintf`
-/// formatting collapses to a pre-formatted `msg` written verbatim at the
-/// Rust call site.
+/// formatting collapses to a pre-formatted `msg` written at the call site.
 pub fn Log_Write(bot: &mut BotLib, msg: *mut c_char) {
     unsafe {
         if bot.logfile.fp.is_null() {
@@ -76,8 +74,6 @@ pub fn Log_Write(bot: &mut BotLib, msg: *mut c_char) {
 /// Raven `Log_WriteTimeStamped`.
 ///
 /// Source: `oracle/codemp/botlib/l_log.cpp:113-131`
-///
-/// PORT-NOTE(variadic): same collapsed-`msg` seam as `Log_Write` above.
 pub fn Log_WriteTimeStamped(bot: &mut BotLib, msg: *mut c_char) {
     unsafe {
         if bot.logfile.fp.is_null() {

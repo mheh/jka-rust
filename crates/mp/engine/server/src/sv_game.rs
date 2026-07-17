@@ -46,13 +46,6 @@ use mp_abi::game::imports::MpGameImport as G;
 use mp_engine_qcommon::qcommon::shared_traps_t::sharedTraps_t as T;
 use mp_engine_qcommon::vm::VM_Call;
 
-// PORT-NOTE(engine-host-state): `CollisionWorld`, `Common`, and `EngineHost`
-// exist in `mp_engine_qcommon`/`mp_host_interface`; `RenderModels` (rm),
-// `RmManager` (rmg), `Navigator` (nav), `Ghoul2System` (g2), and `RoffSystem`
-// (roff) do NOT exist anywhere in the tree yet (grepped: no hits) — these
-// packets were generated ahead of those state structs landing. Imported below
-// by their preamble-table decl-home crate; genuinely missing, escalated in
-// missing_symbols rather than stubbed (ZERO-PARK).
 use mp_engine_botlib::BotLib;
 use mp_engine_icarus::game_interface::{
     icarus_associate_ent, icarus_free_ent, icarus_init, icarus_init_ent, icarus_is_initialized,
@@ -296,8 +289,7 @@ pub fn SV_SetActiveSubBSP(cm: &mut CollisionWorld, sv: &mut Server, index: c_int
 /// `isize` into `VM_ArgPtr`.
 ///
 /// The file-static `gLocalModifier` (ruling 3: genuine cross-frame state)
-/// threads as a `Server` field (`sv.g_local_modifier`); PORT-NOTE(field): that
-/// field does not exist on `Server` yet — escalated (missing_symbols).
+/// threads as a `Server` field (`sv.g_local_modifier`).
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:422-452`
 pub fn ConvertedEntity(
@@ -3713,8 +3705,6 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
         c"1".as_ptr(),
         mp_qshared::shared::cvar::CVAR_LATCH,
     );
-    // PORT-NOTE(bot_enable): the file-scope `extern int bot_enable` threads
-    // as a `Common` field per ruling 3; the field doesn't exist yet, escalated.
     if !var.is_null() {
         view.common.bot_enable = unsafe { (*var).integer };
     } else {

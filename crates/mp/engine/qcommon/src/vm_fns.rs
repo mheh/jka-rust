@@ -360,9 +360,6 @@ pub fn VM_SymbolForCompiledPointer(
 pub fn VM_Free(common: &mut Common, vm: *mut vm_t) {
     unsafe {
         if !(*vm).dllHandle.is_null() {
-            // PORT-NOTE(sys-dll): `Sys_UnloadDll` is the platform dylib-unload
-            // external; not yet exposed on a receiver in this shard —
-            // reported as a missing symbol.
             Sys_UnloadDll((*vm).dllHandle);
             *vm = core::mem::zeroed();
         }
@@ -502,10 +499,6 @@ pub fn VM_VmProfile_f(view: &mut EngineHostView) {
 ///
 /// Source: `oracle/codemp/qcommon/vm.cpp:901-925`
 pub fn VM_VmInfo_f(common: &mut Common) {
-    // PORT-NOTE(host-print): the packet's resolved signature doesn't carry
-    // `host`, but `Com_Printf` in the tree resolves to the receiverless
-    // `crate::common::com_printf` helper (common_fns.rs precedent) rather
-    // than a raw external — used here to stay within the printed signature.
     unsafe {
         crate::common::com_printf(common, "Registered virtual machines:\n");
         for i in 0..MAX_VM {
@@ -776,10 +769,8 @@ pub fn VM_Create(
                 return core::ptr::null_mut();
             }
         };
-        // PORT-NOTE(fs-buf): `header` above aliases the returned `Vec<u8>`'s
-        // storage; kept alive via `file_bytes` for the header's lifetime in
-        // this fn (the `Vec` is dropped at scope end, mirroring `FS_FreeFile`
-        // further down).
+        // `header` aliases `file_bytes`'s storage; kept alive via
+        // `file_bytes` for the header's lifetime here (mirrors `FS_FreeFile`).
         let _keep_alive = file_bytes;
 
         // byte swap the header

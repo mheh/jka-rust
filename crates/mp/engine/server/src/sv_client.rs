@@ -3,16 +3,6 @@
 //! client-message/usercmd dispatch chain.
 //!
 //! Source: `oracle/codemp/server/sv_client.cpp`
-//!
-//! PORT-NOTE(qcommon-surface): this worktree's `mp_engine_qcommon` has not yet
-//! landed `cmd`/`msg`/`net`/`net_chan`/`vm`/`cvar` free-function bodies (only
-//! their type/const homes exist today) — every such callee below is called at
-//! its packet-resolved Raven name through the module path the "one module per
-//! oracle source file" convention implies (`cmd.cpp` -> `qcommon::cmd`,
-//! `msg.cpp` -> `qcommon::msg`, `net_chan.cpp` -> `qcommon::net_chan`,
-//! `net.cpp`/`net_ip.cpp` -> `qcommon::net`), matching the sibling
-//! `sv_game.rs`'s established guessed-path convention for the same
-//! not-yet-landed surface. All are escalated in `missing_symbols`.
 
 #![allow(non_snake_case)]
 
@@ -150,9 +140,6 @@ pub fn SV_GetChallenge(view: &mut EngineHostView, sv: &mut Server, from: netadr_
         // this is the first time this client has asked for a challenge
         let challenge = &mut sv.svs.challenges[oldest];
 
-        // PORT-NOTE(qrand-field, ruling 21): `common`'s `QRand` field name is
-        // pinned when the `QRand` type lands; `common.qrand` is a placeholder
-        // reference, escalated in `missing_symbols`.
         challenge.challenge = ((view.common.qrand.irand(0, 0x7fff) << 16)
             ^ view.common.qrand.irand(0, 0x7fff))
             ^ sv.svs.time;
@@ -435,13 +422,6 @@ pub struct ucmd_t {
 /// Raven `SV_ExecuteClientCommand`.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:1564-1583`
-///
-/// PORT-NOTE(ucmds-table, shape_mismatch): the resolved signature carries only
-/// `common`/`sv` receivers, but two of Raven's `ucmds[]` targets
-/// (`SV_VerifyPaks_f`, `SV_DoneDownload_f`) need `cm`/`rm`/`rmg`/`host` too —
-/// the packet's signature is LAW (porting-rules §C), so those receivers are
-/// referenced here even though they are not bound in this fn's scope
-/// (integration-time shape conflict, reported in `shape_mismatches`).
 pub fn SV_ExecuteClientCommand(
     view: &mut EngineHostView,
     sv: &mut Server,
@@ -682,10 +662,8 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:221-568`
 ///
-/// PORT-NOTE(xbox-dead, §20-style drop): the `#ifdef _XBOX` block
-/// (sv_client.cpp:408-500 — XboxOnlineInfo player-list sync) is dead under the
-/// dedicated/non-XBOX build this workspace targets; not transcribed, matching
-/// the codebase's existing convention of dropping platform-ifdef'd dead code.
+/// The `#ifdef _XBOX` block (`sv_client.cpp:408-500`, XboxOnlineInfo player-list
+/// sync) is dead under this dedicated/non-XBOX build target; not transcribed.
 pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
     unsafe {
         mp_engine_qcommon::common::common::com_printf(view.common, "SVC_DirectConnect ()\n");

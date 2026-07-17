@@ -151,9 +151,7 @@ pub struct BotLib {
     /// Source: `oracle/codemp/botlib/l_crc.cpp:33`
     pub crctable: [c_ushort; 257],
     /// Raven `punctuation_t default_punctuations[]` — the C/C++ operator table.
-    /// PORT-NOTE(default_punctuations): the table's initializer content is
-    /// populated at setup time, not here; the zeroed placeholder only reserves
-    /// the array slot the transcribed bodies index via `.as_mut_ptr()`.
+    /// Populated at setup time (see `impl Default` below), not here.
     /// Source: `oracle/codemp/botlib/l_script.cpp:69-146`
     pub default_punctuations: [punctuation_t; DEFAULT_PUNCTUATIONS_LEN],
     /// Raven `libvar_t *droppedweight`.
@@ -178,7 +176,7 @@ pub struct BotLib {
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:165`
     pub itemconfig: *mut itemconfig_t,
     /// Raven `structdef_t iteminfo_struct` — the item-info struct definition.
-    /// PORT-NOTE(iteminfo_struct): populated at setup; zeroed placeholder here.
+    /// Populated at setup; zeroed placeholder here.
     /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:136`
     pub iteminfo_struct: structdef_t,
     /// Raven `levelitem_t *levelitemheap`.

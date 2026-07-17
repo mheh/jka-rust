@@ -10,15 +10,11 @@
 //! Ported per the engine C-track packets (`botlib__0451`..`botlib__2168`).
 //! Source: `oracle/codemp/botlib/be_aas_reach.cpp`.
 //!
-//! PORT-NOTE(macros): Raven's vector `#define`s (`VectorSubtract`, `VectorAdd`,
-//! `VectorScale`, `VectorCopy`, `VectorClear`, `VectorSet`, `VectorMA`,
-//! `DotProduct`) expand inline here, faithful to the preprocessor. Only the
-//! genuine q_math functions the packets flag as externals
-//! (`CrossProduct`/`VectorLength`/`VectorNormalize`/`VectorInverse`/
-//! `AngleVectors`) are called through the (not-yet-wired) q_math surface — see
-//! missing_symbols.
-//! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers (`aasworld.*`);
-//! bodies deref explicitly inside `unsafe` per porting-rules §D11.
+//! Raven's vector `#define`s (`VectorSubtract`, `VectorAdd`, `VectorScale`,
+//! `VectorCopy`, `VectorClear`, `VectorSet`, `VectorMA`, `DotProduct`) expand
+//! inline here, faithful to the preprocessor; `CrossProduct`/`VectorLength`/
+//! `VectorNormalize`/`VectorInverse`/`AngleVectors` are called through
+//! `mp_qshared::shared::q_math`.
 
 use core::ffi::{c_char, c_int, c_ulong, c_ushort};
 use core::ptr;
@@ -2315,8 +2311,8 @@ pub fn AAS_Reachability_Step_Barrier_WaterJump_WalkOffLedge(
 
 /// Raven `AAS_Reachability_Ladder`.
 ///
-/// PORT-NOTE(int-abs): Raven `abs(DotProduct(...))` truncates the float dot to
-/// int before `abs` (a Raven quirk); ported as `(dot as c_int).abs()`.
+/// Raven `abs(DotProduct(...))` truncates the float dot to int before `abs`
+/// (a Raven quirk); ported faithfully as `(dot as c_int).abs()`.
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:2363-2699`
 pub fn AAS_Reachability_Ladder(bot: &mut BotLib, area1num: c_int, mut area2num: c_int) -> c_int {
     unsafe {
@@ -5348,9 +5344,9 @@ pub fn AAS_Reachability_JumpPad(bot: &mut BotLib) {
 
 /// Raven `AAS_ContinueInitReachability`.
 ///
-/// PORT-NOTE(statics): the `framereachability`/`reachability_delay`/
-/// `lastpercentage` function-scope statics are genuine cross-frame state
-/// (fork-3 kind 3) → threaded fields on `bot`.
+/// The `framereachability`/`reachability_delay`/`lastpercentage`
+/// function-scope statics are genuine cross-frame state, threaded as fields
+/// on `bot`.
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:4347-4487`
 pub fn AAS_ContinueInitReachability(bot: &mut BotLib, time: f32) -> c_int {
     unsafe {

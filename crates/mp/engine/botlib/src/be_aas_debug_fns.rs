@@ -17,16 +17,10 @@
 //! exists as a directory module (`be_aas_debug/mod.rs`, constants-only) —
 //! `_fns` escape per `_PREAMBLE.md`'s destination rule.
 //!
-//! PORT-NOTE(macros): Raven's vector `#define`s (`VectorCopy`, `VectorMA`,
-//! `VectorSubtract`, `VectorScale`, `VectorClear`, `VectorSet`, `DotProduct`)
-//! expand inline here, faithful to the preprocessor, matching the sibling
-//! `be_aas_reach_fns.rs`/`be_aas_move.rs` convention. Only the genuine
-//! q_math functions the packets flag as externals (`CrossProduct`,
-//! `VectorNormalize`) are called through the existing `mp_game::q_math`
-//! surface.
-//! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers
-//! (`aasworld.*`); bodies deref explicitly inside `unsafe` per
-//! porting-rules §D11, matching the sibling files.
+//! Raven's vector `#define`s (`VectorCopy`, `VectorMA`, `VectorSubtract`,
+//! `VectorScale`, `VectorClear`, `VectorSet`, `DotProduct`) expand inline
+//! here, faithful to the preprocessor; `CrossProduct`/`VectorNormalize` are
+//! called through `mp_game::q_math`.
 //!
 // The `bot: &mut BotLib` / `common: &mut Common` receivers named in every
 // signature below are the campaign's threaded-state aggregates (ruling 2);
@@ -334,11 +328,8 @@ pub fn AAS_ShowArea(bot: &mut BotLib, areanum: c_int, groundfacesonly: c_int) {
 
 /// Raven `AAS_PrintTravelType`.
 ///
-/// PORT-NOTE(debug-ifdef): the whole body is `#ifdef DEBUG` in the oracle;
-/// this build has no `DEBUG` preprocessor concept (release-build parity), so
-/// the faithful translation of the retail configuration is a no-op — matches
-/// Raven's own retail binary. `bot`/`botimport` are therefore not threaded
-/// (packet carries no STATE THREADED table for this fn).
+/// The whole body is `#ifdef DEBUG` in the oracle; this is a retail build, so
+/// the faithful translation is a no-op, matching Raven's own retail binary.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_debug.cpp:528-555`
 pub fn AAS_PrintTravelType(traveltype: c_int) {
@@ -362,7 +353,7 @@ pub fn AAS_PrintTravelType(traveltype: c_int) {
         TRAVELTYPE_MASK,
         PRT_MESSAGE,
     );
-    // #ifdef DEBUG only — release build: no-op (see PORT-NOTE above).
+    // #ifdef DEBUG only — release build: no-op (see doc comment above).
 }
 
 /// Raven `AAS_DrawPermanentCross`.

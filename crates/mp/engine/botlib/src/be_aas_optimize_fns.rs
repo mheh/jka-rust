@@ -15,11 +15,6 @@
 //! `crates/mp/engine/botlib/src/be_aas_optimize.rs`, but `be_aas_optimize`
 //! already exists as a directory module (`be_aas_optimize/optimized_s.rs`) —
 //! `_fns` escape per `_PREAMBLE.md`'s destination rule.
-//!
-//! PORT-NOTE(unsafe): the AAS arena and `optimized_t` scratch buffers are raw
-//! pointers (`aasworld.*`, `optimized->*`); bodies deref explicitly inside
-//! `unsafe` per porting-rules §D11, matching the sibling
-//! `be_aas_cluster_fns.rs`/`be_aas_reach_fns.rs` convention.
 
 use core::ffi::c_char;
 use core::ffi::c_int;

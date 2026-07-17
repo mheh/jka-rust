@@ -17,15 +17,8 @@
 //! already exists as a directory module (`be_aas_routealt/mod.rs`,
 //! constants-only) — `_fns` escape per `_PREAMBLE.md`'s destination rule.
 //!
-//! PORT-NOTE(unsafe): the AAS arena is a graph of raw pointers
-//! (`aasworld.*`, `bot.midrangeareas`, `bot.clusterareas`); bodies deref
-//! explicitly inside `unsafe` per porting-rules §D11, matching the sibling
-//! `be_aas_reach_fns.rs`/`be_aas_cluster_fns.rs`/`be_aas_route_fns.rs`
-//! convention.
-//!
-//! PORT-NOTE(ENABLE_ALTROUTING): `crate::be_aas_routealt::be_aas_routealt_cpp_consts::ENABLE_ALTROUTING`
-//! is already ported as `true` (Raven defines it unconditionally at this
-//! site) — the `#ifdef ENABLE_ALTROUTING` bodies below therefore always
+//! `ENABLE_ALTROUTING` is ported as `true` (Raven defines it unconditionally
+//! at this site), so the `#ifdef ENABLE_ALTROUTING` bodies below always
 //! execute, matching the shipped build.
 
 use core::ffi::{c_int, c_ulong};

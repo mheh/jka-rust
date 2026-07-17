@@ -18,32 +18,9 @@
 //! `_PREAMBLE.md`'s destination rule, matching the sibling
 //! `be_aas_cluster_fns.rs`/`be_aas_entity.rs` convention.
 //!
-//! PORT-NOTE(BotLib): `BotLib` is the synthesized botlib aggregate (per
-//! `_PREAMBLE.md`'s state-receiver table) — not yet defined anywhere in the
-//! tree, matching every sibling `*_fns.rs` file in this crate that already
-//! references `bot: &mut BotLib` ahead of its landing. Reported in
-//! missing_symbols.
-//!
-//! PORT-NOTE(bsp_t family): Raven's `bsp_t`/`bsp_entity_t`/`bsp_epair_t`
-//! (be_aas_bspq3.cpp:38-70, the BSP-entity epair store backing `bspworld`)
-//! have no rosetta row yet — referenced here as `bot.bspworld` /
-//! `bsp_entity_t` / `bsp_epair_t` exactly as the packets resolve them.
-//! Reported in missing_symbols.
-//!
-//! PORT-NOTE(unsafe): raw-pointer epair-list walks and `botimport` fn-ptr
-//! calls are confined in `unsafe` per porting-rules §D11, matching the
-//! sibling `be_aas_entity.rs`/`be_aas_cluster_fns.rs` convention. Input
-//! `vec3_t` args are shadowed with `let mut x = x;` only to hand a `&mut`
-//! to the `botimport` callbacks (whose fn-ptr type is `*mut vec3_t` though
-//! they read the arg); true out-params take `*mut vec3_t`.
-//!
-//! PORT-NOTE(callee-signatures): `ScriptError`/`FreeScript`/
-//! `GetClearedHunkMemory`/`GetHunkMemory`/`LoadScriptMemory`/
-//! `PS_ExpectTokenType`/`PS_ReadToken`/`SetScriptFlags`/`StripDoubleQuotes`
-//! are ported in the sibling `l_script_fns.rs`/`l_memory` packets outside
-//! this shard; forward-declared below with their faithful resolved shapes,
-//! matching the `l_script_fns.rs`/`be_aas_cluster_fns.rs` forward-decl
-//! convention. Reported in missing_symbols (not linked into this file).
+//! Input `vec3_t` args are shadowed with `let mut x = x;` only to hand a
+//! `&mut` to the `botimport` callbacks (whose fn-ptr type is `*mut vec3_t`
+//! though they read the arg); true out-params take `*mut vec3_t`.
 
 use core::ffi::c_char;
 use core::ffi::c_int;
@@ -440,8 +417,8 @@ pub fn AAS_ParseBSPEntities(bot: &mut BotLib) {
 
         while PS_ReadToken(bot, script, &mut token) != 0 {
             if libc::strcmp(token.string.as_ptr(), c"{".as_ptr()) != 0 {
-                // PORT-NOTE(variadic): reproduces Raven's `vsprintf`-into-buffer step
-                // before forwarding to `ScriptError` (see l_script_fns.rs script_error!).
+                // Reproduces Raven's `vsprintf`-into-buffer step before forwarding to
+                // `ScriptError` (see l_script_fns.rs script_error!).
                 let mut __se_text = [0 as c_char; 1024];
                 libc::sprintf(
                     __se_text.as_mut_ptr(),

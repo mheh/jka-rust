@@ -13,16 +13,6 @@
 //! per `_PREAMBLE.md`'s destination rule.
 //!
 //! Source: `oracle/codemp/botlib/l_struct.cpp`
-//!
-//! PORT-NOTE(BotLib): `BotLib` is the synthesized botlib-subsystem receiver
-//! (`_PREAMBLE.md` state-receiver table) — it lands with the botlib waves,
-//! same as every other already-landed `l_precomp`/`l_script` fn in this
-//! crate that already references it unimported; kept consistent here.
-//!
-//! PORT-NOTE(FILE): Raven's `FILE *` maps to `libc::FILE` (the C standard
-//! stream handle) — not in the type rosetta (it is a libc seam type, not an
-//! ABI/layout type), reported as a missing_symbols escalation per the
-//! preamble's no-stub rule.
 
 use core::ffi::{c_char, c_int};
 

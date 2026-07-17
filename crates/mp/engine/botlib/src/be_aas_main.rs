@@ -58,10 +58,9 @@ use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:40-49`
 ///
-/// PORT-NOTE(variadic): Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam
-/// cannot be a non-extern Rust fn `...`. Resolved at integration (mirrors the
-/// `l_precomp_fns.rs` `SourceError` precedent): the fn now takes an
-/// already-rendered message in place of `fmt`/`...`.
+/// Raven's `va_start`/`vsprintf`/`va_end` C-variadic seam cannot be a
+/// non-extern Rust fn `...`; the fn takes an already-rendered message in
+/// place of `fmt`/`...` (mirrors the `l_precomp_fns.rs` `SourceError` seam).
 pub fn AAS_Error(bot: &mut BotLib, fmt: *mut c_char) {
     unsafe {
         (bot.botimport.Print.unwrap())(PRT_FATAL, fmt);
@@ -226,9 +225,8 @@ pub fn AAS_Initialized(bot: &mut BotLib) -> c_int {
 ///
 /// Source: `oracle/codemp/botlib/be_aas_main.cpp:166-176`
 ///
-/// PORT-NOTE(DEBUG): the `#ifdef DEBUG` routing-cache-precompute block is
-/// commented out in the oracle itself — dead code, dropped per porting-rules
-/// §C10.
+/// The `#ifdef DEBUG` routing-cache-precompute block is commented out in the
+/// oracle itself — dead code, dropped per §C10.
 pub fn AAS_SetInitialized(bot: &mut BotLib) {
     unsafe {
         bot.aasworld.initialized = mp_qshared::shared::qtrue as c_int;

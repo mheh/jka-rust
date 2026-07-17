@@ -17,11 +17,10 @@
 //! exists as a directory module (`be_ai_char/mod.rs`, types-only) — `_fns`
 //! escape per `_PREAMBLE.md`'s destination rule.
 //!
-//! PORT-NOTE(varsize): `bot_character_t::c` is Raven's variable-sized
-//! trailing characteristic array, emulated in the type port as
-//! `[bot_characteristic_t; 1]`; bodies here index past that bound via raw
-//! pointer arithmetic (`.c.as_mut_ptr().add(i)`) exactly as Raven's C array
-//! indexing does, matching the type's own doc comment.
+//! `bot_character_t::c` is Raven's variable-sized trailing characteristic
+//! array, emulated as `[bot_characteristic_t; 1]`; bodies here index past
+//! that bound via raw pointer arithmetic (`.c.as_mut_ptr().add(i)`), exactly
+//! as Raven's C array indexing does.
 
 use core::ffi::{c_char, c_int, c_ulong};
 
@@ -672,9 +671,8 @@ pub fn BotLoadCharacterFromFile(
 ///
 /// Source: `oracle/codemp/botlib/be_ai_char.cpp:366-472`
 ///
-/// PORT-NOTE(DEBUG): the `#ifdef DEBUG` timing print (`Sys_MilliSeconds`/
-/// `bot_developer`) is dropped — retail/NDEBUG build; `DEBUG` has no rosetta
-/// row (escalated, not guessed).
+/// The `#ifdef DEBUG` timing print (`Sys_MilliSeconds`/`bot_developer`) is
+/// dropped; `DEBUG` is not defined in this retail build.
 pub fn BotLoadCachedCharacter(
     bot: &mut BotLib,
     charfile: *mut c_char,
