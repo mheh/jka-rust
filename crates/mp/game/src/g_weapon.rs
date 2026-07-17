@@ -539,13 +539,10 @@ pub fn WP_FireBlaster(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
 pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let mut damage: c_int = DISRUPTOR_MAIN_DAMAGE;
-        let mut render_impact = qtrue;
+        let mut render_impact = true;
         let mut start: vec3_t;
         let mut end: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
-        // FLAG: `tent` is a transient temp-entity handle (raw return of
-        // G_TempEntity); its conversion is a later pass, so it stays raw.
-        let mut tent: *mut gentity_t;
         let shotRange: f32 = 8192.0;
         let mut ignore: c_int;
         let mut traces: c_int = 0;
@@ -661,23 +658,21 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 {
                     // broadcast and stop the shot because it was blocked
                     let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_MAIN_SHOT) as i32);
-                    tent = ctx.entity_mut(tent_id);
-                    (*tent).s.origin2 = ctx.world.globals.muzzle;
-                    (*tent).s.eventParm = ent_num;
+                    let muzzle = ctx.world.globals.muzzle;
+                    let tent = ctx.entity_mut(tent_id);
+                    tent.s.origin2 = muzzle;
+                    tent.s.eventParm = ent_num;
 
                     let te_eid = G_TempEntity(ctx, tr.endpos, (EV_SABER_BLOCK) as i32);
-                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-                    (*te).s.origin = tr.endpos;
-                    (*te).s.angles = tr.plane.normal;
-                    if (*te).s.angles[0] == 0.0
-                        && (*te).s.angles[1] == 0.0
-                        && (*te).s.angles[2] == 0.0
-                    {
-                        (*te).s.angles[1] = 1.0;
+                    let te = ctx.entity_mut(te_eid);
+                    te.s.origin = tr.endpos;
+                    te.s.angles = tr.plane.normal;
+                    if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                        te.s.angles[1] = 1.0;
                     }
-                    (*te).s.eventParm = 0;
-                    (*te).s.weapon = 0; // saberNum
-                    (*te).s.legsAnim = 0; // bladeNum
+                    te.s.eventParm = 0;
+                    te.s.weapon = 0; // saberNum
+                    te.s.legsAnim = 0; // bladeNum
 
                     return;
                 }
@@ -690,20 +685,21 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if (tr.surfaceFlags & SURF_NOIMPACT) != 0 {
-            render_impact = qfalse;
+            render_impact = false;
         }
 
         // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
         let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_MAIN_SHOT) as i32);
-        tent = ctx.entity_mut(tent_id);
-        (*tent).s.origin2 = ctx.world.globals.muzzle;
-        (*tent).s.eventParm = ent_num;
+        let muzzle = ctx.world.globals.muzzle;
+        let tent = ctx.entity_mut(tent_id);
+        tent.s.origin2 = muzzle;
+        tent.s.eventParm = ent_num;
 
         let traceEnt_id = EntityId(tr.entityNum as u32);
         // FLAG: trace target may be an NPC (pool client); deref its client raw.
         let traceEnt_client = ctx.world.entity(traceEnt_id).client;
 
-        if render_impact != qfalse {
+        if render_impact {
             if tr.entityNum < ENTITYNUM_WORLD as i16
                 && ctx.world.entity(traceEnt_id).takedamage != 0
             {
@@ -725,17 +721,17 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 );
 
                 let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
-                tent = ctx.entity_mut(tent_id);
-                (*tent).s.eventParm = DirToByte(tr.plane.normal);
+                let tent = ctx.entity_mut(tent_id);
+                tent.s.eventParm = DirToByte(tr.plane.normal);
                 if !traceEnt_client.is_null() {
-                    (*tent).s.weapon = 1;
+                    tent.s.weapon = 1;
                 }
             } else {
                 // Hmmm, maybe don't make any marks on things that could break
                 let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_MISS) as i32);
-                tent = ctx.entity_mut(tent_id);
-                (*tent).s.eventParm = DirToByte(tr.plane.normal);
-                (*tent).s.weapon = 1;
+                let tent = ctx.entity_mut(tent_id);
+                tent.s.eventParm = DirToByte(tr.plane.normal);
+                tent.s.weapon = 1;
             }
         }
     }
@@ -777,13 +773,10 @@ pub fn G_CanDisruptify(ent: Option<&gentity_t>) -> qboolean {
 pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let mut damage: c_int = DISRUPTOR_ALT_DAMAGE - 30;
-        let mut render_impact = qtrue;
+        let mut render_impact = true;
         let mut start: vec3_t;
         let mut end: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
-        // FLAG: `tent` is a transient temp-entity handle (raw return of
-        // G_TempEntity); its conversion is a later pass, so it stays raw.
-        let mut tent: *mut gentity_t;
         let shotRange: f32 = 8192.0;
         let mut count: c_int;
         let mut maxCount: c_int = 60;
@@ -889,7 +882,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
             }
 
             if (tr.surfaceFlags & SURF_NOIMPACT) != 0 {
-                render_impact = qfalse;
+                render_impact = false;
             }
 
             if !traceEnt_client.is_null()
@@ -920,24 +913,22 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                 ) != 0
                 {
                     let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_SHOT) as i32);
-                    tent = ctx.entity_mut(tent_id);
-                    (*tent).s.origin2 = ctx.world.globals.muzzle;
-                    (*tent).s.shouldtarget = fullCharge;
-                    (*tent).s.eventParm = ent_num;
+                    let muzzle = ctx.world.globals.muzzle;
+                    let tent = ctx.entity_mut(tent_id);
+                    tent.s.origin2 = muzzle;
+                    tent.s.shouldtarget = fullCharge;
+                    tent.s.eventParm = ent_num;
 
                     let te_eid = G_TempEntity(ctx, tr.endpos, (EV_SABER_BLOCK) as i32);
-                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-                    (*te).s.origin = tr.endpos;
-                    (*te).s.angles = tr.plane.normal;
-                    if (*te).s.angles[0] == 0.0
-                        && (*te).s.angles[1] == 0.0
-                        && (*te).s.angles[2] == 0.0
-                    {
-                        (*te).s.angles[1] = 1.0;
+                    let te = ctx.entity_mut(te_eid);
+                    te.s.origin = tr.endpos;
+                    te.s.angles = tr.plane.normal;
+                    if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                        te.s.angles[1] = 1.0;
                     }
-                    (*te).s.eventParm = 0;
-                    (*te).s.weapon = 0;
-                    (*te).s.legsAnim = 0;
+                    te.s.eventParm = 0;
+                    te.s.weapon = 0;
+                    te.s.legsAnim = 0;
 
                     return;
                 }
@@ -945,20 +936,22 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
 
             // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
             let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_SHOT) as i32);
-            tent = ctx.entity_mut(tent_id);
-            (*tent).s.origin2 = ctx.world.globals.muzzle;
-            (*tent).s.shouldtarget = fullCharge;
-            (*tent).s.eventParm = ent_num;
+            let muzzle = ctx.world.globals.muzzle;
+            let tent = ctx.entity_mut(tent_id);
+            tent.s.origin2 = muzzle;
+            tent.s.shouldtarget = fullCharge;
+            tent.s.eventParm = ent_num;
 
             // If the beam hits a skybox, etc. it would look foolish to add impact effects
-            if render_impact != qfalse {
+            if render_impact {
                 if ctx.world.entity(traceEnt_id).takedamage != 0 && !traceEnt_client.is_null() {
-                    (*tent).s.otherEntityNum = ctx.world.entity(traceEnt_id).s.number;
+                    let traceEnt_num = ctx.world.entity(traceEnt_id).s.number;
+                    ctx.entity_mut(tent_id).s.otherEntityNum = traceEnt_num;
 
                     let tent_id = G_TempEntity(ctx, tr.endpos, (EV_MISSILE_MISS) as i32);
-                    tent = ctx.entity_mut(tent_id);
-                    (*tent).s.eventParm = DirToByte(tr.plane.normal);
-                    (*tent).s.eFlags |= EF_ALT_FIRING;
+                    let tent = ctx.entity_mut(tent_id);
+                    tent.s.eventParm = DirToByte(tr.plane.normal);
+                    tent.s.eFlags |= EF_ALT_FIRING;
 
                     if LogAccuracyHit(ctx, traceEnt_id, Some(ent)) && !ent_client.is_null() {
                         (*ent_client).accuracy_hits += 1;
@@ -983,14 +976,14 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                             );
 
                             let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
-                            tent = ctx.entity_mut(tent_id);
-                            (*tent).s.eventParm = DirToByte(tr.plane.normal);
+                            let tent = ctx.entity_mut(tent_id);
+                            tent.s.eventParm = DirToByte(tr.plane.normal);
                         }
                     } else {
                         let tent_id =
                             G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_MISS) as i32);
-                        tent = ctx.entity_mut(tent_id);
-                        (*tent).s.eventParm = DirToByte(tr.plane.normal);
+                        let tent = ctx.entity_mut(tent_id);
+                        tent.s.eventParm = DirToByte(tr.plane.normal);
                     }
                     break; // and don't try any more traces
                 }
@@ -1040,10 +1033,10 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     }
 
                     let tent_id = G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
-                    tent = ctx.entity_mut(tent_id);
-                    (*tent).s.eventParm = DirToByte(tr.plane.normal);
+                    let tent = ctx.entity_mut(tent_id);
+                    tent.s.eventParm = DirToByte(tr.plane.normal);
                     if !traceEnt_client.is_null() {
-                        (*tent).s.weapon = 1;
+                        tent.s.weapon = 1;
                     }
                 }
             } else {
@@ -3696,16 +3689,13 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let damage: c_int = CONC_ALT_DAMAGE;
         let traces: c_int = DISRUPTOR_ALT_TRACES;
-        let mut render_impact = qtrue;
+        let mut render_impact = true;
         let mut start: vec3_t;
         let mut end: vec3_t = [0.0; 3];
         let mut muzzle2 = ctx.world.globals.muzzle;
         let mut tr: trace_t = std::mem::zeroed();
-        // FLAG: `tent` is a transient temp-entity handle (raw return of
-        // G_TempEntity); its conversion is a later pass, so it stays raw.
-        let mut tent: *mut gentity_t;
         let shotRange: f32 = 8192.0;
-        let mut hitDodged = qfalse;
+        let mut hitDodged = false;
         let mut shot_mins: vec3_t = [-1.0, -1.0, -1.0];
         let mut shot_maxs: vec3_t = [1.0, 1.0, 1.0];
 
@@ -3789,7 +3779,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                 }
             }
             if (tr.surfaceFlags & SURF_NOIMPACT) != 0 {
-                render_impact = qfalse;
+                render_impact = false;
             }
 
             if tr.entityNum == ent_num as i16 {
@@ -3809,11 +3799,12 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
 
             if ctx.world.entity(traceEnt_id).s.weapon == WP_SABER {
                 // FIXME: need a more reliable way to know we hit a jedi?
-                hitDodged = Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, HL_NONE);
+                hitDodged = Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, HL_NONE)
+                    != qfalse;
                 // acts like we didn't even hit him
             }
-            if hitDodged == qfalse {
-                if render_impact != qfalse {
+            if !hitDodged {
+                if render_impact {
                     if (tr.entityNum < ENTITYNUM_WORLD as i16
                         && ctx.world.entity(traceEnt_id).takedamage != 0)
                         || Q_stricmp(
@@ -3935,7 +3926,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
             muzzle2 = tr.endpos;
             start = tr.endpos;
             skip = tr.entityNum as c_int;
-            hitDodged = qfalse;
+            hitDodged = false;
         }
         // just draw one beam all the way to the end
 
@@ -3945,12 +3936,14 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
 
         // let's pack all this junk into a single tempent, and send it off.
         let tent_id = G_TempEntity(ctx, tr.endpos, (EV_CONC_ALT_IMPACT) as i32);
-        tent = ctx.entity_mut(tent_id);
-        (*tent).s.eventParm = DirToByte(tr.plane.normal);
-        (*tent).s.owner = ent_num;
-        (*tent).s.angles = dir;
-        (*tent).s.origin2 = ctx.world.globals.muzzle;
-        (*tent).s.angles2 = ctx.world.globals.forward;
+        let muzzle = ctx.world.globals.muzzle;
+        let forward = ctx.world.globals.forward;
+        let tent = ctx.entity_mut(tent_id);
+        tent.s.eventParm = DirToByte(tr.plane.normal);
+        tent.s.owner = ent_num;
+        tent.s.angles = dir;
+        tent.s.origin2 = muzzle;
+        tent.s.angles2 = forward;
     }
 }
 
