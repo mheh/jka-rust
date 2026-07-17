@@ -270,7 +270,6 @@ pub use crate::entity::gentity_t as bgEntity_t;
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 pub use mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t;
-pub use mp_qshared::common::mp::qcommon::game_item::gitem_t;
 pub use mp_qshared::common::mp::qcommon::player_state::{
     forcedata_t, playerState_t, MAX_POWERUPS, MAX_PS_EVENTS,
 };

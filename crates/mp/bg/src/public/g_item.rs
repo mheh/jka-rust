@@ -9,6 +9,10 @@ use super::item_type::{
     itemType_t, IT_AMMO, IT_ARMOR, IT_BAD, IT_HEALTH, IT_HOLDABLE, IT_POWERUP, IT_TEAM, IT_WEAPON,
 };
 
+/// Raven `#define MAX_ITEM_MODELS 4`.
+/// Source: `oracle/codemp/game/bg_public.h:1120`
+pub const MAX_ITEM_MODELS: usize = 4;
+
 /// Raven `gitem_t` — one master-item-table entry.
 ///
 /// The eight `*mut c_char` fields become borrowed `'static` strings (Raven NULL

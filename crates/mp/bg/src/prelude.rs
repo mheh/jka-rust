@@ -120,7 +120,6 @@ pub use mp_qshared::common::mp::qcommon::b_set_t::{bSet_t, bSet_t::*};
 pub use mp_qshared::common::mp::qcommon::b_state_t::{bState_t, bState_t::*};
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 pub use mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t;
-pub use mp_qshared::common::mp::qcommon::game_item::gitem_t;
 pub use mp_qshared::common::mp::qcommon::nav_debug_draw::*;
 pub use mp_qshared::common::mp::qcommon::parms::{parms_t, MAX_PARMS};
 pub use mp_qshared::common::mp::qcommon::player_state::{
