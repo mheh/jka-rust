@@ -13,15 +13,15 @@ use crate::trap;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:18-35`
 pub fn NPC_LostEnemyDecideChase(ctx: &mut GameContext) {
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     let npc = unsafe { &mut *ctx.world.globals.NPC };
 
     let npc_id = ctx.entity_id_of(ctx.world.globals.NPC).unwrap();
-    match npc_info.behaviorState {
+    match unsafe { (*npc_info).behaviorState } {
         BS_HUNT_AND_KILL => {
             // Oracle: `NPC->enemy == NPCInfo->goalEntity && NPC->enemy->lastWaypoint != WAYPOINT_NONE`.
             if let Some(enemy_id) = npc.enemy {
-                if npc.enemy == npc_info.goalEntity {
+                if npc.enemy == unsafe { (*npc_info).goalEntity } {
                     let last_waypoint = ctx.entity(enemy_id).lastWaypoint;
                     if last_waypoint != WAYPOINT_NONE {
                         NPC_BSSearchStart(ctx, last_waypoint, BS_SEARCH);
@@ -94,8 +94,8 @@ pub fn NPC_StandTrackAndShoot(ctx: &mut GameContext, NPC: EntityId, canDuck: qbo
         if duck_ok {
             attack_ok = false;
             ctx.world.globals.ucmd.upmove = -127;
-            unsafe { &mut *ctx.world.globals.NPCInfo }.duckDebounceTime =
-                ctx.world.level.time + 1000;
+            let duck_debounce_time = ctx.world.level.time + 1000;
+            unsafe { (*ctx.world.globals.NPCInfo).duckDebounceTime = duck_debounce_time };
         }
     }
 
@@ -138,7 +138,7 @@ pub fn NPC_BSRun(ctx: &mut GameContext) {
 pub fn NPC_BSStandGuard(ctx: &mut GameContext) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
     let client = unsafe { &mut *ctx.world.globals.client };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     if npc.enemy.is_none() {
         if ctx.world.bg_state.rng.random() < 0.5 {
@@ -162,12 +162,14 @@ pub fn NPC_BSStandGuard(ctx: &mut GameContext) {
     }
 
     if npc.enemy.is_some() {
-        if npc_info.tempBehavior == BS_STAND_GUARD {
-            npc_info.tempBehavior = BS_DEFAULT;
-        }
+        unsafe {
+            if (*npc_info).tempBehavior == BS_STAND_GUARD {
+                (*npc_info).tempBehavior = BS_DEFAULT;
+            }
 
-        if npc_info.behaviorState == BS_STAND_GUARD {
-            npc_info.behaviorState = BS_STAND_AND_SHOOT;
+            if (*npc_info).behaviorState == BS_STAND_GUARD {
+                (*npc_info).behaviorState = BS_STAND_AND_SHOOT;
+            }
         }
     }
 
@@ -179,7 +181,7 @@ pub fn NPC_BSStandGuard(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:232-304`
 pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     let mut turned = false;
     let mut vec = [0.0; 3];
@@ -188,7 +190,7 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
 
     NPC_CheckEnemy(
         ctx,
-        (npc_info.tempBehavior != BS_HUNT_AND_KILL) as qboolean,
+        (unsafe { (*npc_info).tempBehavior } != BS_HUNT_AND_KILL) as qboolean,
         qfalse,
         qtrue,
     );
@@ -226,13 +228,15 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
                         > IdealDistance(ctx, ctx.entity_id_of(ctx.world.globals.NPC).unwrap())
                             * 3.0)
             {
-                npc_info.goalEntity = npc.enemy;
+                unsafe { (*npc_info).goalEntity = npc.enemy };
                 NPC_MoveToGoal(ctx, qtrue);
             } else if enemy_dist
                 < IdealDistance(ctx, ctx.entity_id_of(ctx.world.globals.NPC).unwrap())
             {
-                npc_info.goalEntity = npc.enemy;
-                npc_info.goalRadius = 12;
+                unsafe {
+                    (*npc_info).goalEntity = npc.enemy;
+                    (*npc_info).goalRadius = 12;
+                }
                 NPC_MoveToGoal(ctx, qtrue);
 
                 ctx.world.globals.ucmd.forwardmove *= -1;
@@ -247,10 +251,10 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
             }
         }
     } else {
-        if npc_info.tempBehavior == BS_HUNT_AND_KILL {
-            npc_info.tempBehavior = BS_DEFAULT;
+        if unsafe { (*npc_info).tempBehavior } == BS_HUNT_AND_KILL {
+            unsafe { (*npc_info).tempBehavior = BS_DEFAULT };
         } else {
-            npc_info.tempBehavior = BS_STAND_GUARD;
+            unsafe { (*npc_info).tempBehavior = BS_STAND_GUARD };
             NPC_BSStandGuard(ctx);
         }
         return;
@@ -267,7 +271,7 @@ pub fn NPC_BSHuntAndKill(ctx: &mut GameContext) {
 pub fn NPC_BSStandAndShoot(ctx: &mut GameContext) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
     let client = unsafe { &mut *ctx.world.globals.client };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     if client.playerTeam != 0 && client.enemyTeam != 0 {
         // many commented-out checks in oracle
@@ -275,7 +279,7 @@ pub fn NPC_BSStandAndShoot(ctx: &mut GameContext) {
 
     NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
 
-    if npc_info.duckDebounceTime > ctx.world.level.time
+    if unsafe { (*npc_info).duckDebounceTime } > ctx.world.level.time
         && client.ps.weapon as i32 != WP_SABER as i32
     {
         ctx.world.globals.ucmd.upmove = -127;
@@ -288,13 +292,17 @@ pub fn NPC_BSStandAndShoot(ctx: &mut GameContext) {
     if npc.enemy.is_some() {
         if NPC_StandTrackAndShoot(ctx, ctx.entity_id_of(ctx.world.globals.NPC).unwrap(), qtrue) == 0
         {
-            npc_info.desiredYaw = client.ps.viewangles[YAW];
-            npc_info.desiredPitch = client.ps.viewangles[PITCH];
+            unsafe {
+                (*npc_info).desiredYaw = client.ps.viewangles[YAW];
+                (*npc_info).desiredPitch = client.ps.viewangles[PITCH];
+            }
             NPC_UpdateAngles(ctx, qtrue, qtrue);
         }
     } else {
-        npc_info.desiredYaw = client.ps.viewangles[YAW];
-        npc_info.desiredPitch = client.ps.viewangles[PITCH];
+        unsafe {
+            (*npc_info).desiredYaw = client.ps.viewangles[YAW];
+            (*npc_info).desiredPitch = client.ps.viewangles[PITCH];
+        }
         NPC_UpdateAngles(ctx, qtrue, qtrue);
     }
 }
@@ -304,11 +312,11 @@ pub fn NPC_BSStandAndShoot(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:394-487`
 pub fn NPC_BSRunAndShoot(ctx: &mut GameContext) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
 
-    if npc_info.duckDebounceTime > ctx.world.level.time {
+    if unsafe { (*npc_info).duckDebounceTime } > ctx.world.level.time {
         ctx.world.globals.ucmd.upmove = -127;
         if npc.enemy.is_some() {
             NPC_CheckCanAttack(ctx, 1.0, qfalse);
@@ -337,14 +345,17 @@ pub fn NPC_BSRunAndShoot(ctx: &mut GameContext) {
                         npc.cantHitEnemyCounter = 60;
                     }
 
-                    if npc.cantHitEnemyCounter >= (npc_info.stats.aggression + 1) * 10 {
+                    if npc.cantHitEnemyCounter >= (unsafe { (*npc_info).stats.aggression } + 1) * 10
+                    {
                         NPC_LostEnemyDecideChase(ctx);
                     }
 
                     ctx.world.globals.ucmd.angles[YAW] = 0;
                     ctx.world.globals.ucmd.angles[PITCH] = 0;
-                    npc_info.goalEntity = npc.enemy;
-                    npc_info.goalRadius = 12;
+                    unsafe {
+                        (*npc_info).goalEntity = npc.enemy;
+                        (*npc_info).goalRadius = 12;
+                    }
                     NPC_MoveToGoal(ctx, qtrue);
                     NPC_UpdateAngles(ctx, qtrue, qtrue);
                 }
@@ -353,8 +364,8 @@ pub fn NPC_BSRunAndShoot(ctx: &mut GameContext) {
             npc.cantHitEnemyCounter = 0;
         }
     } else {
-        if npc_info.tempBehavior == BS_HUNT_AND_KILL {
-            npc_info.tempBehavior = BS_DEFAULT;
+        if unsafe { (*npc_info).tempBehavior } == BS_HUNT_AND_KILL {
+            unsafe { (*npc_info).tempBehavior = BS_DEFAULT };
             return;
         }
     }
@@ -364,7 +375,7 @@ pub fn NPC_BSRunAndShoot(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:490-503`
 pub fn NPC_BSFace(ctx: &mut GameContext) {
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     let client = unsafe { &mut *ctx.world.globals.client };
 
     if NPC_UpdateAngles(ctx, qtrue, qtrue) != 0 {
@@ -376,10 +387,12 @@ pub fn NPC_BSFace(ctx: &mut GameContext) {
             ),
         );
 
-        npc_info.desiredYaw = client.ps.viewangles[YAW];
-        npc_info.desiredPitch = client.ps.viewangles[PITCH];
+        unsafe {
+            (*npc_info).desiredYaw = client.ps.viewangles[YAW];
+            (*npc_info).desiredPitch = client.ps.viewangles[PITCH];
 
-        npc_info.aimTime = 0;
+            (*npc_info).aimTime = 0;
+        }
     }
 }
 
@@ -389,7 +402,7 @@ pub fn NPC_BSFace(ctx: &mut GameContext) {
 pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
     let client = unsafe { &mut *ctx.world.globals.client };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     let mut muzzle = [0.0; 3];
     let mut dir = [0.0; 3];
@@ -405,9 +418,11 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
                 TID_BSTATE as c_int,
             ),
         );
-        npc_info.desiredYaw = client.ps.viewangles[YAW];
-        npc_info.desiredPitch = client.ps.viewangles[PITCH];
-        npc_info.aimTime = 0;
+        unsafe {
+            (*npc_info).desiredYaw = client.ps.viewangles[YAW];
+            (*npc_info).desiredPitch = client.ps.viewangles[PITCH];
+            (*npc_info).aimTime = 0;
+        }
         return;
     }
 
@@ -423,9 +438,11 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
                     TID_BSTATE as c_int,
                 ),
             );
-            npc_info.desiredYaw = client.ps.viewangles[YAW];
-            npc_info.desiredPitch = client.ps.viewangles[PITCH];
-            npc_info.aimTime = 0;
+            unsafe {
+                (*npc_info).desiredYaw = client.ps.viewangles[YAW];
+                (*npc_info).desiredPitch = client.ps.viewangles[PITCH];
+                (*npc_info).aimTime = 0;
+            }
             return;
         }
     }
@@ -449,14 +466,18 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
         }
         _ => {
             let val = crate::q_math::AngleNormalize360(angles[PITCH]);
-            npc_info.desiredPitch = val;
-            npc_info.lockedDesiredPitch = val;
+            unsafe {
+                (*npc_info).desiredPitch = val;
+                (*npc_info).lockedDesiredPitch = val;
+            }
         }
     }
 
     let val = crate::q_math::AngleNormalize360(angles[YAW]);
-    npc_info.desiredYaw = val;
-    npc_info.lockedDesiredYaw = val;
+    unsafe {
+        (*npc_info).desiredYaw = val;
+        (*npc_info).lockedDesiredYaw = val;
+    }
 
     if NPC_UpdateAngles(ctx, qtrue, qtrue) != 0 {
         if shoot != 0 {
@@ -470,9 +491,11 @@ pub fn NPC_BSPointShoot(ctx: &mut GameContext, shoot: qboolean) {
                 TID_BSTATE as c_int,
             ),
         );
-        npc_info.desiredYaw = client.ps.viewangles[YAW];
-        npc_info.desiredPitch = client.ps.viewangles[PITCH];
-        npc_info.aimTime = 0;
+        unsafe {
+            (*npc_info).desiredYaw = client.ps.viewangles[YAW];
+            (*npc_info).desiredPitch = client.ps.viewangles[PITCH];
+            (*npc_info).aimTime = 0;
+        }
     }
 }
 
@@ -516,19 +539,22 @@ pub fn NPC_BSShoot(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Default.c:664-703`
 pub fn NPC_BSPatrol(ctx: &mut GameContext) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
-    if ctx.world.level.time > npc_info.enemyCheckDebounceTime {
-        npc_info.enemyCheckDebounceTime =
-            ctx.world.level.time + (npc_info.stats.vigilance * 1000.0) as c_int;
+    if ctx.world.level.time > unsafe { (*npc_info).enemyCheckDebounceTime } {
+        let level_time = ctx.world.level.time;
+        let vigilance = unsafe { (*npc_info).stats.vigilance };
+        unsafe {
+            (*npc_info).enemyCheckDebounceTime = level_time + (vigilance * 1000.0) as c_int;
+        }
         NPC_CheckEnemy(ctx, qtrue, qfalse, qtrue);
         if npc.enemy.is_some() {
-            npc_info.behaviorState = BS_HUNT_AND_KILL;
+            unsafe { (*npc_info).behaviorState = BS_HUNT_AND_KILL };
             return;
         }
     }
 
-    npc_info.investigateSoundDebounceTime = 0;
+    unsafe { (*npc_info).investigateSoundDebounceTime = 0 };
 
     if UpdateGoal(ctx) != core::ptr::null_mut() {
         NPC_MoveToGoal(ctx, qtrue);
@@ -545,15 +571,15 @@ pub fn NPC_BSPatrol(ctx: &mut GameContext) {
 pub fn NPC_BSDefault(ctx: &mut GameContext) {
     let npc = unsafe { &mut *ctx.world.globals.NPC };
     let client = unsafe { &mut *ctx.world.globals.client };
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     let mut move_ = true;
 
-    if (npc_info.scriptFlags & SCF_FIRE_WEAPON) != 0 {
+    if (unsafe { (*npc_info).scriptFlags } & SCF_FIRE_WEAPON) != 0 {
         WeaponThink(ctx, qtrue);
     }
 
-    if (npc_info.scriptFlags & SCF_FORCED_MARCH) != 0 {
+    if (unsafe { (*npc_info).scriptFlags } & SCF_FORCED_MARCH) != 0 {
         if client.ps.torsoAnim as i32 != TORSO_SURRENDER_START as i32 {
             let npc_id = ctx.entity_id_of(ctx.world.globals.NPC).unwrap();
             NPC_SetAnim(
@@ -568,21 +594,21 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
 
     NPC_CheckEnemy(
         ctx,
-        ((npc_info.scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0) as qboolean,
+        ((unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0) as qboolean,
         qfalse,
         qtrue,
     );
 
     if npc.enemy.is_none() {
-        if (npc_info.scriptFlags & SCF_IGNORE_ALERTS) == 0 {
+        if (unsafe { (*npc_info).scriptFlags } & SCF_IGNORE_ALERTS) == 0 {
             let alert_event =
                 NPC_CheckAlertEvents(ctx, qtrue, qtrue, -1, qtrue, AEL_DISCOVERED as i32);
 
             if alert_event >= 0 {
                 let alert_entry = &ctx.world.level.alertEvents[alert_event as usize];
-                if alert_entry.ID != npc_info.lastAlertID
+                if alert_entry.ID != unsafe { (*npc_info).lastAlertID }
                     && alert_entry.level as i32 >= AEL_DISCOVERED as i32
-                    && (npc_info.scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0
+                    && (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0
                 {
                     if !alert_entry.owner.is_null() {
                         let alert_owner = unsafe { &*alert_entry.owner };
@@ -599,10 +625,10 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
         }
     }
 
-    if npc.enemy.is_some() && (npc_info.scriptFlags & SCF_FORCED_MARCH) == 0 {
+    if npc.enemy.is_some() && (unsafe { (*npc_info).scriptFlags } & SCF_FORCED_MARCH) == 0 {
         NPC_CheckGetNewWeapon(ctx);
         if !client.leader.is_none()
-            && npc_info.goalEntity == client.leader
+            && unsafe { (*npc_info).goalEntity } == client.leader
             && trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
@@ -620,7 +646,7 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
     if UpdateGoal(ctx) != core::ptr::null_mut() {
         if npc.enemy.is_none()
             && !client.leader.is_none()
-            && npc_info.goalEntity == client.leader
+            && unsafe { (*npc_info).goalEntity } == client.leader
             && trap::ICARUS_TaskIDPending(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
@@ -631,36 +657,38 @@ pub fn NPC_BSDefault(ctx: &mut GameContext) {
         {
             NPC_BSFollowLeader(ctx);
         } else {
-            if (npc_info.scriptFlags & SCF_FACE_MOVE_DIR) != 0 || npc_info.goalEntity != npc.enemy {
-                npc_info.combatMove = 0;
+            if (unsafe { (*npc_info).scriptFlags } & SCF_FACE_MOVE_DIR) != 0
+                || unsafe { (*npc_info).goalEntity } != npc.enemy
+            {
+                unsafe { (*npc_info).combatMove = 0 };
             } else {
                 let mut dir = [0.0; 3];
                 let mut angles = [0.0; 3];
 
-                npc_info.combatMove = 0;
+                unsafe { (*npc_info).combatMove = 0 };
 
-                if let Some(goal_id) = npc_info.goalEntity {
+                if let Some(goal_id) = unsafe { (*npc_info).goalEntity } {
                     let goal_origin = ctx.entity(goal_id).r.currentOrigin;
                     crate::q_math::_VectorSubtract(goal_origin, npc.r.currentOrigin, &mut dir);
                     crate::q_math::vectoangles(dir, &mut angles);
-                    npc_info.desiredYaw = angles[YAW];
-                    if npc_info.goalEntity == npc.enemy {
-                        npc_info.desiredPitch = angles[PITCH];
+                    unsafe { (*npc_info).desiredYaw = angles[YAW] };
+                    if unsafe { (*npc_info).goalEntity } == npc.enemy {
+                        unsafe { (*npc_info).desiredPitch = angles[PITCH] };
                     }
                 }
             }
 
-            if (npc_info.scriptFlags & SCF_RUNNING) != 0 {
+            if (unsafe { (*npc_info).scriptFlags } & SCF_RUNNING) != 0 {
                 ctx.world.globals.ucmd.buttons &= !(BUTTON_WALKING as i32);
-            } else if (npc_info.scriptFlags & SCF_WALKING) != 0 {
+            } else if (unsafe { (*npc_info).scriptFlags } & SCF_WALKING) != 0 {
                 ctx.world.globals.ucmd.buttons |= BUTTON_WALKING as i32;
-            } else if npc_info.goalEntity == npc.enemy {
+            } else if unsafe { (*npc_info).goalEntity } == npc.enemy {
                 ctx.world.globals.ucmd.buttons &= !(BUTTON_WALKING as i32);
             } else {
                 ctx.world.globals.ucmd.buttons |= BUTTON_WALKING as i32;
             }
 
-            if (npc_info.scriptFlags & SCF_FORCED_MARCH) != 0 {
+            if (unsafe { (*npc_info).scriptFlags } & SCF_FORCED_MARCH) != 0 {
                 if NPC_SomeoneLookingAtMe(ctx, ctx.entity_id_of(ctx.world.globals.NPC).unwrap())
                     == 0
                 {

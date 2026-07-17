@@ -105,16 +105,17 @@ pub fn NPC_ATST_Pain(
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:130-142`
 pub fn ATST_Hunt(ctx: &mut GameContext, visible: qboolean, advance: qboolean) {
     let npc = ctx.world.globals.NPC;
-    // SAFETY: NPCInfo points into the module-owned gNPC pool (no aliasing accessor).
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
-    if npc_info.goalEntity.is_none() {
+    if unsafe { (*npc_info).goalEntity.is_none() } {
         // hunt
         let npc_id = ctx.entity_id_of(npc).unwrap();
-        npc_info.goalEntity = ctx.entity(npc_id).enemy;
+        let enemy = ctx.entity(npc_id).enemy;
+        unsafe { (*npc_info).goalEntity = enemy };
     }
 
-    npc_info.combatMove = qtrue;
+    unsafe { (*npc_info).combatMove = qtrue };
 
     NPC_MoveToGoal(ctx, qtrue);
 }
@@ -150,8 +151,8 @@ pub fn ATST_Ranged(
         }
     }
 
-    // SAFETY: NPCInfo (gNPC_t) has no safe pool accessor; deref stays unsafe.
-    if (unsafe { &*ctx.world.globals.NPCInfo }.scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+    // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+    if (unsafe { (*ctx.world.globals.NPCInfo).scriptFlags } & SCF_CHASE_ENEMIES) != 0 {
         ATST_Hunt(ctx, visible, advance);
     }
 }
@@ -201,8 +202,8 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
 
     // If we cannot see our target, move to see it
     if visible == qfalse {
-        // SAFETY: NPCInfo (gNPC_t) has no safe pool accessor; deref stays unsafe.
-        if (unsafe { &*ctx.world.globals.NPCInfo }.scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+        // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+        if (unsafe { (*ctx.world.globals.NPCInfo).scriptFlags } & SCF_CHASE_ENEMIES) != 0 {
             ATST_Hunt(ctx, visible, advance);
             return;
         }
@@ -319,15 +320,16 @@ pub fn ATST_Idle(ctx: &mut GameContext) {
 pub fn NPC_BSATST_Default(ctx: &mut GameContext) {
     let npc = ctx.world.globals.NPC;
     let npc_id = ctx.entity_id_of(npc).unwrap();
-    // SAFETY: NPCInfo points into the module-owned gNPC pool (no aliasing accessor).
-    let npc_info = unsafe { &mut *ctx.world.globals.NPCInfo };
+    // FLAG: NPCInfo (gNPC_t) has no accessor — the deref stays raw.
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
 
     if ctx.entity(npc_id).enemy.is_some() {
-        if (npc_info.scriptFlags & SCF_CHASE_ENEMIES) != 0 {
-            npc_info.goalEntity = ctx.entity(npc_id).enemy;
+        if (unsafe { (*npc_info).scriptFlags } & SCF_CHASE_ENEMIES) != 0 {
+            let enemy = ctx.entity(npc_id).enemy;
+            unsafe { (*npc_info).goalEntity = enemy };
         }
         ATST_Attack(ctx);
-    } else if (npc_info.scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
+    } else if (unsafe { (*npc_info).scriptFlags } & SCF_LOOK_FOR_ENEMIES) != 0 {
         ATST_Patrol(ctx);
     } else {
         ATST_Idle(ctx);

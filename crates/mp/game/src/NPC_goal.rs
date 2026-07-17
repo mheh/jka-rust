@@ -36,10 +36,11 @@ pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
     // the still-open ambient-globals seam (2c task #7), not an entity deref. The
     // Stage-1 `ent_id_opt(base, ent_ptr(goal))` round-trip is the identity on
     // `Option<EntityId>`, so the goal handle assigns directly.
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
+    let goal_time = ctx.world.level.time;
     unsafe {
-        let npc_info = &mut *ctx.world.globals.NPCInfo;
-        npc_info.goalEntity = goal;
-        npc_info.goalTime = ctx.world.level.time;
+        (*npc_info).goalEntity = goal;
+        (*npc_info).goalTime = goal_time;
     }
 }
 
@@ -49,10 +50,9 @@ pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
 pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
     // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
     // reached through the safe `ctx.world.entity` accessor.
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_info = &mut *ctx.world.globals.NPCInfo;
-
-        if goal == npc_info.goalEntity {
+        if goal == (*npc_info).goalEntity {
             return;
         }
 
@@ -64,8 +64,8 @@ pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
             return;
         }
 
-        if npc_info.goalEntity.is_some() {
-            npc_info.lastGoalEntity = npc_info.goalEntity;
+        if (*npc_info).goalEntity.is_some() {
+            (*npc_info).lastGoalEntity = (*npc_info).goalEntity;
         }
 
         SetGoal(ctx, goal, rating);
@@ -78,16 +78,15 @@ pub fn NPC_SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
 pub fn NPC_ClearGoal(ctx: &mut GameContext) {
     // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
     // reached through the safe `ctx.world.entity` accessor.
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_info = &mut *ctx.world.globals.NPCInfo;
-
-        if npc_info.lastGoalEntity.is_none() {
+        if (*npc_info).lastGoalEntity.is_none() {
             SetGoal(ctx, None, 0.0);
             return;
         }
 
-        let last_goal_id = npc_info.lastGoalEntity;
-        npc_info.lastGoalEntity = None;
+        let last_goal_id = (*npc_info).lastGoalEntity;
+        (*npc_info).lastGoalEntity = None;
 
         if let Some(goal_id) = last_goal_id {
             let goal = ctx.world.entity(goal_id);
@@ -141,11 +140,12 @@ pub fn G_BoundsOverlap(mins1: vec3_t, maxs1: vec3_t, mins2: vec3_t, maxs2: vec3_
 pub fn NPC_ReachedGoal(ctx: &mut GameContext) {
     NPC_ClearGoal(ctx);
 
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
+    let goal_time = ctx.world.level.time;
     unsafe {
-        let npc_info = &mut *ctx.world.globals.NPCInfo;
-        npc_info.goalTime = ctx.world.level.time;
+        (*npc_info).goalTime = goal_time;
 
-        npc_info.aiFlags &= !NPCAI_MOVING;
+        (*npc_info).aiFlags &= !NPCAI_MOVING;
         ctx.world.globals.ucmd.forwardmove = 0;
 
         let npc = ctx.world.globals.NPC;
@@ -169,11 +169,10 @@ pub fn NPC_ReachedGoal(ctx: &mut GameContext) {
 pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_info = &mut *ctx.world.globals.NPCInfo;
-
-        if (npc_info.aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
-            npc_info.aiFlags &= !NPCAI_TOUCHED_GOAL;
+        if ((*npc_info).aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
+            (*npc_info).aiFlags &= !NPCAI_TOUCHED_GOAL;
             return qtrue;
         }
 
@@ -185,7 +184,7 @@ pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
             (*npc).r.mins,
             (*npc).r.maxs,
             (*goal).r.currentOrigin,
-            npc_info.goalRadius,
+            (*npc_info).goalRadius,
             flying,
         )
     }
@@ -202,14 +201,13 @@ pub fn UpdateGoal(ctx: &mut GameContext) -> *mut gentity_t {
     // SAFETY: `NPCInfo` ambient-global raw deref (2c task #7); the goal entity is
     // reached through the safe accessor, then re-derived as a raw pointer at the
     // return boundary for the still-raw caller.
+    let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
-        let npc_info = &*ctx.world.globals.NPCInfo;
-
-        if npc_info.goalEntity.is_none() {
+        if (*npc_info).goalEntity.is_none() {
             return core::ptr::null_mut();
         }
 
-        let goal_id = npc_info.goalEntity.unwrap();
+        let goal_id = (*npc_info).goalEntity.unwrap();
 
         if ctx.world.entity(goal_id).inuse == 0 {
             NPC_ClearGoal(ctx);
