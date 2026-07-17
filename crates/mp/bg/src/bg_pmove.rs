@@ -6655,9 +6655,7 @@ impl PmoveContext<'_> {
 
             let mut forcedUse = forcedUse;
             if forcedUse == 0 {
-                forcedUse = bg_itemlist
-                    [(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize]
-                    .giTag();
+                forcedUse = selected_holdable_tag(ps);
             }
 
             if BG_IsItemSelectable(ps, forcedUse) == qfalse {
@@ -7342,9 +7340,7 @@ impl PmoveContext<'_> {
                         (*ps).pm_flags |= PMF_USE_ITEM_HELD;
                         return;
                     } else {
-                        let giTag = bg_itemlist
-                            [(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize]
-                            .giTag();
+                        let giTag = selected_holdable_tag(ps);
                         if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << giTag)
                             != 0
                         {
