@@ -15,6 +15,7 @@
 //! unsafe blocks, exactly as Raven derefs them.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_missile::CreateMissile;
 use crate::prelude::*;
 use crate::trap;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
@@ -337,14 +338,14 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
         Some(&mut up),
     );
 
-    let missile = crate::g_missile::CreateMissile(
+    let missile_id = CreateMissile(
         ctx,
         npc_origin,
         forward,
         1000.0,
         10000,
         ctx.entity_id_of(npc).unwrap(),
-        qfalse,
+        false,
     );
 
     crate::g_utils::G_PlayEffectID(
@@ -353,7 +354,6 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
         forward,
     );
 
-    let missile_id = ctx.entity_id_of(missile).unwrap();
     let m = ctx.world.entity_mut(missile_id);
     m.classname = c"briar".as_ptr() as *mut c_char;
     m.s.weapon = WP_BRYAR_PISTOL as c_int;

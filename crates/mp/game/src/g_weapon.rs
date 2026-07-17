@@ -6,6 +6,7 @@
 //! `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_missile::CreateMissile;
 use crate::prelude::*;
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::stat_index::statIndex_t;
@@ -262,16 +263,15 @@ pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: qboolea
 
     let muzzle = ctx.world.globals.muzzle;
     let forward = ctx.world.globals.forward;
-    let missile = crate::g_missile::CreateMissile(
+    let mid = CreateMissile(
         ctx,
         muzzle,
         forward,
         BRYAR_PISTOL_VEL as f32,
         10000,
         ent,
-        altFire,
+        altFire != 0,
     );
-    let mid = ctx.entity_id_of(missile).unwrap();
 
     {
         let m = ctx.world.entity_mut(mid);
@@ -336,9 +336,7 @@ pub fn WP_FireTurretMissile(
     r#mod: c_int,
     ignore: Option<EntityId>,
 ) {
-    let missile =
-        crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"generic_proj".as_ptr() as *mut c_char;
@@ -374,9 +372,7 @@ pub fn WP_FireGenericBlasterMissile(
     velocity: c_int,
     r#mod: c_int,
 ) {
-    let missile =
-        crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"generic_proj".as_ptr() as *mut c_char;
@@ -409,9 +405,7 @@ pub fn WP_FireBlasterMissile(
         damage = 10;
     }
 
-    let missile =
-        crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"blaster_proj".as_ptr() as *mut c_char;
@@ -432,9 +426,7 @@ pub fn WP_FireBlasterMissile(
 pub fn WP_FireTurboLaserMissile(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec3_t) {
     // FIXME (Raven): velocity/damage/splash externalized off the shooter ent.
     let velocity: c_int = ctx.world.entity(ent).mass as c_int;
-    let missile =
-        crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, qfalse);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, false);
 
     // Shooter-ent reads hoisted into locals (CreateMissile does not mutate `ent`).
     let e = ctx.world.entity(ent);
@@ -488,9 +480,7 @@ pub fn WP_FireEmplacedMissile(
     let velocity: c_int = BLASTER_VELOCITY;
     let damage: c_int = BLASTER_DAMAGE;
 
-    let missile =
-        crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"emplaced_gun_proj".as_ptr() as *mut c_char;
@@ -1125,16 +1115,15 @@ pub fn WP_BowcasterAltFire(ctx: &mut GameContext, ent: EntityId) {
 
     let muzzle = ctx.world.globals.muzzle;
     let forward = ctx.world.globals.forward;
-    let missile = crate::g_missile::CreateMissile(
+    let mid = CreateMissile(
         ctx,
         muzzle,
         forward,
         BOWCASTER_VELOCITY as f32,
         10000,
         ent,
-        qfalse,
+        false,
     );
-    let mid = ctx.entity_id_of(missile).unwrap();
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"bowcaster_proj".as_ptr() as *mut c_char;
@@ -1221,8 +1210,7 @@ pub fn WP_BowcasterMainFire(ctx: &mut GameContext, ent: EntityId) {
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
         let muzzle = ctx.world.globals.muzzle;
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, dir, vel, 10000, ent, qtrue);
-        let mid = ctx.entity_id_of(missile).unwrap();
+        let mid = CreateMissile(ctx, muzzle, dir, vel, 10000, ent, true);
         let m = ctx.world.entity_mut(mid);
 
         m.classname = c"bowcaster_alt_proj".as_ptr() as *mut c_char;
@@ -1265,16 +1253,15 @@ pub fn WP_RepeaterMainFire(ctx: &mut GameContext, ent: EntityId, dir: vec3_t) {
     let damage: c_int = REPEATER_DAMAGE;
 
     let muzzle = ctx.world.globals.muzzle;
-    let missile = crate::g_missile::CreateMissile(
+    let mid = CreateMissile(
         ctx,
         muzzle,
         dir,
         REPEATER_VELOCITY as f32,
         10000,
         ent,
-        qfalse,
+        false,
     );
-    let mid = ctx.entity_id_of(missile).unwrap();
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"repeater_proj".as_ptr() as *mut c_char;
@@ -1297,16 +1284,15 @@ pub fn WP_RepeaterAltFire(ctx: &mut GameContext, ent: EntityId) {
 
     let muzzle = ctx.world.globals.muzzle;
     let forward = ctx.world.globals.forward;
-    let missile = crate::g_missile::CreateMissile(
+    let mid = CreateMissile(
         ctx,
         muzzle,
         forward,
         REPEATER_ALT_VELOCITY as f32,
         10000,
         ent,
-        qtrue,
+        true,
     );
-    let mid = ctx.entity_id_of(missile).unwrap();
     // Read the gametype cvar before taking the missile borrow.
     let siege = ctx.world.cvars.g_gametype.integer == GT_SIEGE;
     let m = ctx.world.entity_mut(mid);
@@ -1374,16 +1360,15 @@ pub fn WP_DEMP2_MainFire(ctx: &mut GameContext, ent: EntityId) {
 
     let muzzle = ctx.world.globals.muzzle;
     let forward = ctx.world.globals.forward;
-    let missile = crate::g_missile::CreateMissile(
+    let mid = CreateMissile(
         ctx,
         muzzle,
         forward,
         DEMP2_VELOCITY as f32,
         10000,
         ent,
-        qfalse,
+        false,
     );
-    let mid = ctx.entity_id_of(missile).unwrap();
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"demp2_proj".as_ptr() as *mut c_char;
@@ -1747,16 +1732,7 @@ pub fn WP_FlechetteMainFire(ctx: &mut GameContext, ent: EntityId) {
         crate::q_math::AngleVectors(angs, Some(&mut fwd), None, None);
 
         let muzzle = ctx.world.globals.muzzle;
-        let missile = crate::g_missile::CreateMissile(
-            ctx,
-            muzzle,
-            fwd,
-            FLECHETTE_VEL as f32,
-            10000,
-            ent,
-            qfalse,
-        );
-        let mid = ctx.entity_id_of(missile).unwrap();
+        let mid = CreateMissile(ctx, muzzle, fwd, FLECHETTE_VEL as f32, 10000, ent, false);
         let m = ctx.world.entity_mut(mid);
 
         m.classname = c"flech_proj".as_ptr() as *mut c_char;
@@ -1936,9 +1912,7 @@ pub fn WP_CreateFlechetteBouncyThing(
 ) {
     let vel = 700.0 + ctx.world.bg_state.rng.random() * 700.0;
     let life = 1500.0 + ctx.world.bg_state.rng.random() * 2000.0;
-    let missile =
-        crate::g_missile::CreateMissile(ctx, start, fwd, vel, life as c_int, self_, qtrue);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, fwd, vel, life as c_int, self_, true);
     let m = ctx.world.entity_mut(mid);
 
     m.think = Some(EntThink::WP_flechette_alt_blow).into();
@@ -2242,8 +2216,7 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
         vel *= 0.5;
     }
 
-    let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, vel, 10000, ent, altFire);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, muzzle, forward, vel, 10000, ent, altFire != 0);
 
     // FLAG: firing ent may be an NPC (pool client); deref the client value raw.
     let ent_client = ctx.world.entity(ent).client;
@@ -4029,8 +4002,7 @@ pub fn WP_FireConcussion(ctx: &mut GameContext, ent: EntityId) {
     start = W_TraceSetStart(ctx, ent, start, [0.0; 3], [0.0; 3]); // make sure our start point isn't on the other side of a wall
     let forward = ctx.world.globals.forward;
 
-    let missile = crate::g_missile::CreateMissile(ctx, start, forward, vel, 10000, ent, qfalse);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = CreateMissile(ctx, start, forward, vel, 10000, ent, false);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"conc_proj".as_ptr() as *mut c_char;
@@ -4590,15 +4562,8 @@ pub fn WP_FireVehicleWeapon(
 
             // FIXME: CUSTOM MODEL?
             // QUERY: alt_fire true or not?  Does it matter?
-            missile = crate::g_missile::CreateMissile(
-                ctx,
-                start,
-                dir,
-                (*vehWeapon).fSpeed,
-                10000,
-                ent,
-                qfalse,
-            );
+            let mid = CreateMissile(ctx, start, dir, (*vehWeapon).fSpeed, 10000, ent, false);
+            missile = ctx.entity_mut(mid);
 
             (*missile).classname = c"vehicle_proj".as_ptr() as *mut c_char;
 

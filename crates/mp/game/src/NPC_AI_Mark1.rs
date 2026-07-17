@@ -7,6 +7,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::entity::hit_location::*;
+use crate::g_missile::CreateMissile;
 use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
 use crate::npc::spot_t::spot_t;
 use crate::npc_c::NPC_SetAnim;
@@ -214,37 +215,34 @@ pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
         crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
     );
 
-    let missile = crate::g_missile::CreateMissile(
+    let missile_id = CreateMissile(
         ctx,
         muzzle1,
         muzzle_dir,
         BOWCASTER_VELOCITY as f32,
         10000,
         npc_id,
-        qfalse,
+        false,
     );
 
-    if !missile.is_null() {
-        let missile_id = ctx.entity_id_of(missile).unwrap();
-        ctx.world.entity_mut(missile_id).classname = c"bowcaster_proj".as_ptr().cast_mut();
-        ctx.world.entity_mut(missile_id).s.weapon = WP_BOWCASTER as c_int;
+    ctx.world.entity_mut(missile_id).classname = c"bowcaster_proj".as_ptr().cast_mut();
+    ctx.world.entity_mut(missile_id).s.weapon = WP_BOWCASTER as c_int;
 
-        ctx.world.entity_mut(missile_id).r.maxs[0] = BOWCASTER_SIZE as f32;
-        ctx.world.entity_mut(missile_id).r.maxs[1] = BOWCASTER_SIZE as f32;
-        ctx.world.entity_mut(missile_id).r.maxs[2] = BOWCASTER_SIZE as f32;
-        ctx.world.entity_mut(missile_id).r.mins[0] = -(BOWCASTER_SIZE as f32);
-        ctx.world.entity_mut(missile_id).r.mins[1] = -(BOWCASTER_SIZE as f32);
-        ctx.world.entity_mut(missile_id).r.mins[2] = -(BOWCASTER_SIZE as f32);
+    ctx.world.entity_mut(missile_id).r.maxs[0] = BOWCASTER_SIZE as f32;
+    ctx.world.entity_mut(missile_id).r.maxs[1] = BOWCASTER_SIZE as f32;
+    ctx.world.entity_mut(missile_id).r.maxs[2] = BOWCASTER_SIZE as f32;
+    ctx.world.entity_mut(missile_id).r.mins[0] = -(BOWCASTER_SIZE as f32);
+    ctx.world.entity_mut(missile_id).r.mins[1] = -(BOWCASTER_SIZE as f32);
+    ctx.world.entity_mut(missile_id).r.mins[2] = -(BOWCASTER_SIZE as f32);
 
-        ctx.world.entity_mut(missile_id).damage = damage;
-        ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
-        ctx.world.entity_mut(missile_id).methodOfDeath = MOD_ROCKET as c_int;
-        ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
-        ctx.world.entity_mut(missile_id).splashDamage = BOWCASTER_SPLASH_DAMAGE;
-        ctx.world.entity_mut(missile_id).splashRadius = BOWCASTER_SPLASH_RADIUS;
+    ctx.world.entity_mut(missile_id).damage = damage;
+    ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
+    ctx.world.entity_mut(missile_id).methodOfDeath = MOD_ROCKET as c_int;
+    ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+    ctx.world.entity_mut(missile_id).splashDamage = BOWCASTER_SPLASH_DAMAGE;
+    ctx.world.entity_mut(missile_id).splashRadius = BOWCASTER_SPLASH_RADIUS;
 
-        ctx.world.entity_mut(missile_id).bounceCount = 0;
-    }
+    ctx.world.entity_mut(missile_id).bounceCount = 0;
 }
 
 /// Raven `Mark1Dead_FireBlaster`.
@@ -295,8 +293,7 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
         muzzle_dir,
     );
 
-    let missile =
-        crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc_id, qfalse);
+    let missile_id = CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc_id, false);
 
     crate::g_utils::G_Sound(
         ctx,
@@ -305,16 +302,13 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
         crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
     );
 
-    if !missile.is_null() {
-        let missile_id = ctx.entity_id_of(missile).unwrap();
-        ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
-        ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
+    ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+    ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
 
-        ctx.world.entity_mut(missile_id).damage = 1;
-        ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
-        ctx.world.entity_mut(missile_id).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
-        ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
-    }
+    ctx.world.entity_mut(missile_id).damage = 1;
+    ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
+    ctx.world.entity_mut(missile_id).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
+    ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 }
 
 /// Raven `Mark1_die`.
@@ -774,19 +768,15 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
         crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
     );
 
-    let missile =
-        crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, qfalse);
+    let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
 
-    if !missile.is_null() {
-        let missile_id = ctx.entity_id_of(missile).unwrap();
-        ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
-        ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
+    ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+    ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
 
-        ctx.world.entity_mut(missile_id).damage = 1;
-        ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
-        ctx.world.entity_mut(missile_id).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
-        ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
-    }
+    ctx.world.entity_mut(missile_id).damage = 1;
+    ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
+    ctx.world.entity_mut(missile_id).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
+    ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 }
 
 /// Raven `Mark1_BlasterAttack`.
@@ -930,37 +920,34 @@ pub fn Mark1_FireRocket(ctx: &mut GameContext) {
         crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
     );
 
-    let missile = crate::g_missile::CreateMissile(
+    let missile_id = CreateMissile(
         ctx,
         muzzle1,
         forward,
         BOWCASTER_VELOCITY as f32,
         10000,
         npc_id,
-        qfalse,
+        false,
     );
 
-    if !missile.is_null() {
-        let missile_id = ctx.entity_id_of(missile).unwrap();
-        ctx.world.entity_mut(missile_id).classname = c"bowcaster_proj".as_ptr().cast_mut();
-        ctx.world.entity_mut(missile_id).s.weapon = WP_BOWCASTER as c_int;
+    ctx.world.entity_mut(missile_id).classname = c"bowcaster_proj".as_ptr().cast_mut();
+    ctx.world.entity_mut(missile_id).s.weapon = WP_BOWCASTER as c_int;
 
-        ctx.world.entity_mut(missile_id).r.maxs[0] = BOWCASTER_SIZE as f32;
-        ctx.world.entity_mut(missile_id).r.maxs[1] = BOWCASTER_SIZE as f32;
-        ctx.world.entity_mut(missile_id).r.maxs[2] = BOWCASTER_SIZE as f32;
-        ctx.world.entity_mut(missile_id).r.mins[0] = -(BOWCASTER_SIZE as f32);
-        ctx.world.entity_mut(missile_id).r.mins[1] = -(BOWCASTER_SIZE as f32);
-        ctx.world.entity_mut(missile_id).r.mins[2] = -(BOWCASTER_SIZE as f32);
+    ctx.world.entity_mut(missile_id).r.maxs[0] = BOWCASTER_SIZE as f32;
+    ctx.world.entity_mut(missile_id).r.maxs[1] = BOWCASTER_SIZE as f32;
+    ctx.world.entity_mut(missile_id).r.maxs[2] = BOWCASTER_SIZE as f32;
+    ctx.world.entity_mut(missile_id).r.mins[0] = -(BOWCASTER_SIZE as f32);
+    ctx.world.entity_mut(missile_id).r.mins[1] = -(BOWCASTER_SIZE as f32);
+    ctx.world.entity_mut(missile_id).r.mins[2] = -(BOWCASTER_SIZE as f32);
 
-        ctx.world.entity_mut(missile_id).damage = damage;
-        ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
-        ctx.world.entity_mut(missile_id).methodOfDeath = MOD_ROCKET as c_int;
-        ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
-        ctx.world.entity_mut(missile_id).splashDamage = BOWCASTER_SPLASH_DAMAGE;
-        ctx.world.entity_mut(missile_id).splashRadius = BOWCASTER_SPLASH_RADIUS;
+    ctx.world.entity_mut(missile_id).damage = damage;
+    ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
+    ctx.world.entity_mut(missile_id).methodOfDeath = MOD_ROCKET as c_int;
+    ctx.world.entity_mut(missile_id).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+    ctx.world.entity_mut(missile_id).splashDamage = BOWCASTER_SPLASH_DAMAGE;
+    ctx.world.entity_mut(missile_id).splashRadius = BOWCASTER_SPLASH_RADIUS;
 
-        ctx.world.entity_mut(missile_id).bounceCount = 0;
-    }
+    ctx.world.entity_mut(missile_id).bounceCount = 0;
 }
 
 /// Raven `Mark1_RocketAttack`.

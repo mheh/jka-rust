@@ -34,6 +34,7 @@ unsafe fn ent_base(ctx: &mut GameContext) -> *const gentity_t {
     ctx.world.g_entities.as_ptr()
 }
 
+use crate::q_math::_VectorScale;
 use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
@@ -450,37 +451,38 @@ pub fn CreateMissile(
     vel: f32,
     life: c_int,
     owner: EntityId,
-    altFire: qboolean,
-) -> *mut gentity_t {
-    // Return type stays `*mut gentity_t` (Stage 1 converts params only; the many
-    // external callers consume the raw pointer). `missile_ptr` is the freshly
-    // spawned slot; its handle drives the accessor body.
+    altFire: bool,
+) -> EntityId {
     let missile_ptr = G_Spawn(ctx);
     let missile = ctx.entity_id_of(missile_ptr).unwrap();
 
-    ctx.entity_mut(missile).nextthink = ctx.world.level.time + life;
-    ctx.entity_mut(missile).think = Some(EntThink::G_FreeEntity).into();
-    ctx.entity_mut(missile).s.eType = ET_MISSILE as c_int;
-    ctx.entity_mut(missile).r.svFlags = SVF_USE_CURRENT_ORIGIN;
-    ctx.entity_mut(missile).parent = Some(owner);
-    ctx.entity_mut(missile).r.ownerNum = ctx.entity(owner).s.number;
-
-    if altFire != 0 {
-        ctx.entity_mut(missile).s.eFlags |= EF_ALT_FIRING;
-    }
-
-    ctx.entity_mut(missile).s.pos.trType = TR_LINEAR;
-    ctx.entity_mut(missile).s.pos.trTime = ctx.world.level.time;
-    ctx.entity_mut(missile).target_ent = None;
-
+    let level_time = ctx.world.level.time;
+    let owner_number = ctx.entity(owner).s.number;
     let mut snapped_org = org;
     snap_vector(&mut snapped_org);
-    crate::q_math::_VectorCopy(snapped_org, &mut ctx.entity_mut(missile).s.pos.trBase);
-    crate::q_math::_VectorScale(dir, vel, &mut ctx.entity_mut(missile).s.pos.trDelta);
-    crate::q_math::_VectorCopy(snapped_org, &mut ctx.entity_mut(missile).r.currentOrigin);
-    snap_vector(&mut ctx.entity_mut(missile).s.pos.trDelta);
 
-    missile_ptr
+    let e = ctx.entity_mut(missile);
+    e.nextthink = level_time + life;
+    e.think = Some(EntThink::G_FreeEntity).into();
+    e.s.eType = ET_MISSILE as c_int;
+    e.r.svFlags = SVF_USE_CURRENT_ORIGIN;
+    e.parent = Some(owner);
+    e.r.ownerNum = owner_number;
+
+    if altFire {
+        e.s.eFlags |= EF_ALT_FIRING;
+    }
+
+    e.s.pos.trType = TR_LINEAR;
+    e.s.pos.trTime = level_time;
+    e.target_ent = None;
+
+    e.s.pos.trBase = snapped_org;
+    _VectorScale(dir, vel, &mut e.s.pos.trDelta);
+    e.r.currentOrigin = snapped_org;
+    snap_vector(&mut e.s.pos.trDelta);
+
+    missile
 }
 
 /// Raven `G_MissileBounceEffect`.
