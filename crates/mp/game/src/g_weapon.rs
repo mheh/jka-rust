@@ -191,7 +191,7 @@ pub fn touch_NULL(ent: EntityId, other: Option<EntityId>, trace: *mut trace_t) {
 /// Raven `WP_SpeedOfMissileForWeapon`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:176-179`
-pub fn WP_SpeedOfMissileForWeapon(wp: c_int, alt_fire: qboolean) -> f32 {
+pub fn WP_SpeedOfMissileForWeapon(wp: c_int, alt_fire: bool) -> f32 {
     // Raven comment: "We should really organize weapon data into tables or
     // parse from the ext data so we have accurate info for this."
     500.0
@@ -262,7 +262,7 @@ pub fn W_TraceSetStart(
 /// Raven `WP_FireBryarPistol`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:236-293`
-pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
+pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
     let mut damage: c_int = BRYAR_PISTOL_DAMAGE;
     let mut count: c_int;
 
@@ -275,7 +275,7 @@ pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: qboolea
         BRYAR_PISTOL_VEL as f32,
         10000,
         ent,
-        altFire != 0,
+        altFire,
     );
 
     {
@@ -284,7 +284,7 @@ pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: qboolea
         m.s.weapon = WP_BRYAR_PISTOL;
     }
 
-    if altFire != qfalse {
+    if altFire {
         let boxSize: f32;
 
         // FLAG: firing ent may be an NPC (pool client); deref the client value raw.
@@ -316,7 +316,7 @@ pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: qboolea
     let m = ctx.world.entity_mut(mid);
     m.damage = damage;
     m.dflags = DAMAGE_DEATH_KNOCKBACK;
-    if altFire != qfalse {
+    if altFire {
         m.methodOfDeath = MOD_BRYAR_PISTOL_ALT as c_int;
     } else {
         m.methodOfDeath = MOD_BRYAR_PISTOL as c_int;
@@ -335,13 +335,13 @@ pub fn WP_FireTurretMissile(
     ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
-    altFire: qboolean,
+    altFire: bool,
     damage: c_int,
     velocity: c_int,
     r#mod: c_int,
     ignore: Option<EntityId>,
 ) {
-    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"generic_proj".as_ptr() as *mut c_char;
@@ -372,12 +372,12 @@ pub fn WP_FireGenericBlasterMissile(
     ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
-    altFire: qboolean,
+    altFire: bool,
     damage: c_int,
     velocity: c_int,
     r#mod: c_int,
 ) {
-    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"generic_proj".as_ptr() as *mut c_char;
@@ -400,7 +400,7 @@ pub fn WP_FireBlasterMissile(
     ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
-    altFire: qboolean,
+    altFire: bool,
 ) {
     let velocity: c_int = BLASTER_VELOCITY;
     let mut damage: c_int = BLASTER_DAMAGE;
@@ -410,7 +410,7 @@ pub fn WP_FireBlasterMissile(
         damage = 10;
     }
 
-    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"blaster_proj".as_ptr() as *mut c_char;
@@ -479,13 +479,13 @@ pub fn WP_FireEmplacedMissile(
     ent: EntityId,
     start: vec3_t,
     dir: vec3_t,
-    altFire: qboolean,
+    altFire: bool,
     ignore: Option<EntityId>,
 ) {
     let velocity: c_int = BLASTER_VELOCITY;
     let damage: c_int = BLASTER_DAMAGE;
 
-    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire != 0);
+    let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
     let m = ctx.world.entity_mut(mid);
 
     m.classname = c"emplaced_gun_proj".as_ptr() as *mut c_char;
@@ -510,13 +510,13 @@ pub fn WP_FireEmplacedMissile(
 /// Raven `WP_FireBlaster`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:451-469`
-pub fn WP_FireBlaster(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
+pub fn WP_FireBlaster(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
     let mut dir: vec3_t = [0.0; 3];
     let mut angs: vec3_t = [0.0; 3];
 
     vectoangles(ctx.world.globals.forward, &mut angs);
 
-    if altFire != qfalse {
+    if altFire {
         // add some slop to the alt-fire direction
         // C: `crandom()` is `double`, so each `+=` runs in `double` and
         // narrows back to the `float` angle component.
@@ -1062,7 +1062,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `WP_FireDisruptor`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:890-912`
-pub fn WP_FireDisruptor(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolean) {
+pub fn WP_FireDisruptor(ctx: &mut GameContext, ent: Option<EntityId>, altFire: bool) {
     let mut altFire = altFire;
     // FLAG: firing ent may be an NPC (pool client); read the client pointer value
     // and deref it raw as Raven does.
@@ -1072,7 +1072,7 @@ pub fn WP_FireDisruptor(ctx: &mut GameContext, ent: Option<EntityId>, altFire: q
     };
     if ent.is_none() || client.is_null() || unsafe { (*client).ps.zoomMode } != 1 {
         // do not ever let it do the alt fire when not zoomed
-        altFire = qfalse;
+        altFire = false;
     }
 
     if let Some(id) = ent {
@@ -1083,7 +1083,7 @@ pub fn WP_FireDisruptor(ctx: &mut GameContext, ent: Option<EntityId>, altFire: q
         }
     }
 
-    if altFire != qfalse {
+    if altFire {
         WP_DisruptorAltFire(ctx, ent.unwrap());
     } else {
         WP_DisruptorMainFire(ctx, ent.unwrap());
@@ -1221,8 +1221,8 @@ pub fn WP_BowcasterMainFire(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `WP_FireBowcaster`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1032-1043`
-pub fn WP_FireBowcaster(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
-    if altFire != qfalse {
+pub fn WP_FireBowcaster(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
+    if altFire {
         WP_BowcasterAltFire(ctx, ent);
     } else {
         WP_BowcasterMainFire(ctx, ent);
@@ -1313,13 +1313,13 @@ pub fn WP_RepeaterAltFire(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `WP_FireRepeater`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1110-1131`
-pub fn WP_FireRepeater(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
+pub fn WP_FireRepeater(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
     let mut dir: vec3_t = [0.0; 3];
     let mut angs: vec3_t = [0.0; 3];
 
     vectoangles(ctx.world.globals.forward, &mut angs);
 
-    if altFire != qfalse {
+    if altFire {
         WP_RepeaterAltFire(ctx, ent);
     } else {
         // add some slop to the alt-fire direction
@@ -1682,8 +1682,8 @@ pub fn WP_DEMP2_AltFire(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `WP_FireDEMP2`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1406-1417`
-pub fn WP_FireDEMP2(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
-    if altFire != qfalse {
+pub fn WP_FireDEMP2(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
+    if altFire {
         WP_DEMP2_AltFire(ctx, ent);
     } else {
         WP_DEMP2_MainFire(ctx, ent);
@@ -1961,8 +1961,8 @@ pub fn WP_FlechetteAltFire(ctx: &mut GameContext, self_: EntityId) {
 /// Raven `WP_FireFlechette`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1626-1638`
-pub fn WP_FireFlechette(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
-    if altFire != qfalse {
+pub fn WP_FireFlechette(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
+    if altFire {
         // WP_FlechetteProxMine( ent );
         WP_FlechetteAltFire(ctx, ent);
     } else {
@@ -2186,7 +2186,7 @@ pub fn RocketDie(
 /// Raven `WP_FireRocket`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:1826-1908`
-pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
+pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
     let damage: c_int = ROCKET_DAMAGE;
     let mut vel: f32 = ROCKET_VELOCITY as f32;
     let mut dif: c_int = 0;
@@ -2194,11 +2194,11 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
 
     let muzzle = ctx.world.globals.muzzle;
     let forward = ctx.world.globals.forward;
-    if altFire != qfalse {
+    if altFire {
         vel *= 0.5;
     }
 
-    let mid = CreateMissile(ctx, muzzle, forward, vel, 10000, ent, altFire != 0);
+    let mid = CreateMissile(ctx, muzzle, forward, vel, 10000, ent, altFire);
 
     // FLAG: firing ent may be an NPC (pool client); deref the client value raw.
     let ent_client = ctx.world.entity(ent).client;
@@ -2267,7 +2267,7 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
 
     m.damage = damage;
     m.dflags = DAMAGE_DEATH_KNOCKBACK;
-    if altFire != qfalse {
+    if altFire {
         m.methodOfDeath = MOD_ROCKET_HOMING as c_int;
         m.splashMethodOfDeath = MOD_ROCKET_HOMING_SPLASH as c_int;
     } else {
@@ -2372,7 +2372,7 @@ pub fn thermalThinkStandard(ctx: &mut GameContext, ent: EntityId) {
 pub fn WP_FireThermalDetonator(
     ctx: &mut GameContext,
     ent: EntityId,
-    altFire: qboolean,
+    altFire: bool,
 ) -> *mut gentity_t {
     // Return stays raw `*mut gentity_t` (return conversion is a later pass).
     let dir: vec3_t = ctx.world.globals.forward;
@@ -2433,7 +2433,7 @@ pub fn WP_FireThermalDetonator(
             b.s.pos.trDelta[2] += 120.0;
         }
 
-        if altFire == qfalse {
+        if !altFire {
             b.flags |= FL_BOUNCE_HALF;
         }
 
@@ -2480,7 +2480,7 @@ pub fn WP_DropThermal(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         Some(&mut ctx.world.globals.vright),
         Some(&mut ctx.world.globals.up),
     );
-    WP_FireThermalDetonator(ctx, ent, qfalse)
+    WP_FireThermalDetonator(ctx, ent, false)
 }
 
 /// Raven `WP_LobFire`.
@@ -3082,7 +3082,7 @@ pub fn CreateLaserTrap(ctx: &mut GameContext, laserTrap: EntityId, start: vec3_t
 /// Raven `WP_PlaceLaserTrap`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2533-2626`
-pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
+pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
     let dir: vec3_t = ctx.world.globals.forward;
     let start: vec3_t = ctx.world.globals.muzzle;
     // `FOFS(classname)` — byte offset of `gentity_t::classname` (Raven macro, `g_local.h`).
@@ -3149,7 +3149,7 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
         let lt = ctx.world.entity_mut(laserTrap_id);
         lt.setTime = now; // remember when we placed it
 
-        if alt_fire == qfalse {
+        if !alt_fire {
             // tripwire
             lt.count = 1;
         }
@@ -3157,7 +3157,7 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
         // move it
         lt.s.pos.trType = TR_GRAVITY;
 
-        if alt_fire != qfalse {
+        if alt_fire {
             _VectorScale(dir, 512.0, &mut lt.s.pos.trDelta);
         } else {
             _VectorScale(dir, 256.0, &mut lt.s.pos.trDelta);
@@ -3585,7 +3585,7 @@ pub fn CheatsOn(ctx: &mut GameContext) -> qboolean {
 /// Raven `WP_DropDetPack`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2880-2964`
-pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: qboolean) {
+pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: bool) {
     let Some(ent) = ent else {
         return;
     };
@@ -3649,7 +3649,7 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: qb
         }
     }
 
-    if alt_fire != qfalse {
+    if alt_fire {
         BlowDetpacks(ctx, ent);
     } else {
         // FLAG: firing ent pool client viewangles deref stays raw.
@@ -4000,7 +4000,7 @@ pub fn WP_FireConcussion(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `WP_FireStunBaton`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3282-3357`
-pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
+pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
     unsafe {
         let mut muzzleStun: vec3_t;
 
@@ -4123,7 +4123,7 @@ pub fn WP_FireStunBaton(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean
 /// Raven `WP_FireMelee`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:3363-3445`
-pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
+pub fn WP_FireMelee(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
     unsafe {
         // FLAG: firing ent may be an NPC (pool client); deref its client raw.
         let ent_client = ctx.world.entity(ent).client;
@@ -4487,8 +4487,8 @@ pub fn WP_FireVehicleWeapon(
     start: vec3_t,
     dir: vec3_t,
     vehWeapon: *mut vehWeaponInfo_t,
-    alt_fire: qboolean,
-    isTurretWeap: qboolean,
+    alt_fire: bool,
+    isTurretWeap: bool,
 ) -> *mut gentity_t {
     // Return stays raw `*mut gentity_t` (return conversion is a later pass);
     // `vehWeapon` is not a gentity handle so it stays raw.
@@ -4593,11 +4593,11 @@ pub fn WP_FireVehicleWeapon(
 
             // set veh as cgame side owner for purpose of fx overrides
             (*missile).s.owner = ent_num;
-            if alt_fire != qfalse {
+            if alt_fire {
                 // use the second weapon's iShotFX
                 (*missile).s.eFlags |= EF_ALT_FIRING;
             }
-            if isTurretWeap != qfalse {
+            if isTurretWeap {
                 // look for the turret weapon info on cgame side, not vehicle weapon info
                 (*missile).s.weapon = WP_TURRET;
             }
@@ -5131,7 +5131,7 @@ pub fn WP_VehCheckTraceFromCamPos(
 /// Raven `FireVehicleWeapon`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4116-4413`
-pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolean) {
+pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     // 2c-W6 FLAG (left): the body launders `let pVeh = &mut *pVeh` (a `&mut
     // Vehicle_t` with no accessor) and holds it across many `&mut ctx` calls
@@ -5167,7 +5167,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
             let mut aimCorrect = qfalse;
             let mut linkedFiring = qfalse;
 
-            if alt_fire == 0 {
+            if !alt_fire {
                 weaponNum = 0;
             } else {
                 weaponNum = 1;
@@ -5374,7 +5374,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
                                 dir,
                                 vehWeapon as *mut _,
                                 alt_fire,
-                                qfalse,
+                                false,
                             );
                             if (*vehWeapon).fHoming != (0) as f32 {
                                 clearRocketLockEntity = qtrue;
@@ -5475,7 +5475,7 @@ pub fn FireVehicleWeapon(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
 /// Raven `FireWeapon`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4424-4608`
-pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolean) {
+pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: bool) {
     // Raven's `FireWeapon` is only called for a valid firing entity; the body
     // dereferences `ent->client` unconditionally (g_weapon.c:4426), so `ent`
     // resolves to a live handle here (matches the existing `.unwrap()` sites).
@@ -5610,7 +5610,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
                 WP_FireBryarPistol(ctx, ent_eid, altFire);
             }
             WP_CONCUSSION => {
-                if altFire != 0 {
+                if altFire {
                     WP_FireConcussionAlt(ctx, ent_eid);
                 } else {
                     WP_FireConcussion(ctx, ent_eid);
@@ -5665,7 +5665,7 @@ pub fn FireWeapon(ctx: &mut GameContext, ent: Option<EntityId>, altFire: qboolea
 /// Raven `WP_FireEmplaced`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:4611-4660`
-pub fn WP_FireEmplaced(ctx: &mut GameContext, ent: EntityId, altFire: qboolean) {
+pub fn WP_FireEmplaced(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
     // FLAG: firing ent may be an NPC (pool client); deref the client value raw.
     let ent_client = ctx.world.entity(ent).client;
     if ent_client.is_null() {

@@ -1196,12 +1196,12 @@ pub fn G_CheapWeaponFire(ctx: &mut GameContext, entNum: c_int, ev: c_int) {
                 }
             }
 
-            FireWeapon(ctx, Some(ent), qfalse);
+            FireWeapon(ctx, Some(ent), false);
             (*cl).dangerTime = ctx.world.level.time;
             (*cl).ps.eFlags &= !EF_INVULNERABLE;
             (*cl).invulnerableTimer = 0;
         } else if ev == EV_ALT_FIRE as c_int {
-            FireWeapon(ctx, Some(ent), qtrue);
+            FireWeapon(ctx, Some(ent), true);
             (*cl).dangerTime = ctx.world.level.time;
             (*cl).ps.eFlags &= !EF_INVULNERABLE;
             (*cl).invulnerableTimer = 0;
@@ -1291,12 +1291,12 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                     break 'blk;
                 }
             } else if event == EV_FIRE_WEAPON as c_int {
-                FireWeapon(ctx, Some(ent), qfalse);
+                FireWeapon(ctx, Some(ent), false);
                 (*client).dangerTime = ctx.world.level.time;
                 (*client).ps.eFlags &= !EF_INVULNERABLE;
                 (*client).invulnerableTimer = 0;
             } else if event == EV_ALT_FIRE as c_int {
-                FireWeapon(ctx, Some(ent), qtrue);
+                FireWeapon(ctx, Some(ent), true);
                 (*client).dangerTime = ctx.world.level.time;
                 (*client).ps.eFlags &= !EF_INVULNERABLE;
                 (*client).invulnerableTimer = 0;

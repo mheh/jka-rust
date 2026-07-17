@@ -76,8 +76,8 @@ pub fn VEH_TurretCheckFire(
             (*pVeh).m_vMuzzlePos[curMuzzle as usize],
             (*pVeh).m_vMuzzleDir[curMuzzle as usize],
             vehWeapon,
-            if turretNum != 0 { qtrue } else { qfalse },
-            qtrue,
+            turretNum != 0,
+            true,
         );
 
         // play the weapon's muzzle effect if we have one
