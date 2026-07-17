@@ -778,7 +778,8 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         ];
 
         // get the next free entity
-        let ent = G_Spawn(ctx);
+        let ent_eid = G_Spawn(ctx);
+        let ent = ctx.entity_mut(ent_eid) as *mut gentity_t;
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
             // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
@@ -804,7 +805,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         if ctx.world.cvars.g_gametype.integer == GT_SINGLE_PLAYER {
             G_SpawnInt(ctx, c"notsingle".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ctx, ctx.entity_id_of(ent));
+                G_FreeEntity(ctx, Some(ent_eid));
                 return;
             }
         }
@@ -812,20 +813,20 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             G_SpawnInt(ctx, c"notteam".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ctx, ctx.entity_id_of(ent));
+                G_FreeEntity(ctx, Some(ent_eid));
                 return;
             }
         } else {
             G_SpawnInt(ctx, c"notfree".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ctx, ctx.entity_id_of(ent));
+                G_FreeEntity(ctx, Some(ent_eid));
                 return;
             }
         }
 
         G_SpawnInt(ctx, c"notta".as_ptr(), c"0".as_ptr(), &mut i);
         if i != 0 {
-            G_FreeEntity(ctx, ctx.entity_id_of(ent));
+            G_FreeEntity(ctx, Some(ent_eid));
             return;
         }
 
@@ -836,14 +837,14 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
                 let gametype_name = GAMETYPE_NAMES[gt as usize];
                 let value_str = CStr::from_ptr(value).to_string_lossy();
                 if !value_str.contains(gametype_name.to_str().unwrap()) {
-                    G_FreeEntity(ctx, ctx.entity_id_of(ent));
+                    G_FreeEntity(ctx, Some(ent_eid));
                     return;
                 }
             }
         }
 
         // move editor origin to pos
-        let id = ctx.entity_id_of(ent).unwrap();
+        let id = ent_eid;
         {
             let e = ctx.world.entity_mut(id);
             let origin = e.s.origin;
@@ -1508,9 +1509,10 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
         {
             // World has a spawn script, but we don't want the world in ICARUS and running scripts,
             // so make a scriptrunner and start it going.
-            let script_runner = G_Spawn(ctx);
+            let script_runner_eid = G_Spawn(ctx);
+            let script_runner = ctx.entity_mut(script_runner_eid) as *mut gentity_t;
             if !script_runner.is_null() {
-                let id = ctx.entity_id_of(script_runner).unwrap();
+                let id = script_runner_eid;
                 let world_bset =
                     ctx.world.g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize];
                 let next_think = ctx.world.level.time + 100;

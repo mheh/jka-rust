@@ -1561,7 +1561,8 @@ pub fn Think_SpawnNewDoorTrigger(ctx: &mut GameContext, ent: EntityId) {
         mins[best] -= 120.0;
 
         // create a trigger with this size
-        let other = G_Spawn(ctx);
+        let other_eid = G_Spawn(ctx);
+        let other = ctx.entity_mut(other_eid) as *mut gentity_t;
         (*other).r.mins = mins;
         (*other).r.maxs = maxs;
         (*other).parent = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), ent);
@@ -1969,7 +1970,8 @@ pub fn SpawnPlatTrigger(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // the middle trigger will be a thin trigger just above the starting
         // position
-        let trigger = G_Spawn(ctx);
+        let trigger_eid = G_Spawn(ctx);
+        let trigger = ctx.entity_mut(trigger_eid) as *mut gentity_t;
         (*trigger).touch = Some(EntTouch::Touch_PlatCenterTrigger).into();
         (*trigger).r.contents = CONTENTS_TRIGGER;
         (*trigger).parent = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), ent);
@@ -2824,7 +2826,8 @@ pub fn G_MiscModelExplosion(
             (mins[2] + maxs[2]) * 0.5,
         ];
 
-        let te = G_TempEntity(ctx, mid, entity_event_t::EV_MISC_MODEL_EXP as c_int);
+        let te_eid = G_TempEntity(ctx, mid, entity_event_t::EV_MISC_MODEL_EXP as c_int);
+        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
 
         (*te).s.origin2 = maxs;
         (*te).s.angles2 = mins;
@@ -2850,7 +2853,8 @@ pub fn G_Chunks(
     baseScale: f32,
 ) {
     unsafe {
-        let te = G_TempEntity(ctx, origin, entity_event_t::EV_DEBRIS as c_int);
+        let te_eid = G_TempEntity(ctx, origin, entity_event_t::EV_DEBRIS as c_int);
+        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
 
         // Now it's time to cram everything horribly into the entitystate of
         // an event entity.
@@ -3003,7 +3007,8 @@ pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
                 meansOfDeath_t::MOD_UNKNOWN as c_int,
             );
 
-            let te = G_TempEntity(ctx, org, entity_event_t::EV_GENERAL_SOUND as c_int);
+            let te_eid = G_TempEntity(ctx, org, entity_event_t::EV_GENERAL_SOUND as c_int);
+            let te = ctx.entity_mut(te_eid) as *mut gentity_t;
             (*te).s.eventParm = G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr());
         }
 
@@ -3473,7 +3478,8 @@ pub fn GlassDie(
 
         (*self_).splashRadius = 40; // ?? some random number, maybe it's ok?
 
-        let te = G_TempEntity(ctx, dif, entity_event_t::EV_GLASS_SHATTER as c_int);
+        let te_eid = G_TempEntity(ctx, dif, entity_event_t::EV_GLASS_SHATTER as c_int);
+        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
         (*te).s.genericenemyindex = (*self_).s.number;
         (*te).s.origin = (*self_).pos1;
         (*te).s.angles = (*self_).pos2;
@@ -3509,7 +3515,8 @@ pub fn GlassDie_Old(
 
         G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker));
 
-        let te = G_TempEntity(ctx, dif, entity_event_t::EV_GLASS_SHATTER as c_int);
+        let te_eid = G_TempEntity(ctx, dif, entity_event_t::EV_GLASS_SHATTER as c_int);
+        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
         (*te).s.genericenemyindex = (*self_).s.number;
         (*te).s.origin = (*self_).r.maxs;
         (*te).s.angles = (*self_).r.mins;

@@ -762,7 +762,6 @@ pub fn SiegeBroadcast_OBJECTIVECOMPLETE(
         nomatter,
         entity_event_t::EV_SIEGE_OBJECTIVECOMPLETE as c_int,
     );
-    let te = ctx.entity_id_of(te).unwrap();
     let te = ctx.world.entity_mut(te);
     te.r.svFlags |= SVF_BROADCAST;
     te.s.eventParm = team;
@@ -777,7 +776,6 @@ pub fn SiegeBroadcast_ROUNDOVER(ctx: &mut GameContext, winningteam: c_int, winni
     let nomatter: vec3_t = [0.0, 0.0, 0.0];
 
     let te = G_TempEntity(ctx, nomatter, entity_event_t::EV_SIEGE_ROUNDOVER as c_int);
-    let te = ctx.entity_id_of(te).unwrap();
     let te = ctx.world.entity_mut(te);
     te.r.svFlags |= SVF_BROADCAST;
     te.s.eventParm = winningteam;
@@ -1193,7 +1191,7 @@ pub fn SiegeRespawn(ctx: &mut GameContext, ent: EntityId) {
             let origin = (*client).ps.origin;
             let tent = G_TempEntity(ctx, origin, entity_event_t::EV_PLAYER_TELEPORT_IN as c_int);
             let client_num = ctx.world.entity(ent).s.clientNum;
-            let tent = ctx.entity_id_of(tent).unwrap();
+            let tent = tent;
             ctx.world.entity_mut(tent).s.clientNum = client_num;
         }
     }

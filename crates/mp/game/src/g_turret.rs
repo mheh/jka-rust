@@ -250,11 +250,7 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
     let ent_gv13 = ctx.world.entity(ent).genericValue13;
     G_PlayEffectID(ent_gv13, org, dir);
 
-    let bolt = G_Spawn(ctx);
-    if bolt.is_null() {
-        return;
-    }
-    let bolt_id = ctx.entity_id_of(bolt).unwrap();
+    let bolt_id = G_Spawn(ctx);
 
     let level_time = ctx.world.level.time;
     let ent_gv14 = ctx.world.entity(ent).genericValue14;
@@ -937,11 +933,7 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
     let mut org = [0.0; 3];
     let mut t: c_int = 0;
 
-    let top = G_Spawn(ctx);
-    if top.is_null() {
-        return qfalse;
-    }
-    let top_id = ctx.entity_id_of(top).unwrap();
+    let top_id = G_Spawn(ctx);
 
     let mi = G_ModelIndex(c"models/map_objects/hoth/turret_top_new.md3".as_ptr());
     ctx.world.entity_mut(top_id).s.modelindex = mi;

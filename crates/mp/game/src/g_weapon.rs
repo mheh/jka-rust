@@ -662,15 +662,18 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 ) != 0
                 {
                     // broadcast and stop the shot because it was blocked
-                    tent = crate::g_utils::G_TempEntity(
+                    let __teid1 = crate::g_utils::G_TempEntity(
                         ctx,
                         tr.endpos,
                         (EV_DISRUPTOR_MAIN_SHOT) as i32,
                     );
+                    tent = ctx.entity_mut(__teid1);
                     (*tent).s.origin2 = ctx.world.globals.muzzle;
                     (*tent).s.eventParm = ent_num;
 
-                    let te = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_SABER_BLOCK) as i32);
+                    let te_eid =
+                        crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_SABER_BLOCK) as i32);
+                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                     (*te).s.origin = tr.endpos;
                     (*te).s.angles = tr.plane.normal;
                     if (*te).s.angles[0] == 0.0
@@ -698,7 +701,8 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
         }
 
         // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
-        tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_MAIN_SHOT) as i32);
+        let __teid2 = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_MAIN_SHOT) as i32);
+        tent = ctx.entity_mut(__teid2);
         (*tent).s.origin2 = ctx.world.globals.muzzle;
         (*tent).s.eventParm = ent_num;
 
@@ -729,15 +733,18 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                     MOD_DISRUPTOR as c_int,
                 );
 
-                tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
+                let __teid3 =
+                    crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
+                tent = ctx.entity_mut(__teid3);
                 (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                 if !traceEnt_client.is_null() {
                     (*tent).s.weapon = 1;
                 }
             } else {
                 // Hmmm, maybe don't make any marks on things that could break
-                tent =
+                let __teid_miss =
                     crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_MISS) as i32);
+                tent = ctx.entity_mut(__teid_miss);
                 (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                 (*tent).s.weapon = 1;
             }
@@ -930,16 +937,19 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     0,
                 ) != 0
                 {
-                    tent = crate::g_utils::G_TempEntity(
+                    let __teid4 = crate::g_utils::G_TempEntity(
                         ctx,
                         tr.endpos,
                         (EV_DISRUPTOR_SNIPER_SHOT) as i32,
                     );
+                    tent = ctx.entity_mut(__teid4);
                     (*tent).s.origin2 = ctx.world.globals.muzzle;
                     (*tent).s.shouldtarget = fullCharge;
                     (*tent).s.eventParm = ent_num;
 
-                    let te = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_SABER_BLOCK) as i32);
+                    let te_eid =
+                        crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_SABER_BLOCK) as i32);
+                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                     (*te).s.origin = tr.endpos;
                     (*te).s.angles = tr.plane.normal;
                     if (*te).s.angles[0] == 0.0
@@ -957,7 +967,9 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
             }
 
             // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
-            tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_SHOT) as i32);
+            let __teid5 =
+                crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_SNIPER_SHOT) as i32);
+            tent = ctx.entity_mut(__teid5);
             (*tent).s.origin2 = ctx.world.globals.muzzle;
             (*tent).s.shouldtarget = fullCharge;
             (*tent).s.eventParm = ent_num;
@@ -967,7 +979,9 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                 if ctx.world.entity(traceEnt_id).takedamage != 0 && !traceEnt_client.is_null() {
                     (*tent).s.otherEntityNum = ctx.world.entity(traceEnt_id).s.number;
 
-                    tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_MISSILE_MISS) as i32);
+                    let __teid6 =
+                        crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_MISSILE_MISS) as i32);
+                    tent = ctx.entity_mut(__teid6);
                     (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                     (*tent).s.eFlags |= EF_ALT_FIRING;
 
@@ -995,19 +1009,21 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                                 MOD_DISRUPTOR_SNIPER as c_int,
                             );
 
-                            tent = crate::g_utils::G_TempEntity(
+                            let __teid7 = crate::g_utils::G_TempEntity(
                                 ctx,
                                 tr.endpos,
                                 (EV_DISRUPTOR_HIT) as i32,
                             );
+                            tent = ctx.entity_mut(__teid7);
                             (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                         }
                     } else {
-                        tent = crate::g_utils::G_TempEntity(
+                        let __teid8 = crate::g_utils::G_TempEntity(
                             ctx,
                             tr.endpos,
                             (EV_DISRUPTOR_SNIPER_MISS) as i32,
                         );
+                        tent = ctx.entity_mut(__teid8);
                         (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                     }
                     break; // and don't try any more traces
@@ -1057,7 +1073,9 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                         (*traceEnt_client).ps.velocity = [0.0; 3];
                     }
 
-                    tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
+                    let __teid9 =
+                        crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_DISRUPTOR_HIT) as i32);
+                    tent = ctx.entity_mut(__teid9);
                     (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
                     if !traceEnt_client.is_null() {
                         (*tent).s.weapon = 1;
@@ -1664,8 +1682,7 @@ pub fn WP_DEMP2_AltFire(ctx: &mut GameContext, ent: EntityId) {
         ),
     );
 
-    let missile = crate::g_utils::G_Spawn(ctx);
-    let mid = ctx.entity_id_of(missile).unwrap();
+    let mid = crate::g_utils::G_Spawn(ctx);
     crate::g_utils::G_SetOrigin(ctx.world.entity_mut(mid), tr.endpos);
     // In SP the impact actually travels as a missile based on the trace fraction, but we're
     // just going to be instant. -rww
@@ -2398,8 +2415,8 @@ pub fn WP_FireThermalDetonator(
     let mut start: vec3_t = ctx.world.globals.muzzle;
     let mut chargeAmount: f32 = 1.0; // default of full charge
 
-    let bolt = crate::g_utils::G_Spawn(ctx);
-    let bid = ctx.entity_id_of(bolt).unwrap();
+    let bid = crate::g_utils::G_Spawn(ctx);
+    let bolt = ctx.entity_mut(bid) as *mut gentity_t;
     let now = ctx.world.level.time;
 
     {
@@ -3116,8 +3133,7 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: qboolea
     let mut foundLaserTraps: [c_int; MAX_GENTITIES] = [ENTITYNUM_NONE as c_int; MAX_GENTITIES];
     let mut trapcount: c_int = 0;
 
-    let laserTrap = crate::g_utils::G_Spawn(ctx);
-    let laserTrap_id = ctx.entity_id_of(laserTrap).unwrap();
+    let laserTrap_id = crate::g_utils::G_Spawn(ctx);
 
     // limit to 10 placed at any one time
     // see how many there are now
@@ -3354,8 +3370,7 @@ pub fn charge_stick(
 
     let currentOrigin = ctx.world.entity(self_).r.currentOrigin;
     let self_num = ctx.world.entity(self_).s.number;
-    let tent = crate::g_utils::G_TempEntity(ctx, currentOrigin, EV_MISSILE_MISS as c_int);
-    let tent_id = ctx.entity_id_of(tent).unwrap();
+    let tent_id = crate::g_utils::G_TempEntity(ctx, currentOrigin, EV_MISSILE_MISS as c_int);
     {
         let t = ctx.world.entity_mut(tent_id);
         t.s.weapon = 0;
@@ -3471,8 +3486,7 @@ pub fn drop_charge(ctx: &mut GameContext, self_: EntityId, start: vec3_t, dir: v
     let mut dir = dir;
     crate::q_math::VectorNormalize(&mut dir);
 
-    let bolt = crate::g_utils::G_Spawn(ctx);
-    let bid = ctx.entity_id_of(bolt).unwrap();
+    let bid = crate::g_utils::G_Spawn(ctx);
     let self_num = ctx.world.entity(self_).s.number;
     let now = ctx.world.level.time;
     let modelidx =
@@ -3981,7 +3995,8 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
         crate::q_math::_VectorSubtract(tr.endpos, ctx.world.globals.muzzle, &mut dir);
 
         // let's pack all this junk into a single tempent, and send it off.
-        tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_CONC_ALT_IMPACT) as i32);
+        let __teid10 = crate::g_utils::G_TempEntity(ctx, tr.endpos, (EV_CONC_ALT_IMPACT) as i32);
+        tent = ctx.entity_mut(__teid10);
         (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
         (*tent).s.owner = ent_num;
         (*tent).s.angles = dir;
@@ -4784,7 +4799,7 @@ pub fn G_VehMuzzleFireFX(
             // oh well. We will WASTE A TEMPENT.
             let bt =
                 crate::g_utils::G_TempEntity(ctx, (*ent_client).ps.origin, EV_VEH_FIRE as c_int);
-            b_id = ctx.entity_id_of(bt).unwrap();
+            b_id = bt;
         } else {
             // joy
             b_id = broadcaster.unwrap();

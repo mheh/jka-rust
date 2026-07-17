@@ -289,8 +289,7 @@ pub fn Q3_PlaySound(
 
     if b_broadcast != 0 {
         let origin = ctx.world.entity(id).r.currentOrigin;
-        let te = G_TempEntity(ctx, origin, EV_GLOBAL_SOUND as c_int);
-        let te_id = ctx.entity_id_of(te).unwrap();
+        let te_id = G_TempEntity(ctx, origin, EV_GLOBAL_SOUND as c_int);
         ctx.world.entity_mut(te_id).s.eventParm = sound_handle;
         ctx.world.entity_mut(te_id).r.svFlags |= SVF_BROADCAST;
     } else {
@@ -1662,8 +1661,7 @@ pub fn Q3_SetTeleportDest(ctx: &mut GameContext, entID: c_int, org: vec3_t) -> q
     let id = EntityId(entID as u32);
 
     if SpotWouldTelefrag2(ctx, id, org) != 0 {
-        let teleporter = G_Spawn(ctx);
-        let tp_id = ctx.entity_id_of(teleporter).unwrap();
+        let tp_id = G_Spawn(ctx);
 
         G_SetOrigin(ctx.world.entity_mut(tp_id), org);
         let number = ctx.world.entity(id).s.number;
@@ -3669,8 +3667,7 @@ pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboo
         ctx.world.entity_mut(id).r.contents = CONTENTS_BODY;
         let cur = ctx.world.entity(id).r.currentOrigin;
         if SpotWouldTelefrag2(ctx, id, cur) != qfalse {
-            let solidifier = G_Spawn(ctx);
-            let sid = ctx.entity_id_of(solidifier).unwrap();
+            let sid = G_Spawn(ctx);
 
             let number = ctx.world.entity(id).s.number;
             let level_time = ctx.world.level.time;

@@ -1093,8 +1093,7 @@ pub fn G_ResetDuelists(ctx: &mut GameContext) {
 
         // add a teleportation effect
         let origin = ctx.world.clients[clientNum as usize].ps.origin;
-        let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
-        let tid = ctx.entity_id_of(tent).unwrap();
+        let tid = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
         let cn = ctx.world.entity(id).s.clientNum;
         ctx.entity_mut(tid).s.clientNum = cn;
         i += 1;
@@ -2613,8 +2612,7 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                 AddPowerDuelPlayers(ctx);
 
                 if ctx.world.level.numPlayingClients >= 3 && G_CanResetDuelists(ctx) != qfalse {
-                    let te = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
-                    let te_id = ctx.entity_id_of(te).unwrap();
+                    let te_id = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
                     let s0 = ctx.world.level.sortedClients[0];
                     let s1 = ctx.world.level.sortedClients[1];
                     let s2 = ctx.world.level.sortedClients[2];
@@ -2680,8 +2678,7 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                 {
                     // pulled in a needed person
                     if G_CanResetDuelists(ctx) != qfalse {
-                        let te = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
-                        let te_id = ctx.entity_id_of(te).unwrap();
+                        let te_id = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
                         let s0 = ctx.world.level.sortedClients[0];
                         let s1 = ctx.world.level.sortedClients[1];
                         let s2 = ctx.world.level.sortedClients[2];

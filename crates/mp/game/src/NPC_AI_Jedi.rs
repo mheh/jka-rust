@@ -6242,7 +6242,8 @@ pub fn Jedi_Combat(ctx: &mut GameContext) {
                 } else {
                     if (*npc_info).aiFlags & NPCAI_BLOCKED != 0 {
                         //try to jump to the blockedDest
-                        let tempGoal = crate::g_utils::G_Spawn(ctx);
+                        let tempGoal_eid = crate::g_utils::G_Spawn(ctx);
+                        let tempGoal = ctx.entity_mut(tempGoal_eid) as *mut gentity_t;
                         crate::g_utils::G_SetOrigin(&mut *(tempGoal), (*npc_info).blockedDest);
                         crate::trap::LinkEntity(
                             ctx.engine,
@@ -6250,12 +6251,12 @@ pub fn Jedi_Combat(ctx: &mut GameContext) {
                                 tempGoal.cast(),
                             ),
                         );
-                        if Jedi_TryJump(ctx, ctx.entity_id_of(tempGoal)) != qfalse {
+                        if Jedi_TryJump(ctx, Some(tempGoal_eid)) != qfalse {
                             //going to jump to the dest
-                            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
+                            crate::g_utils::G_FreeEntity(ctx, Some(tempGoal_eid));
                             return;
                         }
-                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
+                        crate::g_utils::G_FreeEntity(ctx, Some(tempGoal_eid));
                     }
 
                     enemy_lost = qtrue;
@@ -7080,7 +7081,8 @@ pub fn NPC_BSJedi_FollowLeader(ctx: &mut GameContext) {
             if (*npc_info).aiFlags & NPCAI_BLOCKED != 0 {
                 //try to jump to the blockedDest
                 if ((*npc_info).blockedDest[2] - (*npc).r.currentOrigin[2]).abs() > 64.0 {
-                    let tempGoal = crate::g_utils::G_Spawn(ctx);
+                    let tempGoal_eid = crate::g_utils::G_Spawn(ctx);
+                    let tempGoal = ctx.entity_mut(tempGoal_eid) as *mut gentity_t;
                     crate::g_utils::G_SetOrigin(&mut *(tempGoal), (*npc_info).blockedDest);
                     crate::trap::LinkEntity(
                         ctx.engine,
@@ -7092,12 +7094,12 @@ pub fn NPC_BSJedi_FollowLeader(ctx: &mut GameContext) {
                         c"jumpChaseDebounce".as_ptr(),
                         -1,
                     );
-                    if Jedi_TryJump(ctx, ctx.entity_id_of(tempGoal)) != qfalse {
+                    if Jedi_TryJump(ctx, Some(tempGoal_eid)) != qfalse {
                         //going to jump to the dest
-                        crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
+                        crate::g_utils::G_FreeEntity(ctx, Some(tempGoal_eid));
                         return;
                     }
-                    crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempGoal));
+                    crate::g_utils::G_FreeEntity(ctx, Some(tempGoal_eid));
                 }
             }
         }

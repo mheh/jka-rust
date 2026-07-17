@@ -170,8 +170,7 @@ pub fn PrintCTFMessage(ctx: &mut GameContext, plIndex: c_int, teamIndex: c_int, 
     let plIndex = if plIndex == -1 { 32 + 1 } else { plIndex };
     let teamIndex = if teamIndex == -1 { 50 } else { teamIndex };
 
-    let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], entity_event_t::EV_CTFMESSAGE as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, [0.0, 0.0, 0.0], entity_event_t::EV_CTFMESSAGE as c_int);
     let te = ctx.world.entity_mut(te_id);
     te.r.svFlags |= SVF_BROADCAST;
     te.s.eventParm = ctfMessage;
@@ -191,8 +190,7 @@ pub fn PrintCTFMessage(ctx: &mut GameContext, plIndex: c_int, teamIndex: c_int, 
 ///
 /// Source: `oracle/codemp/game/g_team.c:142-179`
 pub fn AddTeamScore(ctx: &mut GameContext, origin: vec3_t, team: c_int, score: c_int) {
-    let te = G_TempEntity(ctx, origin, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, origin, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
 
     let red = ctx.world.level.teamScores[TEAM_RED as usize];
     let blue = ctx.world.level.teamScores[TEAM_BLUE as usize];
@@ -797,8 +795,7 @@ pub fn Team_ReturnFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: 
     };
 
     let trbase = ctx.world.entity(ent).s.pos.trBase;
-    let te = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
     let te = ctx.world.entity_mut(te_id);
     te.s.eventParm = if team == TEAM_BLUE {
         global_team_sound_t::GTS_RED_RETURN as c_int
@@ -840,8 +837,7 @@ pub fn Team_TakeFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team: c_
     }
 
     let trbase = ctx.world.entity(ent).s.pos.trBase;
-    let te = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
     let te = ctx.world.entity_mut(te_id);
     if team == TEAM_BLUE {
         te.s.eventParm = global_team_sound_t::GTS_RED_TAKEN as c_int;
@@ -862,8 +858,7 @@ pub fn Team_CaptureFlagSound(ctx: &mut GameContext, ent: Option<EntityId>, team:
     };
 
     let trbase = ctx.world.entity(ent).s.pos.trBase;
-    let te = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, trbase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
     let te = ctx.world.entity_mut(te_id);
     te.s.eventParm = if team == TEAM_BLUE {
         global_team_sound_t::GTS_BLUE_CAPTURE as c_int

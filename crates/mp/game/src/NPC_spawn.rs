@@ -1099,7 +1099,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             }
         }
 
-        newent = crate::g_utils::G_Spawn(ctx);
+        let __teid16 = crate::g_utils::G_Spawn(ctx);
+        newent = ctx.entity_mut(__teid16);
 
         if newent.is_null() {
             crate::g_main::Com_Printf(
@@ -1133,10 +1134,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         crate::g_utils::G_CreateFakeClient(ctx, (*newent).s.number, &mut (*newent).client);
 
-        (*((*newent).NPC)).tempGoal = ent_id_opt(
-            ctx.world.g_entities.as_mut_ptr(),
-            crate::g_utils::G_Spawn(ctx),
-        );
+        (*((*newent).NPC)).tempGoal = Some(crate::g_utils::G_Spawn(ctx));
 
         if (*((*newent).NPC)).tempGoal.is_none() {
             // Oracle nulls NPC and `goto finish` — the finish path returns the
@@ -1550,7 +1548,7 @@ pub fn NPC_Spawn(
 /// Source: `oracle/codemp/game/NPC_spawn.c:1961-1971`
 pub fn NPC_PrecacheType(ctx: &mut GameContext, NPC_type: *mut c_char) {
     let fakespawner = crate::g_utils::G_Spawn(ctx);
-    if let Some(id) = ctx.entity_id_of(fakespawner) {
+    if let Some(id) = Some(fakespawner) {
         ctx.world.entity_mut(id).NPC_type = NPC_type;
         crate::NPC_stats::NPC_Precache(ctx, id);
         crate::g_utils::G_FreeEntity(ctx, Some(id));
@@ -2683,7 +2681,8 @@ pub fn NPC_SpawnType(
     // `targetname` are C strings and stay raw; the return stays raw `*mut
     // gentity_t` (return conversion is a later pass).
     let ent: *mut gentity_t = ent.map_or(core::ptr::null_mut(), |i| ctx.entity_mut(i));
-    let npc_spawner = G_Spawn(ctx);
+    let npc_spawner_eid = G_Spawn(ctx);
+    let npc_spawner = ctx.entity_mut(npc_spawner_eid) as *mut gentity_t;
 
     if npc_spawner.is_null() {
         Com_Printf(c"NPC_Spawn Error: Out of entities!\n".as_ptr() as *const c_char);
@@ -2838,7 +2837,7 @@ pub fn NPC_SpawnType(
         NPC_Wampa_Precache(ctx);
     }
 
-    NPC_Spawn_Do(ctx, ctx.entity_id_of(npc_spawner).unwrap())
+    NPC_Spawn_Do(ctx, npc_spawner_eid)
 }
 
 /// Raven `NPC_Spawn_f`.

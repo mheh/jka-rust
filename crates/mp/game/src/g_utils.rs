@@ -15,6 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_math::_DotProduct;
 
 use crate::client::gclient_t;
 use crate::g_main::G_Printf;
@@ -973,7 +974,7 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
 /// Raven `G_Spawn`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:804-853`
-pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
+pub fn G_Spawn(ctx: &mut GameContext) -> EntityId {
     unsafe {
         let mut e: *mut gentity_t = core::ptr::null_mut();
         let mut i: c_int = 0;
@@ -993,8 +994,9 @@ pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
                     }
 
                     // reuse this slot
-                    G_InitGentity(ctx, ctx.entity_id_of(e).unwrap());
-                    return e;
+                    let id = ctx.entity_id_of(e).unwrap();
+                    G_InitGentity(ctx, id);
+                    return id;
                 }
                 i += 1;
                 e = e.add(1);
@@ -1028,8 +1030,9 @@ pub fn G_Spawn(ctx: &mut GameContext) -> *mut gentity_t {
             ),
         );
 
-        G_InitGentity(ctx, ctx.entity_id_of(e).unwrap());
-        e
+        let id = ctx.entity_id_of(e).unwrap();
+        G_InitGentity(ctx, id);
+        id
     }
 }
 
@@ -1248,11 +1251,8 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
 /// Raven `G_TempEntity`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:1054-1077`
-pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> *mut gentity_t {
-    // Safe-state 2c: te fields via the accessor. `G_Spawn` still yields a raw
-    // pointer, returned to the caller as before.
-    let e = G_Spawn(ctx);
-    let e_id = ctx.entity_id_of(e).unwrap();
+pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> EntityId {
+    let e_id = G_Spawn(ctx);
     let level_time = ctx.world.level.time;
     {
         let ent = ctx.world.entity_mut(e_id);
@@ -1270,9 +1270,10 @@ pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> *mut
     // bandwidth...? (Raven comment, preserved.)
 
     // find cluster for PVS
-    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e.cast()));
+    let e_ptr = ctx.world.entity_mut(e_id) as *mut gentity_t;
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e_ptr.cast()));
 
-    e
+    e_id
 }
 
 /// Raven `G_SoundTempEntity`.
@@ -1283,10 +1284,8 @@ pub fn G_SoundTempEntity(
     origin: vec3_t,
     event: c_int,
     channel: c_int,
-) -> *mut gentity_t {
-    // Safe-state 2c: te fields via the accessor.
-    let e = G_Spawn(ctx);
-    let e_id = ctx.entity_id_of(e).unwrap();
+) -> EntityId {
+    let e_id = G_Spawn(ctx);
     let level_time = ctx.world.level.time;
     {
         let ent = ctx.world.entity_mut(e_id);
@@ -1302,9 +1301,10 @@ pub fn G_SoundTempEntity(
     G_SetOrigin(ctx.world.entity_mut(e_id), snapped);
 
     // find cluster for PVS
-    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e.cast()));
+    let e_ptr = ctx.world.entity_mut(e_id) as *mut gentity_t;
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(e_ptr.cast()));
 
-    e
+    e_id
 }
 
 /// Raven `G_ScaleNetHealth`.
@@ -1483,8 +1483,8 @@ pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
         world: unsafe { &mut *crate::g_strap::strap_world() },
         engine: crate::g_strap::strap_engine(),
     };
-    let te = G_TempEntity(&mut ctx, org, EV_PLAY_EFFECT as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(&mut ctx, org, EV_PLAY_EFFECT as c_int);
+    let te = ctx.entity_mut(te_id) as *mut gentity_t;
     let e = ctx.world.entity_mut(te_id);
     e.s.angles = ang;
     e.s.origin = org;
@@ -1504,8 +1504,8 @@ pub fn G_PlayEffectID(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
         world: unsafe { &mut *crate::g_strap::strap_world() },
         engine: crate::g_strap::strap_engine(),
     };
-    let te = G_TempEntity(&mut ctx, org, EV_PLAY_EFFECT_ID as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(&mut ctx, org, EV_PLAY_EFFECT_ID as c_int);
+    let te = ctx.entity_mut(te_id) as *mut gentity_t;
     {
         let e = ctx.world.entity_mut(te_id);
         e.s.angles = ang;
@@ -1534,8 +1534,8 @@ pub fn G_ScreenShake(
 ) -> *mut gentity_t {
     // Safe-state 2c: `target` handle; te fields via the accessor. `te` is a fresh
     // temp entity whose raw pointer is returned to the caller as before.
-    let te = G_TempEntity(ctx, org, EV_SCREENSHAKE as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, org, EV_SCREENSHAKE as c_int);
+    let te = ctx.entity_mut(te_id) as *mut gentity_t;
 
     let modelindex = match target {
         Some(id) => ctx.world.entity(id).s.number + 1,
@@ -1561,8 +1561,7 @@ pub fn G_ScreenShake(
 /// Source: `oracle/codemp/game/g_utils.c:1322-1338`
 pub fn G_MuteSound(ctx: &mut GameContext, entnum: c_int, channel: c_int) {
     // Safe-state 2c: te + target fields via the accessor.
-    let te = G_TempEntity(ctx, vec3_origin, EV_MUTE_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, vec3_origin, EV_MUTE_SOUND as c_int);
     {
         let e = ctx.world.entity_mut(te_id);
         e.r.svFlags = SVF_BROADCAST;
@@ -1593,8 +1592,7 @@ pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, sou
     };
 
     let origin = ctx.world.entity(ent_id).r.currentOrigin;
-    let te = G_SoundTempEntity(ctx, origin, EV_GENERAL_SOUND as c_int, channel);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_SoundTempEntity(ctx, origin, EV_GENERAL_SOUND as c_int, channel);
     {
         let e = ctx.world.entity_mut(te_id);
         e.s.eventParm = soundIndex;
@@ -1640,7 +1638,8 @@ pub fn G_Sound(ctx: &mut GameContext, ent: Option<EntityId>, channel: c_int, sou
 /// Source: `oracle/codemp/game/g_utils.c:1379-1385`
 pub fn G_SoundAtLoc(ctx: &mut GameContext, loc: vec3_t, channel: c_int, soundIndex: c_int) {
     unsafe {
-        let te = G_TempEntity(ctx, loc, EV_GENERAL_SOUND as c_int);
+        let te_eid = G_TempEntity(ctx, loc, EV_GENERAL_SOUND as c_int);
+        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
         (*te).s.eventParm = soundIndex;
         (*te).s.saberEntityNum = channel;
     }
@@ -1652,8 +1651,7 @@ pub fn G_SoundAtLoc(ctx: &mut GameContext, loc: vec3_t, channel: c_int, soundInd
 pub fn G_EntitySound(ctx: &mut GameContext, ent: EntityId, channel: c_int, soundIndex: c_int) {
     // Safe-state 2c: EntityId param; te + ent fields via the accessor.
     let origin = ctx.world.entity(ent).r.currentOrigin;
-    let te = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
     let ent_number = ctx.world.entity(ent).s.number;
     let e = ctx.world.entity_mut(te_id);
     e.s.eventParm = soundIndex;
@@ -1672,8 +1670,7 @@ pub fn G_SoundOnEnt(
 ) {
     // Safe-state 2c: EntityId param; te + ent fields via the accessor.
     let origin = ctx.world.entity(ent).r.currentOrigin;
-    let te = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
-    let te_id = ctx.entity_id_of(te).unwrap();
+    let te_id = G_TempEntity(ctx, origin, EV_ENTITY_SOUND as c_int);
     let ent_number = ctx.world.entity(ent).s.number;
     let sound = G_SoundIndex(soundPath);
     let e = ctx.world.entity_mut(te_id);
@@ -2431,7 +2428,7 @@ pub fn DebugLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int
     let mut dir = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
     VectorNormalize(&mut dir);
     let up = [0.0f32, 0.0, 1.0];
-    let dot = crate::q_math::_DotProduct(dir, up);
+    let dot = _DotProduct(dir, up);
     let mut cross = [0.0f32; 3];
     // `0.99` is a bare double in the oracle; both compares promote (fn is dead —
     // zero callers in either tree — promoted for F3-class purity).
