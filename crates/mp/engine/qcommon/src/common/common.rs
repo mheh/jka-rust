@@ -41,8 +41,8 @@ use crate::vm::vm_s::vm_t;
 use crate::vm::vm_symbol_s::vmSymbol_t;
 
 /// Raven `cmd_t` — the command-buffer descriptor (`data`/`maxsize`/`cursize`).
-/// No rosetta row; resolved verbatim here as the shape of `Common::cmd_text`
-/// (`cmd_common.cpp` PORT-NOTE), one type per its owning `Common` file.
+/// Resolved verbatim here as the shape of `Common::cmd_text`, one type per
+/// its owning `Common` file.
 ///
 /// Type definition source: `oracle/codemp/qcommon/cmd_common.cpp:10-14`
 #[repr(C)]

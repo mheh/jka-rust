@@ -1,16 +1,10 @@
-// PORT-COMPLETE: bg_pmove.c 11/91
-//! FAITHFUL signature skeleton for `oracle/codemp/game/bg_pmove.c`.
+// PORT-COMPLETE: bg_pmove.c
+//! FAITHFUL port of `oracle/codemp/game/bg_pmove.c`.
 //!
-//! Bodies filled per the settled fork rulings. The vast majority of this file
-//! is built on the file-static pmove working set (`pmove_t *pm`, `pml_t pml`,
+//! Raven's file-static pmove working set (`pmove_t *pm`, `pml_t pml`,
 //! `bgEntity_t *pm_entSelf`, `pm_entVeh`, `pm_flying`, `gPMDoSlowFall`,
-//! `pm_cancelOutZoom`). Porting-rules §B3 forbids `static mut`/hidden globals,
-//! but the faithful no-arg C signatures here thread no `pm`/engine context, so
-//! the representation of that working set is a genuine unsettled design fork.
-//! Every function that reads/writes it — and every function whose skeleton
-//! signature passes a mutated `vec3_t` out-param BY VALUE (`[f32;3]` is `Copy`,
-//! so in-place writes cannot propagate) — is parked with a `PORT-NOTE`.
-//! The clean, pointer-parameterized / pure functions are ported.
+//! `pm_cancelOutZoom`) lives on the `PmoveContext` receiver (§B3 — no
+//! `static mut`/hidden globals).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
