@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_mover.c 22/50
+// PORT-COMPLETE: g_mover.c
 //! FAITHFUL port of `oracle/codemp/game/g_mover.c`.
 //!
 //! Safe-state migration (campaign 2c). Entity params crossing this file's ABI

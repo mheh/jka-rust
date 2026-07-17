@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_items.c 12/55
+// PORT-COMPLETE: g_items.c
 //! FAITHFUL port of `oracle/codemp/game/g_items.c`.
 //!
 //! Filled by the jampgame mega-pass.

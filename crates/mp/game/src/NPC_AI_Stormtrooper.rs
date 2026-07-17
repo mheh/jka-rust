@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Stormtrooper.c 26/26
+// PORT-COMPLETE: NPC_AI_Stormtrooper.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Stormtrooper.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton; the pass-3 mega-pass fills

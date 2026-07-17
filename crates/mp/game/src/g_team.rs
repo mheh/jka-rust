@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_team.c 36/36 (PrintMsg dropped — dead, zero live callers)
+// PORT-COMPLETE: g_team.c (PrintMsg dropped — dead, zero live callers)
 //! FAITHFUL port of `oracle/codemp/game/g_team.c`.
 //!
 //! Functions that reach file-scope game state (`level`, `teamgame`,

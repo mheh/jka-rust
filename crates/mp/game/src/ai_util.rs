@@ -1,4 +1,4 @@
-// PORT-COMPLETE: ai_util.c 12/12
+// PORT-COMPLETE: ai_util.c
 //! FAITHFUL port of `oracle/codemp/game/ai_util.c`.
 //!
 //! Filled by the jampgame mega-pass. `BOT_ZMALLOC`/`BOTMEMTRACK`/`DEBUG` are not defined

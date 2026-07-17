@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_ImperialProbe.c 12/12
+// PORT-COMPLETE: NPC_AI_ImperialProbe.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_ImperialProbe.c`.
 //!
 //! Imperial Probe droid AI behavior: idle, patrol, hunt, strafe, ranged attack.

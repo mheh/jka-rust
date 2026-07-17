@@ -1,4 +1,4 @@
-// PORT-COMPLETE: SpeederNPC.c 3/5
+// PORT-COMPLETE: SpeederNPC.c
 //! FAITHFUL port of `oracle/codemp/game/SpeederNPC.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

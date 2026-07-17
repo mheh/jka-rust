@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_spawn.c 5/85
+// PORT-COMPLETE: NPC_spawn.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_spawn.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

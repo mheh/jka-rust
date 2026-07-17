@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_goal.c 1/6
+// PORT-COMPLETE: NPC_goal.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_goal.c`.
 //!
 //! Filled by the jampgame mega-pass. Functions that reach file-scope AI globals (`NPC`,

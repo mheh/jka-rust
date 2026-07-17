@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_active.c 31/5
+// PORT-COMPLETE: g_active.c
 //! Port of `oracle/codemp/game/g_active.c` (jampgame pass 2).
 //!
 //! Safe-state migration **Stage 1**. Entity params crossing this file's ABI

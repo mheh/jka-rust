@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_strap.c 12/12
+// PORT-COMPLETE: g_strap.c
 //! `g_strap.c` — ctx-less bg-boundary wrappers over the `trap_G2API_*`/`trap_True*`
 //! seam (BLESSED 2026-07-05).
 //!

@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_exphysics.c 1/1
+// PORT-COMPLETE: g_exphysics.c
 //! FAITHFUL port of `oracle/codemp/game/g_exphysics.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

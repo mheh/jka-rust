@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_GalakMech.c 15/15
+// PORT-COMPLETE: NPC_AI_GalakMech.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_GalakMech.c`.
 //!
 //! All functions are ported: `GM_Move` reads the canonical `NIF_COLLISION`

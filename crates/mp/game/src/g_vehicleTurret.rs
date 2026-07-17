@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_vehicleTurret.c 2/6
+// PORT-COMPLETE: g_vehicleTurret.c
 
 //! FAITHFUL port of `oracle/codemp/game/g_vehicleTurret.c`.
 //!

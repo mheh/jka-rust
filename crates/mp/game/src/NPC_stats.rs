@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_stats.c 4/4 (4 ported, 4 parked)
+// PORT-COMPLETE: NPC_stats.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_stats.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

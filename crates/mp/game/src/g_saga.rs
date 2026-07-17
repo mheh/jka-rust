@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_saga.c 33/33 (pass 3 — all open fns filled)
+// PORT-COMPLETE: g_saga.c
 //! FAITHFUL port of `oracle/codemp/game/g_saga.c` — Siege gametype
 //! game-side module.
 //!

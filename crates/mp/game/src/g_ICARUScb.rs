@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_ICARUScb.c — every fn has a real body (Stage 2c below).
+// PORT-COMPLETE: g_ICARUScb.c
 //! FAITHFUL port of `oracle/codemp/game/g_ICARUScb.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

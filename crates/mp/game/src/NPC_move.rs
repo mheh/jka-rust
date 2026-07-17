@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_move.c 2/11
+// PORT-COMPLETE: NPC_move.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_move.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

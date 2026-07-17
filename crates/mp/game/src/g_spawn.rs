@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_spawn.c 14/3
+// PORT-COMPLETE: g_spawn.c
 //! FAITHFUL port of `oracle/codemp/game/g_spawn.c` — entity spawn
 //! dispatch, `level.spawnVars[]` parsing, and `worldspawn`.
 //!

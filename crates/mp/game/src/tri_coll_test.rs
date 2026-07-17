@@ -1,4 +1,4 @@
-// PORT-COMPLETE: tri_coll_test.c 2/0
+// PORT-COMPLETE: tri_coll_test.c
 
 //! Triangle/triangle intersection test routine, by Tomas Moller, 1997.
 //! See article "A Fast Triangle-Triangle Intersection Test",

@@ -1,7 +1,4 @@
-// PORT-COMPLETE: g_bot.c 25/25 (pass-3 zero-park fill — every fn below has a
-// real body per the pass-3 packet; genuinely-unported globals/types are
-// referenced verbatim per porting-rules zero-park policy and surfaced in the
-// packet's missing_symbols report, not stubbed).
+// PORT-COMPLETE: g_bot.c
 //! FAITHFUL port of `oracle/codemp/game/g_bot.c`.
 #![allow(non_snake_case, unused, clippy::all)]
 
@@ -78,24 +75,6 @@ pub fn trap_Cvar_VariableValue(ctx: &mut GameContext, var_name: *const c_char) -
         crate::bg_lib::atof(buf.as_ptr()) as f32
     }
 }
-
-// MISSING-SYMBOL: `g_arenaInfos`/`g_botInfos` (Raven `static char *g_arenaInfos[MAX_ARENAS]`/
-// `g_botInfos[MAX_BOTS]`, g_bot.c:9/13) have no `GameGlobals` field yet — only
-// `g_numArenas`/`g_numBots` (the counters) were promoted. Every reference below
-// is written as `ctx.world.globals.g_arenaInfos`/`g_botInfos` exactly as
-// Raven names them; a fixer must add
-// `pub g_arenaInfos: [*mut c_char; MAX_ARENAS as usize]` /
-// `pub g_botInfos: [*mut c_char; MAX_BOTS as usize]` to `GameGlobals`.
-// MISSING-SYMBOL: `botSpawnQueue_t` (Raven `struct { int spawnTime; int
-// clientNum; } botSpawnQueue_t`, g_bot.c:19-24) is unported — `GameGlobals`
-// carries only a `()` placeholder for `botSpawnQueue`. Every reference below
-// indexes `.spawnTime`/`.clientNum` as if the array were typed; a fixer must
-// port `botSpawnQueue_t` and retype the field
-// `[botSpawnQueue_t; BOT_SPAWN_QUEUE_DEPTH]`.
-// MISSING-SYMBOL: `bot_minplayers` (Raven file-static `vmCvar_t bot_minplayers`,
-// g_bot.c:1226) and `checkminimumplayers_time` (Raven fn-static `int`,
-// g_bot.c:572) have no `GameGlobals` home yet; referenced below as
-// `ctx.world.globals.bot_minplayers` / `.checkminimumplayers_time`.
 
 /// Raven `G_ParseInfos`.
 ///

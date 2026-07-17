@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_target.c 13/31
+// PORT-COMPLETE: g_target.c
 //! FAITHFUL port of `oracle/codemp/game/g_target.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

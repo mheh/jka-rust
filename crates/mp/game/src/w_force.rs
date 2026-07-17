@@ -140,8 +140,6 @@ pub fn G_PreDefSound(ctx: &mut GameContext, org: vec3_t, pdSound: c_int) -> *mut
 /// Raven `WP_InitForcePowers`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:147-572`
-// MISSING-SYMBOL: `bgSiegeClasses` (siege-class force table) is referenced by
-// its faithful Raven name; not yet a real GameWorld/BgState field.
 pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
     unsafe {
         let mut maxRank = ctx.world.cvars.g_maxForceRank.integer;
@@ -230,7 +228,6 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
         if gametype == GT_SIEGE as c_int && (*cl).siegeClass != -1 {
             //Then use the powers for this class, and skip all this nonsense.
-            // MISSING-SYMBOL: `bgSiegeClasses` — siege-class force table.
             for i in 0..NUM_FORCE_POWERS as usize {
                 (*cl).ps.fd.forcePowerLevel[i] = (&ctx.world.bg_state.bgSiegeClasses)
                     [(*cl).siegeClass as usize]
@@ -586,7 +583,6 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 /// Raven `WP_SpawnInitForcePowers` — reset per-spawn force state.
 ///
 /// Source: `oracle/codemp/game/w_force.c:574-691`
-// MISSING-SYMBOL: `bgSiegeClasses` (siege-class force table).
 pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         // FLAG: gclient_t deref stays raw (`ent` can be an NPC pool client,
@@ -665,7 +661,6 @@ pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
 
         if gametype == GT_SIEGE as c_int && (*cl).siegeClass != -1 {
             //Then use the powers for this class.
-            // MISSING-SYMBOL: `bgSiegeClasses`.
             for i in 0..NUM_FORCE_POWERS as usize {
                 (*cl).ps.fd.forcePowerLevel[i] = (&ctx.world.bg_state.bgSiegeClasses)
                     [(*cl).siegeClass as usize]
@@ -783,7 +778,6 @@ pub fn ForcePowerUsableOn(
 /// Raven `WP_ForcePowerAvailable` — is there enough force pool for `forcePower`?
 ///
 /// Source: `oracle/codemp/game/w_force.c:774-801`
-// MISSING-SYMBOL: `forcePowerNeeded` (per-level force-cost table).
 pub fn WP_ForcePowerAvailable(
     ctx: &mut GameContext,
     self_: EntityId,
@@ -1307,7 +1301,6 @@ pub fn WP_AddToClientBitflags(ent: Option<&mut gentity_t>, entNum: c_int) {
 /// Raven `ForceTeamHeal`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1319-1422`
-// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut radius: f32 = 256.0;
@@ -1424,7 +1417,6 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
 /// Raven `ForceTeamForceReplenish`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:1424-1521`
-// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
     unsafe {
         let mut radius: f32 = 256.0;
@@ -2564,7 +2556,6 @@ pub fn ForceShootDrain(ctx: &mut GameContext, self_: EntityId) -> c_int {
 /// Raven `ForceJumpCharge`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2317-2375`
-// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceJumpCharge(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     unsafe {
         // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
@@ -2740,7 +2731,6 @@ pub fn WP_GetVelocityForForceJump(
 /// Raven `ForceJump`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2462-2500`
-// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceJump(ctx: &mut GameContext, self_: EntityId, ucmd: *mut usercmd_t) {
     unsafe {
         // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
@@ -2815,11 +2805,6 @@ pub fn WP_AddAsMindtricked(fd: *mut forcedata_t, entNum: c_int) {
 /// Raven `ForceTelepathyCheckDirectNPCTarget`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:2527-2721`
-// MISSING-SYMBOL: `gNPC_t` — `gentity_t::NPC` is still a `*mut c_void`
-// placeholder (see `crates/mp/qshared/src/common/mp/gentity.rs:160-164`); the
-// `scriptFlags`/`charmedTime`/`confusionTime` field accesses below are
-// transcribed against the faithful Raven `gNPC_t` shape and cast the
-// placeholder pointer, per the zero-park missing-symbol rule.
 pub fn ForceTelepathyCheckDirectNPCTarget(
     ctx: &mut GameContext,
     self_: EntityId,
@@ -5789,7 +5774,6 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                 for i in 0..NUM_FORCE_POWERS as usize {
                     (*cl).ps.fd.forcePowerBaseLevel[i] = (*cl).ps.fd.forcePowerLevel[i];
 
-                    // MISSING-SYMBOL: `forcePowerDarkLight`.
                     if forcePowerDarkLight[i] == 0
                         || (*cl).ps.fd.forceSide == forcePowerDarkLight[i]
                     {
@@ -6044,8 +6028,10 @@ pub fn WP_ForcePowersUpdate(ctx: &mut GameContext, self_: Option<EntityId>, ucmd
                             //1 point per 7 seconds.. super slow
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time + 7000;
                         } else if (*cl).siegeClass != -1
-                            // MISSING-SYMBOL: `bgSiegeClasses`.
-                            && (&ctx.world.bg_state.bgSiegeClasses)[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN as c_int) != 0
+                            && (&ctx.world.bg_state.bgSiegeClasses)[(*cl).siegeClass as usize]
+                                .classflags
+                                & (1 << CFL_FASTFORCEREGEN as c_int)
+                                != 0
                         {
                             //if this is siege and our player class has the fast force regen ability, then recharge with 1/5th the usual delay
                             // Raven's `0.2` is a double literal, so the multiply runs in f64.

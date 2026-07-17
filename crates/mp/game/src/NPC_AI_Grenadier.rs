@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Grenadier.c 3/8
+// PORT-COMPLETE: NPC_AI_Grenadier.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Grenadier.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

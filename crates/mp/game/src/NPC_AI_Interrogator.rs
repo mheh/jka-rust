@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Interrogator.c 10/10
+// PORT-COMPLETE: NPC_AI_Interrogator.c
 //! Faithful port of `oracle/codemp/game/NPC_AI_Interrogator.c` (jampgame mega-pass).
 //!
 //! Interrogator droid NPC AI behavior: idle, patrol, hunt, strafe, melee attack.

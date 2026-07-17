@@ -1,7 +1,4 @@
-// PORT-COMPLETE: pass-3 blind transcription filled the remaining 47 fns
-// (zero-park policy — no fn left `todo!()`-bodied). `g_shooterClients`/
-// `g_shooterClientInit` are now ported as a real `GameWorld` field
-// (`shooterClient_t` array, this file).
+// PORT-COMPLETE: g_misc.c
 //! FAITHFUL port of `oracle/codemp/game/g_misc.c`.
 //!
 //! Filled by the jampgame mega-pass.

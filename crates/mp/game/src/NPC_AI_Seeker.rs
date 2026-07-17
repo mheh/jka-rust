@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Seeker.c 10/10
+// PORT-COMPLETE: NPC_AI_Seeker.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Seeker.c`.
 //!
 //! All 10 functions ported. Nearly every function in this file relies on

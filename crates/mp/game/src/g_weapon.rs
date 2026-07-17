@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_weapon.c 15/70
+// PORT-COMPLETE: g_weapon.c
 //! FAITHFUL port of `oracle/codemp/game/g_weapon.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

@@ -1,5 +1,4 @@
-// PORT-COMPLETE: g_cmds.c 54/54 (pass 3 — all fns filled; see
-// docs/handoffs/jampgame-fork-discovery.md for rulings)
+// PORT-COMPLETE: g_cmds.c
 //! FAITHFUL port of `oracle/codemp/game/g_cmds.c`.
 //!
 //! Filled by the jampgame mega-pass, pass-2 retrofitted with `ctx: GameContext`,

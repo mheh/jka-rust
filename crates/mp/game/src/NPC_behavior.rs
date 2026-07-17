@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_behavior.c 21/21
+// PORT-COMPLETE: NPC_behavior.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_behavior.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton; the pass-3 mega-pass fills

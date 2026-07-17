@@ -1,4 +1,4 @@
-// PORT-COMPLETE: AnimalNPC.c 2/7
+// PORT-COMPLETE: AnimalNPC.c
 //! FAITHFUL port of `oracle/codemp/game/AnimalNPC.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!

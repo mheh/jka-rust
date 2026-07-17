@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_reactions.c 6/6
+// PORT-COMPLETE: NPC_reactions.c
 //! Port of `oracle/codemp/game/NPC_reactions.c` (jampgame mega-pass).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the

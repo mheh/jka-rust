@@ -1,6 +1,4 @@
-// PORT-COMPLETE: g_client.c 31/46 (pass-2b filled ThrowSaberToAttacker +
-// JMSaberThink once gJMSaberEnt got a real type; 15 parked on fn-ptr-store /
-// va-varargs / ghoul2-va / bg-boundary / vehicle-vtable)
+// PORT-COMPLETE: g_client.c
 //! FAITHFUL port of `oracle/codemp/game/g_client.c` — client functions
 //! that don't happen every frame.
 //!

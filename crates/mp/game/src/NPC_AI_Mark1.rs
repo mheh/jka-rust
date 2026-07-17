@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Mark1.c 1/15
+// PORT-COMPLETE: NPC_AI_Mark1.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Mark1.c`.
 //!
 //! Filled by the jampgame mega-pass; all bodies are live. The file-scope AI

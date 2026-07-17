@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_utils.c 23/24 (pass-2, packets/NPC_utils.md)
+// PORT-COMPLETE: NPC_utils.c
 //! Port of `oracle/codemp/game/NPC_utils.c` (jampgame mega-pass).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the

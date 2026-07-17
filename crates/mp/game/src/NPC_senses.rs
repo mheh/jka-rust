@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_senses.c 27/27 (all ported)
+// PORT-COMPLETE: NPC_senses.c
 //! FAITHFUL signature skeleton for `oracle/codemp/game/NPC_senses.c`.
 //!
 //! Filled by the jampgame mega-pass. Most of this file reaches file-scope game state

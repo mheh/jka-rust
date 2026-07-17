@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_combat.c 33/38 (pass-3 shard: +28, see NPC_combat.md)
+// PORT-COMPLETE: NPC_combat.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_combat.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

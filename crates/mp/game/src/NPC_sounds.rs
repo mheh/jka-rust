@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_sounds.c 1/2
+// PORT-COMPLETE: NPC_sounds.c
 
 //! FAITHFUL port of `oracle/codemp/game/NPC_sounds.c`.
 //!

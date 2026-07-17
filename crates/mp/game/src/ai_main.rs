@@ -1,4 +1,4 @@
-// PORT-COMPLETE: ai_main.c 26/102
+// PORT-COMPLETE: ai_main.c
 //! FAITHFUL port of `oracle/codemp/game/ai_main.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_object.c 4/4
+// PORT-COMPLETE: g_object.c
 //! `oracle/codemp/game/g_object.c` — object physics (bounce/run/start/stop).
 //!
 //! Safe-state migration **Stage 0 pilot**. Entity params are `EntityId`

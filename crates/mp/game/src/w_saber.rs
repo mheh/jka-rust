@@ -1,4 +1,4 @@
-// PORT-COMPLETE: w_saber.c 13/66
+// PORT-COMPLETE: w_saber.c
 //! FAITHFUL port of `oracle/codemp/game/w_saber.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

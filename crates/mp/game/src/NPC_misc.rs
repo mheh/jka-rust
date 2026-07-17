@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_misc.c 2/2
+// PORT-COMPLETE: NPC_misc.c
 
 //! FAITHFUL port of `oracle/codemp/game/NPC_misc.c`.
 //!

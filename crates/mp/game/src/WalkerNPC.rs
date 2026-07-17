@@ -1,4 +1,4 @@
-// PORT-COMPLETE: WalkerNPC.c 6/6
+// PORT-COMPLETE: WalkerNPC.c
 //! FAITHFUL port of `oracle/codemp/game/WalkerNPC.c`.
 //!
 //! Walker NPC vehicle implementation — movement, orientation, animation, and

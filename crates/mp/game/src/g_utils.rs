@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_utils.c 6/33 (pass-2 filled most of the 60 parked fns)
+// PORT-COMPLETE: g_utils.c
 //! FAITHFUL port of `oracle/codemp/game/g_utils.c`.
 //!
 //! Filled by the jampgame mega-pass. Pass-2 resolved the ctx threading and the

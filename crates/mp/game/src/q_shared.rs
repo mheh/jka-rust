@@ -1,4 +1,4 @@
-// PORT-COMPLETE: q_shared.c 46/10
+// PORT-COMPLETE: q_shared.c
 //! FAITHFUL port of `oracle/codemp/game/q_shared.c`.
 //!
 //! Filled by the jampgame mega-pass.

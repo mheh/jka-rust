@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_turret.c 3/11
+// PORT-COMPLETE: g_turret.c
 //! FAITHFUL port of `oracle/codemp/game/g_turret.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

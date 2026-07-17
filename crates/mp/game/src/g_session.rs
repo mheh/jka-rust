@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_session.c 0/5
+// PORT-COMPLETE: g_session.c
 //! FAITHFUL port of `oracle/codemp/game/g_session.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

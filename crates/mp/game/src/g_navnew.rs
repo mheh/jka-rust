@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_navnew.c 5/8
+// PORT-COMPLETE: g_navnew.c
 //! Port of `oracle/codemp/game/g_navnew.c` (jampgame mega-pass).
 //!
 //! Generated from `tools/closure-prototype/fnskel.py`; bodies filled per the

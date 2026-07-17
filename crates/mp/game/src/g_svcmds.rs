@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_svcmds.c 14/14
+// PORT-COMPLETE: g_svcmds.c
 //! Faithful port for `oracle/codemp/game/g_svcmds.c`.
 //!
 //! Server-side console commands: IP filtering, entity listing, team forcing.

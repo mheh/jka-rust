@@ -1,4 +1,4 @@
-// PORT-COMPLETE: q_math.c 54/54
+// PORT-COMPLETE: q_math.c
 //! Ported from `oracle/codemp/game/q_math.c`.
 //!
 //! Signature note: the fnskel generator emits Raven's `vec3_t`/`vec4_t`

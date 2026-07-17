@@ -1,4 +1,4 @@
-// PORT-COMPLETE: FighterNPC.c 18/18
+// PORT-COMPLETE: FighterNPC.c
 //! FAITHFUL port of `oracle/codemp/game/FighterNPC.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

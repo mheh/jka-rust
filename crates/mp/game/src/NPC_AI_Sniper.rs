@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Sniper.c 15/15
+// PORT-COMPLETE: NPC_AI_Sniper.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Sniper.c`.
 //!
 //! All functions reach file-scope game state (`level`, `g_entities`, the

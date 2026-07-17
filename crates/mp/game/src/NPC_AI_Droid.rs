@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Droid.c 14/14
+// PORT-COMPLETE: NPC_AI_Droid.c
 //! FAITHFUL port of `oracle/codemp/game/NPC_AI_Droid.c`.
 //!
 //! Filled by the jampgame mega-pass; functions reach file-scope game state

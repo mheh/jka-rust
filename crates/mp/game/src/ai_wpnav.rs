@@ -1,4 +1,4 @@
-// PORT-COMPLETE: ai_wpnav.c 42/42 (pass 3 — zero-park).
+// PORT-COMPLETE: ai_wpnav.c
 //! FAITHFUL port of `oracle/codemp/game/ai_wpnav.c`.
 //!
 //! Filled by the jampgame mega-pass.

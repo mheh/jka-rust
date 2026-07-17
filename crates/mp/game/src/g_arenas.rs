@@ -1,4 +1,4 @@
-// PORT-COMPLETE: g_arenas.c 0/1
+// PORT-COMPLETE: g_arenas.c
 
 //! FAITHFUL port of `oracle/codemp/game/g_arenas.c`.
 //!
