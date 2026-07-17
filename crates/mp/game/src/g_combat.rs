@@ -1871,6 +1871,137 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `player_die` — the normal-death animation phase: draw the
+/// death anim (world-owned `death_anim_i` rotation + `G_PickDeathAnim`),
+/// play it with pm_type shielded, saber/heavy-melee dismemberment check,
+/// the EV_DEATH1+i event (Jedi Master flagged), the death alert, and the
+/// corpse's body_die/takedamage arming.
+/// Source: `oracle/codemp/game/g_combat.c:2845-2928`
+unsafe fn player_die_death_anim(
+    ctx: &mut GameContext,
+    self_: *mut gentity_t,
+    attacker: *mut gentity_t,
+    damage: c_int,
+    meansOfDeath: c_int,
+    wasJediMaster: qboolean,
+) {
+    let cl = (*self_).client;
+    let mut sPMType: c_int;
+    // NOTENOTE No gib deaths right now, this is star wars.
+    {
+        // normal death
+        // Raven's function-`static int i` rotates EV_DEATH1 0..2 across deaths;
+        // world-owned per §B3 (`game_globals.rs`).
+        let mut i_val = ctx.world.globals.death_anim_i;
+
+        // Referee probe capture: holdrand before the death-anim draw.
+        let probe_rin = ctx.world.bg_state.rng.dbg_holdrand();
+        let anim = G_PickDeathAnim(
+            ctx,
+            ctx.entity_id_of(self_),
+            (*self_).pos1,
+            damage,
+            meansOfDeath,
+            HL_NONE,
+        );
+        // Referee probe: G_PickDeathAnim inputs (pos, dmg, mod) + RNG in/out.
+        probe!(
+            "DEATH_ANIM",
+            "t={} en={} dmg={} mod={} p={:08x},{:08x},{:08x} rin={:08x} rout={:08x} anim={}",
+            ctx.world.level.time,
+            (*self_).s.number,
+            damage,
+            meansOfDeath,
+            (*self_).pos1[0].to_bits(),
+            (*self_).pos1[1].to_bits(),
+            (*self_).pos1[2].to_bits(),
+            probe_rin,
+            ctx.world.bg_state.rng.dbg_holdrand(),
+            anim,
+        );
+
+        if anim >= 1 {
+            // Some droids don't have death anims
+            if (*self_).health <= GIB_HEALTH {
+                (*self_).health = GIB_HEALTH + 1;
+            }
+
+            (*cl).respawnTime = ctx.world.level.time + 1000;
+
+            sPMType = (*cl).ps.pm_type;
+            (*cl).ps.pm_type = pmtype_t::PM_NORMAL as c_int; // don't want pm type interfering with our setanim calls.
+
+            if (*self_).inuse != qfalse {
+                // not disconnecting
+                crate::g_utils::G_SetAnim(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    core::ptr::null_mut(),
+                    SETANIM_BOTH,
+                    anim,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_RESTART,
+                    0,
+                );
+            }
+
+            (*cl).ps.pm_type = sPMType;
+
+            if meansOfDeath == meansOfDeath_t::MOD_SABER as c_int
+                || (meansOfDeath == meansOfDeath_t::MOD_MELEE as c_int
+                    && G_HeavyMelee(ctx, ctx.entity_id_of(attacker)) != qfalse)
+            {
+                // saber or heavy melee (claws)
+                crate::g_client::G_UpdateClientAnims(ctx, ctx.entity_id_of(self_).unwrap(), 1.0);
+                G_CheckForDismemberment(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    ctx.entity_id_of(attacker),
+                    (*self_).pos1,
+                    damage,
+                    anim,
+                    qfalse,
+                );
+            }
+        } else if !(*self_).NPC.is_null()
+            && !(*self_).client.is_null()
+            && (*cl).NPC_class != class_t::CLASS_MARK1
+            && (*cl).NPC_class != class_t::CLASS_VEHICLE
+        {
+            // in this case if we're an NPC it's my guess that we want to get removed straight away.
+            (*self_).think = Some(EntThink::G_FreeEntity).into();
+            (*self_).nextthink = ctx.world.level.time;
+        }
+
+        if wasJediMaster != qfalse {
+            G_AddEvent(&mut *(self_), entity_event_t::EV_DEATH1 as c_int + i_val, 1);
+        } else {
+            G_AddEvent(&mut *(self_), entity_event_t::EV_DEATH1 as c_int + i_val, 0);
+        }
+
+        if self_ != attacker {
+            // don't make NPCs want to murder you on respawn for killing yourself!
+            G_DeathAlert(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                ctx.entity_id_of(attacker),
+            );
+        }
+
+        // the body can still be gibbed
+        if (*self_).NPC.is_null() {
+            // don't remove NPCs like this!
+            (*self_).die = Some(EntDie::body_die).into();
+        }
+
+        // It won't gib, it will disintegrate (because this is Star Wars).
+        (*self_).takedamage = qtrue;
+
+        // globally cycle through the different death animations
+        i_val = (i_val + 1) % 3;
+        ctx.world.globals.death_anim_i = i_val;
+    }
+}
+
 /// Split from `player_die` — post-obit scoring: team frag bonuses, the
 /// suicide/nodrop CTF flag returns, item drops (non-NPC, outside nodrop),
 /// the MOD_TEAM_CHANGE score refund vs score display, and the
@@ -2158,7 +2289,6 @@ pub fn player_die(
         let base = ctx.world.g_entities.as_mut_ptr();
         let cl = (*self_).client;
         let mut wasJediMaster: qboolean = qfalse;
-        let mut sPMType: c_int = 0;
         let mut wasInVehicle: c_int = 0;
         let mut tempInflictorEnt: *mut gentity_t = inflictor;
         let mut tempInflictor: qboolean = qfalse;
@@ -2769,123 +2899,7 @@ pub fn player_die(
         // remove powerups
         (*cl).ps.powerups.fill(0);
 
-        // NOTENOTE No gib deaths right now, this is star wars.
-        {
-            // normal death
-            // Raven's function-`static int i` rotates EV_DEATH1 0..2 across deaths;
-            // world-owned per §B3 (`game_globals.rs`).
-            let mut i_val = ctx.world.globals.death_anim_i;
-
-            // Referee probe capture: holdrand before the death-anim draw.
-            let probe_rin = ctx.world.bg_state.rng.dbg_holdrand();
-            let anim = G_PickDeathAnim(
-                ctx,
-                ctx.entity_id_of(self_),
-                (*self_).pos1,
-                damage,
-                meansOfDeath,
-                HL_NONE,
-            );
-            // Referee probe: G_PickDeathAnim inputs (pos, dmg, mod) + RNG in/out.
-            probe!(
-                "DEATH_ANIM",
-                "t={} en={} dmg={} mod={} p={:08x},{:08x},{:08x} rin={:08x} rout={:08x} anim={}",
-                ctx.world.level.time,
-                (*self_).s.number,
-                damage,
-                meansOfDeath,
-                (*self_).pos1[0].to_bits(),
-                (*self_).pos1[1].to_bits(),
-                (*self_).pos1[2].to_bits(),
-                probe_rin,
-                ctx.world.bg_state.rng.dbg_holdrand(),
-                anim,
-            );
-
-            if anim >= 1 {
-                // Some droids don't have death anims
-                if (*self_).health <= GIB_HEALTH {
-                    (*self_).health = GIB_HEALTH + 1;
-                }
-
-                (*cl).respawnTime = ctx.world.level.time + 1000;
-
-                sPMType = (*cl).ps.pm_type;
-                (*cl).ps.pm_type = pmtype_t::PM_NORMAL as c_int; // don't want pm type interfering with our setanim calls.
-
-                if (*self_).inuse != qfalse {
-                    // not disconnecting
-                    crate::g_utils::G_SetAnim(
-                        ctx,
-                        ctx.entity_id_of(self_).unwrap(),
-                        core::ptr::null_mut(),
-                        SETANIM_BOTH,
-                        anim,
-                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_RESTART,
-                        0,
-                    );
-                }
-
-                (*cl).ps.pm_type = sPMType;
-
-                if meansOfDeath == meansOfDeath_t::MOD_SABER as c_int
-                    || (meansOfDeath == meansOfDeath_t::MOD_MELEE as c_int
-                        && G_HeavyMelee(ctx, ctx.entity_id_of(attacker)) != qfalse)
-                {
-                    // saber or heavy melee (claws)
-                    crate::g_client::G_UpdateClientAnims(
-                        ctx,
-                        ctx.entity_id_of(self_).unwrap(),
-                        1.0,
-                    );
-                    G_CheckForDismemberment(
-                        ctx,
-                        ctx.entity_id_of(self_).unwrap(),
-                        ctx.entity_id_of(attacker),
-                        (*self_).pos1,
-                        damage,
-                        anim,
-                        qfalse,
-                    );
-                }
-            } else if !(*self_).NPC.is_null()
-                && !(*self_).client.is_null()
-                && (*cl).NPC_class != class_t::CLASS_MARK1
-                && (*cl).NPC_class != class_t::CLASS_VEHICLE
-            {
-                // in this case if we're an NPC it's my guess that we want to get removed straight away.
-                (*self_).think = Some(EntThink::G_FreeEntity).into();
-                (*self_).nextthink = ctx.world.level.time;
-            }
-
-            if wasJediMaster != qfalse {
-                G_AddEvent(&mut *(self_), entity_event_t::EV_DEATH1 as c_int + i_val, 1);
-            } else {
-                G_AddEvent(&mut *(self_), entity_event_t::EV_DEATH1 as c_int + i_val, 0);
-            }
-
-            if self_ != attacker {
-                // don't make NPCs want to murder you on respawn for killing yourself!
-                G_DeathAlert(
-                    ctx,
-                    ctx.entity_id_of(self_).unwrap(),
-                    ctx.entity_id_of(attacker),
-                );
-            }
-
-            // the body can still be gibbed
-            if (*self_).NPC.is_null() {
-                // don't remove NPCs like this!
-                (*self_).die = Some(EntDie::body_die).into();
-            }
-
-            // It won't gib, it will disintegrate (because this is Star Wars).
-            (*self_).takedamage = qtrue;
-
-            // globally cycle through the different death animations
-            i_val = (i_val + 1) % 3;
-            ctx.world.globals.death_anim_i = i_val;
-        }
+        player_die_death_anim(ctx, self_, attacker, damage, meansOfDeath, wasJediMaster);
 
         if !(*self_).NPC.is_null() {
             // If an NPC, make sure we start running our scripts again
