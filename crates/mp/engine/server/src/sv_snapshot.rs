@@ -21,7 +21,7 @@ use mp_engine_qcommon::qcommon::net_limits::{
     MAX_MSGLEN, MAX_RELIABLE_COMMANDS, PACKET_BACKUP, PACKET_MASK,
 };
 use mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e;
-use mp_engine_qcommon::vm_fns::VM_ArgPtr;
+use mp_engine_qcommon::vm_fns::VM_ArgPtrWord;
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::cgame::refdef_t::MAX_MAP_AREA_BYTES;
 use mp_qshared::common::mp::game::g_public::{
@@ -862,11 +862,10 @@ pub fn SV_BuildClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client
             let veh = SV_GentityNum(sv, (*ps).m_iVehicleNum);
 
             if !veh.is_null() && !(*veh).playerState.is_null() {
-                // Raven's `VM_ArgPtr((int)veh->playerState)` — the shifted-VM
-                // arg-ptr dance is preserved; the pointer field is cast through
-                // `isize` to Raven's `int` argument width.
-                let vps =
-                    VM_ArgPtr(common, (*veh).playerState as isize as c_int) as *mut playerState_t;
+                // Raven's `VM_ArgPtr((int)veh->playerState)` — the `int` cast is
+                // ILP32-era; on LP64 the dll-hosted module stores a full pointer
+                // word here, so the AbiWord-widened twin resolves it untruncated.
+                let vps = VM_ArgPtrWord(common, (*veh).playerState as isize) as *mut playerState_t;
                 (*frame).vps = *vps;
             }
         }
