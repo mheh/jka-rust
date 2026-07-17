@@ -1871,6 +1871,187 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `player_die` — the vehicle-explosion cascade: when a no-delay
+/// vehicle dies with riders, credit a murderer (last attacker, attacking
+/// vehicle's pilot, or own pilot), kill the hidden pilot and eject+kill the
+/// passengers, then kill the droid unit. Self-contained: the temp-inflictor
+/// fake-up is freed and every local resets before returning.
+/// Source: `oracle/codemp/game/g_combat.c:2155-2289`
+unsafe fn player_die_vehicle_cascade(
+    ctx: &mut GameContext,
+    self_: *mut gentity_t,
+    inflictor: *mut gentity_t,
+    attacker: *mut gentity_t,
+    meansOfDeath: c_int,
+) {
+    let cl = (*self_).client;
+    let mut tempInflictorEnt: *mut gentity_t = inflictor;
+    let mut tempInflictor: qboolean = qfalse;
+    let mut actualMOD = meansOfDeath;
+    let selfVeh = (*self_).m_pVehicle;
+    if (*self_).s.eType == entityType_t::ET_NPC as c_int
+        && (*self_).s.NPC_class == class_t::CLASS_VEHICLE as c_int
+        && !(*self_).m_pVehicle.is_null()
+        && (*(*selfVeh).m_pVehicleInfo).explosionDelay == 0
+        && (!(*selfVeh).m_pPilot.is_null()
+            || (*selfVeh).m_iNumPassengers > 0
+            || !(*selfVeh).m_pDroidUnit.is_null())
+    {
+        // kill everyone on board in the name of the attacker... if the vehicle has no death delay
+        let mut murderer: *mut gentity_t = core::ptr::null_mut();
+        let mut killEnt: *mut gentity_t;
+        let mut i = 0;
+
+        if (*cl).ps.otherKillerTime >= ctx.world.level.time {
+            // use the last attacker
+            murderer = &mut ctx.world.g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
+            if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
+                murderer = core::ptr::null_mut();
+            } else {
+                let murdererVeh = (*murderer).m_pVehicle;
+                if (*murderer).s.number >= MAX_CLIENTS as c_int
+                    && (*murderer).s.eType == entityType_t::ET_NPC as c_int
+                    && (*murderer).s.NPC_class == class_t::CLASS_VEHICLE as c_int
+                    && !(*murderer).m_pVehicle.is_null()
+                    && !(*murdererVeh).m_pPilot.is_null()
+                {
+                    let murderPilot = &mut ctx.world.g_entities
+                        [(*((*murdererVeh).m_pPilot as *mut gentity_t)).s.number as usize]
+                        as *mut gentity_t;
+                    if (*murderPilot).inuse != qfalse && !(*murderPilot).client.is_null() {
+                        // give the pilot of the offending vehicle credit for the kill
+                        murderer = murderPilot;
+                        actualMOD = (*cl).otherKillerMOD;
+                        if (*cl).otherKillerVehWeapon > 0 {
+                            tempInflictorEnt = crate::g_utils::G_Spawn(ctx);
+                            if !tempInflictorEnt.is_null() {
+                                // fake up the inflictor
+                                tempInflictor = qtrue;
+                                (*tempInflictorEnt).classname =
+                                    c"vehicle_proj".as_ptr() as *mut c_char;
+                                (*tempInflictorEnt).s.otherEntityNum2 =
+                                    (*cl).otherKillerVehWeapon - 1;
+                                (*tempInflictorEnt).s.weapon = (*cl).otherKillerWeaponType;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if !attacker.is_null()
+            && (*attacker).inuse != qfalse
+            && !(*attacker).client.is_null()
+        {
+            let attackerVeh = (*attacker).m_pVehicle;
+            if (*attacker).s.number >= MAX_CLIENTS as c_int
+                && (*attacker).s.eType == entityType_t::ET_NPC as c_int
+                && (*attacker).s.NPC_class == class_t::CLASS_VEHICLE as c_int
+                && !(*attacker).m_pVehicle.is_null()
+                && !(*attackerVeh).m_pPilot.is_null()
+            {
+                // set vehicles pilot's killer as murderer
+                murderer = &mut ctx.world.g_entities
+                    [(*((*attackerVeh).m_pPilot as *mut gentity_t)).s.number as usize]
+                    as *mut gentity_t;
+                if (*murderer).inuse != qfalse
+                    && !(*murderer).client.is_null()
+                    && (*((*murderer).client)).ps.otherKillerTime >= ctx.world.level.time
+                {
+                    murderer = &mut ctx.world.g_entities
+                        [(*((*murderer).client)).ps.otherKiller as usize]
+                        as *mut gentity_t;
+                    if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
+                        murderer = core::ptr::null_mut();
+                    }
+                } else {
+                    murderer = core::ptr::null_mut();
+                }
+            } else {
+                murderer =
+                    &mut ctx.world.g_entities[(*attacker).s.number as usize] as *mut gentity_t;
+            }
+        } else if !(*selfVeh).m_pPilot.is_null() {
+            murderer = (*selfVeh).m_pPilot as *mut gentity_t;
+            if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
+                murderer = core::ptr::null_mut();
+            }
+        }
+
+        // no valid murderer.. just use self I guess
+        if murderer.is_null() {
+            if attacker.is_null() {
+                murderer = self_;
+            } else {
+                murderer = attacker;
+            }
+        }
+
+        if (*(*selfVeh).m_pVehicleInfo).hideRider != qfalse {
+            // pilot is *inside* me, so kill him, too
+            killEnt = (*selfVeh).m_pPilot as *mut gentity_t;
+            if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
+                G_Damage(
+                    ctx,
+                    ctx.entity_id_of(killEnt),
+                    ctx.entity_id_of(tempInflictorEnt),
+                    ctx.entity_id_of(murderer),
+                    None,
+                    (*((*killEnt).client)).ps.origin,
+                    99999,
+                    DAMAGE_NO_PROTECTION,
+                    actualMOD,
+                );
+            }
+            if !(*selfVeh).m_pVehicleInfo.is_null() {
+                let numPass = (*selfVeh).m_iNumPassengers;
+                i = 0;
+                while i < numPass && (*selfVeh).m_iNumPassengers != 0 {
+                    // go through and eject the last passenger
+                    killEnt = (*selfVeh).m_ppPassengers[((*selfVeh).m_iNumPassengers - 1) as usize]
+                        as *mut gentity_t;
+                    if !killEnt.is_null() {
+                        crate::veh_dispatch::eject(ctx, selfVeh, killEnt as *mut bgEntity_t, qtrue);
+                        if (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
+                            G_Damage(
+                                ctx,
+                                ctx.entity_id_of(killEnt),
+                                ctx.entity_id_of(tempInflictorEnt),
+                                ctx.entity_id_of(murderer),
+                                None,
+                                (*((*killEnt).client)).ps.origin,
+                                99999,
+                                DAMAGE_NO_PROTECTION,
+                                actualMOD,
+                            );
+                        }
+                    }
+                    i += 1;
+                }
+            }
+        }
+        killEnt = (*selfVeh).m_pDroidUnit as *mut gentity_t;
+        if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
+            (*killEnt).flags &= !FL_UNDYING;
+            G_Damage(
+                ctx,
+                ctx.entity_id_of(killEnt),
+                ctx.entity_id_of(tempInflictorEnt),
+                ctx.entity_id_of(murderer),
+                None,
+                (*((*killEnt).client)).ps.origin,
+                99999,
+                DAMAGE_NO_PROTECTION,
+                actualMOD,
+            );
+        }
+        if tempInflictor != qfalse {
+            crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempInflictorEnt));
+        }
+        tempInflictorEnt = inflictor;
+        tempInflictor = qfalse;
+        actualMOD = meansOfDeath;
+    }
+}
+
 /// Raven `player_die`.
 ///
 /// Source: `oracle/codemp/game/g_combat.c:2123-3011`
@@ -1919,176 +2100,7 @@ pub fn player_die(
             }
         }
 
-        let selfVeh = (*self_).m_pVehicle;
-        if (*self_).s.eType == entityType_t::ET_NPC as c_int
-            && (*self_).s.NPC_class == class_t::CLASS_VEHICLE as c_int
-            && !(*self_).m_pVehicle.is_null()
-            && (*(*selfVeh).m_pVehicleInfo).explosionDelay == 0
-            && (!(*selfVeh).m_pPilot.is_null()
-                || (*selfVeh).m_iNumPassengers > 0
-                || !(*selfVeh).m_pDroidUnit.is_null())
-        {
-            // kill everyone on board in the name of the attacker... if the vehicle has no death delay
-            let mut murderer: *mut gentity_t = core::ptr::null_mut();
-            let mut killEnt: *mut gentity_t;
-            let mut i = 0;
-
-            if (*cl).ps.otherKillerTime >= ctx.world.level.time {
-                // use the last attacker
-                murderer =
-                    &mut ctx.world.g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
-                if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
-                    murderer = core::ptr::null_mut();
-                } else {
-                    let murdererVeh = (*murderer).m_pVehicle;
-                    if (*murderer).s.number >= MAX_CLIENTS as c_int
-                        && (*murderer).s.eType == entityType_t::ET_NPC as c_int
-                        && (*murderer).s.NPC_class == class_t::CLASS_VEHICLE as c_int
-                        && !(*murderer).m_pVehicle.is_null()
-                        && !(*murdererVeh).m_pPilot.is_null()
-                    {
-                        let murderPilot = &mut ctx.world.g_entities
-                            [(*((*murdererVeh).m_pPilot as *mut gentity_t)).s.number as usize]
-                            as *mut gentity_t;
-                        if (*murderPilot).inuse != qfalse && !(*murderPilot).client.is_null() {
-                            // give the pilot of the offending vehicle credit for the kill
-                            murderer = murderPilot;
-                            actualMOD = (*cl).otherKillerMOD;
-                            if (*cl).otherKillerVehWeapon > 0 {
-                                tempInflictorEnt = crate::g_utils::G_Spawn(ctx);
-                                if !tempInflictorEnt.is_null() {
-                                    // fake up the inflictor
-                                    tempInflictor = qtrue;
-                                    (*tempInflictorEnt).classname =
-                                        c"vehicle_proj".as_ptr() as *mut c_char;
-                                    (*tempInflictorEnt).s.otherEntityNum2 =
-                                        (*cl).otherKillerVehWeapon - 1;
-                                    (*tempInflictorEnt).s.weapon = (*cl).otherKillerWeaponType;
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if !attacker.is_null()
-                && (*attacker).inuse != qfalse
-                && !(*attacker).client.is_null()
-            {
-                let attackerVeh = (*attacker).m_pVehicle;
-                if (*attacker).s.number >= MAX_CLIENTS as c_int
-                    && (*attacker).s.eType == entityType_t::ET_NPC as c_int
-                    && (*attacker).s.NPC_class == class_t::CLASS_VEHICLE as c_int
-                    && !(*attacker).m_pVehicle.is_null()
-                    && !(*attackerVeh).m_pPilot.is_null()
-                {
-                    // set vehicles pilot's killer as murderer
-                    murderer = &mut ctx.world.g_entities
-                        [(*((*attackerVeh).m_pPilot as *mut gentity_t)).s.number as usize]
-                        as *mut gentity_t;
-                    if (*murderer).inuse != qfalse
-                        && !(*murderer).client.is_null()
-                        && (*((*murderer).client)).ps.otherKillerTime >= ctx.world.level.time
-                    {
-                        murderer = &mut ctx.world.g_entities
-                            [(*((*murderer).client)).ps.otherKiller as usize]
-                            as *mut gentity_t;
-                        if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
-                            murderer = core::ptr::null_mut();
-                        }
-                    } else {
-                        murderer = core::ptr::null_mut();
-                    }
-                } else {
-                    murderer =
-                        &mut ctx.world.g_entities[(*attacker).s.number as usize] as *mut gentity_t;
-                }
-            } else if !(*selfVeh).m_pPilot.is_null() {
-                murderer = (*selfVeh).m_pPilot as *mut gentity_t;
-                if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
-                    murderer = core::ptr::null_mut();
-                }
-            }
-
-            // no valid murderer.. just use self I guess
-            if murderer.is_null() {
-                if attacker.is_null() {
-                    murderer = self_;
-                } else {
-                    murderer = attacker;
-                }
-            }
-
-            if (*(*selfVeh).m_pVehicleInfo).hideRider != qfalse {
-                // pilot is *inside* me, so kill him, too
-                killEnt = (*selfVeh).m_pPilot as *mut gentity_t;
-                if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null()
-                {
-                    G_Damage(
-                        ctx,
-                        ctx.entity_id_of(killEnt),
-                        ctx.entity_id_of(tempInflictorEnt),
-                        ctx.entity_id_of(murderer),
-                        None,
-                        (*((*killEnt).client)).ps.origin,
-                        99999,
-                        DAMAGE_NO_PROTECTION,
-                        actualMOD,
-                    );
-                }
-                if !(*selfVeh).m_pVehicleInfo.is_null() {
-                    let numPass = (*selfVeh).m_iNumPassengers;
-                    i = 0;
-                    while i < numPass && (*selfVeh).m_iNumPassengers != 0 {
-                        // go through and eject the last passenger
-                        killEnt = (*selfVeh).m_ppPassengers
-                            [((*selfVeh).m_iNumPassengers - 1) as usize]
-                            as *mut gentity_t;
-                        if !killEnt.is_null() {
-                            crate::veh_dispatch::eject(
-                                ctx,
-                                selfVeh,
-                                killEnt as *mut bgEntity_t,
-                                qtrue,
-                            );
-                            if (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
-                                G_Damage(
-                                    ctx,
-                                    ctx.entity_id_of(killEnt),
-                                    ctx.entity_id_of(tempInflictorEnt),
-                                    ctx.entity_id_of(murderer),
-                                    None,
-                                    (*((*killEnt).client)).ps.origin,
-                                    99999,
-                                    DAMAGE_NO_PROTECTION,
-                                    actualMOD,
-                                );
-                            }
-                        }
-                        i += 1;
-                    }
-                }
-            }
-            killEnt = (*selfVeh).m_pDroidUnit as *mut gentity_t;
-            if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
-                (*killEnt).flags &= !FL_UNDYING;
-                G_Damage(
-                    ctx,
-                    ctx.entity_id_of(killEnt),
-                    ctx.entity_id_of(tempInflictorEnt),
-                    ctx.entity_id_of(murderer),
-                    None,
-                    (*((*killEnt).client)).ps.origin,
-                    99999,
-                    DAMAGE_NO_PROTECTION,
-                    actualMOD,
-                );
-            }
-            if tempInflictor != qfalse {
-                crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(tempInflictorEnt));
-            }
-            tempInflictorEnt = inflictor;
-            tempInflictor = qfalse;
-            actualMOD = meansOfDeath;
-        }
+        player_die_vehicle_cascade(ctx, self_, inflictor, attacker, meansOfDeath);
 
         (*cl).ps.emplacedIndex = 0;
 
