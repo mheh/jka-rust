@@ -1,11 +1,11 @@
 // PORT-COMPLETE: g_exphysics.c
 //! FAITHFUL port of `oracle/codemp/game/g_exphysics.c`.
 //!
-//! Filled by the jampgame mega-pass; functions reach file-scope game state
-//! (`level`, `g_entities`, cvars) and engine traps through the threaded
-//! `GameContext`/`GameWorld` handle.
+//! Functions reach file-scope game state (`level`, `g_entities`, cvars) and
+//! engine traps through the threaded `GameContext`/`GameWorld` handle.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::ent_fn_enums::dispatch_touch;
 use crate::prelude::*;
 
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
@@ -26,275 +26,271 @@ pub fn G_RunExPhys(
     gravity: f32,
     mass: f32,
     bounce: f32,
-    autoKill: qboolean,
+    autoKill: bool,
     g2Bolts: *mut c_int,
     numG2Bolts: c_int,
 ) {
-    unsafe {
-        let mut tr: trace_t = core::mem::zeroed();
-        let mut projectedOrigin: vec3_t = [0.0; 3];
-        let mut vNorm: vec3_t = [0.0; 3];
-        let mut ground: vec3_t = [0.0; 3];
-        let velScaling: f32 = 0.1f32;
-        let mut vTotal: f32 = 0.0f32;
+    // trace_t has no zeroing constructor; the mem::zeroed is a plain POD-init.
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+    let mut projectedOrigin: vec3_t = [0.0; 3];
+    let mut vNorm: vec3_t = [0.0; 3];
+    let velScaling: f32 = 0.1f32;
 
-        // C `assert` is elided under NDEBUG (release), so out-of-range mass is
-        // tolerated in shipping builds; `debug_assert!` mirrors that.
-        debug_assert!(mass <= 1.0 && mass >= 0.01);
+    // C `assert` is elided under NDEBUG (release), so out-of-range mass is
+    // tolerated in shipping builds; `debug_assert!` mirrors that.
+    debug_assert!(mass <= 1.0 && mass >= 0.01);
 
-        if gravity != 0.0 {
-            _VectorCopy(ctx.world.entity(id).r.currentOrigin, &mut ground);
-            ground[2] -= 0.1f32;
-
-            trap::Trace(
-                ctx.engine,
-                GTraceArgs::new(
-                    &mut tr as *mut trace_t,
-                    &ctx.world.entity(id).r.currentOrigin as *const vec3_t,
-                    &ctx.world.entity(id).r.mins as *const vec3_t,
-                    &ctx.world.entity(id).r.maxs as *const vec3_t,
-                    &ground as *const vec3_t,
-                    ctx.world.entity(id).s.number,
-                    ctx.world.entity(id).clipmask,
-                ),
-            );
-
-            if tr.fraction == 1.0f32 {
-                ctx.world.entity_mut(id).s.groundEntityNum = ENTITYNUM_NONE;
-            } else {
-                ctx.world.entity_mut(id).s.groundEntityNum = tr.entityNum as c_int;
-            }
-
-            if ctx.world.entity(id).s.groundEntityNum == ENTITYNUM_NONE {
-                ctx.world.entity_mut(id).epGravFactor += gravity;
-
-                if ctx.world.entity(id).epGravFactor > MAX_GRAVITY_PULL {
-                    ctx.world.entity_mut(id).epGravFactor = MAX_GRAVITY_PULL;
-                }
-
-                let grav_factor = ctx.world.entity(id).epGravFactor;
-                ctx.world.entity_mut(id).epVelocity[2] -= grav_factor;
-            } else {
-                ctx.world.entity_mut(id).epGravFactor = 0.0;
-            }
-        }
-
-        if ctx.world.entity(id).epVelocity[0] == 0.0
-            && ctx.world.entity(id).epVelocity[1] == 0.0
-            && ctx.world.entity(id).epVelocity[2] == 0.0
-        {
-            if ctx.world.entity(id).touch.is_some() {
-                trap::Trace(
-                    ctx.engine,
-                    GTraceArgs::new(
-                        &mut tr as *mut trace_t,
-                        &ctx.world.entity(id).r.currentOrigin as *const vec3_t,
-                        &ctx.world.entity(id).r.mins as *const vec3_t,
-                        &ctx.world.entity(id).r.maxs as *const vec3_t,
-                        &ctx.world.entity(id).r.currentOrigin as *const vec3_t,
-                        ctx.world.entity(id).s.number,
-                        ctx.world.entity(id).clipmask,
-                    ),
-                );
-                if tr.startsolid != 0 || tr.allsolid != 0 {
-                    let touch_fn = ctx.world.entity(id).touch.get();
-                    if let Some(touch_fn) = touch_fn {
-                        let self_ent = ctx.world.entity_mut(id) as *mut gentity_t;
-                        let other_ent =
-                            &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-                        crate::ent_fn_enums::dispatch_touch(
-                            ctx, touch_fn, self_ent, other_ent, &mut tr,
-                        );
-                    }
-                }
-            }
-            return;
-        }
-
-        _VectorMA(
-            ctx.world.entity(id).r.currentOrigin,
-            velScaling,
-            ctx.world.entity(id).epVelocity,
-            &mut projectedOrigin,
-        );
-
-        let vel = ctx.world.entity(id).epVelocity;
-        _VectorScale(vel, 1.0f32 - mass, &mut ctx.world.entity_mut(id).epVelocity);
-
-        _VectorCopy(ctx.world.entity(id).epVelocity, &mut vNorm);
-        vTotal = VectorNormalize(&mut vNorm);
-
-        if vTotal < 1.0 && ctx.world.entity(id).s.groundEntityNum != ENTITYNUM_NONE {
-            ctx.world.entity_mut(id).epVelocity[0] = 0.0;
-            ctx.world.entity_mut(id).epVelocity[1] = 0.0;
-            ctx.world.entity_mut(id).epVelocity[2] = 0.0;
-            ctx.world.entity_mut(id).epGravFactor = 0.0;
-            let ent_ptr = ctx.world.entity_mut(id) as *mut gentity_t;
-            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
-            return;
-        }
-
-        if !ctx.world.entity(id).ghoul2.is_null() && !g2Bolts.is_null() {
-            let mut tMins: vec3_t = [-3.0, -3.0, -3.0];
-            let mut tMaxs: vec3_t = [3.0, 3.0, 3.0];
-            let mut trajDif: vec3_t = [0.0; 3];
-            let mut gbmAngles: vec3_t = [0.0; 3];
-            let mut boneOrg: vec3_t = [0.0; 3];
-            let mut projectedBoneOrg: vec3_t = [0.0; 3];
-            let mut collisionRootPos: vec3_t = [0.0; 3];
-            let mut matrix: mdxaBone_t = core::mem::zeroed();
-            let mut bestCollision: trace_t = core::mem::zeroed();
-            let mut hasFirstCollision: qboolean = qfalse;
-            let mut i: c_int = 0;
-
-            gbmAngles[PITCH as usize] = 0.0;
-            gbmAngles[ROLL as usize] = 0.0;
-            gbmAngles[YAW as usize] = ctx.world.entity(id).s.apos.trBase[YAW as usize];
-
-            _VectorSubtract(
-                ctx.world.entity(id).r.currentOrigin,
-                projectedOrigin,
-                &mut trajDif,
-            );
-
-            while i < numG2Bolts {
-                trap::G2API_GetBoltMatrix(
-                    ctx.engine,
-                    GG2GetboltArgs::new(
-                        ctx.world.entity(id).ghoul2,
-                        0,
-                        *g2Bolts.add(i as usize),
-                        &mut matrix as *mut mdxaBone_t,
-                        &gbmAngles as *const vec3_t,
-                        &ctx.world.entity(id).r.currentOrigin as *const vec3_t,
-                        ctx.world.level.time,
-                        core::ptr::null_mut(),
-                        &ctx.world.entity(id).modelScale as *const vec3_t,
-                    ),
-                );
-                BG_GiveMeVectorFromMatrix(
-                    &matrix as *const mdxaBone_t,
-                    mp_qshared::shared::Eorientations::ORIGIN as c_int,
-                    &mut boneOrg,
-                );
-
-                _VectorAdd(boneOrg, trajDif, &mut projectedBoneOrg);
-
-                trap::Trace(
-                    ctx.engine,
-                    GTraceArgs::new(
-                        &mut tr as *mut trace_t,
-                        &boneOrg as *const vec3_t,
-                        &tMins as *const vec3_t,
-                        &tMaxs as *const vec3_t,
-                        &projectedBoneOrg as *const vec3_t,
-                        ctx.world.entity(id).s.number,
-                        ctx.world.entity(id).clipmask,
-                    ),
-                );
-
-                if tr.fraction != 1.0f32 || tr.startsolid != 0 || tr.allsolid != 0 {
-                    if hasFirstCollision == qfalse {
-                        bestCollision = tr;
-                        _VectorCopy(boneOrg, &mut collisionRootPos);
-                        hasFirstCollision = qtrue;
-                    } else {
-                        if tr.allsolid != 0 && bestCollision.allsolid == 0 {
-                            bestCollision = tr;
-                            _VectorCopy(boneOrg, &mut collisionRootPos);
-                        } else if tr.startsolid != 0
-                            && bestCollision.startsolid == 0
-                            && bestCollision.allsolid == 0
-                        {
-                            bestCollision = tr;
-                            _VectorCopy(boneOrg, &mut collisionRootPos);
-                        } else if bestCollision.startsolid == 0
-                            && bestCollision.allsolid == 0
-                            && tr.fraction < bestCollision.fraction
-                        {
-                            bestCollision = tr;
-                            _VectorCopy(boneOrg, &mut collisionRootPos);
-                        }
-                    }
-                }
-
-                i += 1;
-            }
-
-            if hasFirstCollision != qfalse {
-                _VectorSubtract(collisionRootPos, bestCollision.endpos, &mut trajDif);
-
-                _VectorAdd(
-                    ctx.world.entity(id).r.currentOrigin,
-                    trajDif,
-                    &mut projectedOrigin,
-                );
-            }
-        }
+    if gravity != 0.0 {
+        let mut ground = ctx.entity(id).r.currentOrigin;
+        ground[2] -= 0.1f32;
 
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
                 &mut tr as *mut trace_t,
-                &ctx.world.entity(id).r.currentOrigin as *const vec3_t,
-                &ctx.world.entity(id).r.mins as *const vec3_t,
-                &ctx.world.entity(id).r.maxs as *const vec3_t,
-                &projectedOrigin as *const vec3_t,
-                ctx.world.entity(id).s.number,
-                ctx.world.entity(id).clipmask,
+                &ctx.entity(id).r.currentOrigin as *const vec3_t,
+                &ctx.entity(id).r.mins as *const vec3_t,
+                &ctx.entity(id).r.maxs as *const vec3_t,
+                &ground as *const vec3_t,
+                ctx.entity(id).s.number,
+                ctx.entity(id).clipmask,
             ),
         );
 
-        if tr.startsolid != 0 || tr.allsolid != 0 {
-            if autoKill != qfalse {
-                ctx.world.entity_mut(id).think = Some(EntThink::G_FreeEntity).into();
-                let lt = ctx.world.level.time;
-                ctx.world.entity_mut(id).nextthink = lt;
-            }
-            return;
-        }
-
-        G_SetOrigin(ctx.world.entity_mut(id), tr.endpos);
-        let ent_ptr = ctx.world.entity_mut(id) as *mut gentity_t;
-        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
-
         if tr.fraction == 1.0f32 {
-            return;
+            ctx.entity_mut(id).s.groundEntityNum = ENTITYNUM_NONE;
+        } else {
+            ctx.entity_mut(id).s.groundEntityNum = tr.entityNum as c_int;
         }
 
-        if bounce != 0.0 {
-            vTotal *= bounce;
+        if ctx.entity(id).s.groundEntityNum == ENTITYNUM_NONE {
+            let e = ctx.entity_mut(id);
+            e.epGravFactor += gravity;
 
-            _VectorScale(tr.plane.normal, vTotal, &mut vNorm);
-
-            if vNorm[2] > 0.0 {
-                ctx.world.entity_mut(id).epGravFactor -= vNorm[2] * (1.0f32 - mass);
-                if ctx.world.entity(id).epGravFactor < 0.0 {
-                    ctx.world.entity_mut(id).epGravFactor = 0.0;
-                }
+            if e.epGravFactor > MAX_GRAVITY_PULL {
+                e.epGravFactor = MAX_GRAVITY_PULL;
             }
 
-            if tr.entityNum as c_int != ENTITYNUM_NONE && ctx.world.entity(id).touch.is_some() {
-                let touch_fn = ctx.world.entity(id).touch.get();
-                if let Some(touch_fn) = touch_fn {
-                    let self_ent = ctx.world.entity_mut(id) as *mut gentity_t;
-                    let other_ent =
-                        &mut ctx.world.g_entities[tr.entityNum as usize] as *mut gentity_t;
-                    crate::ent_fn_enums::dispatch_touch(
-                        ctx, touch_fn, self_ent, other_ent, &mut tr,
-                    );
-                }
-            }
-
-            let vel = ctx.world.entity(id).epVelocity;
-            _VectorAdd(vel, vNorm, &mut ctx.world.entity_mut(id).epVelocity);
+            e.epVelocity[2] -= e.epGravFactor;
         } else {
-            ctx.world.entity_mut(id).epVelocity[0] = 0.0;
-            ctx.world.entity_mut(id).epVelocity[1] = 0.0;
+            ctx.entity_mut(id).epGravFactor = 0.0;
+        }
+    }
 
-            if gravity == 0.0 {
-                ctx.world.entity_mut(id).epVelocity[2] = 0.0;
+    if ctx.entity(id).epVelocity[0] == 0.0
+        && ctx.entity(id).epVelocity[1] == 0.0
+        && ctx.entity(id).epVelocity[2] == 0.0
+    {
+        if ctx.entity(id).touch.is_some() {
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &ctx.entity(id).r.currentOrigin as *const vec3_t,
+                    &ctx.entity(id).r.mins as *const vec3_t,
+                    &ctx.entity(id).r.maxs as *const vec3_t,
+                    &ctx.entity(id).r.currentOrigin as *const vec3_t,
+                    ctx.entity(id).s.number,
+                    ctx.entity(id).clipmask,
+                ),
+            );
+            if tr.startsolid != 0 || tr.allsolid != 0 {
+                if let Some(touch_fn) = ctx.entity(id).touch.get() {
+                    let self_ptr: *mut gentity_t = ctx.entity_mut(id);
+                    let other_ptr: *mut gentity_t = ctx.entity_mut(EntityId(tr.entityNum as u32));
+                    dispatch_touch(ctx, touch_fn, self_ptr, other_ptr, &mut tr);
+                }
             }
+        }
+        return;
+    }
+
+    _VectorMA(
+        ctx.entity(id).r.currentOrigin,
+        velScaling,
+        ctx.entity(id).epVelocity,
+        &mut projectedOrigin,
+    );
+
+    let e = ctx.entity_mut(id);
+    let vel = e.epVelocity;
+    _VectorScale(vel, 1.0f32 - mass, &mut e.epVelocity);
+
+    vNorm = e.epVelocity;
+    let mut vTotal = VectorNormalize(&mut vNorm);
+
+    if vTotal < 1.0 && ctx.entity(id).s.groundEntityNum != ENTITYNUM_NONE {
+        let e = ctx.entity_mut(id);
+        e.epVelocity[0] = 0.0;
+        e.epVelocity[1] = 0.0;
+        e.epVelocity[2] = 0.0;
+        e.epGravFactor = 0.0;
+        let ent_ptr = e as *mut gentity_t;
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
+        return;
+    }
+
+    if !ctx.entity(id).ghoul2.is_null() && !g2Bolts.is_null() {
+        let tMins: vec3_t = [-3.0, -3.0, -3.0];
+        let tMaxs: vec3_t = [3.0, 3.0, 3.0];
+        let mut trajDif: vec3_t = [0.0; 3];
+        let mut gbmAngles: vec3_t = [0.0; 3];
+        let mut boneOrg: vec3_t = [0.0; 3];
+        let mut projectedBoneOrg: vec3_t = [0.0; 3];
+        let mut collisionRootPos: vec3_t = [0.0; 3];
+        // mdxaBone_t/trace_t POD-inits, as with `tr` above.
+        let mut matrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+        let mut bestCollision: trace_t = unsafe { core::mem::zeroed() };
+        let mut hasFirstCollision = false;
+
+        gbmAngles[PITCH as usize] = 0.0;
+        gbmAngles[ROLL as usize] = 0.0;
+        gbmAngles[YAW as usize] = ctx.entity(id).s.apos.trBase[YAW as usize];
+
+        _VectorSubtract(
+            ctx.entity(id).r.currentOrigin,
+            projectedOrigin,
+            &mut trajDif,
+        );
+
+        for i in 0..numG2Bolts {
+            // `g2Bolts` is a raw caller-owned bolt array; the indexed read is
+            // the one genuinely unsafe op in this fn.
+            let bolt = unsafe { *g2Bolts.add(i as usize) };
+            trap::G2API_GetBoltMatrix(
+                ctx.engine,
+                GG2GetboltArgs::new(
+                    ctx.entity(id).ghoul2,
+                    0,
+                    bolt,
+                    &mut matrix as *mut mdxaBone_t,
+                    &gbmAngles as *const vec3_t,
+                    &ctx.entity(id).r.currentOrigin as *const vec3_t,
+                    ctx.world.level.time,
+                    core::ptr::null_mut(),
+                    &ctx.entity(id).modelScale as *const vec3_t,
+                ),
+            );
+            BG_GiveMeVectorFromMatrix(
+                &matrix as *const mdxaBone_t,
+                mp_qshared::shared::Eorientations::ORIGIN as c_int,
+                &mut boneOrg,
+            );
+
+            _VectorAdd(boneOrg, trajDif, &mut projectedBoneOrg);
+
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &boneOrg as *const vec3_t,
+                    &tMins as *const vec3_t,
+                    &tMaxs as *const vec3_t,
+                    &projectedBoneOrg as *const vec3_t,
+                    ctx.entity(id).s.number,
+                    ctx.entity(id).clipmask,
+                ),
+            );
+
+            if tr.fraction != 1.0f32 || tr.startsolid != 0 || tr.allsolid != 0 {
+                if !hasFirstCollision {
+                    bestCollision = tr;
+                    collisionRootPos = boneOrg;
+                    hasFirstCollision = true;
+                } else {
+                    if tr.allsolid != 0 && bestCollision.allsolid == 0 {
+                        bestCollision = tr;
+                        collisionRootPos = boneOrg;
+                    } else if tr.startsolid != 0
+                        && bestCollision.startsolid == 0
+                        && bestCollision.allsolid == 0
+                    {
+                        bestCollision = tr;
+                        collisionRootPos = boneOrg;
+                    } else if bestCollision.startsolid == 0
+                        && bestCollision.allsolid == 0
+                        && tr.fraction < bestCollision.fraction
+                    {
+                        bestCollision = tr;
+                        collisionRootPos = boneOrg;
+                    }
+                }
+            }
+        }
+
+        if hasFirstCollision {
+            _VectorSubtract(collisionRootPos, bestCollision.endpos, &mut trajDif);
+
+            _VectorAdd(
+                ctx.entity(id).r.currentOrigin,
+                trajDif,
+                &mut projectedOrigin,
+            );
+        }
+    }
+
+    trap::Trace(
+        ctx.engine,
+        GTraceArgs::new(
+            &mut tr as *mut trace_t,
+            &ctx.entity(id).r.currentOrigin as *const vec3_t,
+            &ctx.entity(id).r.mins as *const vec3_t,
+            &ctx.entity(id).r.maxs as *const vec3_t,
+            &projectedOrigin as *const vec3_t,
+            ctx.entity(id).s.number,
+            ctx.entity(id).clipmask,
+        ),
+    );
+
+    if tr.startsolid != 0 || tr.allsolid != 0 {
+        if autoKill {
+            let time = ctx.world.level.time;
+            let e = ctx.entity_mut(id);
+            e.think = Some(EntThink::G_FreeEntity).into();
+            e.nextthink = time;
+        }
+        return;
+    }
+
+    G_SetOrigin(ctx.entity_mut(id), tr.endpos);
+    let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
+    trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
+
+    if tr.fraction == 1.0f32 {
+        return;
+    }
+
+    if bounce != 0.0 {
+        vTotal *= bounce;
+
+        _VectorScale(tr.plane.normal, vTotal, &mut vNorm);
+
+        if vNorm[2] > 0.0 {
+            let e = ctx.entity_mut(id);
+            e.epGravFactor -= vNorm[2] * (1.0f32 - mass);
+            if e.epGravFactor < 0.0 {
+                e.epGravFactor = 0.0;
+            }
+        }
+
+        if tr.entityNum as c_int != ENTITYNUM_NONE && ctx.entity(id).touch.is_some() {
+            if let Some(touch_fn) = ctx.entity(id).touch.get() {
+                let self_ptr: *mut gentity_t = ctx.entity_mut(id);
+                let other_ptr: *mut gentity_t = ctx.entity_mut(EntityId(tr.entityNum as u32));
+                dispatch_touch(ctx, touch_fn, self_ptr, other_ptr, &mut tr);
+            }
+        }
+
+        let e = ctx.entity_mut(id);
+        let vel = e.epVelocity;
+        _VectorAdd(vel, vNorm, &mut e.epVelocity);
+    } else {
+        let e = ctx.entity_mut(id);
+        e.epVelocity[0] = 0.0;
+        e.epVelocity[1] = 0.0;
+
+        if gravity == 0.0 {
+            e.epVelocity[2] = 0.0;
         }
     }
 }

@@ -1955,7 +1955,7 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
                 radius,
                 mass,
                 random,
-                qfalse,
+                false,
                 core::ptr::null_mut(),
                 0,
             );

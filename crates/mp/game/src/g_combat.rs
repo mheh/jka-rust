@@ -3666,7 +3666,7 @@ pub fn LimbThink(ctx: &mut GameContext, ent: EntityId) {
             gravity,
             mass,
             bounce,
-            qtrue,
+            true,
             core::ptr::null_mut(),
             0,
         );
