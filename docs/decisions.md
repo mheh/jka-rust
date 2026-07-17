@@ -500,3 +500,44 @@ behavior, not a defect; no bot-quality hunt should be reopened against the
 oracle baseline. Reference if ever revisited: local OpenJK checkout at
 `~/Developer/Milo/OpenJK` (game/ai_*.c, g_bot.c); note OpenJK server lanes
 also differ environmentally (sv_fps 40, g_maxForceRank 7).
+
+## DEC-31 — Safe-state mechanical stages frozen; idiom era opens (2026-07-16)
+
+**Ruling (user, 2026-07-16): the remaining mechanical safe-state work
+(STAGE-1 tails, Stage-2 world-borrow flip as a standalone pass) is
+abandoned — superseded by per-subsystem idiomatic rewrites ("the idiom
+era").** The goal shifts from incrementally hardening the transcribed C
+shape to producing Rust-centric end results: each slice rewrites one
+subsystem into idiomatic Rust, gated by byte-identical referee replay,
+and the finished mp_game becomes the exemplar for porting cgame/ui
+directly into idiomatic shape (cgame/ui deferred until then).
+
+Settled parameters of the era:
+
+- **Slice one: g_items.** Chosen as first exemplar (bounded, referee-hot,
+  forces the item-table/bg call surface).
+- **bg idiomizes call-surface-by-call-surface.** Each game slice
+  idiomizes the bg APIs it actually consumes (g_items pulls
+  `gitem_t`→`GItem`/`ItemId` and the `BG_FindItem*` signatures);
+  bg_pmove internals wait for a movement slice. No throwaway adapters,
+  no dedicated bg slice.
+- **Naming: Raven names stay** (`BG_FindItemForWeapon`, `RegisterItem`,
+  …) — grep-parity with the oracle is load-bearing for referee debugging
+  and audits. Only genuinely new constructs with no Raven counterpart
+  (`ItemId`, `ItemKind`, methods on them) get Rust-style names.
+- **Referee tapes lead the slices.** A bots-heavy mp/ffa1 tape is
+  recorded before slice one; every referee-blind subsystem (NPC,
+  vehicle, mover) gets a tape before its slice starts.
+- **ABI seam unchanged**: engine-crossing types stay `#[repr(C)]` with
+  layout asserts; wire-visible values must stay byte-identical.
+- **Two-`&mut` rule**: split-borrow (`entity_pair_mut`) only at
+  structurally disjoint sites (e.g. pusher loops excluding self);
+  `G_Damage` stays on sequential re-acquire — suicide aliases
+  target/attacker/inflictor (`g_cmds.c:1193`).
+- **Carried forward for their future slices** (from the task-#7
+  sit-down): gNPC_t → owned slab + accessor; pool clients stay DEC-29
+  raw until their slice; bot_state_t gets full conversion. The
+  `&mut *NPCInfo` UB carve-out landed ahead of the era (4bd836a4); the
+  remaining held gentity_t/gclient_t derefs retire slice-by-slice.
+- Function-static atomics folded to owned state (5ed6e1b0); B3
+  exception list is empty.
