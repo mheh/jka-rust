@@ -716,19 +716,12 @@ pub fn BotUpdateInput(
 
 /// Raven `FloatTime()` (`#define FloatTime() floattime`).
 ///
-/// `floattime` is a genuine Raven module-global (`ai_main.c:50`, `extern float
-/// floattime` in `ai_main.h:410`) updated once per bot frame — narrower than the
-/// `level`/`g_entities` state spine, so it is mirrored here as a monotonic
-/// seconds clock via an atomic bit-store rather than threaded through
-/// `GameContext`, matching the call sites' bare `FloatTime()` usage.
-/// Source: `oracle/codemp/game/ai_main.c:663,665,871`; `ai_main.h:410-411`
-static FLOATTIME_BITS: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-
-/// Raven `FloatTime()`.
-///
-/// Source: `oracle/codemp/game/ai_main.c:663,665,871`
+/// `floattime` (`ai_main.c:50`) is zero-initialized and never assigned
+/// anywhere in the MP oracle — a Q3 leftover the JKA bot brain stopped
+/// updating — so every read is constantly `0.0`.
+/// Source: `oracle/codemp/game/ai_main.h:410-411`
 pub fn FloatTime() -> f32 {
-    f32::from_bits(FLOATTIME_BITS.load(core::sync::atomic::Ordering::Relaxed))
+    0.0
 }
 
 /// Raven `BotAIRegularUpdate`.

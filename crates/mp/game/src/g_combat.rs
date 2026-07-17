@@ -1886,9 +1886,6 @@ pub fn player_die(
     damage: c_int,
     meansOfDeath: c_int,
 ) {
-    // Raven's function-`static int i` rotates EV_DEATH1 0..2 across calls; §B3
-    // bans `static mut`, so the counter lives in one atomic (behavior-preserving).
-    static DEATH_ANIM_I: core::sync::atomic::AtomicI32 = core::sync::atomic::AtomicI32::new(0);
     // STAGE-1: EntityId/Option params (body null-checks inflictor/attacker), raw
     // re-derived verbatim (Stage-2 debt); mega-fn.
     let self_: *mut gentity_t = ctx.entity_mut(self_);
@@ -2751,7 +2748,9 @@ pub fn player_die(
         // NOTENOTE No gib deaths right now, this is star wars.
         {
             // normal death
-            let mut i_val = DEATH_ANIM_I.load(core::sync::atomic::Ordering::Relaxed);
+            // Raven's function-`static int i` rotates EV_DEATH1 0..2 across deaths;
+            // world-owned per §B3 (`game_globals.rs`).
+            let mut i_val = ctx.world.globals.death_anim_i;
 
             // Referee probe capture: holdrand before the death-anim draw.
             let probe_rin = ctx.world.bg_state.rng.dbg_holdrand();
@@ -2861,7 +2860,7 @@ pub fn player_die(
 
             // globally cycle through the different death animations
             i_val = (i_val + 1) % 3;
-            DEATH_ANIM_I.store(i_val, core::sync::atomic::Ordering::Relaxed);
+            ctx.world.globals.death_anim_i = i_val;
         }
 
         if !(*self_).NPC.is_null() {

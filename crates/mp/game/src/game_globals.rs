@@ -888,6 +888,10 @@ pub struct GameGlobals {
     /// `g_preventTeamBegin`. Source: `oracle/codemp/game/g_cmds.c:751`
     pub g_preventTeamBegin: qboolean,
     // --- `g_combat.c` file-scope globals ---
+    /// `static int i` in `player_die` — rotates the EV_DEATH1..3 anim pick
+    /// across deaths (function-scope static; genuine cross-frame state).
+    /// Source: `oracle/codemp/game/g_combat.c:2858`
+    pub death_anim_i: c_int,
     /// `gGAvoidDismember`. Source: `oracle/codemp/game/g_combat.c:3753`
     pub gGAvoidDismember: c_int,
     /// `gPainHitLoc`. Source: `oracle/codemp/game/g_combat.c:4574`
@@ -1315,6 +1319,7 @@ impl Default for GameGlobals {
             gJMSaberEnt: Default::default(),
             g_dontPenalizeTeam: Default::default(),
             g_preventTeamBegin: Default::default(),
+            death_anim_i: Default::default(),
             gGAvoidDismember: Default::default(),
             // Raven file-scope `= -1`. Source: `oracle/codemp/game/g_combat.c:4574`
             gPainHitLoc: -1,
