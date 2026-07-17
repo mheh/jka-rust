@@ -15,6 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_math::_DotProduct;
 
 use crate::client::gclient_t;
 use crate::g_main::G_Printf;
@@ -2427,7 +2428,7 @@ pub fn DebugLine(ctx: &mut GameContext, start: vec3_t, end: vec3_t, color: c_int
     let mut dir = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
     VectorNormalize(&mut dir);
     let up = [0.0f32, 0.0, 1.0];
-    let dot = crate::q_math::_DotProduct(dir, up);
+    let dot = _DotProduct(dir, up);
     let mut cross = [0.0f32; 3];
     // `0.99` is a bare double in the oracle; both compares promote (fn is dead —
     // zero callers in either tree — promoted for F3-class purity).
