@@ -1871,6 +1871,222 @@ pub fn G_BroadcastObit(
     }
 }
 
+/// Split from `player_die` — kill credit and per-gametype scoring: the
+/// PERS_KILLED bump, suicide count, victory script, the droid/collision
+/// no-credit picks, self/team-kill penalties (duel opponent credit, TK
+/// autokick), Jedi Master saber handoff and scoring, duel/powerduel win
+/// bookkeeping, and the world-kill penalty.
+/// Source: `oracle/codemp/game/g_combat.c:2566-2743`
+unsafe fn player_die_kill_credit(
+    ctx: &mut GameContext,
+    self_: *mut gentity_t,
+    attacker: *mut gentity_t,
+    meansOfDeath: c_int,
+) {
+    let cl = (*self_).client;
+    (*cl).ps.persistant[persEnum_t::PERS_KILLED as usize] += 1;
+
+    if self_ == attacker {
+        (*cl).ps.fd.suicides += 1;
+    }
+
+    if !attacker.is_null() && !(*attacker).client.is_null() {
+        // killed by a client of some kind (player, NPC or vehicle)
+        let acl = (*attacker).client;
+        if (*self_).s.number < MAX_CLIENTS as c_int {
+            // only remember real clients
+            (*acl).lastkilled_client = (*self_).s.number;
+        }
+
+        G_CheckVictoryScript(ctx, ctx.entity_id_of(attacker).unwrap());
+
+        if (*self_).s.number >= MAX_CLIENTS as c_int
+            && !(*self_).client.is_null()
+            && (*cl).NPC_class != class_t::CLASS_VEHICLE
+            && (*self_).s.m_iVehicleNum != 0
+        {
+            // no credit for droid
+        } else if meansOfDeath == meansOfDeath_t::MOD_COLLISION as c_int
+            || meansOfDeath == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
+        {
+            // no credit for veh-veh collisions?
+        } else if attacker == self_
+            || crate::g_team::OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(attacker))
+                != qfalse
+        {
+            // killed self or teammate
+            if meansOfDeath == meansOfDeath_t::MOD_FALLING as c_int
+                && attacker != self_
+                && (*attacker).s.number < MAX_CLIENTS as c_int
+                && (*attacker).s.m_iVehicleNum != 0
+            {
+                // crushed by a teammate in a vehicle, no penalty
+            } else if ctx.world.cvars.g_gametype.integer == GT_DUEL {
+                // in duel, if you kill yourself, the person you are dueling against gets a kill for it
+                let mut otherClNum: c_int = -1;
+                if ctx.world.level.sortedClients[0] == (*self_).s.number {
+                    otherClNum = ctx.world.level.sortedClients[1];
+                } else if ctx.world.level.sortedClients[1] == (*self_).s.number {
+                    otherClNum = ctx.world.level.sortedClients[0];
+                }
+
+                if otherClNum >= 0
+                    && otherClNum < MAX_CLIENTS as c_int
+                    && ctx.world.g_entities[otherClNum as usize].inuse != qfalse
+                    && !ctx.world.g_entities[otherClNum as usize].client.is_null()
+                    && otherClNum != (*attacker).s.number
+                {
+                    AddScore(
+                        ctx,
+                        EntityId::from_num(otherClNum).unwrap(),
+                        (*self_).r.currentOrigin,
+                        1,
+                    );
+                } else {
+                    AddScore(
+                        ctx,
+                        ctx.entity_id_of(attacker).unwrap(),
+                        (*self_).r.currentOrigin,
+                        -1,
+                    );
+                }
+            } else {
+                AddScore(
+                    ctx,
+                    ctx.entity_id_of(attacker).unwrap(),
+                    (*self_).r.currentOrigin,
+                    -1,
+                );
+                if attacker != self_
+                    && (*attacker).s.number < MAX_CLIENTS as c_int
+                    && (*self_).s.number < MAX_CLIENTS as c_int
+                {
+                    crate::g_cmds::G_CheckTKAutoKickBan(ctx, ctx.entity_id_of(attacker).unwrap());
+                }
+            }
+            if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
+                if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
+                    // killed ourself so return the saber to the original position
+                    crate::g_client::ThrowSaberToAttacker(
+                        ctx,
+                        ctx.entity_id_of(self_).unwrap(),
+                        None,
+                    );
+                    (*cl).ps.isJediMaster = qfalse;
+                }
+            }
+        } else {
+            if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
+                if (!(*attacker).client.is_null() && (*acl).ps.isJediMaster != qfalse)
+                    || (!(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse)
+                {
+                    AddScore(
+                        ctx,
+                        ctx.entity_id_of(attacker).unwrap(),
+                        (*self_).r.currentOrigin,
+                        1,
+                    );
+
+                    if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
+                        crate::g_client::ThrowSaberToAttacker(
+                            ctx,
+                            ctx.entity_id_of(self_).unwrap(),
+                            ctx.entity_id_of(attacker),
+                        );
+                        (*cl).ps.isJediMaster = qfalse;
+                    }
+                } else {
+                    let jmEnt = G_GetJediMaster(ctx);
+
+                    if !jmEnt.is_null() && !(*jmEnt).client.is_null() {
+                        AddScore(
+                            ctx,
+                            ctx.entity_id_of(jmEnt).unwrap(),
+                            (*self_).r.currentOrigin,
+                            1,
+                        );
+                    }
+                }
+            } else {
+                AddScore(
+                    ctx,
+                    ctx.entity_id_of(attacker).unwrap(),
+                    (*self_).r.currentOrigin,
+                    1,
+                );
+            }
+
+            if meansOfDeath == meansOfDeath_t::MOD_STUN_BATON as c_int {
+                // play humiliation on player
+                (*acl).ps.persistant[persEnum_t::PERS_GAUNTLET_FRAG_COUNT as usize] += 1;
+
+                (*acl).rewardTime = ctx.world.level.time + REWARD_SPRITE_TIME;
+
+                // also play humiliation on target
+                (*cl).ps.persistant[persEnum_t::PERS_PLAYEREVENTS as usize] ^=
+                    PLAYEREVENT_GAUNTLETREWARD;
+            }
+
+            // check for two kills in a short amount of time
+            if ctx.world.level.time - (*acl).lastKillTime < CARNAGE_REWARD_TIME {
+                // play excellent on player
+                (*acl).ps.persistant[persEnum_t::PERS_EXCELLENT_COUNT as usize] += 1;
+
+                (*acl).rewardTime = ctx.world.level.time + REWARD_SPRITE_TIME;
+            }
+            (*acl).lastKillTime = ctx.world.level.time;
+        }
+    } else if meansOfDeath == meansOfDeath_t::MOD_COLLISION as c_int
+        || meansOfDeath == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
+    {
+        // no credit for veh-veh collisions?
+    } else {
+        if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
+            // killed ourself so return the saber to the original position
+            crate::g_client::ThrowSaberToAttacker(ctx, ctx.entity_id_of(self_).unwrap(), None);
+            (*cl).ps.isJediMaster = qfalse;
+        }
+
+        if ctx.world.cvars.g_gametype.integer == GT_DUEL {
+            // in duel, if you kill yourself, the person you are dueling against gets a kill for it
+            let mut otherClNum: c_int = -1;
+            if ctx.world.level.sortedClients[0] == (*self_).s.number {
+                otherClNum = ctx.world.level.sortedClients[1];
+            } else if ctx.world.level.sortedClients[1] == (*self_).s.number {
+                otherClNum = ctx.world.level.sortedClients[0];
+            }
+
+            if otherClNum >= 0
+                && otherClNum < MAX_CLIENTS as c_int
+                && ctx.world.g_entities[otherClNum as usize].inuse != qfalse
+                && !ctx.world.g_entities[otherClNum as usize].client.is_null()
+                && otherClNum != (*self_).s.number
+            {
+                AddScore(
+                    ctx,
+                    EntityId::from_num(otherClNum).unwrap(),
+                    (*self_).r.currentOrigin,
+                    1,
+                );
+            } else {
+                AddScore(
+                    ctx,
+                    ctx.entity_id_of(self_).unwrap(),
+                    (*self_).r.currentOrigin,
+                    -1,
+                );
+            }
+        } else {
+            AddScore(
+                ctx,
+                ctx.entity_id_of(self_).unwrap(),
+                (*self_).r.currentOrigin,
+                -1,
+            );
+        }
+    }
+}
+
 /// Split from `player_die` — the kill log: killer number/name and obituary
 /// resolution (with the §19 NULL-modName pick), the "Kill:" log line, the
 /// g_austrian duel-details block, and the weapon kill/death/frag logs.
@@ -2682,213 +2898,7 @@ pub fn player_die(
 
         (*self_).enemy = Some(ent_id(base, attacker));
 
-        (*cl).ps.persistant[persEnum_t::PERS_KILLED as usize] += 1;
-
-        if self_ == attacker {
-            (*cl).ps.fd.suicides += 1;
-        }
-
-        if !attacker.is_null() && !(*attacker).client.is_null() {
-            // killed by a client of some kind (player, NPC or vehicle)
-            let acl = (*attacker).client;
-            if (*self_).s.number < MAX_CLIENTS as c_int {
-                // only remember real clients
-                (*acl).lastkilled_client = (*self_).s.number;
-            }
-
-            G_CheckVictoryScript(ctx, ctx.entity_id_of(attacker).unwrap());
-
-            if (*self_).s.number >= MAX_CLIENTS as c_int
-                && !(*self_).client.is_null()
-                && (*cl).NPC_class != class_t::CLASS_VEHICLE
-                && (*self_).s.m_iVehicleNum != 0
-            {
-                // no credit for droid
-            } else if meansOfDeath == meansOfDeath_t::MOD_COLLISION as c_int
-                || meansOfDeath == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
-            {
-                // no credit for veh-veh collisions?
-            } else if attacker == self_
-                || crate::g_team::OnSameTeam(
-                    ctx,
-                    ctx.entity_id_of(self_),
-                    ctx.entity_id_of(attacker),
-                ) != qfalse
-            {
-                // killed self or teammate
-                if meansOfDeath == meansOfDeath_t::MOD_FALLING as c_int
-                    && attacker != self_
-                    && (*attacker).s.number < MAX_CLIENTS as c_int
-                    && (*attacker).s.m_iVehicleNum != 0
-                {
-                    // crushed by a teammate in a vehicle, no penalty
-                } else if ctx.world.cvars.g_gametype.integer == GT_DUEL {
-                    // in duel, if you kill yourself, the person you are dueling against gets a kill for it
-                    let mut otherClNum: c_int = -1;
-                    if ctx.world.level.sortedClients[0] == (*self_).s.number {
-                        otherClNum = ctx.world.level.sortedClients[1];
-                    } else if ctx.world.level.sortedClients[1] == (*self_).s.number {
-                        otherClNum = ctx.world.level.sortedClients[0];
-                    }
-
-                    if otherClNum >= 0
-                        && otherClNum < MAX_CLIENTS as c_int
-                        && ctx.world.g_entities[otherClNum as usize].inuse != qfalse
-                        && !ctx.world.g_entities[otherClNum as usize].client.is_null()
-                        && otherClNum != (*attacker).s.number
-                    {
-                        AddScore(
-                            ctx,
-                            EntityId::from_num(otherClNum).unwrap(),
-                            (*self_).r.currentOrigin,
-                            1,
-                        );
-                    } else {
-                        AddScore(
-                            ctx,
-                            ctx.entity_id_of(attacker).unwrap(),
-                            (*self_).r.currentOrigin,
-                            -1,
-                        );
-                    }
-                } else {
-                    AddScore(
-                        ctx,
-                        ctx.entity_id_of(attacker).unwrap(),
-                        (*self_).r.currentOrigin,
-                        -1,
-                    );
-                    if attacker != self_
-                        && (*attacker).s.number < MAX_CLIENTS as c_int
-                        && (*self_).s.number < MAX_CLIENTS as c_int
-                    {
-                        crate::g_cmds::G_CheckTKAutoKickBan(
-                            ctx,
-                            ctx.entity_id_of(attacker).unwrap(),
-                        );
-                    }
-                }
-                if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
-                    if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
-                        // killed ourself so return the saber to the original position
-                        crate::g_client::ThrowSaberToAttacker(
-                            ctx,
-                            ctx.entity_id_of(self_).unwrap(),
-                            None,
-                        );
-                        (*cl).ps.isJediMaster = qfalse;
-                    }
-                }
-            } else {
-                if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
-                    if (!(*attacker).client.is_null() && (*acl).ps.isJediMaster != qfalse)
-                        || (!(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse)
-                    {
-                        AddScore(
-                            ctx,
-                            ctx.entity_id_of(attacker).unwrap(),
-                            (*self_).r.currentOrigin,
-                            1,
-                        );
-
-                        if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
-                            crate::g_client::ThrowSaberToAttacker(
-                                ctx,
-                                ctx.entity_id_of(self_).unwrap(),
-                                ctx.entity_id_of(attacker),
-                            );
-                            (*cl).ps.isJediMaster = qfalse;
-                        }
-                    } else {
-                        let jmEnt = G_GetJediMaster(ctx);
-
-                        if !jmEnt.is_null() && !(*jmEnt).client.is_null() {
-                            AddScore(
-                                ctx,
-                                ctx.entity_id_of(jmEnt).unwrap(),
-                                (*self_).r.currentOrigin,
-                                1,
-                            );
-                        }
-                    }
-                } else {
-                    AddScore(
-                        ctx,
-                        ctx.entity_id_of(attacker).unwrap(),
-                        (*self_).r.currentOrigin,
-                        1,
-                    );
-                }
-
-                if meansOfDeath == meansOfDeath_t::MOD_STUN_BATON as c_int {
-                    // play humiliation on player
-                    (*acl).ps.persistant[persEnum_t::PERS_GAUNTLET_FRAG_COUNT as usize] += 1;
-
-                    (*acl).rewardTime = ctx.world.level.time + REWARD_SPRITE_TIME;
-
-                    // also play humiliation on target
-                    (*cl).ps.persistant[persEnum_t::PERS_PLAYEREVENTS as usize] ^=
-                        PLAYEREVENT_GAUNTLETREWARD;
-                }
-
-                // check for two kills in a short amount of time
-                if ctx.world.level.time - (*acl).lastKillTime < CARNAGE_REWARD_TIME {
-                    // play excellent on player
-                    (*acl).ps.persistant[persEnum_t::PERS_EXCELLENT_COUNT as usize] += 1;
-
-                    (*acl).rewardTime = ctx.world.level.time + REWARD_SPRITE_TIME;
-                }
-                (*acl).lastKillTime = ctx.world.level.time;
-            }
-        } else if meansOfDeath == meansOfDeath_t::MOD_COLLISION as c_int
-            || meansOfDeath == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
-        {
-            // no credit for veh-veh collisions?
-        } else {
-            if !(*self_).client.is_null() && (*cl).ps.isJediMaster != qfalse {
-                // killed ourself so return the saber to the original position
-                crate::g_client::ThrowSaberToAttacker(ctx, ctx.entity_id_of(self_).unwrap(), None);
-                (*cl).ps.isJediMaster = qfalse;
-            }
-
-            if ctx.world.cvars.g_gametype.integer == GT_DUEL {
-                // in duel, if you kill yourself, the person you are dueling against gets a kill for it
-                let mut otherClNum: c_int = -1;
-                if ctx.world.level.sortedClients[0] == (*self_).s.number {
-                    otherClNum = ctx.world.level.sortedClients[1];
-                } else if ctx.world.level.sortedClients[1] == (*self_).s.number {
-                    otherClNum = ctx.world.level.sortedClients[0];
-                }
-
-                if otherClNum >= 0
-                    && otherClNum < MAX_CLIENTS as c_int
-                    && ctx.world.g_entities[otherClNum as usize].inuse != qfalse
-                    && !ctx.world.g_entities[otherClNum as usize].client.is_null()
-                    && otherClNum != (*self_).s.number
-                {
-                    AddScore(
-                        ctx,
-                        EntityId::from_num(otherClNum).unwrap(),
-                        (*self_).r.currentOrigin,
-                        1,
-                    );
-                } else {
-                    AddScore(
-                        ctx,
-                        ctx.entity_id_of(self_).unwrap(),
-                        (*self_).r.currentOrigin,
-                        -1,
-                    );
-                }
-            } else {
-                AddScore(
-                    ctx,
-                    ctx.entity_id_of(self_).unwrap(),
-                    (*self_).r.currentOrigin,
-                    -1,
-                );
-            }
-        }
+        player_die_kill_credit(ctx, self_, attacker, meansOfDeath);
 
         player_die_scoring_and_drops(ctx, self_, inflictor, attacker, meansOfDeath);
 
