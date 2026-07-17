@@ -5,6 +5,9 @@
 use core::ffi::c_int;
 
 use super::holdable::holdable_t;
+use super::item_type::{
+    itemType_t, IT_AMMO, IT_ARMOR, IT_BAD, IT_HEALTH, IT_HOLDABLE, IT_POWERUP, IT_TEAM, IT_WEAPON,
+};
 use super::powerup::powerup_t;
 use crate::weapons::weapon_t::weapon_t;
 
@@ -32,4 +35,26 @@ pub enum ItemKind {
     Ammo(c_int),
     /// CTF flags (`PW_*FLAG`); the red/blue cubes carry 0.
     Team(powerup_t),
+}
+
+impl ItemKind {
+    /// Exact inverse of the `GItem::giType()`/`giTag()` pair — builds the kind
+    /// a Raven `(giType, giTag)` int pair denotes, for callers that still carry
+    /// the two ints (e.g. `BG_GetItemIndexByTag`): comparing against `from_gi`
+    /// equals Raven's paired `giType == type && giTag == tag`. `None` for pairs
+    /// that don't round-trip (`IT_BATTERY`/`IT_HOLOCRON`, or a payload-less
+    /// type with a nonzero tag).
+    pub fn from_gi(giType: itemType_t, giTag: c_int) -> Option<ItemKind> {
+        Some(match giType {
+            IT_BAD if giTag == 0 => ItemKind::Bad,
+            IT_ARMOR => ItemKind::Armor { rating: giTag },
+            IT_HEALTH if giTag == 0 => ItemKind::Health,
+            IT_HOLDABLE => ItemKind::Holdable(giTag),
+            IT_POWERUP => ItemKind::Powerup(giTag),
+            IT_WEAPON => ItemKind::Weapon(giTag),
+            IT_AMMO => ItemKind::Ammo(giTag),
+            IT_TEAM => ItemKind::Team(giTag),
+            _ => return None,
+        })
+    }
 }

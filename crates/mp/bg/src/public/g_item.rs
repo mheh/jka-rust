@@ -42,6 +42,10 @@ pub struct GItem {
 
 impl GItem {
     /// Raven `giType` (`IT_*`), reconstructed from [`Self::kind`].
+    ///
+    /// Dumper-only: the bgmisc parity golden records Raven's raw pair. Code
+    /// matches on [`Self::kind`] directly (see [`ItemKind::from_gi`] for the
+    /// int-pair direction).
     #[inline]
     pub fn giType(&self) -> itemType_t {
         match self.kind {

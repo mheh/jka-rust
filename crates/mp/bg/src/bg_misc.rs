@@ -860,15 +860,24 @@ pub fn BG_CycleForce(ps: *mut playerState_t, direction: c_int) {
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:2092-2108`
 pub fn BG_GetItemIndexByTag(tag: c_int, r#type: c_int) -> c_int {
-    let mut i: c_int = 0;
-    while i < bg_numItems {
-        let it = &bg_itemlist[i as usize];
-        if it.giTag() == tag && it.giType() == r#type {
-            return i;
-        }
-        i += 1;
+    let target = ItemKind::from_gi(r#type, tag);
+    bg_itemlist
+        .iter()
+        .position(|it| Some(it.kind) == target)
+        .unwrap_or(0) as c_int
+}
+
+/// Tag of the holdable selected in `STAT_HOLDABLE_ITEM` — the raw
+/// `bg_itemlist[ps->stats[STAT_HOLDABLE_ITEM]].giTag` read Raven spells at
+/// three sites (`BG_CycleInven`, `PM_ItemUsable`, `PM_Weapon`). The slot only
+/// ever holds a holdable's index or sentinel 0 (nothing selected, tag 0).
+pub fn selected_holdable_tag(ps: *const playerState_t) -> c_int {
+    let slot = unsafe { (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] };
+    match bg_itemlist[slot as usize].kind {
+        ItemKind::Holdable(tag) => tag,
+        ItemKind::Bad => 0,
+        k => unreachable!("STAT_HOLDABLE_ITEM slot {slot} holds non-holdable {k:?}"),
     }
-    0
 }
 
 /// Raven `BG_IsItemSelectable`.
@@ -886,8 +895,7 @@ pub fn BG_IsItemSelectable(ps: *mut playerState_t, item: c_int) -> qboolean {
 /// Source: `oracle/codemp/game/bg_misc.c:2121-2182`
 pub fn BG_CycleInven(ps: *mut playerState_t, direction: c_int) {
     unsafe {
-        let mut i =
-            bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag();
+        let mut i = selected_holdable_tag(ps);
         let original = i;
         if direction == 1 {
             i += 1;
@@ -945,23 +953,33 @@ pub fn BG_CanItemBeGrabbed(
         };
         if !ps.is_null() {
             if (*ps).trueJedi != 0 {
-                if item.giType() != IT_TEAM
-                    && item.giType() != IT_ARMOR
-                    && (item.giType() != IT_WEAPON || item.giTag() != WP_SABER)
-                    && (item.giType() != IT_HOLDABLE || item.giTag() != HI_SEEKER)
-                    && (item.giType() != IT_POWERUP || item.giTag() == PW_YSALAMIRI)
-                {
+                // in true jedi mode you can only pick up the following items
+                let allowed = match item.kind {
+                    ItemKind::Team(_) | ItemKind::Armor { .. } => true,
+                    ItemKind::Weapon(tag) => tag == WP_SABER,
+                    ItemKind::Holdable(tag) => tag == HI_SEEKER,
+                    // Raven's conjunct reads inverted: every powerup EXCEPT
+                    // ysalamiri is grabbable in true-jedi.
+                    ItemKind::Powerup(tag) => tag != PW_YSALAMIRI,
+                    _ => false,
+                };
+                if !allowed {
                     return qfalse;
                 }
             } else if (*ps).trueNonJedi != 0 {
-                if (item.giType() == IT_POWERUP && item.giTag() != PW_YSALAMIRI)
-                    || (item.giType() == IT_HOLDABLE && item.giTag() == HI_SEEKER)
-                    || (item.giType() == IT_WEAPON && item.giTag() == WP_SABER)
-                {
+                let banned = match item.kind {
+                    ItemKind::Powerup(tag) => tag != PW_YSALAMIRI,
+                    ItemKind::Holdable(tag) => tag == HI_SEEKER,
+                    ItemKind::Weapon(tag) => tag == WP_SABER,
+                    _ => false,
+                };
+                if banned {
                     return qfalse;
                 }
             }
-            if (*ps).isJediMaster != 0 && (item.giType() == IT_WEAPON || item.giType() == IT_AMMO) {
+            if (*ps).isJediMaster != 0
+                && matches!(item.kind, ItemKind::Weapon(_) | ItemKind::Ammo(_))
+            {
                 return qfalse;
             }
             if (*ps).duelInProgress != 0 {
@@ -970,40 +988,37 @@ pub fn BG_CanItemBeGrabbed(
         } else {
             return qfalse;
         }
-        match item.giType() {
-            IT_WEAPON => {
+        match item.kind {
+            ItemKind::Weapon(weapon) => {
                 if (*ent).generic1 == (*ps).clientNum && (*ent).powerups != 0 {
                     return qfalse;
                 }
                 if ((*ent).eFlags & EF_DROPPEDWEAPON) == 0
-                    && ((*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << item.giTag())) != 0
-                    && item.giTag() != WP_THERMAL
-                    && item.giTag() != WP_TRIP_MINE
-                    && item.giTag() != WP_DET_PACK
+                    && ((*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << weapon)) != 0
+                    && weapon != WP_THERMAL
+                    && weapon != WP_TRIP_MINE
+                    && weapon != WP_DET_PACK
                 {
                     return qfalse;
                 }
-                if item.giTag() == WP_THERMAL
-                    || item.giTag() == WP_TRIP_MINE
-                    || item.giTag() == WP_DET_PACK
-                {
-                    let ammoIndex = weaponData[item.giTag() as usize].ammoIndex;
+                if weapon == WP_THERMAL || weapon == WP_TRIP_MINE || weapon == WP_DET_PACK {
+                    let ammoIndex = weaponData[weapon as usize].ammoIndex;
                     if (*ps).ammo[ammoIndex as usize] >= ammoData[ammoIndex as usize].max {
                         return qfalse;
                     }
                 }
                 qtrue
             }
-            IT_AMMO => {
-                if item.giTag() == -1 {
+            ItemKind::Ammo(tag) => {
+                if tag == -1 {
                     return qtrue;
                 }
-                if (*ps).ammo[item.giTag() as usize] >= ammoData[item.giTag() as usize].max {
+                if (*ps).ammo[tag as usize] >= ammoData[tag as usize].max {
                     return qfalse;
                 }
                 qtrue
             }
-            IT_ARMOR => {
+            ItemKind::Armor { .. } => {
                 if (*ps).stats[statIndex_t::STAT_ARMOR as usize]
                     >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize]
                 {
@@ -1011,7 +1026,7 @@ pub fn BG_CanItemBeGrabbed(
                 }
                 qtrue
             }
-            IT_HEALTH => {
+            ItemKind::Health => {
                 if ((*ps).fd.forcePowersActive & (1 << FP_RAGE)) != 0 {
                     return qfalse;
                 }
@@ -1030,29 +1045,29 @@ pub fn BG_CanItemBeGrabbed(
                 }
                 qtrue
             }
-            IT_POWERUP => {
-                if !ps.is_null() && ((*ps).powerups[PW_YSALAMIRI as usize] != 0) {
-                    if item.giTag() != PW_YSALAMIRI {
-                        return qfalse;
-                    }
+            ItemKind::Powerup(tag) => {
+                if !ps.is_null()
+                    && ((*ps).powerups[PW_YSALAMIRI as usize] != 0)
+                    && tag != PW_YSALAMIRI
+                {
+                    return qfalse;
                 }
                 qtrue
             }
-            IT_TEAM => {
+            ItemKind::Team(tag) => {
+                // The red/blue cubes (Team(0)) fall through to qfalse.
                 if gametype == GT_CTF || gametype == GT_CTY {
                     if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_RED {
-                        if item.giTag() == PW_BLUEFLAG
-                            || (item.giTag() == PW_REDFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag() == PW_REDFLAG
-                                && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
+                        if tag == PW_BLUEFLAG
+                            || (tag == PW_REDFLAG && (*ent).modelindex2 != 0)
+                            || (tag == PW_REDFLAG && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
                         {
                             return qtrue;
                         }
                     } else if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_BLUE {
-                        if item.giTag() == PW_REDFLAG
-                            || (item.giTag() == PW_BLUEFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag() == PW_BLUEFLAG
-                                && (*ps).powerups[PW_REDFLAG as usize] != 0)
+                        if tag == PW_REDFLAG
+                            || (tag == PW_BLUEFLAG && (*ent).modelindex2 != 0)
+                            || (tag == PW_BLUEFLAG && (*ps).powerups[PW_REDFLAG as usize] != 0)
                         {
                             return qtrue;
                         }
@@ -1060,15 +1075,13 @@ pub fn BG_CanItemBeGrabbed(
                 }
                 qfalse
             }
-            IT_HOLDABLE => {
-                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag()))
-                    != 0
-                {
+            ItemKind::Holdable(tag) => {
+                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << tag)) != 0 {
                     return qfalse;
                 }
                 qtrue
             }
-            _ => qfalse,
+            ItemKind::Bad => qfalse,
         }
     }
 }
