@@ -64,6 +64,8 @@ pub const FORCE_MASTERY_JEDI_KNIGHT: c_int = 6;
 pub const FORCE_MASTERY_JEDI_MASTER: c_int = 7;
 pub const NUM_FORCE_MASTERY_LEVELS: c_int = 8;
 use crate::ai_main::{InFieldOfVision, OrgVisible};
+use crate::client::player_team_state::playerTeamStateState_t;
+use crate::client::spectator_state::spectatorState_t;
 use crate::g_cmds::Cmd_ToggleSaber_f;
 use crate::g_combat::{G_Damage, TossClientWeapon};
 use crate::g_missile::G_ReflectMissile;
@@ -78,10 +80,14 @@ use crate::q_math::{
     vectoangles, AngleSubtract, AngleVectors, DirToByte, VectorLength, VectorNormalize,
 };
 use crate::trap;
+use crate::veh_dispatch;
 use crate::w_saber::HasSetSaberOnly;
 use crate::world::GameContext;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
+use crate::NPC_AI_Jedi::NPC_Jedi_PlayConfusionSound;
+use crate::NPC_reactions::NPC_UseResponse;
 use crate::NPC_senses::InFront;
+use crate::NPC_sounds::NPC_PlayConfusionSound;
 use mp_bg::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri, BG_LegalizedForcePowers};
 use mp_bg::bg_panimate::{
     BG_FullBodyTauntAnim, BG_InReboundHold, BG_InReboundJump, BG_SaberInSpecial,
@@ -495,12 +501,10 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                         if ctx.world.cvars.g_teamAutoJoin.integer == 0 {
                             //Make them a spectator so they can set their powerups up without being bothered.
                             (*cl).sess.sessionTeam = TEAM_SPECTATOR;
-                            (*cl).sess.spectatorState =
-                                crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
+                            (*cl).sess.spectatorState = spectatorState_t::SPECTATOR_FREE;
                             (*cl).sess.spectatorClient = 0;
 
-                            (*cl).pers.teamState.state =
-                                crate::client::player_team_state::playerTeamStateState_t::TEAM_BEGIN;
+                            (*cl).pers.teamState.state = playerTeamStateState_t::TEAM_BEGIN;
                             trap::SendServerCommand(
                                 ctx.engine,
                                 GSendServerCommandArgs::new(ent_number, cstr("spc")),
@@ -1389,9 +1393,8 @@ pub fn ForceTeamHeal(ctx: &mut GameContext, self_: EntityId) {
 
                 //At this point we know we got one, so add him into the collective event client bitflag
                 if te.is_null() {
-                    let __teid17 = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
-                    te = ctx.entity_mut(__teid17);
-                    let te_id = ctx.entity_id_of(te).unwrap();
+                    let te_id = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
+                    te = ctx.entity_mut(te_id);
                     ctx.world.entity_mut(te_id).s.eventParm = 1; //eventParm 1 is heal, eventParm 2 is force regen
 
                     //since we had an extra check above, do the drain now because we got at least one guy
@@ -1505,9 +1508,8 @@ pub fn ForceTeamForceReplenish(ctx: &mut GameContext, self_: EntityId) {
 
             //At this point we know we got one, so add him into the collective event client bitflag
             if te.is_null() {
-                let __teid18 = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
-                te = ctx.entity_mut(__teid18);
-                let te_id = ctx.entity_id_of(te).unwrap();
+                let te_id = G_TempEntity(ctx, (*cl).ps.origin, EV_TEAM_POWER as c_int);
+                te = ctx.entity_mut(te_id);
                 ctx.world.entity_mut(te_id).s.eventParm = 2; //eventParm 1 is heal, eventParm 2 is force regen
             }
 
@@ -1620,7 +1622,7 @@ pub fn ForceGrip(ctx: &mut GameContext, self_: EntityId) {
                         // pointer (can't restructure without touching that file).
                         let target_raw =
                             ctx.world.entity_mut(target_id) as *mut gentity_t as *mut bgEntity_t;
-                        crate::veh_dispatch::eject(ctx, pVeh, target_raw, qfalse);
+                        veh_dispatch::eject(ctx, pVeh, target_raw, qfalse);
                     }
                 }
             }
@@ -2949,13 +2951,13 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                         (*npc).confusionTime = ctx.world.level.time
                             + mindTrickTime
                                 [(*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] as usize]; //confused for about 10 seconds
-                        crate::NPC_sounds::NPC_PlayConfusionSound(ctx, te_id);
+                        NPC_PlayConfusionSound(ctx, te_id);
                         if ctx.entity(te_id).enemy.is_some() {
                             G_ClearEnemy(ctx, te_id);
                         }
                     }
                 } else {
-                    crate::NPC_AI_Jedi::NPC_Jedi_PlayConfusionSound(ctx, te_id);
+                    NPC_Jedi_PlayConfusionSound(ctx, te_id);
                 }
                 WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, over_ride);
             } else if (*tcl).playerTeam == (*cl).playerTeam {
@@ -2965,7 +2967,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                     && !npc.is_null()
                     && (*npc).scriptFlags & SCF_NO_RESPONSE == 0
                 {
-                    crate::NPC_reactions::NPC_UseResponse(ctx, te_id, Some(self_), qfalse);
+                    NPC_UseResponse(ctx, te_id, Some(self_), qfalse);
                     WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 1);
                 }
             } //NOTE: no effect on TEAM_NEUTRAL?
@@ -3979,7 +3981,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: qboolean) {
                                         let pEnt = ctx.world.entity_mut(push_list[x])
                                             as *mut gentity_t
                                             as *mut bgEntity_t;
-                                        crate::veh_dispatch::eject(ctx, pVeh, pEnt, qfalse);
+                                        veh_dispatch::eject(ctx, pVeh, pEnt, qfalse);
                                     }
                                 }
                             }
