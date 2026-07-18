@@ -179,10 +179,7 @@ fn sec_armor(o: &mut String, ctx: &mut GameContext) {
                 core::ptr::null_mut()
             };
         }
-        // SAFETY: `ctx.world` is the live boxed GameWorld built in the test.
-        unsafe {
-            (*ctx.world).level.time = pi(tok[5]);
-        }
+        ctx.world.level.time = pi(tok[5]);
         let damage = pi(tok[6]);
         let dflags = pi(tok[7]);
         let r = CheckArmor(ctx, id, damage, dflags);

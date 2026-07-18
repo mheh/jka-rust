@@ -636,7 +636,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                 continue;
             }
 
-            if Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, hit_loc) != qfalse {
+            if Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, hit_loc) {
                 // act like we didn't even hit him
                 start = tr.endpos;
                 ignore = (tr.entityNum) as i32;
@@ -894,7 +894,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                 continue;
             }
 
-            if Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, hit_loc) != qfalse {
+            if Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, hit_loc) {
                 skip = (tr.entityNum) as i32;
                 start = tr.endpos;
                 continue;
@@ -3799,8 +3799,7 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
 
             if ctx.world.entity(traceEnt_id).s.weapon == WP_SABER {
                 // FIXME: need a more reliable way to know we hit a jedi?
-                hitDodged = Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, HL_NONE)
-                    != qfalse;
+                hitDodged = Jedi_DodgeEvasion(ctx, Some(traceEnt_id), Some(ent), &mut tr, HL_NONE);
                 // acts like we didn't even hit him
             }
             if !hitDodged {

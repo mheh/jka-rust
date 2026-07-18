@@ -6873,14 +6873,13 @@ pub fn WP_SaberStartMissileBlockCheck(
                         && ((*ent).s.pos.trType == TR_STATIONARY
                             || (*ent).s.pos.trType == TR_INTERPOLATE
                             || _DotProduct(dir, forward) < SABER_REFLECT_MISSILE_CONE
-                            || WP_ForcePowerUsable(ctx, ctx.entity_id_of(self_).unwrap(), FP_PUSH)
-                                == 0)
+                            || !WP_ForcePowerUsable(ctx, ctx.entity_id_of(self_).unwrap(), FP_PUSH))
                     {
                         //TD is close enough to hurt me, I'm on the ground and the thing is at rest or behind me and about to blow up, or I don't have force-push so force-jump!
                         (*sc).ps.fd.forceJumpCharge = 480.0f32;
                     } else if (*sc).NPC_class != CLASS_BOBAFETT {
                         //FIXME: check forcePushRadius[NPC->client->ps.forcePowerLevel[FP_PUSH]]
-                        ForceThrow(ctx, ctx.entity_id_of(self_).unwrap(), qfalse);
+                        ForceThrow(ctx, ctx.entity_id_of(self_).unwrap(), false);
                     }
                 }
                 continue;
@@ -6894,14 +6893,13 @@ pub fn WP_SaberStartMissileBlockCheck(
                     if dist < (*ent).splashRadius as f32
                         && (*sc).ps.groundEntityNum != ENTITYNUM_NONE
                         && (_DotProduct(dir, forward) < SABER_REFLECT_MISSILE_CONE
-                            || WP_ForcePowerUsable(ctx, ctx.entity_id_of(self_).unwrap(), FP_PUSH)
-                                == 0)
+                            || !WP_ForcePowerUsable(ctx, ctx.entity_id_of(self_).unwrap(), FP_PUSH))
                     {
                         //NPCs try to evade it
                         (*sc).ps.fd.forceJumpCharge = 480.0f32;
                     } else if (*sc).NPC_class != CLASS_BOBAFETT {
                         //else, try to force-throw it away
-                        ForceThrow(ctx, ctx.entity_id_of(self_).unwrap(), qfalse);
+                        ForceThrow(ctx, ctx.entity_id_of(self_).unwrap(), false);
                     }
                 }
                 //otherwise, can't block it, so we're screwed

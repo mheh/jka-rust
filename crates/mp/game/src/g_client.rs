@@ -3015,7 +3015,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                             continue;
                         }
                         if cl.sess.sessionTeam == TEAM_BLUE || cl.sess.sessionTeam == TEAM_RED {
-                            if WP_HasForcePowers(&cl.ps) != qfalse {
+                            if WP_HasForcePowers(&cl.ps) {
                                 force_team = cl.sess.sessionTeam;
                             } else if cl.sess.sessionTeam == TEAM_BLUE {
                                 force_team = TEAM_RED;
@@ -3026,8 +3026,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                         }
                         i += 1;
                     }
-                    if WP_HasForcePowers(&(*client).ps) != qfalse
-                        && (*client).sess.sessionTeam != force_team
+                    if WP_HasForcePowers(&(*client).ps) && (*client).sess.sessionTeam != force_team
                     {
                         let team_name = TeamName(force_team as c_int);
                         SetTeam(
@@ -3040,7 +3039,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                 }
             }
 
-            if WP_HasForcePowers(&(*client).ps) != qfalse {
+            if WP_HasForcePowers(&(*client).ps) {
                 (*client).ps.trueNonJedi = qfalse;
                 (*client).ps.trueJedi = qtrue;
                 (*client).ps.weapon = WP_SABER;
