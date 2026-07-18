@@ -53,6 +53,7 @@ use mp_qshared::shared::CHAN_WEAPON;
 // (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
 // preserves the Raven spelling; their exact enum-qualification / module path is
 // resolved at integration (the mega-pass tree is not compiled per porter).
+use crate::bg_channel::{GameBgTraps, GameCallbacksImpl};
 use crate::client::render_info::renderInfo_t;
 use crate::g_combat::{G_Damage, G_Knockdown};
 use crate::g_mover::G_EntIsBreakable;
@@ -284,7 +285,7 @@ pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> 
         return qtrue;
     }
 
-    if crate::g_team::OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
+    if OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
         // ff not on, don't hurt teammates
         return qfalse;
     }
@@ -352,7 +353,7 @@ pub fn G_SaberAttackPower(
                     ctx.world.entity(ent).s.number,
                     baseLevel
                 );
-                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(cstr(&s).as_ptr());
             }
         }
 
@@ -404,7 +405,7 @@ pub fn WP_DeactivateSaber(ctx: &mut GameContext, self_: Option<EntityId>, clearL
             (*client).ps.saberHolstered = 2;
             // Doesn't matter ATM (SetSaberLength commented out in oracle).
             if (*client).saber[0].soundOff != 0 {
-                crate::g_utils::G_Sound(
+                G_Sound(
                     ctx,
                     Some(self_),
                     CHAN_WEAPON as c_int,
@@ -413,7 +414,7 @@ pub fn WP_DeactivateSaber(ctx: &mut GameContext, self_: Option<EntityId>, clearL
             }
 
             if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
-                crate::g_utils::G_Sound(
+                G_Sound(
                     ctx,
                     Some(self_),
                     CHAN_WEAPON as c_int,
@@ -664,7 +665,7 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                         "Client {} in broken parry, saber box 0\n",
                         ctx.world.entity(owner_id).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
                 return;
             }
@@ -741,8 +742,8 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                         let blade = &(*oc).saber[j as usize].blade[k as usize];
                         (blade.muzzlePoint, blade.lengthMax, blade.muzzleDir)
                     };
-                    crate::q_math::_VectorCopy(muzzlePoint, &mut saberOrg);
-                    crate::q_math::_VectorMA(muzzlePoint, lengthMax, muzzleDir, &mut saberTip);
+                    _VectorCopy(muzzlePoint, &mut saberOrg);
+                    _VectorMA(muzzlePoint, lengthMax, muzzleDir, &mut saberTip);
 
                     if saberOrg[i] < ctx.world.entity(saberent).r.mins[i] {
                         ctx.world.entity_mut(saberent).r.mins[i] = saberOrg[i];
@@ -767,8 +768,8 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
         let mins = e.r.mins;
         let maxs = e.r.maxs;
         let origin = e.r.currentOrigin;
-        crate::q_math::_VectorSubtract(mins, origin, &mut e.r.mins);
-        crate::q_math::_VectorSubtract(maxs, origin, &mut e.r.maxs);
+        _VectorSubtract(mins, origin, &mut e.r.mins);
+        _VectorSubtract(maxs, origin, &mut e.r.maxs);
     }
 }
 
@@ -794,7 +795,7 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
             && ce.r.ownerNum == ent_number
             && !ce.classname.is_null()
             && unsafe { *ce.classname != 0 }
-            && unsafe { crate::q_shared::Q_stricmp(ce.classname, c"lightsaber".as_ptr()) == 0 };
+            && unsafe { Q_stricmp(ce.classname, c"lightsaber".as_ptr()) == 0 };
 
         if matches {
             if saberent.is_some() {
@@ -953,7 +954,7 @@ pub fn G_CheckLookTarget(
                 (*sc).renderInfo.eyeAngles[i] = AngleNormalize180((*sc).renderInfo.eyeAngles[i]);
             }
             let la = *lookAngles;
-            crate::q_math::AnglesSubtract(la, (*sc).renderInfo.eyeAngles, lookAngles);
+            AnglesSubtract(la, (*sc).renderInfo.eyeAngles, lookAngles);
             return qtrue;
         }
 
@@ -971,8 +972,7 @@ pub fn G_G2NPCAngles(
     angles: &mut vec3_t,
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let cranium_bone = cstr("cranium");
         let thoracic_bone = cstr("thoracic"); // only used by atst so doesn't need a case
@@ -1013,7 +1013,7 @@ pub fn G_G2NPCAngles(
 
             if (*sc).NPC_class == CLASS_ATST {
                 // body pitch
-                crate::NPC_utils::NPC_SetBoneAngles(
+                NPC_SetBoneAngles(
                     ctx,
                     ctx.entity_id_of(ent).unwrap(),
                     thoracic_bone.as_ptr() as *mut c_char,
@@ -1079,7 +1079,7 @@ pub fn G_G2NPCAngles(
                 lookAngles[YAW as usize] -= (*sc).ps.viewangles[YAW as usize];
             }
 
-            crate::NPC_utils::NPC_SetBoneAngles(
+            NPC_SetBoneAngles(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),
                 cranium_bone.as_ptr() as *mut c_char,
@@ -1100,8 +1100,7 @@ pub fn G_G2PlayerAngles(
     legsAngles: &mut vec3_t,
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let sc = (*ent).client;
         let mut tPitching: qboolean = qfalse;
@@ -1217,7 +1216,7 @@ pub fn G_G2PlayerAngles(
                 (*sc).lookTime,
                 emplaced,
                 core::ptr::null_mut(),
-                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &GameBgTraps::new(ctx.engine),
             );
 
             if (*sc).ps.heldByClient != 0 && (*sc).ps.heldByClient <= MAX_CLIENTS as c_int {
@@ -1287,7 +1286,7 @@ pub fn G_G2PlayerAngles(
                         500,
                         qfalse,
                         &ctx.world.bg_state,
-                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                        &GameBgTraps::new(ctx.engine),
                     );
                 }
             } else if (*sc).ikStatus != 0 {
@@ -1327,7 +1326,7 @@ pub fn G_G2PlayerAngles(
                         500,
                         qtrue,
                         &ctx.world.bg_state,
-                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                        &GameBgTraps::new(ctx.engine),
                     );
                 }
             }
@@ -1351,7 +1350,7 @@ pub fn G_G2PlayerAngles(
                 (*ent).ghoul2,
                 ctx.world.level.time,
                 lookAngles,
-                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &GameBgTraps::new(ctx.engine),
             );
         } else if !(*ent).NPC.is_null() {
             // an NPC not using a humanoid skeleton, do special angle stuff.
@@ -1769,7 +1768,7 @@ pub fn WP_SabersCheckLock2(
             }
         }
 
-        crate::g_utils::G_SetAnim(
+        G_SetAnim(
             ctx,
             ctx.entity_id_of(attacker).unwrap(),
             core::ptr::null_mut(),
@@ -1786,7 +1785,7 @@ pub fn WP_SabersCheckLock2(
                 anim.firstFrame as c_int + (anim.numFrames as f32 * attStart) as c_int;
         }
 
-        crate::g_utils::G_SetAnim(
+        G_SetAnim(
             ctx,
             ctx.entity_id_of(defender).unwrap(),
             core::ptr::null_mut(),
@@ -2493,9 +2492,9 @@ pub fn WP_GetSaberDeflectionAngle(
 ) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     let defender: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), defender) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), defender) };
     unsafe {
         let animBasedDeflection: qboolean = qtrue;
         let _ = saberHitFraction;
@@ -2592,7 +2591,7 @@ pub fn WP_GetSaberDeflectionAngle(
                                 .name
                         ),
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                 return qfalse;
@@ -2649,7 +2648,7 @@ pub fn WP_GetSaberDeflectionAngle(
                                     .name
                             ),
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
                     (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                     return qfalse;
@@ -2678,7 +2677,7 @@ pub fn WP_GetSaberDeflectionAngle(
                                     .name
                             ),
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
                     (*ac).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
                     return qtrue;
@@ -2826,7 +2825,7 @@ pub fn G_GetAttackDamage(
             // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
             // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
             // arena by client number (replaces the old `g_entities` base arg).
-            &mut crate::bg_channel::GameCallbacksImpl {
+            &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             },
@@ -2887,7 +2886,7 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
             // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
             // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
             // arena by client number (replaces the old `g_entities` base arg).
-            &mut crate::bg_channel::GameCallbacksImpl {
+            &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             },
@@ -3125,9 +3124,9 @@ pub fn G_BuildSaberFaces(
         let mut invRight: vec3_t = [0.0; 3];
 
         _VectorCopy(fwd, &mut invFwd);
-        crate::q_math::VectorInverse(&mut invFwd);
+        VectorInverse(&mut invFwd);
         _VectorCopy(right, &mut invRight);
-        crate::q_math::VectorInverse(&mut invRight);
+        VectorInverse(&mut invRight);
 
         while i < 8 {
             // yeah, this part is kind of a hack, but eh
@@ -3577,10 +3576,8 @@ pub fn WP_SabersIntersect(
     checkDir: qboolean,
 ) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent1: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent1) };
-    let ent2: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent2) };
+    let ent1: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent1) };
+    let ent2: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent2) };
     let _ = ctx;
     unsafe {
         let mut saberBase1: vec3_t = [0.0; 3];
@@ -3827,8 +3824,7 @@ pub fn G_PowerLevelForSaberAnim(
     mySaberHit: qboolean,
 ) -> c_int {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() || saberNum >= MAX_SABERS as c_int {
             return FORCE_LEVEL_0;
@@ -4289,10 +4285,10 @@ pub fn WP_SaberDamageAdd(
         let cv = curVictim as usize;
         g.totalDmg[cv] += trDmg as f32;
         if VectorCompare(g.dmgDir[cv], vec3_origin) != 0 {
-            crate::q_math::_VectorCopy(trDmgDir, &mut g.dmgDir[cv]);
+            _VectorCopy(trDmgDir, &mut g.dmgDir[cv]);
         }
         if VectorCompare(g.dmgSpot[cv], vec3_origin) != 0 {
-            crate::q_math::_VectorCopy(trDmgSpot, &mut g.dmgSpot[cv]);
+            _VectorCopy(trDmgSpot, &mut g.dmgSpot[cv]);
         }
         if doDismemberment != 0 {
             g.dismemberDmg[cv] = qtrue;
@@ -4406,11 +4402,7 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
                 (*te).s.legsAnim = bladeNum;
 
                 (*te).s.origin = ctx.world.globals.dmgSpot[iu];
-                crate::q_math::_VectorScale(
-                    ctx.world.globals.dmgDir[iu],
-                    -1.0,
-                    &mut (*te).s.angles,
-                );
+                _VectorScale(ctx.world.globals.dmgDir[iu], -1.0, &mut (*te).s.angles);
 
                 if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
                 {
@@ -4467,8 +4459,7 @@ pub fn WP_SaberRadiusDamage(
     knockBack: f32,
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -5411,7 +5402,7 @@ pub fn CheckSaberDamage(
 
         if ctx.world.cvars.g_saberDebugPrint.integer > 2 && dmg > 1 {
             let s = format!("CL {} SABER DMG: {}\n", (*self_).s.number, dmg);
-            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+            Com_Printf(cstr(&s).as_ptr());
         }
 
         _VectorSubtract(*saberEnd, saberStart, &mut dir);
@@ -5457,8 +5448,8 @@ pub fn CheckSaberDamage(
                 //do bounce sound & force feedback
                 WP_SaberBounceSound(ctx, ctx.entity_id_of(self_), rSaberNum, rBladeNum);
                 //do hit effect
-                let __teid11 = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                te = ctx.entity_mut(__teid11);
+                let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                te = ctx.entity_mut(te_id);
                 (*te).s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
                 (*te).s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
                 (*te).s.weapon = rSaberNum;
@@ -5939,7 +5930,7 @@ pub fn CheckSaberDamage(
                             (*self_).s.number,
                             (*otherOwner).s.number
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
                 }
             }
@@ -5994,7 +5985,7 @@ pub fn CheckSaberDamage(
                         (*otherOwner).s.number,
                         (*self_).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
 
                 didDefense = qtrue;
@@ -6029,7 +6020,7 @@ pub fn CheckSaberDamage(
                         (*self_).s.number,
                         (*otherOwner).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
 
                 (*ooc).ps.saberMove =
@@ -6057,7 +6048,7 @@ pub fn CheckSaberDamage(
                         (*self_).s.number,
                         (*otherOwner).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
 
                 if tryDeflectAgain == 0 {
@@ -6117,7 +6108,7 @@ pub fn CheckSaberDamage(
                             (*self_).s.number,
                             (*otherOwner).s.number
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
 
                     attackBonus = ctx
@@ -6240,7 +6231,7 @@ pub fn CheckSaberDamage(
                                 (*self_).s.number,
                                 (*otherOwner).s.number
                             );
-                            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                            Com_Printf(cstr(&s).as_ptr());
                         }
                     } else {
                         //They are attacking, so are we
@@ -6276,7 +6267,7 @@ pub fn CheckSaberDamage(
                                     (*self_).s.number,
                                     (*otherOwner).s.number
                                 );
-                                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                                Com_Printf(cstr(&s).as_ptr());
                             }
 
                             (*sc).ps.saberEventFlags |= SEF_DEFLECTED;
@@ -6306,7 +6297,7 @@ pub fn CheckSaberDamage(
                                     (*self_).s.number,
                                     (*otherOwner).s.number
                                 );
-                                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                                Com_Printf(cstr(&s).as_ptr());
                             }
 
                             (*ooc).ps.saberEventFlags &= !SEF_BLOCKED;
@@ -6334,7 +6325,7 @@ pub fn CheckSaberDamage(
                                 (*self_).s.number,
                                 (*otherOwner).s.number
                             );
-                            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                            Com_Printf(cstr(&s).as_ptr());
                         }
                     } else if PM_SaberInParry(G_GetParryForBlock((*ooc).ps.saberBlocked)) != 0
                         && didOffense == 0
@@ -7066,7 +7057,7 @@ pub fn WP_SaberStartMissileBlockCheck(
 
                 WP_SaberBlockNonRandom(&*(self_), (*incoming).r.currentOrigin, qtrue);
                 let owc = (*owner).client;
-                let selfEnemy = crate::ent_id::resolve(base, (*self_).enemy);
+                let selfEnemy = ent_id::resolve(base, (*self_).enemy);
                 if !(*owner).client.is_null()
                     && ((*self_).enemy.is_none() || (*selfEnemy).s.weapon != WP_SABER as c_int)
                 //keep enemy jedi over shooters
@@ -7093,9 +7084,8 @@ pub fn CheckThrownSaberDamaged(
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let saberent: *mut gentity_t = ctx.entity_mut(saberent);
     let saberOwner: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), saberOwner) };
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), saberOwner) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let level_time = ctx.world.level.time;
         let mut vecsub: vec3_t;
@@ -7137,11 +7127,7 @@ pub fn CheckThrownSaberDamaged(
             }
 
             vecsub = [0.0; 3];
-            crate::q_math::_VectorSubtract(
-                (*saberent).r.currentOrigin,
-                (*ec).ps.origin,
-                &mut vecsub,
-            );
+            _VectorSubtract((*saberent).r.currentOrigin, (*ec).ps.origin, &mut vecsub);
             veclen = VectorLength(vecsub);
 
             if veclen < dist as f32 {
@@ -7175,8 +7161,8 @@ pub fn CheckThrownSaberDamaged(
                         // they blocked it
                         WP_SaberBlockNonRandom(&*(ent), tr.endpos, qfalse);
 
-                        let __teid12 = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
-                        te = ctx.entity_mut(__teid12);
+                        let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
+                        te = ctx.entity_mut(te_id);
                         (*te).s.origin = tr.endpos;
                         (*te).s.angles = tr.plane.normal;
                         if (*te).s.angles[0] == 0.0
@@ -7219,11 +7205,7 @@ pub fn CheckThrownSaberDamaged(
                         let mut dir: vec3_t = [0.0; 3];
                         let mut dflags = 0;
 
-                        crate::q_math::_VectorSubtract(
-                            tr.endpos,
-                            (*saberent).r.currentOrigin,
-                            &mut dir,
-                        );
+                        _VectorSubtract(tr.endpos, (*saberent).r.currentOrigin, &mut dir);
                         VectorNormalize(&mut dir);
 
                         if dir[0] == 0.0 && dir[1] == 0.0 && dir[2] == 0.0 {
@@ -7265,8 +7247,8 @@ pub fn CheckThrownSaberDamaged(
                             );
                         }
 
-                        let __teid13 = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                        te = ctx.entity_mut(__teid13);
+                        let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                        te = ctx.entity_mut(te_id);
                         (*te).s.otherEntityNum = (*ent).s.number;
                         (*te).s.otherEntityNum2 = (*saberOwner).s.number;
                         (*te).s.weapon = 0;
@@ -7316,7 +7298,7 @@ pub fn CheckThrownSaberDamaged(
                 veclen = 0.0;
             } else {
                 vecsub = [0.0; 3];
-                crate::q_math::_VectorSubtract(
+                _VectorSubtract(
                     (*saberent).r.currentOrigin,
                     (*ent).r.currentOrigin,
                     &mut vecsub,
@@ -7329,18 +7311,14 @@ pub fn CheckThrownSaberDamaged(
                 let mut entOrigin: vec3_t = [0.0; 3];
 
                 if (*ent).s.eType == ET_MOVER as c_int {
-                    crate::q_math::_VectorSubtract(
-                        (*ent).r.absmax,
-                        (*ent).r.absmin,
-                        &mut entOrigin,
-                    );
+                    _VectorSubtract((*ent).r.absmax, (*ent).r.absmin, &mut entOrigin);
                     let tmp = entOrigin;
-                    crate::q_math::_VectorMA((*ent).r.absmin, 0.5, tmp, &mut entOrigin);
-                    crate::q_math::_VectorAdd((*ent).r.absmin, (*ent).r.absmax, &mut entOrigin);
+                    _VectorMA((*ent).r.absmin, 0.5, tmp, &mut entOrigin);
+                    _VectorAdd((*ent).r.absmin, (*ent).r.absmax, &mut entOrigin);
                     let tmp2 = entOrigin;
-                    crate::q_math::_VectorScale(tmp2, 0.5, &mut entOrigin);
+                    _VectorScale(tmp2, 0.5, &mut entOrigin);
                 } else {
-                    crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut entOrigin);
+                    _VectorCopy((*ent).r.currentOrigin, &mut entOrigin);
                 }
 
                 trap::Trace(
@@ -7360,7 +7338,7 @@ pub fn CheckThrownSaberDamaged(
                     let mut dir: vec3_t = [0.0; 3];
                     let mut dflags = 0;
 
-                    crate::q_math::_VectorSubtract(tr.endpos, entOrigin, &mut dir);
+                    _VectorSubtract(tr.endpos, entOrigin, &mut dir);
                     VectorNormalize(&mut dir);
 
                     if ((*soc).saber[0].saberFlags2 & SFL2_NO_DISMEMBERMENT) != 0 {
@@ -7525,7 +7503,7 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         VectorSet(&mut mins, -24.0, -24.0, -8.0);
         VectorSet(&mut maxs, 24.0, 24.0, 8.0);
 
-        crate::q_math::_VectorSubtract(origin, oldOrg, &mut calcComp);
+        _VectorSubtract(origin, oldOrg, &mut calcComp);
         let originalLength = VectorLength(calcComp);
 
         VectorNormalize(&mut calcComp);
@@ -7590,7 +7568,7 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         }
     }
 
-    crate::q_math::_VectorCopy(origin, &mut ctx.world.entity_mut(ent).r.currentOrigin);
+    _VectorCopy(origin, &mut ctx.world.entity_mut(ent).r.currentOrigin);
 }
 
 /// Raven `SaberBounceSound`.
@@ -8047,9 +8025,9 @@ pub fn WP_SaberAddG2Model(
 ) {
     WP_SaberRemoveG2Model(ctx, saberent);
     let modelindex = if !saberModel.is_null() && unsafe { *saberModel != 0 } {
-        crate::g_utils::G_ModelIndex(saberModel)
+        G_ModelIndex(saberModel)
     } else {
-        crate::g_utils::G_ModelIndex(cstr("models/weapons2/saber/saber_w.glm").as_ptr())
+        G_ModelIndex(cstr("models/weapons2/saber/saber_w.glm").as_ptr())
     };
     ctx.world.entity_mut(saberent).s.modelindex = modelindex;
     // FIXME(Raven): use customSkin?
@@ -8157,7 +8135,7 @@ pub fn saberKnockOutOfHand(
     G_SetOrigin(ctx.world.entity_mut(saberent), base);
     saberKnockDown(ctx, saberent, saberOwner, saberOwner);
     // override the velocity on the knocked away saber.
-    crate::q_math::_VectorCopy(velocity, &mut ctx.world.entity_mut(saberent).s.pos.trDelta);
+    _VectorCopy(velocity, &mut ctx.world.entity_mut(saberent).s.pos.trDelta);
 
     qtrue
 }
@@ -8205,11 +8183,7 @@ pub fn saberCheckKnockdown_DuelLoss(
 
         if validMomentum != 0 {
             // Get the difference
-            crate::q_math::_VectorSubtract(
-                (*ooc).lastSaberBase_Always,
-                (*ooc).olderSaberBase,
-                &mut dif,
-            );
+            _VectorSubtract((*ooc).lastSaberBase_Always, (*ooc).olderSaberBase, &mut dif);
             totalDistance = VectorNormalize(&mut dif);
 
             if totalDistance == 0.0 {
@@ -8218,11 +8192,7 @@ pub fn saberCheckKnockdown_DuelLoss(
                     validMomentum = qfalse;
                 }
                 if validMomentum != 0 {
-                    crate::q_math::_VectorSubtract(
-                        (*soc).lastSaberBase_Always,
-                        (*soc).olderSaberBase,
-                        &mut dif,
-                    );
+                    _VectorSubtract((*soc).lastSaberBase_Always, (*soc).olderSaberBase, &mut dif);
                     totalDistance = VectorNormalize(&mut dif);
                 }
             }
@@ -8230,7 +8200,7 @@ pub fn saberCheckKnockdown_DuelLoss(
             if validMomentum != 0 {
                 if totalDistance == 0.0 {
                     // try the difference between the two blades
-                    crate::q_math::_VectorSubtract(
+                    _VectorSubtract(
                         (*soc).lastSaberBase_Always,
                         (*ooc).lastSaberBase_Always,
                         &mut dif,
@@ -8242,7 +8212,7 @@ pub fn saberCheckKnockdown_DuelLoss(
                     if totalDistance < 20.0 {
                         totalDistance = 20.0;
                     }
-                    crate::q_math::_VectorScale(dif, totalDistance * distScale, &mut dif);
+                    _VectorScale(dif, totalDistance * distScale, &mut dif);
                 }
             }
         }
@@ -8321,11 +8291,7 @@ pub fn saberCheckKnockdown_BrokenParry(
             let mut totalDistance;
             let distScale = 6.5f32;
 
-            crate::q_math::_VectorSubtract(
-                (*ooc).lastSaberBase_Always,
-                (*ooc).olderSaberBase,
-                &mut dif,
-            );
+            _VectorSubtract((*ooc).lastSaberBase_Always, (*ooc).olderSaberBase, &mut dif);
             totalDistance = VectorNormalize(&mut dif);
 
             if totalDistance == 0.0 {
@@ -8334,11 +8300,7 @@ pub fn saberCheckKnockdown_BrokenParry(
                     return qfalse;
                 }
 
-                crate::q_math::_VectorSubtract(
-                    (*soc).lastSaberBase_Always,
-                    (*soc).olderSaberBase,
-                    &mut dif,
-                );
+                _VectorSubtract((*soc).lastSaberBase_Always, (*soc).olderSaberBase, &mut dif);
                 totalDistance = VectorNormalize(&mut dif);
             }
 
@@ -8350,7 +8312,7 @@ pub fn saberCheckKnockdown_BrokenParry(
             if totalDistance < 20.0 {
                 totalDistance = 20.0;
             }
-            crate::q_math::_VectorScale(dif, totalDistance * distScale, &mut dif);
+            _VectorScale(dif, totalDistance * distScale, &mut dif);
 
             if !ctx.world.entity(other).client.is_null() {
                 disarmChance += (*ooc).saber[0].disarmBonus;
@@ -8542,7 +8504,7 @@ pub fn saberBackToOwner(ctx: &mut GameContext, saberent: EntityId) {
 
         (*saberent).r.contents = CONTENTS_LIGHTSABER;
 
-        crate::q_math::_VectorSubtract((*saberent).pos1, (*saberent).r.currentOrigin, &mut dir);
+        _VectorSubtract((*saberent).pos1, (*saberent).r.currentOrigin, &mut dir);
 
         ownerLen = VectorLength(dir);
 
@@ -8565,13 +8527,13 @@ pub fn saberBackToOwner(ctx: &mut GameContext, saberent: EntityId) {
 
             // Gradually slow down as it approaches.
             if ownerLen < 64.0 {
-                crate::q_math::_VectorScale(dir, baseSpeed - 200.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed - 200.0, &mut (*saberent).s.pos.trDelta);
             } else if ownerLen < 128.0 {
-                crate::q_math::_VectorScale(dir, baseSpeed - 150.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed - 150.0, &mut (*saberent).s.pos.trDelta);
             } else if ownerLen < 256.0 {
-                crate::q_math::_VectorScale(dir, baseSpeed - 100.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed - 100.0, &mut (*saberent).s.pos.trDelta);
             } else {
-                crate::q_math::_VectorScale(dir, baseSpeed, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed, &mut (*saberent).s.pos.trDelta);
             }
 
             (*saberent).s.pos.trTime = level_time;
@@ -8795,11 +8757,7 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
             }
 
             let mut vSub: vec3_t = [0.0; 3];
-            crate::q_math::_VectorSubtract(
-                (*soc).ps.origin,
-                (*saberent).r.currentOrigin,
-                &mut vSub,
-            );
+            _VectorSubtract((*soc).ps.origin, (*saberent).r.currentOrigin, &mut vSub);
             let vLen = VectorLength(vSub);
 
             if vLen
@@ -8827,10 +8785,10 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
 
                 AngleVectors((*soc).ps.viewangles, Some(&mut fwd), None, None);
 
-                crate::q_math::_VectorCopy((*soc).ps.origin, &mut traceFrom);
+                _VectorCopy((*soc).ps.origin, &mut traceFrom);
                 traceFrom[2] += (*soc).ps.viewheight as f32;
 
-                crate::q_math::_VectorCopy(traceFrom, &mut traceTo);
+                _VectorCopy(traceFrom, &mut traceTo);
                 traceTo[0] += fwd[0] * 4096.0;
                 traceTo[1] += fwd[1] * 4096.0;
                 traceTo[2] += fwd[2] * 4096.0;
@@ -8857,9 +8815,9 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
                     ),
                 );
 
-                crate::q_math::_VectorSubtract(tr.endpos, (*saberent).r.currentOrigin, &mut dir);
+                _VectorSubtract(tr.endpos, (*saberent).r.currentOrigin, &mut dir);
                 VectorNormalize(&mut dir);
-                crate::q_math::_VectorScale(dir, 500.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, 500.0, &mut (*saberent).s.pos.trDelta);
                 (*saberent).s.pos.trTime = level_time;
 
                 if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_3 {
@@ -9349,7 +9307,7 @@ pub fn G_KickTrace(
                 (*ent).r.currentOrigin[1],
                 kickEnd[2],
             ];
-            crate::q_math::_VectorCopy(kickEnd, &mut traceEnd);
+            _VectorCopy(kickEnd, &mut traceEnd);
         } else {
             //extrude
             traceOrg = [
@@ -9357,7 +9315,7 @@ pub fn G_KickTrace(
                 (*ent).r.currentOrigin[1],
                 (*ent).r.currentOrigin[2] + (*ent).r.maxs[2] * 0.5f32,
             ];
-            crate::q_math::_VectorMA(traceOrg, kickDist, kickDir, &mut traceEnd);
+            _VectorMA(traceOrg, kickDist, kickDir, &mut traceEnd);
         }
 
         if ctx.world.cvars.d_saberKickTweak.integer != 0 {
@@ -9554,7 +9512,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         Some(&mut kickEnd),
                         0,
                     );
-                    crate::q_math::_VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
+                    _VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
                     kickDir[2] = 0.0; //ah, flatten it, I guess...
                     VectorNormalize(&mut kickDir);
                 } else {
@@ -9581,7 +9539,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
+                        _VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9606,11 +9564,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9632,11 +9586,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9658,17 +9608,13 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, Some(&mut kickDir), None, None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_R as c_int {
@@ -9685,11 +9631,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9711,17 +9653,13 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_S as c_int {
@@ -9737,15 +9675,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     }
                 } else {
                     //guess
@@ -9771,7 +9705,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         //back
                         doKick = 1;
                         AngleVectors(fwdAngs, Some(&mut kickDir), None, None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     } else if elapsedTime >= 900.0 && elapsedTime < 1000.0 {
                         //back-left?
                         doKick = 1;
@@ -9781,13 +9715,13 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         //left
                         doKick = 1;
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     } else if elapsedTime >= 1100.0 && elapsedTime < 1200.0 {
                         //front-left?
                         doKick = 1;
                         fwdAngs[YAW as usize] += 45.0;
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_BF as c_int {
@@ -9813,15 +9747,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     }
                 } else {
                     //guess
@@ -9833,7 +9763,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         //back
                         doKick = 1;
                         AngleVectors(fwdAngs, Some(&mut kickDir), None, None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_RL as c_int {
@@ -9857,15 +9787,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
@@ -9884,19 +9810,15 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             }
@@ -10137,7 +10059,7 @@ pub fn WP_SaberPositionUpdate(
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), self_) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), self_) };
     unsafe {
         let mut mySaber: *mut gentity_t = core::ptr::null_mut();
         let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -10240,7 +10162,7 @@ pub fn WP_SaberPositionUpdate(
             } else {
                 let mut grapAng: vec3_t = [0.0; 3];
 
-                crate::q_math::_VectorSubtract((*gcl).ps.origin, (*client).ps.origin, &mut grapAng);
+                _VectorSubtract((*gcl).ps.origin, (*client).ps.origin, &mut grapAng);
 
                 if VectorLength(grapAng) > 64.0f32 {
                     // too far away, break it off
@@ -10286,7 +10208,7 @@ pub fn WP_SaberPositionUpdate(
                         }
 
                         AngleVectors((*gcl).ps.viewangles, Some(&mut gFwd), None, None);
-                        crate::q_math::_VectorMA((*gcl).ps.origin, idealDist, gFwd, &mut idealSpot);
+                        _VectorMA((*gcl).ps.origin, idealDist, gFwd, &mut idealSpot);
 
                         trap::Trace(
                             ctx.engine,
@@ -10304,7 +10226,7 @@ pub fn WP_SaberPositionUpdate(
                         {
                             // go there
                             G_SetOrigin(&mut *(self_), idealSpot);
-                            crate::q_math::_VectorCopy(idealSpot, &mut (*client).ps.origin);
+                            _VectorCopy(idealSpot, &mut (*client).ps.origin);
                         }
                     } else if (*client).grappleState >= 1 {
                         // grappler
@@ -10408,16 +10330,16 @@ pub fn WP_SaberPositionUpdate(
 
                                     (*client).grappleState = 0;
 
-                                    crate::q_math::_VectorSubtract(
+                                    _VectorSubtract(
                                         (*gcl).ps.origin,
                                         (*client).ps.origin,
                                         &mut tossDir,
                                     );
                                     VectorNormalize(&mut tossDir);
-                                    crate::q_math::_VectorScale(tossDir, 500.0f32, &mut tossDir);
+                                    _VectorScale(tossDir, 500.0f32, &mut tossDir);
                                     tossDir[2] = 200.0f32;
 
-                                    crate::q_math::_VectorAdd(
+                                    _VectorAdd(
                                         (*gcl).ps.velocity,
                                         tossDir,
                                         &mut (*gcl).ps.velocity,
@@ -10539,10 +10461,7 @@ pub fn WP_SaberPositionUpdate(
                     && (*client).ps.saberInFlight == 0
                 {
                     // Since we haven't got a bolt position, place it on top of the player origin.
-                    crate::q_math::_VectorCopy(
-                        (*client).ps.origin,
-                        &mut (*mySaber).r.currentOrigin,
-                    );
+                    _VectorCopy((*client).ps.origin, &mut (*mySaber).r.currentOrigin);
                 }
             }
 
@@ -10590,10 +10509,10 @@ pub fn WP_SaberPositionUpdate(
                 animSpeedScale = 2.0;
             }
 
-            crate::q_math::_VectorCopy((*client).ps.origin, &mut properOrigin);
+            _VectorCopy((*client).ps.origin, &mut properOrigin);
 
             // try to predict the origin based on velocity so it's more like what the client sees
-            crate::q_math::_VectorCopy((*client).ps.velocity, &mut addVel);
+            _VectorCopy((*client).ps.velocity, &mut addVel);
             VectorNormalize(&mut addVel);
 
             if (*client).ps.velocity[0] < 0.0 {
@@ -10675,10 +10594,7 @@ pub fn WP_SaberPositionUpdate(
                         || (*mySaber).r.contents == 0)
                     && (*client).ps.saberInFlight == 0
                 {
-                    crate::q_math::_VectorCopy(
-                        (*client).ps.origin,
-                        &mut (*mySaber).r.currentOrigin,
-                    );
+                    _VectorCopy((*client).ps.origin, &mut (*mySaber).r.currentOrigin);
                 }
 
                 break 'finalUpdate;
@@ -10720,7 +10636,7 @@ pub fn WP_SaberPositionUpdate(
                 && (ctx.world.level.time - (*client).lastSaberStorageTime) < 200
             {
                 // alright
-                crate::q_math::_VectorCopy(
+                _VectorCopy(
                     (*client).lastSaberBase_Always,
                     &mut (*client).olderSaberBase,
                 );
@@ -10729,13 +10645,13 @@ pub fn WP_SaberPositionUpdate(
                 (*client).olderIsValid = qfalse;
             }
 
-            crate::q_math::_VectorCopy(boltOrigin, &mut (*client).lastSaberBase_Always);
-            crate::q_math::_VectorCopy(boltAngles, &mut (*client).lastSaberDir_Always);
+            _VectorCopy(boltOrigin, &mut (*client).lastSaberBase_Always);
+            _VectorCopy(boltAngles, &mut (*client).lastSaberDir_Always);
             (*client).lastSaberStorageTime = ctx.world.level.time;
 
-            crate::q_math::_VectorCopy(boltAngles, &mut rawAngles);
+            _VectorCopy(boltAngles, &mut rawAngles);
 
-            crate::q_math::_VectorMA(
+            _VectorMA(
                 boltOrigin,
                 (*client).saber[0].blade[0].lengthMax,
                 boltAngles,
@@ -10749,7 +10665,7 @@ pub fn WP_SaberPositionUpdate(
                     && (*client).ps.saberInFlight == 0
                 {
                     // place it roughly in the middle of the saber..
-                    crate::q_math::_VectorMA(
+                    _VectorMA(
                         boltOrigin,
                         (*client).saber[0].blade[0].lengthMax,
                         boltAngles,
@@ -10770,20 +10686,20 @@ pub fn WP_SaberPositionUpdate(
                         let mut startang: vec3_t = [0.0; 3];
                         let mut dir: vec3_t = [0.0; 3];
 
-                        crate::q_math::_VectorCopy(boltOrigin, &mut (*saberent).r.currentOrigin);
+                        _VectorCopy(boltOrigin, &mut (*saberent).r.currentOrigin);
 
-                        crate::q_math::_VectorCopy(boltOrigin, &mut startorg);
-                        crate::q_math::_VectorCopy(boltAngles, &mut startang);
+                        _VectorCopy(boltOrigin, &mut startorg);
+                        _VectorCopy(boltAngles, &mut startang);
 
                         // Instead of forcing startang[0]=90 we fake it and slowly tilt it down on
                         // the client via a perframe method (doesn't affect where/how the saber hits)
 
                         (*saberent).r.svFlags &= !SVF_NOCLIENT;
-                        crate::q_math::_VectorCopy(startorg, &mut (*saberent).s.pos.trBase);
-                        crate::q_math::_VectorCopy(startang, &mut (*saberent).s.apos.trBase);
+                        _VectorCopy(startorg, &mut (*saberent).s.pos.trBase);
+                        _VectorCopy(startang, &mut (*saberent).s.apos.trBase);
 
-                        crate::q_math::_VectorCopy(startorg, &mut (*saberent).s.origin);
-                        crate::q_math::_VectorCopy(startang, &mut (*saberent).s.angles);
+                        _VectorCopy(startorg, &mut (*saberent).s.origin);
+                        _VectorCopy(startang, &mut (*saberent).s.angles);
 
                         (*saberent).s.saberInFlight = qtrue;
 
@@ -10823,13 +10739,13 @@ pub fn WP_SaberPositionUpdate(
 
                         (*saberent).genericValue5 = 0;
 
-                        crate::q_math::VectorSet(
+                        VectorSet(
                             &mut (*saberent).r.mins,
                             SABERMINS_X,
                             SABERMINS_Y,
                             SABERMINS_Z,
                         );
-                        crate::q_math::VectorSet(
+                        VectorSet(
                             &mut (*saberent).r.maxs,
                             SABERMAXS_X,
                             SABERMAXS_Y,
@@ -10842,7 +10758,7 @@ pub fn WP_SaberPositionUpdate(
 
                         (*saberent).s.weapon = WP_SABER as c_int;
 
-                        crate::q_math::_VectorScale(dir, 400.0, &mut (*saberent).s.pos.trDelta);
+                        _VectorScale(dir, 400.0, &mut (*saberent).s.pos.trDelta);
                         (*saberent).s.pos.trTime = ctx.world.level.time;
 
                         if (*client).saber[0].spinSound != 0 {
@@ -10866,7 +10782,7 @@ pub fn WP_SaberPositionUpdate(
                         );
                     } else if (*client).ps.saberEntityNum != 0 {
                         // only do this stuff if your saber is active and has not been knocked out of the air.
-                        crate::q_math::_VectorCopy(boltOrigin, &mut (*saberent).pos1);
+                        _VectorCopy(boltOrigin, &mut (*saberent).pos1);
                         trap::LinkEntity(
                             ctx.engine,
                             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
@@ -10909,12 +10825,12 @@ pub fn WP_SaberPositionUpdate(
                         let te_eid = G_TempEntity(ctx, saber_org, EV_SABER_BLOCK as c_int);
                         let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                         let mut dir: vec3_t = [0.0; 3];
-                        crate::q_math::VectorSet(&mut dir, 0.0, 1.0, 0.0);
-                        crate::q_math::_VectorCopy(
+                        VectorSet(&mut dir, 0.0, 1.0, 0.0);
+                        _VectorCopy(
                             ctx.world.g_entities[saberNum as usize].r.currentOrigin,
                             &mut (*te).s.origin,
                         );
-                        crate::q_math::_VectorCopy(dir, &mut (*te).s.angles);
+                        _VectorCopy(dir, &mut (*te).s.angles);
                         (*te).s.eventParm = 1;
                         (*te).s.weapon = 0; // saberNum
                         (*te).s.legsAnim = 0; // bladeNum
@@ -10932,13 +10848,13 @@ pub fn WP_SaberPositionUpdate(
                             // number (>= MAX_CLIENTS) — an OOB write past saber[MAX_SABERS]; the
                             // loop bound (rSaberNum < MAX_SABERS) and adjacent blade[rBladeNum]
                             // show the intent, so index saber[rSaberNum] (§19).
-                            crate::q_math::_VectorCopy(
+                            _VectorCopy(
                                 boltOrigin,
                                 &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .trail
                                     .base,
                             );
-                            crate::q_math::_VectorCopy(
+                            _VectorCopy(
                                 end,
                                 &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .trail
@@ -11006,13 +10922,13 @@ pub fn WP_SaberPositionUpdate(
                     rBladeNum = 0;
                     while rBladeNum < (*client).saber[rSaberNum as usize].numBlades {
                         // update muzzle data for the blade
-                        crate::q_math::_VectorCopy(
+                        _VectorCopy(
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .muzzlePoint,
                             &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .muzzlePointOld,
                         );
-                        crate::q_math::_VectorCopy(
+                        _VectorCopy(
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir,
                             &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .muzzleDirOld,
@@ -11073,7 +10989,7 @@ pub fn WP_SaberPositionUpdate(
                                         ctx.world.level.time,
                                         &mut saberOrg,
                                     );
-                                    crate::q_math::_VectorSubtract(
+                                    _VectorSubtract(
                                         (*self_).r.currentOrigin,
                                         saberOrg,
                                         &mut saberDir,
@@ -11108,12 +11024,12 @@ pub fn WP_SaberPositionUpdate(
                                         [rBladeNum as usize]
                                         .muzzleDir,
                                 );
-                                crate::q_math::_VectorCopy(
+                                _VectorCopy(
                                     (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                         .muzzlePoint,
                                     &mut boltOrigin,
                                 );
-                                crate::q_math::_VectorMA(
+                                _VectorMA(
                                     boltOrigin,
                                     (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                         .lengthMax,
@@ -11149,12 +11065,12 @@ pub fn WP_SaberPositionUpdate(
                                 &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .muzzleDir,
                             );
-                            crate::q_math::_VectorCopy(
+                            _VectorCopy(
                                 (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .muzzlePoint,
                                 &mut boltOrigin,
                             );
-                            crate::q_math::_VectorMA(
+                            _VectorMA(
                                 boltOrigin,
                                 (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .lengthMax,
@@ -11290,21 +11206,18 @@ pub fn WP_SaberPositionUpdate(
                                                 > 100
                                             {
                                                 // no valid last pos, use current
-                                                crate::q_math::_VectorCopy(
-                                                    boltOrigin,
-                                                    &mut oldSaberStart,
-                                                );
-                                                crate::q_math::_VectorCopy(end, &mut oldSaberEnd);
+                                                _VectorCopy(boltOrigin, &mut oldSaberStart);
+                                                _VectorCopy(end, &mut oldSaberEnd);
                                             } else {
                                                 // trace from last pos
-                                                crate::q_math::_VectorCopy(
+                                                _VectorCopy(
                                                     (*client).saber[rSaberNum as usize].blade
                                                         [rBladeNum as usize]
                                                         .trail
                                                         .base,
                                                     &mut oldSaberStart,
                                                 );
-                                                crate::q_math::_VectorCopy(
+                                                _VectorCopy(
                                                     (*client).saber[rSaberNum as usize].blade
                                                         [rBladeNum as usize]
                                                         .trail
@@ -11313,18 +11226,14 @@ pub fn WP_SaberPositionUpdate(
                                                 );
                                             }
 
-                                            crate::q_math::_VectorSubtract(
+                                            _VectorSubtract(
                                                 oldSaberEnd,
                                                 oldSaberStart,
                                                 &mut saberAngleBefore,
                                             );
                                             vectoangles(saberAngleBefore, &mut saberAngleBefore);
 
-                                            crate::q_math::_VectorSubtract(
-                                                end,
-                                                boltOrigin,
-                                                &mut saberAngleNow,
-                                            );
+                                            _VectorSubtract(end, boltOrigin, &mut saberAngleNow);
                                             vectoangles(saberAngleNow, &mut saberAngleNow);
 
                                             deltaX =
@@ -11355,7 +11264,7 @@ pub fn WP_SaberPositionUpdate(
 
                                                 // Now that I have the angle, I'll just say the base
                                                 // is the difference between the two start points.
-                                                crate::q_math::_VectorSubtract(
+                                                _VectorSubtract(
                                                     boltOrigin,
                                                     oldSaberStart,
                                                     &mut saberSubBase,
@@ -11494,13 +11403,13 @@ pub fn WP_SaberPositionUpdate(
                             );
                         }
 
-                        crate::q_math::_VectorCopy(
+                        _VectorCopy(
                             boltOrigin,
                             &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .trail
                                 .base,
                         );
-                        crate::q_math::_VectorCopy(
+                        _VectorCopy(
                             end,
                             &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .trail
