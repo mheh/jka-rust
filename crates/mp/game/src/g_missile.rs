@@ -604,7 +604,7 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
         && !isKnockedSaber
         && {
             let ent_origin = ctx.entity(ent).r.currentOrigin;
-            WP_SaberCanBlock(ctx, Some(other), ent_origin, 0, 0, qtrue, 0)
+            WP_SaberCanBlock(ctx, Some(other), ent_origin, 0, 0, true, 0)
         } != 0
     {
         let mut fwd: vec3_t = [0.0; 3];

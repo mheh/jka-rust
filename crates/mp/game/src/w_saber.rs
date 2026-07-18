@@ -252,12 +252,12 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
 /// Raven `G_CanBeEnemy`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:82-115`
-pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> qboolean {
+pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> bool {
     let (sc, ec, self_number, enemy_number) = {
         let se = ctx.world.entity(self_);
         let ee = ctx.world.entity(enemy);
         if se.inuse == 0 || ee.inuse == 0 || se.client.is_null() || ee.client.is_null() {
-            return qfalse;
+            return false;
         }
         (se.client, ee.client, se.s.number, ee.s.number)
     };
@@ -266,41 +266,37 @@ pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> 
     unsafe {
         if (*sc).ps.duelInProgress != 0 && (*sc).ps.duelIndex != enemy_number {
             // dueling but not with this person
-            return qfalse;
+            return false;
         }
 
         if (*ec).ps.duelInProgress != 0 && (*ec).ps.duelIndex != self_number {
             // other guy dueling but not with me
-            return qfalse;
+            return false;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer < mp_bg::public::gametype::GT_TEAM {
         // ok, sure
-        return qtrue;
+        return true;
     }
 
     if ctx.world.cvars.g_friendlyFire.integer != 0 {
         // if ff on then can inflict damage normally on teammates
-        return qtrue;
+        return true;
     }
 
     if OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
         // ff not on, don't hurt teammates
-        return qfalse;
+        return false;
     }
 
-    qtrue
+    true
 }
 
 /// Raven `G_SaberAttackPower`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:120-217`
-pub fn G_SaberAttackPower(
-    ctx: &mut GameContext,
-    ent: Option<EntityId>,
-    attacking: qboolean,
-) -> c_int {
+pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attacking: bool) -> c_int {
     // Raven asserts a live entity here; every caller passes one.
     let ent = ent.unwrap();
     // FLAG: pool client (NPC-capable saber wielder); deref raw per recipe 2b.
@@ -317,7 +313,7 @@ pub fn G_SaberAttackPower(
             baseLevel = 2;
         }
 
-        if attacking != 0 {
+        if attacking {
             // The attacker gets a boost to help penetrate defense; general boost
             // up so the individual levels make a bigger difference.
             baseLevel *= 2;
@@ -376,7 +372,7 @@ pub fn G_SaberAttackPower(
         {
             // Get more power then.
             return baseLevel * 2;
-        } else if attacking != 0 && ctx.world.cvars.g_gametype.integer == GT_SIEGE {
+        } else if attacking && ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // In siege, saber battles should be quicker and biased to the attacker.
             return baseLevel * 3;
         }
@@ -871,7 +867,7 @@ pub fn G_CheckLookTarget(
     ent: EntityId,
     lookAngles: &mut vec3_t,
     lookingSpeed: *mut f32,
-) -> qboolean {
+) -> bool {
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let sc = ctx.world.entity(ent).client;
 
@@ -898,7 +894,7 @@ pub fn G_CheckLookTarget(
         let npc = ctx.world.entity(ent).NPC;
         let shoot_yaw = unsafe { (*npc).shootAngles[YAW as usize] };
         VectorSet(lookAngles, 0.0, shoot_yaw, 0.0);
-        return qtrue;
+        return true;
     }
 
     // Now calc head angle to lookTarget, if any
@@ -929,7 +925,7 @@ pub fn G_CheckLookTarget(
                     _VectorCopy(ctx.world.entity(look_cent).r.currentOrigin, &mut lookOrg);
                 } else {
                     // at origin of world
-                    return qfalse;
+                    return false;
                 }
             } else if (*sc).renderInfo.lookMode == lookMode_t::LM_INTEREST
                 && look_target > -1
@@ -940,7 +936,7 @@ pub fn G_CheckLookTarget(
                     &mut lookOrg,
                 );
             } else {
-                return qfalse;
+                return false;
             }
 
             _VectorCopy((*sc).renderInfo.eyePoint, &mut eyeOrg);
@@ -955,10 +951,10 @@ pub fn G_CheckLookTarget(
             }
             let la = *lookAngles;
             AnglesSubtract(la, (*sc).renderInfo.eyeAngles, lookAngles);
-            return qtrue;
+            return true;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -976,7 +972,7 @@ pub fn G_G2NPCAngles(
     unsafe {
         let cranium_bone = cstr("cranium");
         let thoracic_bone = cstr("thoracic"); // only used by atst so doesn't need a case
-        let mut looking: qboolean = qfalse;
+        let mut looking = false;
         let mut viewAngles: vec3_t = [0.0; 3];
         let mut lookAngles: vec3_t = [0.0; 3];
 
@@ -1042,7 +1038,7 @@ pub fn G_G2NPCAngles(
                 );
                 lookAngles[PITCH as usize] = 0.0;
                 lookAngles[ROLL as usize] = 0.0; // droids can't pitch or roll their heads
-                if looking != 0 {
+                if looking {
                     // keep doing this lerp behavior for a full second after stopped looking
                     (*sc).renderInfo.lookingDebounceTime = ctx.world.level.time + 1000;
                 }
@@ -1375,7 +1371,7 @@ pub fn G_G2PlayerAngles(
 /// Raven `SaberAttacking`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:1036-1073`
-pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
+pub fn SaberAttacking(self_: &gentity_t) -> bool {
     let client = self_.client;
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let (saberMove, weaponstate, saberBlocked) = unsafe {
@@ -1383,19 +1379,19 @@ pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
         (ps.saberMove, ps.weaponstate, ps.saberBlocked)
     };
     if mp_bg::bg_panimate::PM_SaberInParry(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_saber::PM_SaberInBrokenParry(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_panimate::PM_SaberInDeflect(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_saber::PM_SaberInBounce(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_panimate::PM_SaberInKnockaway(saberMove) != 0 {
-        return 0;
+        return false;
     }
 
     if mp_bg::bg_panimate::BG_SaberInAttack(saberMove) != 0
@@ -1403,14 +1399,14 @@ pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
         && saberBlocked == BLOCKED_NONE as c_int
     {
         // if we're firing and not blocking, then we're attacking.
-        return 1;
+        return true;
     }
 
     if mp_bg::bg_panimate::BG_SaberInSpecial(saberMove) != 0 {
-        return 1;
+        return true;
     }
 
-    0
+    false
 }
 
 /// Raven `G_SaberLockAnim`.
@@ -1520,7 +1516,7 @@ pub fn WP_SabersCheckLock2(
     attacker: EntityId,
     defender: EntityId,
     mut lockMode: sabersLockMode_t,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t = ctx.entity_mut(attacker);
     let defender: *mut gentity_t = ctx.entity_mut(defender);
@@ -1602,7 +1598,7 @@ pub fn WP_SabersCheckLock2(
                 defStart = 0.75f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
             } else {
-                return qfalse;
+                return false;
             }
         } else {
             // use the new system — all new saberlocks are 46.08 apart
@@ -1763,7 +1759,7 @@ pub fn WP_SabersCheckLock2(
                         defStart = 0.25f32;
                     }
                 } else {
-                    return qfalse;
+                    return false;
                 }
             }
         }
@@ -1890,14 +1886,14 @@ pub fn WP_SabersCheckLock2(
         }
 
         // DONE!
-        qtrue
+        true
     }
 }
 
 /// Raven `WP_SabersCheckLock`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:1462-1889`
-pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId) -> qboolean {
+pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent1: *mut gentity_t = ctx.entity_mut(ent1);
     let ent2: *mut gentity_t = ctx.entity_mut(ent2);
@@ -1912,19 +1908,19 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                 ctx.entity_id_of(ent2).unwrap(),
                 LOCK_RANDOM,
             );
-            return qtrue;
+            return true;
         }
         // for now.. it's not fair to the lone duelist (no dual saber lock anims).
         if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
-            return qfalse;
+            return false;
         }
 
         if ctx.world.cvars.g_saberLocking.integer == 0 {
-            return qfalse;
+            return false;
         }
 
         if (*ent1).client.is_null() || (*ent2).client.is_null() {
-            return qfalse;
+            return false;
         }
         let c1 = (*ent1).client;
         let c2 = (*ent2).client;
@@ -1932,7 +1928,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
         if (*ent1).s.eType == ET_NPC as c_int || (*ent2).s.eType == ET_NPC as c_int {
             // never let an NPC lock with someone on the same playerTeam
             if (*c1).playerTeam == (*c2).playerTeam {
-                return qfalse;
+                return false;
             }
         }
 
@@ -1942,7 +1938,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             || (*c2).ps.saberInFlight != 0
         {
             // can't get in lock if one has had the saber knocked out of his hand
-            return qfalse;
+            return false;
         }
 
         if (*ent1).s.eType != ET_NPC as c_int && (*ent2).s.eType != ET_NPC as c_int {
@@ -1956,69 +1952,69 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                 if ctx.world.cvars.g_gametype.integer != GT_DUEL
                     && ctx.world.cvars.g_gametype.integer != GT_POWERDUEL
                 {
-                    return qfalse;
+                    return false;
                 }
             }
         }
 
         if ((*ent1).r.currentOrigin[2] - (*ent2).r.currentOrigin[2]).abs() > 16.0 {
-            return qfalse;
+            return false;
         }
         if (*c1).ps.groundEntityNum == ENTITYNUM_NONE || (*c2).ps.groundEntityNum == ENTITYNUM_NONE
         {
-            return qfalse;
+            return false;
         }
         let dist = DistanceSquared((*ent1).r.currentOrigin, (*ent2).r.currentOrigin);
         if dist < 64.0 || dist > 6400.0 {
             // between 8 and 80 from each other
-            return qfalse;
+            return false;
         }
 
         if mp_bg::bg_panimate::BG_InSpecialJump((*c1).ps.legsAnim) != 0 {
-            return qfalse;
+            return false;
         }
         if mp_bg::bg_panimate::BG_InSpecialJump((*c2).ps.legsAnim) != 0 {
-            return qfalse;
+            return false;
         }
 
         if mp_bg::bg_panimate::BG_InRoll(&mut (*c1).ps as *mut playerState_t, (*c1).ps.legsAnim)
             != 0
         {
-            return qfalse;
+            return false;
         }
         if mp_bg::bg_panimate::BG_InRoll(&mut (*c2).ps as *mut playerState_t, (*c2).ps.legsAnim)
             != 0
         {
-            return qfalse;
+            return false;
         }
 
         if (*c1).ps.forceHandExtend != HANDEXTEND_NONE as c_int
             || (*c2).ps.forceHandExtend != HANDEXTEND_NONE as c_int
         {
-            return qfalse;
+            return false;
         }
 
         if ((*c1).ps.pm_flags & PMF_DUCKED) != 0 || ((*c2).ps.pm_flags & PMF_DUCKED) != 0 {
-            return qfalse;
+            return false;
         }
 
         if ((*c1).saber[0].saberFlags & SFL_NOT_LOCKABLE) != 0
             || ((*c2).saber[0].saberFlags & SFL_NOT_LOCKABLE) != 0
         {
-            return qfalse;
+            return false;
         }
         // (Raven's `saber[1].model &&` array-address test is vacuously true.)
         if (*c1).saber[1].model[0] != 0
             && (*c1).ps.saberHolstered == 0
             && ((*c1).saber[1].saberFlags & SFL_NOT_LOCKABLE) != 0
         {
-            return qfalse;
+            return false;
         }
         if (*c2).saber[1].model[0] != 0
             && (*c2).ps.saberHolstered == 0
             && ((*c2).saber[1].saberFlags & SFL_NOT_LOCKABLE) != 0
         {
-            return qfalse;
+            return false;
         }
 
         if InFront(
@@ -2028,7 +2024,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             0.4f32,
         ) == 0
         {
-            return qfalse;
+            return false;
         }
         if InFront(
             (*c2).ps.origin,
@@ -2037,7 +2033,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             0.4f32,
         ) == 0
         {
-            return qfalse;
+            return false;
         }
 
         let ta1 = (*c1).ps.torsoAnim;
@@ -2141,7 +2137,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BL,
                 );
             }
-            return qfalse;
+            return false;
         }
 
         if ta2 == BOTH_A1_TR_BL as c_int
@@ -2193,7 +2189,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BL,
                 );
             }
-            return qfalse;
+            return false;
         }
 
         // TL to BR lock
@@ -2246,7 +2242,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BR,
                 );
             }
-            return qfalse;
+            return false;
         }
 
         if ta2 == BOTH_A1_TL_BR as c_int
@@ -2298,7 +2294,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BR,
                 );
             }
-            return qfalse;
+            return false;
         }
         // L to R lock
         if ta1 == BOTH_A1__L__R as c_int
@@ -2336,7 +2332,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_L,
                 );
             }
-            return qfalse;
+            return false;
         }
         if ta2 == BOTH_A1__L__R as c_int
             || ta2 == BOTH_A2__L__R as c_int
@@ -2373,7 +2369,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_L,
                 );
             }
-            return qfalse;
+            return false;
         }
         // R to L lock
         if ta1 == BOTH_A1__R__L as c_int
@@ -2411,7 +2407,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_R,
                 );
             }
-            return qfalse;
+            return false;
         }
         if ta2 == BOTH_A1__R__L as c_int
             || ta2 == BOTH_A2__R__L as c_int
@@ -2448,7 +2444,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_R,
                 );
             }
-            return qfalse;
+            return false;
         }
         if ctx.world.bg_state.rng.Q_irand(0, 10) == 0 {
             return WP_SabersCheckLock2(
@@ -2458,7 +2454,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                 LOCK_RANDOM,
             );
         }
-        qfalse
+        false
     }
 }
 
@@ -2489,7 +2485,7 @@ pub fn WP_GetSaberDeflectionAngle(
     attacker: Option<EntityId>,
     defender: Option<EntityId>,
     saberHitFraction: f32,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t =
         unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
@@ -2500,20 +2496,20 @@ pub fn WP_GetSaberDeflectionAngle(
         let _ = saberHitFraction;
 
         if attacker.is_null() || (*attacker).client.is_null() || (*attacker).ghoul2.is_null() {
-            return qfalse;
+            return false;
         }
         if defender.is_null() || (*defender).client.is_null() || (*defender).ghoul2.is_null() {
-            return qfalse;
+            return false;
         }
         let ac = (*attacker).client;
         let dc = (*defender).client;
 
         if (ctx.world.level.time - (*ac).lastSaberStorageTime) > 500 {
             // last update too long ago; something prevents his saber from updating
-            return qfalse;
+            return false;
         }
         if (ctx.world.level.time - (*dc).lastSaberStorageTime) > 500 {
-            return qfalse;
+            return false;
         }
 
         let attSaberLevel = G_SaberAttackPower(
@@ -2536,7 +2532,7 @@ pub fn WP_GetSaberDeflectionAngle(
             let mut quadDiff = ((defQuad - attQuadStart) as f32).abs() as c_int;
 
             if (*dc).ps.saberMove == LS_READY {
-                return qfalse;
+                return false;
             }
 
             // reverse the left/right of the defQuad (mirrored when facing each other)
@@ -2594,7 +2590,7 @@ pub fn WP_GetSaberDeflectionAngle(
                     Com_Printf(cstr(&s).as_ptr());
                 }
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
-                return qfalse;
+                return false;
             } else {
                 // attack hit at an angle; figure out what angle it bounces off att
                 quadDiff = defQuad - attQuadEnd;
@@ -2651,7 +2647,7 @@ pub fn WP_GetSaberDeflectionAngle(
                         Com_Printf(cstr(&s).as_ptr());
                     }
                     (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
-                    return qfalse;
+                    return false;
                 } else {
                     // else, pick a deflection
                     let attMove = (*ac).ps.saberMove;
@@ -2680,7 +2676,7 @@ pub fn WP_GetSaberDeflectionAngle(
                         Com_Printf(cstr(&s).as_ptr());
                     }
                     (*ac).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
-                    return qtrue;
+                    return true;
                 }
             }
         } else {
@@ -2708,7 +2704,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 (*ac).ps.saberMove =
                     mp_bg::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
-                return qfalse;
+                return false;
             } else {
                 // a deflection
                 let mut att_Right: vec3_t = [0.0; 3];
@@ -2770,7 +2766,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 }
 
                 (*ac).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
-                return qtrue;
+                return true;
             }
         }
     }
@@ -2903,9 +2899,9 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
 /// Raven `G_ClientIdleInWorld`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2312-2334`
-pub fn G_ClientIdleInWorld(ent: &gentity_t) -> qboolean {
+pub fn G_ClientIdleInWorld(ent: &gentity_t) -> bool {
     if ent.s.eType == ET_NPC as c_int {
-        return 0;
+        return false;
     }
     let client = ent.client;
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
@@ -2924,9 +2920,9 @@ pub fn G_ClientIdleInWorld(ent: &gentity_t) -> qboolean {
         && (buttons & BUTTON_FORCE_DRAIN) == 0
         && (buttons & BUTTON_ATTACK) == 0
     {
-        return 1;
+        return true;
     }
-    0
+    false
 }
 
 /// Raven `G_G2TraceCollide`.
@@ -2969,7 +2965,7 @@ pub fn G_G2TraceCollide(
     lastValidEnd: vec3_t,
     traceMins: vec3_t,
     traceMaxs: vec3_t,
-) -> qboolean {
+) -> bool {
     // Hit the ent with the normal trace, try the collision trace.
     unsafe {
         let mut G2Trace: G2Trace_t = core::mem::zeroed();
@@ -2978,12 +2974,12 @@ pub fn G_G2TraceCollide(
         let mut fRadius: f32 = 0.0;
 
         if ctx.world.cvars.d_saberGhoul2Collision.integer == 0 {
-            return qfalse;
+            return false;
         }
 
         if ctx.world.g_entities[(*tr).entityNum as usize].inuse == 0 {
             // don't do perpoly on corpses.
-            return qfalse;
+            return false;
         }
 
         if traceMins[0] != 0.0
@@ -3073,7 +3069,7 @@ pub fn G_G2TraceCollide(
                 (*tr).entityNum = ENTITYNUM_NONE as c_short;
                 (*tr).startsolid = 0;
                 (*tr).allsolid = 0;
-                return qfalse;
+                return false;
             } else {
                 // The ghoul2 trace result matches; copy the collision position back.
                 _VectorCopy(G2Trace[0].mCollisionPosition, &mut (*tr).endpos);
@@ -3084,21 +3080,21 @@ pub fn G_G2TraceCollide(
                     (*gc).g2LastSurfaceHit = G2Trace[0].mSurfaceIndex;
                     (*gc).g2LastSurfaceTime = ctx.world.level.time;
                 }
-                return qtrue;
+                return true;
             }
         }
 
-        qfalse
+        false
     }
 }
 
 /// Raven `G_SaberInBackAttack`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2428-2439`
-pub fn G_SaberInBackAttack(r#move: c_int) -> qboolean {
+pub fn G_SaberInBackAttack(r#move: c_int) -> bool {
     match r#move {
-        LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB => 1,
-        _ => 0,
+        LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB => true,
+        _ => false,
     }
 }
 
@@ -3287,7 +3283,7 @@ pub fn G_SaberFaceCollisionCheck(
     atkMins: &mut vec3_t,
     atkMaxs: &mut vec3_t,
     impactPoint: &mut vec3_t,
-) -> qboolean {
+) -> bool {
     let _ = ctx;
     unsafe {
         let mut planeEq: [f32; 4] = [0.0; 4];
@@ -3393,7 +3389,7 @@ pub fn G_SaberFaceCollisionCheck(
                         if facing >= 0 {
                             //third edge is facing.. success
                             _VectorCopy(point, impactPoint);
-                            return qtrue;
+                            return true;
                         }
                     }
                 }
@@ -3404,7 +3400,7 @@ pub fn G_SaberFaceCollisionCheck(
         }
 
         //did not hit anything
-        qfalse
+        false
     }
 }
 
@@ -3420,7 +3416,7 @@ pub fn G_SaberCollide(
     mut atkMins: vec3_t,
     mut atkMaxs: vec3_t,
     mut impactPoint: vec3_t,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let atk: *mut gentity_t = ctx.entity_mut(atk);
     let def: *mut gentity_t = ctx.entity_mut(def);
@@ -3430,7 +3426,7 @@ pub fn G_SaberCollide(
 
         if ctx.world.cvars.g_saberBladeFaces.integer == 0 {
             //detailed check not enabled
-            return qtrue;
+            return true;
         }
 
         if (*atk).inuse == 0
@@ -3439,7 +3435,7 @@ pub fn G_SaberCollide(
             || (*def).client.is_null()
         {
             //must have 2 clients and a valid saber entity
-            return qfalse;
+            return false;
         }
 
         let dc = (*def).client;
@@ -3494,10 +3490,9 @@ pub fn G_SaberCollide(
                                 &mut atkMins,
                                 &mut atkMaxs,
                                 &mut impactPoint,
-                            ) != 0
-                            {
+                            ) {
                                 //collided
-                                return qtrue;
+                                return true;
                             }
                         }
                     }
@@ -3507,7 +3502,7 @@ pub fn G_SaberCollide(
             i += 1;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -3574,7 +3569,7 @@ pub fn WP_SabersIntersect(
     ent1BladeNum: c_int,
     ent2: Option<EntityId>,
     checkDir: qboolean,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent1: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent1) };
     let ent2: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent2) };
@@ -3593,17 +3588,17 @@ pub fn WP_SabersIntersect(
         let mut dir: vec3_t = [0.0; 3];
 
         if ent1.is_null() || ent2.is_null() {
-            return qfalse;
+            return false;
         }
         if (*ent1).client.is_null() || (*ent2).client.is_null() {
-            return qfalse;
+            return false;
         }
         let ec1 = (*ent1).client;
         let ec2 = (*ent2).client;
         if BG_SabersOff(&mut (*ec1).ps as *mut playerState_t) != 0
             || BG_SabersOff(&mut (*ec2).ps as *mut playerState_t) != 0
         {
-            return qfalse;
+            return false;
         }
 
         ent2SaberNum = 0;
@@ -3769,7 +3764,7 @@ pub fn WP_SabersIntersect(
                             saberBaseNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                         if tri_tri_intersect(
                             saberBase1,
@@ -3780,7 +3775,7 @@ pub fn WP_SabersIntersect(
                             saberTipNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                         if tri_tri_intersect(
                             saberBase1,
@@ -3791,7 +3786,7 @@ pub fn WP_SabersIntersect(
                             saberBaseNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                         if tri_tri_intersect(
                             saberBase1,
@@ -3802,7 +3797,7 @@ pub fn WP_SabersIntersect(
                             saberTipNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                     }
                     ent2BladeNum += 1;
@@ -3810,7 +3805,7 @@ pub fn WP_SabersIntersect(
             }
             ent2SaberNum += 1;
         }
-        qfalse
+        false
     }
 }
 
@@ -4677,7 +4672,7 @@ pub fn CheckSaberDamage(
     doInterpolate: qboolean,
     mut trMask: c_int,
     extrapolate: qboolean,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -4695,7 +4690,7 @@ pub fn CheckSaberDamage(
         let mut attackStr: c_int = 0;
         let mut saberBoxSize: f32 = ctx.world.cvars.d_saberBoxTraceSize.value;
         let mut idleDamage: qboolean = qfalse;
-        let mut didHit: qboolean = qfalse;
+        let mut didHit = false;
         let mut sabersClashed: qboolean = qfalse;
         let mut unblockable: qboolean = qfalse;
         let mut didDefense: qboolean = qfalse;
@@ -4706,7 +4701,7 @@ pub fn CheckSaberDamage(
         let mut otherOwner: *mut gentity_t = core::ptr::null_mut();
 
         if BG_SabersOff(&mut (*sc).ps as *mut playerState_t) != 0 {
-            return qfalse;
+            return false;
         }
 
         selfSaberLevel =
@@ -5038,7 +5033,7 @@ pub fn CheckSaberDamage(
         }
 
         if (*sc).ps.saberAttackWound < ctx.world.level.time
-            && (SaberAttacking(&*(self_)) != 0
+            && (SaberAttacking(&*(self_))
                 || BG_SuperBreakWinAnim((*sc).ps.torsoAnim) != 0
                 || (ctx.world.cvars.d_saberSPStyleDamage.integer != 0
                     && (*sc).ps.saberInFlight != 0
@@ -5052,7 +5047,7 @@ pub fn CheckSaberDamage(
         {
             //this animation is that of the last attack movement, and so it should do full damage
             let saberInSpecial: qboolean = BG_SaberInSpecial((*sc).ps.saberMove);
-            let inBackAttack: qboolean = G_SaberInBackAttack((*sc).ps.saberMove);
+            let inBackAttack = G_SaberInBackAttack((*sc).ps.saberMove);
 
             if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
                 let mut fDmg: f32 = 0.0f32;
@@ -5190,7 +5185,7 @@ pub fn CheckSaberDamage(
                     }
                 } else if (*sc).ps.fd.saberAnimLevel == 3 {
                     //new damage-ramping system
-                    if saberInSpecial == 0 && inBackAttack == 0 {
+                    if saberInSpecial == 0 && !inBackAttack {
                         dmg = G_GetAttackDamage(
                             ctx,
                             ctx.entity_id_of(self_).unwrap(),
@@ -5206,7 +5201,7 @@ pub fn CheckSaberDamage(
                             180,
                             0.65f32,
                         );
-                    } else if inBackAttack != 0 {
+                    } else if inBackAttack {
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 30, 0.5f32);
                     //can hit multiple times (and almost always does), so..
@@ -5221,7 +5216,7 @@ pub fn CheckSaberDamage(
                         //a well-timed hit with this can do a full 85
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 80, 0.5f32);
-                    } else if inBackAttack != 0 {
+                    } else if inBackAttack {
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 25, 0.5f32);
                     } else {
@@ -5236,7 +5231,7 @@ pub fn CheckSaberDamage(
                             SABER_HITDAMAGE - 5,
                             0.3f32,
                         );
-                    } else if inBackAttack != 0 {
+                    } else if inBackAttack {
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 30, 0.5f32);
                     } else {
@@ -5252,7 +5247,7 @@ pub fn CheckSaberDamage(
             //just touching, do minimal damage and only check for it every 200ms
             if (*sc).saber[0].saberFlags2 & SFL2_NO_IDLE_EFFECT != 0 {
                 //no idle damage or effects
-                return qtrue; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
+                return true; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
             }
             trMask &= !CONTENTS_LIGHTSABER;
             if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
@@ -5270,17 +5265,17 @@ pub fn CheckSaberDamage(
             }
             idleDamage = qtrue;
         } else {
-            return qtrue; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
+            return true; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
         }
 
         if BG_SaberInSpecial((*sc).ps.saberMove) != 0 {
-            let inBackAttack: qboolean = G_SaberInBackAttack((*sc).ps.saberMove);
+            let inBackAttack = G_SaberInBackAttack((*sc).ps.saberMove);
 
             unblockable = qtrue;
             (*sc).ps.saberBlocked = 0;
 
             if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
-            } else if inBackAttack == 0 {
+            } else if !inBackAttack {
                 if (*sc).ps.saberMove == LS_A_JUMP_T__B_ {
                     //do extra damage for special unblockables
                     dmg += 5; //This is very tiny, because this move has a huge damage ramp
@@ -5338,9 +5333,9 @@ pub fn CheckSaberDamage(
                         & CONTENTS_LIGHTSABER)
                         != 0)
             {
-                return qtrue;
+                return true;
             }
-            return qfalse;
+            return false;
         }
 
         if dmg > SABER_NONATTACK_DAMAGE {
@@ -5486,7 +5481,7 @@ pub fn CheckSaberDamage(
                     );
                 }
 
-                return qtrue;
+                return true;
             }
         }
 
@@ -5509,21 +5504,21 @@ pub fn CheckSaberDamage(
                 && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(trEnt)) != 0
                 && ctx.world.cvars.g_friendlySaber.integer == 0
             {
-                return qfalse;
+                return false;
             }
 
             if !(*trEnt).client.is_null()
                 && (*trc).ps.duelInProgress != 0
                 && (*trc).ps.duelIndex != (*self_).s.number
             {
-                return qfalse;
+                return false;
             }
 
             if !(*trEnt).client.is_null()
                 && (*sc).ps.duelInProgress != 0
                 && (*sc).ps.duelIndex != (*trEnt).s.number
             {
-                return qfalse;
+                return false;
             }
 
             if BG_StabDownAnim((*sc).ps.torsoAnim) != 0
@@ -5534,12 +5529,12 @@ pub fn CheckSaberDamage(
                 ) == 0
             {
                 //stabdowns only damage people who are actually on the ground...
-                return qfalse;
+                return false;
             }
             (*sc).ps.saberIdleWound =
                 ctx.world.level.time + ctx.world.cvars.g_saberDmgDelay_Idle.integer;
 
-            didHit = qtrue;
+            didHit = true;
 
             if ctx.world.cvars.d_saberSPStyleDamage.integer == 0
                 && !(*trEnt).client.is_null()
@@ -5550,7 +5545,7 @@ pub fn CheckSaberDamage(
                     tr.endpos,
                     0,
                     MOD_SABER as c_int,
-                    qfalse,
+                    false,
                     attackStr,
                 ) != 0
             {
@@ -5573,13 +5568,13 @@ pub fn CheckSaberDamage(
                         && ctx.world.bg_state.rng.Q_irand(1, 10) < lockFactor * 2
                     {
                         //Just got blocked by someone with a decently higher attack level, so enter into a lock
-                        if G_ClientIdleInWorld(&*(trEnt)) == 0 {
+                        if !G_ClientIdleInWorld(&*(trEnt)) {
                             if (trMask & CONTENTS_LIGHTSABER) != 0
                                 && WP_SabersCheckLock(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
                                     ctx.entity_id_of(trEnt).unwrap(),
-                                ) != 0
+                                )
                             {
                                 (*sc).ps.saberBlocked = BLOCKED_NONE;
                                 (*trc).ps.saberBlocked = BLOCKED_NONE;
@@ -5587,13 +5582,13 @@ pub fn CheckSaberDamage(
                             }
                         }
                     } else if ctx.world.bg_state.rng.Q_irand(1, 20) < lockFactor {
-                        if G_ClientIdleInWorld(&*(trEnt)) == 0 {
+                        if !G_ClientIdleInWorld(&*(trEnt)) {
                             if (trMask & CONTENTS_LIGHTSABER) != 0
                                 && WP_SabersCheckLock(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
                                     ctx.entity_id_of(trEnt).unwrap(),
-                                ) != 0
+                                )
                             {
                                 (*sc).ps.saberBlocked = BLOCKED_NONE;
                                 (*trc).ps.saberBlocked = BLOCKED_NONE;
@@ -5721,7 +5716,7 @@ pub fn CheckSaberDamage(
             otherOwner = &mut ctx.world.g_entities[oo_num as usize] as *mut gentity_t;
 
             if (*otherOwner).inuse == 0 || (*otherOwner).client.is_null() {
-                return qfalse;
+                return false;
             }
 
             let ooc = (*otherOwner).client;
@@ -5732,21 +5727,20 @@ pub fn CheckSaberDamage(
                 //hit an in-hand saber, do extra collision check against it
                 if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
                     //use SP-style blade-collision test
-                    if WP_SabersIntersect(
+                    if !WP_SabersIntersect(
                         ctx,
                         ctx.entity_id_of(self_),
                         rSaberNum,
                         rBladeNum,
                         ctx.entity_id_of(otherOwner),
                         qfalse,
-                    ) == 0
-                    {
+                    ) {
                         //sabers did not actually intersect
-                        return qfalse;
+                        return false;
                     }
                 } else {
                     //MP-style
-                    if G_SaberCollide(
+                    if !G_SaberCollide(
                         ctx,
                         ctx.entity_id_of(self_).unwrap(),
                         ctx.entity_id_of(otherOwner).unwrap(),
@@ -5755,10 +5749,9 @@ pub fn CheckSaberDamage(
                         saberTrMins,
                         saberTrMaxs,
                         tr.endpos,
-                    ) == 0
-                    {
+                    ) {
                         //detailed collision did not produce results...
-                        return qfalse;
+                        return false;
                     }
                 }
             }
@@ -5766,7 +5759,7 @@ pub fn CheckSaberDamage(
             if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(otherOwner)) != 0
                 && ctx.world.cvars.g_friendlySaber.integer == 0
             {
-                return qfalse;
+                return false;
             }
 
             if ((*self_).s.eType == ET_NPC as c_int || (*otherOwner).s.eType == ET_NPC as c_int)
@@ -5774,15 +5767,15 @@ pub fn CheckSaberDamage(
                 && ctx.world.cvars.g_gametype.integer != GT_SIEGE
             {
                 //don't hit your teammate's sabers if you are an NPC.
-                return qfalse;
+                return false;
             }
 
             if (*ooc).ps.duelInProgress != 0 && (*ooc).ps.duelIndex != (*self_).s.number {
-                return qfalse;
+                return false;
             }
 
             if (*sc).ps.duelInProgress != 0 && (*sc).ps.duelIndex != (*otherOwner).s.number {
-                return qfalse;
+                return false;
             }
 
             if ctx.world.cvars.g_debugSaberLocks.integer != 0 {
@@ -5792,9 +5785,9 @@ pub fn CheckSaberDamage(
                     ctx.entity_id_of(otherOwner).unwrap(),
                     LOCK_RANDOM,
                 );
-                return qtrue;
+                return true;
             }
-            didHit = qtrue;
+            didHit = true;
             (*sc).ps.saberIdleWound =
                 ctx.world.level.time + ctx.world.cvars.g_saberDmgDelay_Idle.integer;
 
@@ -5818,10 +5811,9 @@ pub fn CheckSaberDamage(
                 ctx.entity_id_of(otherOwner),
                 ctx.entity_id_of(self_),
                 dmg,
-            ) != 0
-            {
+            ) {
                 //smashed it out of the air
-                return qfalse;
+                return false;
             }
 
             //is this my thrown saber?
@@ -5834,10 +5826,10 @@ pub fn CheckSaberDamage(
                     ctx.entity_id_of(self_),
                     ctx.entity_id_of(otherOwner),
                     dmg,
-                ) != 0
+                )
             {
                 //they smashed it out of the air
-                return qfalse;
+                return false;
             }
 
             do_block_stuff = true;
@@ -5852,12 +5844,12 @@ pub fn CheckSaberDamage(
                 && !(*otherOwner).client.is_null()
                 && (*ooc).ps.saberInFlight != 0
             {
-                return qfalse;
+                return false;
             }
 
             //this is a thrown saber, don't do any fancy saber-saber collision stuff
             if (*sc).ps.saberEntityNum != 0 && (*sc).ps.saberInFlight != 0 && rSaberNum == 0 {
-                return qfalse;
+                return false;
             }
 
             otherSaberLevel = G_SaberAttackPower(
@@ -5870,13 +5862,12 @@ pub fn CheckSaberDamage(
                 let lockFactor = ctx.world.cvars.g_saberLockFactor.integer;
 
                 if sabersClashed != 0 && ctx.world.bg_state.rng.Q_irand(1, 20) <= lockFactor {
-                    if G_ClientIdleInWorld(&*(otherOwner)) == 0 {
+                    if !G_ClientIdleInWorld(&*(otherOwner)) {
                         if WP_SabersCheckLock(
                             ctx,
                             ctx.entity_id_of(self_).unwrap(),
                             ctx.entity_id_of(otherOwner).unwrap(),
-                        ) != 0
-                        {
+                        ) {
                             (*sc).ps.saberBlocked = BLOCKED_NONE;
                             (*ooc).ps.saberBlocked = BLOCKED_NONE;
                             return didHit;
@@ -5908,13 +5899,12 @@ pub fn CheckSaberDamage(
             {
                 //for now, just always try a deflect. (deflect func can cause bounces too)
                 if true {
-                    if WP_GetSaberDeflectionAngle(
+                    if !WP_GetSaberDeflectionAngle(
                         ctx,
                         ctx.entity_id_of(self_),
                         ctx.entity_id_of(otherOwner),
                         tr.fraction,
-                    ) == 0
-                    {
+                    ) {
                         tryDeflectAgain = qtrue; //Failed the deflect, try it again if we can
                     } else {
                         (*sc).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
@@ -6052,19 +6042,18 @@ pub fn CheckSaberDamage(
                 }
 
                 if tryDeflectAgain == 0 {
-                    if WP_GetSaberDeflectionAngle(
+                    if !WP_GetSaberDeflectionAngle(
                         ctx,
                         ctx.entity_id_of(self_),
                         ctx.entity_id_of(otherOwner),
                         tr.fraction,
-                    ) == 0
-                    {
+                    ) {
                         tryDeflectAgain = qtrue;
                     }
                 }
 
                 didOffense = qtrue;
-            } else if SaberAttacking(&*(otherOwner)) != 0
+            } else if SaberAttacking(&*(otherOwner))
                 && dmg > SABER_NONATTACK_DAMAGE
                 && BG_SaberInSpecial((*ooc).ps.saberMove) == 0
                 && didOffense == 0
@@ -6189,7 +6178,7 @@ pub fn CheckSaberDamage(
                         crushTheParry = qtrue;
                     }
 
-                    if SaberAttacking(&*(otherOwner)) == 0 {
+                    if !SaberAttacking(&*(otherOwner)) {
                         let mut otherIdleStr = (*ooc).ps.fd.saberAnimLevel;
                         if otherIdleStr == saber_styles_t::SS_DUAL as c_int
                             || otherIdleStr == saber_styles_t::SS_STAFF as c_int
@@ -7080,7 +7069,7 @@ pub fn CheckThrownSaberDamaged(
     dist: c_int,
     returning: c_int,
     noDCheck: qboolean,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let saberent: *mut gentity_t = ctx.entity_mut(saberent);
     let saberOwner: *mut gentity_t =
@@ -7098,7 +7087,7 @@ pub fn CheckThrownSaberDamaged(
             && !(*saberOwner).client.is_null()
             && (*soc).ps.saberAttackWound > level_time
         {
-            return qfalse;
+            return false;
         }
 
         if !ent.is_null()
@@ -7120,10 +7109,10 @@ pub fn CheckThrownSaberDamaged(
             // hit a client
             let ec = (*ent).client;
             if (*ec).ps.duelInProgress != 0 && (*ec).ps.duelIndex != (*saberOwner).s.number {
-                return qfalse;
+                return false;
             }
             if (*soc).ps.duelInProgress != 0 && (*soc).ps.duelIndex != (*ent).s.number {
-                return qfalse;
+                return false;
             }
 
             vecsub = [0.0; 3];
@@ -7154,7 +7143,7 @@ pub fn CheckThrownSaberDamaged(
                             tr.endpos,
                             0,
                             MOD_SABER as c_int,
-                            qfalse,
+                            false,
                             999,
                         ) != 0
                     {
@@ -7182,10 +7171,9 @@ pub fn CheckThrownSaberDamaged(
                             ctx.entity_id_of(
                                 &mut (*base.add(tr.entityNum as usize)) as *mut gentity_t,
                             ),
-                        ) != 0
-                        {
+                        ) {
                             // it was knocked out of the air
-                            return qfalse;
+                            return false;
                         }
 
                         if returning == 0 {
@@ -7199,7 +7187,7 @@ pub fn CheckThrownSaberDamaged(
                         }
 
                         (*soc).ps.saberAttackWound = level_time + 500;
-                        return qfalse;
+                        return false;
                     } else {
                         // a good hit
                         let mut dir: vec3_t = [0.0; 3];
@@ -7423,7 +7411,7 @@ pub fn CheckThrownSaberDamaged(
             }
         }
 
-        qtrue
+        true
     }
 }
 
@@ -8056,17 +8044,17 @@ pub fn saberKnockOutOfHand(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     velocity: vec3_t,
-) -> qboolean {
+) -> bool {
     let level_time = ctx.world.level.time;
 
     let (Some(saberent), Some(saberOwner)) = (saberent, saberOwner) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
         || ctx.world.entity(saberOwner).client.is_null()
     {
-        return qfalse;
+        return false;
     }
 
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
@@ -8074,19 +8062,19 @@ pub fn saberKnockOutOfHand(
     unsafe {
         if (*soc).ps.saberEntityNum == 0 {
             // already gone
-            return qfalse;
+            return false;
         }
 
         if (level_time - (*soc).lastSaberStorageTime) > 50 {
             // must have a reasonably updated saber base pos
-            return qfalse;
+            return false;
         }
 
         if (*soc).ps.saberLockTime > (level_time - 100) {
-            return qfalse;
+            return false;
         }
         if ((*soc).saber[0].saberFlags & SFL_NOT_DISARMABLE) != 0 {
-            return qfalse;
+            return false;
         }
 
         (*soc).ps.saberInFlight = qtrue;
@@ -8137,7 +8125,7 @@ pub fn saberKnockOutOfHand(
     // override the velocity on the knocked away saber.
     _VectorCopy(velocity, &mut ctx.world.entity_mut(saberent).s.pos.trDelta);
 
-    qtrue
+    true
 }
 
 /// Raven `saberCheckKnockdown_DuelLoss`.
@@ -8148,7 +8136,7 @@ pub fn saberCheckKnockdown_DuelLoss(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
-) -> qboolean {
+) -> bool {
     let mut dif: vec3_t = [0.0; 3];
     let mut totalDistance = 1.0f32;
     let distScale = 6.5f32;
@@ -8157,7 +8145,7 @@ pub fn saberCheckKnockdown_DuelLoss(
 
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8165,14 +8153,14 @@ pub fn saberCheckKnockdown_DuelLoss(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
 
         let level_time = ctx.world.level.time;
@@ -8230,7 +8218,7 @@ pub fn saberCheckKnockdown_DuelLoss(
         if ctx.world.bg_state.rng.Q_irand(0, disarmChance) != 0 {
             saberKnockOutOfHand(ctx, Some(saberent), Some(saberOwner), dif)
         } else {
-            qfalse
+            false
         }
     }
 }
@@ -8243,13 +8231,13 @@ pub fn saberCheckKnockdown_BrokenParry(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
-) -> qboolean {
+) -> bool {
     let mut doKnock = qfalse;
     let mut disarmChance = 1;
 
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8257,26 +8245,26 @@ pub fn saberCheckKnockdown_BrokenParry(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
     }
 
     let level_time = ctx.world.level.time;
 
     // Neither gets an advantage based on attack state.
-    let myAttack = G_SaberAttackPower(ctx, Some(saberOwner), qfalse);
-    let otherAttack = G_SaberAttackPower(ctx, Some(other), qfalse);
+    let myAttack = G_SaberAttackPower(ctx, Some(saberOwner), false);
+    let otherAttack = G_SaberAttackPower(ctx, Some(other), false);
 
     unsafe {
         if (*ooc).olderIsValid == 0 || (level_time - (*ooc).lastSaberStorageTime) >= 200 {
-            return qfalse;
+            return false;
         }
 
         // only knock the saber out of the hand if they're in a stronger stance
@@ -8297,7 +8285,7 @@ pub fn saberCheckKnockdown_BrokenParry(
             if totalDistance == 0.0 {
                 // fine, try our own
                 if (*soc).olderIsValid == 0 || (level_time - (*soc).lastSaberStorageTime) >= 200 {
-                    return qfalse;
+                    return false;
                 }
 
                 _VectorSubtract((*soc).lastSaberBase_Always, (*soc).olderSaberBase, &mut dif);
@@ -8306,7 +8294,7 @@ pub fn saberCheckKnockdown_BrokenParry(
 
             if totalDistance == 0.0 {
                 // ...forget it then.
-                return qfalse;
+                return false;
             }
 
             if totalDistance < 20.0 {
@@ -8325,7 +8313,7 @@ pub fn saberCheckKnockdown_BrokenParry(
             }
         }
 
-        qfalse
+        false
     }
 }
 
@@ -8338,10 +8326,10 @@ pub fn saberCheckKnockdown_Smashed(
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
     damage: c_int,
-) -> qboolean {
+) -> bool {
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8349,18 +8337,18 @@ pub fn saberCheckKnockdown_Smashed(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
 
         if (*soc).ps.saberInFlight == 0 {
             // can only do this if the saber is already actually in flight
-            return qfalse;
+            return false;
         }
     }
 
@@ -8371,16 +8359,16 @@ pub fn saberCheckKnockdown_Smashed(
     {
         // make sure the blow was strong enough
         saberKnockDown(ctx, saberent, saberOwner, other);
-        return qtrue;
+        return true;
     }
 
     if damage > 10 {
         // make sure the blow was strong enough
         saberKnockDown(ctx, saberent, saberOwner, other);
-        return qtrue;
+        return true;
     }
 
-    qfalse
+    false
 }
 
 /// Raven `saberCheckKnockdown_Thrown`.
@@ -8391,12 +8379,12 @@ pub fn saberCheckKnockdown_Thrown(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
-) -> qboolean {
+) -> bool {
     let mut tossIt = qfalse;
 
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8404,7 +8392,7 @@ pub fn saberCheckKnockdown_Thrown(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
@@ -8412,7 +8400,7 @@ pub fn saberCheckKnockdown_Thrown(
 
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
 
         let defenLevel = (*ooc).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
@@ -8427,10 +8415,10 @@ pub fn saberCheckKnockdown_Thrown(
 
         if tossIt != 0 {
             saberKnockDown(ctx, saberent, saberOwner, other);
-            return qtrue;
+            return true;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -9187,16 +9175,16 @@ pub fn UpdateClientRenderinfo(
 /// Raven `G_KickDownable`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7474-7500`
-pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
+pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> bool {
     if ctx.world.cvars.d_saberKickTweak.integer == 0 {
-        return 1;
+        return true;
     }
 
     let Some(ent) = ent else {
-        return 0;
+        return false;
     };
     if ctx.world.entity(ent).inuse == 0 || ctx.world.entity(ent).client.is_null() {
-        return 0;
+        return false;
     }
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(ent).client;
@@ -9204,18 +9192,18 @@ pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
     unsafe {
         if BG_InKnockDown((*client).ps.legsAnim) != 0 || BG_InKnockDown((*client).ps.torsoAnim) != 0
         {
-            return 0;
+            return false;
         }
 
         if (*client).ps.weaponTime <= 0
             && (*client).ps.weapon == WP_SABER as c_int
             && (*client).ps.groundEntityNum != ENTITYNUM_NONE
         {
-            return 0;
+            return false;
         }
     }
 
-    1
+    true
 }
 
 /// Raven `G_TossTheMofo`.
@@ -9251,7 +9239,7 @@ pub fn G_TossTheMofo(ctx: &mut GameContext, ent: EntityId, tossDir: vec3_t, toss
         if health > 0
             && (*client).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int
             && BG_KnockDownable(&mut (*client).ps) != 0
-            && G_KickDownable(ctx, Some(ent)) != 0
+            && G_KickDownable(ctx, Some(ent))
         {
             // if they are alive, knock them down I suppose
             (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
@@ -9420,7 +9408,7 @@ pub fn G_KickTrace(
                 }
                 if !(*hitEnt).client.is_null()
                     && ((*((*hitEnt).client)).ps.pm_flags & PMF_TIME_KNOCKBACK) == 0 //not already flying through air?  Intended to stop multiple hits, but...
-                    && G_CanBeEnemy(ctx, ctx.entity_id_of(ent).unwrap(), ctx.entity_id_of(hitEnt).unwrap()) != 0
+                    && G_CanBeEnemy(ctx, ctx.entity_id_of(ent).unwrap(), ctx.entity_id_of(hitEnt).unwrap())
                 {
                     //FIXME: this should not always work
                     if (*hitEnt).health <= 0 {
@@ -9844,11 +9832,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `G_PrettyCloseIGuess`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7958-7967`
-pub fn G_PrettyCloseIGuess(a: f32, b: f32, tolerance: f32) -> qboolean {
+pub fn G_PrettyCloseIGuess(a: f32, b: f32, tolerance: f32) -> bool {
     if (a - b) < tolerance && (a - b) > -tolerance {
-        return 1;
+        return true;
     }
-    0
+    false
 }
 
 /// Raven `G_GrabSomeMofos`.
@@ -9922,8 +9910,8 @@ pub fn G_GrabSomeMofos(ctx: &mut GameContext, self_: EntityId) {
                     ctx,
                     ctx.entity_id_of(self_).unwrap(),
                     ctx.entity_id_of(grabbed).unwrap(),
-                ) != 0
-                && G_PrettyCloseIGuess((*gcl).ps.origin[2], (*client).ps.origin[2], 4.0) != 0
+                )
+                && G_PrettyCloseIGuess((*gcl).ps.origin[2], (*client).ps.origin[2], 4.0)
                 && (BG_InGrappleMove((*gcl).ps.torsoAnim) == 0
                     || (*gcl).ps.torsoAnim == animNumber_t::BOTH_KYLE_GRAB as c_int)
                 && (BG_InGrappleMove((*gcl).ps.legsAnim) == 0
@@ -10136,8 +10124,7 @@ pub fn WP_SaberPositionUpdate(
                 || (*gcl).grappleState == 0
                 || (*grappler).health < 1
                 || (*self_).health < 1
-                || G_PrettyCloseIGuess((*client).ps.origin[2], (*gcl).ps.origin[2], 4.0f32)
-                    == qfalse
+                || !G_PrettyCloseIGuess((*client).ps.origin[2], (*gcl).ps.origin[2], 4.0f32)
             {
                 (*client).grappleState = 0;
                 if (BG_InGrappleMove((*client).ps.torsoAnim) != 0 && (*client).ps.torsoTimer > 100)
@@ -11161,7 +11148,7 @@ pub fn WP_SaberPositionUpdate(
                                 }
 
                                 while gotHit == qfalse {
-                                    if CheckSaberDamage(
+                                    if !CheckSaberDamage(
                                         ctx,
                                         ctx.entity_id_of(self_).unwrap(),
                                         rSaberNum,
@@ -11171,9 +11158,8 @@ pub fn WP_SaberPositionUpdate(
                                         qfalse,
                                         trMask,
                                         qfalse,
-                                    ) == qfalse
-                                    {
-                                        if CheckSaberDamage(
+                                    ) {
+                                        if !CheckSaberDamage(
                                             ctx,
                                             ctx.entity_id_of(self_).unwrap(),
                                             rSaberNum,
@@ -11183,8 +11169,7 @@ pub fn WP_SaberPositionUpdate(
                                             qtrue,
                                             trMask,
                                             qfalse,
-                                        ) == qfalse
-                                        {
+                                        ) {
                                             let mut oldSaberStart: vec3_t = [0.0; 3];
                                             let mut oldSaberEnd: vec3_t = [0.0; 3];
                                             let mut saberAngleNow: vec3_t = [0.0; 3];
@@ -11313,8 +11298,7 @@ pub fn WP_SaberPositionUpdate(
                                                     qfalse,
                                                     trMask,
                                                     qfalse,
-                                                ) != qfalse
-                                                {
+                                                ) {
                                                     gotHit = qtrue;
                                                 }
                                             }
@@ -11354,7 +11338,7 @@ pub fn WP_SaberPositionUpdate(
                                 }
                             } else if ctx.world.cvars.d_saberInterpolate.integer != 0 {
                                 // anything but 0 or 1, use the old plain method.
-                                if CheckSaberDamage(
+                                if !CheckSaberDamage(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
                                     rSaberNum,
@@ -11364,8 +11348,7 @@ pub fn WP_SaberPositionUpdate(
                                     qfalse,
                                     MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT,
                                     qfalse,
-                                ) == qfalse
-                                {
+                                ) {
                                     CheckSaberDamage(
                                         ctx,
                                         ctx.entity_id_of(self_).unwrap(),
@@ -11624,10 +11607,10 @@ pub fn WP_SaberCanBlock(
     point: vec3_t,
     dflags: c_int,
     r#mod: c_int,
-    projectile: qboolean,
+    projectile: bool,
     mut attackStr: c_int,
 ) -> c_int {
-    let mut thrownSaber: qboolean = 0;
+    let mut thrownSaber = false;
     let mut blockFactor: f32 = 0.0;
 
     let Some(self_) = self_ else {
@@ -11642,7 +11625,7 @@ pub fn WP_SaberCanBlock(
     unsafe {
         if attackStr == 999 {
             attackStr = 0;
-            thrownSaber = 1;
+            thrownSaber = true;
         }
 
         if BG_SaberInAttack((*client).ps.saberMove) != 0 {
@@ -11692,7 +11675,7 @@ pub fn WP_SaberCanBlock(
 
         // Removed for now (pre-1.03 block-decision code); see oracle 9342-9384.
 
-        if SaberAttacking(ctx.world.entity(self_)) != 0 {
+        if SaberAttacking(ctx.world.entity(self_)) {
             // attacking, can't block now
             return 0;
         }
@@ -11724,7 +11707,7 @@ pub fn WP_SaberCanBlock(
             return 0;
         }
 
-        if thrownSaber != 0 {
+        if thrownSaber {
             blockFactor -= 0.25;
         }
 
@@ -11743,8 +11726,8 @@ pub fn WP_SaberCanBlock(
             return 0;
         }
 
-        if projectile != 0 {
-            WP_SaberBlockNonRandom(ctx.world.entity(self_), point, projectile);
+        if projectile {
+            WP_SaberBlockNonRandom(ctx.world.entity(self_), point, projectile as qboolean);
         }
         1
     }
@@ -11753,13 +11736,13 @@ pub fn WP_SaberCanBlock(
 /// Raven `HasSetSaberOnly`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:9453-9484`
-pub fn HasSetSaberOnly(ctx: &mut GameContext) -> qboolean {
+pub fn HasSetSaberOnly(ctx: &mut GameContext) -> bool {
     let mut i: c_int = 0;
     let mut wDisable: c_int = 0;
 
     if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
         // set to 0
-        return 0;
+        return false;
     }
 
     if ctx.world.cvars.g_gametype.integer == GT_DUEL
@@ -11772,11 +11755,11 @@ pub fn HasSetSaberOnly(ctx: &mut GameContext) -> qboolean {
 
     while i < WP_NUM_WEAPONS as c_int {
         if (wDisable & (1 << i)) == 0 && i != WP_SABER as c_int && i != WP_NONE as c_int {
-            return 0;
+            return false;
         }
 
         i += 1;
     }
 
-    1
+    true
 }

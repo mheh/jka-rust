@@ -305,7 +305,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                 warnClient = (BG_LegalizedForcePowers(
                     forcePowers.as_mut_ptr(),
                     maxRank,
-                    HasSetSaberOnly(ctx),
+                    HasSetSaberOnly(ctx) as qboolean,
                     FORCE_DARKSIDE as c_int,
                     gametype,
                     ctx.world.cvars.g_forcePowerDisable.integer,
@@ -314,7 +314,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                 warnClient = (BG_LegalizedForcePowers(
                     forcePowers.as_mut_ptr(),
                     maxRank,
-                    HasSetSaberOnly(ctx),
+                    HasSetSaberOnly(ctx) as qboolean,
                     FORCE_LIGHTSIDE as c_int,
                     gametype,
                     ctx.world.cvars.g_forcePowerDisable.integer,
@@ -323,7 +323,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                 warnClient = (BG_LegalizedForcePowers(
                     forcePowers.as_mut_ptr(),
                     maxRank,
-                    HasSetSaberOnly(ctx),
+                    HasSetSaberOnly(ctx) as qboolean,
                     0,
                     gametype,
                     ctx.world.cvars.g_forcePowerDisable.integer,
@@ -333,7 +333,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             warnClient = (BG_LegalizedForcePowers(
                 forcePowers.as_mut_ptr(),
                 maxRank,
-                HasSetSaberOnly(ctx),
+                HasSetSaberOnly(ctx) as qboolean,
                 0,
                 gametype,
                 ctx.world.cvars.g_forcePowerDisable.integer,
@@ -454,7 +454,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         //THE POWERS
 
         if ent_etype != ET_NPC as c_int {
-            if HasSetSaberOnly(ctx) != 0 {
+            if HasSetSaberOnly(ctx) {
                 let te_id = G_TempEntity(ctx, vec3_origin, EV_SET_FREE_SABER as c_int);
                 let e = ctx.world.entity_mut(te_id);
                 e.r.svFlags |= SVF_BROADCAST;
@@ -620,7 +620,7 @@ pub fn WP_SpawnInitForcePowers(ctx: &mut GameContext, ent: EntityId) {
                 (*cl).ps.fd.forcePowerLevel[i] = FORCE_LEVEL_0 as c_int;
             }
 
-            if HasSetSaberOnly(ctx) != 0 {
+            if HasSetSaberOnly(ctx) {
                 if (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] < FORCE_LEVEL_1 as c_int {
                     (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] = FORCE_LEVEL_1 as c_int;
                 }
@@ -5406,7 +5406,7 @@ pub fn HolocronUpdate(ctx: &mut GameContext, self_: EntityId) {
             i += 1;
         }
 
-        if HasSetSaberOnly(ctx) != 0 {
+        if HasSetSaberOnly(ctx) {
             //if saberonly, we get these powers no matter what (still need the holocrons for level 3)
             if (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] < FORCE_LEVEL_1 {
                 (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] = FORCE_LEVEL_1;
