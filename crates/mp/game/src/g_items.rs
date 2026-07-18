@@ -1723,7 +1723,7 @@ pub fn SpecialItemThink(ctx: &mut GameContext, ent: EntityId) {
         gravity,
         mass,
         bounce,
-        qfalse,
+        false,
         core::ptr::null_mut(),
         0,
     );
@@ -2451,7 +2451,7 @@ pub fn EWebThink(ctx: &mut GameContext, self_: EntityId) {
         gravity,
         mass,
         bounce,
-        qfalse,
+        false,
         core::ptr::null_mut(),
         0,
     );
