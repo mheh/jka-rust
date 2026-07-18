@@ -2997,7 +2997,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
 
         if ctx.world.cvars.g_gametype.integer != GT_HOLOCRON
             && ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER
-            && HasSetSaberOnly(ctx) == qfalse
+            && !HasSetSaberOnly(ctx)
             && AllForceDisabled(ctx.world.cvars.g_forcePowerDisable.integer) == qfalse
             && ctx.world.cvars.g_trueJedi.integer != 0
         {

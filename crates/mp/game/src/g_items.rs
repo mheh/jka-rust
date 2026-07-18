@@ -3643,7 +3643,7 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
     }
 
     if ctx.world.cvars.g_gametype.integer != GT_JEDIMASTER {
-        if HasSetSaberOnly(ctx) != 0 {
+        if HasSetSaberOnly(ctx) {
             if matches!(it.kind, ItemKind::Ammo(_)) {
                 G_FreeEntity(ctx, Some(ent));
                 return;

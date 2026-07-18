@@ -247,13 +247,23 @@ impl Lcg {
 /// `WP_InitForcePowers` reads. REQUIRED: an empty `forcepowers` leaves the
 /// oracle's stack array uninitialized and it segfaults (see the note in
 /// `mod.rs`'s `CLIENT0_USERINFO`).
-const FORCEPOWERS: &str = "7-1-032330000000001333";
+/// Must be a fixed point of `BG_LegalizedForcePowers` at the server default
+/// `g_maxForceRank 6` — an illegal config sets `warnClient`, and
+/// `WP_InitForcePowers` re-parks the client in SPECTATOR on every spawn
+/// (2026-07-17 finding; rank-7 strings never survived).
+const FORCEPOWERS: &str = "6-1-030330000000000333";
 
 fn userinfo_for(client: i32, model: &str) -> String {
+    userinfo_with_force(client, model, FORCEPOWERS)
+}
+
+/// `userinfo_for` with an explicit forcepowers config (rank-side-18digits) for
+/// scenarios that need specific powers known (e.g. lightning).
+fn userinfo_with_force(client: i32, model: &str, forcepowers: &str) -> String {
     format!(
         "\\name\\Player{client}\\rate\\25000\\snaps\\20\\model\\{model}\
 \\team_model\\{model}\\color1\\4\\color2\\4\\handicap\\100\\sex\\male\
-\\cg_predictItems\\1\\teamtask\\0\\forcepowers\\{FORCEPOWERS}\\password\\"
+\\cg_predictItems\\1\\teamtask\\0\\forcepowers\\{forcepowers}\\password\\"
     )
 }
 
@@ -374,6 +384,91 @@ pub fn gen_melee_brawl() -> Scenario {
         map: "arena3".into(),
         seed: 1337,
         clients: 2,
+        msec: 50,
+        starttime: 600,
+        frames,
+        userinfos,
+        cmds,
+    }
+}
+
+/// `force-duel.reflog`: 3 clients on arena3 exercising the force-power run
+/// path the other tapes never touch. Client 0 is dark-side with LEVEL-1
+/// LIGHTNING (the 2026-07-17 live-repro config) and holds
+/// `BUTTON_FORCE_LIGHTNING` in bursts; clients 1-2 are the standard config
+/// brawling with melee. Lightning ticks (`ForceShootLightning` →
+/// `ForceLightningDamage` → `G_Damage`), drain, knockback, deaths, and the
+/// respawn-on-attack path all land on tape.
+pub fn gen_force_duel() -> Scenario {
+    let mut userinfos = BTreeMap::new();
+    // forcePowers_t digit order; [7] = FP_LIGHTNING at level 1, dark side.
+    // Rank-6 budget is 75 points: base neutral kit (72) + lightning 1 (2)
+    // fits with saberthrow shaved to 2. Fixed point of the legalizer.
+    userinfos.insert(0, userinfo_with_force(0, "desann/default", "6-2-030330010000000332"));
+    userinfos.insert(1, userinfo_for(1, "kyle/default"));
+    userinfos.insert(2, userinfo_for(2, "jan/default"));
+
+    const BUTTON_ATTACK: i32 = 1;
+    const BUTTON_FORCE_LIGHTNING: i32 = 1024;
+
+    let frames = 1000;
+    let mut cmds = BTreeMap::new();
+    for client in 0..3i32 {
+        let mut rng = Lcg(0xF0_5CE_u32.wrapping_add((client as u32).wrapping_mul(0x9E37_79B9)));
+        let mut yaw: i32 = rng.range(0, 65535);
+        for frame in 0..frames {
+            let mut buttons = 0;
+            let (pitch, yaw_now, forwardmove, rightmove) = if client == 0 {
+                // Continuous level-1 lightning stream aimed at client 1's
+                // duel1 spawn (c0 (1504,288,33) -> c1 (1248,416,33) = view yaw
+                // 153.4deg). Spawn latches delta_angles = 180deg against the
+                // zeroed pre-spawn cmd, so the CMD yaw is 153.4-180 = -26.6deg
+                // = 60698 shorts. Guaranteed beam contact: ticks, drain,
+                // knockback, and eventually the kill + respawn land on tape.
+                buttons |= BUTTON_FORCE_LIGHTNING;
+                (0, 60698, 0i8, 0i8)
+            } else if client == 1 {
+                // The victim holds position; attack presses double as the
+                // dead-state respawn press once the stream kills them.
+                if rng.chance(35) {
+                    buttons |= BUTTON_ATTACK;
+                }
+                yaw = (yaw + rng.range(-400, 400)).rem_euclid(65536);
+                (rng.range(-1000, 1000), yaw, 0i8, 0i8)
+            } else {
+                // A roamer for background variety.
+                yaw = (yaw + rng.range(-900, 900)).rem_euclid(65536);
+                if rng.chance(35) {
+                    buttons |= BUTTON_ATTACK;
+                }
+                (rng.range(-2000, 2000), yaw, 127i8, rng.range(-60, 60) as i8)
+            };
+            let yaw = yaw_now;
+            let upmove = if client == 2 && rng.chance(8) { 127 } else { 0 } as i8;
+
+            cmds.insert(
+                (frame, client),
+                CmdInput {
+                    angles: [pitch, yaw, 0],
+                    buttons,
+                    forwardmove,
+                    rightmove,
+                    upmove,
+                    weapon: WP_MELEE,
+                    forcesel: 0,
+                },
+            );
+        }
+    }
+
+    Scenario {
+        name: "force-duel".into(),
+        // REAL map (engine-island CM/sv_world): synthetic-map mock traces
+        // never clip entities, so no hit can land on arena3 — combat tapes
+        // need real collision. duel1 is the close-quarters arena.
+        map: "mp/duel1".into(),
+        seed: 0xF05,
+        clients: 3,
         msec: 50,
         starttime: 600,
         frames,

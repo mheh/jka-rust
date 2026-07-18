@@ -8,7 +8,7 @@ clients 1
 msec 50
 starttime 600
 frames 120
-userinfo 0 \name\Player0\rate\25000\snaps\20\model\kyle/default\team_model\kyle/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\7-1-032330000000001333\password\
+userinfo 0 \name\Player0\rate\25000\snaps\20\model\kyle/default\team_model\kyle/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\6-1-030330000000000333\password\
 # cmd <frame> <client> <ang0> <ang1> <ang2> <buttons> <fwd> <right> <up> <weapon> <forcesel>
 cmd 0 0 2886 39865 0 0 117 -81 0 2 0
 cmd 1 0 995 40946 0 0 -124 -19 0 2 0

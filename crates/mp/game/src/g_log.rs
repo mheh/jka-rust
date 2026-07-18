@@ -723,7 +723,7 @@ pub fn CalculateTactician(ctx: &mut GameContext, ent: EntityId, kills: *mut c_in
     let ec = ctx.world.entity(ent).client;
     let play_time = (ctx.world.level.time - unsafe { (*ec).pers.enterTime }) / 60000;
 
-    if HasSetSaberOnly(ctx) != qfalse {
+    if HasSetSaberOnly(ctx) {
         // duh, only 1 weapon
         return qfalse;
     }

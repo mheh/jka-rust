@@ -8,8 +8,8 @@ clients 4
 msec 50
 starttime 600
 frames 900
-userinfo 0 \name\Player0\rate\25000\snaps\20\model\kyle/default\team_model\kyle/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\7-1-032330000000001333\password\
-userinfo 1 \name\Player1\rate\25000\snaps\20\model\jan/default\team_model\jan/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\7-1-032330000000001333\password\
-userinfo 2 \name\Player2\rate\25000\snaps\20\model\luke/default\team_model\luke/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\7-1-032330000000001333\password\
-userinfo 3 \name\Player3\rate\25000\snaps\20\model\desann/default\team_model\desann/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\7-1-032330000000001333\password\
+userinfo 0 \name\Player0\rate\25000\snaps\20\model\kyle/default\team_model\kyle/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\6-1-030330000000000333\password\
+userinfo 1 \name\Player1\rate\25000\snaps\20\model\jan/default\team_model\jan/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\6-1-030330000000000333\password\
+userinfo 2 \name\Player2\rate\25000\snaps\20\model\luke/default\team_model\luke/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\6-1-030330000000000333\password\
+userinfo 3 \name\Player3\rate\25000\snaps\20\model\desann/default\team_model\desann/default\color1\4\color2\4\handicap\100\sex\male\cg_predictItems\1\teamtask\0\forcepowers\6-1-030330000000000333\password\
 # cmd <frame> <client> <ang0> <ang1> <ang2> <buttons> <fwd> <right> <up> <weapon> <forcesel>

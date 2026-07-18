@@ -89,6 +89,12 @@ const G_CVAR_VARIABLE_INTEGER_VALUE: isize = MpGameImport::G_CVAR_VARIABLE_INTEG
 const G_CVAR_VARIABLE_STRING_BUFFER: isize = MpGameImport::G_CVAR_VARIABLE_STRING_BUFFER as isize;
 const G_ARGC: isize = MpGameImport::G_ARGC as isize;
 const G_ARGV: isize = MpGameImport::G_ARGV as isize;
+/// The one file the mock FS serves (see `G_FS_FOPEN_FILE`): the committed
+/// synthetic humanoid animation.cfg parity fixture.
+const ANIMCFG: &[u8] =
+    include_bytes!("../../../mp/game/tests/oracle/fixtures/pmove_saber/animation.cfg");
+const ANIMCFG_HANDLE: c_int = 0x41_4E_49; // "ANI"
+
 const G_FS_FOPEN_FILE: isize = MpGameImport::G_FS_FOPEN_FILE as isize;
 const G_FS_READ: isize = MpGameImport::G_FS_READ as isize;
 const G_FS_WRITE: isize = MpGameImport::G_FS_WRITE as isize;
@@ -655,7 +661,10 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
             // command. Source: oracle/codemp/game/g_public.h (trap_Argc/Argv).
             G_ARGC => m.cmd_args.len() as isize,
             G_ARGV => {
-                let idx = unsafe { word(args, 1) } as usize;
+                // `int n` — the LP64 oracle's varargs promote int with garbage
+                // upper bits (2026-07-17 finding: 0x1_0000_0000 for n=0), so
+                // decode at C int width like the real engine does.
+                let idx = unsafe { word(args, 1) } as c_int as usize;
                 let s = m
                     .cmd_args
                     .get(idx)
@@ -664,18 +673,41 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
                 unsafe { write_c_buffer(word(args, 2), word(args, 3), s) };
                 0
             }
-            // ---- filesystem: everything missing ----------------------------
+            // ---- filesystem: one committed fixture, everything else missing
             G_FS_FOPEN_FILE => {
                 // ( const char *qpath, fileHandle_t *f, fsMode_t mode ) -> int len
-                // Missing file: handle 0, length -1. All optional BG data loads
-                // (sabers, vehicles, anim cfg, logfile) take their skip paths.
+                // The humanoid animation.cfg is REQUIRED once tape clients
+                // actually join and animate (2026-07-17: the oracle SIGSEGVs in
+                // BG_SetAnim on the unparsed table; spectators never animated).
+                // Serve the committed synthetic fixture; every other path stays
+                // missing (handle 0, length -1) so optional loads skip.
+                let qpath = unsafe { c_str(word(args, 1)) };
                 let handle_out = unsafe { word(args, 2) } as *mut c_int;
-                if !handle_out.is_null() {
-                    unsafe { *handle_out = 0 };
+                if qpath == "models/players/_humanoid/animation.cfg" {
+                    if !handle_out.is_null() {
+                        unsafe { *handle_out = ANIMCFG_HANDLE };
+                    }
+                    ANIMCFG.len() as isize
+                } else {
+                    if !handle_out.is_null() {
+                        unsafe { *handle_out = 0 };
+                    }
+                    -1
                 }
-                -1
             }
-            G_FS_READ | G_FS_WRITE | G_FS_FCLOSE_FILE => 0,
+            G_FS_READ => {
+                // ( void *buffer, int len, fileHandle_t f ) — whole-file reads
+                // of the one served fixture; anything else is a no-op.
+                let buf = unsafe { word(args, 1) } as *mut u8;
+                let len = unsafe { word(args, 2) } as c_int;
+                let handle = unsafe { word(args, 3) } as c_int;
+                if handle == ANIMCFG_HANDLE && !buf.is_null() && len > 0 {
+                    let n = (len as usize).min(ANIMCFG.len());
+                    unsafe { core::ptr::copy_nonoverlapping(ANIMCFG.as_ptr(), buf, n) };
+                }
+                0
+            }
+            G_FS_WRITE | G_FS_FCLOSE_FILE => 0,
             G_FS_GETFILELIST => 0,
             // ---- server info / config strings ------------------------------
             G_GET_SERVERINFO => {
@@ -1292,6 +1324,18 @@ pub fn referee_set_userinfo(num: c_int, s: &str) {
 
 /// Inject the replay usercmd for a client for the upcoming frame's
 /// `GAME_CLIENT_THINK` (`G_GET_USERCMD` returns it).
+/// Install the tokenized command view served by `G_ARGC`/`G_ARGV` for the
+/// duration of one `GAME_CLIENT_COMMAND` dispatch (call `referee_clear_cmd`
+/// after the vm call returns).
+pub fn referee_set_cmd(tokens: &[&str]) {
+    MOCK.with(|m| m.borrow_mut().set_cmd(tokens));
+}
+
+/// Clear the command view installed by `referee_set_cmd`.
+pub fn referee_clear_cmd() {
+    MOCK.with(|m| m.borrow_mut().clear_cmd());
+}
+
 pub fn referee_set_usercmd(num: c_int, cmd: usercmd_t) {
     MOCK.with(|m| {
         m.borrow_mut().usercmds.insert(num, cmd);

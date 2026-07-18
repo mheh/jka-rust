@@ -56,13 +56,18 @@ cat > build/codemp/game/shim.h <<'EOF'
 #define powf raven_powf
 EOF
 
-# raven_rng.c: Raven's holdrand LCG (q_math.c:1432-1474) extracted verbatim,
-# `unsigned long holdrand` kept at NATIVE width (ruling 2026-07-09, reversing
-# the earlier 32-bit normalization: the port's `c_ulong` model is
-# platform-faithful — 32-bit on the i686 ship, 64-bit on this LP64 host — so
-# the golden is generated at host width, matching the referee A/B oracle).
-# Functions renamed r_* so they don't clash with the copies still living in
-# q_math.c.
+# retail-win32 holdrand width (2026-07-17 ruling, reversing 2026-07-09's
+# native-width choice; same class as the referee oracle's SnapVector/libm
+# patches): retail win32 `unsigned long` is 32-bit — at LP64 width
+# `(int)(holdrand >> 17)` spans the full register and irand(1,2) returns
+# +/-32k garbage (the live level-1 lightning "instagib" finding). Patch the
+# build copy BEFORE the raven_rng extraction below inherits the decl.
+sed -i '' 's/static unsigned long[[:space:]]*holdrand = 0x89abcdef;/static unsigned int	holdrand = 0x89abcdef; \/* retail-win32 32-bit width *\//' build/codemp/game/q_math.c
+grep -q "unsigned int	holdrand" build/codemp/game/q_math.c || { echo "holdrand patch failed"; exit 1; }
+
+# raven_rng.c: Raven's holdrand LCG (q_math.c:1432-1474) extracted verbatim
+# (with the retail-width holdrand patched above). Functions renamed r_* so
+# they don't clash with the copies still living in q_math.c.
 {
 	echo '#include <assert.h>'
 	sed -n '1432,1474p' build/codemp/game/q_math.c \

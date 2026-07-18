@@ -53,6 +53,7 @@ use mp_qshared::shared::CHAN_WEAPON;
 // (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
 // preserves the Raven spelling; their exact enum-qualification / module path is
 // resolved at integration (the mega-pass tree is not compiled per porter).
+use crate::bg_channel::{GameBgTraps, GameCallbacksImpl};
 use crate::client::render_info::renderInfo_t;
 use crate::g_combat::{G_Damage, G_Knockdown};
 use crate::g_mover::G_EntIsBreakable;
@@ -223,8 +224,8 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
     let y = maxs[1] - mins[1];
 
     // top of box
-    _VectorCopy(maxs, &mut start);
-    _VectorCopy(maxs, &mut end);
+    start = maxs;
+    end = maxs;
     start[0] -= x;
     G_TestLine(ctx, start, end, 0x00000ff, duration);
     end[0] = start[0];
@@ -235,8 +236,8 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
     G_TestLine(ctx, start, end, 0x00000ff, duration);
     G_TestLine(ctx, start, maxs, 0x00000ff, duration);
     // bottom of box
-    _VectorCopy(mins, &mut start);
-    _VectorCopy(mins, &mut end);
+    start = mins;
+    end = mins;
     start[0] += x;
     G_TestLine(ctx, start, end, 0x00000ff, duration);
     end[0] = start[0];
@@ -251,12 +252,12 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
 /// Raven `G_CanBeEnemy`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:82-115`
-pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> qboolean {
+pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> bool {
     let (sc, ec, self_number, enemy_number) = {
         let se = ctx.world.entity(self_);
         let ee = ctx.world.entity(enemy);
         if se.inuse == 0 || ee.inuse == 0 || se.client.is_null() || ee.client.is_null() {
-            return qfalse;
+            return false;
         }
         (se.client, ee.client, se.s.number, ee.s.number)
     };
@@ -265,41 +266,37 @@ pub fn G_CanBeEnemy(ctx: &mut GameContext, self_: EntityId, enemy: EntityId) -> 
     unsafe {
         if (*sc).ps.duelInProgress != 0 && (*sc).ps.duelIndex != enemy_number {
             // dueling but not with this person
-            return qfalse;
+            return false;
         }
 
         if (*ec).ps.duelInProgress != 0 && (*ec).ps.duelIndex != self_number {
             // other guy dueling but not with me
-            return qfalse;
+            return false;
         }
     }
 
     if ctx.world.cvars.g_gametype.integer < mp_bg::public::gametype::GT_TEAM {
         // ok, sure
-        return qtrue;
+        return true;
     }
 
     if ctx.world.cvars.g_friendlyFire.integer != 0 {
         // if ff on then can inflict damage normally on teammates
-        return qtrue;
+        return true;
     }
 
-    if crate::g_team::OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
+    if OnSameTeam(ctx, Some(self_), Some(enemy)) != 0 {
         // ff not on, don't hurt teammates
-        return qfalse;
+        return false;
     }
 
-    qtrue
+    true
 }
 
 /// Raven `G_SaberAttackPower`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:120-217`
-pub fn G_SaberAttackPower(
-    ctx: &mut GameContext,
-    ent: Option<EntityId>,
-    attacking: qboolean,
-) -> c_int {
+pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attacking: bool) -> c_int {
     // Raven asserts a live entity here; every caller passes one.
     let ent = ent.unwrap();
     // FLAG: pool client (NPC-capable saber wielder); deref raw per recipe 2b.
@@ -316,7 +313,7 @@ pub fn G_SaberAttackPower(
             baseLevel = 2;
         }
 
-        if attacking != 0 {
+        if attacking {
             // The attacker gets a boost to help penetrate defense; general boost
             // up so the individual levels make a bigger difference.
             baseLevel *= 2;
@@ -352,7 +349,7 @@ pub fn G_SaberAttackPower(
                     ctx.world.entity(ent).s.number,
                     baseLevel
                 );
-                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(cstr(&s).as_ptr());
             }
         }
 
@@ -375,7 +372,7 @@ pub fn G_SaberAttackPower(
         {
             // Get more power then.
             return baseLevel * 2;
-        } else if attacking != 0 && ctx.world.cvars.g_gametype.integer == GT_SIEGE {
+        } else if attacking && ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // In siege, saber battles should be quicker and biased to the attacker.
             return baseLevel * 3;
         }
@@ -404,7 +401,7 @@ pub fn WP_DeactivateSaber(ctx: &mut GameContext, self_: Option<EntityId>, clearL
             (*client).ps.saberHolstered = 2;
             // Doesn't matter ATM (SetSaberLength commented out in oracle).
             if (*client).saber[0].soundOff != 0 {
-                crate::g_utils::G_Sound(
+                G_Sound(
                     ctx,
                     Some(self_),
                     CHAN_WEAPON as c_int,
@@ -413,7 +410,7 @@ pub fn WP_DeactivateSaber(ctx: &mut GameContext, self_: Option<EntityId>, clearL
             }
 
             if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
-                crate::g_utils::G_Sound(
+                G_Sound(
                     ctx,
                     Some(self_),
                     CHAN_WEAPON as c_int,
@@ -664,7 +661,7 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                         "Client {} in broken parry, saber box 0\n",
                         ctx.world.entity(owner_id).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
                 return;
             }
@@ -741,8 +738,8 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                         let blade = &(*oc).saber[j as usize].blade[k as usize];
                         (blade.muzzlePoint, blade.lengthMax, blade.muzzleDir)
                     };
-                    crate::q_math::_VectorCopy(muzzlePoint, &mut saberOrg);
-                    crate::q_math::_VectorMA(muzzlePoint, lengthMax, muzzleDir, &mut saberTip);
+                    saberOrg = muzzlePoint;
+                    _VectorMA(muzzlePoint, lengthMax, muzzleDir, &mut saberTip);
 
                     if saberOrg[i] < ctx.world.entity(saberent).r.mins[i] {
                         ctx.world.entity_mut(saberent).r.mins[i] = saberOrg[i];
@@ -767,8 +764,8 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
         let mins = e.r.mins;
         let maxs = e.r.maxs;
         let origin = e.r.currentOrigin;
-        crate::q_math::_VectorSubtract(mins, origin, &mut e.r.mins);
-        crate::q_math::_VectorSubtract(maxs, origin, &mut e.r.maxs);
+        _VectorSubtract(mins, origin, &mut e.r.mins);
+        _VectorSubtract(maxs, origin, &mut e.r.maxs);
     }
 }
 
@@ -794,7 +791,7 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
             && ce.r.ownerNum == ent_number
             && !ce.classname.is_null()
             && unsafe { *ce.classname != 0 }
-            && unsafe { crate::q_shared::Q_stricmp(ce.classname, c"lightsaber".as_ptr()) == 0 };
+            && unsafe { Q_stricmp(ce.classname, c"lightsaber".as_ptr()) == 0 };
 
         if matches {
             if saberent.is_some() {
@@ -870,7 +867,7 @@ pub fn G_CheckLookTarget(
     ent: EntityId,
     lookAngles: &mut vec3_t,
     lookingSpeed: *mut f32,
-) -> qboolean {
+) -> bool {
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let sc = ctx.world.entity(ent).client;
 
@@ -897,7 +894,7 @@ pub fn G_CheckLookTarget(
         let npc = ctx.world.entity(ent).NPC;
         let shoot_yaw = unsafe { (*npc).shootAngles[YAW as usize] };
         VectorSet(lookAngles, 0.0, shoot_yaw, 0.0);
-        return qtrue;
+        return true;
     }
 
     // Now calc head angle to lookTarget, if any
@@ -921,28 +918,25 @@ pub fn G_CheckLookTarget(
                 // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
                 let lcc = ctx.world.entity(look_cent).client;
                 if !lcc.is_null() {
-                    _VectorCopy((*lcc).renderInfo.eyePoint, &mut lookOrg);
+                    lookOrg = (*lcc).renderInfo.eyePoint;
                 } else if ctx.world.entity(look_cent).inuse != 0
                     && VectorCompare(ctx.world.entity(look_cent).r.currentOrigin, vec3_origin) == 0
                 {
-                    _VectorCopy(ctx.world.entity(look_cent).r.currentOrigin, &mut lookOrg);
+                    lookOrg = ctx.world.entity(look_cent).r.currentOrigin;
                 } else {
                     // at origin of world
-                    return qfalse;
+                    return false;
                 }
             } else if (*sc).renderInfo.lookMode == lookMode_t::LM_INTEREST
                 && look_target > -1
                 && look_target < MAX_INTEREST_POINTS as c_int
             {
-                _VectorCopy(
-                    ctx.world.level.interestPoints[look_target as usize].origin,
-                    &mut lookOrg,
-                );
+                lookOrg = ctx.world.level.interestPoints[look_target as usize].origin;
             } else {
-                return qfalse;
+                return false;
             }
 
-            _VectorCopy((*sc).renderInfo.eyePoint, &mut eyeOrg);
+            eyeOrg = (*sc).renderInfo.eyePoint;
 
             _VectorSubtract(lookOrg, eyeOrg, &mut lookDir);
 
@@ -953,11 +947,11 @@ pub fn G_CheckLookTarget(
                 (*sc).renderInfo.eyeAngles[i] = AngleNormalize180((*sc).renderInfo.eyeAngles[i]);
             }
             let la = *lookAngles;
-            crate::q_math::AnglesSubtract(la, (*sc).renderInfo.eyeAngles, lookAngles);
-            return qtrue;
+            AnglesSubtract(la, (*sc).renderInfo.eyeAngles, lookAngles);
+            return true;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -971,12 +965,11 @@ pub fn G_G2NPCAngles(
     angles: &mut vec3_t,
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let cranium_bone = cstr("cranium");
         let thoracic_bone = cstr("thoracic"); // only used by atst so doesn't need a case
-        let mut looking: qboolean = qfalse;
+        let mut looking = false;
         let mut viewAngles: vec3_t = [0.0; 3];
         let mut lookAngles: vec3_t = [0.0; 3];
 
@@ -999,21 +992,21 @@ pub fn G_G2NPCAngles(
                 && (*ent).s.NPC_class != CLASS_VEHICLE as c_int
             {
                 // an NPC bolted to a vehicle should use the full angles
-                _VectorCopy((*ent).r.currentAngles, angles);
+                *angles = (*ent).r.currentAngles;
             } else {
-                _VectorCopy((*sc).ps.viewangles, angles);
+                *angles = (*sc).ps.viewangles;
                 angles[PITCH as usize] = 0.0;
             }
 
-            _VectorCopy((*sc).ps.viewangles, &mut viewAngles);
+            viewAngles = (*sc).ps.viewangles;
             viewAngles[PITCH as usize] = (viewAngles[PITCH as usize] as f64 * 0.5) as f32;
-            _VectorCopy(viewAngles, &mut lookAngles);
+            lookAngles = viewAngles;
 
             lookAngles[1] = 0.0;
 
             if (*sc).NPC_class == CLASS_ATST {
                 // body pitch
-                crate::NPC_utils::NPC_SetBoneAngles(
+                NPC_SetBoneAngles(
                     ctx,
                     ctx.entity_id_of(ent).unwrap(),
                     thoracic_bone.as_ptr() as *mut c_char,
@@ -1021,7 +1014,7 @@ pub fn G_G2NPCAngles(
                 );
             }
 
-            _VectorCopy(viewAngles, &mut lookAngles);
+            lookAngles = viewAngles;
 
             if !ent.is_null() && !(*ent).client.is_null() && (*sc).NPC_class == CLASS_ATST {
                 // CG_ATSTLegsYaw( cent, trailingLegsAngles );
@@ -1042,7 +1035,7 @@ pub fn G_G2NPCAngles(
                 );
                 lookAngles[PITCH as usize] = 0.0;
                 lookAngles[ROLL as usize] = 0.0; // droids can't pitch or roll their heads
-                if looking != 0 {
+                if looking {
                     // keep doing this lerp behavior for a full second after stopped looking
                     (*sc).renderInfo.lookingDebounceTime = ctx.world.level.time + 1000;
                 }
@@ -1057,19 +1050,19 @@ pub fn G_G2NPCAngles(
                 lookAngles[YAW as usize] = AngleNormalize180(lookAngles[YAW as usize]);
 
                 // slowly lerp to this new value; remember last headAngles
-                _VectorCopy((*sc).renderInfo.lastHeadAngles, &mut oldLookAngles);
+                oldLookAngles = (*sc).renderInfo.lastHeadAngles;
                 if VectorCompare(oldLookAngles, lookAngles) == qfalse {
                     lookAngles[YAW as usize] = oldLookAngles[YAW as usize]
                         + (lookAngles[YAW as usize] - oldLookAngles[YAW as usize]) * 0.4f32;
                 }
                 // Remember current lookAngles next time
-                _VectorCopy(lookAngles, &mut (*sc).renderInfo.lastHeadAngles);
+                (*sc).renderInfo.lastHeadAngles = lookAngles;
             } else {
                 // Remember current lookAngles next time
-                _VectorCopy(lookAngles, &mut (*sc).renderInfo.lastHeadAngles);
+                (*sc).renderInfo.lastHeadAngles = lookAngles;
             }
             if (*sc).NPC_class == CLASS_ATST {
-                _VectorCopy((*sc).ps.viewangles, &mut lookAngles);
+                lookAngles = (*sc).ps.viewangles;
                 lookAngles[0] = 0.0;
                 lookAngles[2] = 0.0;
                 lookAngles[YAW as usize] -= trailingLegsAngles[YAW as usize];
@@ -1079,7 +1072,7 @@ pub fn G_G2NPCAngles(
                 lookAngles[YAW as usize] -= (*sc).ps.viewangles[YAW as usize];
             }
 
-            crate::NPC_utils::NPC_SetBoneAngles(
+            NPC_SetBoneAngles(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),
                 cranium_bone.as_ptr() as *mut c_char,
@@ -1100,8 +1093,7 @@ pub fn G_G2PlayerAngles(
     legsAngles: &mut vec3_t,
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let sc = (*ent).client;
         let mut tPitching: qboolean = qfalse;
@@ -1150,8 +1142,8 @@ pub fn G_G2PlayerAngles(
             }
         }
 
-        _VectorCopy((*sc).ps.origin, &mut lerpOrg);
-        _VectorCopy((*sc).ps.viewangles, &mut lerpAng);
+        lerpOrg = (*sc).ps.origin;
+        lerpAng = (*sc).ps.viewangles;
 
         if (*ent).localAnimIndex <= 1 {
             // don't do these things on non-humanoids
@@ -1170,7 +1162,7 @@ pub fn G_G2PlayerAngles(
                 vectoangles(la, &mut lookAngles);
                 (*sc).lookTime = ctx.world.level.time + 1000;
             } else {
-                _VectorCopy((*sc).ps.origin, &mut lookAngles);
+                lookAngles = (*sc).ps.origin;
             }
             lookAngles[PITCH as usize] = 0.0;
             // Referee probe: caller-side look-target angles + hasLookTarget/lookTime.
@@ -1217,7 +1209,7 @@ pub fn G_G2PlayerAngles(
                 (*sc).lookTime,
                 emplaced,
                 core::ptr::null_mut(),
-                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &GameBgTraps::new(ctx.engine),
             );
 
             if (*sc).ps.heldByClient != 0 && (*sc).ps.heldByClient <= MAX_CLIENTS as c_int {
@@ -1251,7 +1243,7 @@ pub fn G_G2PlayerAngles(
                     let mut tAngles: vec3_t = [0.0; 3];
 
                     let oc = (*other).client;
-                    _VectorCopy((*oc).ps.viewangles, &mut tAngles);
+                    tAngles = (*oc).ps.viewangles;
                     tAngles[PITCH as usize] = 0.0;
                     tAngles[ROLL as usize] = 0.0;
 
@@ -1287,7 +1279,7 @@ pub fn G_G2PlayerAngles(
                         500,
                         qfalse,
                         &ctx.world.bg_state,
-                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                        &GameBgTraps::new(ctx.engine),
                     );
                 }
             } else if (*sc).ikStatus != 0 {
@@ -1327,7 +1319,7 @@ pub fn G_G2PlayerAngles(
                         500,
                         qtrue,
                         &ctx.world.bg_state,
-                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                        &GameBgTraps::new(ctx.engine),
                     );
                 }
             }
@@ -1339,11 +1331,11 @@ pub fn G_G2PlayerAngles(
         {
             let mut lookAngles: vec3_t = [0.0; 3];
 
-            _VectorCopy((*sc).ps.viewangles, legsAngles);
+            *legsAngles = (*sc).ps.viewangles;
             legsAngles[PITCH as usize] = 0.0;
             AnglesToAxis(*legsAngles, legs);
 
-            _VectorCopy((*sc).ps.viewangles, &mut lookAngles);
+            lookAngles = (*sc).ps.viewangles;
             lookAngles[YAW as usize] = 0.0;
             lookAngles[ROLL as usize] = 0.0;
 
@@ -1351,7 +1343,7 @@ pub fn G_G2PlayerAngles(
                 (*ent).ghoul2,
                 ctx.world.level.time,
                 lookAngles,
-                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &GameBgTraps::new(ctx.engine),
             );
         } else if !(*ent).NPC.is_null() {
             // an NPC not using a humanoid skeleton, do special angle stuff.
@@ -1364,7 +1356,7 @@ pub fn G_G2PlayerAngles(
                     == VH_FIGHTER
             {
                 // fighters take pitch and roll into account for the axial angles
-                _VectorCopy((*sc).ps.viewangles, legsAngles);
+                *legsAngles = (*sc).ps.viewangles;
                 AnglesToAxis(*legsAngles, legs);
             } else {
                 G_G2NPCAngles(ctx, ctx.entity_id_of(ent), legs, legsAngles);
@@ -1376,7 +1368,7 @@ pub fn G_G2PlayerAngles(
 /// Raven `SaberAttacking`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:1036-1073`
-pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
+pub fn SaberAttacking(self_: &gentity_t) -> bool {
     let client = self_.client;
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let (saberMove, weaponstate, saberBlocked) = unsafe {
@@ -1384,19 +1376,19 @@ pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
         (ps.saberMove, ps.weaponstate, ps.saberBlocked)
     };
     if mp_bg::bg_panimate::PM_SaberInParry(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_saber::PM_SaberInBrokenParry(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_panimate::PM_SaberInDeflect(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_saber::PM_SaberInBounce(saberMove) != 0 {
-        return 0;
+        return false;
     }
     if mp_bg::bg_panimate::PM_SaberInKnockaway(saberMove) != 0 {
-        return 0;
+        return false;
     }
 
     if mp_bg::bg_panimate::BG_SaberInAttack(saberMove) != 0
@@ -1404,14 +1396,14 @@ pub fn SaberAttacking(self_: &gentity_t) -> qboolean {
         && saberBlocked == BLOCKED_NONE as c_int
     {
         // if we're firing and not blocking, then we're attacking.
-        return 1;
+        return true;
     }
 
     if mp_bg::bg_panimate::BG_SaberInSpecial(saberMove) != 0 {
-        return 1;
+        return true;
     }
 
-    0
+    false
 }
 
 /// Raven `G_SaberLockAnim`.
@@ -1521,7 +1513,7 @@ pub fn WP_SabersCheckLock2(
     attacker: EntityId,
     defender: EntityId,
     mut lockMode: sabersLockMode_t,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t = ctx.entity_mut(attacker);
     let defender: *mut gentity_t = ctx.entity_mut(defender);
@@ -1603,7 +1595,7 @@ pub fn WP_SabersCheckLock2(
                 defStart = 0.75f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
             } else {
-                return qfalse;
+                return false;
             }
         } else {
             // use the new system — all new saberlocks are 46.08 apart
@@ -1764,12 +1756,12 @@ pub fn WP_SabersCheckLock2(
                         defStart = 0.25f32;
                     }
                 } else {
-                    return qfalse;
+                    return false;
                 }
             }
         }
 
-        crate::g_utils::G_SetAnim(
+        G_SetAnim(
             ctx,
             ctx.entity_id_of(attacker).unwrap(),
             core::ptr::null_mut(),
@@ -1786,7 +1778,7 @@ pub fn WP_SabersCheckLock2(
                 anim.firstFrame as c_int + (anim.numFrames as f32 * attStart) as c_int;
         }
 
-        crate::g_utils::G_SetAnim(
+        G_SetAnim(
             ctx,
             ctx.entity_id_of(defender).unwrap(),
             core::ptr::null_mut(),
@@ -1824,7 +1816,7 @@ pub fn WP_SabersCheckLock2(
             (*attacker).r.currentOrigin,
             &mut defDir,
         );
-        _VectorCopy((*ac).ps.viewangles, &mut attAngles);
+        attAngles = (*ac).ps.viewangles;
         attAngles[YAW as usize] = mp_bg::bg_misc::vectoyaw(defDir);
         SetClientViewAngle(&mut *attacker, attAngles);
         defAngles[PITCH as usize] = attAngles[PITCH as usize] * -1.0;
@@ -1857,7 +1849,7 @@ pub fn WP_SabersCheckLock2(
         if trace.startsolid == 0 && trace.allsolid == 0 {
             G_SetOrigin(&mut *(attacker), trace.endpos);
             if !(*attacker).client.is_null() {
-                _VectorCopy(trace.endpos, &mut (*ac).ps.origin);
+                (*ac).ps.origin = trace.endpos;
             }
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(attacker.cast()));
         }
@@ -1884,21 +1876,21 @@ pub fn WP_SabersCheckLock2(
         );
         if trace.startsolid == 0 && trace.allsolid == 0 {
             if !(*defender).client.is_null() {
-                _VectorCopy(trace.endpos, &mut (*dc).ps.origin);
+                (*dc).ps.origin = trace.endpos;
             }
             G_SetOrigin(&mut *(defender), trace.endpos);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(defender.cast()));
         }
 
         // DONE!
-        qtrue
+        true
     }
 }
 
 /// Raven `WP_SabersCheckLock`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:1462-1889`
-pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId) -> qboolean {
+pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let ent1: *mut gentity_t = ctx.entity_mut(ent1);
     let ent2: *mut gentity_t = ctx.entity_mut(ent2);
@@ -1913,19 +1905,19 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                 ctx.entity_id_of(ent2).unwrap(),
                 LOCK_RANDOM,
             );
-            return qtrue;
+            return true;
         }
         // for now.. it's not fair to the lone duelist (no dual saber lock anims).
         if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
-            return qfalse;
+            return false;
         }
 
         if ctx.world.cvars.g_saberLocking.integer == 0 {
-            return qfalse;
+            return false;
         }
 
         if (*ent1).client.is_null() || (*ent2).client.is_null() {
-            return qfalse;
+            return false;
         }
         let c1 = (*ent1).client;
         let c2 = (*ent2).client;
@@ -1933,7 +1925,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
         if (*ent1).s.eType == ET_NPC as c_int || (*ent2).s.eType == ET_NPC as c_int {
             // never let an NPC lock with someone on the same playerTeam
             if (*c1).playerTeam == (*c2).playerTeam {
-                return qfalse;
+                return false;
             }
         }
 
@@ -1943,7 +1935,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             || (*c2).ps.saberInFlight != 0
         {
             // can't get in lock if one has had the saber knocked out of his hand
-            return qfalse;
+            return false;
         }
 
         if (*ent1).s.eType != ET_NPC as c_int && (*ent2).s.eType != ET_NPC as c_int {
@@ -1957,69 +1949,69 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                 if ctx.world.cvars.g_gametype.integer != GT_DUEL
                     && ctx.world.cvars.g_gametype.integer != GT_POWERDUEL
                 {
-                    return qfalse;
+                    return false;
                 }
             }
         }
 
         if ((*ent1).r.currentOrigin[2] - (*ent2).r.currentOrigin[2]).abs() > 16.0 {
-            return qfalse;
+            return false;
         }
         if (*c1).ps.groundEntityNum == ENTITYNUM_NONE || (*c2).ps.groundEntityNum == ENTITYNUM_NONE
         {
-            return qfalse;
+            return false;
         }
         let dist = DistanceSquared((*ent1).r.currentOrigin, (*ent2).r.currentOrigin);
         if dist < 64.0 || dist > 6400.0 {
             // between 8 and 80 from each other
-            return qfalse;
+            return false;
         }
 
         if mp_bg::bg_panimate::BG_InSpecialJump((*c1).ps.legsAnim) != 0 {
-            return qfalse;
+            return false;
         }
         if mp_bg::bg_panimate::BG_InSpecialJump((*c2).ps.legsAnim) != 0 {
-            return qfalse;
+            return false;
         }
 
         if mp_bg::bg_panimate::BG_InRoll(&mut (*c1).ps as *mut playerState_t, (*c1).ps.legsAnim)
             != 0
         {
-            return qfalse;
+            return false;
         }
         if mp_bg::bg_panimate::BG_InRoll(&mut (*c2).ps as *mut playerState_t, (*c2).ps.legsAnim)
             != 0
         {
-            return qfalse;
+            return false;
         }
 
         if (*c1).ps.forceHandExtend != HANDEXTEND_NONE as c_int
             || (*c2).ps.forceHandExtend != HANDEXTEND_NONE as c_int
         {
-            return qfalse;
+            return false;
         }
 
         if ((*c1).ps.pm_flags & PMF_DUCKED) != 0 || ((*c2).ps.pm_flags & PMF_DUCKED) != 0 {
-            return qfalse;
+            return false;
         }
 
         if ((*c1).saber[0].saberFlags & SFL_NOT_LOCKABLE) != 0
             || ((*c2).saber[0].saberFlags & SFL_NOT_LOCKABLE) != 0
         {
-            return qfalse;
+            return false;
         }
         // (Raven's `saber[1].model &&` array-address test is vacuously true.)
         if (*c1).saber[1].model[0] != 0
             && (*c1).ps.saberHolstered == 0
             && ((*c1).saber[1].saberFlags & SFL_NOT_LOCKABLE) != 0
         {
-            return qfalse;
+            return false;
         }
         if (*c2).saber[1].model[0] != 0
             && (*c2).ps.saberHolstered == 0
             && ((*c2).saber[1].saberFlags & SFL_NOT_LOCKABLE) != 0
         {
-            return qfalse;
+            return false;
         }
 
         if InFront(
@@ -2029,7 +2021,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             0.4f32,
         ) == 0
         {
-            return qfalse;
+            return false;
         }
         if InFront(
             (*c2).ps.origin,
@@ -2038,7 +2030,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
             0.4f32,
         ) == 0
         {
-            return qfalse;
+            return false;
         }
 
         let ta1 = (*c1).ps.torsoAnim;
@@ -2142,7 +2134,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BL,
                 );
             }
-            return qfalse;
+            return false;
         }
 
         if ta2 == BOTH_A1_TR_BL as c_int
@@ -2194,7 +2186,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BL,
                 );
             }
-            return qfalse;
+            return false;
         }
 
         // TL to BR lock
@@ -2247,7 +2239,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BR,
                 );
             }
-            return qfalse;
+            return false;
         }
 
         if ta2 == BOTH_A1_TL_BR as c_int
@@ -2299,7 +2291,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_DIAG_BR,
                 );
             }
-            return qfalse;
+            return false;
         }
         // L to R lock
         if ta1 == BOTH_A1__L__R as c_int
@@ -2337,7 +2329,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_L,
                 );
             }
-            return qfalse;
+            return false;
         }
         if ta2 == BOTH_A1__L__R as c_int
             || ta2 == BOTH_A2__L__R as c_int
@@ -2374,7 +2366,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_L,
                 );
             }
-            return qfalse;
+            return false;
         }
         // R to L lock
         if ta1 == BOTH_A1__R__L as c_int
@@ -2412,7 +2404,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_R,
                 );
             }
-            return qfalse;
+            return false;
         }
         if ta2 == BOTH_A1__R__L as c_int
             || ta2 == BOTH_A2__R__L as c_int
@@ -2449,7 +2441,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                     LOCK_R,
                 );
             }
-            return qfalse;
+            return false;
         }
         if ctx.world.bg_state.rng.Q_irand(0, 10) == 0 {
             return WP_SabersCheckLock2(
@@ -2459,7 +2451,7 @@ pub fn WP_SabersCheckLock(ctx: &mut GameContext, ent1: EntityId, ent2: EntityId)
                 LOCK_RANDOM,
             );
         }
-        qfalse
+        false
     }
 }
 
@@ -2490,31 +2482,31 @@ pub fn WP_GetSaberDeflectionAngle(
     attacker: Option<EntityId>,
     defender: Option<EntityId>,
     saberHitFraction: f32,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let attacker: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), attacker) };
     let defender: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), defender) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), defender) };
     unsafe {
         let animBasedDeflection: qboolean = qtrue;
         let _ = saberHitFraction;
 
         if attacker.is_null() || (*attacker).client.is_null() || (*attacker).ghoul2.is_null() {
-            return qfalse;
+            return false;
         }
         if defender.is_null() || (*defender).client.is_null() || (*defender).ghoul2.is_null() {
-            return qfalse;
+            return false;
         }
         let ac = (*attacker).client;
         let dc = (*defender).client;
 
         if (ctx.world.level.time - (*ac).lastSaberStorageTime) > 500 {
             // last update too long ago; something prevents his saber from updating
-            return qfalse;
+            return false;
         }
         if (ctx.world.level.time - (*dc).lastSaberStorageTime) > 500 {
-            return qfalse;
+            return false;
         }
 
         let attSaberLevel = G_SaberAttackPower(
@@ -2537,7 +2529,7 @@ pub fn WP_GetSaberDeflectionAngle(
             let mut quadDiff = ((defQuad - attQuadStart) as f32).abs() as c_int;
 
             if (*dc).ps.saberMove == LS_READY {
-                return qfalse;
+                return false;
             }
 
             // reverse the left/right of the defQuad (mirrored when facing each other)
@@ -2592,10 +2584,10 @@ pub fn WP_GetSaberDeflectionAngle(
                                 .name
                         ),
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
-                return qfalse;
+                return false;
             } else {
                 // attack hit at an angle; figure out what angle it bounces off att
                 quadDiff = defQuad - attQuadEnd;
@@ -2649,10 +2641,10 @@ pub fn WP_GetSaberDeflectionAngle(
                                     .name
                             ),
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
                     (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
-                    return qfalse;
+                    return false;
                 } else {
                     // else, pick a deflection
                     let attMove = (*ac).ps.saberMove;
@@ -2678,10 +2670,10 @@ pub fn WP_GetSaberDeflectionAngle(
                                     .name
                             ),
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
                     (*ac).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
-                    return qtrue;
+                    return true;
                 }
             }
         } else {
@@ -2691,7 +2683,7 @@ pub fn WP_GetSaberDeflectionAngle(
             let mut temp: vec3_t = [0.0; 3];
             let hitDot: f32;
 
-            _VectorCopy((*ac).lastSaberBase_Always, &mut temp);
+            temp = (*ac).lastSaberBase_Always;
 
             AngleVectors((*ac).lastSaberDir_Always, Some(&mut att_HitDir), None, None);
 
@@ -2709,7 +2701,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 (*ac).ps.saberMove =
                     mp_bg::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
-                return qfalse;
+                return false;
             } else {
                 // a deflection
                 let mut att_Right: vec3_t = [0.0; 3];
@@ -2771,7 +2763,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 }
 
                 (*ac).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
-                return qtrue;
+                return true;
             }
         }
     }
@@ -2826,7 +2818,7 @@ pub fn G_GetAttackDamage(
             // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
             // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
             // arena by client number (replaces the old `g_entities` base arg).
-            &mut crate::bg_channel::GameCallbacksImpl {
+            &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             },
@@ -2887,7 +2879,7 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
             // STAGE-2b: irreducible — the ruling-21 `GameCallbacksImpl` seam
             // adapter holds a raw `*mut GameWorld`; `my_saber` reaches the game
             // arena by client number (replaces the old `g_entities` base arg).
-            &mut crate::bg_channel::GameCallbacksImpl {
+            &mut GameCallbacksImpl {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             },
@@ -2904,9 +2896,9 @@ pub fn G_GetAnimPoint(ctx: &mut GameContext, self_: EntityId) -> f32 {
 /// Raven `G_ClientIdleInWorld`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2312-2334`
-pub fn G_ClientIdleInWorld(ent: &gentity_t) -> qboolean {
+pub fn G_ClientIdleInWorld(ent: &gentity_t) -> bool {
     if ent.s.eType == ET_NPC as c_int {
-        return 0;
+        return false;
     }
     let client = ent.client;
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
@@ -2925,9 +2917,9 @@ pub fn G_ClientIdleInWorld(ent: &gentity_t) -> qboolean {
         && (buttons & BUTTON_FORCE_DRAIN) == 0
         && (buttons & BUTTON_ATTACK) == 0
     {
-        return 1;
+        return true;
     }
-    0
+    false
 }
 
 /// Raven `G_G2TraceCollide`.
@@ -2970,7 +2962,7 @@ pub fn G_G2TraceCollide(
     lastValidEnd: vec3_t,
     traceMins: vec3_t,
     traceMaxs: vec3_t,
-) -> qboolean {
+) -> bool {
     // Hit the ent with the normal trace, try the collision trace.
     unsafe {
         let mut G2Trace: G2Trace_t = core::mem::zeroed();
@@ -2979,12 +2971,12 @@ pub fn G_G2TraceCollide(
         let mut fRadius: f32 = 0.0;
 
         if ctx.world.cvars.d_saberGhoul2Collision.integer == 0 {
-            return qfalse;
+            return false;
         }
 
         if ctx.world.g_entities[(*tr).entityNum as usize].inuse == 0 {
             // don't do perpoly on corpses.
-            return qfalse;
+            return false;
         }
 
         if traceMins[0] != 0.0
@@ -3012,10 +3004,10 @@ pub fn G_G2TraceCollide(
 
             if !(*g2Hit).client.is_null() {
                 let gc = (*g2Hit).client;
-                _VectorCopy((*gc).ps.origin, &mut g2HitOrigin);
+                g2HitOrigin = (*gc).ps.origin;
                 angles[YAW as usize] = (*gc).ps.viewangles[YAW as usize];
             } else {
-                _VectorCopy((*g2Hit).r.currentOrigin, &mut g2HitOrigin);
+                g2HitOrigin = (*g2Hit).r.currentOrigin;
                 angles[YAW as usize] = (*g2Hit).r.currentAngles[YAW as usize];
             }
 
@@ -3074,32 +3066,32 @@ pub fn G_G2TraceCollide(
                 (*tr).entityNum = ENTITYNUM_NONE as c_short;
                 (*tr).startsolid = 0;
                 (*tr).allsolid = 0;
-                return qfalse;
+                return false;
             } else {
                 // The ghoul2 trace result matches; copy the collision position back.
-                _VectorCopy(G2Trace[0].mCollisionPosition, &mut (*tr).endpos);
-                _VectorCopy(G2Trace[0].mCollisionNormal, &mut (*tr).plane.normal);
+                (*tr).endpos = G2Trace[0].mCollisionPosition;
+                (*tr).plane.normal = G2Trace[0].mCollisionNormal;
 
                 if !(*g2Hit).client.is_null() {
                     let gc = (*g2Hit).client;
                     (*gc).g2LastSurfaceHit = G2Trace[0].mSurfaceIndex;
                     (*gc).g2LastSurfaceTime = ctx.world.level.time;
                 }
-                return qtrue;
+                return true;
             }
         }
 
-        qfalse
+        false
     }
 }
 
 /// Raven `G_SaberInBackAttack`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:2428-2439`
-pub fn G_SaberInBackAttack(r#move: c_int) -> qboolean {
+pub fn G_SaberInBackAttack(r#move: c_int) -> bool {
     match r#move {
-        LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB => 1,
-        _ => 0,
+        LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB => true,
+        _ => false,
     }
 }
 
@@ -3124,10 +3116,10 @@ pub fn G_BuildSaberFaces(
         let mut invFwd: vec3_t = [0.0; 3];
         let mut invRight: vec3_t = [0.0; 3];
 
-        _VectorCopy(fwd, &mut invFwd);
-        crate::q_math::VectorInverse(&mut invFwd);
-        _VectorCopy(right, &mut invRight);
-        crate::q_math::VectorInverse(&mut invRight);
+        invFwd = fwd;
+        VectorInverse(&mut invFwd);
+        invRight = right;
+        VectorInverse(&mut invRight);
 
         while i < 8 {
             // yeah, this part is kind of a hack, but eh
@@ -3288,7 +3280,7 @@ pub fn G_SaberFaceCollisionCheck(
     atkMins: &mut vec3_t,
     atkMaxs: &mut vec3_t,
     impactPoint: &mut vec3_t,
-) -> qboolean {
+) -> bool {
     let _ = ctx;
     unsafe {
         let mut planeEq: [f32; 4] = [0.0; 4];
@@ -3393,8 +3385,8 @@ pub fn G_SaberFaceCollisionCheck(
 
                         if facing >= 0 {
                             //third edge is facing.. success
-                            _VectorCopy(point, impactPoint);
-                            return qtrue;
+                            *impactPoint = point;
+                            return true;
                         }
                     }
                 }
@@ -3405,7 +3397,7 @@ pub fn G_SaberFaceCollisionCheck(
         }
 
         //did not hit anything
-        qfalse
+        false
     }
 }
 
@@ -3421,7 +3413,7 @@ pub fn G_SaberCollide(
     mut atkMins: vec3_t,
     mut atkMaxs: vec3_t,
     mut impactPoint: vec3_t,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let atk: *mut gentity_t = ctx.entity_mut(atk);
     let def: *mut gentity_t = ctx.entity_mut(def);
@@ -3431,7 +3423,7 @@ pub fn G_SaberCollide(
 
         if ctx.world.cvars.g_saberBladeFaces.integer == 0 {
             //detailed check not enabled
-            return qtrue;
+            return true;
         }
 
         if (*atk).inuse == 0
@@ -3440,7 +3432,7 @@ pub fn G_SaberCollide(
             || (*def).client.is_null()
         {
             //must have 2 clients and a valid saber entity
-            return qfalse;
+            return false;
         }
 
         let dc = (*def).client;
@@ -3465,7 +3457,7 @@ pub fn G_SaberCollide(
                     if (ctx.world.level.time - (*blade).storageTime) < 200 {
                         //recently updated
                         //first get base and tip of blade
-                        _VectorCopy((*blade).muzzlePoint, &mut base);
+                        base = (*blade).muzzlePoint;
                         _VectorMA(base, (*blade).lengthMax, (*blade).muzzleDir, &mut tip);
 
                         //Now get relative angles between the points
@@ -3495,10 +3487,9 @@ pub fn G_SaberCollide(
                                 &mut atkMins,
                                 &mut atkMaxs,
                                 &mut impactPoint,
-                            ) != 0
-                            {
+                            ) {
                                 //collided
-                                return qtrue;
+                                return true;
                             }
                         }
                     }
@@ -3508,7 +3499,7 @@ pub fn G_SaberCollide(
             i += 1;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -3575,12 +3566,10 @@ pub fn WP_SabersIntersect(
     ent1BladeNum: c_int,
     ent2: Option<EntityId>,
     checkDir: qboolean,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent1: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent1) };
-    let ent2: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent2) };
+    let ent1: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent1) };
+    let ent2: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent2) };
     let _ = ctx;
     unsafe {
         let mut saberBase1: vec3_t = [0.0; 3];
@@ -3596,17 +3585,17 @@ pub fn WP_SabersIntersect(
         let mut dir: vec3_t = [0.0; 3];
 
         if ent1.is_null() || ent2.is_null() {
-            return qfalse;
+            return false;
         }
         if (*ent1).client.is_null() || (*ent2).client.is_null() {
-            return qfalse;
+            return false;
         }
         let ec1 = (*ent1).client;
         let ec2 = (*ent2).client;
         if BG_SabersOff(&mut (*ec1).ps as *mut playerState_t) != 0
             || BG_SabersOff(&mut (*ec2).ps as *mut playerState_t) != 0
         {
-            return qfalse;
+            return false;
         }
 
         ent2SaberNum = 0;
@@ -3622,8 +3611,8 @@ pub fn WP_SabersIntersect(
                         {
                             let b1 =
                                 &(*ec1).saber[ent1SaberNum as usize].blade[ent1BladeNum as usize];
-                            _VectorCopy(b1.muzzlePointOld, &mut saberBase1);
-                            _VectorCopy(b1.muzzlePoint, &mut saberBaseNext1);
+                            saberBase1 = b1.muzzlePointOld;
+                            saberBaseNext1 = b1.muzzlePoint;
 
                             _VectorSubtract(b1.muzzlePoint, b1.muzzlePointOld, &mut dir);
                             VectorNormalize(&mut dir);
@@ -3653,8 +3642,8 @@ pub fn WP_SabersIntersect(
                         {
                             let b2 =
                                 &(*ec2).saber[ent2SaberNum as usize].blade[ent2BladeNum as usize];
-                            _VectorCopy(b2.muzzlePointOld, &mut saberBase2);
-                            _VectorCopy(b2.muzzlePoint, &mut saberBaseNext2);
+                            saberBase2 = b2.muzzlePointOld;
+                            saberBaseNext2 = b2.muzzlePoint;
 
                             _VectorSubtract(b2.muzzlePoint, b2.muzzlePointOld, &mut dir);
                             VectorNormalize(&mut dir);
@@ -3772,7 +3761,7 @@ pub fn WP_SabersIntersect(
                             saberBaseNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                         if tri_tri_intersect(
                             saberBase1,
@@ -3783,7 +3772,7 @@ pub fn WP_SabersIntersect(
                             saberTipNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                         if tri_tri_intersect(
                             saberBase1,
@@ -3794,7 +3783,7 @@ pub fn WP_SabersIntersect(
                             saberBaseNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                         if tri_tri_intersect(
                             saberBase1,
@@ -3805,7 +3794,7 @@ pub fn WP_SabersIntersect(
                             saberTipNext2,
                         ) != 0
                         {
-                            return qtrue;
+                            return true;
                         }
                     }
                     ent2BladeNum += 1;
@@ -3813,7 +3802,7 @@ pub fn WP_SabersIntersect(
             }
             ent2SaberNum += 1;
         }
-        qfalse
+        false
     }
 }
 
@@ -3827,8 +3816,7 @@ pub fn G_PowerLevelForSaberAnim(
     mySaberHit: qboolean,
 ) -> c_int {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() || saberNum >= MAX_SABERS as c_int {
             return FORCE_LEVEL_0;
@@ -4289,10 +4277,10 @@ pub fn WP_SaberDamageAdd(
         let cv = curVictim as usize;
         g.totalDmg[cv] += trDmg as f32;
         if VectorCompare(g.dmgDir[cv], vec3_origin) != 0 {
-            crate::q_math::_VectorCopy(trDmgDir, &mut g.dmgDir[cv]);
+            g.dmgDir[cv] = trDmgDir;
         }
         if VectorCompare(g.dmgSpot[cv], vec3_origin) != 0 {
-            crate::q_math::_VectorCopy(trDmgSpot, &mut g.dmgSpot[cv]);
+            g.dmgSpot[cv] = trDmgSpot;
         }
         if doDismemberment != 0 {
             g.dismemberDmg[cv] = qtrue;
@@ -4398,57 +4386,55 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
             }
 
             let te_eid = G_TempEntity(ctx, dmg_spot, EV_SABER_HIT as c_int);
-            let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-            if !te.is_null() {
-                (*te).s.otherEntityNum = ctx.world.globals.victimEntityNum[iu];
-                (*te).s.otherEntityNum2 = ctx.world.entity(self_).s.number;
-                (*te).s.weapon = saberNum;
-                (*te).s.legsAnim = bladeNum;
+            // Raven's `if (te)` guard is vacuous — G_TempEntity never returns NULL.
+            let victim_num = ctx.world.globals.victimEntityNum[iu];
+            let self_num = ctx.world.entity(self_).s.number;
+            let dmg_dir = ctx.world.globals.dmgDir[iu];
+            let victim_client_null = ctx.world.entity(victim_id).client.is_null();
+            let victim_etype = ctx.world.entity(victim_id).s.eType;
+            let total_dmg = ctx.world.globals.totalDmg[iu];
+            let te = ctx.entity_mut(te_eid);
+            te.s.otherEntityNum = victim_num;
+            te.s.otherEntityNum2 = self_num;
+            te.s.weapon = saberNum;
+            te.s.legsAnim = bladeNum;
 
-                (*te).s.origin = ctx.world.globals.dmgSpot[iu];
-                crate::q_math::_VectorScale(
-                    ctx.world.globals.dmgDir[iu],
-                    -1.0,
-                    &mut (*te).s.angles,
-                );
+            te.s.origin = dmg_spot;
+            _VectorScale(dmg_dir, -1.0, &mut te.s.angles);
 
-                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
-                {
-                    // don't let it play with no direction
-                    (*te).s.angles[1] = 1.0;
-                }
+            if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                // don't let it play with no direction
+                te.s.angles[1] = 1.0;
+            }
 
-                if isDroid == 0
-                    && (!ctx.world.entity(victim_id).client.is_null()
-                        || ctx.world.entity(victim_id).s.eType == ET_NPC as c_int
-                        || ctx.world.entity(victim_id).s.eType == ET_BODY as c_int)
-                {
-                    if ctx.world.globals.totalDmg[iu] < 5.0 {
-                        (*te).s.eventParm = 3;
-                    } else if ctx.world.globals.totalDmg[iu] < 20.0 {
-                        (*te).s.eventParm = 2;
-                    } else {
-                        (*te).s.eventParm = 1;
-                    }
+            if isDroid == 0
+                && (!victim_client_null
+                    || victim_etype == ET_NPC as c_int
+                    || victim_etype == ET_BODY as c_int)
+            {
+                if total_dmg < 5.0 {
+                    te.s.eventParm = 3;
+                } else if total_dmg < 20.0 {
+                    te.s.eventParm = 2;
                 } else {
-                    let saber = &mut (*sc).saber[saberNum as usize] as *mut saberInfo_t;
-                    if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0
-                        && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE) != 0
-                    {
-                        // don't do clash flare
-                    } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
-                        && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE2) != 0
-                    {
-                        // don't do clash flare
-                    } else {
-                        if ctx.world.globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE as f32 {
-                            let teS_id =
-                                G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
-                            let teS = ctx.entity_mut(teS_id) as *mut gentity_t;
-                            (*teS).s.origin = (*te).s.origin;
-                        }
-                        (*te).s.eventParm = 0;
+                    te.s.eventParm = 1;
+                }
+            } else {
+                let saber = &mut (*sc).saber[saberNum as usize] as *mut saberInfo_t;
+                if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0
+                    && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE) != 0
+                {
+                    // don't do clash flare
+                } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
+                    && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE2) != 0
+                {
+                    // don't do clash flare
+                } else {
+                    if total_dmg > SABER_NONATTACK_DAMAGE as f32 {
+                        let teS_id = G_TempEntity(ctx, dmg_spot, EV_SABER_CLASHFLARE as c_int);
+                        ctx.entity_mut(teS_id).s.origin = dmg_spot;
                     }
+                    ctx.entity_mut(te_eid).s.eventParm = 0;
                 }
             }
         }
@@ -4467,8 +4453,7 @@ pub fn WP_SaberRadiusDamage(
     knockBack: f32,
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -4686,7 +4671,7 @@ pub fn CheckSaberDamage(
     doInterpolate: qboolean,
     mut trMask: c_int,
     extrapolate: qboolean,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     unsafe {
@@ -4704,7 +4689,7 @@ pub fn CheckSaberDamage(
         let mut attackStr: c_int = 0;
         let mut saberBoxSize: f32 = ctx.world.cvars.d_saberBoxTraceSize.value;
         let mut idleDamage: qboolean = qfalse;
-        let mut didHit: qboolean = qfalse;
+        let mut didHit = false;
         let mut sabersClashed: qboolean = qfalse;
         let mut unblockable: qboolean = qfalse;
         let mut didDefense: qboolean = qfalse;
@@ -4715,7 +4700,7 @@ pub fn CheckSaberDamage(
         let mut otherOwner: *mut gentity_t = core::ptr::null_mut();
 
         if BG_SabersOff(&mut (*sc).ps as *mut playerState_t) != 0 {
-            return qfalse;
+            return false;
         }
 
         selfSaberLevel =
@@ -4795,22 +4780,16 @@ pub fn CheckSaberDamage(
                     > 100
                 {
                     //no valid last pos, use current
-                    _VectorCopy(saberStart, &mut oldSaberStart);
-                    _VectorCopy(*saberEnd, &mut oldSaberEnd);
+                    oldSaberStart = saberStart;
+                    oldSaberEnd = *saberEnd;
                 } else {
                     //trace from last pos
-                    _VectorCopy(
-                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                            .trail
-                            .base,
-                        &mut oldSaberStart,
-                    );
-                    _VectorCopy(
-                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                            .trail
-                            .tip,
-                        &mut oldSaberEnd,
-                    );
+                    oldSaberStart = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                        .trail
+                        .base;
+                    oldSaberEnd = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                        .trail
+                        .tip;
                 }
 
                 _VectorSubtract(saberStart, *saberEnd, &mut saberDif);
@@ -4850,8 +4829,8 @@ pub fn CheckSaberDamage(
                     tr.fraction,
                     tr.entityNum as i32,
                 ); // TEMP G6
-                _VectorCopy(*saberEnd, &mut lastValidStart);
-                _VectorCopy(saberStart, &mut lastValidEnd);
+                lastValidStart = *saberEnd;
+                lastValidEnd = saberStart;
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(
                         ctx,
@@ -4890,22 +4869,16 @@ pub fn CheckSaberDamage(
                         > 100
                     {
                         //no valid last pos, use current
-                        _VectorCopy(saberStart, &mut oldSaberStart);
-                        _VectorCopy(*saberEnd, &mut oldSaberEnd);
+                        oldSaberStart = saberStart;
+                        oldSaberEnd = *saberEnd;
                     } else {
                         //trace from last pos
-                        _VectorCopy(
-                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .base,
-                            &mut oldSaberStart,
-                        );
-                        _VectorCopy(
-                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .tip,
-                            &mut oldSaberEnd,
-                        );
+                        oldSaberStart = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .base;
+                        oldSaberEnd = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .tip;
                     }
 
                     _VectorSubtract(saberStart, *saberEnd, &mut saberDif);
@@ -4945,8 +4918,8 @@ pub fn CheckSaberDamage(
                         tr.fraction,
                         tr.entityNum as i32,
                     ); // TEMP G6
-                    _VectorCopy(*saberEnd, &mut lastValidStart);
-                    _VectorCopy(saberStart, &mut lastValidEnd);
+                    lastValidStart = *saberEnd;
+                    lastValidEnd = saberStart;
                     if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                         G_G2TraceCollide(
                             ctx,
@@ -4990,7 +4963,7 @@ pub fn CheckSaberDamage(
                         &mut saberEndExtrapolated,
                     );
                 } else {
-                    _VectorCopy(*saberEnd, &mut saberEndExtrapolated);
+                    saberEndExtrapolated = *saberEnd;
                 }
                 trap::Trace(
                     ctx.engine,
@@ -5015,8 +4988,8 @@ pub fn CheckSaberDamage(
                     tr.fraction,
                     tr.entityNum as i32,
                 ); // TEMP G6
-                _VectorCopy(saberStart, &mut lastValidStart);
-                _VectorCopy(saberEndExtrapolated, &mut lastValidEnd);
+                lastValidStart = saberStart;
+                lastValidEnd = saberEndExtrapolated;
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(
                         ctx,
@@ -5047,7 +5020,7 @@ pub fn CheckSaberDamage(
         }
 
         if (*sc).ps.saberAttackWound < ctx.world.level.time
-            && (SaberAttacking(&*(self_)) != 0
+            && (SaberAttacking(&*(self_))
                 || BG_SuperBreakWinAnim((*sc).ps.torsoAnim) != 0
                 || (ctx.world.cvars.d_saberSPStyleDamage.integer != 0
                     && (*sc).ps.saberInFlight != 0
@@ -5061,7 +5034,7 @@ pub fn CheckSaberDamage(
         {
             //this animation is that of the last attack movement, and so it should do full damage
             let saberInSpecial: qboolean = BG_SaberInSpecial((*sc).ps.saberMove);
-            let inBackAttack: qboolean = G_SaberInBackAttack((*sc).ps.saberMove);
+            let inBackAttack = G_SaberInBackAttack((*sc).ps.saberMove);
 
             if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
                 let mut fDmg: f32 = 0.0f32;
@@ -5199,7 +5172,7 @@ pub fn CheckSaberDamage(
                     }
                 } else if (*sc).ps.fd.saberAnimLevel == 3 {
                     //new damage-ramping system
-                    if saberInSpecial == 0 && inBackAttack == 0 {
+                    if saberInSpecial == 0 && !inBackAttack {
                         dmg = G_GetAttackDamage(
                             ctx,
                             ctx.entity_id_of(self_).unwrap(),
@@ -5215,7 +5188,7 @@ pub fn CheckSaberDamage(
                             180,
                             0.65f32,
                         );
-                    } else if inBackAttack != 0 {
+                    } else if inBackAttack {
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 30, 0.5f32);
                     //can hit multiple times (and almost always does), so..
@@ -5230,7 +5203,7 @@ pub fn CheckSaberDamage(
                         //a well-timed hit with this can do a full 85
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 80, 0.5f32);
-                    } else if inBackAttack != 0 {
+                    } else if inBackAttack {
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 25, 0.5f32);
                     } else {
@@ -5245,7 +5218,7 @@ pub fn CheckSaberDamage(
                             SABER_HITDAMAGE - 5,
                             0.3f32,
                         );
-                    } else if inBackAttack != 0 {
+                    } else if inBackAttack {
                         dmg =
                             G_GetAttackDamage(ctx, ctx.entity_id_of(self_).unwrap(), 2, 30, 0.5f32);
                     } else {
@@ -5261,7 +5234,7 @@ pub fn CheckSaberDamage(
             //just touching, do minimal damage and only check for it every 200ms
             if (*sc).saber[0].saberFlags2 & SFL2_NO_IDLE_EFFECT != 0 {
                 //no idle damage or effects
-                return qtrue; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
+                return true; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
             }
             trMask &= !CONTENTS_LIGHTSABER;
             if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
@@ -5279,17 +5252,17 @@ pub fn CheckSaberDamage(
             }
             idleDamage = qtrue;
         } else {
-            return qtrue; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
+            return true; //true cause even though we didn't get a hit, we don't want to do those extra traces because the debounce time says not to.
         }
 
         if BG_SaberInSpecial((*sc).ps.saberMove) != 0 {
-            let inBackAttack: qboolean = G_SaberInBackAttack((*sc).ps.saberMove);
+            let inBackAttack = G_SaberInBackAttack((*sc).ps.saberMove);
 
             unblockable = qtrue;
             (*sc).ps.saberBlocked = 0;
 
             if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
-            } else if inBackAttack == 0 {
+            } else if !inBackAttack {
                 if (*sc).ps.saberMove == LS_A_JUMP_T__B_ {
                     //do extra damage for special unblockables
                     dmg += 5; //This is very tiny, because this move has a huge damage ramp
@@ -5347,9 +5320,9 @@ pub fn CheckSaberDamage(
                         & CONTENTS_LIGHTSABER)
                         != 0)
             {
-                return qtrue;
+                return true;
             }
-            return qfalse;
+            return false;
         }
 
         if dmg > SABER_NONATTACK_DAMAGE {
@@ -5411,7 +5384,7 @@ pub fn CheckSaberDamage(
 
         if ctx.world.cvars.g_saberDebugPrint.integer > 2 && dmg > 1 {
             let s = format!("CL {} SABER DMG: {}\n", (*self_).s.number, dmg);
-            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+            Com_Printf(cstr(&s).as_ptr());
         }
 
         _VectorSubtract(*saberEnd, saberStart, &mut dir);
@@ -5432,8 +5405,6 @@ pub fn CheckSaberDamage(
         {
             //then bounce off
             {
-                let mut te: *mut gentity_t = core::ptr::null_mut();
-
                 (*sc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                     &ctx.world.bg_state,
                     (*sc).ps.saberMove,
@@ -5457,18 +5428,17 @@ pub fn CheckSaberDamage(
                 //do bounce sound & force feedback
                 WP_SaberBounceSound(ctx, ctx.entity_id_of(self_), rSaberNum, rBladeNum);
                 //do hit effect
-                let __teid11 = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                te = ctx.entity_mut(__teid11);
-                (*te).s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
-                (*te).s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
-                (*te).s.weapon = rSaberNum;
-                (*te).s.legsAnim = rBladeNum;
-                _VectorCopy(tr.endpos, &mut (*te).s.origin);
-                _VectorCopy(tr.plane.normal, &mut (*te).s.angles);
-                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
-                {
+                let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                let te = ctx.entity_mut(te_id);
+                te.s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
+                te.s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
+                te.s.weapon = rSaberNum;
+                te.s.legsAnim = rBladeNum;
+                te.s.origin = tr.endpos;
+                te.s.angles = tr.plane.normal;
+                if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
                     //don't let it play with no direction
-                    (*te).s.angles[1] = 1.0;
+                    te.s.angles[1] = 1.0;
                 }
                 //do radius damage/knockback, if any
                 if WP_SaberBladeUseSecondBladeStyle(
@@ -5495,7 +5465,7 @@ pub fn CheckSaberDamage(
                     );
                 }
 
-                return qtrue;
+                return true;
             }
         }
 
@@ -5518,21 +5488,21 @@ pub fn CheckSaberDamage(
                 && OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(trEnt)) != 0
                 && ctx.world.cvars.g_friendlySaber.integer == 0
             {
-                return qfalse;
+                return false;
             }
 
             if !(*trEnt).client.is_null()
                 && (*trc).ps.duelInProgress != 0
                 && (*trc).ps.duelIndex != (*self_).s.number
             {
-                return qfalse;
+                return false;
             }
 
             if !(*trEnt).client.is_null()
                 && (*sc).ps.duelInProgress != 0
                 && (*sc).ps.duelIndex != (*trEnt).s.number
             {
-                return qfalse;
+                return false;
             }
 
             if BG_StabDownAnim((*sc).ps.torsoAnim) != 0
@@ -5543,12 +5513,12 @@ pub fn CheckSaberDamage(
                 ) == 0
             {
                 //stabdowns only damage people who are actually on the ground...
-                return qfalse;
+                return false;
             }
             (*sc).ps.saberIdleWound =
                 ctx.world.level.time + ctx.world.cvars.g_saberDmgDelay_Idle.integer;
 
-            didHit = qtrue;
+            didHit = true;
 
             if ctx.world.cvars.d_saberSPStyleDamage.integer == 0
                 && !(*trEnt).client.is_null()
@@ -5559,7 +5529,7 @@ pub fn CheckSaberDamage(
                     tr.endpos,
                     0,
                     MOD_SABER as c_int,
-                    qfalse,
+                    false,
                     attackStr,
                 ) != 0
             {
@@ -5569,8 +5539,8 @@ pub fn CheckSaberDamage(
                         ctx.world.level.time + ctx.world.cvars.g_saberDmgDelay_Idle.integer;
                 }
                 ctx.world.globals.saberDoClashEffect = qtrue;
-                _VectorCopy(tr.endpos, &mut ctx.world.globals.saberClashPos);
-                _VectorCopy(tr.plane.normal, &mut ctx.world.globals.saberClashNorm);
+                ctx.world.globals.saberClashPos = tr.endpos;
+                ctx.world.globals.saberClashNorm = tr.plane.normal;
                 ctx.world.globals.saberClashEventParm = 1;
 
                 if dmg > SABER_NONATTACK_DAMAGE {
@@ -5582,13 +5552,13 @@ pub fn CheckSaberDamage(
                         && ctx.world.bg_state.rng.Q_irand(1, 10) < lockFactor * 2
                     {
                         //Just got blocked by someone with a decently higher attack level, so enter into a lock
-                        if G_ClientIdleInWorld(&*(trEnt)) == 0 {
+                        if !G_ClientIdleInWorld(&*(trEnt)) {
                             if (trMask & CONTENTS_LIGHTSABER) != 0
                                 && WP_SabersCheckLock(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
                                     ctx.entity_id_of(trEnt).unwrap(),
-                                ) != 0
+                                )
                             {
                                 (*sc).ps.saberBlocked = BLOCKED_NONE;
                                 (*trc).ps.saberBlocked = BLOCKED_NONE;
@@ -5596,13 +5566,13 @@ pub fn CheckSaberDamage(
                             }
                         }
                     } else if ctx.world.bg_state.rng.Q_irand(1, 20) < lockFactor {
-                        if G_ClientIdleInWorld(&*(trEnt)) == 0 {
+                        if !G_ClientIdleInWorld(&*(trEnt)) {
                             if (trMask & CONTENTS_LIGHTSABER) != 0
                                 && WP_SabersCheckLock(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
                                     ctx.entity_id_of(trEnt).unwrap(),
-                                ) != 0
+                                )
                             {
                                 (*sc).ps.saberBlocked = BLOCKED_NONE;
                                 (*trc).ps.saberBlocked = BLOCKED_NONE;
@@ -5730,7 +5700,7 @@ pub fn CheckSaberDamage(
             otherOwner = &mut ctx.world.g_entities[oo_num as usize] as *mut gentity_t;
 
             if (*otherOwner).inuse == 0 || (*otherOwner).client.is_null() {
-                return qfalse;
+                return false;
             }
 
             let ooc = (*otherOwner).client;
@@ -5741,21 +5711,20 @@ pub fn CheckSaberDamage(
                 //hit an in-hand saber, do extra collision check against it
                 if ctx.world.cvars.d_saberSPStyleDamage.integer != 0 {
                     //use SP-style blade-collision test
-                    if WP_SabersIntersect(
+                    if !WP_SabersIntersect(
                         ctx,
                         ctx.entity_id_of(self_),
                         rSaberNum,
                         rBladeNum,
                         ctx.entity_id_of(otherOwner),
                         qfalse,
-                    ) == 0
-                    {
+                    ) {
                         //sabers did not actually intersect
-                        return qfalse;
+                        return false;
                     }
                 } else {
                     //MP-style
-                    if G_SaberCollide(
+                    if !G_SaberCollide(
                         ctx,
                         ctx.entity_id_of(self_).unwrap(),
                         ctx.entity_id_of(otherOwner).unwrap(),
@@ -5764,10 +5733,9 @@ pub fn CheckSaberDamage(
                         saberTrMins,
                         saberTrMaxs,
                         tr.endpos,
-                    ) == 0
-                    {
+                    ) {
                         //detailed collision did not produce results...
-                        return qfalse;
+                        return false;
                     }
                 }
             }
@@ -5775,7 +5743,7 @@ pub fn CheckSaberDamage(
             if OnSameTeam(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(otherOwner)) != 0
                 && ctx.world.cvars.g_friendlySaber.integer == 0
             {
-                return qfalse;
+                return false;
             }
 
             if ((*self_).s.eType == ET_NPC as c_int || (*otherOwner).s.eType == ET_NPC as c_int)
@@ -5783,15 +5751,15 @@ pub fn CheckSaberDamage(
                 && ctx.world.cvars.g_gametype.integer != GT_SIEGE
             {
                 //don't hit your teammate's sabers if you are an NPC.
-                return qfalse;
+                return false;
             }
 
             if (*ooc).ps.duelInProgress != 0 && (*ooc).ps.duelIndex != (*self_).s.number {
-                return qfalse;
+                return false;
             }
 
             if (*sc).ps.duelInProgress != 0 && (*sc).ps.duelIndex != (*otherOwner).s.number {
-                return qfalse;
+                return false;
             }
 
             if ctx.world.cvars.g_debugSaberLocks.integer != 0 {
@@ -5801,9 +5769,9 @@ pub fn CheckSaberDamage(
                     ctx.entity_id_of(otherOwner).unwrap(),
                     LOCK_RANDOM,
                 );
-                return qtrue;
+                return true;
             }
-            didHit = qtrue;
+            didHit = true;
             (*sc).ps.saberIdleWound =
                 ctx.world.level.time + ctx.world.cvars.g_saberDmgDelay_Idle.integer;
 
@@ -5813,8 +5781,8 @@ pub fn CheckSaberDamage(
             }
 
             ctx.world.globals.saberDoClashEffect = qtrue;
-            _VectorCopy(tr.endpos, &mut ctx.world.globals.saberClashPos);
-            _VectorCopy(tr.plane.normal, &mut ctx.world.globals.saberClashNorm);
+            ctx.world.globals.saberClashPos = tr.endpos;
+            ctx.world.globals.saberClashNorm = tr.plane.normal;
             ctx.world.globals.saberClashEventParm = 1;
 
             sabersClashed = qtrue;
@@ -5827,10 +5795,9 @@ pub fn CheckSaberDamage(
                 ctx.entity_id_of(otherOwner),
                 ctx.entity_id_of(self_),
                 dmg,
-            ) != 0
-            {
+            ) {
                 //smashed it out of the air
-                return qfalse;
+                return false;
             }
 
             //is this my thrown saber?
@@ -5843,10 +5810,10 @@ pub fn CheckSaberDamage(
                     ctx.entity_id_of(self_),
                     ctx.entity_id_of(otherOwner),
                     dmg,
-                ) != 0
+                )
             {
                 //they smashed it out of the air
-                return qfalse;
+                return false;
             }
 
             do_block_stuff = true;
@@ -5861,12 +5828,12 @@ pub fn CheckSaberDamage(
                 && !(*otherOwner).client.is_null()
                 && (*ooc).ps.saberInFlight != 0
             {
-                return qfalse;
+                return false;
             }
 
             //this is a thrown saber, don't do any fancy saber-saber collision stuff
             if (*sc).ps.saberEntityNum != 0 && (*sc).ps.saberInFlight != 0 && rSaberNum == 0 {
-                return qfalse;
+                return false;
             }
 
             otherSaberLevel = G_SaberAttackPower(
@@ -5879,13 +5846,12 @@ pub fn CheckSaberDamage(
                 let lockFactor = ctx.world.cvars.g_saberLockFactor.integer;
 
                 if sabersClashed != 0 && ctx.world.bg_state.rng.Q_irand(1, 20) <= lockFactor {
-                    if G_ClientIdleInWorld(&*(otherOwner)) == 0 {
+                    if !G_ClientIdleInWorld(&*(otherOwner)) {
                         if WP_SabersCheckLock(
                             ctx,
                             ctx.entity_id_of(self_).unwrap(),
                             ctx.entity_id_of(otherOwner).unwrap(),
-                        ) != 0
-                        {
+                        ) {
                             (*sc).ps.saberBlocked = BLOCKED_NONE;
                             (*ooc).ps.saberBlocked = BLOCKED_NONE;
                             return didHit;
@@ -5917,13 +5883,12 @@ pub fn CheckSaberDamage(
             {
                 //for now, just always try a deflect. (deflect func can cause bounces too)
                 if true {
-                    if WP_GetSaberDeflectionAngle(
+                    if !WP_GetSaberDeflectionAngle(
                         ctx,
                         ctx.entity_id_of(self_),
                         ctx.entity_id_of(otherOwner),
                         tr.fraction,
-                    ) == 0
-                    {
+                    ) {
                         tryDeflectAgain = qtrue; //Failed the deflect, try it again if we can
                     } else {
                         (*sc).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
@@ -5939,7 +5904,7 @@ pub fn CheckSaberDamage(
                             (*self_).s.number,
                             (*otherOwner).s.number
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
                 }
             }
@@ -5994,7 +5959,7 @@ pub fn CheckSaberDamage(
                         (*otherOwner).s.number,
                         (*self_).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
 
                 didDefense = qtrue;
@@ -6029,7 +5994,7 @@ pub fn CheckSaberDamage(
                         (*self_).s.number,
                         (*otherOwner).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
 
                 (*ooc).ps.saberMove =
@@ -6057,23 +6022,22 @@ pub fn CheckSaberDamage(
                         (*self_).s.number,
                         (*otherOwner).s.number
                     );
-                    crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(cstr(&s).as_ptr());
                 }
 
                 if tryDeflectAgain == 0 {
-                    if WP_GetSaberDeflectionAngle(
+                    if !WP_GetSaberDeflectionAngle(
                         ctx,
                         ctx.entity_id_of(self_),
                         ctx.entity_id_of(otherOwner),
                         tr.fraction,
-                    ) == 0
-                    {
+                    ) {
                         tryDeflectAgain = qtrue;
                     }
                 }
 
                 didOffense = qtrue;
-            } else if SaberAttacking(&*(otherOwner)) != 0
+            } else if SaberAttacking(&*(otherOwner))
                 && dmg > SABER_NONATTACK_DAMAGE
                 && BG_SaberInSpecial((*ooc).ps.saberMove) == 0
                 && didOffense == 0
@@ -6117,7 +6081,7 @@ pub fn CheckSaberDamage(
                             (*self_).s.number,
                             (*otherOwner).s.number
                         );
-                        crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(cstr(&s).as_ptr());
                     }
 
                     attackBonus = ctx
@@ -6198,7 +6162,7 @@ pub fn CheckSaberDamage(
                         crushTheParry = qtrue;
                     }
 
-                    if SaberAttacking(&*(otherOwner)) == 0 {
+                    if !SaberAttacking(&*(otherOwner)) {
                         let mut otherIdleStr = (*ooc).ps.fd.saberAnimLevel;
                         if otherIdleStr == saber_styles_t::SS_DUAL as c_int
                             || otherIdleStr == saber_styles_t::SS_STAFF as c_int
@@ -6240,7 +6204,7 @@ pub fn CheckSaberDamage(
                                 (*self_).s.number,
                                 (*otherOwner).s.number
                             );
-                            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                            Com_Printf(cstr(&s).as_ptr());
                         }
                     } else {
                         //They are attacking, so are we
@@ -6276,7 +6240,7 @@ pub fn CheckSaberDamage(
                                     (*self_).s.number,
                                     (*otherOwner).s.number
                                 );
-                                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                                Com_Printf(cstr(&s).as_ptr());
                             }
 
                             (*sc).ps.saberEventFlags |= SEF_DEFLECTED;
@@ -6306,7 +6270,7 @@ pub fn CheckSaberDamage(
                                     (*self_).s.number,
                                     (*otherOwner).s.number
                                 );
-                                crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                                Com_Printf(cstr(&s).as_ptr());
                             }
 
                             (*ooc).ps.saberEventFlags &= !SEF_BLOCKED;
@@ -6334,7 +6298,7 @@ pub fn CheckSaberDamage(
                                 (*self_).s.number,
                                 (*otherOwner).s.number
                             );
-                            crate::g_main::Com_Printf(cstr(&s).as_ptr());
+                            Com_Printf(cstr(&s).as_ptr());
                         }
                     } else if PM_SaberInParry(G_GetParryForBlock((*ooc).ps.saberBlocked)) != 0
                         && didOffense == 0
@@ -6423,26 +6387,20 @@ pub fn G_SPSaberDamageTraceLerped(
             > 100
         {
             //no valid last pos, use current
-            _VectorCopy(*baseNew, &mut baseOld);
-            _VectorCopy(*endNew, &mut endOld);
+            baseOld = *baseNew;
+            endOld = *endNew;
         } else {
             //trace from last pos
-            _VectorCopy(
-                (*ec).saber[saberNum as usize].blade[bladeNum as usize]
-                    .trail
-                    .base,
-                &mut baseOld,
-            );
-            _VectorCopy(
-                (*ec).saber[saberNum as usize].blade[bladeNum as usize]
-                    .trail
-                    .tip,
-                &mut endOld,
-            );
+            baseOld = (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                .trail
+                .base;
+            endOld = (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                .trail
+                .tip;
         }
 
-        _VectorCopy(baseOld, &mut mp1);
-        _VectorCopy(*baseNew, &mut mp2);
+        mp1 = baseOld;
+        mp2 = *baseNew;
         _VectorSubtract(endOld, baseOld, &mut md1);
         VectorNormalize(&mut md1);
         _VectorSubtract(*endNew, *baseNew, &mut md2);
@@ -6484,8 +6442,8 @@ pub fn G_SPSaberDamageTraceLerped(
             let mut extrapolate: qboolean = qtrue;
 
             //do the trace at the base first
-            _VectorCopy(baseOld, &mut bladePointOld);
-            _VectorCopy(*baseNew, &mut bladePointNew);
+            bladePointOld = baseOld;
+            bladePointNew = *baseNew;
             CheckSaberDamage(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
@@ -6547,15 +6505,15 @@ pub fn G_SPSaberDamageTraceLerped(
             vectoangles(md1, &mut ma1);
             vectoangles(md2, &mut ma2);
 
-            _VectorCopy(md1, &mut curMD2);
-            _VectorCopy(baseOld, &mut curBase2);
+            curMD2 = md1;
+            curBase2 = baseOld;
 
             loop {
-                _VectorCopy(curMD2, &mut curMD1);
-                _VectorCopy(curBase2, &mut curBase1);
+                curMD1 = curMD2;
+                curBase1 = curBase2;
                 if curDirFrac >= 1.0f32 {
-                    _VectorCopy(md2, &mut curMD2);
-                    _VectorCopy(*baseNew, &mut curBase2);
+                    curMD2 = md2;
+                    curBase2 = *baseNew;
                 } else {
                     xx = 0;
                     while xx < 3 {
@@ -6793,7 +6751,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                     let mut tr: trace_t = core::mem::zeroed();
                     let mut myEyes: vec3_t = [0.0; 3];
 
-                    _VectorCopy((*sc).ps.origin, &mut myEyes);
+                    myEyes = (*sc).ps.origin;
                     myEyes[2] += (*sc).ps.viewheight as f32;
 
                     trap::Trace(
@@ -6917,7 +6875,7 @@ pub fn WP_SaberStartMissileBlockCheck(
             } //NPCs always try to block sabers coming from behind!
 
             //see if they're heading towards me
-            _VectorCopy((*ent).s.pos.trDelta, &mut missile_dir);
+            missile_dir = (*ent).s.pos.trDelta;
             VectorNormalize(&mut missile_dir);
             if _DotProduct(dir, missile_dir) > 0.0 {
                 continue;
@@ -6925,7 +6883,7 @@ pub fn WP_SaberStartMissileBlockCheck(
 
             //FIXME: must have a clear trace to me, too...
             if dist < closestDist {
-                _VectorCopy((*self_).r.currentOrigin, &mut traceTo);
+                traceTo = (*self_).r.currentOrigin;
                 traceTo[2] = (*self_).r.absmax[2] - 4.0;
                 trap::Trace(
                     ctx.engine,
@@ -7066,7 +7024,7 @@ pub fn WP_SaberStartMissileBlockCheck(
 
                 WP_SaberBlockNonRandom(&*(self_), (*incoming).r.currentOrigin, qtrue);
                 let owc = (*owner).client;
-                let selfEnemy = crate::ent_id::resolve(base, (*self_).enemy);
+                let selfEnemy = ent_id::resolve(base, (*self_).enemy);
                 if !(*owner).client.is_null()
                     && ((*self_).enemy.is_none() || (*selfEnemy).s.weapon != WP_SABER as c_int)
                 //keep enemy jedi over shooters
@@ -7089,18 +7047,16 @@ pub fn CheckThrownSaberDamaged(
     dist: c_int,
     returning: c_int,
     noDCheck: qboolean,
-) -> qboolean {
+) -> bool {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let saberent: *mut gentity_t = ctx.entity_mut(saberent);
     let saberOwner: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), saberOwner) };
-    let ent: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), saberOwner) };
+    let ent: *mut gentity_t = unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), ent) };
     unsafe {
         let level_time = ctx.world.level.time;
         let mut vecsub: vec3_t;
         let mut veclen: f32;
-        let te: *mut gentity_t;
         let base = ctx.world.g_entities.as_mut_ptr();
 
         let soc = (*saberOwner).client;
@@ -7108,7 +7064,7 @@ pub fn CheckThrownSaberDamaged(
             && !(*saberOwner).client.is_null()
             && (*soc).ps.saberAttackWound > level_time
         {
-            return qfalse;
+            return false;
         }
 
         if !ent.is_null()
@@ -7130,18 +7086,14 @@ pub fn CheckThrownSaberDamaged(
             // hit a client
             let ec = (*ent).client;
             if (*ec).ps.duelInProgress != 0 && (*ec).ps.duelIndex != (*saberOwner).s.number {
-                return qfalse;
+                return false;
             }
             if (*soc).ps.duelInProgress != 0 && (*soc).ps.duelIndex != (*ent).s.number {
-                return qfalse;
+                return false;
             }
 
             vecsub = [0.0; 3];
-            crate::q_math::_VectorSubtract(
-                (*saberent).r.currentOrigin,
-                (*ec).ps.origin,
-                &mut vecsub,
-            );
+            _VectorSubtract((*saberent).r.currentOrigin, (*ec).ps.origin, &mut vecsub);
             veclen = VectorLength(vecsub);
 
             if veclen < dist as f32 {
@@ -7168,26 +7120,23 @@ pub fn CheckThrownSaberDamaged(
                             tr.endpos,
                             0,
                             MOD_SABER as c_int,
-                            qfalse,
+                            false,
                             999,
                         ) != 0
                     {
                         // they blocked it
                         WP_SaberBlockNonRandom(&*(ent), tr.endpos, qfalse);
 
-                        let __teid12 = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
-                        te = ctx.entity_mut(__teid12);
-                        (*te).s.origin = tr.endpos;
-                        (*te).s.angles = tr.plane.normal;
-                        if (*te).s.angles[0] == 0.0
-                            && (*te).s.angles[1] == 0.0
-                            && (*te).s.angles[2] == 0.0
-                        {
-                            (*te).s.angles[1] = 1.0;
+                        let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
+                        let te = ctx.entity_mut(te_id);
+                        te.s.origin = tr.endpos;
+                        te.s.angles = tr.plane.normal;
+                        if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                            te.s.angles[1] = 1.0;
                         }
-                        (*te).s.eventParm = 1;
-                        (*te).s.weapon = 0;
-                        (*te).s.legsAnim = 0;
+                        te.s.eventParm = 1;
+                        te.s.weapon = 0;
+                        te.s.legsAnim = 0;
 
                         if saberCheckKnockdown_Thrown(
                             ctx,
@@ -7196,10 +7145,9 @@ pub fn CheckThrownSaberDamaged(
                             ctx.entity_id_of(
                                 &mut (*base.add(tr.entityNum as usize)) as *mut gentity_t,
                             ),
-                        ) != 0
-                        {
+                        ) {
                             // it was knocked out of the air
-                            return qfalse;
+                            return false;
                         }
 
                         if returning == 0 {
@@ -7213,17 +7161,13 @@ pub fn CheckThrownSaberDamaged(
                         }
 
                         (*soc).ps.saberAttackWound = level_time + 500;
-                        return qfalse;
+                        return false;
                     } else {
                         // a good hit
                         let mut dir: vec3_t = [0.0; 3];
                         let mut dflags = 0;
 
-                        crate::q_math::_VectorSubtract(
-                            tr.endpos,
-                            (*saberent).r.currentOrigin,
-                            &mut dir,
-                        );
+                        _VectorSubtract(tr.endpos, (*saberent).r.currentOrigin, &mut dir);
                         VectorNormalize(&mut dir);
 
                         if dir[0] == 0.0 && dir[1] == 0.0 && dir[2] == 0.0 {
@@ -7265,22 +7209,19 @@ pub fn CheckThrownSaberDamaged(
                             );
                         }
 
-                        let __teid13 = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                        te = ctx.entity_mut(__teid13);
-                        (*te).s.otherEntityNum = (*ent).s.number;
-                        (*te).s.otherEntityNum2 = (*saberOwner).s.number;
-                        (*te).s.weapon = 0;
-                        (*te).s.legsAnim = 0;
-                        (*te).s.origin = tr.endpos;
-                        (*te).s.angles = tr.plane.normal;
-                        if (*te).s.angles[0] == 0.0
-                            && (*te).s.angles[1] == 0.0
-                            && (*te).s.angles[2] == 0.0
-                        {
-                            (*te).s.angles[1] = 1.0;
+                        let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
+                        let te = ctx.entity_mut(te_id);
+                        te.s.otherEntityNum = (*ent).s.number;
+                        te.s.otherEntityNum2 = (*saberOwner).s.number;
+                        te.s.weapon = 0;
+                        te.s.legsAnim = 0;
+                        te.s.origin = tr.endpos;
+                        te.s.angles = tr.plane.normal;
+                        if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                            te.s.angles[1] = 1.0;
                         }
 
-                        (*te).s.eventParm = 1;
+                        te.s.eventParm = 1;
 
                         if returning == 0 {
                             thrownSaberTouch(
@@ -7316,7 +7257,7 @@ pub fn CheckThrownSaberDamaged(
                 veclen = 0.0;
             } else {
                 vecsub = [0.0; 3];
-                crate::q_math::_VectorSubtract(
+                _VectorSubtract(
                     (*saberent).r.currentOrigin,
                     (*ent).r.currentOrigin,
                     &mut vecsub,
@@ -7329,18 +7270,14 @@ pub fn CheckThrownSaberDamaged(
                 let mut entOrigin: vec3_t = [0.0; 3];
 
                 if (*ent).s.eType == ET_MOVER as c_int {
-                    crate::q_math::_VectorSubtract(
-                        (*ent).r.absmax,
-                        (*ent).r.absmin,
-                        &mut entOrigin,
-                    );
+                    _VectorSubtract((*ent).r.absmax, (*ent).r.absmin, &mut entOrigin);
                     let tmp = entOrigin;
-                    crate::q_math::_VectorMA((*ent).r.absmin, 0.5, tmp, &mut entOrigin);
-                    crate::q_math::_VectorAdd((*ent).r.absmin, (*ent).r.absmax, &mut entOrigin);
+                    _VectorMA((*ent).r.absmin, 0.5, tmp, &mut entOrigin);
+                    _VectorAdd((*ent).r.absmin, (*ent).r.absmax, &mut entOrigin);
                     let tmp2 = entOrigin;
-                    crate::q_math::_VectorScale(tmp2, 0.5, &mut entOrigin);
+                    _VectorScale(tmp2, 0.5, &mut entOrigin);
                 } else {
-                    crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut entOrigin);
+                    entOrigin = (*ent).r.currentOrigin;
                 }
 
                 trap::Trace(
@@ -7360,7 +7297,7 @@ pub fn CheckThrownSaberDamaged(
                     let mut dir: vec3_t = [0.0; 3];
                     let mut dflags = 0;
 
-                    crate::q_math::_VectorSubtract(tr.endpos, entOrigin, &mut dir);
+                    _VectorSubtract(tr.endpos, entOrigin, &mut dir);
                     VectorNormalize(&mut dir);
 
                     if ((*soc).saber[0].saberFlags2 & SFL2_NO_DISMEMBERMENT) != 0 {
@@ -7398,18 +7335,15 @@ pub fn CheckThrownSaberDamaged(
                     }
 
                     let te_eid = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-                    (*te).s.otherEntityNum = ENTITYNUM_NONE;
-                    (*te).s.otherEntityNum2 = (*saberOwner).s.number;
-                    (*te).s.weapon = 0;
-                    (*te).s.legsAnim = 0;
-                    (*te).s.origin = tr.endpos;
-                    (*te).s.angles = tr.plane.normal;
-                    if (*te).s.angles[0] == 0.0
-                        && (*te).s.angles[1] == 0.0
-                        && (*te).s.angles[2] == 0.0
-                    {
-                        (*te).s.angles[1] = 1.0;
+                    let te = ctx.entity_mut(te_eid);
+                    te.s.otherEntityNum = ENTITYNUM_NONE;
+                    te.s.otherEntityNum2 = (*saberOwner).s.number;
+                    te.s.weapon = 0;
+                    te.s.legsAnim = 0;
+                    te.s.origin = tr.endpos;
+                    te.s.angles = tr.plane.normal;
+                    if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                        te.s.angles[1] = 1.0;
                     }
 
                     if (*ent).s.eType == ET_MOVER as c_int {
@@ -7420,14 +7354,12 @@ pub fn CheckThrownSaberDamaged(
                             // don't do clash flare
                             G_FreeEntity(ctx, Some(te_eid));
                         } else {
-                            let teS_id =
-                                G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
-                            let teS = ctx.entity_mut(teS_id) as *mut gentity_t;
-                            (*teS).s.origin = (*te).s.origin;
-                            (*te).s.eventParm = 0;
+                            let teS_id = G_TempEntity(ctx, tr.endpos, EV_SABER_CLASHFLARE as c_int);
+                            ctx.entity_mut(teS_id).s.origin = tr.endpos;
+                            ctx.entity_mut(te_eid).s.eventParm = 0;
                         }
                     } else {
-                        (*te).s.eventParm = 1;
+                        ctx.entity_mut(te_eid).s.eventParm = 1;
                     }
 
                     if returning == 0 {
@@ -7445,7 +7377,7 @@ pub fn CheckThrownSaberDamaged(
             }
         }
 
-        qtrue
+        true
     }
 }
 
@@ -7525,7 +7457,7 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         VectorSet(&mut mins, -24.0, -24.0, -8.0);
         VectorSet(&mut maxs, 24.0, 24.0, 8.0);
 
-        crate::q_math::_VectorSubtract(origin, oldOrg, &mut calcComp);
+        _VectorSubtract(origin, oldOrg, &mut calcComp);
         let originalLength = VectorLength(calcComp);
 
         VectorNormalize(&mut calcComp);
@@ -7590,7 +7522,7 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         }
     }
 
-    crate::q_math::_VectorCopy(origin, &mut ctx.world.entity_mut(ent).r.currentOrigin);
+    ctx.world.entity_mut(ent).r.currentOrigin = origin;
 }
 
 /// Raven `SaberBounceSound`.
@@ -8047,9 +7979,9 @@ pub fn WP_SaberAddG2Model(
 ) {
     WP_SaberRemoveG2Model(ctx, saberent);
     let modelindex = if !saberModel.is_null() && unsafe { *saberModel != 0 } {
-        crate::g_utils::G_ModelIndex(saberModel)
+        G_ModelIndex(saberModel)
     } else {
-        crate::g_utils::G_ModelIndex(cstr("models/weapons2/saber/saber_w.glm").as_ptr())
+        G_ModelIndex(cstr("models/weapons2/saber/saber_w.glm").as_ptr())
     };
     ctx.world.entity_mut(saberent).s.modelindex = modelindex;
     // FIXME(Raven): use customSkin?
@@ -8078,17 +8010,17 @@ pub fn saberKnockOutOfHand(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     velocity: vec3_t,
-) -> qboolean {
+) -> bool {
     let level_time = ctx.world.level.time;
 
     let (Some(saberent), Some(saberOwner)) = (saberent, saberOwner) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
         || ctx.world.entity(saberOwner).client.is_null()
     {
-        return qfalse;
+        return false;
     }
 
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
@@ -8096,19 +8028,19 @@ pub fn saberKnockOutOfHand(
     unsafe {
         if (*soc).ps.saberEntityNum == 0 {
             // already gone
-            return qfalse;
+            return false;
         }
 
         if (level_time - (*soc).lastSaberStorageTime) > 50 {
             // must have a reasonably updated saber base pos
-            return qfalse;
+            return false;
         }
 
         if (*soc).ps.saberLockTime > (level_time - 100) {
-            return qfalse;
+            return false;
         }
         if ((*soc).saber[0].saberFlags & SFL_NOT_DISARMABLE) != 0 {
-            return qfalse;
+            return false;
         }
 
         (*soc).ps.saberInFlight = qtrue;
@@ -8157,9 +8089,9 @@ pub fn saberKnockOutOfHand(
     G_SetOrigin(ctx.world.entity_mut(saberent), base);
     saberKnockDown(ctx, saberent, saberOwner, saberOwner);
     // override the velocity on the knocked away saber.
-    crate::q_math::_VectorCopy(velocity, &mut ctx.world.entity_mut(saberent).s.pos.trDelta);
+    ctx.world.entity_mut(saberent).s.pos.trDelta = velocity;
 
-    qtrue
+    true
 }
 
 /// Raven `saberCheckKnockdown_DuelLoss`.
@@ -8170,7 +8102,7 @@ pub fn saberCheckKnockdown_DuelLoss(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
-) -> qboolean {
+) -> bool {
     let mut dif: vec3_t = [0.0; 3];
     let mut totalDistance = 1.0f32;
     let distScale = 6.5f32;
@@ -8179,7 +8111,7 @@ pub fn saberCheckKnockdown_DuelLoss(
 
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8187,14 +8119,14 @@ pub fn saberCheckKnockdown_DuelLoss(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
 
         let level_time = ctx.world.level.time;
@@ -8205,11 +8137,7 @@ pub fn saberCheckKnockdown_DuelLoss(
 
         if validMomentum != 0 {
             // Get the difference
-            crate::q_math::_VectorSubtract(
-                (*ooc).lastSaberBase_Always,
-                (*ooc).olderSaberBase,
-                &mut dif,
-            );
+            _VectorSubtract((*ooc).lastSaberBase_Always, (*ooc).olderSaberBase, &mut dif);
             totalDistance = VectorNormalize(&mut dif);
 
             if totalDistance == 0.0 {
@@ -8218,11 +8146,7 @@ pub fn saberCheckKnockdown_DuelLoss(
                     validMomentum = qfalse;
                 }
                 if validMomentum != 0 {
-                    crate::q_math::_VectorSubtract(
-                        (*soc).lastSaberBase_Always,
-                        (*soc).olderSaberBase,
-                        &mut dif,
-                    );
+                    _VectorSubtract((*soc).lastSaberBase_Always, (*soc).olderSaberBase, &mut dif);
                     totalDistance = VectorNormalize(&mut dif);
                 }
             }
@@ -8230,7 +8154,7 @@ pub fn saberCheckKnockdown_DuelLoss(
             if validMomentum != 0 {
                 if totalDistance == 0.0 {
                     // try the difference between the two blades
-                    crate::q_math::_VectorSubtract(
+                    _VectorSubtract(
                         (*soc).lastSaberBase_Always,
                         (*ooc).lastSaberBase_Always,
                         &mut dif,
@@ -8242,7 +8166,7 @@ pub fn saberCheckKnockdown_DuelLoss(
                     if totalDistance < 20.0 {
                         totalDistance = 20.0;
                     }
-                    crate::q_math::_VectorScale(dif, totalDistance * distScale, &mut dif);
+                    _VectorScale(dif, totalDistance * distScale, &mut dif);
                 }
             }
         }
@@ -8260,7 +8184,7 @@ pub fn saberCheckKnockdown_DuelLoss(
         if ctx.world.bg_state.rng.Q_irand(0, disarmChance) != 0 {
             saberKnockOutOfHand(ctx, Some(saberent), Some(saberOwner), dif)
         } else {
-            qfalse
+            false
         }
     }
 }
@@ -8273,13 +8197,13 @@ pub fn saberCheckKnockdown_BrokenParry(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
-) -> qboolean {
+) -> bool {
     let mut doKnock = qfalse;
     let mut disarmChance = 1;
 
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8287,26 +8211,26 @@ pub fn saberCheckKnockdown_BrokenParry(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     let ooc = ctx.world.entity(other).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
     }
 
     let level_time = ctx.world.level.time;
 
     // Neither gets an advantage based on attack state.
-    let myAttack = G_SaberAttackPower(ctx, Some(saberOwner), qfalse);
-    let otherAttack = G_SaberAttackPower(ctx, Some(other), qfalse);
+    let myAttack = G_SaberAttackPower(ctx, Some(saberOwner), false);
+    let otherAttack = G_SaberAttackPower(ctx, Some(other), false);
 
     unsafe {
         if (*ooc).olderIsValid == 0 || (level_time - (*ooc).lastSaberStorageTime) >= 200 {
-            return qfalse;
+            return false;
         }
 
         // only knock the saber out of the hand if they're in a stronger stance
@@ -8321,36 +8245,28 @@ pub fn saberCheckKnockdown_BrokenParry(
             let mut totalDistance;
             let distScale = 6.5f32;
 
-            crate::q_math::_VectorSubtract(
-                (*ooc).lastSaberBase_Always,
-                (*ooc).olderSaberBase,
-                &mut dif,
-            );
+            _VectorSubtract((*ooc).lastSaberBase_Always, (*ooc).olderSaberBase, &mut dif);
             totalDistance = VectorNormalize(&mut dif);
 
             if totalDistance == 0.0 {
                 // fine, try our own
                 if (*soc).olderIsValid == 0 || (level_time - (*soc).lastSaberStorageTime) >= 200 {
-                    return qfalse;
+                    return false;
                 }
 
-                crate::q_math::_VectorSubtract(
-                    (*soc).lastSaberBase_Always,
-                    (*soc).olderSaberBase,
-                    &mut dif,
-                );
+                _VectorSubtract((*soc).lastSaberBase_Always, (*soc).olderSaberBase, &mut dif);
                 totalDistance = VectorNormalize(&mut dif);
             }
 
             if totalDistance == 0.0 {
                 // ...forget it then.
-                return qfalse;
+                return false;
             }
 
             if totalDistance < 20.0 {
                 totalDistance = 20.0;
             }
-            crate::q_math::_VectorScale(dif, totalDistance * distScale, &mut dif);
+            _VectorScale(dif, totalDistance * distScale, &mut dif);
 
             if !ctx.world.entity(other).client.is_null() {
                 disarmChance += (*ooc).saber[0].disarmBonus;
@@ -8363,7 +8279,7 @@ pub fn saberCheckKnockdown_BrokenParry(
             }
         }
 
-        qfalse
+        false
     }
 }
 
@@ -8376,10 +8292,10 @@ pub fn saberCheckKnockdown_Smashed(
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
     damage: c_int,
-) -> qboolean {
+) -> bool {
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8387,18 +8303,18 @@ pub fn saberCheckKnockdown_Smashed(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
 
         if (*soc).ps.saberInFlight == 0 {
             // can only do this if the saber is already actually in flight
-            return qfalse;
+            return false;
         }
     }
 
@@ -8409,16 +8325,16 @@ pub fn saberCheckKnockdown_Smashed(
     {
         // make sure the blow was strong enough
         saberKnockDown(ctx, saberent, saberOwner, other);
-        return qtrue;
+        return true;
     }
 
     if damage > 10 {
         // make sure the blow was strong enough
         saberKnockDown(ctx, saberent, saberOwner, other);
-        return qtrue;
+        return true;
     }
 
-    qfalse
+    false
 }
 
 /// Raven `saberCheckKnockdown_Thrown`.
@@ -8429,12 +8345,12 @@ pub fn saberCheckKnockdown_Thrown(
     saberent: Option<EntityId>,
     saberOwner: Option<EntityId>,
     other: Option<EntityId>,
-) -> qboolean {
+) -> bool {
     let mut tossIt = qfalse;
 
     // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
     let (Some(saberent), Some(saberOwner), Some(other)) = (saberent, saberOwner, other) else {
-        return qfalse;
+        return false;
     };
     if ctx.world.entity(saberent).inuse == 0
         || ctx.world.entity(saberOwner).inuse == 0
@@ -8442,7 +8358,7 @@ pub fn saberCheckKnockdown_Thrown(
         || ctx.world.entity(saberOwner).client.is_null()
         || ctx.world.entity(other).client.is_null()
     {
-        return qfalse;
+        return false;
     }
     // FLAG: pool clients (NPC-capable); deref raw per recipe 2b.
     let soc = ctx.world.entity(saberOwner).client;
@@ -8450,7 +8366,7 @@ pub fn saberCheckKnockdown_Thrown(
 
     unsafe {
         if (*soc).ps.saberEntityNum == 0 || (*soc).ps.saberLockTime > (ctx.world.level.time - 100) {
-            return qfalse;
+            return false;
         }
 
         let defenLevel = (*ooc).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
@@ -8465,10 +8381,10 @@ pub fn saberCheckKnockdown_Thrown(
 
         if tossIt != 0 {
             saberKnockDown(ctx, saberent, saberOwner, other);
-            return qtrue;
+            return true;
         }
 
-        qfalse
+        false
     }
 }
 
@@ -8542,7 +8458,7 @@ pub fn saberBackToOwner(ctx: &mut GameContext, saberent: EntityId) {
 
         (*saberent).r.contents = CONTENTS_LIGHTSABER;
 
-        crate::q_math::_VectorSubtract((*saberent).pos1, (*saberent).r.currentOrigin, &mut dir);
+        _VectorSubtract((*saberent).pos1, (*saberent).r.currentOrigin, &mut dir);
 
         ownerLen = VectorLength(dir);
 
@@ -8565,13 +8481,13 @@ pub fn saberBackToOwner(ctx: &mut GameContext, saberent: EntityId) {
 
             // Gradually slow down as it approaches.
             if ownerLen < 64.0 {
-                crate::q_math::_VectorScale(dir, baseSpeed - 200.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed - 200.0, &mut (*saberent).s.pos.trDelta);
             } else if ownerLen < 128.0 {
-                crate::q_math::_VectorScale(dir, baseSpeed - 150.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed - 150.0, &mut (*saberent).s.pos.trDelta);
             } else if ownerLen < 256.0 {
-                crate::q_math::_VectorScale(dir, baseSpeed - 100.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed - 100.0, &mut (*saberent).s.pos.trDelta);
             } else {
-                crate::q_math::_VectorScale(dir, baseSpeed, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, baseSpeed, &mut (*saberent).s.pos.trDelta);
             }
 
             (*saberent).s.pos.trTime = level_time;
@@ -8795,11 +8711,7 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
             }
 
             let mut vSub: vec3_t = [0.0; 3];
-            crate::q_math::_VectorSubtract(
-                (*soc).ps.origin,
-                (*saberent).r.currentOrigin,
-                &mut vSub,
-            );
+            _VectorSubtract((*soc).ps.origin, (*saberent).r.currentOrigin, &mut vSub);
             let vLen = VectorLength(vSub);
 
             if vLen
@@ -8827,10 +8739,10 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
 
                 AngleVectors((*soc).ps.viewangles, Some(&mut fwd), None, None);
 
-                crate::q_math::_VectorCopy((*soc).ps.origin, &mut traceFrom);
+                traceFrom = (*soc).ps.origin;
                 traceFrom[2] += (*soc).ps.viewheight as f32;
 
-                crate::q_math::_VectorCopy(traceFrom, &mut traceTo);
+                traceTo = traceFrom;
                 traceTo[0] += fwd[0] * 4096.0;
                 traceTo[1] += fwd[1] * 4096.0;
                 traceTo[2] += fwd[2] * 4096.0;
@@ -8857,9 +8769,9 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
                     ),
                 );
 
-                crate::q_math::_VectorSubtract(tr.endpos, (*saberent).r.currentOrigin, &mut dir);
+                _VectorSubtract(tr.endpos, (*saberent).r.currentOrigin, &mut dir);
                 VectorNormalize(&mut dir);
-                crate::q_math::_VectorScale(dir, 500.0, &mut (*saberent).s.pos.trDelta);
+                _VectorScale(dir, 500.0, &mut (*saberent).s.pos.trDelta);
                 (*saberent).s.pos.trTime = level_time;
 
                 if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_3 {
@@ -9041,7 +8953,7 @@ pub fn UpdateClientRenderinfo(
                 (*ri).lastG2 = (*self_).ghoul2;
             }
 
-            _VectorCopy((*client).ps.viewangles, &mut (*ri).eyeAngles);
+            (*ri).eyeAngles = (*client).ps.viewangles;
 
             //we'll just say the legs/torso are whatever the first frame of our current anim is.
             (*ri).torsoFrame = (*(&ctx.world.bg_state.bgAllAnims)[(*self_).localAnimIndex as usize]
@@ -9057,13 +8969,13 @@ pub fn UpdateClientRenderinfo(
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
 
                 if (*self_).ghoul2.is_null() {
-                    _VectorCopy((*client).ps.origin, &mut (*ri).headPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).handRPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).handLPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).torsoPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).crotchPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).footRPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).footLPoint);
+                    (*ri).headPoint = (*client).ps.origin;
+                    (*ri).handRPoint = (*client).ps.origin;
+                    (*ri).handLPoint = (*client).ps.origin;
+                    (*ri).torsoPoint = (*client).ps.origin;
+                    (*ri).crotchPoint = (*client).ps.origin;
+                    (*ri).footRPoint = (*client).ps.origin;
+                    (*ri).footLPoint = (*client).ps.origin;
                 } else {
                     //head
                     trap::G2API_GetBoltMatrix(
@@ -9209,9 +9121,9 @@ pub fn UpdateClientRenderinfo(
             }
 
             //muzzle point calc (we are going to be cheap here)
-            _VectorCopy((*ri).muzzlePoint, &mut (*ri).muzzlePointOld);
-            _VectorCopy((*client).ps.origin, &mut (*ri).muzzlePoint);
-            _VectorCopy((*ri).muzzleDir, &mut (*ri).muzzleDirOld);
+            (*ri).muzzlePointOld = (*ri).muzzlePoint;
+            (*ri).muzzlePoint = (*client).ps.origin;
+            (*ri).muzzleDirOld = (*ri).muzzleDir;
             AngleVectors(
                 (*client).ps.viewangles,
                 Some(&mut (*ri).muzzleDir),
@@ -9220,7 +9132,7 @@ pub fn UpdateClientRenderinfo(
             );
             (*ri).mPCalcTime = ctx.world.level.time;
 
-            _VectorCopy((*client).ps.origin, &mut (*ri).eyePoint);
+            (*ri).eyePoint = (*client).ps.origin;
             (*ri).eyePoint[2] += (*client).ps.viewheight as f32;
         }
     }
@@ -9229,16 +9141,16 @@ pub fn UpdateClientRenderinfo(
 /// Raven `G_KickDownable`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7474-7500`
-pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean {
+pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> bool {
     if ctx.world.cvars.d_saberKickTweak.integer == 0 {
-        return 1;
+        return true;
     }
 
     let Some(ent) = ent else {
-        return 0;
+        return false;
     };
     if ctx.world.entity(ent).inuse == 0 || ctx.world.entity(ent).client.is_null() {
-        return 0;
+        return false;
     }
     // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
     let client = ctx.world.entity(ent).client;
@@ -9246,18 +9158,18 @@ pub fn G_KickDownable(ctx: &mut GameContext, ent: Option<EntityId>) -> qboolean 
     unsafe {
         if BG_InKnockDown((*client).ps.legsAnim) != 0 || BG_InKnockDown((*client).ps.torsoAnim) != 0
         {
-            return 0;
+            return false;
         }
 
         if (*client).ps.weaponTime <= 0
             && (*client).ps.weapon == WP_SABER as c_int
             && (*client).ps.groundEntityNum != ENTITYNUM_NONE
         {
-            return 0;
+            return false;
         }
     }
 
-    1
+    true
 }
 
 /// Raven `G_TossTheMofo`.
@@ -9293,7 +9205,7 @@ pub fn G_TossTheMofo(ctx: &mut GameContext, ent: EntityId, tossDir: vec3_t, toss
         if health > 0
             && (*client).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int
             && BG_KnockDownable(&mut (*client).ps) != 0
-            && G_KickDownable(ctx, Some(ent)) != 0
+            && G_KickDownable(ctx, Some(ent))
         {
             // if they are alive, knock them down I suppose
             (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
@@ -9349,7 +9261,7 @@ pub fn G_KickTrace(
                 (*ent).r.currentOrigin[1],
                 kickEnd[2],
             ];
-            crate::q_math::_VectorCopy(kickEnd, &mut traceEnd);
+            traceEnd = kickEnd;
         } else {
             //extrude
             traceOrg = [
@@ -9357,7 +9269,7 @@ pub fn G_KickTrace(
                 (*ent).r.currentOrigin[1],
                 (*ent).r.currentOrigin[2] + (*ent).r.maxs[2] * 0.5f32,
             ];
-            crate::q_math::_VectorMA(traceOrg, kickDist, kickDir, &mut traceEnd);
+            _VectorMA(traceOrg, kickDist, kickDir, &mut traceEnd);
         }
 
         if ctx.world.cvars.d_saberKickTweak.integer != 0 {
@@ -9462,7 +9374,7 @@ pub fn G_KickTrace(
                 }
                 if !(*hitEnt).client.is_null()
                     && ((*((*hitEnt).client)).ps.pm_flags & PMF_TIME_KNOCKBACK) == 0 //not already flying through air?  Intended to stop multiple hits, but...
-                    && G_CanBeEnemy(ctx, ctx.entity_id_of(ent).unwrap(), ctx.entity_id_of(hitEnt).unwrap()) != 0
+                    && G_CanBeEnemy(ctx, ctx.entity_id_of(ent).unwrap(), ctx.entity_id_of(hitEnt).unwrap())
                 {
                     //FIXME: this should not always work
                     if (*hitEnt).health <= 0 {
@@ -9554,7 +9466,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         Some(&mut kickEnd),
                         0,
                     );
-                    crate::q_math::_VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
+                    _VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
                     kickDir[2] = 0.0; //ah, flatten it, I guess...
                     VectorNormalize(&mut kickDir);
                 } else {
@@ -9581,7 +9493,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
+                        _VectorSubtract(kickEnd, (*client).ps.origin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9606,11 +9518,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9632,11 +9540,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9658,17 +9562,13 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, Some(&mut kickDir), None, None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_R as c_int {
@@ -9685,11 +9585,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
@@ -9711,17 +9607,13 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_S as c_int {
@@ -9737,15 +9629,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     }
                 } else {
                     //guess
@@ -9771,7 +9659,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         //back
                         doKick = 1;
                         AngleVectors(fwdAngs, Some(&mut kickDir), None, None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     } else if elapsedTime >= 900.0 && elapsedTime < 1000.0 {
                         //back-left?
                         doKick = 1;
@@ -9781,13 +9669,13 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         //left
                         doKick = 1;
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     } else if elapsedTime >= 1100.0 && elapsedTime < 1200.0 {
                         //front-left?
                         doKick = 1;
                         fwdAngs[YAW as usize] += 45.0;
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_BF as c_int {
@@ -9813,15 +9701,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     }
                 } else {
                     //guess
@@ -9833,7 +9717,7 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                         //back
                         doKick = 1;
                         AngleVectors(fwdAngs, Some(&mut kickDir), None, None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             } else if legsAnim == BOTH_A7_KICK_RL as c_int {
@@ -9857,15 +9741,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
@@ -9884,19 +9764,15 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
                             Some(&mut kickEnd),
                             0,
                         );
-                        crate::q_math::_VectorSubtract(
-                            kickEnd,
-                            (*ent).r.currentOrigin,
-                            &mut kickDir,
-                        );
+                        _VectorSubtract(kickEnd, (*ent).r.currentOrigin, &mut kickDir);
                         kickDir[2] = 0.0; //ah, flatten it, I guess...
                         VectorNormalize(&mut kickDir);
                         //NOTE: have to fudge this a little because it's not getting enough range with the anim as-is
-                        crate::q_math::_VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
+                        _VectorMA(kickEnd, 8.0f32, kickDir, &mut kickEnd);
                     } else {
                         //guess
                         AngleVectors(fwdAngs, None, Some(&mut kickDir), None);
-                        crate::q_math::_VectorScale(kickDir, -1.0, &mut kickDir);
+                        _VectorScale(kickDir, -1.0, &mut kickDir);
                     }
                 }
             }
@@ -9922,11 +9798,11 @@ pub fn G_KickSomeMofos(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `G_PrettyCloseIGuess`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:7958-7967`
-pub fn G_PrettyCloseIGuess(a: f32, b: f32, tolerance: f32) -> qboolean {
+pub fn G_PrettyCloseIGuess(a: f32, b: f32, tolerance: f32) -> bool {
     if (a - b) < tolerance && (a - b) > -tolerance {
-        return 1;
+        return true;
     }
-    0
+    false
 }
 
 /// Raven `G_GrabSomeMofos`.
@@ -10000,8 +9876,8 @@ pub fn G_GrabSomeMofos(ctx: &mut GameContext, self_: EntityId) {
                     ctx,
                     ctx.entity_id_of(self_).unwrap(),
                     ctx.entity_id_of(grabbed).unwrap(),
-                ) != 0
-                && G_PrettyCloseIGuess((*gcl).ps.origin[2], (*client).ps.origin[2], 4.0) != 0
+                )
+                && G_PrettyCloseIGuess((*gcl).ps.origin[2], (*client).ps.origin[2], 4.0)
                 && (BG_InGrappleMove((*gcl).ps.torsoAnim) == 0
                     || (*gcl).ps.torsoAnim == animNumber_t::BOTH_KYLE_GRAB as c_int)
                 && (BG_InGrappleMove((*gcl).ps.legsAnim) == 0
@@ -10137,7 +10013,7 @@ pub fn WP_SaberPositionUpdate(
 ) {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t =
-        unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), self_) };
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), self_) };
     unsafe {
         let mut mySaber: *mut gentity_t = core::ptr::null_mut();
         let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -10214,8 +10090,7 @@ pub fn WP_SaberPositionUpdate(
                 || (*gcl).grappleState == 0
                 || (*grappler).health < 1
                 || (*self_).health < 1
-                || G_PrettyCloseIGuess((*client).ps.origin[2], (*gcl).ps.origin[2], 4.0f32)
-                    == qfalse
+                || !G_PrettyCloseIGuess((*client).ps.origin[2], (*gcl).ps.origin[2], 4.0f32)
             {
                 (*client).grappleState = 0;
                 if (BG_InGrappleMove((*client).ps.torsoAnim) != 0 && (*client).ps.torsoTimer > 100)
@@ -10240,7 +10115,7 @@ pub fn WP_SaberPositionUpdate(
             } else {
                 let mut grapAng: vec3_t = [0.0; 3];
 
-                crate::q_math::_VectorSubtract((*gcl).ps.origin, (*client).ps.origin, &mut grapAng);
+                _VectorSubtract((*gcl).ps.origin, (*client).ps.origin, &mut grapAng);
 
                 if VectorLength(grapAng) > 64.0f32 {
                     // too far away, break it off
@@ -10286,7 +10161,7 @@ pub fn WP_SaberPositionUpdate(
                         }
 
                         AngleVectors((*gcl).ps.viewangles, Some(&mut gFwd), None, None);
-                        crate::q_math::_VectorMA((*gcl).ps.origin, idealDist, gFwd, &mut idealSpot);
+                        _VectorMA((*gcl).ps.origin, idealDist, gFwd, &mut idealSpot);
 
                         trap::Trace(
                             ctx.engine,
@@ -10304,7 +10179,7 @@ pub fn WP_SaberPositionUpdate(
                         {
                             // go there
                             G_SetOrigin(&mut *(self_), idealSpot);
-                            crate::q_math::_VectorCopy(idealSpot, &mut (*client).ps.origin);
+                            (*client).ps.origin = idealSpot;
                         }
                     } else if (*client).grappleState >= 1 {
                         // grappler
@@ -10408,16 +10283,16 @@ pub fn WP_SaberPositionUpdate(
 
                                     (*client).grappleState = 0;
 
-                                    crate::q_math::_VectorSubtract(
+                                    _VectorSubtract(
                                         (*gcl).ps.origin,
                                         (*client).ps.origin,
                                         &mut tossDir,
                                     );
                                     VectorNormalize(&mut tossDir);
-                                    crate::q_math::_VectorScale(tossDir, 500.0f32, &mut tossDir);
+                                    _VectorScale(tossDir, 500.0f32, &mut tossDir);
                                     tossDir[2] = 200.0f32;
 
-                                    crate::q_math::_VectorAdd(
+                                    _VectorAdd(
                                         (*gcl).ps.velocity,
                                         tossDir,
                                         &mut (*gcl).ps.velocity,
@@ -10539,10 +10414,7 @@ pub fn WP_SaberPositionUpdate(
                     && (*client).ps.saberInFlight == 0
                 {
                     // Since we haven't got a bolt position, place it on top of the player origin.
-                    crate::q_math::_VectorCopy(
-                        (*client).ps.origin,
-                        &mut (*mySaber).r.currentOrigin,
-                    );
+                    (*mySaber).r.currentOrigin = (*client).ps.origin;
                 }
             }
 
@@ -10590,10 +10462,10 @@ pub fn WP_SaberPositionUpdate(
                 animSpeedScale = 2.0;
             }
 
-            crate::q_math::_VectorCopy((*client).ps.origin, &mut properOrigin);
+            properOrigin = (*client).ps.origin;
 
             // try to predict the origin based on velocity so it's more like what the client sees
-            crate::q_math::_VectorCopy((*client).ps.velocity, &mut addVel);
+            addVel = (*client).ps.velocity;
             VectorNormalize(&mut addVel);
 
             if (*client).ps.velocity[0] < 0.0 {
@@ -10675,10 +10547,7 @@ pub fn WP_SaberPositionUpdate(
                         || (*mySaber).r.contents == 0)
                     && (*client).ps.saberInFlight == 0
                 {
-                    crate::q_math::_VectorCopy(
-                        (*client).ps.origin,
-                        &mut (*mySaber).r.currentOrigin,
-                    );
+                    (*mySaber).r.currentOrigin = (*client).ps.origin;
                 }
 
                 break 'finalUpdate;
@@ -10720,22 +10589,19 @@ pub fn WP_SaberPositionUpdate(
                 && (ctx.world.level.time - (*client).lastSaberStorageTime) < 200
             {
                 // alright
-                crate::q_math::_VectorCopy(
-                    (*client).lastSaberBase_Always,
-                    &mut (*client).olderSaberBase,
-                );
+                (*client).olderSaberBase = (*client).lastSaberBase_Always;
                 (*client).olderIsValid = qtrue;
             } else {
                 (*client).olderIsValid = qfalse;
             }
 
-            crate::q_math::_VectorCopy(boltOrigin, &mut (*client).lastSaberBase_Always);
-            crate::q_math::_VectorCopy(boltAngles, &mut (*client).lastSaberDir_Always);
+            (*client).lastSaberBase_Always = boltOrigin;
+            (*client).lastSaberDir_Always = boltAngles;
             (*client).lastSaberStorageTime = ctx.world.level.time;
 
-            crate::q_math::_VectorCopy(boltAngles, &mut rawAngles);
+            rawAngles = boltAngles;
 
-            crate::q_math::_VectorMA(
+            _VectorMA(
                 boltOrigin,
                 (*client).saber[0].blade[0].lengthMax,
                 boltAngles,
@@ -10749,7 +10615,7 @@ pub fn WP_SaberPositionUpdate(
                     && (*client).ps.saberInFlight == 0
                 {
                     // place it roughly in the middle of the saber..
-                    crate::q_math::_VectorMA(
+                    _VectorMA(
                         boltOrigin,
                         (*client).saber[0].blade[0].lengthMax,
                         boltAngles,
@@ -10770,20 +10636,20 @@ pub fn WP_SaberPositionUpdate(
                         let mut startang: vec3_t = [0.0; 3];
                         let mut dir: vec3_t = [0.0; 3];
 
-                        crate::q_math::_VectorCopy(boltOrigin, &mut (*saberent).r.currentOrigin);
+                        (*saberent).r.currentOrigin = boltOrigin;
 
-                        crate::q_math::_VectorCopy(boltOrigin, &mut startorg);
-                        crate::q_math::_VectorCopy(boltAngles, &mut startang);
+                        startorg = boltOrigin;
+                        startang = boltAngles;
 
                         // Instead of forcing startang[0]=90 we fake it and slowly tilt it down on
                         // the client via a perframe method (doesn't affect where/how the saber hits)
 
                         (*saberent).r.svFlags &= !SVF_NOCLIENT;
-                        crate::q_math::_VectorCopy(startorg, &mut (*saberent).s.pos.trBase);
-                        crate::q_math::_VectorCopy(startang, &mut (*saberent).s.apos.trBase);
+                        (*saberent).s.pos.trBase = startorg;
+                        (*saberent).s.apos.trBase = startang;
 
-                        crate::q_math::_VectorCopy(startorg, &mut (*saberent).s.origin);
-                        crate::q_math::_VectorCopy(startang, &mut (*saberent).s.angles);
+                        (*saberent).s.origin = startorg;
+                        (*saberent).s.angles = startang;
 
                         (*saberent).s.saberInFlight = qtrue;
 
@@ -10823,13 +10689,13 @@ pub fn WP_SaberPositionUpdate(
 
                         (*saberent).genericValue5 = 0;
 
-                        crate::q_math::VectorSet(
+                        VectorSet(
                             &mut (*saberent).r.mins,
                             SABERMINS_X,
                             SABERMINS_Y,
                             SABERMINS_Z,
                         );
-                        crate::q_math::VectorSet(
+                        VectorSet(
                             &mut (*saberent).r.maxs,
                             SABERMAXS_X,
                             SABERMAXS_Y,
@@ -10842,7 +10708,7 @@ pub fn WP_SaberPositionUpdate(
 
                         (*saberent).s.weapon = WP_SABER as c_int;
 
-                        crate::q_math::_VectorScale(dir, 400.0, &mut (*saberent).s.pos.trDelta);
+                        _VectorScale(dir, 400.0, &mut (*saberent).s.pos.trDelta);
                         (*saberent).s.pos.trTime = ctx.world.level.time;
 
                         if (*client).saber[0].spinSound != 0 {
@@ -10866,7 +10732,7 @@ pub fn WP_SaberPositionUpdate(
                         );
                     } else if (*client).ps.saberEntityNum != 0 {
                         // only do this stuff if your saber is active and has not been knocked out of the air.
-                        crate::q_math::_VectorCopy(boltOrigin, &mut (*saberent).pos1);
+                        (*saberent).pos1 = boltOrigin;
                         trap::LinkEntity(
                             ctx.engine,
                             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
@@ -10907,17 +10773,14 @@ pub fn WP_SaberPositionUpdate(
                     if (*client).ps.saberIdleWound < ctx.world.level.time {
                         let saber_org = ctx.world.g_entities[saberNum as usize].r.currentOrigin;
                         let te_eid = G_TempEntity(ctx, saber_org, EV_SABER_BLOCK as c_int);
-                        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                         let mut dir: vec3_t = [0.0; 3];
-                        crate::q_math::VectorSet(&mut dir, 0.0, 1.0, 0.0);
-                        crate::q_math::_VectorCopy(
-                            ctx.world.g_entities[saberNum as usize].r.currentOrigin,
-                            &mut (*te).s.origin,
-                        );
-                        crate::q_math::_VectorCopy(dir, &mut (*te).s.angles);
-                        (*te).s.eventParm = 1;
-                        (*te).s.weapon = 0; // saberNum
-                        (*te).s.legsAnim = 0; // bladeNum
+                        VectorSet(&mut dir, 0.0, 1.0, 0.0);
+                        let te = ctx.entity_mut(te_eid);
+                        te.s.origin = saber_org;
+                        te.s.angles = dir;
+                        te.s.eventParm = 1;
+                        te.s.weapon = 0; // saberNum
+                        te.s.legsAnim = 0; // bladeNum
 
                         (*client).ps.saberIdleWound =
                             ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(400, 600);
@@ -10932,18 +10795,12 @@ pub fn WP_SaberPositionUpdate(
                             // number (>= MAX_CLIENTS) — an OOB write past saber[MAX_SABERS]; the
                             // loop bound (rSaberNum < MAX_SABERS) and adjacent blade[rBladeNum]
                             // show the intent, so index saber[rSaberNum] (§19).
-                            crate::q_math::_VectorCopy(
-                                boltOrigin,
-                                &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                    .trail
-                                    .base,
-                            );
-                            crate::q_math::_VectorCopy(
-                                end,
-                                &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                    .trail
-                                    .tip,
-                            );
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .trail
+                                .base = boltOrigin;
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .trail
+                                .tip = end;
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .trail
                                 .lastTime = ctx.world.level.time;
@@ -11006,17 +10863,13 @@ pub fn WP_SaberPositionUpdate(
                     rBladeNum = 0;
                     while rBladeNum < (*client).saber[rSaberNum as usize].numBlades {
                         // update muzzle data for the blade
-                        crate::q_math::_VectorCopy(
-                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .muzzlePoint,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .muzzlePointOld,
-                        );
-                        crate::q_math::_VectorCopy(
-                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .muzzleDirOld,
-                        );
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .muzzlePointOld = (*client).saber[rSaberNum as usize].blade
+                            [rBladeNum as usize]
+                            .muzzlePoint;
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .muzzleDirOld =
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir;
 
                         // Raven's `!saber[1].model` operand is an always-false array-address
                         // test; only `!saber[1].model[0]` is load-bearing.
@@ -11073,7 +10926,7 @@ pub fn WP_SaberPositionUpdate(
                                         ctx.world.level.time,
                                         &mut saberOrg,
                                     );
-                                    crate::q_math::_VectorSubtract(
+                                    _VectorSubtract(
                                         (*self_).r.currentOrigin,
                                         saberOrg,
                                         &mut saberDir,
@@ -11108,12 +10961,10 @@ pub fn WP_SaberPositionUpdate(
                                         [rBladeNum as usize]
                                         .muzzleDir,
                                 );
-                                crate::q_math::_VectorCopy(
-                                    (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                        .muzzlePoint,
-                                    &mut boltOrigin,
-                                );
-                                crate::q_math::_VectorMA(
+                                boltOrigin = (*client).saber[rSaberNum as usize].blade
+                                    [rBladeNum as usize]
+                                    .muzzlePoint;
+                                _VectorMA(
                                     boltOrigin,
                                     (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                         .lengthMax,
@@ -11149,12 +11000,10 @@ pub fn WP_SaberPositionUpdate(
                                 &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .muzzleDir,
                             );
-                            crate::q_math::_VectorCopy(
-                                (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                    .muzzlePoint,
-                                &mut boltOrigin,
-                            );
-                            crate::q_math::_VectorMA(
+                            boltOrigin = (*client).saber[rSaberNum as usize].blade
+                                [rBladeNum as usize]
+                                .muzzlePoint;
+                            _VectorMA(
                                 boltOrigin,
                                 (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .lengthMax,
@@ -11245,7 +11094,7 @@ pub fn WP_SaberPositionUpdate(
                                 }
 
                                 while gotHit == qfalse {
-                                    if CheckSaberDamage(
+                                    if !CheckSaberDamage(
                                         ctx,
                                         ctx.entity_id_of(self_).unwrap(),
                                         rSaberNum,
@@ -11255,9 +11104,8 @@ pub fn WP_SaberPositionUpdate(
                                         qfalse,
                                         trMask,
                                         qfalse,
-                                    ) == qfalse
-                                    {
-                                        if CheckSaberDamage(
+                                    ) {
+                                        if !CheckSaberDamage(
                                             ctx,
                                             ctx.entity_id_of(self_).unwrap(),
                                             rSaberNum,
@@ -11267,8 +11115,7 @@ pub fn WP_SaberPositionUpdate(
                                             qtrue,
                                             trMask,
                                             qfalse,
-                                        ) == qfalse
-                                        {
+                                        ) {
                                             let mut oldSaberStart: vec3_t = [0.0; 3];
                                             let mut oldSaberEnd: vec3_t = [0.0; 3];
                                             let mut saberAngleNow: vec3_t = [0.0; 3];
@@ -11290,41 +11137,30 @@ pub fn WP_SaberPositionUpdate(
                                                 > 100
                                             {
                                                 // no valid last pos, use current
-                                                crate::q_math::_VectorCopy(
-                                                    boltOrigin,
-                                                    &mut oldSaberStart,
-                                                );
-                                                crate::q_math::_VectorCopy(end, &mut oldSaberEnd);
+                                                oldSaberStart = boltOrigin;
+                                                oldSaberEnd = end;
                                             } else {
                                                 // trace from last pos
-                                                crate::q_math::_VectorCopy(
-                                                    (*client).saber[rSaberNum as usize].blade
-                                                        [rBladeNum as usize]
-                                                        .trail
-                                                        .base,
-                                                    &mut oldSaberStart,
-                                                );
-                                                crate::q_math::_VectorCopy(
-                                                    (*client).saber[rSaberNum as usize].blade
-                                                        [rBladeNum as usize]
-                                                        .trail
-                                                        .tip,
-                                                    &mut oldSaberEnd,
-                                                );
+                                                oldSaberStart = (*client).saber[rSaberNum as usize]
+                                                    .blade
+                                                    [rBladeNum as usize]
+                                                    .trail
+                                                    .base;
+                                                oldSaberEnd = (*client).saber[rSaberNum as usize]
+                                                    .blade
+                                                    [rBladeNum as usize]
+                                                    .trail
+                                                    .tip;
                                             }
 
-                                            crate::q_math::_VectorSubtract(
+                                            _VectorSubtract(
                                                 oldSaberEnd,
                                                 oldSaberStart,
                                                 &mut saberAngleBefore,
                                             );
                                             vectoangles(saberAngleBefore, &mut saberAngleBefore);
 
-                                            crate::q_math::_VectorSubtract(
-                                                end,
-                                                boltOrigin,
-                                                &mut saberAngleNow,
-                                            );
+                                            _VectorSubtract(end, boltOrigin, &mut saberAngleNow);
                                             vectoangles(saberAngleNow, &mut saberAngleNow);
 
                                             deltaX =
@@ -11355,7 +11191,7 @@ pub fn WP_SaberPositionUpdate(
 
                                                 // Now that I have the angle, I'll just say the base
                                                 // is the difference between the two start points.
-                                                crate::q_math::_VectorSubtract(
+                                                _VectorSubtract(
                                                     boltOrigin,
                                                     oldSaberStart,
                                                     &mut saberSubBase,
@@ -11404,8 +11240,7 @@ pub fn WP_SaberPositionUpdate(
                                                     qfalse,
                                                     trMask,
                                                     qfalse,
-                                                ) != qfalse
-                                                {
+                                                ) {
                                                     gotHit = qtrue;
                                                 }
                                             }
@@ -11445,7 +11280,7 @@ pub fn WP_SaberPositionUpdate(
                                 }
                             } else if ctx.world.cvars.d_saberInterpolate.integer != 0 {
                                 // anything but 0 or 1, use the old plain method.
-                                if CheckSaberDamage(
+                                if !CheckSaberDamage(
                                     ctx,
                                     ctx.entity_id_of(self_).unwrap(),
                                     rSaberNum,
@@ -11455,8 +11290,7 @@ pub fn WP_SaberPositionUpdate(
                                     qfalse,
                                     MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT,
                                     qfalse,
-                                ) == qfalse
-                                {
+                                ) {
                                     CheckSaberDamage(
                                         ctx,
                                         ctx.entity_id_of(self_).unwrap(),
@@ -11494,18 +11328,12 @@ pub fn WP_SaberPositionUpdate(
                             );
                         }
 
-                        crate::q_math::_VectorCopy(
-                            boltOrigin,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .base,
-                        );
-                        crate::q_math::_VectorCopy(
-                            end,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .tip,
-                        );
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .base = boltOrigin;
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .tip = end;
                         (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                             .trail
                             .lastTime = ctx.world.level.time;
@@ -11715,10 +11543,10 @@ pub fn WP_SaberCanBlock(
     point: vec3_t,
     dflags: c_int,
     r#mod: c_int,
-    projectile: qboolean,
+    projectile: bool,
     mut attackStr: c_int,
 ) -> c_int {
-    let mut thrownSaber: qboolean = 0;
+    let mut thrownSaber = false;
     let mut blockFactor: f32 = 0.0;
 
     let Some(self_) = self_ else {
@@ -11733,7 +11561,7 @@ pub fn WP_SaberCanBlock(
     unsafe {
         if attackStr == 999 {
             attackStr = 0;
-            thrownSaber = 1;
+            thrownSaber = true;
         }
 
         if BG_SaberInAttack((*client).ps.saberMove) != 0 {
@@ -11783,7 +11611,7 @@ pub fn WP_SaberCanBlock(
 
         // Removed for now (pre-1.03 block-decision code); see oracle 9342-9384.
 
-        if SaberAttacking(ctx.world.entity(self_)) != 0 {
+        if SaberAttacking(ctx.world.entity(self_)) {
             // attacking, can't block now
             return 0;
         }
@@ -11815,7 +11643,7 @@ pub fn WP_SaberCanBlock(
             return 0;
         }
 
-        if thrownSaber != 0 {
+        if thrownSaber {
             blockFactor -= 0.25;
         }
 
@@ -11834,8 +11662,8 @@ pub fn WP_SaberCanBlock(
             return 0;
         }
 
-        if projectile != 0 {
-            WP_SaberBlockNonRandom(ctx.world.entity(self_), point, projectile);
+        if projectile {
+            WP_SaberBlockNonRandom(ctx.world.entity(self_), point, projectile as qboolean);
         }
         1
     }
@@ -11844,13 +11672,13 @@ pub fn WP_SaberCanBlock(
 /// Raven `HasSetSaberOnly`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:9453-9484`
-pub fn HasSetSaberOnly(ctx: &mut GameContext) -> qboolean {
+pub fn HasSetSaberOnly(ctx: &mut GameContext) -> bool {
     let mut i: c_int = 0;
     let mut wDisable: c_int = 0;
 
     if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
         // set to 0
-        return 0;
+        return false;
     }
 
     if ctx.world.cvars.g_gametype.integer == GT_DUEL
@@ -11863,11 +11691,11 @@ pub fn HasSetSaberOnly(ctx: &mut GameContext) -> qboolean {
 
     while i < WP_NUM_WEAPONS as c_int {
         if (wDisable & (1 << i)) == 0 && i != WP_SABER as c_int && i != WP_NONE as c_int {
-            return 0;
+            return false;
         }
 
         i += 1;
     }
 
-    1
+    true
 }

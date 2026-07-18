@@ -652,7 +652,7 @@ pub fn WP_DisruptorMainFire(ctx: &mut GameContext, ent: EntityId) {
                     tr.endpos,
                     0,
                     MOD_DISRUPTOR as c_int,
-                    qtrue,
+                    true,
                     0,
                 ) != 0
                 {
@@ -908,7 +908,7 @@ pub fn WP_DisruptorAltFire(ctx: &mut GameContext, ent: EntityId) {
                     tr.endpos,
                     0,
                     MOD_DISRUPTOR_SNIPER as c_int,
-                    qtrue,
+                    true,
                     0,
                 ) != 0
                 {

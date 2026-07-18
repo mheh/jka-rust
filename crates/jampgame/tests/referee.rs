@@ -70,7 +70,8 @@ use common::reflog::{self, Scenario};
 use common::{
     referee_arm, referee_begin_frame, referee_error, referee_frame_syscall_digest,
     referee_frame_syscalls, referee_import_name, referee_install_real_world, referee_load,
-    referee_locate, referee_reset, referee_set_cvar, referee_set_map, referee_set_usercmd,
+    referee_clear_cmd, referee_locate, referee_reset, referee_set_cmd, referee_set_cvar,
+    referee_set_map, referee_set_usercmd,
     referee_set_userinfo, referee_vm_call, run_on_engine_thread_fn, LocateData,
 };
 
@@ -377,6 +378,9 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
         assert_eq!(r, 0, "warm-up GAME_RUN_FRAME returned {r}");
     }
 
+    // Reset the syscall accumulation so the join-phase pre-frame snapshot
+    // captures ONLY connect/begin/team-join traffic (not GAME_INIT spam).
+    referee_begin_frame();
     for c in 0..sc.clients {
         let cr = referee_vm_call(vm, MpGameExport::GAME_CLIENT_CONNECT, &[c as isize, 1, 0]);
         assert_eq!(cr, 0, "GAME_CLIENT_CONNECT({c}) rejected (ret {cr})");
@@ -387,9 +391,28 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
             "client {c} begin G_ERROR: {:?}",
             referee_error()
         );
+        // Human first connects are parked in SPECTATOR by WP_InitForcePowers
+        // (the retail force-config-menu flow; a live cgame answers by joining).
+        // Replay the cgame's join: `team f`. Before 2026-07-17 no tape client
+        // ever joined — every scenario "fought" as noclip spectators and no
+        // combat was on tape.
+        referee_set_cmd(&["team", "f"]);
+        let tr = referee_vm_call(vm, MpGameExport::GAME_CLIENT_COMMAND, &[c as isize]);
+        referee_clear_cmd();
+        assert_eq!(tr, 0, "GAME_CLIENT_COMMAND(team f, {c}) returned {tr}");
+        assert!(
+            referee_error().is_none(),
+            "client {c} team-join G_ERROR: {:?}",
+            referee_error()
+        );
     }
 
-    let mut snaps = Vec::with_capacity(sc.frames as usize);
+    // Join-phase capture: the connect/begin/team-join syscalls above are the
+    // first place the two modules can part ways (2026-07-17 finding: the
+    // frame-0 melee-brawl divergence originates here). Snapshot them as a
+    // pre-frame so the syscall-stream diff pinpoints the first divergent call.
+    let mut snaps = Vec::with_capacity(sc.frames as usize + 1);
+    snaps.push(snapshot(&locate, sc.clients, 0));
     for f in 0..sc.frames {
         t += sc.msec;
         // Inject this frame's replay input for every client (G_RunClient
@@ -926,6 +949,7 @@ fn reflog_roundtrip() {
         reflog::gen_real_duel1_walk(),
         reflog::gen_real_duel1_combat(),
         reflog::gen_real_ffa1_items(),
+        reflog::gen_force_duel(),
     ] {
         let text = reflog::to_text(&sc);
         let reparsed = reflog::parse(&text);
@@ -968,6 +992,7 @@ fn regenerate_logs() {
         reflog::gen_real_duel1_walk(),
         reflog::gen_real_duel1_combat(),
         reflog::gen_real_ffa1_items(),
+        reflog::gen_force_duel(),
     ] {
         let path = dir.join(format!("{}.reflog", sc.name));
         std::fs::write(&path, reflog::to_text(&sc)).unwrap();
@@ -991,6 +1016,15 @@ fn referee_idle() {
 #[ignore = "requires tools/referee-oracle/build.sh + cargo build --workspace; run with --ignored"]
 fn referee_melee_brawl() {
     run_referee("referee_melee_brawl", reflog::gen_melee_brawl());
+}
+
+/// Force-power A/B coverage (2026-07-17 live findings: level-1 lightning
+/// "instagib" + stuck bot bodies). Client 0 holds level-1 lightning in bursts;
+/// deaths and respawn-on-attack land on tape.
+#[test]
+#[ignore = "requires tools/referee-oracle/build.sh + cargo build --workspace; run with --ignored"]
+fn referee_force_duel() {
+    run_referee("referee_force_duel", reflog::gen_force_duel());
 }
 
 /// Real-map (plan §3c) idle scenario on `mp/duel1`: 4 clients spawn on the REAL

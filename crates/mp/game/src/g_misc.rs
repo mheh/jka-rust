@@ -1196,7 +1196,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        if crate::w_saber::HasSetSaberOnly(ctx) != qfalse {
+        if crate::w_saber::HasSetSaberOnly(ctx) {
             let count = ctx.world.entity(ent).count;
             if count == FP_SABER_OFFENSE || count == FP_SABER_DEFENSE || count == FP_SABERTHROW {
                 // having saber holocrons in saber only mode is pointless
