@@ -1292,6 +1292,18 @@ pub fn referee_set_userinfo(num: c_int, s: &str) {
 
 /// Inject the replay usercmd for a client for the upcoming frame's
 /// `GAME_CLIENT_THINK` (`G_GET_USERCMD` returns it).
+/// Install the tokenized command view served by `G_ARGC`/`G_ARGV` for the
+/// duration of one `GAME_CLIENT_COMMAND` dispatch (call `referee_clear_cmd`
+/// after the vm call returns).
+pub fn referee_set_cmd(tokens: &[&str]) {
+    MOCK.with(|m| m.borrow_mut().set_cmd(tokens));
+}
+
+/// Clear the command view installed by `referee_set_cmd`.
+pub fn referee_clear_cmd() {
+    MOCK.with(|m| m.borrow_mut().clear_cmd());
+}
+
 pub fn referee_set_usercmd(num: c_int, cmd: usercmd_t) {
     MOCK.with(|m| {
         m.borrow_mut().usercmds.insert(num, cmd);

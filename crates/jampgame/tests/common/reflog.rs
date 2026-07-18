@@ -250,10 +250,16 @@ impl Lcg {
 const FORCEPOWERS: &str = "7-1-032330000000001333";
 
 fn userinfo_for(client: i32, model: &str) -> String {
+    userinfo_with_force(client, model, FORCEPOWERS)
+}
+
+/// `userinfo_for` with an explicit forcepowers config (rank-side-18digits) for
+/// scenarios that need specific powers known (e.g. lightning).
+fn userinfo_with_force(client: i32, model: &str, forcepowers: &str) -> String {
     format!(
         "\\name\\Player{client}\\rate\\25000\\snaps\\20\\model\\{model}\
 \\team_model\\{model}\\color1\\4\\color2\\4\\handicap\\100\\sex\\male\
-\\cg_predictItems\\1\\teamtask\\0\\forcepowers\\{FORCEPOWERS}\\password\\"
+\\cg_predictItems\\1\\teamtask\\0\\forcepowers\\{forcepowers}\\password\\"
     )
 }
 
@@ -374,6 +380,88 @@ pub fn gen_melee_brawl() -> Scenario {
         map: "arena3".into(),
         seed: 1337,
         clients: 2,
+        msec: 50,
+        starttime: 600,
+        frames,
+        userinfos,
+        cmds,
+    }
+}
+
+/// `force-duel.reflog`: 3 clients on arena3 exercising the force-power run
+/// path the other tapes never touch. Client 0 is dark-side with LEVEL-1
+/// LIGHTNING (the 2026-07-17 live-repro config) and holds
+/// `BUTTON_FORCE_LIGHTNING` in bursts; clients 1-2 are the standard config
+/// brawling with melee. Lightning ticks (`ForceShootLightning` →
+/// `ForceLightningDamage` → `G_Damage`), drain, knockback, deaths, and the
+/// respawn-on-attack path all land on tape.
+pub fn gen_force_duel() -> Scenario {
+    let mut userinfos = BTreeMap::new();
+    // forcePowers_t digit order; [7] = FP_LIGHTNING at level 1, dark side.
+    userinfos.insert(0, userinfo_with_force(0, "desann/default", "7-2-030330010000000333"));
+    userinfos.insert(1, userinfo_for(1, "kyle/default"));
+    userinfos.insert(2, userinfo_for(2, "jan/default"));
+
+    const BUTTON_ATTACK: i32 = 1;
+    const BUTTON_FORCE_LIGHTNING: i32 = 1024;
+
+    let frames = 600;
+    let mut cmds = BTreeMap::new();
+    for client in 0..3i32 {
+        let mut rng = Lcg(0xF0_5CE_u32.wrapping_add((client as u32).wrapping_mul(0x9E37_79B9)));
+        let mut yaw: i32 = rng.range(0, 65535);
+        // Client 0 alternates lightning bursts and wander; 1-2 melee-brawl.
+        let mut in_burst = false;
+        let mut phase_left = rng.range(30, 80);
+        for frame in 0..frames {
+            if phase_left <= 0 {
+                in_burst = !in_burst;
+                phase_left = if in_burst {
+                    rng.range(40, 90)
+                } else {
+                    rng.range(20, 60)
+                };
+            }
+            phase_left -= 1;
+
+            yaw = (yaw + rng.range(-1200, 1200)).rem_euclid(65536);
+            let pitch = rng.range(-3000, 3000);
+
+            let mut buttons = 0;
+            if client == 0 {
+                if in_burst {
+                    buttons |= BUTTON_FORCE_LIGHTNING;
+                } else if rng.chance(25) {
+                    // dead-state frames double as the respawn press
+                    buttons |= BUTTON_ATTACK;
+                }
+            } else if rng.chance(35) {
+                buttons |= BUTTON_ATTACK;
+            }
+            let forwardmove = rng.range(-60, 127) as i8;
+            let rightmove = rng.range(-100, 100) as i8;
+            let upmove = if rng.chance(8) { 127 } else { 0 } as i8;
+
+            cmds.insert(
+                (frame, client),
+                CmdInput {
+                    angles: [pitch, yaw, 0],
+                    buttons,
+                    forwardmove,
+                    rightmove,
+                    upmove,
+                    weapon: WP_MELEE,
+                    forcesel: 0,
+                },
+            );
+        }
+    }
+
+    Scenario {
+        name: "force-duel".into(),
+        map: "arena3".into(),
+        seed: 0xF05,
+        clients: 3,
         msec: 50,
         starttime: 600,
         frames,
