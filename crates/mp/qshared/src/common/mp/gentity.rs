@@ -11,36 +11,19 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::c_int;
-
-/// Raven MP `NUM_TIDS`.
-///
-/// Definition source: `oracle/codemp/game/g_public.h:623-638`
+///`oracle/codemp/game/g_public.h:623-638`
 pub const NUM_TIDS: usize = 10;
-
-/// Raven MP `NUM_BSETS`.
-///
-/// Definition source: `oracle/codemp/game/g_public.h:642-663`
 pub const NUM_BSETS: usize = 17;
-
-/// Raven MP `BSET_FIRST` — alias for `BSET_SPAWN` (first `bSet_t` value), used
-/// as the loop start when walking `behaviorSet[]`.
-///
-/// Definition source: `oracle/codemp/game/g_public.h:642-663`
 pub const BSET_FIRST: usize = 0;
 
-/// Raven MP `MAX_FAILED_NODES`.
-///
-/// Definition source: `oracle/codemp/game/g_public.h:673`
+/// `oracle/codemp/game/g_public.h:673`
 pub const MAX_FAILED_NODES: usize = 8;
 
-/// Raven MP `HL_MAX`.
-///
-/// Definition source: `oracle/codemp/game/g_local.h:99-123`
+/// `oracle/codemp/game/g_local.h:99-123`
 pub const HL_MAX: usize = 23;
 
 /// Raven MP `moverState_t`.
-///
-/// Type definition source: `oracle/codemp/game/g_local.h:89-94`
+/// `oracle/codemp/game/g_local.h:89-94`
 pub type moverState_t = c_int;
 
 pub const MOVER_POS1: moverState_t = 0;
@@ -49,14 +32,11 @@ pub const MOVER_1TO2: moverState_t = 2;
 pub const MOVER_2TO1: moverState_t = 3;
 
 /// Raven MP `material_t`.
-///
-/// Type definition source: `oracle/codemp/game/q_shared.h:990`
+/// `oracle/codemp/game/q_shared.h:990`
 pub type material_t = c_int;
 
-/// Raven `material_e` variants (`//# material_e`, anonymous-enum + `typedef int
-/// material_t` per enum-vs-alias fidelity).
-///
-/// Source: `oracle/codemp/game/q_shared.h:967-987`
+/// Raven `material_e` variants
+/// `oracle/codemp/game/q_shared.h:967-987`
 pub const MAT_METAL: material_t = 0; // scorched blue-grey metal
 pub const MAT_GLASS: material_t = 1; // not a real chunk type, just plays an effect with glass sprites
 pub const MAT_ELECTRICAL: material_t = 2; // sparks only
