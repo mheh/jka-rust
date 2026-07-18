@@ -28,6 +28,14 @@ cp "$ORACLE/qcommon/cm_terrain.cpp"       \
    "$ORACLE/qcommon/cm_patch.h"           build/codemp/qcommon/
 cp "$ORACLE/RMG/RM_Manager.cpp" "$ORACLE/RMG/RM_Manager.h" build/codemp/RMG/
 
+# retail-win32 holdrand width (2026-07-17 ruling; mirrors referee-oracle and
+# jampgame-oracle): CCMLandScape's `unsigned long holdrand` member is 32-bit
+# on the ship target; at LP64 width its flrand/irand draws span the full
+# register. Patch the build copy of the header.
+sed -i '' 's/unsigned long			holdrand;/unsigned int			holdrand; \/* retail-win32 32-bit width *\//' build/codemp/qcommon/cm_landscape.h
+sed -i '' 's/unsigned long	get_rand_seed(void) { return holdrand; }/unsigned int	get_rand_seed(void) { return holdrand; }/' build/codemp/qcommon/cm_landscape.h
+grep -q "unsigned int" build/codemp/qcommon/cm_landscape.h || { echo "holdrand patch failed"; exit 1; }
+
 # --- stub headers (oracle never edited) ---
 cp stubs/qcommon/* build/codemp/qcommon/
 cp stubs/RMG/*     build/codemp/RMG/

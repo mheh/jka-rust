@@ -31,7 +31,7 @@ pub struct QRand {
     /// 64-bit on LP64 referee/native builds, exactly as Raven's
     /// `unsigned long` compiles.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    holdrand: c_ulong,
+    holdrand: u32,
 
     /// Raven `bg_lib.c`'s `static int randSeed = 0;` — the independent LCG
     /// state backing `bg_lib.c`'s `rand`/`srand` and the `q_shared.h`
@@ -44,7 +44,7 @@ impl QRand {
     /// The initial `holdrand` value (`0x89abcdef`) — Raven's compile-time
     /// static initializer, installed by `Default`/`new`.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: c_ulong = 0x89ab_cdef;
+    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
 
     /// Fresh generator seeded with Raven's compile-time `holdrand` value and
     /// `bg_lib.c`'s compile-time `randSeed = 0`.
@@ -59,7 +59,7 @@ impl QRand {
     /// conversion; Rust's sign-extending `as` cast matches C's value-mod-2^N).
     /// Source: `oracle/codemp/game/q_math.c:1434-1437`
     pub fn Rand_Init(&mut self, seed: c_int) {
-        self.holdrand = seed as c_ulong;
+        self.holdrand = seed as u32;
     }
 
     /// Raven `flrand` — returns a float `min <= x < max` (exclusive; will get
@@ -67,8 +67,8 @@ impl QRand {
     /// Source: `oracle/codemp/game/q_math.c:1441-1450`
     pub fn flrand(&mut self, min: f32, max: f32) -> f32 {
         self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        // Raven: `(float)(holdrand >> 17)` — full unsigned-long width, so on
-        // LP64 this is NOT confined to 0-32767 (referee-proven behavior).
+        // Raven: `(float)(holdrand >> 17)` — retail-win32 32-bit width
+        // confines the draw to [0, 32767] (2026-07-17 ruling).
         let result = (self.holdrand >> 17) as f32;
         ((result * (max - min)) / 32768.0f32) + min
     }
@@ -82,9 +82,8 @@ impl QRand {
     /// Raven `irand` — returns an integer `min <= x <= max` (inclusive).
     ///
     /// Raven asserts `(max - min) < 32768`; we preserve the wrapping integer
-    /// arithmetic rather than the debug assert. `result = holdrand >> 17` is
-    /// an `int`, i.e. the shift happens at `unsigned long` width and then
-    /// truncates to 32 bits.
+    /// arithmetic rather than the debug assert. `holdrand >> 17` at the
+    /// retail-win32 32-bit width is confined to [0, 32767].
     /// Source: `oracle/codemp/game/q_math.c:1458-1469`
     pub fn irand(&mut self, min: c_int, max: c_int) -> c_int {
         debug_assert!((max - min) < 32768);

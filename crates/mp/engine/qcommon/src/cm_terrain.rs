@@ -364,10 +364,11 @@ pub struct CmLandScape {
     /// Source: `cm_landscape.h:158`
     water_surface_flags: i32,
     /// Raven `holdrand` — the per-instance LCG seed, seeded `0x89abcdef` in
-    /// the ctor and streamed by [`CmLandScape::get_rand_seed`]. Platform-
-    /// width `c_ulong` (Raven `unsigned long`), not a `Rng`/`QRand` type.
+    /// the ctor and streamed by [`CmLandScape::get_rand_seed`]. Retail-win32
+    /// 32-bit width (2026-07-17 ruling; Raven `unsigned long` = 32-bit on the
+    /// ship target), not a `Rng`/`QRand` type.
     /// Source: `cm_landscape.h:160`; seeded `cm_terrain.cpp:122`
-    holdrand: c_ulong,
+    holdrand: u32,
     /// Raven `mHeightDetails[HEIGHT_RESOLUTION]` — surface/contents flags per
     /// height band, zeroed by the ctor's `memset` (`cm_terrain.cpp:125`;
     /// `CmHeightDetails` derives `Default` for the equivalent zero-init).
@@ -1007,7 +1008,7 @@ impl CmLandScape {
     ///
     /// Source: `oracle/codemp/qcommon/cm_landscape.h:239`
     pub fn get_rand_seed(&self) -> c_ulong {
-        self.holdrand
+        self.holdrand as c_ulong
     }
 }
 
