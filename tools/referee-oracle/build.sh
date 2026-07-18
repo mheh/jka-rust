@@ -160,6 +160,16 @@ open(p, "w").write(s)
 p = "build/src/codemp/game/q_math.c"
 s = open(p).read()
 s += "\n/* referee-oracle: MSVC CRT rand() state (see q_shared.h patch). */\nunsigned int jka_msvc_holdrand = 1u;\n"
+
+# retail-win32 holdrand width (2026-07-17 ruling, same class as SnapVector/
+# libm above): `unsigned long` is 32-bit on win32, 64-bit here on LP64. At
+# LP64 width `(int)(holdrand >> 17)` spans the full register and irand(1,2)
+# returns +/-32k garbage (the live level-1 lightning "instagib"). Force the
+# retail 32-bit state so flrand/irand draws confine to [0, 32767].
+old_hold = "static unsigned long\tholdrand = 0x89abcdef;"
+new_hold = "static unsigned int\tholdrand = 0x89abcdef; /* referee-oracle: retail-win32 32-bit width */"
+assert old_hold in s, "q_math.c holdrand decl not found — oracle changed?"
+s = s.replace(old_hold, new_hold, 1)
 open(p, "w").write(s)
 
 

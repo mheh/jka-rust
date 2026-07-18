@@ -19,12 +19,16 @@ use core::ffi::{c_int, c_uint, c_ulong};
 ///
 /// Source: `oracle/codemp/game/q_math.c:1432`
 pub struct Rng {
-    /// Raven `static unsigned long holdrand = 0x89abcdef;` — platform-width
-    /// `c_ulong` by ruling (2026-07-09, reversing the earlier u32
-    /// normalization): 32-bit on the retail i686 ship, 64-bit on LP64
-    /// referee/native builds, exactly as Raven's `unsigned long` compiles.
+    /// Raven `static unsigned long holdrand = 0x89abcdef;` — 32-bit by the
+    /// retail-win32 parity bar (2026-07-17 ruling, applying the 2026-07-12
+    /// SnapVector/libm precedent; reverses the 2026-07-09 platform-width
+    /// ruling). On LP64 the full-register `holdrand >> 17` made
+    /// `irand(1,2)` return ±32k garbage (the level-1 lightning "instagib"
+    /// live finding) — retail win32's 32-bit `unsigned long` confines the
+    /// draw to [0,32767]. The oracle referee build is patched to 32-bit in
+    /// `tools/referee-oracle/build.sh` to match.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    holdrand: c_ulong,
+    holdrand: u32,
 
     /// The C runtime `rand()` state backing the native module's `rand`/`srand`
     /// and the `q_shared.h` `random`/`crandom` macros. Retail win32 links the
@@ -39,7 +43,7 @@ impl Rng {
     /// The initial `holdrand` value (`0x89abcdef`) — the state a fresh zeroed
     /// `BgState` must carry, so this is what `Default`/`new` install.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: c_ulong = 0x89ab_cdef;
+    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
 
     /// Fresh generator seeded with Raven's compile-time `holdrand` value and
     /// the MSVC CRT's compile-time `holdrand = 1L`.
@@ -55,14 +59,14 @@ impl Rng {
     /// moves it). Observes only; production behavior is unchanged.
     /// Source: `oracle/codemp/game/q_math.c:1432`
     pub fn holdrand(&self) -> c_ulong {
-        self.holdrand
+        self.holdrand as c_ulong
     }
 
     /// Raven `Rand_Init` — reseed the generator (`int` → `unsigned long`
     /// conversion; Rust's sign-extending `as` cast matches C's value-mod-2^N).
     /// Source: `oracle/codemp/game/q_math.c:1434-1437`
     pub fn Rand_Init(&mut self, seed: c_int) {
-        self.holdrand = seed as c_ulong;
+        self.holdrand = seed as u32;
     }
 
     /// Raven `flrand` — returns a float `min <= x < max` (exclusive; will get
@@ -70,8 +74,8 @@ impl Rng {
     /// Source: `oracle/codemp/game/q_math.c:1441-1450`
     pub fn flrand(&mut self, min: f32, max: f32) -> f32 {
         self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        // Raven: `(float)(holdrand >> 17)` — full unsigned-long width, so on
-        // LP64 this is NOT confined to 0-32767 (referee-proven behavior).
+        // Raven: `(float)(holdrand >> 17)` — retail-win32 32-bit width
+        // confines the draw to [0, 32767], so the result is [min, max).
         let result = (self.holdrand >> 17) as f32;
         ((result * (max - min)) / 32768.0f32) + min
     }
@@ -85,9 +89,9 @@ impl Rng {
     /// Raven `irand` — returns an integer `min <= x <= max` (inclusive).
     ///
     /// Raven asserts `(max - min) < 32768`; we preserve the wrapping integer
-    /// arithmetic rather than the debug assert. `result = holdrand >> 17` is
-    /// an `int`, i.e. the shift happens at `unsigned long` width and then
-    /// truncates to 32 bits (arm64 disasm: `lsr x2,x2,#17; madd w2,...`).
+    /// arithmetic rather than the debug assert. `holdrand >> 17` at the
+    /// retail-win32 32-bit width is confined to [0, 32767], so the result is
+    /// `min ..= max` (well, `min ..= max+?` per Raven's own off-by-one shape).
     /// Source: `oracle/codemp/game/q_math.c:1458-1469`
     pub fn irand(&mut self, min: c_int, max: c_int) -> c_int {
         debug_assert!((max - min) < 32768);
