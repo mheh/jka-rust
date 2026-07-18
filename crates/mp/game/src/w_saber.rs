@@ -224,8 +224,8 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
     let y = maxs[1] - mins[1];
 
     // top of box
-    _VectorCopy(maxs, &mut start);
-    _VectorCopy(maxs, &mut end);
+    start = maxs;
+    end = maxs;
     start[0] -= x;
     G_TestLine(ctx, start, end, 0x00000ff, duration);
     end[0] = start[0];
@@ -236,8 +236,8 @@ pub fn G_DebugBoxLines(ctx: &mut GameContext, mins: vec3_t, maxs: vec3_t, durati
     G_TestLine(ctx, start, end, 0x00000ff, duration);
     G_TestLine(ctx, start, maxs, 0x00000ff, duration);
     // bottom of box
-    _VectorCopy(mins, &mut start);
-    _VectorCopy(mins, &mut end);
+    start = mins;
+    end = mins;
     start[0] += x;
     G_TestLine(ctx, start, end, 0x00000ff, duration);
     end[0] = start[0];
@@ -738,7 +738,7 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                         let blade = &(*oc).saber[j as usize].blade[k as usize];
                         (blade.muzzlePoint, blade.lengthMax, blade.muzzleDir)
                     };
-                    _VectorCopy(muzzlePoint, &mut saberOrg);
+                    saberOrg = muzzlePoint;
                     _VectorMA(muzzlePoint, lengthMax, muzzleDir, &mut saberTip);
 
                     if saberOrg[i] < ctx.world.entity(saberent).r.mins[i] {
@@ -918,11 +918,11 @@ pub fn G_CheckLookTarget(
                 // FLAG: pool client (NPC-capable); deref raw per recipe 2b.
                 let lcc = ctx.world.entity(look_cent).client;
                 if !lcc.is_null() {
-                    _VectorCopy((*lcc).renderInfo.eyePoint, &mut lookOrg);
+                    lookOrg = (*lcc).renderInfo.eyePoint;
                 } else if ctx.world.entity(look_cent).inuse != 0
                     && VectorCompare(ctx.world.entity(look_cent).r.currentOrigin, vec3_origin) == 0
                 {
-                    _VectorCopy(ctx.world.entity(look_cent).r.currentOrigin, &mut lookOrg);
+                    lookOrg = ctx.world.entity(look_cent).r.currentOrigin;
                 } else {
                     // at origin of world
                     return false;
@@ -931,15 +931,12 @@ pub fn G_CheckLookTarget(
                 && look_target > -1
                 && look_target < MAX_INTEREST_POINTS as c_int
             {
-                _VectorCopy(
-                    ctx.world.level.interestPoints[look_target as usize].origin,
-                    &mut lookOrg,
-                );
+                lookOrg = ctx.world.level.interestPoints[look_target as usize].origin;
             } else {
                 return false;
             }
 
-            _VectorCopy((*sc).renderInfo.eyePoint, &mut eyeOrg);
+            eyeOrg = (*sc).renderInfo.eyePoint;
 
             _VectorSubtract(lookOrg, eyeOrg, &mut lookDir);
 
@@ -995,15 +992,15 @@ pub fn G_G2NPCAngles(
                 && (*ent).s.NPC_class != CLASS_VEHICLE as c_int
             {
                 // an NPC bolted to a vehicle should use the full angles
-                _VectorCopy((*ent).r.currentAngles, angles);
+                *angles = (*ent).r.currentAngles;
             } else {
-                _VectorCopy((*sc).ps.viewangles, angles);
+                *angles = (*sc).ps.viewangles;
                 angles[PITCH as usize] = 0.0;
             }
 
-            _VectorCopy((*sc).ps.viewangles, &mut viewAngles);
+            viewAngles = (*sc).ps.viewangles;
             viewAngles[PITCH as usize] = (viewAngles[PITCH as usize] as f64 * 0.5) as f32;
-            _VectorCopy(viewAngles, &mut lookAngles);
+            lookAngles = viewAngles;
 
             lookAngles[1] = 0.0;
 
@@ -1017,7 +1014,7 @@ pub fn G_G2NPCAngles(
                 );
             }
 
-            _VectorCopy(viewAngles, &mut lookAngles);
+            lookAngles = viewAngles;
 
             if !ent.is_null() && !(*ent).client.is_null() && (*sc).NPC_class == CLASS_ATST {
                 // CG_ATSTLegsYaw( cent, trailingLegsAngles );
@@ -1053,19 +1050,19 @@ pub fn G_G2NPCAngles(
                 lookAngles[YAW as usize] = AngleNormalize180(lookAngles[YAW as usize]);
 
                 // slowly lerp to this new value; remember last headAngles
-                _VectorCopy((*sc).renderInfo.lastHeadAngles, &mut oldLookAngles);
+                oldLookAngles = (*sc).renderInfo.lastHeadAngles;
                 if VectorCompare(oldLookAngles, lookAngles) == qfalse {
                     lookAngles[YAW as usize] = oldLookAngles[YAW as usize]
                         + (lookAngles[YAW as usize] - oldLookAngles[YAW as usize]) * 0.4f32;
                 }
                 // Remember current lookAngles next time
-                _VectorCopy(lookAngles, &mut (*sc).renderInfo.lastHeadAngles);
+                (*sc).renderInfo.lastHeadAngles = lookAngles;
             } else {
                 // Remember current lookAngles next time
-                _VectorCopy(lookAngles, &mut (*sc).renderInfo.lastHeadAngles);
+                (*sc).renderInfo.lastHeadAngles = lookAngles;
             }
             if (*sc).NPC_class == CLASS_ATST {
-                _VectorCopy((*sc).ps.viewangles, &mut lookAngles);
+                lookAngles = (*sc).ps.viewangles;
                 lookAngles[0] = 0.0;
                 lookAngles[2] = 0.0;
                 lookAngles[YAW as usize] -= trailingLegsAngles[YAW as usize];
@@ -1145,8 +1142,8 @@ pub fn G_G2PlayerAngles(
             }
         }
 
-        _VectorCopy((*sc).ps.origin, &mut lerpOrg);
-        _VectorCopy((*sc).ps.viewangles, &mut lerpAng);
+        lerpOrg = (*sc).ps.origin;
+        lerpAng = (*sc).ps.viewangles;
 
         if (*ent).localAnimIndex <= 1 {
             // don't do these things on non-humanoids
@@ -1165,7 +1162,7 @@ pub fn G_G2PlayerAngles(
                 vectoangles(la, &mut lookAngles);
                 (*sc).lookTime = ctx.world.level.time + 1000;
             } else {
-                _VectorCopy((*sc).ps.origin, &mut lookAngles);
+                lookAngles = (*sc).ps.origin;
             }
             lookAngles[PITCH as usize] = 0.0;
             // Referee probe: caller-side look-target angles + hasLookTarget/lookTime.
@@ -1246,7 +1243,7 @@ pub fn G_G2PlayerAngles(
                     let mut tAngles: vec3_t = [0.0; 3];
 
                     let oc = (*other).client;
-                    _VectorCopy((*oc).ps.viewangles, &mut tAngles);
+                    tAngles = (*oc).ps.viewangles;
                     tAngles[PITCH as usize] = 0.0;
                     tAngles[ROLL as usize] = 0.0;
 
@@ -1334,11 +1331,11 @@ pub fn G_G2PlayerAngles(
         {
             let mut lookAngles: vec3_t = [0.0; 3];
 
-            _VectorCopy((*sc).ps.viewangles, legsAngles);
+            *legsAngles = (*sc).ps.viewangles;
             legsAngles[PITCH as usize] = 0.0;
             AnglesToAxis(*legsAngles, legs);
 
-            _VectorCopy((*sc).ps.viewangles, &mut lookAngles);
+            lookAngles = (*sc).ps.viewangles;
             lookAngles[YAW as usize] = 0.0;
             lookAngles[ROLL as usize] = 0.0;
 
@@ -1359,7 +1356,7 @@ pub fn G_G2PlayerAngles(
                     == VH_FIGHTER
             {
                 // fighters take pitch and roll into account for the axial angles
-                _VectorCopy((*sc).ps.viewangles, legsAngles);
+                *legsAngles = (*sc).ps.viewangles;
                 AnglesToAxis(*legsAngles, legs);
             } else {
                 G_G2NPCAngles(ctx, ctx.entity_id_of(ent), legs, legsAngles);
@@ -1819,7 +1816,7 @@ pub fn WP_SabersCheckLock2(
             (*attacker).r.currentOrigin,
             &mut defDir,
         );
-        _VectorCopy((*ac).ps.viewangles, &mut attAngles);
+        attAngles = (*ac).ps.viewangles;
         attAngles[YAW as usize] = mp_bg::bg_misc::vectoyaw(defDir);
         SetClientViewAngle(&mut *attacker, attAngles);
         defAngles[PITCH as usize] = attAngles[PITCH as usize] * -1.0;
@@ -1852,7 +1849,7 @@ pub fn WP_SabersCheckLock2(
         if trace.startsolid == 0 && trace.allsolid == 0 {
             G_SetOrigin(&mut *(attacker), trace.endpos);
             if !(*attacker).client.is_null() {
-                _VectorCopy(trace.endpos, &mut (*ac).ps.origin);
+                (*ac).ps.origin = trace.endpos;
             }
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(attacker.cast()));
         }
@@ -1879,7 +1876,7 @@ pub fn WP_SabersCheckLock2(
         );
         if trace.startsolid == 0 && trace.allsolid == 0 {
             if !(*defender).client.is_null() {
-                _VectorCopy(trace.endpos, &mut (*dc).ps.origin);
+                (*dc).ps.origin = trace.endpos;
             }
             G_SetOrigin(&mut *(defender), trace.endpos);
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(defender.cast()));
@@ -2686,7 +2683,7 @@ pub fn WP_GetSaberDeflectionAngle(
             let mut temp: vec3_t = [0.0; 3];
             let hitDot: f32;
 
-            _VectorCopy((*ac).lastSaberBase_Always, &mut temp);
+            temp = (*ac).lastSaberBase_Always;
 
             AngleVectors((*ac).lastSaberDir_Always, Some(&mut att_HitDir), None, None);
 
@@ -3007,10 +3004,10 @@ pub fn G_G2TraceCollide(
 
             if !(*g2Hit).client.is_null() {
                 let gc = (*g2Hit).client;
-                _VectorCopy((*gc).ps.origin, &mut g2HitOrigin);
+                g2HitOrigin = (*gc).ps.origin;
                 angles[YAW as usize] = (*gc).ps.viewangles[YAW as usize];
             } else {
-                _VectorCopy((*g2Hit).r.currentOrigin, &mut g2HitOrigin);
+                g2HitOrigin = (*g2Hit).r.currentOrigin;
                 angles[YAW as usize] = (*g2Hit).r.currentAngles[YAW as usize];
             }
 
@@ -3072,8 +3069,8 @@ pub fn G_G2TraceCollide(
                 return false;
             } else {
                 // The ghoul2 trace result matches; copy the collision position back.
-                _VectorCopy(G2Trace[0].mCollisionPosition, &mut (*tr).endpos);
-                _VectorCopy(G2Trace[0].mCollisionNormal, &mut (*tr).plane.normal);
+                (*tr).endpos = G2Trace[0].mCollisionPosition;
+                (*tr).plane.normal = G2Trace[0].mCollisionNormal;
 
                 if !(*g2Hit).client.is_null() {
                     let gc = (*g2Hit).client;
@@ -3119,9 +3116,9 @@ pub fn G_BuildSaberFaces(
         let mut invFwd: vec3_t = [0.0; 3];
         let mut invRight: vec3_t = [0.0; 3];
 
-        _VectorCopy(fwd, &mut invFwd);
+        invFwd = fwd;
         VectorInverse(&mut invFwd);
-        _VectorCopy(right, &mut invRight);
+        invRight = right;
         VectorInverse(&mut invRight);
 
         while i < 8 {
@@ -3388,7 +3385,7 @@ pub fn G_SaberFaceCollisionCheck(
 
                         if facing >= 0 {
                             //third edge is facing.. success
-                            _VectorCopy(point, impactPoint);
+                            *impactPoint = point;
                             return true;
                         }
                     }
@@ -3460,7 +3457,7 @@ pub fn G_SaberCollide(
                     if (ctx.world.level.time - (*blade).storageTime) < 200 {
                         //recently updated
                         //first get base and tip of blade
-                        _VectorCopy((*blade).muzzlePoint, &mut base);
+                        base = (*blade).muzzlePoint;
                         _VectorMA(base, (*blade).lengthMax, (*blade).muzzleDir, &mut tip);
 
                         //Now get relative angles between the points
@@ -3614,8 +3611,8 @@ pub fn WP_SabersIntersect(
                         {
                             let b1 =
                                 &(*ec1).saber[ent1SaberNum as usize].blade[ent1BladeNum as usize];
-                            _VectorCopy(b1.muzzlePointOld, &mut saberBase1);
-                            _VectorCopy(b1.muzzlePoint, &mut saberBaseNext1);
+                            saberBase1 = b1.muzzlePointOld;
+                            saberBaseNext1 = b1.muzzlePoint;
 
                             _VectorSubtract(b1.muzzlePoint, b1.muzzlePointOld, &mut dir);
                             VectorNormalize(&mut dir);
@@ -3645,8 +3642,8 @@ pub fn WP_SabersIntersect(
                         {
                             let b2 =
                                 &(*ec2).saber[ent2SaberNum as usize].blade[ent2BladeNum as usize];
-                            _VectorCopy(b2.muzzlePointOld, &mut saberBase2);
-                            _VectorCopy(b2.muzzlePoint, &mut saberBaseNext2);
+                            saberBase2 = b2.muzzlePointOld;
+                            saberBaseNext2 = b2.muzzlePoint;
 
                             _VectorSubtract(b2.muzzlePoint, b2.muzzlePointOld, &mut dir);
                             VectorNormalize(&mut dir);
@@ -4280,10 +4277,10 @@ pub fn WP_SaberDamageAdd(
         let cv = curVictim as usize;
         g.totalDmg[cv] += trDmg as f32;
         if VectorCompare(g.dmgDir[cv], vec3_origin) != 0 {
-            _VectorCopy(trDmgDir, &mut g.dmgDir[cv]);
+            g.dmgDir[cv] = trDmgDir;
         }
         if VectorCompare(g.dmgSpot[cv], vec3_origin) != 0 {
-            _VectorCopy(trDmgSpot, &mut g.dmgSpot[cv]);
+            g.dmgSpot[cv] = trDmgSpot;
         }
         if doDismemberment != 0 {
             g.dismemberDmg[cv] = qtrue;
@@ -4781,22 +4778,16 @@ pub fn CheckSaberDamage(
                     > 100
                 {
                     //no valid last pos, use current
-                    _VectorCopy(saberStart, &mut oldSaberStart);
-                    _VectorCopy(*saberEnd, &mut oldSaberEnd);
+                    oldSaberStart = saberStart;
+                    oldSaberEnd = *saberEnd;
                 } else {
                     //trace from last pos
-                    _VectorCopy(
-                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                            .trail
-                            .base,
-                        &mut oldSaberStart,
-                    );
-                    _VectorCopy(
-                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                            .trail
-                            .tip,
-                        &mut oldSaberEnd,
-                    );
+                    oldSaberStart = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                        .trail
+                        .base;
+                    oldSaberEnd = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                        .trail
+                        .tip;
                 }
 
                 _VectorSubtract(saberStart, *saberEnd, &mut saberDif);
@@ -4836,8 +4827,8 @@ pub fn CheckSaberDamage(
                     tr.fraction,
                     tr.entityNum as i32,
                 ); // TEMP G6
-                _VectorCopy(*saberEnd, &mut lastValidStart);
-                _VectorCopy(saberStart, &mut lastValidEnd);
+                lastValidStart = *saberEnd;
+                lastValidEnd = saberStart;
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(
                         ctx,
@@ -4876,22 +4867,16 @@ pub fn CheckSaberDamage(
                         > 100
                     {
                         //no valid last pos, use current
-                        _VectorCopy(saberStart, &mut oldSaberStart);
-                        _VectorCopy(*saberEnd, &mut oldSaberEnd);
+                        oldSaberStart = saberStart;
+                        oldSaberEnd = *saberEnd;
                     } else {
                         //trace from last pos
-                        _VectorCopy(
-                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .base,
-                            &mut oldSaberStart,
-                        );
-                        _VectorCopy(
-                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .tip,
-                            &mut oldSaberEnd,
-                        );
+                        oldSaberStart = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .base;
+                        oldSaberEnd = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .tip;
                     }
 
                     _VectorSubtract(saberStart, *saberEnd, &mut saberDif);
@@ -4931,8 +4916,8 @@ pub fn CheckSaberDamage(
                         tr.fraction,
                         tr.entityNum as i32,
                     ); // TEMP G6
-                    _VectorCopy(*saberEnd, &mut lastValidStart);
-                    _VectorCopy(saberStart, &mut lastValidEnd);
+                    lastValidStart = *saberEnd;
+                    lastValidEnd = saberStart;
                     if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                         G_G2TraceCollide(
                             ctx,
@@ -4976,7 +4961,7 @@ pub fn CheckSaberDamage(
                         &mut saberEndExtrapolated,
                     );
                 } else {
-                    _VectorCopy(*saberEnd, &mut saberEndExtrapolated);
+                    saberEndExtrapolated = *saberEnd;
                 }
                 trap::Trace(
                     ctx.engine,
@@ -5001,8 +4986,8 @@ pub fn CheckSaberDamage(
                     tr.fraction,
                     tr.entityNum as i32,
                 ); // TEMP G6
-                _VectorCopy(saberStart, &mut lastValidStart);
-                _VectorCopy(saberEndExtrapolated, &mut lastValidEnd);
+                lastValidStart = saberStart;
+                lastValidEnd = saberEndExtrapolated;
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(
                         ctx,
@@ -5449,8 +5434,8 @@ pub fn CheckSaberDamage(
                 (*te).s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
                 (*te).s.weapon = rSaberNum;
                 (*te).s.legsAnim = rBladeNum;
-                _VectorCopy(tr.endpos, &mut (*te).s.origin);
-                _VectorCopy(tr.plane.normal, &mut (*te).s.angles);
+                (*te).s.origin = tr.endpos;
+                (*te).s.angles = tr.plane.normal;
                 if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
                 {
                     //don't let it play with no direction
@@ -5555,8 +5540,8 @@ pub fn CheckSaberDamage(
                         ctx.world.level.time + ctx.world.cvars.g_saberDmgDelay_Idle.integer;
                 }
                 ctx.world.globals.saberDoClashEffect = qtrue;
-                _VectorCopy(tr.endpos, &mut ctx.world.globals.saberClashPos);
-                _VectorCopy(tr.plane.normal, &mut ctx.world.globals.saberClashNorm);
+                ctx.world.globals.saberClashPos = tr.endpos;
+                ctx.world.globals.saberClashNorm = tr.plane.normal;
                 ctx.world.globals.saberClashEventParm = 1;
 
                 if dmg > SABER_NONATTACK_DAMAGE {
@@ -5797,8 +5782,8 @@ pub fn CheckSaberDamage(
             }
 
             ctx.world.globals.saberDoClashEffect = qtrue;
-            _VectorCopy(tr.endpos, &mut ctx.world.globals.saberClashPos);
-            _VectorCopy(tr.plane.normal, &mut ctx.world.globals.saberClashNorm);
+            ctx.world.globals.saberClashPos = tr.endpos;
+            ctx.world.globals.saberClashNorm = tr.plane.normal;
             ctx.world.globals.saberClashEventParm = 1;
 
             sabersClashed = qtrue;
@@ -6403,26 +6388,20 @@ pub fn G_SPSaberDamageTraceLerped(
             > 100
         {
             //no valid last pos, use current
-            _VectorCopy(*baseNew, &mut baseOld);
-            _VectorCopy(*endNew, &mut endOld);
+            baseOld = *baseNew;
+            endOld = *endNew;
         } else {
             //trace from last pos
-            _VectorCopy(
-                (*ec).saber[saberNum as usize].blade[bladeNum as usize]
-                    .trail
-                    .base,
-                &mut baseOld,
-            );
-            _VectorCopy(
-                (*ec).saber[saberNum as usize].blade[bladeNum as usize]
-                    .trail
-                    .tip,
-                &mut endOld,
-            );
+            baseOld = (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                .trail
+                .base;
+            endOld = (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                .trail
+                .tip;
         }
 
-        _VectorCopy(baseOld, &mut mp1);
-        _VectorCopy(*baseNew, &mut mp2);
+        mp1 = baseOld;
+        mp2 = *baseNew;
         _VectorSubtract(endOld, baseOld, &mut md1);
         VectorNormalize(&mut md1);
         _VectorSubtract(*endNew, *baseNew, &mut md2);
@@ -6464,8 +6443,8 @@ pub fn G_SPSaberDamageTraceLerped(
             let mut extrapolate: qboolean = qtrue;
 
             //do the trace at the base first
-            _VectorCopy(baseOld, &mut bladePointOld);
-            _VectorCopy(*baseNew, &mut bladePointNew);
+            bladePointOld = baseOld;
+            bladePointNew = *baseNew;
             CheckSaberDamage(
                 ctx,
                 ctx.entity_id_of(self_).unwrap(),
@@ -6527,15 +6506,15 @@ pub fn G_SPSaberDamageTraceLerped(
             vectoangles(md1, &mut ma1);
             vectoangles(md2, &mut ma2);
 
-            _VectorCopy(md1, &mut curMD2);
-            _VectorCopy(baseOld, &mut curBase2);
+            curMD2 = md1;
+            curBase2 = baseOld;
 
             loop {
-                _VectorCopy(curMD2, &mut curMD1);
-                _VectorCopy(curBase2, &mut curBase1);
+                curMD1 = curMD2;
+                curBase1 = curBase2;
                 if curDirFrac >= 1.0f32 {
-                    _VectorCopy(md2, &mut curMD2);
-                    _VectorCopy(*baseNew, &mut curBase2);
+                    curMD2 = md2;
+                    curBase2 = *baseNew;
                 } else {
                     xx = 0;
                     while xx < 3 {
@@ -6773,7 +6752,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                     let mut tr: trace_t = core::mem::zeroed();
                     let mut myEyes: vec3_t = [0.0; 3];
 
-                    _VectorCopy((*sc).ps.origin, &mut myEyes);
+                    myEyes = (*sc).ps.origin;
                     myEyes[2] += (*sc).ps.viewheight as f32;
 
                     trap::Trace(
@@ -6897,7 +6876,7 @@ pub fn WP_SaberStartMissileBlockCheck(
             } //NPCs always try to block sabers coming from behind!
 
             //see if they're heading towards me
-            _VectorCopy((*ent).s.pos.trDelta, &mut missile_dir);
+            missile_dir = (*ent).s.pos.trDelta;
             VectorNormalize(&mut missile_dir);
             if _DotProduct(dir, missile_dir) > 0.0 {
                 continue;
@@ -6905,7 +6884,7 @@ pub fn WP_SaberStartMissileBlockCheck(
 
             //FIXME: must have a clear trace to me, too...
             if dist < closestDist {
-                _VectorCopy((*self_).r.currentOrigin, &mut traceTo);
+                traceTo = (*self_).r.currentOrigin;
                 traceTo[2] = (*self_).r.absmax[2] - 4.0;
                 trap::Trace(
                     ctx.engine,
@@ -7306,7 +7285,7 @@ pub fn CheckThrownSaberDamaged(
                     let tmp2 = entOrigin;
                     _VectorScale(tmp2, 0.5, &mut entOrigin);
                 } else {
-                    _VectorCopy((*ent).r.currentOrigin, &mut entOrigin);
+                    entOrigin = (*ent).r.currentOrigin;
                 }
 
                 trap::Trace(
@@ -7556,7 +7535,7 @@ pub fn saberMoveBack(ctx: &mut GameContext, ent: EntityId, goingBack: qboolean) 
         }
     }
 
-    _VectorCopy(origin, &mut ctx.world.entity_mut(ent).r.currentOrigin);
+    ctx.world.entity_mut(ent).r.currentOrigin = origin;
 }
 
 /// Raven `SaberBounceSound`.
@@ -8123,7 +8102,7 @@ pub fn saberKnockOutOfHand(
     G_SetOrigin(ctx.world.entity_mut(saberent), base);
     saberKnockDown(ctx, saberent, saberOwner, saberOwner);
     // override the velocity on the knocked away saber.
-    _VectorCopy(velocity, &mut ctx.world.entity_mut(saberent).s.pos.trDelta);
+    ctx.world.entity_mut(saberent).s.pos.trDelta = velocity;
 
     true
 }
@@ -8773,10 +8752,10 @@ pub fn saberFirstThrown(ctx: &mut GameContext, saberent: EntityId) {
 
                 AngleVectors((*soc).ps.viewangles, Some(&mut fwd), None, None);
 
-                _VectorCopy((*soc).ps.origin, &mut traceFrom);
+                traceFrom = (*soc).ps.origin;
                 traceFrom[2] += (*soc).ps.viewheight as f32;
 
-                _VectorCopy(traceFrom, &mut traceTo);
+                traceTo = traceFrom;
                 traceTo[0] += fwd[0] * 4096.0;
                 traceTo[1] += fwd[1] * 4096.0;
                 traceTo[2] += fwd[2] * 4096.0;
@@ -8987,7 +8966,7 @@ pub fn UpdateClientRenderinfo(
                 (*ri).lastG2 = (*self_).ghoul2;
             }
 
-            _VectorCopy((*client).ps.viewangles, &mut (*ri).eyeAngles);
+            (*ri).eyeAngles = (*client).ps.viewangles;
 
             //we'll just say the legs/torso are whatever the first frame of our current anim is.
             (*ri).torsoFrame = (*(&ctx.world.bg_state.bgAllAnims)[(*self_).localAnimIndex as usize]
@@ -9003,13 +8982,13 @@ pub fn UpdateClientRenderinfo(
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
 
                 if (*self_).ghoul2.is_null() {
-                    _VectorCopy((*client).ps.origin, &mut (*ri).headPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).handRPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).handLPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).torsoPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).crotchPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).footRPoint);
-                    _VectorCopy((*client).ps.origin, &mut (*ri).footLPoint);
+                    (*ri).headPoint = (*client).ps.origin;
+                    (*ri).handRPoint = (*client).ps.origin;
+                    (*ri).handLPoint = (*client).ps.origin;
+                    (*ri).torsoPoint = (*client).ps.origin;
+                    (*ri).crotchPoint = (*client).ps.origin;
+                    (*ri).footRPoint = (*client).ps.origin;
+                    (*ri).footLPoint = (*client).ps.origin;
                 } else {
                     //head
                     trap::G2API_GetBoltMatrix(
@@ -9155,9 +9134,9 @@ pub fn UpdateClientRenderinfo(
             }
 
             //muzzle point calc (we are going to be cheap here)
-            _VectorCopy((*ri).muzzlePoint, &mut (*ri).muzzlePointOld);
-            _VectorCopy((*client).ps.origin, &mut (*ri).muzzlePoint);
-            _VectorCopy((*ri).muzzleDir, &mut (*ri).muzzleDirOld);
+            (*ri).muzzlePointOld = (*ri).muzzlePoint;
+            (*ri).muzzlePoint = (*client).ps.origin;
+            (*ri).muzzleDirOld = (*ri).muzzleDir;
             AngleVectors(
                 (*client).ps.viewangles,
                 Some(&mut (*ri).muzzleDir),
@@ -9166,7 +9145,7 @@ pub fn UpdateClientRenderinfo(
             );
             (*ri).mPCalcTime = ctx.world.level.time;
 
-            _VectorCopy((*client).ps.origin, &mut (*ri).eyePoint);
+            (*ri).eyePoint = (*client).ps.origin;
             (*ri).eyePoint[2] += (*client).ps.viewheight as f32;
         }
     }
@@ -9295,7 +9274,7 @@ pub fn G_KickTrace(
                 (*ent).r.currentOrigin[1],
                 kickEnd[2],
             ];
-            _VectorCopy(kickEnd, &mut traceEnd);
+            traceEnd = kickEnd;
         } else {
             //extrude
             traceOrg = [
@@ -10213,7 +10192,7 @@ pub fn WP_SaberPositionUpdate(
                         {
                             // go there
                             G_SetOrigin(&mut *(self_), idealSpot);
-                            _VectorCopy(idealSpot, &mut (*client).ps.origin);
+                            (*client).ps.origin = idealSpot;
                         }
                     } else if (*client).grappleState >= 1 {
                         // grappler
@@ -10448,7 +10427,7 @@ pub fn WP_SaberPositionUpdate(
                     && (*client).ps.saberInFlight == 0
                 {
                     // Since we haven't got a bolt position, place it on top of the player origin.
-                    _VectorCopy((*client).ps.origin, &mut (*mySaber).r.currentOrigin);
+                    (*mySaber).r.currentOrigin = (*client).ps.origin;
                 }
             }
 
@@ -10496,10 +10475,10 @@ pub fn WP_SaberPositionUpdate(
                 animSpeedScale = 2.0;
             }
 
-            _VectorCopy((*client).ps.origin, &mut properOrigin);
+            properOrigin = (*client).ps.origin;
 
             // try to predict the origin based on velocity so it's more like what the client sees
-            _VectorCopy((*client).ps.velocity, &mut addVel);
+            addVel = (*client).ps.velocity;
             VectorNormalize(&mut addVel);
 
             if (*client).ps.velocity[0] < 0.0 {
@@ -10581,7 +10560,7 @@ pub fn WP_SaberPositionUpdate(
                         || (*mySaber).r.contents == 0)
                     && (*client).ps.saberInFlight == 0
                 {
-                    _VectorCopy((*client).ps.origin, &mut (*mySaber).r.currentOrigin);
+                    (*mySaber).r.currentOrigin = (*client).ps.origin;
                 }
 
                 break 'finalUpdate;
@@ -10623,20 +10602,17 @@ pub fn WP_SaberPositionUpdate(
                 && (ctx.world.level.time - (*client).lastSaberStorageTime) < 200
             {
                 // alright
-                _VectorCopy(
-                    (*client).lastSaberBase_Always,
-                    &mut (*client).olderSaberBase,
-                );
+                (*client).olderSaberBase = (*client).lastSaberBase_Always;
                 (*client).olderIsValid = qtrue;
             } else {
                 (*client).olderIsValid = qfalse;
             }
 
-            _VectorCopy(boltOrigin, &mut (*client).lastSaberBase_Always);
-            _VectorCopy(boltAngles, &mut (*client).lastSaberDir_Always);
+            (*client).lastSaberBase_Always = boltOrigin;
+            (*client).lastSaberDir_Always = boltAngles;
             (*client).lastSaberStorageTime = ctx.world.level.time;
 
-            _VectorCopy(boltAngles, &mut rawAngles);
+            rawAngles = boltAngles;
 
             _VectorMA(
                 boltOrigin,
@@ -10673,20 +10649,20 @@ pub fn WP_SaberPositionUpdate(
                         let mut startang: vec3_t = [0.0; 3];
                         let mut dir: vec3_t = [0.0; 3];
 
-                        _VectorCopy(boltOrigin, &mut (*saberent).r.currentOrigin);
+                        (*saberent).r.currentOrigin = boltOrigin;
 
-                        _VectorCopy(boltOrigin, &mut startorg);
-                        _VectorCopy(boltAngles, &mut startang);
+                        startorg = boltOrigin;
+                        startang = boltAngles;
 
                         // Instead of forcing startang[0]=90 we fake it and slowly tilt it down on
                         // the client via a perframe method (doesn't affect where/how the saber hits)
 
                         (*saberent).r.svFlags &= !SVF_NOCLIENT;
-                        _VectorCopy(startorg, &mut (*saberent).s.pos.trBase);
-                        _VectorCopy(startang, &mut (*saberent).s.apos.trBase);
+                        (*saberent).s.pos.trBase = startorg;
+                        (*saberent).s.apos.trBase = startang;
 
-                        _VectorCopy(startorg, &mut (*saberent).s.origin);
-                        _VectorCopy(startang, &mut (*saberent).s.angles);
+                        (*saberent).s.origin = startorg;
+                        (*saberent).s.angles = startang;
 
                         (*saberent).s.saberInFlight = qtrue;
 
@@ -10769,7 +10745,7 @@ pub fn WP_SaberPositionUpdate(
                         );
                     } else if (*client).ps.saberEntityNum != 0 {
                         // only do this stuff if your saber is active and has not been knocked out of the air.
-                        _VectorCopy(boltOrigin, &mut (*saberent).pos1);
+                        (*saberent).pos1 = boltOrigin;
                         trap::LinkEntity(
                             ctx.engine,
                             mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
@@ -10813,11 +10789,8 @@ pub fn WP_SaberPositionUpdate(
                         let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                         let mut dir: vec3_t = [0.0; 3];
                         VectorSet(&mut dir, 0.0, 1.0, 0.0);
-                        _VectorCopy(
-                            ctx.world.g_entities[saberNum as usize].r.currentOrigin,
-                            &mut (*te).s.origin,
-                        );
-                        _VectorCopy(dir, &mut (*te).s.angles);
+                        (*te).s.origin = ctx.world.g_entities[saberNum as usize].r.currentOrigin;
+                        (*te).s.angles = dir;
                         (*te).s.eventParm = 1;
                         (*te).s.weapon = 0; // saberNum
                         (*te).s.legsAnim = 0; // bladeNum
@@ -10835,18 +10808,12 @@ pub fn WP_SaberPositionUpdate(
                             // number (>= MAX_CLIENTS) — an OOB write past saber[MAX_SABERS]; the
                             // loop bound (rSaberNum < MAX_SABERS) and adjacent blade[rBladeNum]
                             // show the intent, so index saber[rSaberNum] (§19).
-                            _VectorCopy(
-                                boltOrigin,
-                                &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                    .trail
-                                    .base,
-                            );
-                            _VectorCopy(
-                                end,
-                                &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                    .trail
-                                    .tip,
-                            );
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .trail
+                                .base = boltOrigin;
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .trail
+                                .tip = end;
                             (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .trail
                                 .lastTime = ctx.world.level.time;
@@ -10909,17 +10876,13 @@ pub fn WP_SaberPositionUpdate(
                     rBladeNum = 0;
                     while rBladeNum < (*client).saber[rSaberNum as usize].numBlades {
                         // update muzzle data for the blade
-                        _VectorCopy(
-                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .muzzlePoint,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .muzzlePointOld,
-                        );
-                        _VectorCopy(
-                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .muzzleDirOld,
-                        );
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .muzzlePointOld = (*client).saber[rSaberNum as usize].blade
+                            [rBladeNum as usize]
+                            .muzzlePoint;
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .muzzleDirOld =
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzleDir;
 
                         // Raven's `!saber[1].model` operand is an always-false array-address
                         // test; only `!saber[1].model[0]` is load-bearing.
@@ -11011,11 +10974,9 @@ pub fn WP_SaberPositionUpdate(
                                         [rBladeNum as usize]
                                         .muzzleDir,
                                 );
-                                _VectorCopy(
-                                    (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                        .muzzlePoint,
-                                    &mut boltOrigin,
-                                );
+                                boltOrigin = (*client).saber[rSaberNum as usize].blade
+                                    [rBladeNum as usize]
+                                    .muzzlePoint;
                                 _VectorMA(
                                     boltOrigin,
                                     (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
@@ -11052,11 +11013,9 @@ pub fn WP_SaberPositionUpdate(
                                 &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .muzzleDir,
                             );
-                            _VectorCopy(
-                                (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                    .muzzlePoint,
-                                &mut boltOrigin,
-                            );
+                            boltOrigin = (*client).saber[rSaberNum as usize].blade
+                                [rBladeNum as usize]
+                                .muzzlePoint;
                             _VectorMA(
                                 boltOrigin,
                                 (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
@@ -11191,24 +11150,20 @@ pub fn WP_SaberPositionUpdate(
                                                 > 100
                                             {
                                                 // no valid last pos, use current
-                                                _VectorCopy(boltOrigin, &mut oldSaberStart);
-                                                _VectorCopy(end, &mut oldSaberEnd);
+                                                oldSaberStart = boltOrigin;
+                                                oldSaberEnd = end;
                                             } else {
                                                 // trace from last pos
-                                                _VectorCopy(
-                                                    (*client).saber[rSaberNum as usize].blade
-                                                        [rBladeNum as usize]
-                                                        .trail
-                                                        .base,
-                                                    &mut oldSaberStart,
-                                                );
-                                                _VectorCopy(
-                                                    (*client).saber[rSaberNum as usize].blade
-                                                        [rBladeNum as usize]
-                                                        .trail
-                                                        .tip,
-                                                    &mut oldSaberEnd,
-                                                );
+                                                oldSaberStart = (*client).saber[rSaberNum as usize]
+                                                    .blade
+                                                    [rBladeNum as usize]
+                                                    .trail
+                                                    .base;
+                                                oldSaberEnd = (*client).saber[rSaberNum as usize]
+                                                    .blade
+                                                    [rBladeNum as usize]
+                                                    .trail
+                                                    .tip;
                                             }
 
                                             _VectorSubtract(
@@ -11386,18 +11341,12 @@ pub fn WP_SaberPositionUpdate(
                             );
                         }
 
-                        _VectorCopy(
-                            boltOrigin,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .base,
-                        );
-                        _VectorCopy(
-                            end,
-                            &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
-                                .trail
-                                .tip,
-                        );
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .base = boltOrigin;
+                        (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .tip = end;
                         (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                             .trail
                             .lastTime = ctx.world.level.time;
