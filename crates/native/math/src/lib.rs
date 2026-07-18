@@ -6,7 +6,6 @@
 //! name. Membership is decided by `tools/qmath-census.py`, never by hand.
 #![allow(non_camel_case_types)]
 
-pub mod deviations;
 pub mod eorientations;
 pub mod orientation;
 pub mod qmath;

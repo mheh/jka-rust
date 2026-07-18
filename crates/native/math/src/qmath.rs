@@ -1,52 +1,32 @@
 //! Raven `q_math.c` — the SP/MP-shared core (see `tools/qmath-census.py`).
 //!
-//! Placement rule (2026-07-17 centralization ruling): a function whose MP and
-//! SP oracle bodies are behaviorally identical is defined ONCE here under its
-//! Raven name; behaviorally divergent functions live in [`crate::deviations`]
-//! as `<Name>MP`/`<Name>SP` and each mode re-exports its own under the Raven
-//! name. `cplane_t` consumers (`SetPlaneSignbits`/`BoxOnPlaneSide`) cannot
-//! move below the ABI tier and stay in `mp_qshared::shared::q_math`.
-//!
-//! Bodies are verbatim moves from `crates/mp/game/src/q_math.rs` (reconciled
-//! with the cosmetically-drifted `mp_qshared` copies, 2026-07-17); every item
-//! keeps its original doc comment and oracle source ref.
-//! Source: `oracle/codemp/game/q_math.c` / `oracle/code/game/q_math.cpp`
+//! - PerpendicularVectorMP/SP
+//! - ClearBoundsMP/SP
+//! 
+//! Sources: 
+//! - `oracle/codemp/game/q_math.c` / `oracle/code/game/q_math.cpp`
+//! - `oracle/codemp/game/q_shared.h`
 #![allow(non_snake_case, unused, clippy::all)]
 
 use core::ffi::{c_int, c_schar, c_short, c_uint};
-
 use crate::vector::{vec3_t, vec4_t, vec_t};
 
-// `RotatePointAroundVector`/`RotateAroundDirection` exist only in the MP
-// oracle (`q_math.c`; SP's `q_math.cpp` has no counterpart) and transitively
-// call the mode-divergent `PerpendicularVector` — bound here to the MP
-// variant. If an SP counterpart ever appears, the census forces the split.
-use crate::deviations::PerpendicularVectorMP as PerpendicularVector;
-
-/// Raven `qboolean` at its C width (`c_int`); spelled locally so this crate
-/// stays below the ABI tier. `mp_qshared::qboolean` is the same alias, so
-/// re-exports are signature-identical.
 pub type qboolean = c_int;
 type byte = u8;
 
-/// Raven angle-vector indices (`PITCH`/`YAW`/`ROLL`).
+/// Angle-vector indices
 /// Source: `oracle/codemp/game/q_shared.h:374-376`
 pub const PITCH: usize = 0;
 pub const YAW: usize = 1;
 pub const ROLL: usize = 2;
-
-/// Raven `vec3_origin`.
-/// Source: `oracle/codemp/game/q_math.c:7`
 pub const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
 
-// Integration round-1: the mega-pass fnskel packets transcribe this constant
-// under its exact Raven (lowercase) spelling; kept as an alias rather than
-// renaming the established `VEC3_ORIGIN` (in use throughout this file).
+// kept as an alias rather
 #[allow(non_upper_case_globals)]
 pub const vec3_origin: vec3_t = VEC3_ORIGIN;
 
-/// Raven `bytedirs[NUMVERTEXNORMALS]` — precomputed icosahedron-subdivision
-/// unit normals used by `DirToByte`/`ByteToDir`.
+/// Raven `bytedirs[NUMVERTEXNORMALS]`
+/// precomputed icosahedron-subdivision unit normals used by `DirToByte`/`ByteToDir`.
 /// Source: `oracle/codemp/game/q_math.c:39-122`
 pub const BYTEDIRS: [vec3_t; 162] = [
     [-0.525731f32, 0.000000f32, 0.850651f32],
@@ -364,6 +344,34 @@ pub fn ClampShort(i: c_int) -> c_short {
     i as c_short
 }
 
+/// Raven `ClearBounds`.
+///
+/// Source: `oracle/codemp/game/q_math.c:1129-1132`
+pub fn ClearBoundsMP(mins: &mut vec3_t, maxs: &mut vec3_t) {
+    mins[0] = 99999.0;
+    mins[1] = 99999.0;
+    mins[2] = 99999.0;
+    maxs[0] = -99999.0;
+    maxs[1] = -99999.0;
+    maxs[2] = -99999.0;
+}
+
+/// Raven SP `ClearBounds` — seeds with `WORLD_SIZE` (`MAX_WORLD_COORD -
+/// MIN_WORLD_COORD` = 131072), where MP seeds with `99999`: bounds that never
+/// accumulate a point read back differently per mode.
+/// Source: `oracle/code/game/q_math.cpp` (`ClearBounds`);
+/// `oracle/code/game/q_shared.h:1599-1601` (`WORLD_SIZE`)
+pub fn ClearBoundsSP(mins: &mut vec3_t, maxs: &mut vec3_t) {
+    const WORLD_SIZE: vec_t = 131072.0;
+    mins[0] = WORLD_SIZE;
+    mins[1] = WORLD_SIZE;
+    mins[2] = WORLD_SIZE;
+    maxs[0] = -WORLD_SIZE;
+    maxs[1] = -WORLD_SIZE;
+    maxs[2] = -WORLD_SIZE;
+}
+
+
 /// Raven `DirToByte`.
 ///
 /// Raven checks `!dir` for a null pointer; a Rust `vec3_t` value can't be
@@ -437,6 +445,57 @@ pub fn NormalizeColor(r#in: vec3_t, out: &mut vec3_t) -> f32 {
     max
 }
 
+/// Raven `PerpendicularVector`.
+///
+/// Assumes "src" is normalized.
+/// Source: `oracle/codemp/game/q_math.c:1353-1383`
+pub fn PerpendicularVectorMP(dst: &mut vec3_t, src: vec3_t) {
+    // find the smallest magnitude axially aligned vector
+    let mut pos = 0usize;
+    let mut minelem = 1.0f32;
+    for (i, comp) in src.iter().enumerate() {
+        if comp.abs() < minelem {
+            pos = i;
+            minelem = comp.abs();
+        }
+    }
+    let mut tempvec: vec3_t = [0.0, 0.0, 0.0];
+    tempvec[pos] = 1.0;
+
+    // project the point onto the plane defined by src
+    ProjectPointOnPlane(dst, tempvec, src);
+
+    // normalize the result
+    VectorNormalize(dst);
+}
+
+/// Raven SP `PerpendicularVector` — scans axes z->x ("bias towards using z
+/// instead of x or y"), where MP scans x->z: same-magnitude components can
+/// select a different axis, so the two modes genuinely diverge.
+/// Source: `oracle/code/game/q_math.cpp` (`PerpendicularVector`)
+pub fn PerpendicularVectorSP(dst: &mut vec3_t, src: vec3_t) {
+    let mut pos: usize = 0;
+    let mut minelem: f32 = 1.0;
+    let mut tempvec: vec3_t = [0.0; 3];
+
+    // find the smallest magnitude axially aligned vector, z->x with z bias
+    let mut i: i32 = 2;
+    while i >= 0 {
+        if Q_fabs(src[i as usize]) < minelem {
+            pos = i as usize;
+            minelem = Q_fabs(src[i as usize]);
+        }
+        i -= 1;
+    }
+    tempvec[pos] = 1.0;
+
+    // project the point onto the plane defined by src
+    ProjectPointOnPlane(dst, tempvec, src);
+
+    // normalize the result
+    VectorNormalize(dst);
+}
+
 /// Raven `PlaneFromPoints`.
 ///
 /// Returns false if the triangle is degenerate. The normal points out of the
@@ -471,7 +530,7 @@ pub fn RotatePointAroundVector(dst: &mut vec3_t, dir: vec3_t, point: vec3_t, deg
     let mut vup: vec3_t = [0.0; 3];
     let vf = dir;
 
-    PerpendicularVector(&mut vr, dir);
+    PerpendicularVectorMP(&mut vr, dir);
     CrossProduct(vr, vf, &mut vup);
 
     m[0][0] = vr[0];
@@ -528,7 +587,7 @@ pub fn RotateAroundDirection(axis: *mut vec3_t, yaw: f32) {
 
     // create an arbitrary axis[1]
     let a0 = axis[0];
-    PerpendicularVector(&mut axis[1], a0);
+    PerpendicularVectorMP(&mut axis[1], a0);
 
     // rotate it around axis[0] by yaw
     if yaw != 0.0 {

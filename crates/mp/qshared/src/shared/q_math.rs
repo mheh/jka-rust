@@ -18,7 +18,7 @@ use crate::shared::{vec3_t, vec_t};
 // `native_math::qmath` (membership per tools/qmath-census.py); this module
 // re-exports them under their established paths and keeps only the
 // ABI-tier (`cplane_t`) and engine-lineage functions defined locally.
-pub use native_math::deviations::PerpendicularVectorMP as PerpendicularVector;
+pub use native_math::qmath::PerpendicularVectorMP as PerpendicularVector;
 pub use native_math::qmath::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
     vectoangles, AngleDelta, AngleMod, AngleNormalize180, AngleNormalize360, AngleSubtract,
