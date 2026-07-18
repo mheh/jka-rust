@@ -4386,53 +4386,55 @@ pub fn WP_SaberDoHit(ctx: &mut GameContext, self_: EntityId, saberNum: c_int, bl
             }
 
             let te_eid = G_TempEntity(ctx, dmg_spot, EV_SABER_HIT as c_int);
-            let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-            if !te.is_null() {
-                (*te).s.otherEntityNum = ctx.world.globals.victimEntityNum[iu];
-                (*te).s.otherEntityNum2 = ctx.world.entity(self_).s.number;
-                (*te).s.weapon = saberNum;
-                (*te).s.legsAnim = bladeNum;
+            // Raven's `if (te)` guard is vacuous — G_TempEntity never returns NULL.
+            let victim_num = ctx.world.globals.victimEntityNum[iu];
+            let self_num = ctx.world.entity(self_).s.number;
+            let dmg_dir = ctx.world.globals.dmgDir[iu];
+            let victim_client_null = ctx.world.entity(victim_id).client.is_null();
+            let victim_etype = ctx.world.entity(victim_id).s.eType;
+            let total_dmg = ctx.world.globals.totalDmg[iu];
+            let te = ctx.entity_mut(te_eid);
+            te.s.otherEntityNum = victim_num;
+            te.s.otherEntityNum2 = self_num;
+            te.s.weapon = saberNum;
+            te.s.legsAnim = bladeNum;
 
-                (*te).s.origin = ctx.world.globals.dmgSpot[iu];
-                _VectorScale(ctx.world.globals.dmgDir[iu], -1.0, &mut (*te).s.angles);
+            te.s.origin = dmg_spot;
+            _VectorScale(dmg_dir, -1.0, &mut te.s.angles);
 
-                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
-                {
-                    // don't let it play with no direction
-                    (*te).s.angles[1] = 1.0;
-                }
+            if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                // don't let it play with no direction
+                te.s.angles[1] = 1.0;
+            }
 
-                if isDroid == 0
-                    && (!ctx.world.entity(victim_id).client.is_null()
-                        || ctx.world.entity(victim_id).s.eType == ET_NPC as c_int
-                        || ctx.world.entity(victim_id).s.eType == ET_BODY as c_int)
-                {
-                    if ctx.world.globals.totalDmg[iu] < 5.0 {
-                        (*te).s.eventParm = 3;
-                    } else if ctx.world.globals.totalDmg[iu] < 20.0 {
-                        (*te).s.eventParm = 2;
-                    } else {
-                        (*te).s.eventParm = 1;
-                    }
+            if isDroid == 0
+                && (!victim_client_null
+                    || victim_etype == ET_NPC as c_int
+                    || victim_etype == ET_BODY as c_int)
+            {
+                if total_dmg < 5.0 {
+                    te.s.eventParm = 3;
+                } else if total_dmg < 20.0 {
+                    te.s.eventParm = 2;
                 } else {
-                    let saber = &mut (*sc).saber[saberNum as usize] as *mut saberInfo_t;
-                    if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0
-                        && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE) != 0
-                    {
-                        // don't do clash flare
-                    } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
-                        && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE2) != 0
-                    {
-                        // don't do clash flare
-                    } else {
-                        if ctx.world.globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE as f32 {
-                            let teS_id =
-                                G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
-                            let teS = ctx.entity_mut(teS_id) as *mut gentity_t;
-                            (*teS).s.origin = (*te).s.origin;
-                        }
-                        (*te).s.eventParm = 0;
+                    te.s.eventParm = 1;
+                }
+            } else {
+                let saber = &mut (*sc).saber[saberNum as usize] as *mut saberInfo_t;
+                if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0
+                    && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE) != 0
+                {
+                    // don't do clash flare
+                } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
+                    && ((*saber).saberFlags2 & SFL2_NO_CLASH_FLARE2) != 0
+                {
+                    // don't do clash flare
+                } else {
+                    if total_dmg > SABER_NONATTACK_DAMAGE as f32 {
+                        let teS_id = G_TempEntity(ctx, dmg_spot, EV_SABER_CLASHFLARE as c_int);
+                        ctx.entity_mut(teS_id).s.origin = dmg_spot;
                     }
+                    ctx.entity_mut(te_eid).s.eventParm = 0;
                 }
             }
         }
@@ -5403,8 +5405,6 @@ pub fn CheckSaberDamage(
         {
             //then bounce off
             {
-                let mut te: *mut gentity_t = core::ptr::null_mut();
-
                 (*sc).ps.saberMove = mp_bg::bg_panimate::BG_BrokenParryForAttack(
                     &ctx.world.bg_state,
                     (*sc).ps.saberMove,
@@ -5429,17 +5429,16 @@ pub fn CheckSaberDamage(
                 WP_SaberBounceSound(ctx, ctx.entity_id_of(self_), rSaberNum, rBladeNum);
                 //do hit effect
                 let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                te = ctx.entity_mut(te_id);
-                (*te).s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
-                (*te).s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
-                (*te).s.weapon = rSaberNum;
-                (*te).s.legsAnim = rBladeNum;
-                (*te).s.origin = tr.endpos;
-                (*te).s.angles = tr.plane.normal;
-                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
-                {
+                let te = ctx.entity_mut(te_id);
+                te.s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
+                te.s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
+                te.s.weapon = rSaberNum;
+                te.s.legsAnim = rBladeNum;
+                te.s.origin = tr.endpos;
+                te.s.angles = tr.plane.normal;
+                if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
                     //don't let it play with no direction
-                    (*te).s.angles[1] = 1.0;
+                    te.s.angles[1] = 1.0;
                 }
                 //do radius damage/knockback, if any
                 if WP_SaberBladeUseSecondBladeStyle(
@@ -7058,7 +7057,6 @@ pub fn CheckThrownSaberDamaged(
         let level_time = ctx.world.level.time;
         let mut vecsub: vec3_t;
         let mut veclen: f32;
-        let te: *mut gentity_t;
         let base = ctx.world.g_entities.as_mut_ptr();
 
         let soc = (*saberOwner).client;
@@ -7130,18 +7128,15 @@ pub fn CheckThrownSaberDamaged(
                         WP_SaberBlockNonRandom(&*(ent), tr.endpos, qfalse);
 
                         let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
-                        te = ctx.entity_mut(te_id);
-                        (*te).s.origin = tr.endpos;
-                        (*te).s.angles = tr.plane.normal;
-                        if (*te).s.angles[0] == 0.0
-                            && (*te).s.angles[1] == 0.0
-                            && (*te).s.angles[2] == 0.0
-                        {
-                            (*te).s.angles[1] = 1.0;
+                        let te = ctx.entity_mut(te_id);
+                        te.s.origin = tr.endpos;
+                        te.s.angles = tr.plane.normal;
+                        if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                            te.s.angles[1] = 1.0;
                         }
-                        (*te).s.eventParm = 1;
-                        (*te).s.weapon = 0;
-                        (*te).s.legsAnim = 0;
+                        te.s.eventParm = 1;
+                        te.s.weapon = 0;
+                        te.s.legsAnim = 0;
 
                         if saberCheckKnockdown_Thrown(
                             ctx,
@@ -7215,21 +7210,18 @@ pub fn CheckThrownSaberDamaged(
                         }
 
                         let te_id = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                        te = ctx.entity_mut(te_id);
-                        (*te).s.otherEntityNum = (*ent).s.number;
-                        (*te).s.otherEntityNum2 = (*saberOwner).s.number;
-                        (*te).s.weapon = 0;
-                        (*te).s.legsAnim = 0;
-                        (*te).s.origin = tr.endpos;
-                        (*te).s.angles = tr.plane.normal;
-                        if (*te).s.angles[0] == 0.0
-                            && (*te).s.angles[1] == 0.0
-                            && (*te).s.angles[2] == 0.0
-                        {
-                            (*te).s.angles[1] = 1.0;
+                        let te = ctx.entity_mut(te_id);
+                        te.s.otherEntityNum = (*ent).s.number;
+                        te.s.otherEntityNum2 = (*saberOwner).s.number;
+                        te.s.weapon = 0;
+                        te.s.legsAnim = 0;
+                        te.s.origin = tr.endpos;
+                        te.s.angles = tr.plane.normal;
+                        if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                            te.s.angles[1] = 1.0;
                         }
 
-                        (*te).s.eventParm = 1;
+                        te.s.eventParm = 1;
 
                         if returning == 0 {
                             thrownSaberTouch(
@@ -7343,18 +7335,15 @@ pub fn CheckThrownSaberDamaged(
                     }
 
                     let te_eid = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
-                    let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-                    (*te).s.otherEntityNum = ENTITYNUM_NONE;
-                    (*te).s.otherEntityNum2 = (*saberOwner).s.number;
-                    (*te).s.weapon = 0;
-                    (*te).s.legsAnim = 0;
-                    (*te).s.origin = tr.endpos;
-                    (*te).s.angles = tr.plane.normal;
-                    if (*te).s.angles[0] == 0.0
-                        && (*te).s.angles[1] == 0.0
-                        && (*te).s.angles[2] == 0.0
-                    {
-                        (*te).s.angles[1] = 1.0;
+                    let te = ctx.entity_mut(te_eid);
+                    te.s.otherEntityNum = ENTITYNUM_NONE;
+                    te.s.otherEntityNum2 = (*saberOwner).s.number;
+                    te.s.weapon = 0;
+                    te.s.legsAnim = 0;
+                    te.s.origin = tr.endpos;
+                    te.s.angles = tr.plane.normal;
+                    if te.s.angles[0] == 0.0 && te.s.angles[1] == 0.0 && te.s.angles[2] == 0.0 {
+                        te.s.angles[1] = 1.0;
                     }
 
                     if (*ent).s.eType == ET_MOVER as c_int {
@@ -7365,14 +7354,12 @@ pub fn CheckThrownSaberDamaged(
                             // don't do clash flare
                             G_FreeEntity(ctx, Some(te_eid));
                         } else {
-                            let teS_id =
-                                G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
-                            let teS = ctx.entity_mut(teS_id) as *mut gentity_t;
-                            (*teS).s.origin = (*te).s.origin;
-                            (*te).s.eventParm = 0;
+                            let teS_id = G_TempEntity(ctx, tr.endpos, EV_SABER_CLASHFLARE as c_int);
+                            ctx.entity_mut(teS_id).s.origin = tr.endpos;
+                            ctx.entity_mut(te_eid).s.eventParm = 0;
                         }
                     } else {
-                        (*te).s.eventParm = 1;
+                        ctx.entity_mut(te_eid).s.eventParm = 1;
                     }
 
                     if returning == 0 {
@@ -10786,14 +10773,14 @@ pub fn WP_SaberPositionUpdate(
                     if (*client).ps.saberIdleWound < ctx.world.level.time {
                         let saber_org = ctx.world.g_entities[saberNum as usize].r.currentOrigin;
                         let te_eid = G_TempEntity(ctx, saber_org, EV_SABER_BLOCK as c_int);
-                        let te = ctx.entity_mut(te_eid) as *mut gentity_t;
                         let mut dir: vec3_t = [0.0; 3];
                         VectorSet(&mut dir, 0.0, 1.0, 0.0);
-                        (*te).s.origin = ctx.world.g_entities[saberNum as usize].r.currentOrigin;
-                        (*te).s.angles = dir;
-                        (*te).s.eventParm = 1;
-                        (*te).s.weapon = 0; // saberNum
-                        (*te).s.legsAnim = 0; // bladeNum
+                        let te = ctx.entity_mut(te_eid);
+                        te.s.origin = saber_org;
+                        te.s.angles = dir;
+                        te.s.eventParm = 1;
+                        te.s.weapon = 0; // saberNum
+                        te.s.legsAnim = 0; // bladeNum
 
                         (*client).ps.saberIdleWound =
                             ctx.world.level.time + ctx.world.bg_state.rng.Q_irand(400, 600);
