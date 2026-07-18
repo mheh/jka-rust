@@ -134,13 +134,12 @@ pub const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 /// Raven `G_PreDefSound` — spawn a predefined-sound temp entity at `org`.
 ///
 /// Source: `oracle/codemp/game/w_force.c:40-49`
-pub fn G_PreDefSound(ctx: &mut GameContext, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
+pub fn G_PreDefSound(ctx: &mut GameContext, org: vec3_t, pdSound: c_int) -> EntityId {
     let te_id = G_TempEntity(ctx, org, EV_PREDEFSOUND as c_int);
-    let te = ctx.entity_mut(te_id) as *mut gentity_t;
     let e = ctx.world.entity_mut(te_id);
     e.s.eventParm = pdSound;
     e.s.origin = org; // VectorCopy(org, te->s.origin)
-    te
+    te_id
 }
 
 /// Raven `WP_InitForcePowers`.
@@ -732,9 +731,8 @@ pub fn ForcePowerUsableOn(
                 //don't allow gripping to begin with if they are absorbing
                 //play sound indicating that attack was absorbed
                 if (*other_cl).forcePowerSoundDebounce < level_time {
-                    let abSound =
+                    let ab_id =
                         G_PreDefSound(ctx, (*other_cl).ps.origin, PDSOUND_ABSORBHIT as c_int);
-                    let ab_id = ctx.entity_id_of(abSound).unwrap();
                     ctx.world.entity_mut(ab_id).s.trickedentindex = other_number;
                     (*other_cl).forcePowerSoundDebounce = level_time + 400;
                 }
@@ -1005,8 +1003,7 @@ pub fn WP_AbsorbConversion(
         //play sound indicating that attack was absorbed
         let level_time = ctx.world.level.time;
         if (*atcl).forcePowerSoundDebounce < level_time {
-            let abSound = G_PreDefSound(ctx, (*atcl).ps.origin, PDSOUND_ABSORBHIT as c_int);
-            let ab_id = ctx.entity_id_of(abSound).unwrap();
+            let ab_id = G_PreDefSound(ctx, (*atcl).ps.origin, PDSOUND_ABSORBHIT as c_int);
             let attacked_number = ctx.entity(attacked).s.number;
             ctx.world.entity_mut(ab_id).s.trickedentindex = attacked_number;
 
