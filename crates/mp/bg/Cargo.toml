@@ -7,5 +7,6 @@ edition = "2021"
 name = "mp_bg"
 
 [dependencies]
+native_math = { path = "../../native/math" }
 mp_qshared = { path = "../qshared" }
 native_platform = { path = "../../native/platform" }

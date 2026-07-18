@@ -17,6 +17,8 @@
 
 use core::ffi::{c_int, c_uint, c_ulong};
 
+use native_math::rng::HoldrandLcg;
+
 /// Raven's `holdrand` seed plus the VC-libc `rand()` LCG, the engine island's
 /// own instance (ruling 21).
 ///
@@ -31,7 +33,7 @@ pub struct QRand {
     /// 64-bit on LP64 referee/native builds, exactly as Raven's
     /// `unsigned long` compiles.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    holdrand: u32,
+    holdrand: HoldrandLcg,
 
     /// Raven `bg_lib.c`'s `static int randSeed = 0;` — the independent LCG
     /// state backing `bg_lib.c`'s `rand`/`srand` and the `q_shared.h`
@@ -41,16 +43,11 @@ pub struct QRand {
 }
 
 impl QRand {
-    /// The initial `holdrand` value (`0x89abcdef`) — Raven's compile-time
-    /// static initializer, installed by `Default`/`new`.
-    /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
-
     /// Fresh generator seeded with Raven's compile-time `holdrand` value and
     /// `bg_lib.c`'s compile-time `randSeed = 0`.
     pub fn new() -> Self {
         Self {
-            holdrand: Self::HOLDRAND_INIT,
+            holdrand: HoldrandLcg::new(),
             randSeed: 0,
         }
     }
@@ -59,18 +56,14 @@ impl QRand {
     /// conversion; Rust's sign-extending `as` cast matches C's value-mod-2^N).
     /// Source: `oracle/codemp/game/q_math.c:1434-1437`
     pub fn Rand_Init(&mut self, seed: c_int) {
-        self.holdrand = seed as u32;
+        self.holdrand.Rand_Init(seed);
     }
 
     /// Raven `flrand` — returns a float `min <= x < max` (exclusive; will get
     /// `max - 0.00001`, but never `max`).
     /// Source: `oracle/codemp/game/q_math.c:1441-1450`
     pub fn flrand(&mut self, min: f32, max: f32) -> f32 {
-        self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        // Raven: `(float)(holdrand >> 17)` — retail-win32 32-bit width
-        // confines the draw to [0, 32767] (2026-07-17 ruling).
-        let result = (self.holdrand >> 17) as f32;
-        ((result * (max - min)) / 32768.0f32) + min
+        self.holdrand.flrand(min, max)
     }
 
     /// Raven `Q_flrand` — the thin dual over `flrand`.
@@ -86,11 +79,7 @@ impl QRand {
     /// retail-win32 32-bit width is confined to [0, 32767].
     /// Source: `oracle/codemp/game/q_math.c:1458-1469`
     pub fn irand(&mut self, min: c_int, max: c_int) -> c_int {
-        debug_assert!((max - min) < 32768);
-        let max = max + 1;
-        self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        let result = (self.holdrand >> 17) as c_int;
-        (result.wrapping_mul(max - min) >> 15).wrapping_add(min)
+        self.holdrand.irand(min, max)
     }
 
     /// Raven `Q_irand` — the thin dual over `irand`.

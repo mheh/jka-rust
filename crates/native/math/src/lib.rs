@@ -10,4 +10,5 @@ pub mod deviations;
 pub mod eorientations;
 pub mod orientation;
 pub mod qmath;
+pub mod rng;
 pub mod vector;

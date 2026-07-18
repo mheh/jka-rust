@@ -7,4 +7,5 @@ edition = "2021"
 name = "mp_host_interface"
 
 [dependencies]
+native_math = { path = "../../native/math" }
 mp_qshared = { path = "../qshared" }

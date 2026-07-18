@@ -11,6 +11,8 @@
 
 use core::ffi::{c_int, c_uint, c_ulong};
 
+use native_math::rng::HoldrandLcg;
+
 /// Raven's `holdrand` seed plus the C runtime `rand()` LCG.
 ///
 /// The retail native module carries two independent generator states — the
@@ -28,7 +30,7 @@ pub struct Rng {
     /// draw to [0,32767]. The oracle referee build is patched to 32-bit in
     /// `tools/referee-oracle/build.sh` to match.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    holdrand: u32,
+    holdrand: HoldrandLcg,
 
     /// The C runtime `rand()` state backing the native module's `rand`/`srand`
     /// and the `q_shared.h` `random`/`crandom` macros. Retail win32 links the
@@ -40,16 +42,11 @@ pub struct Rng {
 }
 
 impl Rng {
-    /// The initial `holdrand` value (`0x89abcdef`) — the state a fresh zeroed
-    /// `BgState` must carry, so this is what `Default`/`new` install.
-    /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
-
     /// Fresh generator seeded with Raven's compile-time `holdrand` value and
     /// the MSVC CRT's compile-time `holdrand = 1L`.
     pub fn new() -> Self {
         Self {
-            holdrand: Self::HOLDRAND_INIT,
+            holdrand: HoldrandLcg::new(),
             crt_holdrand: 1,
         }
     }
@@ -59,25 +56,21 @@ impl Rng {
     /// moves it). Observes only; production behavior is unchanged.
     /// Source: `oracle/codemp/game/q_math.c:1432`
     pub fn holdrand(&self) -> c_ulong {
-        self.holdrand as c_ulong
+        self.holdrand.state() as c_ulong
     }
 
     /// Raven `Rand_Init` — reseed the generator (`int` → `unsigned long`
     /// conversion; Rust's sign-extending `as` cast matches C's value-mod-2^N).
     /// Source: `oracle/codemp/game/q_math.c:1434-1437`
     pub fn Rand_Init(&mut self, seed: c_int) {
-        self.holdrand = seed as u32;
+        self.holdrand.Rand_Init(seed);
     }
 
     /// Raven `flrand` — returns a float `min <= x < max` (exclusive; will get
     /// `max - 0.00001`, but never `max`).
     /// Source: `oracle/codemp/game/q_math.c:1441-1450`
     pub fn flrand(&mut self, min: f32, max: f32) -> f32 {
-        self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        // Raven: `(float)(holdrand >> 17)` — retail-win32 32-bit width
-        // confines the draw to [0, 32767], so the result is [min, max).
-        let result = (self.holdrand >> 17) as f32;
-        ((result * (max - min)) / 32768.0f32) + min
+        self.holdrand.flrand(min, max)
     }
 
     /// Raven `Q_flrand` — the thin dual over `flrand`.
@@ -94,11 +87,7 @@ impl Rng {
     /// `min ..= max` (well, `min ..= max+?` per Raven's own off-by-one shape).
     /// Source: `oracle/codemp/game/q_math.c:1458-1469`
     pub fn irand(&mut self, min: c_int, max: c_int) -> c_int {
-        debug_assert!((max - min) < 32768);
-        let max = max + 1;
-        self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        let result = (self.holdrand >> 17) as c_int;
-        (result.wrapping_mul(max - min) >> 15).wrapping_add(min)
+        self.holdrand.irand(min, max)
     }
 
     /// Raven `Q_irand` — the thin dual over `irand`.

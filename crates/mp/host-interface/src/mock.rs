@@ -15,12 +15,10 @@
 //!   `None`, Raven's `-1`); free is a drop.
 //! * `print`/`sys_print` capture into buffers; `error` records then panics
 //!   (the fork-1 `catch_unwind` model — a test wraps the call to observe it).
-//! * `flrand`/`irand` run a faithful replica of Raven's `q_math.c` `holdrand`
-//!   LCG. The engine's real generator (ruling 21: a qshared `QRand`-type field
-//!   on `Engine.common`) is not yet ported — the referee-proven bit-exact
-//!   generator today is `mp_game`'s `bg_channel::rng::Rng`, which this crate
-//!   must not depend on (wrong tier), so the LCG is replicated inline against
-//!   the same oracle source.
+//! * `flrand`/`irand` run Raven's `q_math.c` `holdrand` LCG — the single
+//!   `native_math::rng::HoldrandLcg` definition (2026-07-17 centralization;
+//!   this module previously carried an inline replica because the only other
+//!   copy lived in `mp_bg`, a higher tier).
 //! * `gentity` hands back a stable pointer into a byte arena strided by
 //!   `size_of::<sharedEntity_t>()` — the exact `SV_GentityNum` arithmetic.
 //! * `trace` writes a deterministic empty-space result (moved fully to `end`,
@@ -58,44 +56,9 @@ use crate::engine_host::EngineHost;
 use crate::platform_host::PlatformHost;
 use crate::vm_slot::VmSlot;
 
-/// Faithful replica of Raven's `q_math.c` `holdrand` LCG (see the module doc
-/// for why it is inlined rather than reused). `holdrand` is 32-bit per the
-/// retail-win32 parity bar (2026-07-17 ruling; win32 `unsigned long`)
-/// `c_ulong`, matching Raven's `unsigned long` (the referee ground truth on
-/// LP64 hosts).
-/// Source: `oracle/codemp/game/q_math.c:1432-1474`
-struct HoldrandLcg {
-    holdrand: u32,
-}
-
-impl HoldrandLcg {
-    /// Raven's compile-time `static unsigned long holdrand = 0x89abcdef;`.
-    /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
-
-    fn new() -> Self {
-        Self {
-            holdrand: Self::HOLDRAND_INIT,
-        }
-    }
-
-    /// Raven `flrand` — `min <= x < max`.
-    /// Source: `oracle/codemp/game/q_math.c:1441-1450`
-    fn flrand(&mut self, min: f32, max: f32) -> f32 {
-        self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        let result = (self.holdrand >> 17) as f32;
-        ((result * (max - min)) / 32768.0f32) + min
-    }
-
-    /// Raven `irand` — `min <= x <= max` (inclusive).
-    /// Source: `oracle/codemp/game/q_math.c:1458-1469`
-    fn irand(&mut self, min: i32, max: i32) -> i32 {
-        let max = max + 1;
-        self.holdrand = self.holdrand.wrapping_mul(214013).wrapping_add(2531011);
-        let result = (self.holdrand >> 17) as i32;
-        (result.wrapping_mul(max - min) >> 15).wrapping_add(min)
-    }
-}
+// (2026-07-17 centralization) the LCG type now lives in `native_math::rng` —
+// the tier objection to reuse is gone; the state instance stays local.
+use native_math::rng::HoldrandLcg;
 
 /// One registered cvar in [`MockHost::cvars`] — the fixture mirror of Raven's
 /// `cvar_t` slots the ruled services read (`string`/`modified`) plus the
@@ -294,7 +257,7 @@ impl MockHost {
     /// [`irand`]: EngineHost::irand
     /// Source: `oracle/codemp/game/q_math.c:1436`
     pub fn rand_init(&mut self, seed: i32) {
-        self.rng.holdrand = seed as u32;
+        self.rng.Rand_Init(seed);
     }
 
     /// The raw `holdrand` LCG state (the RMG oracle dumper's `rng_state()`,
@@ -303,7 +266,7 @@ impl MockHost {
     ///
     /// Source: `oracle/codemp/game/q_math.c:1432`
     pub fn rng_state(&self) -> c_ulong {
-        self.rng.holdrand as c_ulong
+        self.rng.state() as c_ulong
     }
 }
 
