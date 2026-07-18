@@ -3525,9 +3525,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
             } else if gc == GENCMD_FORCE_SPEED as c_int {
                 ForceSpeed(ctx, ctx.entity_id_of(ent).unwrap(), 0);
             } else if gc == GENCMD_FORCE_THROW as c_int {
-                ForceThrow(ctx, ctx.entity_id_of(ent).unwrap(), qfalse);
+                ForceThrow(ctx, ctx.entity_id_of(ent).unwrap(), false);
             } else if gc == GENCMD_FORCE_PULL as c_int {
-                ForceThrow(ctx, ctx.entity_id_of(ent).unwrap(), qtrue);
+                ForceThrow(ctx, ctx.entity_id_of(ent).unwrap(), true);
             } else if gc == GENCMD_FORCE_DISTRACT as c_int {
                 ForceTelepathy(ctx, ctx.entity_id_of(ent).unwrap());
             } else if gc == GENCMD_FORCE_RAGE as c_int {
