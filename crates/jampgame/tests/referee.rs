@@ -378,6 +378,9 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
         assert_eq!(r, 0, "warm-up GAME_RUN_FRAME returned {r}");
     }
 
+    // Reset the syscall accumulation so the join-phase pre-frame snapshot
+    // captures ONLY connect/begin/team-join traffic (not GAME_INIT spam).
+    referee_begin_frame();
     for c in 0..sc.clients {
         let cr = referee_vm_call(vm, MpGameExport::GAME_CLIENT_CONNECT, &[c as isize, 1, 0]);
         assert_eq!(cr, 0, "GAME_CLIENT_CONNECT({c}) rejected (ret {cr})");
@@ -404,7 +407,12 @@ fn drive(dylib: &Path, sc: &Scenario) -> Vec<FrameSnap> {
         );
     }
 
-    let mut snaps = Vec::with_capacity(sc.frames as usize);
+    // Join-phase capture: the connect/begin/team-join syscalls above are the
+    // first place the two modules can part ways (2026-07-17 finding: the
+    // frame-0 melee-brawl divergence originates here). Snapshot them as a
+    // pre-frame so the syscall-stream diff pinpoints the first divergent call.
+    let mut snaps = Vec::with_capacity(sc.frames as usize + 1);
+    snaps.push(snapshot(&locate, sc.clients, 0));
     for f in 0..sc.frames {
         t += sc.msec;
         // Inject this frame's replay input for every client (G_RunClient
