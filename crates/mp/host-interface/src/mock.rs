@@ -59,18 +59,19 @@ use crate::platform_host::PlatformHost;
 use crate::vm_slot::VmSlot;
 
 /// Faithful replica of Raven's `q_math.c` `holdrand` LCG (see the module doc
-/// for why it is inlined rather than reused). `holdrand` is platform-width
+/// for why it is inlined rather than reused). `holdrand` is 32-bit per the
+/// retail-win32 parity bar (2026-07-17 ruling; win32 `unsigned long`)
 /// `c_ulong`, matching Raven's `unsigned long` (the referee ground truth on
 /// LP64 hosts).
 /// Source: `oracle/codemp/game/q_math.c:1432-1474`
 struct HoldrandLcg {
-    holdrand: c_ulong,
+    holdrand: u32,
 }
 
 impl HoldrandLcg {
     /// Raven's compile-time `static unsigned long holdrand = 0x89abcdef;`.
     /// Source: `oracle/codemp/game/q_math.c:1432`
-    const HOLDRAND_INIT: c_ulong = 0x89ab_cdef;
+    const HOLDRAND_INIT: u32 = 0x89ab_cdef;
 
     fn new() -> Self {
         Self {
@@ -293,7 +294,7 @@ impl MockHost {
     /// [`irand`]: EngineHost::irand
     /// Source: `oracle/codemp/game/q_math.c:1436`
     pub fn rand_init(&mut self, seed: i32) {
-        self.rng.holdrand = seed as c_ulong;
+        self.rng.holdrand = seed as u32;
     }
 
     /// The raw `holdrand` LCG state (the RMG oracle dumper's `rng_state()`,
@@ -302,7 +303,7 @@ impl MockHost {
     ///
     /// Source: `oracle/codemp/game/q_math.c:1432`
     pub fn rng_state(&self) -> c_ulong {
-        self.rng.holdrand
+        self.rng.holdrand as c_ulong
     }
 }
 

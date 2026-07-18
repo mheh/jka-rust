@@ -161,6 +161,14 @@ p = "build/src/codemp/game/q_math.c"
 s = open(p).read()
 s += "\n/* referee-oracle: MSVC CRT rand() state (see q_shared.h patch). */\nunsigned int jka_msvc_holdrand = 1u;\n"
 
+# Q_rsqrt's `long i` type-pun reads 8 bytes from a 4-byte float at LP64
+# width (UB: stack garbage feeds the shift) — retail i386 `long` is 32-bit.
+# Same normalization tools/jampgame-oracle/run.sh applies to its dumper.
+old_rsqrt = "\tlong i;"
+new_rsqrt = "\tint i; /* referee-oracle: retail 32-bit long */"
+assert old_rsqrt in s, "q_math.c Q_rsqrt long decl not found — oracle changed?"
+s = s.replace(old_rsqrt, new_rsqrt, 1)
+
 # retail-win32 holdrand width (2026-07-17 ruling, same class as SnapVector/
 # libm above): `unsigned long` is 32-bit on win32, 64-bit here on LP64. At
 # LP64 width `(int)(holdrand >> 17)` spans the full register and irand(1,2)

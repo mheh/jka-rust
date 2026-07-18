@@ -129,7 +129,7 @@ CCMShader *CM_GetShaderInfo( const char *name ) {
 // Faithful q_math.c helpers (the determinism anchor for golden #1). Transcribed
 // VERBATIM from oracle/codemp/game/q_math.c:1432-1470 and :SetPlaneSignbits.
 // --------------------------------------------------------------------------
-static unsigned long holdrand = 0x89abcdef;
+static unsigned int holdrand = 0x89abcdef; /* retail-win32 32-bit width (2026-07-17 ruling) */
 
 void Rand_Init( int seed ) { holdrand = seed; }
 unsigned long rng_state( void ) { return holdrand; }
