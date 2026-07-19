@@ -541,3 +541,27 @@ Settled parameters of the era:
   remaining held gentity_t/gclient_t derefs retire slice-by-slice.
 - Function-static atomics folded to owned state (5ed6e1b0); B3
   exception list is empty.
+
+## DEC-32 — Dedup campaign ratified: one home per duplicated implementation (2026-07-18)
+
+The whole-workspace duplicate sweep (49 reader agents over every file in
+`crates/`; merged inventory at `docs/audits/duplicate-inventory-2026-07-18.md`)
+found 6 behavioral-divergence clusters, ~48 same-side centralization clusters,
+16 byte-identical SP/MP twins, and 7 test-support clusters. The campaign plan
+(`docs/plans/2026-07-18-dedup-campaign.md`) is ratified with four user-settled
+choices:
+
+1. **`crates/native/string` is created** as the C-string runtime home
+   (`c_str*` family, `c_atoi`, ptr→String, `Com_Filter` glob family,
+   `VALIDSTRING`, GP2 tokenizer); `native_platform` re-exports from it.
+2. **`c_atoi` standardizes on strtol-style clamp overflow semantics**
+   (retail win32 msvcrt behavior); the three divergent copies converge.
+3. **All 14 byte-identical SP/MP twin clusters hoist into `native`**
+   (per-side re-exports, layout asserts retained). Deliberately-divergent
+   ABI twins are untouched.
+4. **The `QSharedScratch`-threaded string shape is canonical** —
+   `mp_qshared`'s `static mut` `q_string`/`COM_Parse` copies retire in favor
+   of the threaded impls (closes the §B3 violation inside qshared).
+
+Oracle-inherited duplication (inventory category 5) stays faithful per
+porting-rules §A2/§20 — no action pre-parity.
