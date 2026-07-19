@@ -80,7 +80,7 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_FORCEGRIP, BUTTON_FORCEPOWER, BUTTON_FORCE_DRAIN,
     BUTTON_FORCE_LIGHTNING, BUTTON_GESTURE,
 };
-use mp_qshared::shared::q_math_rand::RAND_MAX;
+use mp_qshared::shared::RAND_MAX;
 // --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
 use crate::ai_wpnav::G_TestLine;
 use crate::g_client::{G_UpdateClientAnims, SetClientViewAngle};

@@ -103,7 +103,7 @@ pub use crate::q_shared_cvar_flags::*;
 pub use crate::w_force::mindTrickTime;
 pub use mp_bg::bg_vehicleLoad_tables::*;
 pub use mp_bg::vehicles::{vehFieldType_t, vehFieldType_t::*, vehField_t};
-pub use mp_qshared::shared::q_math_rand::RAND_MAX;
+pub use mp_qshared::shared::RAND_MAX;
 // `BG_GiveMeVectorFromMatrix` lives in `bg_misc` (its oracle home,
 // `bg_misc.c:736`); the canonical export for bare-use sites.
 pub use crate::saber::w_saber_consts::*;

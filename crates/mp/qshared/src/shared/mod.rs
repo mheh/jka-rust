@@ -43,7 +43,6 @@ pub mod print_parm;
 pub mod q_color;
 pub mod q_format;
 pub mod q_math;
-pub mod q_math_rand;
 pub mod q_string;
 pub mod saber_block_type;
 pub mod saber_blocked_type;
@@ -115,7 +114,8 @@ pub use q_color::{Q_IsColorString, Q_COLOR_ESCAPE};
 pub use q_math::{
     _DotProduct, _VectorCopy, _VectorSubtract, VectorLength, VectorNormalize, VectorNormalizeRow,
 };
-pub use q_math_rand::RAND_MAX;
+// Raven's implicit VC-libc RAND_MAX (0x7fff) lives beside the LCG in native_math.
+pub use native_math::rng::RAND_MAX;
 pub use saber_block_type::saberBlockType_t;
 pub use saber_blocked_type::saberBlockedType_t;
 pub use shared_eik_move_state::sharedEIKMoveState;

@@ -15,6 +15,13 @@
 
 use core::ffi::c_int;
 
+/// Raven's `flrand`/`irand` divide the LCG's top 15 bits (`holdrand >> 17`)
+/// by `32768.0F` (`0x8000`), i.e. treat the output range as `0..0x7fff`
+/// inclusive — the VC libc `RAND_MAX` convention. No `#define RAND_MAX`
+/// appears in `q_math.c` itself; this names that implicit constant.
+/// Source: `oracle/codemp/game/q_math.c:1445-1446,1465-1466`
+pub const RAND_MAX: c_int = 0x7fff;
+
 /// One `holdrand` state. Raven seeds the file-static with `0x89abcdef`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HoldrandLcg(pub u32);

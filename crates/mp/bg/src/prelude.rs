@@ -162,7 +162,7 @@ pub use mp_qshared::shared::q_math::{
     Q_fabs, RadiusFromBounds, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize,
     VectorSet, PITCH, ROLL, YAW,
 };
-pub use mp_qshared::shared::q_math_rand::RAND_MAX;
+pub use mp_qshared::shared::RAND_MAX;
 pub use mp_qshared::shared::q_string::{
     va, COM_Compress, COM_StripExtension, GetIDForString, Info_ValueForKey, Q_strcat, Q_strcmp,
     Q_stricmp, Q_stricmpn, Q_strncmp, Q_strncpyz,
