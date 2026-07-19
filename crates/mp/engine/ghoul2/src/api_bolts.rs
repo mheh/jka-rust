@@ -71,14 +71,12 @@
 //! back to Raven's own "bolt has neither a bone nor a surface" identity-matrix
 //! arm (`tr_ghoul2.cpp:3328-3330`).
 //!
-//! **Fourth, minor gap (reported under `problems`).** `VectorNormalize`
-//! (`q_math.c:1172-1186`) and `Create_Matrix` (`G2_misc.cpp:1630-1653`) are
-//! both needed by `g2api_get_bolt_matrix`; the former has no port anywhere
-//! reachable from this crate (`mp_engine_ghoul2` depends only on `mp_qshared`/
-//! `mp_host_interface`), and the latter exists only as `misc::create_matrix`,
-//! which is file-private (not `pub`) and so cannot be reused here. Both are
-//! reimplemented locally below as narrow stopgaps (`vector_normalize_row`,
-//! `create_matrix_from_angles`) rather than left uncallable.
+//! **Fourth, minor gap (reported under `problems`).** `Create_Matrix`
+//! (`G2_misc.cpp:1630-1653`) is needed by `g2api_get_bolt_matrix` but exists
+//! only as `misc::create_matrix`, which is file-private (not `pub`) and so
+//! cannot be reused here; it is reimplemented locally below as a narrow
+//! stopgap (`create_matrix_from_angles`) rather than left uncallable. (The
+//! row-normalize it pairs with is the canonical q_math `VectorNormalizeRow`.)
 //!
 //! Bounds guards on a few direct `bltlist[index]` reads below (`
 //! g2api_attach_g2_model`/`g2api_attach_ent`) are a §19 divergence: Raven's own
@@ -88,7 +86,7 @@
 //! /`None`) behavior instead of an out-of-bounds panic.
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t};
+use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, VectorNormalizeRow};
 
 use crate::api_collision;
 use crate::bolts;
@@ -346,9 +344,9 @@ pub fn g2api_get_bolt_matrix(
             if scale[2] != 0.0 {
                 bolt.matrix[2][3] *= scale[2];
             }
-            vector_normalize_row(&mut bolt.matrix[0]);
-            vector_normalize_row(&mut bolt.matrix[1]);
-            vector_normalize_row(&mut bolt.matrix[2]);
+            VectorNormalizeRow(&mut bolt.matrix[0]);
+            VectorNormalizeRow(&mut bolt.matrix[1]);
+            VectorNormalizeRow(&mut bolt.matrix[2]);
 
             bone_transform::multiply_3x4_matrix(bolt_matrix, &world_matrix, &bolt);
 
@@ -382,22 +380,6 @@ pub fn g2api_get_bolt_matrix(
 
     bone_transform::multiply_3x4_matrix(bolt_matrix, &world_matrix, &IDENTITY_MATRIX);
     false
-}
-
-/// Stopgap reimplementation of Raven `VectorNormalize` (`oracle/codemp/game/
-/// q_math.c:1172-1186`) — `mp_engine_ghoul2` has no reachable port of this
-/// q_math primitive (module-doc gap #4, reported under `problems`; the crate
-/// depends only on `mp_qshared`/`mp_host_interface`). Normalizes only the
-/// first 3 elements of a 4-wide `mdxaBone_t` row, matching the oracle's
-/// `(float*)matrix[i]` cast onto a `vec3_t`-shaped `VectorNormalize` call.
-fn vector_normalize_row(row: &mut [f32; 4]) {
-    let length = (row[0] * row[0] + row[1] * row[1] + row[2] * row[2]).sqrt();
-    if length != 0.0 {
-        let ilength = 1.0 / length;
-        row[0] *= ilength;
-        row[1] *= ilength;
-        row[2] *= ilength;
-    }
 }
 
 /// Stopgap reimplementation of Raven `Create_Matrix` (`G2_misc.cpp:1630-1653`,

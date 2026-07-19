@@ -141,8 +141,8 @@ use core::ffi::c_void;
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::{
-    cplane_t, mdxaBone_t, vec3_t, CONTENTS_SOLID, CONTENTS_TERRAIN, ENTITYNUM_NONE,
-    ENTITYNUM_WORLD, MAX_QPATH,
+    cplane_t, mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID,
+    CONTENTS_TERRAIN, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
 };
 
 use crate::api_collision::{g2api_get_time, g2api_give_me_vector_from_matrix};
@@ -368,24 +368,9 @@ fn vector_inverse(a: vec3_t) -> vec3_t {
 fn dot_product(a: vec3_t, b: vec3_t) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
-fn vector_length(a: vec3_t) -> f32 {
-    dot_product(a, a).sqrt()
-}
 fn distance_squared(a: vec3_t, b: vec3_t) -> f32 {
     let d = vector_subtract(a, b);
     dot_product(d, d)
-}
-/// Raven `float VectorNormalize(vec3_t v)` (`q_math.c`) — normalizes in
-/// place, returns the pre-normalize length; `0,0,0` stays `0,0,0`.
-fn vector_normalize(v: &mut vec3_t) -> f32 {
-    let len = vector_length(*v);
-    if len != 0.0 {
-        let inv = 1.0 / len;
-        v[0] *= inv;
-        v[1] *= inv;
-        v[2] *= inv;
-    }
-    len
 }
 
 /// Raven `void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t
@@ -1257,7 +1242,7 @@ pub fn g2_apply_real_bone_physics(
     bone.epVelocity = vector_scale(bone.epVelocity, 1.0 - mass);
 
     let mut v_norm = bone.epVelocity;
-    let v_total = vector_normalize(&mut v_norm);
+    let v_total = VectorNormalize(&mut v_norm);
 
     if v_total < 1.0 && bone_on_ground {
         bone.epVelocity = [0.0; 3];
@@ -1581,12 +1566,12 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                     offset_rotation
                 };
                 let mut v = vector_subtract(base_pos, anim_pelvis_pos);
-                let f = vector_length(v);
+                let f = VectorLength(v);
                 let mut a = vectoangles(v);
                 a[1] -= fa;
                 let (fwd, _right, _up) = angle_vectors(a);
                 v = fwd;
-                vector_normalize(&mut v);
+                VectorNormalize(&mut v);
                 base_pos = vector_ma(anim_pelvis_pos, f, v);
                 v = vector_subtract(base_pos, anim_pelvis_pos);
                 base_pos = vector_add(pelvis_pos, v);
@@ -1625,7 +1610,7 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                     goal_spot[2] = (params.position[2] - 23.0) - test_mins[2];
                 } else {
                     let mut v_sub = vector_subtract(current_origin, params.position);
-                    vector_normalize(&mut v_sub);
+                    VectorNormalize(&mut v_sub);
                     goal_spot = vector_ma(params.position, 40.0, v_sub);
                     goal_spot[2] = (params.position[2] - 23.0) - test_mins[2];
                 }
@@ -1655,8 +1640,8 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                 } else {
                     vel_dir = vector_subtract(current_origin, params.position);
                 }
-                if vector_length(vel_dir) > 2.0 {
-                    vector_normalize(&mut vel_dir);
+                if VectorLength(vel_dir) > 2.0 {
+                    VectorNormalize(&mut vel_dir);
                     vel_dir = vector_scale(vel_dir, 8.0);
                     vel_dir[2] = 0.0;
                     let bone = &mut instances[idx].blist[blist_idx];
@@ -1665,7 +1650,7 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
 
                 if rag_flags & RAG_BONE_LIGHTWEIGHT != 0 {
                     let mut vel = vector_scale(params.velocity, 0.5);
-                    let vellen = vector_length(vel);
+                    let vellen = VectorLength(vel);
                     if vellen > 64.0 {
                         vel = vector_scale(vel, 64.0 / vellen);
                     }

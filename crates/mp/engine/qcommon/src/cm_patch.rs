@@ -54,7 +54,7 @@ use crate::cm::cbrush_s::cbrush_t;
 use crate::cm::cbrushside_s::cbrushside_t;
 use crate::cm_terrain::CmLandScape;
 use mp_qshared::shared::collision::{cplane_t, PLANE_X, PLANE_Y, PLANE_Z};
-use mp_qshared::shared::{vec3_t, vec3pair_t};
+use mp_qshared::shared::{vec3_t, vec3pair_t, VectorNormalize};
 
 /// Raven `BRUSH_SIDES_PER_TERXEL` under the unconditionally-defined
 /// `_SMOOTH_TERXEL_BRUSH` (no `#undef`/config gate anywhere in the TU, so the
@@ -104,21 +104,6 @@ fn cross_product(v1: vec3_t, v2: vec3_t) -> vec3_t {
         v1[2] * v2[0] - v1[0] * v2[2],
         v1[0] * v2[1] - v1[1] * v2[0],
     ]
-}
-
-/// Raven `VectorNormalize` — normalizes `v` in place, returns the
-/// pre-normalize length (`0.0` length leaves `v` untouched, as Raven's
-/// `if(length)` guard does).
-/// Source: `oracle/codemp/game/q_math.c:1172-1186`
-fn vector_normalize(v: &mut vec3_t) -> f32 {
-    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if length != 0.0 {
-        let ilength = 1.0 / length;
-        v[0] *= ilength;
-        v[1] *= ilength;
-        v[2] *= ilength;
-    }
-    length
 }
 
 /// Raven `PlaneTypeForNormal` macro.
@@ -410,7 +395,7 @@ impl CmPatch {
         let dx = vector_subtract(p1, p0);
         let dy = vector_subtract(p2, p0);
         plane.normal = cross_product(dx, dy);
-        vector_normalize(&mut plane.normal);
+        VectorNormalize(&mut plane.normal);
 
         plane.dist = dot_product(p0, plane.normal);
         plane.r#type = plane_type_for_normal(plane.normal);

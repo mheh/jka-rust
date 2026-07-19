@@ -58,7 +58,7 @@
 
 use core::ffi::c_void;
 
-use mp_qshared::shared::{mdxaBone_t, vec4_t, MAX_QPATH};
+use mp_qshared::shared::{mdxaBone_t, vec4_t, VectorLength, MAX_QPATH};
 
 use crate::render::bone_cache::CBoneCache;
 use crate::shared::bone_info_t::boneInfo_t;
@@ -165,14 +165,6 @@ unsafe fn mdxa_skel_base_pose_mat(header: *const c_void, bone_index: i32) -> mdx
 unsafe fn mdxa_skel_base_pose_mat_inv(header: *const c_void, bone_index: i32) -> mdxaBone_t {
     let skel = mdxa_skel_ptr(header, bone_index);
     core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *const mdxaBone_t)
-}
-
-/// Raven `VectorLength((float*)&temp)` applied to a matrix's first row
-/// (`tr_ghoul2.cpp:1867,1955,1985` etc. — the non-`_XBOX` arm,
-/// `oracle/codemp/game/q_shared.h:1487`): `sqrt(v[0]^2+v[1]^2+v[2]^2)` over
-/// the first three floats of the `mdxaBone_t*` cast, i.e. `matrix[0][0..2]`.
-fn vector_length3(x: f32, y: f32, z: f32) -> f32 {
-    (x * x + y * y + z * z).sqrt()
 }
 
 /// Raven `void G2_TransformBone(int child,CBoneCache &BC)` — the core
@@ -408,7 +400,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
             };
             multiply_3x4_matrix(&mut temp, &first_pass, &base_pose_mat);
             let matrix_scale =
-                vector_length3(temp.matrix[0][0], temp.matrix[0][1], temp.matrix[0][2]);
+                VectorLength([temp.matrix[0][0], temp.matrix[0][1], temp.matrix[0][2]]);
 
             let mut to_matrix = mdxaBone_t {
                 matrix: [[0.0; 4]; 3],
@@ -482,7 +474,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
                     };
                     multiply_3x4_matrix(&mut temp, &first_pass, &base_pose_mat);
                     let matrix_scale =
-                        vector_length3(temp.matrix[0][0], temp.matrix[0][1], temp.matrix[0][2]);
+                        VectorLength([temp.matrix[0][0], temp.matrix[0][1], temp.matrix[0][2]]);
 
                     let mut new_matrix_temp = mdxaBone_t {
                         matrix: [[0.0; 4]; 3],
@@ -521,7 +513,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
                 };
                 multiply_3x4_matrix(&mut temp, &first_pass, &base_pose_mat);
                 let matrix_scale =
-                    vector_length3(temp.matrix[0][0], temp.matrix[0][1], temp.matrix[0][2]);
+                    VectorLength([temp.matrix[0][0], temp.matrix[0][1], temp.matrix[0][2]]);
 
                 let mut new_matrix_temp = mdxaBone_t {
                     matrix: [[0.0; 4]; 3],

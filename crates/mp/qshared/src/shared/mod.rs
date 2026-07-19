@@ -112,7 +112,9 @@ pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use print_parm::printParm_t;
 pub use q_color::{Q_IsColorString, Q_COLOR_ESCAPE};
-pub use q_math::{_DotProduct, _VectorCopy, _VectorSubtract, VectorNormalize};
+pub use q_math::{
+    _DotProduct, _VectorCopy, _VectorSubtract, VectorLength, VectorNormalize, VectorNormalizeRow,
+};
 pub use q_math_rand::RAND_MAX;
 pub use saber_block_type::saberBlockType_t;
 pub use saber_blocked_type::saberBlockedType_t;

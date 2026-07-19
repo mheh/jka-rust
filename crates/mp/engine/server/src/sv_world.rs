@@ -24,6 +24,10 @@ use mp_qshared::common::mp::game::g_public::{
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES};
+use mp_qshared::shared::q_math::{
+    _VectorAdd as VectorAdd, _VectorCopy as VectorCopy, _VectorSubtract as VectorSubtract,
+    VectorLength,
+};
 use mp_qshared::shared::q_math::{vec3_origin, RadiusFromBounds};
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LIGHTSABER, CONTENTS_NOSHOT, CONTENTS_SOLID, MASK_SHOT, SOLID_BMODEL,
@@ -46,32 +50,6 @@ fn VectorDistance(p1: vec3_t, p2: vec3_t) -> f32 {
     let mut dir: vec3_t = [0.0; 3];
     VectorSubtract(p2, p1, &mut dir);
     VectorLength(dir)
-}
-
-// Local vector helpers (established per-file convention — see
-// `cm_load.rs`/`be_aas_move.rs`): Raven's `VectorSubtract`/`VectorCopy`/
-// `VectorAdd`/`VectorLength` macros, transcribed as free fns colocated with
-// their callers in this file.
-fn VectorSubtract(a: vec3_t, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] - b[0];
-    out[1] = a[1] - b[1];
-    out[2] = a[2] - b[2];
-}
-
-fn VectorAdd(a: vec3_t, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] + b[0];
-    out[1] = a[1] + b[1];
-    out[2] = a[2] + b[2];
-}
-
-fn VectorCopy(src: vec3_t, dst: &mut vec3_t) {
-    dst[0] = src[0];
-    dst[1] = src[1];
-    dst[2] = src[2];
-}
-
-fn VectorLength(v: vec3_t) -> f32 {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
 }
 
 /// Raven `SV_CreateworldSector`.

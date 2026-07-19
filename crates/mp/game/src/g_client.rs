@@ -100,14 +100,6 @@ pub static playerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2 as vec_t];
 /// Source: `oracle/codemp/game/g_client.c:10`
 pub static playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2 as vec_t];
 
-/// `VectorLength` header-inline helper (plain-C branch; the `_XBOX` asm branch
-/// is ignored per the packet rider).
-/// Source: `oracle/codemp/game/q_shared.h:1460-1489`
-#[inline]
-fn VectorLength(v: vec3_t) -> vec_t {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-}
-
 /// `FOFS(x)` — byte offset of field `x` within `gentity_t` (Raven macro,
 /// `g_local.h`). Used as the `fieldofs` argument to `G_Find`.
 #[inline]

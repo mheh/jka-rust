@@ -71,7 +71,7 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::{mdxaBone_t, vec3_t, MAX_QPATH};
+use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow, MAX_QPATH};
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
 use crate::render::bone_cache::CBoneCache;
@@ -158,21 +158,6 @@ static IDENTITY_MATRIX: mdxaBone_t = mdxaBone_t {
     ],
 };
 
-/// Stopgap reimplementation of Raven `VectorNormalize`
-/// (`oracle/codemp/game/q_math.c:1172-1186`) — `mp_engine_ghoul2` has no
-/// reachable port of this q_math primitive (same gap `api_bolts.rs` already
-/// reported; the crate depends only on `mp_qshared`/`mp_host_interface`).
-/// Normalizes only the first 3 elements of a 4-wide `mdxaBone_t` row, matching
-/// the oracle's `(float*)matrix[i]` cast onto a `vec3_t`-shaped call.
-fn vector_normalize_row(row: &mut [f32; 4]) {
-    let length = (row[0] * row[0] + row[1] * row[1] + row[2] * row[2]).sqrt();
-    if length != 0.0 {
-        let ilength = 1.0 / length;
-        row[0] *= ilength;
-        row[1] *= ilength;
-        row[2] *= ilength;
-    }
-}
 
 // ---------------------------------------------------------------------------
 // mdxm mesh byte-offset table — the surface-bolt path (`G2_FindSurface_BC` /
@@ -284,18 +269,6 @@ fn vector_ma(veca: &[f32; 3], scale: f32, vecb: &[f32; 3]) -> [f32; 3] {
     ]
 }
 
-/// Raven `vec_t VectorNormalize( vec3_t v )` (`q_math.c` — normalize in place;
-/// leaves `v` untouched on zero length). Uses `f32::sqrt`, matching this file's
-/// established `vector_normalize_row` idiom.
-fn vector_normalize(v: &mut [f32; 3]) {
-    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if length != 0.0 {
-        let ilength = 1.0 / length;
-        v[0] *= ilength;
-        v[1] *= ilength;
-        v[2] *= ilength;
-    }
-}
 
 /// Raven `vec_t VectorNormalize2( const vec3_t v, vec3_t out )` (`q_math.c`) —
 /// `out = normalize(v)`, or `VectorClear(out)` on zero length.
@@ -508,7 +481,7 @@ fn g2_process_surface_bolt2(
             let vec0 = vector_subtract(&p_tri[0], &p_tri[1]);
             let vec1 = vector_subtract(&p_tri[2], &p_tri[1]);
             let mut normal = cross_product(&vec0, &vec1);
-            vector_normalize(&mut normal);
+            VectorNormalize(&mut normal);
 
             // forward vector
             ret_matrix.matrix[0][0] = normal[0];
@@ -523,7 +496,7 @@ fn g2_process_surface_bolt2(
                 ret_matrix.matrix[2][3] - p_tri[0][2],
             ];
             // normalise it
-            vector_normalize(&mut up);
+            VectorNormalize(&mut up);
 
             // that's the up vector
             ret_matrix.matrix[0][1] = up[0];
@@ -977,9 +950,9 @@ pub fn g2_get_bone_matrix_low(
     if scale[2] != 0.0 {
         bolt.matrix[2][3] *= scale[2];
     }
-    vector_normalize_row(&mut bolt.matrix[0]);
-    vector_normalize_row(&mut bolt.matrix[1]);
-    vector_normalize_row(&mut bolt.matrix[2]);
+    VectorNormalizeRow(&mut bolt.matrix[0]);
+    VectorNormalizeRow(&mut bolt.matrix[1]);
+    VectorNormalizeRow(&mut bolt.matrix[2]);
 
     let mut ret_matrix = IDENTITY_MATRIX;
     bone_transform::multiply_3x4_matrix(&mut ret_matrix, world_matrix, &bolt);
@@ -1059,9 +1032,9 @@ pub fn g2_rag_get_bone_base_pose_matrix_low(
     if scale[2] != 0.0 {
         ret_matrix.matrix[2][3] *= scale[2];
     }
-    vector_normalize_row(&mut ret_matrix.matrix[0]);
-    vector_normalize_row(&mut ret_matrix.matrix[1]);
-    vector_normalize_row(&mut ret_matrix.matrix[2]);
+    VectorNormalizeRow(&mut ret_matrix.matrix[0]);
+    VectorNormalizeRow(&mut ret_matrix.matrix[1]);
+    VectorNormalizeRow(&mut ret_matrix.matrix[2]);
 
     ret_matrix
 }

@@ -14,8 +14,6 @@ use crate::vector::{vec3_t, vec4_t, vec_t};
 pub type qboolean = c_int;
 type byte = u8;
 
-/// Angle-vector indices
-/// Source: `oracle/codemp/game/q_shared.h:374-376`
 pub const PITCH: usize = 0;
 pub const YAW: usize = 1;
 pub const ROLL: usize = 2;
@@ -921,6 +919,15 @@ pub fn VectorNormalize2(v: vec3_t, out: &mut vec3_t) -> vec_t {
     }
 
     length
+}
+
+/// Raven call shape `VectorNormalize((float*)matrix[i])` — ghoul2 casts a
+/// 4-wide `mdxaBone_t` row to `vec3_t` and normalizes its first three elements
+/// in place. Named once here; not a distinct Raven function.
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp` bolt/skeleton call sites
+pub fn VectorNormalizeRow(row: &mut [f32; 4]) -> vec_t {
+    let v3: &mut vec3_t = (&mut row[..3]).try_into().unwrap();
+    VectorNormalize(v3)
 }
 
 /// Raven `_VectorMA`.
