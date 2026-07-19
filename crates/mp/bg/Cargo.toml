@@ -8,5 +8,6 @@ name = "mp_bg"
 
 [dependencies]
 native_math = { path = "../../native/math" }
+native_string = { path = "../../native/string" }
 mp_qshared = { path = "../qshared" }
 native_platform = { path = "../../native/platform" }
