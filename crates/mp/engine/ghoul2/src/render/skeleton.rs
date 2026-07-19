@@ -71,6 +71,9 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorMA, _VectorSubtract, CrossProduct, DotProductRow, VectorNormalize2,
+};
 use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow, MAX_QPATH};
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
@@ -239,48 +242,6 @@ unsafe fn read_f32(base: *const u8, offset: usize) -> f32 {
     unsafe { base.add(offset).cast::<f32>().read_unaligned() }
 }
 
-/// `DotProduct(x,y)` (`q_shared.h:1358`) over the first three components — the
-/// bone-matrix rows are 4-wide, the vert coords 3-wide, and Raven's macro only
-/// touches `[0..3]`. Left-associative, matching the macro's expansion.
-fn dot3(x: &[f32], y: &[f32]) -> f32 {
-    x[0] * y[0] + x[1] * y[1] + x[2] * y[2]
-}
-
-/// `CrossProduct(v1,v2,cross)` (`q_shared.h:1553-1557`).
-fn cross_product(v1: &[f32; 3], v2: &[f32; 3]) -> [f32; 3] {
-    [
-        v1[1] * v2[2] - v1[2] * v2[1],
-        v1[2] * v2[0] - v1[0] * v2[2],
-        v1[0] * v2[1] - v1[1] * v2[0],
-    ]
-}
-
-/// `VectorSubtract(a,b,c)` (`q_shared.h:1359`) — `c = a - b`.
-fn vector_subtract(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-/// `VectorMA(v,s,b,o)` (`q_shared.h:1365`) — `o = v + b*s`.
-fn vector_ma(veca: &[f32; 3], scale: f32, vecb: &[f32; 3]) -> [f32; 3] {
-    [
-        veca[0] + vecb[0] * scale,
-        veca[1] + vecb[1] * scale,
-        veca[2] + vecb[2] * scale,
-    ]
-}
-
-
-/// Raven `vec_t VectorNormalize2( const vec3_t v, vec3_t out )` (`q_math.c`) —
-/// `out = normalize(v)`, or `VectorClear(out)` on zero length.
-fn vector_normalize2(v: &[f32; 3]) -> [f32; 3] {
-    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if length != 0.0 {
-        let ilength = 1.0 / length;
-        [v[0] * ilength, v[1] * ilength, v[2] * ilength]
-    } else {
-        [0.0, 0.0, 0.0]
-    }
-}
 
 /// `G2_GetVertWeights` (`mdx_format.h:290-295`) — the packed weight count (1..4).
 ///
@@ -359,9 +320,9 @@ unsafe fn transform_vertex(
         let bone_weight = unsafe { vert_bone_weight(vert, k, &mut total_weight, num_weights) };
         let bone_ref = unsafe { read_i32(bone_refs, 4 * bone_index as usize) };
         let bone = cache.eval(bone_ref);
-        p[0] += bone_weight * (dot3(&bone.matrix[0], &vert_coords) + bone.matrix[0][3]);
-        p[1] += bone_weight * (dot3(&bone.matrix[1], &vert_coords) + bone.matrix[1][3]);
-        p[2] += bone_weight * (dot3(&bone.matrix[2], &vert_coords) + bone.matrix[2][3]);
+        p[0] += bone_weight * (DotProductRow(&bone.matrix[0], vert_coords) + bone.matrix[0][3]);
+        p[1] += bone_weight * (DotProductRow(&bone.matrix[1], vert_coords) + bone.matrix[1][3]);
+        p[2] += bone_weight * (DotProductRow(&bone.matrix[2], vert_coords) + bone.matrix[2][3]);
     }
     p
 }
@@ -478,9 +439,12 @@ fn g2_process_surface_bolt2(
                 + (p_tri[2][2] * bary_centric_k);
 
             // generate a normal to this new triangle
-            let vec0 = vector_subtract(&p_tri[0], &p_tri[1]);
-            let vec1 = vector_subtract(&p_tri[2], &p_tri[1]);
-            let mut normal = cross_product(&vec0, &vec1);
+            let mut vec0 = [0.0f32; 3];
+            _VectorSubtract(p_tri[0], p_tri[1], &mut vec0);
+            let mut vec1 = [0.0f32; 3];
+            _VectorSubtract(p_tri[2], p_tri[1], &mut vec1);
+            let mut normal = [0.0f32; 3];
+            CrossProduct(vec0, vec1, &mut normal);
             VectorNormalize(&mut normal);
 
             // forward vector
@@ -504,7 +468,8 @@ fn g2_process_surface_bolt2(
             ret_matrix.matrix[2][1] = up[2];
 
             // right is always straight
-            let right = cross_product(&normal, &up);
+            let mut right = [0.0f32; 3];
+            CrossProduct(normal, up, &mut right);
             ret_matrix.matrix[0][2] = right[0];
             ret_matrix.matrix[1][2] = right[1];
             ret_matrix.matrix[2][2] = right[2];
@@ -545,17 +510,23 @@ fn g2_process_surface_bolt2(
             // do math trig to work out what the matrix will be from this
             // triangle's translated position
             let mut axes = [[0.0f32; 3]; 3];
-            axes[0] = vector_normalize2(&sides[IG2_TRISIDE_LONGEST]);
-            axes[1] = vector_normalize2(&sides[IG2_TRISIDE_SHORTEST]);
+            VectorNormalize2(sides[IG2_TRISIDE_LONGEST], &mut axes[0]);
+            VectorNormalize2(sides[IG2_TRISIDE_SHORTEST], &mut axes[1]);
 
             // project shortest side so that it is exactly 90 degrees to the
             // longer side
-            let d = dot3(&axes[0], &axes[1]);
-            axes[0] = vector_ma(&axes[0], -d, &axes[1]);
-            axes[0] = vector_normalize2(&axes[0]);
+            let d = _DotProduct(axes[0], axes[1]);
+            _VectorMA(axes[0], -d, axes[1], &mut axes[0]);
+            let a0 = axes[0];
+            VectorNormalize2(a0, &mut axes[0]);
 
-            axes[2] = cross_product(&sides[IG2_TRISIDE_LONGEST], &sides[IG2_TRISIDE_SHORTEST]);
-            axes[2] = vector_normalize2(&axes[2]);
+            CrossProduct(
+                sides[IG2_TRISIDE_LONGEST],
+                sides[IG2_TRISIDE_SHORTEST],
+                &mut axes[2],
+            );
+            let a2 = axes[2];
+            VectorNormalize2(a2, &mut axes[2]);
 
             // set up location in world space of the origin point in out going
             // matrix

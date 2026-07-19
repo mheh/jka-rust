@@ -80,6 +80,7 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
+use mp_qshared::shared::q_math::AnglesToAxis;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations, MAX_QPATH};
 
 use crate::ghoul2_system::Ghoul2System;
@@ -233,36 +234,13 @@ unsafe fn mdxa_skel_base_pose_mat_inv(header: *const c_void, bone_index: i32) ->
 /// graph, `docs/workspace-architecture.md`). Mirrors the f64-then-round-to-f32
 /// precision `mp_game::q_math::AngleVectors` already uses for the same Raven
 /// `M_PI` double literal.
-fn angles_to_axis(angles: vec3_t) -> [vec3_t; 3] {
-    let deg2rad = core::f64::consts::PI * 2.0 / 360.0;
-    let angle = angles[1] as f64 * deg2rad; // YAW
-    let sy = angle.sin() as f32;
-    let cy = angle.cos() as f32;
-    let angle = angles[0] as f64 * deg2rad; // PITCH
-    let sp = angle.sin() as f32;
-    let cp = angle.cos() as f32;
-    let angle = angles[2] as f64 * deg2rad; // ROLL
-    let sr = angle.sin() as f32;
-    let cr = angle.cos() as f32;
-
-    let forward = [cp * cy, cp * sy, -sp];
-    let right = [
-        -1.0 * sr * sp * cy + -1.0 * cr * -sy,
-        -1.0 * sr * sp * sy + -1.0 * cr * cy,
-        -1.0 * sr * cp,
-    ];
-    let up = [cr * sp * cy + -sr * -sy, cr * sp * sy + -sr * cy, cr * cp];
-    // AnglesToAxis: axis[1] = vec3_origin - right ("angle vectors returns
-    // 'right' instead of 'y axis'").
-    [forward, [-right[0], -right[1], -right[2]], up]
-}
-
 /// Raven `Create_Matrix` (module doc finding 3) — `AnglesToAxis` + pack into a
 /// rotation-only `mdxaBone_t` (translation column zeroed).
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1630-1653`
 fn create_matrix(angle: vec3_t) -> mdxaBone_t {
-    let axis = angles_to_axis(angle);
+    let mut axis = [[0.0f32; 3]; 3];
+    AnglesToAxis(angle, axis.as_mut_ptr());
     let mut matrix = mdxaBone_t {
         matrix: [[0.0; 4]; 3],
     };

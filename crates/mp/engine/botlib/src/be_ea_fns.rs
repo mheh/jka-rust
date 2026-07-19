@@ -19,6 +19,7 @@ use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::shared::q_format::FmtArg;
 use mp_qshared::shared::q_string::va;
+use mp_qshared::shared::q_math::{_VectorCopy, VectorClear};
 use mp_qshared::shared::vec3_t;
 
 use crate::be_ea::ea_consts::{ACTION_JUMPEDLASTFRAME, MAX_USERMOVE};
@@ -26,15 +27,6 @@ use crate::l_memory_fns::{FreeMemory, GetClearedHunkMemory};
 use crate::BotLib;
 
 use mp_engine_qcommon::common_fns::Com_Memcpy;
-
-// Raven's `VectorCopy`/`VectorClear` are `#define`s; ported as local private helpers.
-fn VectorCopy(src: vec3_t, dst: &mut vec3_t) {
-    *dst = src;
-}
-
-fn VectorClear(v: &mut vec3_t) {
-    *v = [0.0, 0.0, 0.0];
-}
 
 /// Raven `EA_Say`.
 ///
@@ -322,7 +314,7 @@ pub fn EA_MoveRight(bot: &mut BotLib, client: c_int) {
 pub fn EA_Move(bot: &mut BotLib, client: c_int, dir: vec3_t, mut speed: f32) {
     unsafe {
         let bi = &mut *bot.botinputs.add(client as usize);
-        VectorCopy(dir, &mut bi.dir);
+        _VectorCopy(dir, &mut bi.dir);
         // cap speed
         if speed > MAX_USERMOVE as f32 {
             speed = MAX_USERMOVE as f32;
@@ -339,7 +331,7 @@ pub fn EA_Move(bot: &mut BotLib, client: c_int, dir: vec3_t, mut speed: f32) {
 pub fn EA_View(bot: &mut BotLib, client: c_int, viewangles: vec3_t) {
     unsafe {
         let bi = &mut *bot.botinputs.add(client as usize);
-        VectorCopy(viewangles, &mut bi.viewangles);
+        _VectorCopy(viewangles, &mut bi.viewangles);
     }
 }
 

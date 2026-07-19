@@ -145,8 +145,8 @@ use mp_qshared::shared::q_math::{
     AngleNormalize180, AnglesToAxis, AngleVectors, DistanceSquared, VectorInverse,
 };
 use mp_qshared::shared::{
-    cplane_t, mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID,
-    CONTENTS_TERRAIN, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
+    mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID, CONTENTS_TERRAIN,
+    ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
 };
 
 use crate::api_collision::{g2api_get_time, g2api_give_me_vector_from_matrix};
@@ -371,27 +371,6 @@ fn create_matrix(angle: vec3_t) -> mdxaBone_t {
         matrix.matrix[row][3] = 0.0;
     }
     matrix
-}
-
-/// Zeroed `trace_t` (the type carries no `Default`); every `rag_trace` caller
-/// needs one to write into.
-fn zero_trace() -> trace_t {
-    trace_t {
-        allsolid: 0,
-        startsolid: 0,
-        entityNum: 0,
-        fraction: 0.0,
-        endpos: [0.0; 3],
-        plane: cplane_t {
-            normal: [0.0; 3],
-            dist: 0.0,
-            r#type: 0,
-            signbits: 0,
-            pad: [0, 0],
-        },
-        surfaceFlags: 0,
-        contents: 0,
-    }
 }
 
 /// Materialize an independent `&mut boneInfo_t` out of `ghoul2.blist[index]`
@@ -1060,7 +1039,7 @@ pub fn g2_bone_on_ground(
 ) -> bool {
     let mut g_spot = org;
     g_spot[2] -= 1.0;
-    let mut tr = zero_trace();
+    let mut tr = trace_t::zeroed();
     rag_trace(
         host,
         &mut tr,
@@ -1113,7 +1092,7 @@ pub fn g2_apply_real_bone_physics(
     if gravity != 0.0 {
         let mut ground = e.current_origin;
         ground[2] -= 1.0;
-        let mut tr = zero_trace();
+        let mut tr = trace_t::zeroed();
         rag_trace(
             host,
             &mut tr,
@@ -1167,7 +1146,7 @@ pub fn g2_apply_real_bone_physics(
         return true;
     }
 
-    let mut tr = zero_trace();
+    let mut tr = trace_t::zeroed();
     rag_trace(
         host,
         &mut tr,
@@ -1504,7 +1483,7 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
         let mut goal_spot;
         let start_solid;
         {
-            let mut tr = zero_trace();
+            let mut tr = trace_t::zeroed();
             let trace_end = if has_daddy {
                 parent_origin
             } else {
@@ -1537,7 +1516,7 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                     _VectorMA(params.position, 40.0, v_sub, &mut goal_spot);
                     goal_spot[2] = (params.position[2] - 23.0) - test_mins[2];
                 }
-                let mut tr2 = zero_trace();
+                let mut tr2 = trace_t::zeroed();
                 rag_trace(
                     host,
                     &mut tr2,

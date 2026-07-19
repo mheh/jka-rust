@@ -25,10 +25,8 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES};
 use mp_qshared::shared::q_math::{
-    _VectorAdd as VectorAdd, _VectorCopy as VectorCopy, _VectorSubtract as VectorSubtract,
-    VectorLength,
+    _VectorAdd, _VectorCopy, _VectorSubtract, vec3_origin, Distance, RadiusFromBounds,
 };
-use mp_qshared::shared::q_math::{vec3_origin, RadiusFromBounds};
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LIGHTSABER, CONTENTS_NOSHOT, CONTENTS_SOLID, MASK_SHOT, SOLID_BMODEL,
 };
@@ -43,14 +41,6 @@ use crate::server::world_sector_s::{worldSector_t, AREA_DEPTH, AREA_NODES, MAX_T
 use crate::sv_game::SV_SvEntityForGentity;
 use crate::Server;
 
-/// Raven `VectorDistance` (`sv_world.cpp`-local `static float`).
-///
-/// Source: `oracle/codemp/server/sv_world.cpp:513-519`
-fn VectorDistance(p1: vec3_t, p2: vec3_t) -> f32 {
-    let mut dir: vec3_t = [0.0; 3];
-    VectorSubtract(p2, p1, &mut dir);
-    VectorLength(dir)
-}
 
 /// Raven `SV_CreateworldSector`.
 ///
@@ -74,7 +64,7 @@ pub fn SV_CreateworldSector(
         }
 
         let mut size: vec3_t = [0.0; 3];
-        VectorSubtract(maxs, mins, &mut size);
+        _VectorSubtract(maxs, mins, &mut size);
         if size[0] > size[1] {
             (*anode).axis = 0;
         } else {
@@ -88,10 +78,10 @@ pub fn SV_CreateworldSector(
         let mut mins2: vec3_t = [0.0; 3];
         let mut maxs1: vec3_t = [0.0; 3];
         let mut maxs2: vec3_t = [0.0; 3];
-        VectorCopy(mins, &mut mins1);
-        VectorCopy(mins, &mut mins2);
-        VectorCopy(maxs, &mut maxs1);
-        VectorCopy(maxs, &mut maxs2);
+        _VectorCopy(mins, &mut mins1);
+        _VectorCopy(mins, &mut mins2);
+        _VectorCopy(maxs, &mut maxs1);
+        _VectorCopy(maxs, &mut maxs2);
 
         maxs1[axis] = (*anode).dist;
         mins2[axis] = (*anode).dist;
@@ -318,8 +308,8 @@ pub fn SV_LinkEntity(
             // normal
             let mut absmin: vec3_t = [0.0; 3];
             let mut absmax: vec3_t = [0.0; 3];
-            VectorAdd(origin, (*gEnt).r.mins, &mut absmin);
-            VectorAdd(origin, (*gEnt).r.maxs, &mut absmax);
+            _VectorAdd(origin, (*gEnt).r.mins, &mut absmin);
+            _VectorAdd(origin, (*gEnt).r.maxs, &mut absmax);
             (*gEnt).r.absmin = absmin;
             (*gEnt).r.absmax = absmax;
         }
@@ -771,9 +761,9 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                 }
 
                 if ((*touch).s.number) < MAX_CLIENTS as c_int {
-                    VectorCopy((*touch).s.apos.trBase, &mut angles2);
+                    _VectorCopy((*touch).s.apos.trBase, &mut angles2);
                 } else {
-                    VectorCopy((*touch).r.currentAngles, &mut angles2);
+                    _VectorCopy((*touch).r.currentAngles, &mut angles2);
                 }
                 angles2[mp_qshared::shared::q_math::ROLL as usize] = 0.0;
                 angles2[mp_qshared::shared::q_math::PITCH as usize] = 0.0;
@@ -786,7 +776,7 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                         &format!(
                             "Ghoul2 trace   lod={:1}   length={:6.0}   to {}\n",
                             (*clip).useLod,
-                            VectorDistance((*clip).start, (*clip).end),
+                            Distance((*clip).start, (*clip).end),
                             (&*((*touch).ghoul2 as *mut CGhoul2Info_v))
                                 .get(&*(view.g2.as_raw() as *mut Ghoul2System), 0)
                                 .file_name
@@ -862,8 +852,8 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
                     // Otherwise, set the endpos/normal/etc. to the model
                     // location hit instead of leaving it out in space.
                     let bt = bestTr as usize;
-                    VectorCopy(g2trace[bt].mCollisionPosition, &mut (*clip).trace.endpos);
-                    VectorCopy(
+                    _VectorCopy(g2trace[bt].mCollisionPosition, &mut (*clip).trace.endpos);
+                    _VectorCopy(
                         g2trace[bt].mCollisionNormal,
                         &mut (*clip).trace.plane.normal,
                     );
@@ -934,11 +924,11 @@ pub fn SV_Trace(
 
         clip.contentmask = contentmask;
 
-        VectorCopy(start, &mut clip.start);
+        _VectorCopy(start, &mut clip.start);
         clip.traceFlags = traceFlags;
         clip.useLod = useLod;
 
-        VectorCopy(end, &mut clip.end);
+        _VectorCopy(end, &mut clip.end);
         clip.mins = mins.as_ptr();
         clip.maxs = maxs.as_ptr();
         clip.passEntityNum = passEntityNum;

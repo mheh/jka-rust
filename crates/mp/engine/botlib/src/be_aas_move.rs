@@ -29,8 +29,9 @@ use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::line_color::{LINECOLOR_BLUE, LINECOLOR_RED};
 use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
 use mp_qshared::shared::q_math::{
-    vec3_origin, AngleVectors, VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH,
-    ROLL, YAW,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
+    AngleVectors,
+    VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER,
@@ -52,38 +53,8 @@ use crate::BotLib;
 
 // Raven's vector `#define`s are ported as local private helpers below;
 // `VectorClear`/`VectorCompare`/`VectorNormalize`/`VectorLength`/`AngleVectors`
-// are the genuine q_math functions, imported from `mp_game::q_math`.
-fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn VectorCopy(src: vec3_t, dst: &mut vec3_t) {
-    *dst = src;
-}
-
-fn VectorAdd(a: vec3_t, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] + b[0];
-    out[1] = a[1] + b[1];
-    out[2] = a[2] + b[2];
-}
-
-fn VectorSubtract(a: vec3_t, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] - b[0];
-    out[1] = a[1] - b[1];
-    out[2] = a[2] - b[2];
-}
-
-fn VectorScale(a: vec3_t, scale: f32, out: &mut vec3_t) {
-    out[0] = a[0] * scale;
-    out[1] = a[1] * scale;
-    out[2] = a[2] * scale;
-}
-
-fn VectorMA(a: vec3_t, scale: f32, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] + scale * b[0];
-    out[1] = a[1] + scale * b[1];
-    out[2] = a[2] + scale * b[2];
-}
+// are the genuine q_math functions (canonical `_Vector*` bodies in
+// native_math, alias-imported at the top of this file).
 
 use crate::be_aas_bspq3_fns::{AAS_PointContents, AAS_Trace};
 use crate::be_aas_debug_fns::{AAS_ClearShownDebugLines, AAS_DebugLine};
@@ -104,9 +75,9 @@ pub fn AAS_SetMovedir(bot: &mut BotLib, angles: vec3_t, movedir: *mut vec3_t) {
 
     unsafe {
         if VectorCompare(angles, VEC_UP) != 0 {
-            VectorCopy(MOVEDIR_UP, &mut *movedir);
+            _VectorCopy(MOVEDIR_UP, &mut *movedir);
         } else if VectorCompare(angles, VEC_DOWN) != 0 {
-            VectorCopy(MOVEDIR_DOWN, &mut *movedir);
+            _VectorCopy(MOVEDIR_DOWN, &mut *movedir);
         } else {
             AngleVectors(angles, Some(&mut *movedir), None, None);
         }
@@ -125,7 +96,7 @@ pub fn AAS_Accelerate(
     accel: f32,
 ) {
     unsafe {
-        let currentspeed = DotProduct(*velocity, wishdir);
+        let currentspeed = _DotProduct(*velocity, wishdir);
         let addspeed = wishspeed - currentspeed;
         if addspeed <= 0.0 {
             return;
@@ -146,7 +117,7 @@ pub fn AAS_Accelerate(
 /// Source: `oracle/codemp/botlib/be_aas_move.cpp:373-378`
 pub fn AAS_AirControl(start: vec3_t, end: vec3_t, velocity: vec3_t, cmdmove: vec3_t) {
     let mut dir: vec3_t = [0.0; 3];
-    VectorSubtract(end, start, &mut dir);
+    _VectorSubtract(end, start, &mut dir);
 }
 
 /// Raven `AAS_ApplyFriction`.
@@ -198,7 +169,7 @@ pub fn AAS_HorizontalVelocityForJump(
         let t = (height2fall / (0.5 * phys_gravity)).sqrt();
         // direction from start to end
         let mut dir: vec3_t = [0.0; 3];
-        VectorSubtract(end, start, &mut dir);
+        _VectorSubtract(end, start, &mut dir);
         //
         if (t + zvel / phys_gravity) == 0.0f32 {
             *velocity = phys_maxvelocity;
@@ -221,13 +192,13 @@ pub fn AAS_HorizontalVelocityForJump(
 pub fn AAS_DropToFloor(bot: &mut BotLib, origin: *mut vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
     unsafe {
         let mut end: vec3_t = [0.0; 3];
-        VectorCopy(*origin, &mut end);
+        _VectorCopy(*origin, &mut end);
         end[2] -= 100.0;
         let trace = AAS_Trace(bot, *origin, mins, maxs, end, 0, CONTENTS_SOLID);
         if trace.startsolid != 0 {
             return 0;
         }
-        VectorCopy(trace.endpos, &mut *origin);
+        _VectorCopy(trace.endpos, &mut *origin);
         1
     }
 }
@@ -238,7 +209,7 @@ pub fn AAS_DropToFloor(bot: &mut BotLib, origin: *mut vec3_t, mins: vec3_t, maxs
 pub fn AAS_AgainstLadder(bot: &mut BotLib, origin: vec3_t) -> c_int {
     unsafe {
         let mut org: vec3_t = [0.0; 3];
-        VectorCopy(origin, &mut org);
+        _VectorCopy(origin, &mut org);
         let mut areanum = crate::be_aas_sample_fns::AAS_PointAreaNum(bot, org);
         if areanum == 0 {
             org[0] += 1.0;
@@ -282,7 +253,7 @@ pub fn AAS_AgainstLadder(bot: &mut BotLib, origin: vec3_t) -> c_int {
             let plane: *mut aas_plane_t =
                 bot.aasworld.planes.add(((*face).planenum ^ side) as usize);
             // if the origin is pretty close to the plane
-            if (DotProduct((*plane).normal, origin) - (*plane).dist).abs() < 3.0 {
+            if (_DotProduct((*plane).normal, origin) - (*plane).dist).abs() < 3.0 {
                 if crate::be_aas_sample_fns::AAS_PointInsideFace(
                     bot,
                     facenum.unsigned_abs() as c_int,
@@ -304,7 +275,7 @@ pub fn AAS_AgainstLadder(bot: &mut BotLib, origin: vec3_t) -> c_int {
 pub fn AAS_Swimming(bot: &mut BotLib, origin: vec3_t) -> c_int {
     unsafe {
         let mut testorg: vec3_t = [0.0; 3];
-        VectorCopy(origin, &mut testorg);
+        _VectorCopy(origin, &mut testorg);
         testorg[2] -= 2.0;
         if AAS_PointContents(bot, testorg) & (CONTENTS_LAVA | CONTENTS_SLIME | CONTENTS_WATER) != 0
         {
@@ -330,7 +301,7 @@ pub fn AAS_WeaponJumpZVelocity(bot: &mut BotLib, origin: vec3_t, radiusdamage: f
         viewangles[ROLL as usize] = 0.0;
         // get the start point shooting from
         let mut start: vec3_t = [0.0; 3];
-        VectorCopy(origin, &mut start);
+        _VectorCopy(origin, &mut start);
         start[2] += 8.0; // view offset Z
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
@@ -340,14 +311,14 @@ pub fn AAS_WeaponJumpZVelocity(bot: &mut BotLib, origin: vec3_t, radiusdamage: f
         start[2] += forward[2] * rocketoffset[0] + right[2] * rocketoffset[1] + rocketoffset[2];
         // end point of the trace
         let mut end: vec3_t = [0.0; 3];
-        VectorMA(start, 500.0, forward, &mut end);
+        _VectorMA(start, 500.0, forward, &mut end);
         // trace a line to get the impact point
         let bsptrace = AAS_Trace(bot, start, [0.0; 3], [0.0; 3], end, 1, CONTENTS_SOLID);
         // calculate the damage the bot will get from the rocket impact
         let mut v: vec3_t = [0.0; 3];
-        VectorAdd(botmins, botmaxs, &mut v);
-        VectorMA(origin, 0.5, v, &mut v);
-        VectorSubtract(bsptrace.endpos, v, &mut v);
+        _VectorAdd(botmins, botmaxs, &mut v);
+        _VectorMA(origin, 0.5, v, &mut v);
+        _VectorSubtract(bsptrace.endpos, v, &mut v);
         //
         let mut points = radiusdamage - 0.5 * VectorLength(v);
         if points < 0.0 {
@@ -361,11 +332,11 @@ pub fn AAS_WeaponJumpZVelocity(bot: &mut BotLib, origin: vec3_t, radiusdamage: f
         let knockback = points;
         // direction of the damage (from trace.endpos to bot origin)
         let mut dir: vec3_t = [0.0; 3];
-        VectorSubtract(origin, bsptrace.endpos, &mut dir);
+        _VectorSubtract(origin, bsptrace.endpos, &mut dir);
         VectorNormalize(&mut dir);
         // damage velocity
         let mut kvel: vec3_t = [0.0; 3];
-        VectorScale(dir, 1600.0 * knockback / mass, &mut kvel); // the rocket jump hack...
+        _VectorScale(dir, 1600.0 * knockback / mass, &mut kvel); // the rocket jump hack...
                                                                 // rocket impact velocity + jump velocity
         kvel[2] + bot.aassettings.phys_jumpvel
     }
@@ -394,10 +365,10 @@ pub fn AAS_ClipToBBox(
         );
         let mut absmins: vec3_t = [0.0; 3];
         let mut absmaxs: vec3_t = [0.0; 3];
-        VectorSubtract(mins, bboxmaxs, &mut absmins);
-        VectorSubtract(maxs, bboxmins, &mut absmaxs);
+        _VectorSubtract(mins, bboxmaxs, &mut absmins);
+        _VectorSubtract(maxs, bboxmins, &mut absmaxs);
         //
-        VectorCopy(end, &mut (*trace).endpos);
+        _VectorCopy(end, &mut (*trace).endpos);
         (*trace).fraction = 1.0;
         for i in 0..3 {
             if start[i] < absmins[i] && end[i] < absmins[i] {
@@ -409,7 +380,7 @@ pub fn AAS_ClipToBBox(
         }
         // check bounding box collision
         let mut dir: vec3_t = [0.0; 3];
-        VectorSubtract(end, start, &mut dir);
+        _VectorSubtract(end, start, &mut dir);
         let mut frac = 1.0f32;
         let mut mid: vec3_t = [0.0; 3];
         let mut i = 0usize;
@@ -556,7 +527,7 @@ pub fn AAS_OnGround(
     unsafe {
         let up: vec3_t = [0.0, 0.0, 1.0];
         let mut end: vec3_t = [0.0; 3];
-        VectorCopy(origin, &mut end);
+        _VectorCopy(origin, &mut end);
         end[2] -= 10.0;
 
         let trace =
@@ -576,7 +547,7 @@ pub fn AAS_OnGround(
         }
         // check if the plane isn't too steep
         let plane = crate::be_aas_sample_fns::AAS_PlaneFromNum(bot, trace.planenum);
-        if DotProduct((*plane).normal, up) < bot.aassettings.phys_maxsteepness {
+        if _DotProduct((*plane).normal, up) < bot.aassettings.phys_maxsteepness {
             return 0;
         }
         // the bot is on the ground
@@ -638,11 +609,11 @@ pub fn AAS_ClientMovementPrediction(
         );
         // start at the current origin
         let mut org: vec3_t = [0.0; 3];
-        VectorCopy(origin, &mut org);
+        _VectorCopy(origin, &mut org);
         org[2] += 0.25;
         // velocity to test for the first frame
         let mut frame_test_vel: vec3_t = [0.0; 3];
-        VectorScale(velocity, frametime, &mut frame_test_vel);
+        _VectorScale(velocity, frametime, &mut frame_test_vel);
         //
         let mut jump_frame: c_int = -1;
         let up: vec3_t = [0.0, 0.0, 1.0];
@@ -666,9 +637,9 @@ pub fn AAS_ClientMovementPrediction(
                     phys_waterfriction
                 };
                 // apply friction
-                VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
+                _VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
                 AAS_ApplyFriction(&mut frame_test_vel, friction, phys_stopspeed, frametime);
-                VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
+                _VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
             }
             let mut crouch = 0;
             // apply command movement
@@ -676,7 +647,7 @@ pub fn AAS_ClientMovementPrediction(
                 let mut maxvel = phys_maxwalkvelocity;
                 let mut accelerate = phys_airaccelerate;
                 let mut wishdir: vec3_t = [0.0; 3];
-                VectorCopy(cmdmove, &mut wishdir);
+                _VectorCopy(cmdmove, &mut wishdir);
                 if onground != 0 {
                     if cmdmove[2] < -300.0 {
                         crouch = 1;
@@ -704,7 +675,7 @@ pub fn AAS_ClientMovementPrediction(
                 if wishspeed > maxvel {
                     wishspeed = maxvel;
                 }
-                VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
+                _VectorScale(frame_test_vel, 1.0 / frametime, &mut frame_test_vel);
                 AAS_Accelerate(
                     &mut frame_test_vel,
                     frametime,
@@ -712,7 +683,7 @@ pub fn AAS_ClientMovementPrediction(
                     wishspeed,
                     accelerate,
                 );
-                VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
+                _VectorScale(frame_test_vel, frametime, &mut frame_test_vel);
             }
             if crouch != 0 {
                 presencetype = PRESENCE_CROUCH;
@@ -724,15 +695,15 @@ pub fn AAS_ClientMovementPrediction(
             }
             // save the current origin
             let mut lastorg: vec3_t = [0.0; 3];
-            VectorCopy(org, &mut lastorg);
+            _VectorCopy(org, &mut lastorg);
             // move linear during one frame
             let mut left_test_vel: vec3_t = [0.0; 3];
-            VectorCopy(frame_test_vel, &mut left_test_vel);
+            _VectorCopy(frame_test_vel, &mut left_test_vel);
             let mut j: c_int = 0;
             let mut end: vec3_t;
             loop {
                 end = [0.0; 3];
-                VectorAdd(org, left_test_vel, &mut end);
+                _VectorAdd(org, left_test_vel, &mut end);
                 // trace a bounding box
                 trace = crate::be_aas_sample_fns::AAS_TraceClientBBox(
                     bot,
@@ -769,8 +740,8 @@ pub fn AAS_ClientMovementPrediction(
                     for i in 0..numareas {
                         let ai = areas[i as usize];
                         if stopevent & SE_ENTERAREA != 0 && ai == stopareanum {
-                            VectorCopy(points[i as usize], &mut (*r#move).endpos);
-                            VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                            _VectorCopy(points[i as usize], &mut (*r#move).endpos);
+                            _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                             (*r#move).endarea = ai;
                             (*r#move).trace = trace;
                             (*r#move).stopevent = SE_ENTERAREA;
@@ -786,8 +757,8 @@ pub fn AAS_ClientMovementPrediction(
                                 & AREACONTENTS_JUMPPAD
                                 != 0
                             {
-                                VectorCopy(points[i as usize], &mut (*r#move).endpos);
-                                VectorScale(
+                                _VectorCopy(points[i as usize], &mut (*r#move).endpos);
+                                _VectorScale(
                                     frame_test_vel,
                                     1.0 / frametime,
                                     &mut (*r#move).velocity,
@@ -807,9 +778,9 @@ pub fn AAS_ClientMovementPrediction(
                                 & AREACONTENTS_TELEPORTER
                                 != 0
                         {
-                            VectorCopy(points[i as usize], &mut (*r#move).endpos);
+                            _VectorCopy(points[i as usize], &mut (*r#move).endpos);
                             (*r#move).endarea = ai;
-                            VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                            _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                             (*r#move).trace = trace;
                             (*r#move).stopevent = SE_TOUCHTELEPORTER;
                             (*r#move).presencetype = presencetype;
@@ -823,9 +794,9 @@ pub fn AAS_ClientMovementPrediction(
                                 & AREACONTENTS_CLUSTERPORTAL
                                 != 0
                         {
-                            VectorCopy(points[i as usize], &mut (*r#move).endpos);
+                            _VectorCopy(points[i as usize], &mut (*r#move).endpos);
                             (*r#move).endarea = ai;
-                            VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                            _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                             (*r#move).trace = trace;
                             (*r#move).stopevent = SE_TOUCHCLUSTERPORTAL;
                             (*r#move).presencetype = presencetype;
@@ -848,10 +819,10 @@ pub fn AAS_ClientMovementPrediction(
                         maxs,
                     ) != 0
                     {
-                        VectorCopy(trace.endpos, &mut (*r#move).endpos);
+                        _VectorCopy(trace.endpos, &mut (*r#move).endpos);
                         (*r#move).endarea =
                             crate::be_aas_sample_fns::AAS_PointAreaNum(bot, (*r#move).endpos);
-                        VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                        _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                         (*r#move).trace = trace;
                         (*r#move).stopevent = SE_HITBOUNDINGBOX;
                         (*r#move).presencetype = presencetype;
@@ -862,22 +833,22 @@ pub fn AAS_ClientMovementPrediction(
                     }
                 }
                 // move the entity to the trace end point
-                VectorCopy(trace.endpos, &mut org);
+                _VectorCopy(trace.endpos, &mut org);
                 // if there was a collision
                 if trace.fraction < 1.0 {
                     // get the plane the bounding box collided with
                     let plane = crate::be_aas_sample_fns::AAS_PlaneFromNum(bot, trace.planenum);
                     //
                     if stopevent & SE_HITGROUNDAREA != 0
-                        && DotProduct((*plane).normal, up) > phys_maxsteepness
+                        && _DotProduct((*plane).normal, up) > phys_maxsteepness
                     {
                         let mut start: vec3_t = [0.0; 3];
-                        VectorCopy(org, &mut start);
+                        _VectorCopy(org, &mut start);
                         start[2] += 0.5;
                         if crate::be_aas_sample_fns::AAS_PointAreaNum(bot, start) == stopareanum {
-                            VectorCopy(start, &mut (*r#move).endpos);
+                            _VectorCopy(start, &mut (*r#move).endpos);
                             (*r#move).endarea = stopareanum;
-                            VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                            _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                             (*r#move).trace = trace;
                             (*r#move).stopevent = SE_HITGROUNDAREA;
                             (*r#move).presencetype = presencetype;
@@ -893,9 +864,9 @@ pub fn AAS_ClientMovementPrediction(
                     if (*plane).normal[2] == 0.0 && (jump_frame < 0 || n - jump_frame > 2) {
                         // check for a step
                         let mut start: vec3_t = [0.0; 3];
-                        VectorMA(org, -0.25, (*plane).normal, &mut start);
+                        _VectorMA(org, -0.25, (*plane).normal, &mut start);
                         let mut stepend: vec3_t = [0.0; 3];
-                        VectorCopy(start, &mut stepend);
+                        _VectorCopy(start, &mut stepend);
                         start[2] += phys_maxstep;
                         let steptrace = crate::be_aas_sample_fns::AAS_TraceClientBBox(
                             bot,
@@ -908,13 +879,13 @@ pub fn AAS_ClientMovementPrediction(
                         if steptrace.startsolid == 0 {
                             let plane2 =
                                 crate::be_aas_sample_fns::AAS_PlaneFromNum(bot, steptrace.planenum);
-                            if DotProduct((*plane2).normal, up) > phys_maxsteepness {
-                                VectorSubtract(end, steptrace.endpos, &mut left_test_vel);
+                            if _DotProduct((*plane2).normal, up) > phys_maxsteepness {
+                                _VectorSubtract(end, steptrace.endpos, &mut left_test_vel);
                                 left_test_vel[2] = 0.0;
                                 frame_test_vel[2] = 0.0;
                                 if visualize != 0 && steptrace.endpos[2] - org[2] > 0.125 {
                                     let mut dbg_start: vec3_t = [0.0; 3];
-                                    VectorCopy(org, &mut dbg_start);
+                                    _VectorCopy(org, &mut dbg_start);
                                     dbg_start[2] = steptrace.endpos[2];
                                     AAS_DebugLine(bot, org, dbg_start, LINECOLOR_BLUE);
                                 }
@@ -927,17 +898,17 @@ pub fn AAS_ClientMovementPrediction(
                     if !step {
                         // velocity left to test for this frame is the projection
                         // of the current test velocity into the hit plane
-                        let dp = DotProduct(left_test_vel, (*plane).normal);
-                        VectorMA(left_test_vel, -dp, (*plane).normal, &mut left_test_vel);
+                        let dp = _DotProduct(left_test_vel, (*plane).normal);
+                        _VectorMA(left_test_vel, -dp, (*plane).normal, &mut left_test_vel);
                         // store the old velocity for landing check
                         let mut old_frame_test_vel: vec3_t = [0.0; 3];
-                        VectorCopy(frame_test_vel, &mut old_frame_test_vel);
+                        _VectorCopy(frame_test_vel, &mut old_frame_test_vel);
                         // test velocity for the next frame is the projection
                         // of the velocity of the current frame into the hit plane
-                        let dp2 = DotProduct(frame_test_vel, (*plane).normal);
-                        VectorMA(frame_test_vel, -dp2, (*plane).normal, &mut frame_test_vel);
+                        let dp2 = _DotProduct(frame_test_vel, (*plane).normal);
+                        _VectorMA(frame_test_vel, -dp2, (*plane).normal, &mut frame_test_vel);
                         // check for a landing on an almost horizontal floor
-                        if DotProduct((*plane).normal, up) > phys_maxsteepness {
+                        if _DotProduct((*plane).normal, up) > phys_maxsteepness {
                             onground = 1;
                         }
                         if stopevent & SE_HITGROUNDDAMAGE != 0 {
@@ -958,10 +929,10 @@ pub fn AAS_ClientMovementPrediction(
                                 }
                                 // never take falling damage if completely underwater
                                 if delta > 40.0 {
-                                    VectorCopy(org, &mut (*r#move).endpos);
+                                    _VectorCopy(org, &mut (*r#move).endpos);
                                     (*r#move).endarea =
                                         crate::be_aas_sample_fns::AAS_PointAreaNum(bot, org);
-                                    VectorCopy(frame_test_vel, &mut (*r#move).velocity);
+                                    _VectorCopy(frame_test_vel, &mut (*r#move).velocity);
                                     (*r#move).trace = trace;
                                     (*r#move).stopevent = SE_HITGROUNDDAMAGE;
                                     (*r#move).presencetype = presencetype;
@@ -988,7 +959,7 @@ pub fn AAS_ClientMovementPrediction(
             if frame_test_vel[2] <= 10.0 {
                 // check for a liquid at the feet of the bot
                 let mut feet: vec3_t = [0.0; 3];
-                VectorCopy(org, &mut feet);
+                _VectorCopy(org, &mut feet);
                 feet[2] -= 22.0;
                 let pc = AAS_PointContents(bot, feet);
                 // get event from pc
@@ -1021,9 +992,9 @@ pub fn AAS_ClientMovementPrediction(
                 }
                 // if in lava or slime
                 if event & stopevent != 0 {
-                    VectorCopy(org, &mut (*r#move).endpos);
+                    _VectorCopy(org, &mut (*r#move).endpos);
                     (*r#move).endarea = areanum;
-                    VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                    _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                     (*r#move).stopevent = event & stopevent;
                     (*r#move).presencetype = presencetype;
                     (*r#move).endcontents = pc;
@@ -1037,9 +1008,9 @@ pub fn AAS_ClientMovementPrediction(
             // if onground and on the ground for at least one whole frame
             if onground != 0 {
                 if stopevent & SE_HITGROUND != 0 {
-                    VectorCopy(org, &mut (*r#move).endpos);
+                    _VectorCopy(org, &mut (*r#move).endpos);
                     (*r#move).endarea = crate::be_aas_sample_fns::AAS_PointAreaNum(bot, org);
-                    VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                    _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                     (*r#move).trace = trace;
                     (*r#move).stopevent = SE_HITGROUND;
                     (*r#move).presencetype = presencetype;
@@ -1049,9 +1020,9 @@ pub fn AAS_ClientMovementPrediction(
                     return 1;
                 }
             } else if stopevent & SE_LEAVEGROUND != 0 {
-                VectorCopy(org, &mut (*r#move).endpos);
+                _VectorCopy(org, &mut (*r#move).endpos);
                 (*r#move).endarea = crate::be_aas_sample_fns::AAS_PointAreaNum(bot, org);
-                VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                 (*r#move).trace = trace;
                 (*r#move).stopevent = SE_LEAVEGROUND;
                 (*r#move).presencetype = presencetype;
@@ -1061,9 +1032,9 @@ pub fn AAS_ClientMovementPrediction(
                 return 1;
             } else if stopevent & SE_GAP != 0 {
                 let mut start: vec3_t = [0.0; 3];
-                VectorCopy(org, &mut start);
+                _VectorCopy(org, &mut start);
                 let mut gend: vec3_t = [0.0; 3];
-                VectorCopy(start, &mut gend);
+                _VectorCopy(start, &mut gend);
                 gend[2] -= 48.0 + bot.aassettings.phys_maxbarrier;
                 let gaptrace = crate::be_aas_sample_fns::AAS_TraceClientBBox(
                     bot,
@@ -1077,10 +1048,10 @@ pub fn AAS_ClientMovementPrediction(
                     // if it is a gap (lower than one step height)
                     if gaptrace.endpos[2] < org[2] - bot.aassettings.phys_maxstep - 1.0 {
                         if AAS_PointContents(bot, gend) & CONTENTS_WATER == 0 {
-                            VectorCopy(lastorg, &mut (*r#move).endpos);
+                            _VectorCopy(lastorg, &mut (*r#move).endpos);
                             (*r#move).endarea =
                                 crate::be_aas_sample_fns::AAS_PointAreaNum(bot, lastorg);
-                            VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+                            _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
                             (*r#move).trace = trace;
                             (*r#move).stopevent = SE_GAP;
                             (*r#move).presencetype = presencetype;
@@ -1095,9 +1066,9 @@ pub fn AAS_ClientMovementPrediction(
             n += 1;
         }
         //
-        VectorCopy(org, &mut (*r#move).endpos);
+        _VectorCopy(org, &mut (*r#move).endpos);
         (*r#move).endarea = crate::be_aas_sample_fns::AAS_PointAreaNum(bot, org);
-        VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
+        _VectorScale(frame_test_vel, 1.0 / frametime, &mut (*r#move).velocity);
         (*r#move).stopevent = SE_NONE;
         (*r#move).presencetype = presencetype;
         (*r#move).endcontents = 0;
@@ -1206,11 +1177,11 @@ pub fn AAS_JumpReachRunStart(
         VectorNormalize(&mut hordir);
         // start point
         let mut start: vec3_t = [0.0; 3];
-        VectorCopy((*reach).start, &mut start);
+        _VectorCopy((*reach).start, &mut start);
         start[2] += 1.0;
         // get command movement
         let mut cmdmove: vec3_t = [0.0; 3];
-        VectorScale(hordir, 400.0, &mut cmdmove);
+        _VectorScale(hordir, 400.0, &mut cmdmove);
         //
         let mut r#move: aas_clientmove_t = core::mem::zeroed();
         AAS_PredictClientMovement(
@@ -1229,10 +1200,10 @@ pub fn AAS_JumpReachRunStart(
             0,
             0,
         );
-        VectorCopy(r#move.endpos, &mut *runstart);
+        _VectorCopy(r#move.endpos, &mut *runstart);
         // don't enter slime or lava and don't fall from too high
         if r#move.stopevent & (SE_ENTERSLIME | SE_ENTERLAVA | SE_HITGROUNDDAMAGE) != 0 {
-            VectorCopy(start, &mut *runstart);
+            _VectorCopy(start, &mut *runstart);
         }
     }
 }
@@ -1250,7 +1221,7 @@ pub fn AAS_TestMovementPrediction(bot: &mut BotLib, entnum: c_int, origin: vec3_
         }
         VectorNormalize(&mut dir);
         let mut cmdmove: vec3_t = [0.0; 3];
-        VectorScale(dir, 400.0, &mut cmdmove);
+        _VectorScale(dir, 400.0, &mut cmdmove);
         cmdmove[2] = 224.0;
         AAS_ClearShownDebugLines(bot);
         let mut r#move: aas_clientmove_t = core::mem::zeroed();

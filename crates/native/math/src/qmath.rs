@@ -930,6 +930,14 @@ pub fn VectorNormalizeRow(row: &mut [f32; 4]) -> vec_t {
     VectorNormalize(v3)
 }
 
+/// Raven call shape `DotProduct((float*)row, v)` — ghoul2 dots a 4-wide
+/// `mdxaBone_t` matrix row against a `vec3_t`; the macro reads `[0..3]` only.
+/// Named once here; not a distinct Raven function.
+/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp` skinning call sites
+pub fn DotProductRow(row: &[f32; 4], v: vec3_t) -> vec_t {
+    row[0] * v[0] + row[1] * v[1] + row[2] * v[2]
+}
+
 /// Raven `_VectorMA`.
 ///
 /// Source: `oracle/codemp/game/q_math.c:1214-1218`

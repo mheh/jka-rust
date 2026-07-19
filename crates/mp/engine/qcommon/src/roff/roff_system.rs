@@ -25,6 +25,7 @@ use std::ffi::CString;
 use mp_host_interface::vm_slot::VmSlot;
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::game_export_t::gameExport_t;
+use mp_qshared::shared::q_math::{_VectorMA, _VectorScale, AngleVectors};
 use mp_qshared::shared::{qfalse, qtrue, trType_t, trajectory_t, vec3_t};
 
 use super::croff::MoveRotateEntry;
@@ -693,11 +694,17 @@ impl RoffSystem {
             let mut f = [0.0f32; 3];
             let mut r = [0.0f32; 3];
             let mut u = [0.0f32; 3];
-            angle_vectors(roff_ent.m_start_angles, &mut f, &mut r, &mut u);
+            AngleVectors(
+                roff_ent.m_start_angles,
+                Some(&mut f),
+                Some(&mut r),
+                Some(&mut u),
+            );
             // result = f*offset[0]; result += -offset[1]*r; result += offset[2]*u
-            let mut result = vector_scale(f, entry.origin_offset[0]);
-            result = vector_ma(result, -entry.origin_offset[1], r);
-            result = vector_ma(result, entry.origin_offset[2], u);
+            let mut result = [0.0f32; 3];
+            _VectorScale(f, entry.origin_offset[0], &mut result);
+            _VectorMA(result, -entry.origin_offset[1], r, &mut result);
+            _VectorMA(result, entry.origin_offset[2], u, &mut result);
             result
         } else {
             entry.origin_offset
@@ -810,7 +817,7 @@ impl RoffSystem {
         match delta {
             Some(d) => {
                 // VectorScale( delta, rate, tr->trDelta )
-                tr.trDelta = vector_scale(d, rate as f32);
+                _VectorScale(d, rate as f32, &mut tr.trDelta);
             }
             None => {
                 // VectorClear( tr->trDelta )
@@ -926,53 +933,6 @@ fn c_strlen(data: &[u8], start: usize) -> usize {
 
 /// Raven `VectorScale( v, s, out )` — `out[i] = v[i] * s`.
 /// Source: `oracle/codemp/game/q_shared.h` (macro)
-fn vector_scale(v: vec3_t, s: f32) -> vec3_t {
-    [v[0] * s, v[1] * s, v[2] * s]
-}
-
-/// Raven `VectorMA( a, s, b, out )` — `out[i] = a[i] + s * b[i]`.
-/// Source: `oracle/codemp/game/q_shared.h` (macro)
-fn vector_ma(a: vec3_t, s: f32, b: vec3_t) -> vec3_t {
-    [a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2]]
-}
-
-/// Raven `AngleVectors( angles, forward, right, up )` — derives the forward /
-/// right / up basis vectors from Euler `angles`. Inlined from
-/// `oracle/codemp/game/q_math.c:1315` (`mp_engine_qcommon` cannot reach
-/// `mp_game`'s copy). Raven evaluates `M_PI` and `sin`/`cos` in `double`
-/// (rounded to the `float` locals); f32 trig would diverge from the oracle, so
-/// the intermediate math stays in f64, matching the sibling `mp_game`
-/// `AngleVectors` idiom.
-/// Source: `oracle/codemp/game/q_math.c:1315-1349`
-fn angle_vectors(angles: vec3_t, forward: &mut vec3_t, right: &mut vec3_t, up: &mut vec3_t) {
-    // Raven index constants: PITCH = 0, YAW = 1, ROLL = 2 (`q_shared.h`).
-    const PITCH: usize = 0;
-    const YAW: usize = 1;
-    const ROLL: usize = 2;
-
-    let angle = (angles[YAW] as f64 * (std::f64::consts::PI * 2.0 / 360.0)) as f32;
-    let sy = (angle as f64).sin() as f32;
-    let cy = (angle as f64).cos() as f32;
-    let angle = (angles[PITCH] as f64 * (std::f64::consts::PI * 2.0 / 360.0)) as f32;
-    let sp = (angle as f64).sin() as f32;
-    let cp = (angle as f64).cos() as f32;
-    let angle = (angles[ROLL] as f64 * (std::f64::consts::PI * 2.0 / 360.0)) as f32;
-    let sr = (angle as f64).sin() as f32;
-    let cr = (angle as f64).cos() as f32;
-
-    forward[0] = cp * cy;
-    forward[1] = cp * sy;
-    forward[2] = -sp;
-
-    right[0] = -1.0 * sr * sp * cy + -1.0 * cr * -sy;
-    right[1] = -1.0 * sr * sp * sy + -1.0 * cr * cy;
-    right[2] = -1.0 * sr * cp;
-
-    up[0] = cr * sp * cy + -sr * -sy;
-    up[1] = cr * sp * sy + -sr * cy;
-    up[2] = cr * cp;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

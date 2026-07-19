@@ -53,7 +53,10 @@
 use crate::cm::cbrush_s::cbrush_t;
 use crate::cm::cbrushside_s::cbrushside_t;
 use crate::cm_terrain::CmLandScape;
-use mp_qshared::shared::collision::{cplane_t, PLANE_X, PLANE_Y, PLANE_Z};
+use mp_qshared::shared::collision::cplane_t;
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorSubtract, CrossProduct, PlaneTypeForNormal, SetPlaneSignbits,
+};
 use mp_qshared::shared::{vec3_t, vec3pair_t, VectorNormalize};
 
 /// Raven `BRUSH_SIDES_PER_TERXEL` under the unconditionally-defined
@@ -71,66 +74,6 @@ const MAX_WORLD_COORD: f32 = 64.0 * 1024.0;
 /// Raven `MIN_WORLD_COORD`.
 /// Source: `oracle/codemp/game/q_shared.h:19`
 const MIN_WORLD_COORD: f32 = -64.0 * 1024.0;
-
-/// Raven `PLANE_NON_AXIAL` (`PLANE_X`/`PLANE_Y`/`PLANE_Z` are already ported,
-/// `mp_qshared::shared::collision`; this fourth band has no existing home
-/// there, so it is repeated locally rather than widening that module's
-/// public surface for one private-helper use).
-/// Source: `oracle/codemp/game/q_shared.h:1847`
-const PLANE_NON_AXIAL: i32 = 3;
-
-/// Raven `DotProduct` macro. Pure vec3 math with no existing home reachable
-/// from this crate (`mp_engine_qcommon` depends on `mp_qshared`/
-/// `mp_host_interface` only — `q_math.c`'s free-fn port lives in the
-/// game-tier `mp_game` crate, wrong dependency direction, porting-rules
-/// workspace-architecture tiers), so the handful of primitives
-/// `InitPlane`/`CreatePatchPlaneData` need are transcribed locally.
-/// Source: `oracle/codemp/game/q_shared.h:1358`
-fn dot_product(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-/// Raven `VectorSubtract` macro.
-/// Source: `oracle/codemp/game/q_shared.h:1359`
-fn vector_subtract(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-/// Raven `CrossProduct`.
-/// Source: `oracle/codemp/game/q_shared.h:1553-1557`
-fn cross_product(v1: vec3_t, v2: vec3_t) -> vec3_t {
-    [
-        v1[1] * v2[2] - v1[2] * v2[1],
-        v1[2] * v2[0] - v1[0] * v2[2],
-        v1[0] * v2[1] - v1[1] * v2[0],
-    ]
-}
-
-/// Raven `PlaneTypeForNormal` macro.
-/// Source: `oracle/codemp/game/q_shared.h:1856`
-fn plane_type_for_normal(n: vec3_t) -> u8 {
-    if n[0] == 1.0 {
-        PLANE_X as u8
-    } else if n[1] == 1.0 {
-        PLANE_Y as u8
-    } else if n[2] == 1.0 {
-        PLANE_Z as u8
-    } else {
-        PLANE_NON_AXIAL as u8
-    }
-}
-
-/// Raven `SetPlaneSignbits`.
-/// Source: `oracle/codemp/game/q_math.c:751-762`
-fn set_plane_signbits(plane: &mut cplane_t) {
-    let mut bits: u8 = 0;
-    for j in 0..3 {
-        if plane.normal[j] < 0.0 {
-            bits |= 1 << j;
-        }
-    }
-    plane.signbits = bits;
-}
 
 /// Byte length of one patch's slice of the shared brush arena (RMG-D7):
 /// `numBrushesPerPatch * sizeof(cbrush_t) + numBrushesPerPatch *
@@ -392,14 +335,16 @@ impl CmPatch {
         p1: vec3_t,
         p2: vec3_t,
     ) {
-        let dx = vector_subtract(p1, p0);
-        let dy = vector_subtract(p2, p0);
-        plane.normal = cross_product(dx, dy);
+        let mut dx = [0.0f32; 3];
+        _VectorSubtract(p1, p0, &mut dx);
+        let mut dy = [0.0f32; 3];
+        _VectorSubtract(p2, p0, &mut dy);
+        CrossProduct(dx, dy, &mut plane.normal);
         VectorNormalize(&mut plane.normal);
 
-        plane.dist = dot_product(p0, plane.normal);
-        plane.r#type = plane_type_for_normal(plane.normal);
-        set_plane_signbits(plane);
+        plane.dist = _DotProduct(p0, plane.normal);
+        plane.r#type = PlaneTypeForNormal(plane.normal) as u8;
+        SetPlaneSignbits(plane);
 
         // Raven's non-`_XBOX` arm: `side->plane = plane;`
         side.plane = plane as *mut cplane_t;
@@ -601,7 +546,7 @@ impl CmPatch {
                 // SAFETY: `plane_idx + 8` was initialized just above.
                 let v = unsafe {
                     let p8 = &*plane_ptr(arena_ptr, plane_base, plane_idx + 8);
-                    dot_product(p8.normal, local_coords[0]) - p8.dist
+                    _DotProduct(p8.normal, local_coords[0]) - p8.dist
                 };
 
                 if v < 0.0 {
@@ -657,7 +602,7 @@ impl CmPatch {
                         let above_plane = (*above_sides).plane;
                         ((*above_plane).normal, (*above_plane).dist)
                     };
-                    let v = dot_product(above_normal, cmp_coord) - above_dist;
+                    let v = _DotProduct(above_normal, cmp_coord) - above_dist;
 
                     if v < 0.0 {
                         // SAFETY: `above` remains borrowed from `ls` for
@@ -689,7 +634,7 @@ impl CmPatch {
                         let above_plane = (*above_sides).plane;
                         ((*above_plane).normal, (*above_plane).dist)
                     };
-                    let v = dot_product(above_normal, local_coords[1]) - above_dist;
+                    let v = _DotProduct(above_normal, local_coords[1]) - above_dist;
 
                     if v < 0.0 {
                         // SAFETY: see the y-adjacent block above.
@@ -829,14 +774,18 @@ impl CmPatch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mp_qshared::shared::collision::{PLANE_X, PLANE_Y, PLANE_Z};
+
+    /// Raven `PLANE_NON_AXIAL` (`q_shared.h:1847`); test-only band value.
+    const PLANE_NON_AXIAL: i32 = 3;
 
     // -- PlaneTypeForNormal / SetPlaneSignbits (cm_terrain.cpp:230-232) --
 
     #[test]
     fn plane_type_for_normal_axial() {
-        assert_eq!(plane_type_for_normal([1.0, 0.0, 0.0]), PLANE_X as u8);
-        assert_eq!(plane_type_for_normal([0.0, 1.0, 0.0]), PLANE_Y as u8);
-        assert_eq!(plane_type_for_normal([0.0, 0.0, 1.0]), PLANE_Z as u8);
+        assert_eq!(PlaneTypeForNormal([1.0, 0.0, 0.0]), PLANE_X);
+        assert_eq!(PlaneTypeForNormal([0.0, 1.0, 0.0]), PLANE_Y);
+        assert_eq!(PlaneTypeForNormal([0.0, 0.0, 1.0]), PLANE_Z);
     }
 
     #[test]
@@ -844,10 +793,7 @@ mod tests {
         // Raven's macro checks `x[0]==1.0` before `x[1]==1.0` before
         // `x[2]==1.0` — a normal that is none of those exactly is
         // PLANE_NON_AXIAL even if one axis dominates.
-        assert_eq!(
-            plane_type_for_normal([0.7071, 0.7071, 0.0]),
-            PLANE_NON_AXIAL as u8
-        );
+        assert_eq!(PlaneTypeForNormal([0.7071, 0.7071, 0.0]), PLANE_NON_AXIAL);
     }
 
     #[test]
@@ -859,7 +805,7 @@ mod tests {
             signbits: 0,
             pad: [0, 0],
         };
-        set_plane_signbits(&mut plane);
+        SetPlaneSignbits(&mut plane);
         // bit0 (x<0) | bit2 (z<0) = 0b101 = 5
         assert_eq!(plane.signbits, 0b101);
     }

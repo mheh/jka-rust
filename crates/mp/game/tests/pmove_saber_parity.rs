@@ -80,7 +80,7 @@ struct Brush {
 }
 
 fn zero_trace() -> trace_t {
-    let mut tr: trace_t = unsafe { core::mem::zeroed() };
+    let mut tr = trace_t::zeroed();
     tr.fraction = 1.0f32;
     tr
 }

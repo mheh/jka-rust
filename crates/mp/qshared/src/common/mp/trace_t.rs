@@ -32,6 +32,16 @@ pub struct trace_t {
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)
 // or ENTITYNUM_NONE, ENTITYNUM_WORLD
 
+impl trace_t {
+    /// All-zero value — the analogue of Raven's uninitialised `trace_t trace;`
+    /// out-param every trace call fills before reading.
+    pub fn zeroed() -> Self {
+        // SAFETY: `#[repr(C)]` plain-old-data (floats/ints, a `cplane_t` of
+        // floats/ints) with no niche/invariant — all-zero is a valid value.
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 const _: () = assert!(core::mem::size_of::<trace_t>() == 48);
 const _: () = assert!(core::mem::offset_of!(trace_t, allsolid) == 0);
 const _: () = assert!(core::mem::offset_of!(trace_t, startsolid) == 1);

@@ -23,6 +23,7 @@ use core::ffi::{c_char, c_int};
 
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_FATAL, PRT_MESSAGE};
+use mp_qshared::shared::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
 use mp_qshared::shared::vec3_t;
 
 use mp_bg::public::configstring::CS_MODELS;
@@ -434,27 +435,11 @@ pub fn AAS_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vEnd: vec3_t, v
     let mut pVec = [0.0f32; 3];
     let mut vec = [0.0f32; 3];
 
-    VectorSubtract(point, vStart, &mut pVec);
-    VectorSubtract(vEnd, vStart, &mut vec);
+    _VectorSubtract(point, vStart, &mut pVec);
+    _VectorSubtract(vEnd, vStart, &mut vec);
     mp_game::q_math::VectorNormalize(&mut vec);
     // project onto the directional vector for this segment
-    VectorMA(vStart, DotProduct(pVec, vec), vec, unsafe { &mut *vProj });
-}
-
-fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn VectorSubtract(a: vec3_t, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] - b[0];
-    out[1] = a[1] - b[1];
-    out[2] = a[2] - b[2];
-}
-
-fn VectorMA(a: vec3_t, scale: f32, b: vec3_t, out: &mut vec3_t) {
-    out[0] = a[0] + scale * b[0];
-    out[1] = a[1] + scale * b[1];
-    out[2] = a[2] + scale * b[2];
+    _VectorMA(vStart, _DotProduct(pVec, vec), vec, unsafe { &mut *vProj });
 }
 
 /// Raven `AAS_Setup`.

@@ -51,7 +51,9 @@ use mp_qshared::common::mp::gentity::MAX_FAILED_NODES;
 use mp_qshared::common::mp::qcommon::failedEdge_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
-use mp_qshared::shared::q_math::{_DotProduct, _VectorSubtract, VectorNormalize};
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorSubtract, Distance, DistanceSquared, VectorNormalize,
+};
 use mp_qshared::shared::{
     qboolean, qfalse, qtrue, vec3_t, CONTENTS_BODY, CONTENTS_BOTCLIP, CONTENTS_MONSTERCLIP,
     CONTENTS_SOLID, ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_NPCSOLID, MASK_SOLID, MAX_GENTITIES,
@@ -120,31 +122,6 @@ const ET_NPC: i32 = 13;
 /// Raven `#define EF_DEAD (1<<1)`.
 /// Source: `oracle/codemp/game/bg_public.h:561`
 const EF_DEAD: i32 = 1 << 1;
-
-/// A zeroed `trace_t` out-param — the analogue of Raven's uninitialised
-/// `trace_t trace;` the host `SV_Trace`/`host.trace` fills. `trace_t` is a
-/// `#[repr(C)]` POD, so an all-zero bit pattern is a valid value.
-fn zeroed_trace() -> trace_t {
-    // SAFETY: `trace_t` is a `#[repr(C)]` plain-old-data struct (floats, ints,
-    // a `cplane_t` of floats/ints) with no niche/invariant — all-zero is valid.
-    unsafe { core::mem::zeroed() }
-}
-
-/// Raven `DistanceSquared( p1, p2 )` — the squared distance as a `float`
-/// (`q_shared.h` macro over `_DistanceSquared`); a free helper here since only
-/// the `_`-prefixed vec3 primitives were migrated into `mp_qshared` (NAV-D3).
-fn distance_squared(a: vec3_t, b: vec3_t) -> f32 {
-    let dx = a[0] - b[0];
-    let dy = a[1] - b[1];
-    let dz = a[2] - b[2];
-    dx * dx + dy * dy + dz * dz
-}
-
-/// Raven `Distance( p1, p2 )` — `VectorLength( VectorSubtract )`; the `sqrt`
-/// runs in `double` then rounds to `float`, matching `VectorNormalize`.
-fn distance(a: vec3_t, b: vec3_t) -> f32 {
-    (distance_squared(a, b) as f64).sqrt() as f32
-}
 
 /// Reads one little-endian `i32` off the front of a byte cursor, advancing it
 /// 4 bytes — the shared in-memory analogue of `FS_Read( &value, 4, file )`
@@ -437,7 +414,7 @@ impl Navigator {
         let p1 = self.nodes[first as usize].get_position();
         let p2 = self.nodes[second as usize].get_position();
 
-        let mut trace = zeroed_trace();
+        let mut trace = trace_t::zeroed();
         let mut flags = EFLAG_NONE;
 
         host.trace(
@@ -453,7 +430,7 @@ impl Navigator {
             10,
         );
 
-        let cost = distance(p1, p2) as i32;
+        let cost = Distance(p1, p2) as i32;
 
         if trace.fraction != 1.0 || trace.startsolid != 0 || trace.allsolid != 0 {
             flags |= EFLAG_BLOCKED;
@@ -478,7 +455,7 @@ impl Navigator {
             let show_radius = qfalse;
             let player = host.gentity(0);
             let player_origin = unsafe { (*player).r.currentOrigin };
-            let dist = distance_squared(player_origin, position);
+            let dist = DistanceSquared(player_origin, position);
 
             if dist < 1048576.0 && self.sv_in_pvs(player_origin, position) {
                 // Raven `(*ni)->Draw( showRadius )` — a no-op (renderer stripped).
@@ -503,7 +480,7 @@ impl Navigator {
 
         for ni in 0..n {
             let start = self.nodes[ni].get_position();
-            if distance_squared(player_origin, start) >= 1048576.0 {
+            if DistanceSquared(player_origin, start) >= 1048576.0 {
                 continue;
             }
             if !self.sv_in_pvs(player_origin, start) {
@@ -529,7 +506,7 @@ impl Navigator {
                 // Set this as drawn.
                 draw_map[id as usize].insert(ni_id, true);
 
-                if distance_squared(player_origin, end) >= 1048576.0 {
+                if DistanceSquared(player_origin, end) >= 1048576.0 {
                     continue;
                 }
                 if !self.sv_in_pvs(player_origin, end) {
@@ -1359,7 +1336,7 @@ impl Navigator {
                 return qfalse;
             }
 
-            let mut trace = zeroed_trace();
+            let mut trace = trace_t::zeroed();
             host.trace(
                 &mut trace,
                 &start,
@@ -1733,8 +1710,8 @@ impl Navigator {
 
                 // First get the entire path cost, including distance to first
                 // node from ents' positions.
-                let mut cost = (distance(ent_origin, position) as f64
-                    + distance(goal_origin, position2) as f64)
+                let mut cost = (Distance(ent_origin, position) as f64
+                    + Distance(goal_origin, position2) as f64)
                     .floor() as i32;
 
                 if host.cvar_integer("d_altRoutes") != 0 {
@@ -1831,7 +1808,7 @@ impl Navigator {
                     let p2 = self.nodes[second as usize].get_position();
                     let mut failed = qfalse;
 
-                    let mut trace = zeroed_trace();
+                    let mut trace = trace_t::zeroed();
                     host.trace(
                         &mut trace,
                         &p1,
@@ -2037,7 +2014,7 @@ impl Navigator {
         let mut best_dist = if best_node == NODE_NONE {
             Q3_INFINITE as f32
         } else {
-            distance_squared(ent_origin, node_pos0)
+            DistanceSquared(ent_origin, node_pos0)
         };
 
         // Test all these edges first.
@@ -2051,7 +2028,7 @@ impl Navigator {
 
             let node_pos = self.nodes[edge_id as usize].get_position();
 
-            let dist = distance_squared(ent_origin, node_pos);
+            let dist = DistanceSquared(ent_origin, node_pos);
 
             // Test against current best.
             if dist < best_dist {
@@ -2092,7 +2069,7 @@ impl Navigator {
         // Get a distance rating for each node in the system.
         for ni in &self.nodes {
             let position = ni.get_position();
-            let dist = distance_squared(position, origin);
+            let dist = DistanceSquared(position, origin);
 
             // Must be within our radius range.
             if dist > (radius * radius) as f32 {
@@ -2181,7 +2158,7 @@ impl Navigator {
             // They want us to calc it.
             let pos1 = self.nodes[id1 as usize].get_position();
             let pos2 = self.nodes[id2 as usize].get_position();
-            cost = distance(pos1, pos2) as i32;
+            cost = Distance(pos1, pos2) as i32;
         }
 
         // Set it (bidirectional, :778-779).
@@ -2210,7 +2187,7 @@ impl Navigator {
         let start = self.nodes[first_id as usize].get_position();
         let end = self.nodes[second_id as usize].get_position();
 
-        let mut trace = zeroed_trace();
+        let mut trace = trace_t::zeroed();
         host.trace(
             &mut trace,
             &start,
@@ -2229,7 +2206,7 @@ impl Navigator {
         }
 
         // Connection successful, return the cost.
-        distance(start, end) as i32
+        Distance(start, end) as i32
     }
 
     /// Raven `protected void CNavigator::AddNodeEdges( CNode *node, int

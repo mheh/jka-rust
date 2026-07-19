@@ -23,9 +23,10 @@ pub use native_math::qmath::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
     vectoangles, AngleDelta, AngleMod, AngleNormalize180, AngleNormalize360, AngleSubtract,
     AngleVectors, AnglesSubtract, AnglesToAxis, CrossProduct, Distance, DistanceSquared,
-    MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand, Q_random, RadiusFromBounds, VectorClear,
-    VectorCompare, VectorInverse, VectorLength, VectorLengthSquared, VectorNormalize,
-    VectorNormalize2, VectorNormalizeRow, VectorSet, PITCH, ROLL, VEC3_ORIGIN, YAW,
+    DotProductRow, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand, Q_random,
+    RadiusFromBounds, VectorClear, VectorCompare, VectorInverse, VectorLength,
+    VectorLengthSquared, VectorNormalize, VectorNormalize2, VectorNormalizeRow, VectorSet, PITCH,
+    ROLL, VEC3_ORIGIN, YAW,
 };
 
 /// Raven `SetPlaneSignbits`.
