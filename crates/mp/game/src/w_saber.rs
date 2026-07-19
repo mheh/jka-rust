@@ -6327,22 +6327,6 @@ pub fn CheckSaberDamage(
     }
 }
 
-/// Raven `VectorCompare2`.
-///
-/// Source: `oracle/codemp/game/w_saber.c:5275-5282`
-pub fn VectorCompare2(v1: vec3_t, v2: vec3_t) -> c_int {
-    if v1[0] > v2[0] + 0.0001f32
-        || v1[0] < v2[0] - 0.0001f32
-        || v1[1] > v2[1] + 0.0001f32
-        || v1[1] < v2[1] - 0.0001f32
-        || v1[2] > v2[2] + 0.0001f32
-        || v1[2] < v2[2] - 0.0001f32
-    {
-        return 0;
-    }
-    1
-}
-
 /// Raven `G_SPSaberDamageTraceLerped`.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:5285-5480`

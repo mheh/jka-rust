@@ -21,12 +21,12 @@ use crate::shared::{vec3_t, vec_t};
 pub use native_math::qmath::PerpendicularVectorMP as PerpendicularVector;
 pub use native_math::qmath::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
-    vectoangles, AngleDelta, AngleMod, AngleNormalize180, AngleNormalize360, AngleSubtract,
-    AngleVectors, AnglesSubtract, AnglesToAxis, CrossProduct, Distance, DistanceSquared,
-    DotProductRow, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand, Q_random,
-    RadiusFromBounds, VectorClear, VectorCompare, VectorInverse, VectorLength,
-    VectorLengthSquared, VectorNormalize, VectorNormalize2, VectorNormalizeRow, VectorSet, PITCH,
-    ROLL, VEC3_ORIGIN, YAW,
+    vectoangles, vectoyaw, AngleDelta, AngleMod, AngleNormalize180, AngleNormalize360,
+    AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, CrossProduct, Distance,
+    DistanceSquared, DotProductRow, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand, Q_random,
+    RadiusFromBounds, VectorBetweenVectors, VectorClear, VectorCompare, VectorCompare2,
+    VectorInverse, VectorLength, VectorLengthSquared, VectorNPos, VectorNormalize,
+    VectorNormalize2, VectorNormalizeRow, VectorSet, PITCH, ROLL, VEC3_ORIGIN, YAW,
 };
 
 /// Raven `SetPlaneSignbits`.
@@ -149,11 +149,4 @@ pub fn Sys_SnapVector(v: *mut f32) {
     }
 }
 
-/// Raven `VectorAdvance` (`q_shared.h` macro) — lerp `a`→`b` by `s` into `c`.
-///
-/// Source: `oracle/codemp/game/q_shared.h:1370`
-pub fn VectorAdvance(a: vec3_t, s: vec_t, b: vec3_t, c: &mut vec3_t) {
-    c[0] = a[0] + s * (b[0] - a[0]);
-    c[1] = a[1] + s * (b[1] - a[1]);
-    c[2] = a[2] + s * (b[2] - a[2]);
-}
+pub use native_math::qmath::VectorAdvance;

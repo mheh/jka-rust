@@ -162,7 +162,6 @@ pub use mp_qshared::shared::q_math::{
     Q_fabs, RadiusFromBounds, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize,
     VectorSet, PITCH, ROLL, YAW,
 };
-pub use mp_qshared::shared::RAND_MAX;
 pub use mp_qshared::shared::q_string::{
     va, COM_Compress, COM_StripExtension, GetIDForString, Info_ValueForKey, Q_strcat, Q_strcmp,
     Q_stricmp, Q_stricmpn, Q_strncmp, Q_strncpyz,
@@ -178,6 +177,7 @@ pub use mp_qshared::shared::trajectory::{trType_t, trType_t::*, trajectory_t};
 pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
 pub use mp_qshared::shared::wpobject::{wpobject_t, MAX_NEIGHBOR_SIZE};
 pub use mp_qshared::shared::Eorientations::*;
+pub use mp_qshared::shared::RAND_MAX;
 pub use mp_qshared::shared::{
     fileHandle_t, mdxaBone_t, qboolean, qfalse, qhandle_t, qtrue, vec3_t, vec4_t, vec_t,
     Eorientations, MAX_QPATH,

@@ -2,14 +2,14 @@
 //!
 //! - PerpendicularVectorMP/SP
 //! - ClearBoundsMP/SP
-//! 
-//! Sources: 
+//!
+//! Sources:
 //! - `oracle/codemp/game/q_math.c` / `oracle/code/game/q_math.cpp`
 //! - `oracle/codemp/game/q_shared.h`
 #![allow(non_snake_case, unused, clippy::all)]
 
-use core::ffi::{c_int, c_schar, c_short, c_uint};
 use crate::vector::{vec3_t, vec4_t, vec_t};
+use core::ffi::{c_int, c_schar, c_short, c_uint};
 
 pub type qboolean = c_int;
 type byte = u8;
@@ -368,7 +368,6 @@ pub fn ClearBoundsSP(mins: &mut vec3_t, maxs: &mut vec3_t) {
     maxs[1] = -WORLD_SIZE;
     maxs[2] = -WORLD_SIZE;
 }
-
 
 /// Raven `DirToByte`.
 ///
@@ -936,6 +935,76 @@ pub fn VectorNormalizeRow(row: &mut [f32; 4]) -> vec_t {
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp` skinning call sites
 pub fn DotProductRow(row: &[f32; 4], v: vec3_t) -> vec_t {
     row[0] * v[0] + row[1] * v[1] + row[2] * v[2]
+}
+
+/// Raven `vectoyaw`.
+///
+/// Source: `oracle/codemp/game/bg_misc.c:1773-1792`
+pub fn vectoyaw(vec: vec3_t) -> f32 {
+    let mut yaw: f32;
+
+    if vec[YAW] == 0.0 && vec[PITCH] == 0.0 {
+        yaw = 0.0;
+    } else {
+        if vec[PITCH] != 0.0 {
+            // Raven's atan2 is the double libm call and M_PI is math.h's double;
+            // the `*180/M_PI` chain evaluates in f64 then rounds to the float result.
+            yaw =
+                ((vec[YAW] as f64).atan2(vec[PITCH] as f64) * 180.0 / std::f64::consts::PI) as f32;
+        } else if vec[YAW] > 0.0 {
+            yaw = 90.0;
+        } else {
+            yaw = 270.0;
+        }
+        if yaw < 0.0 {
+            yaw += 360.0;
+        }
+    }
+
+    yaw
+}
+
+/// Raven `VectorBetweenVectors`.
+///
+/// Source: `oracle/codemp/botlib/be_aas_reach.cpp:1607-1614`
+pub fn VectorBetweenVectors(v: vec3_t, v1: vec3_t, v2: vec3_t) -> c_int {
+    let dir1: vec3_t = [v[0] - v1[0], v[1] - v1[1], v[2] - v1[2]];
+    let dir2: vec3_t = [v[0] - v2[0], v[1] - v2[1], v[2] - v2[2]];
+    (dir1[0] * dir2[0] + dir1[1] * dir2[1] + dir1[2] * dir2[2] <= 0.0) as c_int
+}
+
+/// Raven `VectorNPos` — component-wise absolute value.
+///
+/// Source: `oracle/codemp/game/g_weapon.c:2636-2641`
+pub fn VectorNPos(r#in: vec3_t, out: &mut vec3_t) {
+    out[0] = if r#in[0] < 0.0 { -r#in[0] } else { r#in[0] };
+    out[1] = if r#in[1] < 0.0 { -r#in[1] } else { r#in[1] };
+    out[2] = if r#in[2] < 0.0 { -r#in[2] } else { r#in[2] };
+}
+
+/// Raven `VectorCompare2` — epsilon (0.0001) component compare.
+///
+/// Source: `oracle/codemp/game/w_saber.c:5275-5282`
+pub fn VectorCompare2(v1: vec3_t, v2: vec3_t) -> c_int {
+    if v1[0] > v2[0] + 0.0001f32
+        || v1[0] < v2[0] - 0.0001f32
+        || v1[1] > v2[1] + 0.0001f32
+        || v1[1] < v2[1] - 0.0001f32
+        || v1[2] > v2[2] + 0.0001f32
+        || v1[2] < v2[2] - 0.0001f32
+    {
+        return 0;
+    }
+    1
+}
+
+/// Raven `VectorAdvance` (`q_shared.h` macro) — lerp `a`→`b` by `s` into `c`.
+///
+/// Source: `oracle/codemp/game/q_shared.h:1370`
+pub fn VectorAdvance(a: vec3_t, s: vec_t, b: vec3_t, c: &mut vec3_t) {
+    c[0] = a[0] + s * (b[0] - a[0]);
+    c[1] = a[1] + s * (b[1] - a[1]);
+    c[2] = a[2] + s * (b[2] - a[2]);
 }
 
 /// Raven `_VectorMA`.

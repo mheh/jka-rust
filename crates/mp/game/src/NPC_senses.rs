@@ -47,11 +47,6 @@ unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t
     }
 }
 
-/// Vector comparison helper — returns 1 if vectors are equal, 0 otherwise.
-fn vector_compare(v1: vec3_t, v2: vec3_t) -> bool {
-    v1[0] == v2[0] && v1[1] == v2[1] && v1[2] == v2[2]
-}
-
 /// Raven `G_ClearLineOfSight`.
 ///
 /// Raven: "returns true if can see from point 1 to 2, even through glass (1
@@ -287,7 +282,7 @@ pub fn InFOV(
     if !client.is_null() {
         // §2b: pool client (may be an NPC), deref raw as Raven does.
         // Check if renderInfo.eyeAngles is not zero
-        if !vector_compare(unsafe { (*client).renderInfo.eyeAngles }, vec3_origin) {
+        if VectorCompare(unsafe { (*client).renderInfo.eyeAngles }, vec3_origin) == 0 {
             // Actual facing of tag_head!
             _VectorCopy(unsafe { (*client).renderInfo.eyeAngles }, &mut fromAngles);
         } else {

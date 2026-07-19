@@ -3164,17 +3164,6 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
     );
 }
 
-/// Raven `VectorNPos`.
-///
-/// Source: `oracle/codemp/game/g_weapon.c:2636-2641`
-pub fn VectorNPos(r#in: vec3_t, out: vec3_t) -> vec3_t {
-    let mut out = out;
-    out[0] = if r#in[0] < 0.0 { -r#in[0] } else { r#in[0] };
-    out[1] = if r#in[1] < 0.0 { -r#in[1] } else { r#in[1] };
-    out[2] = if r#in[2] < 0.0 { -r#in[2] } else { r#in[2] };
-    out
-}
-
 /// Raven `charge_stick`.
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2645-2738`
@@ -3212,7 +3201,8 @@ pub fn charge_stick(
         let mut vNor: vec3_t = unsafe { (*trace).plane.normal };
         VectorNormalize(&mut vNor);
         let td = ctx.world.entity(self_).s.pos.trDelta;
-        let tN = VectorNPos(td, [0.0; 3]);
+        let mut tN = [0.0f32; 3];
+        VectorNPos(td, &mut tN);
         // C: `vNor[i]*(tN[i]*(((float)Q_irand(1,10))*0.1))` — the bare `0.1`
         // (double) runs the whole product chain in f64, narrowed once at the
         // `+=` store. The `vNor[1]` on the [2] component is a faithful oracle bug.

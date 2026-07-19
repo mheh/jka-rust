@@ -62,10 +62,10 @@ use mp_qshared::common::mp::botlib::travel_flags::{TFL_DONOTENTER, TFL_JUMPPAD};
 use mp_qshared::common::mp::qcommon::bot_goal::bot_goal_t;
 use mp_qshared::shared::limits::MAX_MODELS;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS};
-use mp_qshared::shared::q_math::PITCH;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
-    VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2, VectorSet,
+    DistanceSquared, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2,
+    VectorSet, PITCH,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_SOLID,
@@ -142,14 +142,6 @@ pub fn AngleDiff(ang1: f32, ang2: f32) -> f32 {
         }
     }
     diff
-}
-
-/// Raven `VectorDistanceSquared`.
-/// Source: `oracle/codemp/botlib/be_ai_move.cpp:624-629`
-pub fn VectorDistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
-    let mut dir: vec3_t = [0.0; 3];
-    _VectorSubtract(p2, p1, &mut dir);
-    VectorLengthSquared(dir)
 }
 
 /// Raven `BotAddToTarget`.
@@ -1433,7 +1425,7 @@ pub fn BotAvoidSpots(
             );
             // if moving towards the avoid spot
             if squareddist < squaredradius
-                && VectorDistanceSquared((*avoidspots.add(i as usize)).origin, origin) > squareddist
+                && DistanceSquared((*avoidspots.add(i as usize)).origin, origin) > squareddist
             {
                 r#type = (*avoidspots.add(i as usize)).r#type;
             } else if checkbetween != 0 {
@@ -1444,16 +1436,16 @@ pub fn BotAvoidSpots(
                 );
                 // if moving towards the avoid spot
                 if squareddist < squaredradius
-                    && VectorDistanceSquared((*avoidspots.add(i as usize)).origin, (*reach).start)
+                    && DistanceSquared((*avoidspots.add(i as usize)).origin, (*reach).start)
                         > squareddist
                 {
                     r#type = (*avoidspots.add(i as usize)).r#type;
                 }
             } else {
-                VectorDistanceSquared((*avoidspots.add(i as usize)).origin, (*reach).end);
+                DistanceSquared((*avoidspots.add(i as usize)).origin, (*reach).end);
                 // if the reachability leads closer to the avoid spot
                 if squareddist < squaredradius
-                    && VectorDistanceSquared((*avoidspots.add(i as usize)).origin, (*reach).start)
+                    && DistanceSquared((*avoidspots.add(i as usize)).origin, (*reach).start)
                         > squareddist
                 {
                     r#type = (*avoidspots.add(i as usize)).r#type;

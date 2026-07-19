@@ -37,6 +37,7 @@ use mp_qshared::common::mp::qcommon::t_g_icarus_set::T_G_ICARUS_SET;
 use mp_qshared::common::mp::qcommon::t_g_icarus_use::T_G_ICARUS_USE;
 use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 use mp_qshared::shared::limits::MAX_GENTITIES;
+use mp_qshared::shared::q_math::VectorCompare;
 use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::wl_e::WL_e;
 
@@ -198,12 +199,6 @@ fn stricmp(a: &str, b: &str) -> i32 {
         }
     }
     0
-}
-
-/// Raven `VectorCompare` — exact (bit-for-bit) equality of all three axes.
-/// Source: `oracle/codemp/game/q_shared.h`
-fn vector_compare(a: &vec3_t, b: &vec3_t) -> bool {
-    a[0] == b[0] && a[1] == b[1] && a[2] == b[2]
 }
 
 /// `sscanf(s, "%f %f %f", …)` — whitespace-split, leading-float per token,
@@ -937,7 +932,7 @@ pub fn Q3_Evaluate(
         TK_EQUALS => match p1_type {
             TK_FLOAT => (f1 == f2) as i32,
             TK_INT => (i1 == i2) as i32,
-            TK_VECTOR => vector_compare(&v1, &v2) as i32,
+            TK_VECTOR => VectorCompare(v1, v2),
             // `!stricmp` — equal strings compare true.
             TK_STRING | TK_IDENTIFIER => (stricmp(p1, p2) == 0) as i32,
             _ => {
@@ -1003,7 +998,7 @@ pub fn Q3_Evaluate(
         TK_NOT => match p1_type {
             TK_FLOAT => (f1 != f2) as i32,
             TK_INT => (i1 != i2) as i32,
-            TK_VECTOR => (!vector_compare(&v1, &v2)) as i32,
+            TK_VECTOR => (VectorCompare(v1, v2) == 0) as i32,
             // Raven returns the raw `stricmp` result (nonzero when different).
             TK_STRING | TK_IDENTIFIER => stricmp(p1, p2),
             _ => {
@@ -1249,7 +1244,7 @@ mod tests {
 
     #[test]
     fn vector_compare_is_exact() {
-        assert!(vector_compare(&[1.0, 2.0, 3.0], &[1.0, 2.0, 3.0]));
-        assert!(!vector_compare(&[1.0, 2.0, 3.0], &[1.0, 2.0, 3.1]));
+        assert!(VectorCompare([1.0, 2.0, 3.0], [1.0, 2.0, 3.0]) != 0);
+        assert!(VectorCompare([1.0, 2.0, 3.0], [1.0, 2.0, 3.1]) == 0);
     }
 }

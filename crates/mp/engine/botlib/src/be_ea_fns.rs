@@ -18,8 +18,8 @@ use mp_qshared::common::mp::botlib::action::{
 use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 use mp_qshared::common::mp::botlib::botlib_error::BLERR_NOERROR;
 use mp_qshared::shared::q_format::FmtArg;
-use mp_qshared::shared::q_string::va;
 use mp_qshared::shared::q_math::{_VectorCopy, VectorClear};
+use mp_qshared::shared::q_string::va;
 use mp_qshared::shared::vec3_t;
 
 use crate::be_ea::ea_consts::{ACTION_JUMPEDLASTFRAME, MAX_USERMOVE};

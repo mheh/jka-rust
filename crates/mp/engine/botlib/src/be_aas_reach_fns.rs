@@ -56,7 +56,8 @@ use mp_qshared::common::mp::botlib::aas_trace_s::aas_trace_t;
 use mp_qshared::common::mp::botlib::bsp_trace_s::bsp_trace_t;
 use mp_qshared::common::mp::botlib::print_type::{PRT_ERROR, PRT_MESSAGE, PRT_WARNING};
 use mp_qshared::shared::q_math::{
-    AngleVectors, CrossProduct, VectorInverse, VectorLength, VectorNormalize,
+    AngleVectors, CrossProduct, Distance, VectorBetweenVectors, VectorInverse, VectorLength,
+    VectorNormalize,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER, SURF_SKY,
@@ -318,23 +319,6 @@ pub fn AAS_ReachabilityExists(bot: &mut BotLib, area1num: c_int, area2num: c_int
         }
         qfalse
     }
-}
-
-/// Raven `VectorDistance`.
-///
-/// Source: `oracle/codemp/botlib/be_aas_reach.cpp:1593-1599`
-pub fn VectorDistance(v1: vec3_t, v2: vec3_t) -> f32 {
-    let dir: vec3_t = [v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2]];
-    VectorLength(dir)
-}
-
-/// Raven `VectorBetweenVectors`.
-///
-/// Source: `oracle/codemp/botlib/be_aas_reach.cpp:1607-1614`
-pub fn VectorBetweenVectors(v: vec3_t, v1: vec3_t, v2: vec3_t) -> c_int {
-    let dir1: vec3_t = [v[0] - v1[0], v[1] - v1[1], v[2] - v1[2]];
-    let dir2: vec3_t = [v[0] - v2[0], v[1] - v2[1], v[2] - v2[2]];
-    (dir1[0] * dir2[0] + dir1[1] * dir2[1] + dir1[2] * dir2[2] <= 0.0) as c_int
 }
 
 /// Raven `AAS_AreaVolume`.
@@ -608,24 +592,24 @@ pub fn AAS_ClosestEdgePoints(
         founddist = qfalse;
         //
         if VectorBetweenVectors(p1, v3, v4) != 0 {
-            dist = VectorDistance(v1, p1);
+            dist = Distance(v1, p1);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(*beststart1, v1);
-                dist2 = VectorDistance(*beststart2, v1);
+                dist1 = Distance(*beststart1, v1);
+                dist2 = Distance(*beststart2, v1);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                    if dist1 > Distance(*beststart1, *beststart2) {
                         *beststart2 = v1;
                     }
-                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                } else if dist2 > Distance(*beststart1, *beststart2) {
                     *beststart1 = v1;
                 }
-                dist1 = VectorDistance(*bestend1, p1);
-                dist2 = VectorDistance(*bestend2, p1);
+                dist1 = Distance(*bestend1, p1);
+                dist2 = Distance(*bestend2, p1);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                    if dist1 > Distance(*bestend1, *bestend2) {
                         *bestend2 = p1;
                     }
-                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                } else if dist2 > Distance(*bestend1, *bestend2) {
                     *bestend1 = p1;
                 }
             } else if dist < bestdist {
@@ -638,24 +622,24 @@ pub fn AAS_ClosestEdgePoints(
             founddist = qtrue;
         }
         if VectorBetweenVectors(p2, v3, v4) != 0 {
-            dist = VectorDistance(v2, p2);
+            dist = Distance(v2, p2);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(*beststart1, v2);
-                dist2 = VectorDistance(*beststart2, v2);
+                dist1 = Distance(*beststart1, v2);
+                dist2 = Distance(*beststart2, v2);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                    if dist1 > Distance(*beststart1, *beststart2) {
                         *beststart2 = v2;
                     }
-                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                } else if dist2 > Distance(*beststart1, *beststart2) {
                     *beststart1 = v2;
                 }
-                dist1 = VectorDistance(*bestend1, p2);
-                dist2 = VectorDistance(*bestend2, p2);
+                dist1 = Distance(*bestend1, p2);
+                dist2 = Distance(*bestend2, p2);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                    if dist1 > Distance(*bestend1, *bestend2) {
                         *bestend2 = p2;
                     }
-                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                } else if dist2 > Distance(*bestend1, *bestend2) {
                     *bestend1 = p2;
                 }
             } else if dist < bestdist {
@@ -668,24 +652,24 @@ pub fn AAS_ClosestEdgePoints(
             founddist = qtrue;
         }
         if VectorBetweenVectors(p3, v1, v2) != 0 {
-            dist = VectorDistance(v3, p3);
+            dist = Distance(v3, p3);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(*beststart1, p3);
-                dist2 = VectorDistance(*beststart2, p3);
+                dist1 = Distance(*beststart1, p3);
+                dist2 = Distance(*beststart2, p3);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                    if dist1 > Distance(*beststart1, *beststart2) {
                         *beststart2 = p3;
                     }
-                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                } else if dist2 > Distance(*beststart1, *beststart2) {
                     *beststart1 = p3;
                 }
-                dist1 = VectorDistance(*bestend1, v3);
-                dist2 = VectorDistance(*bestend2, v3);
+                dist1 = Distance(*bestend1, v3);
+                dist2 = Distance(*bestend2, v3);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                    if dist1 > Distance(*bestend1, *bestend2) {
                         *bestend2 = v3;
                     }
-                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                } else if dist2 > Distance(*bestend1, *bestend2) {
                     *bestend1 = v3;
                 }
             } else if dist < bestdist {
@@ -698,24 +682,24 @@ pub fn AAS_ClosestEdgePoints(
             founddist = qtrue;
         }
         if VectorBetweenVectors(p4, v1, v2) != 0 {
-            dist = VectorDistance(v4, p4);
+            dist = Distance(v4, p4);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
-                dist1 = VectorDistance(*beststart1, p4);
-                dist2 = VectorDistance(*beststart2, p4);
+                dist1 = Distance(*beststart1, p4);
+                dist2 = Distance(*beststart2, p4);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*beststart1, *beststart2) {
+                    if dist1 > Distance(*beststart1, *beststart2) {
                         *beststart2 = p4;
                     }
-                } else if dist2 > VectorDistance(*beststart1, *beststart2) {
+                } else if dist2 > Distance(*beststart1, *beststart2) {
                     *beststart1 = p4;
                 }
-                dist1 = VectorDistance(*bestend1, v4);
-                dist2 = VectorDistance(*bestend2, v4);
+                dist1 = Distance(*bestend1, v4);
+                dist2 = Distance(*bestend2, v4);
                 if dist1 > dist2 {
-                    if dist1 > VectorDistance(*bestend1, *bestend2) {
+                    if dist1 > Distance(*bestend1, *bestend2) {
                         *bestend2 = v4;
                     }
-                } else if dist2 > VectorDistance(*bestend1, *bestend2) {
+                } else if dist2 > Distance(*bestend1, *bestend2) {
                     *bestend1 = v4;
                 }
             } else if dist < bestdist {
@@ -730,7 +714,7 @@ pub fn AAS_ClosestEdgePoints(
         //if no shortest distance was found the shortest distance
         //is between one of the vertexes of edge1 and one of edge2
         if founddist == 0 {
-            dist = VectorDistance(v1, v3);
+            dist = Distance(v1, v3);
             if dist < bestdist {
                 bestdist = dist;
                 *beststart1 = v1;
@@ -738,7 +722,7 @@ pub fn AAS_ClosestEdgePoints(
                 *bestend1 = v3;
                 *bestend2 = v3;
             }
-            dist = VectorDistance(v1, v4);
+            dist = Distance(v1, v4);
             if dist < bestdist {
                 bestdist = dist;
                 *beststart1 = v1;
@@ -746,7 +730,7 @@ pub fn AAS_ClosestEdgePoints(
                 *bestend1 = v4;
                 *bestend2 = v4;
             }
-            dist = VectorDistance(v2, v3);
+            dist = Distance(v2, v3);
             if dist < bestdist {
                 bestdist = dist;
                 *beststart1 = v2;
@@ -754,7 +738,7 @@ pub fn AAS_ClosestEdgePoints(
                 *bestend1 = v3;
                 *bestend2 = v3;
             }
-            dist = VectorDistance(v2, v4);
+            dist = Distance(v2, v4);
             if dist < bestdist {
                 bestdist = dist;
                 *beststart1 = v2;
@@ -4466,8 +4450,7 @@ pub fn AAS_Reachability_Jump(bot: &mut BotLib, area1num: c_int, area2num: c_int)
                     as c_ushort;
             } else {
                 (*lreach).traveltime = (bot.aassettings.rs_startjump
-                    + VectorDistance(bestend, beststart) * 240.0
-                        / bot.aassettings.phys_maxwalkvelocity)
+                    + Distance(bestend, beststart) * 240.0 / bot.aassettings.phys_maxwalkvelocity)
                     as c_ushort;
             }
             //

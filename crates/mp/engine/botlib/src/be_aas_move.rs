@@ -30,8 +30,7 @@ use mp_qshared::common::mp::botlib::line_color::{LINECOLOR_BLUE, LINECOLOR_RED};
 use mp_qshared::common::mp::botlib::print_type::PRT_MESSAGE;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
-    AngleVectors,
-    VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH, ROLL, YAW,
+    AngleVectors, VectorClear, VectorCompare, VectorLength, VectorNormalize, PITCH, ROLL, YAW,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_LAVA, CONTENTS_SLIME, CONTENTS_SOLID, CONTENTS_WATER,
@@ -50,11 +49,6 @@ use crate::aasfile::area_flags::AREA_LADDER;
 use crate::aasfile::face_flags::FACE_LADDER;
 use crate::aasfile::presence_type::{PRESENCE_CROUCH, PRESENCE_NORMAL};
 use crate::BotLib;
-
-// Raven's vector `#define`s are ported as local private helpers below;
-// `VectorClear`/`VectorCompare`/`VectorNormalize`/`VectorLength`/`AngleVectors`
-// are the genuine q_math functions (canonical `_Vector*` bodies in
-// native_math, alias-imported at the top of this file).
 
 use crate::be_aas_bspq3_fns::{AAS_PointContents, AAS_Trace};
 use crate::be_aas_debug_fns::{AAS_ClearShownDebugLines, AAS_DebugLine};
@@ -337,7 +331,7 @@ pub fn AAS_WeaponJumpZVelocity(bot: &mut BotLib, origin: vec3_t, radiusdamage: f
         // damage velocity
         let mut kvel: vec3_t = [0.0; 3];
         _VectorScale(dir, 1600.0 * knockback / mass, &mut kvel); // the rocket jump hack...
-                                                                // rocket impact velocity + jump velocity
+                                                                 // rocket impact velocity + jump velocity
         kvel[2] + bot.aassettings.phys_jumpvel
     }
 }

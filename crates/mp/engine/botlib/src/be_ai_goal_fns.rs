@@ -72,24 +72,11 @@ use crate::l_precomp_fns::{
 };
 use crate::l_script_fns::StripDoubleQuotes;
 use crate::l_struct_fns::ReadStructure;
-use mp_qshared::shared::q_math::VectorLength;
+use mp_qshared::shared::q_math::{_VectorAdd, _VectorScale, _VectorSubtract, VectorLength};
 
 // helper: vector arithmetic used inline below (mirrors the qshared q_math
 // primitives; ported bodies transcribed inline to avoid a spurious edge for
 // simple 3-float ops not listed as callees by any packet).
-#[inline]
-fn vec_sub(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-#[inline]
-fn vec_add(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-#[inline]
-fn vec_scale(a: vec3_t, s: f32) -> vec3_t {
-    [a[0] * s, a[1] * s, a[2] * s]
-}
-
 /// Raven `BotGoalStateFromHandle`.
 ///
 /// Source: `oracle/codemp/botlib/be_ai_goal.cpp:186-199`
@@ -574,13 +561,15 @@ pub fn BotTouchingGoal(bot: &mut BotLib, origin: vec3_t, goal: *mut bot_goal_t) 
 
     unsafe {
         AAS_PresenceTypeBoundingBox(bot, PRESENCE_NORMAL, &mut boxmins, &mut boxmaxs);
-        let mut absmins = vec_sub((*goal).mins, boxmaxs);
-        let mut absmaxs = vec_sub((*goal).maxs, boxmins);
-        absmins = vec_add(absmins, (*goal).origin);
-        absmaxs = vec_add(absmaxs, (*goal).origin);
+        let mut absmins = [0.0f32; 3];
+        _VectorSubtract((*goal).mins, boxmaxs, &mut absmins);
+        let mut absmaxs = [0.0f32; 3];
+        _VectorSubtract((*goal).maxs, boxmins, &mut absmaxs);
+        _VectorAdd(absmins, (*goal).origin, &mut absmins);
+        _VectorAdd(absmaxs, (*goal).origin, &mut absmaxs);
         //make the box a little smaller for safety
-        absmaxs = vec_sub(absmaxs, safety_maxs);
-        absmins = vec_sub(absmins, safety_mins);
+        _VectorSubtract(absmaxs, safety_maxs, &mut absmaxs);
+        _VectorSubtract(absmins, safety_mins, &mut absmins);
 
         for i in 0..3 {
             if origin[i] < absmins[i] || origin[i] > absmaxs[i] {
@@ -720,7 +709,8 @@ pub fn BotFindEntityForLevelItem(bot: &mut BotLib, li: *mut levelitem_t) {
                     let iteminfo_idx = (*li).iteminfo as usize;
                     if (*(*ic).iteminfo.add(iteminfo_idx)).modelindex == modelindex {
                         //check if the entity is very close
-                        let dir = vec_sub((*li).origin, entinfo.origin);
+                        let mut dir = [0.0f32; 3];
+                        _VectorSubtract((*li).origin, entinfo.origin, &mut dir);
                         if VectorLength(dir) < 30.0 {
                             //found an entity for this level item
                             (*li).entitynum = ent;
@@ -773,9 +763,10 @@ pub fn BotItemGoalInVisButNotVisible(
         if (*goal).flags & GFL_ITEM == 0 {
             return qfalse;
         }
-        let mut middle = vec_add((*goal).mins, (*goal).mins);
-        middle = vec_scale(middle, 0.5);
-        middle = vec_add((*goal).origin, middle);
+        let mut middle = [0.0f32; 3];
+        _VectorAdd((*goal).mins, (*goal).mins, &mut middle);
+        _VectorScale(middle, 0.5, &mut middle);
+        _VectorAdd((*goal).origin, middle, &mut middle);
 
         let trace = AAS_Trace(
             bot,
@@ -1112,7 +1103,12 @@ pub fn BotUpdateEntityItems(bot: &mut BotLib) {
                                         //if the model of the level item and the entity are the same
                                         if (*ii).modelindex == modelindex {
                                             //check if the entity is very close
-                                            let dir = vec_sub((*li2).origin, entinfo.origin);
+                                            let mut dir = [0.0f32; 3];
+                                            _VectorSubtract(
+                                                (*li2).origin,
+                                                entinfo.origin,
+                                                &mut dir,
+                                            );
                                             if VectorLength(dir) < 30.0 {
                                                 //found an entity for this level item
                                                 (*li2).entitynum = ent;
