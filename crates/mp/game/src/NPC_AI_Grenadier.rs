@@ -556,9 +556,7 @@ pub fn Grenadier_CheckFireState(ctx: &mut GameContext) {
     // FLAG: NPC carries a BG_Alloc'd pool client — deref raw via the safe entity
     // borrow, per trap 2b.
     let client = ctx.world.entity(npc_id).client;
-    if crate::q_math::VectorCompare(unsafe { (*client).ps.velocity }, crate::q_math::vec3_origin)
-        == qfalse
-    {
+    if !VectorCompare(unsafe { (*client).ps.velocity }, vec3_origin) {
         // if moving at all, don't do this
         return;
     }

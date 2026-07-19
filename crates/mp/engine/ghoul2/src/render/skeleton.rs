@@ -161,7 +161,6 @@ static IDENTITY_MATRIX: mdxaBone_t = mdxaBone_t {
     ],
 };
 
-
 // ---------------------------------------------------------------------------
 // mdxm mesh byte-offset table — the surface-bolt path (`G2_FindSurface_BC` /
 // `G2_ProcessSurfaceBolt2`) walks `mod->mdxm`'s LOD/surface/vertex arrays.
@@ -241,7 +240,6 @@ unsafe fn read_i32(base: *const u8, offset: usize) -> i32 {
 unsafe fn read_f32(base: *const u8, offset: usize) -> f32 {
     unsafe { base.add(offset).cast::<f32>().read_unaligned() }
 }
-
 
 /// `G2_GetVertWeights` (`mdx_format.h:290-295`) — the packed weight count (1..4).
 ///

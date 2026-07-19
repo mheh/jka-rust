@@ -41,7 +41,6 @@ use crate::server::world_sector_s::{worldSector_t, AREA_DEPTH, AREA_NODES, MAX_T
 use crate::sv_game::SV_SvEntityForGentity;
 use crate::Server;
 
-
 /// Raven `SV_CreateworldSector`.
 ///
 /// Source: `oracle/codemp/server/sv_world.cpp:90-123`

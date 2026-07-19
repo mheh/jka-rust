@@ -282,7 +282,7 @@ pub fn InFOV(
     if !client.is_null() {
         // §2b: pool client (may be an NPC), deref raw as Raven does.
         // Check if renderInfo.eyeAngles is not zero
-        if VectorCompare(unsafe { (*client).renderInfo.eyeAngles }, vec3_origin) == 0 {
+        if !VectorCompare(unsafe { (*client).renderInfo.eyeAngles }, vec3_origin) {
             // Actual facing of tag_head!
             _VectorCopy(unsafe { (*client).renderInfo.eyeAngles }, &mut fromAngles);
         } else {

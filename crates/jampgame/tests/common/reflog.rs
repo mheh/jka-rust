@@ -404,7 +404,10 @@ pub fn gen_force_duel() -> Scenario {
     // forcePowers_t digit order; [7] = FP_LIGHTNING at level 1, dark side.
     // Rank-6 budget is 75 points: base neutral kit (72) + lightning 1 (2)
     // fits with saberthrow shaved to 2. Fixed point of the legalizer.
-    userinfos.insert(0, userinfo_with_force(0, "desann/default", "6-2-030330010000000332"));
+    userinfos.insert(
+        0,
+        userinfo_with_force(0, "desann/default", "6-2-030330010000000332"),
+    );
     userinfos.insert(1, userinfo_for(1, "kyle/default"));
     userinfos.insert(2, userinfo_for(2, "jan/default"));
 

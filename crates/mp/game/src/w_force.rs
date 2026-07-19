@@ -4090,7 +4090,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                     let mut center2: vec3_t;
                     let mut pos1: vec3_t;
                     let mut pos2: vec3_t;
-                    if VectorCompare(vec3_origin, ctx.world.entity(push_list[x]).s.origin) != 0 {
+                    if VectorCompare(vec3_origin, ctx.world.entity(push_list[x]).s.origin) {
                         //does not have an origin brush, so pos1 & pos2 are relative to world origin, need to calc center
                         let size: vec3_t = [
                             ctx.world.entity(push_list[x]).r.absmax[0]

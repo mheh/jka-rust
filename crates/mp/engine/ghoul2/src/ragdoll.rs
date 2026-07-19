@@ -142,7 +142,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
-    AngleNormalize180, AnglesToAxis, AngleVectors, DistanceSquared, VectorInverse,
+    AngleNormalize180, AngleVectors, AnglesToAxis, DistanceSquared, VectorInverse,
 };
 use mp_qshared::shared::{
     mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID, CONTENTS_TERRAIN,
@@ -353,7 +353,6 @@ impl Default for RagDollSolver {
 // aren't imported from a shared home (none of the tree's existing q_math
 // ports cover this set at time of writing).
 // ---------------------------------------------------------------------------
-
 
 /// Raven `void Create_Matrix(const float *angle, mdxaBone_t *matrix)` — file-
 /// local twin of `misc.rs`'s private (also-stubbed) `create_matrix`; see this

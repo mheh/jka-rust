@@ -870,7 +870,7 @@ pub fn Boba_FireDecide(ctx: &mut GameContext) {
                                 SPOT_HEAD,
                                 &mut muzzle,
                             );
-                            if crate::q_math::VectorCompare(impactPos, vec3_origin) != qfalse {
+                            if VectorCompare(impactPos, vec3_origin) {
                                 //never checked ShotEntity this frame, so must do a trace...
                                 let mut tr: trace_t = core::mem::zeroed();
                                 let mut forward: vec3_t = [0.0; 3];
@@ -4118,7 +4118,7 @@ pub fn Jedi_EvasionSaber(
         if ctx.world.bg_state.rng.Q_irand(0, 100) < evasionChance {
             //check to see if he's coming at me
             let facingAmt: f32;
-            if crate::q_math::VectorCompare(enemy_movedir, vec3_origin) != qfalse
+            if VectorCompare(enemy_movedir, vec3_origin)
                 || shooting_lightning != qfalse
                 || throwing_saber != qfalse
             {
@@ -4181,7 +4181,7 @@ pub fn Jedi_EvasionSaber(
                         //already chose one
                     } else if enemy_dist > 80.0 || enemy_attacking == qfalse {
                         //he's pretty far, or not swinging, just strafe
-                        if crate::q_math::VectorCompare(enemy_movedir, vec3_origin) != qfalse {
+                        if VectorCompare(enemy_movedir, vec3_origin) {
                             return;
                         }
                         if ctx.world.bg_state.rng.Q_irand(0, 10) < (*npc_info).stats.aggression {

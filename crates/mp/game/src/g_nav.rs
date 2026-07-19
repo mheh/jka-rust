@@ -830,7 +830,7 @@ pub fn NAV_Bypass(
     if !blocker_client.is_null() {
         // FLAG: gclient_t deref stays raw (recipe 2b).
         let blocker_velocity = unsafe { (*blocker_client).ps.velocity };
-        if VectorCompare(blocker_velocity, [0.0, 0.0, 0.0]) == 0 {
+        if !VectorCompare(blocker_velocity, [0.0, 0.0, 0.0]) {
             let mut blocker_movedir = [0.0f32; 3];
             VectorNormalize2(blocker_velocity, &mut blocker_movedir);
             let dot = crate::q_math::_DotProduct(blocker_movedir, blocked_dir);
@@ -1526,7 +1526,7 @@ pub fn NAV_GetNearestNode(ctx: &mut GameContext, self_: EntityId, lastNode: c_in
 ///
 /// Source: `oracle/codemp/game/g_nav.c:1094-1105`
 pub fn NAV_MicroError(ctx: &mut GameContext, start: vec3_t, end: vec3_t) -> qboolean {
-    if VectorCompare(start, end) != 0 {
+    if VectorCompare(start, end) {
         let npc_id = ctx.entity_id_of(ctx.world.globals.NPC).unwrap();
         let npc_origin = ctx.entity(npc_id).r.currentOrigin;
         if DistanceSquared(npc_origin, start) < (8.0 * 8.0) {

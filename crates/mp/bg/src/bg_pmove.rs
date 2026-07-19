@@ -232,7 +232,7 @@ impl PmoveContext<'_> {
             let mut new_angles: vec3_t = [0.0, 0.0, 0.0];
 
             //if we don't have a slope, get one
-            if VectorCompare(vec3_origin, pass_slope) != qfalse {
+            if VectorCompare(vec3_origin, pass_slope) {
                 let mut trace: trace_t = core::mem::zeroed();
 
                 _VectorCopy((*(*self.pm).ps).origin, &mut startspot);
@@ -254,7 +254,7 @@ impl PmoveContext<'_> {
                     return;
                 }
 
-                if VectorCompare(vec3_origin, trace.plane.normal) != qfalse {
+                if VectorCompare(vec3_origin, trace.plane.normal) {
                     return;
                 }
 
@@ -3627,9 +3627,7 @@ impl PmoveContext<'_> {
             // Get The WishVel And WishSpeed
             if (*ps).clientNum >= MAX_CLIENTS as c_int {
                 //NPC
-                if (fmove != 0.0 || smove != 0.0)
-                    && VectorCompare((*ps).moveDir, vec3_origin) != qfalse
-                {
+                if (fmove != 0.0 || smove != 0.0) && VectorCompare((*ps).moveDir, vec3_origin) {
                     for i in 0..3 {
                         wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
                     }
@@ -3887,16 +3885,13 @@ impl PmoveContext<'_> {
             VectorNormalize(&mut self.pml.right);
 
             // Get The WishVel And WishSpeed
-            if (*ps).clientNum >= MAX_CLIENTS as c_int
-                && VectorCompare((*ps).moveDir, vec3_origin) == qfalse
+            if (*ps).clientNum >= MAX_CLIENTS as c_int && !VectorCompare((*ps).moveDir, vec3_origin)
             {
                 //NPC
                 let pEnt = self.pm_entSelf;
 
                 if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
-                    if (fmove != 0.0 || smove != 0.0)
-                        && VectorCompare((*ps).moveDir, vec3_origin) != qfalse
-                    {
+                    if (fmove != 0.0 || smove != 0.0) && VectorCompare((*ps).moveDir, vec3_origin) {
                         for i in 0..3 {
                             wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
                         }
@@ -7167,7 +7162,7 @@ impl PmoveContext<'_> {
                 } else if fhe == HANDEXTEND_TAUNT as c_int {
                     desiredAnim = (*ps).forceDodgeAnim as c_int;
                     if desiredAnim != BOTH_ENGAGETAUNT as c_int
-                        && VectorCompare((*ps).velocity, vec3_origin) != qfalse
+                        && VectorCompare((*ps).velocity, vec3_origin)
                         && (*ps).groundEntityNum != ENTITYNUM_NONE
                     {
                         playFullBody = qtrue;
@@ -9299,7 +9294,7 @@ pub fn BG_G2PlayerAngles(
 
         _VectorSubtract(cent_lerpOrigin, velPos, &mut velAng);
 
-        if VectorCompare(velAng, vec3_origin) == qfalse {
+        if !VectorCompare(velAng, vec3_origin) {
             vectoangles(velAng, &mut velAng);
 
             if velAng[YAW] <= legsAngles[YAW] {

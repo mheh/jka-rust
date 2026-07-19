@@ -90,7 +90,7 @@ pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 ///
 /// Source: `oracle/codemp/game/g_trigger.c:8-20`
 pub fn InitTrigger(ctx: &mut GameContext, self_id: EntityId) {
-    if VectorCompare(ctx.world.entity(self_id).s.angles, vec3_origin) == 0 {
+    if !VectorCompare(ctx.world.entity(self_id).s.angles, vec3_origin) {
         let e = ctx.world.entity_mut(self_id);
         G_SetMovedir(&mut e.s.angles, &mut e.movedir);
     }

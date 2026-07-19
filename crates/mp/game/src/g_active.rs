@@ -400,7 +400,7 @@ pub fn DoImpact(ctx: &mut GameContext, self_: EntityId, other: EntityId, damageS
             if magnitude >= 100.0 && ctx.world.entity(other).s.number < ENTITYNUM_WORLD {
                 dir1 = velocity;
                 VectorNormalize(&mut dir1);
-                if VectorCompare(ctx.world.entity(other).r.currentOrigin, vec3_origin) != qfalse {
+                if VectorCompare(ctx.world.entity(other).r.currentOrigin, vec3_origin) {
                     //a brush with no origin
                     dir2 = dir1;
                 } else {
@@ -1628,7 +1628,7 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
             viewChange[i] = (*cl).ps.viewangles[i] - (*cl).idleViewAngles[i];
         }
         let level_time = ctx.world.level.time;
-        if VectorCompare(vec3_origin, (*cl).ps.velocity) == qfalse
+        if !VectorCompare(vec3_origin, (*cl).ps.velocity)
             || actionPressed != 0
             || (*ucmd).forwardmove != 0
             || (*ucmd).rightmove != 0
@@ -1654,7 +1654,7 @@ pub fn G_CheckClientIdle(ctx: &mut GameContext, ent: Option<EntityId>, ucmd: *mu
             //FIXME: also check for turning?
             let mut brokeOut: qboolean = qfalse;
 
-            if VectorCompare(vec3_origin, (*cl).ps.velocity) == qfalse
+            if !VectorCompare(vec3_origin, (*cl).ps.velocity)
                 || actionPressed != 0
                 || (*ucmd).forwardmove != 0
                 || (*ucmd).rightmove != 0
@@ -1851,12 +1851,12 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
     let cl = ctx.world.entity(ent).client;
     unsafe {
         if !cl.is_null() {
-            if (!ctx.world.entity(ent).NPC.is_null() && VectorCompare(vec3_origin, (*cl).ps.moveDir) == qfalse) //moving using moveDir
+            if (!ctx.world.entity(ent).NPC.is_null() && !VectorCompare(vec3_origin, (*cl).ps.moveDir)) //moving using moveDir
                 || (*ucmd).forwardmove != 0
                 || (*ucmd).rightmove != 0 //moving using ucmds
                 || ((*ucmd).upmove != 0 && FlyingCreature(ctx.world.entity(ent)) != 0) //flier using ucmds to move
                 || (FlyingCreature(ctx.world.entity(ent)) != 0
-                    && VectorCompare(vec3_origin, (*cl).ps.velocity) == qfalse
+                    && !VectorCompare(vec3_origin, (*cl).ps.velocity)
                     && ctx.world.entity(ent).health > 0)
             {
                 //flier using velocity to move

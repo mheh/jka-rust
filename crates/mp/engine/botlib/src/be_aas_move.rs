@@ -68,9 +68,9 @@ pub fn AAS_SetMovedir(bot: &mut BotLib, angles: vec3_t, movedir: *mut vec3_t) {
     const MOVEDIR_DOWN: vec3_t = [0.0, 0.0, -1.0];
 
     unsafe {
-        if VectorCompare(angles, VEC_UP) != 0 {
+        if VectorCompare(angles, VEC_UP) {
             _VectorCopy(MOVEDIR_UP, &mut *movedir);
-        } else if VectorCompare(angles, VEC_DOWN) != 0 {
+        } else if VectorCompare(angles, VEC_DOWN) {
             _VectorCopy(MOVEDIR_DOWN, &mut *movedir);
         } else {
             AngleVectors(angles, Some(&mut *movedir), None, None);

@@ -712,7 +712,7 @@ pub fn NPC_BSFollowLeader(ctx: &mut GameContext) {
             }
             if ctx.world.globals.ucmd.forwardmove != 0
                 || ctx.world.globals.ucmd.rightmove != 0
-                || VectorCompare(vec3_origin, (*npc_client).ps.moveDir) != 0
+                || VectorCompare(vec3_origin, (*npc_client).ps.moveDir)
             {
                 crate::NPC_AI_Jedi::NPC_MoveDirClear(
                     ctx,

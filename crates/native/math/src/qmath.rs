@@ -254,11 +254,9 @@ pub fn Distance(p1: vec3_t, p2: vec3_t) -> vec_t {
 /// Raven `VectorCompare` (header-inline helper).
 /// Returns 1 if vectors are equal, 0 otherwise.
 /// Source: `oracle/codemp/game/q_shared.h:1527-1532`
-pub fn VectorCompare(v1: vec3_t, v2: vec3_t) -> qboolean {
-    if v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2] {
-        return 0;
-    }
-    1
+// Raven returns qboolean; C truthiness call shape maps to a Rust bool (§C7).
+pub fn VectorCompare(v1: vec3_t, v2: vec3_t) -> bool {
+    !(v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2])
 }
 
 /// Raven `VectorClear` (`q_shared.h` macro; canonical home for the per-file
@@ -498,7 +496,8 @@ pub fn PerpendicularVectorSP(dst: &mut vec3_t, src: vec3_t) {
 /// Returns false if the triangle is degenerate. The normal points out of the
 /// clock for clockwise ordered points.
 /// Source: `oracle/codemp/game/q_math.c:384-396`
-pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> qboolean {
+// Raven returns qboolean; C truthiness call shape maps to a Rust bool (§C7).
+pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> bool {
     let d1 = vec_sub(b, a);
     let d2 = vec_sub(c, a);
     let mut n: vec3_t = [0.0; 3];
@@ -508,10 +507,10 @@ pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> q
     plane[1] = n[1];
     plane[2] = n[2];
     if len == 0.0 {
-        return Q_FALSE;
+        return false;
     }
     plane[3] = vec_dot(a, n);
-    Q_TRUE
+    true
 }
 
 /// Raven `RotatePointAroundVector`.
@@ -967,10 +966,11 @@ pub fn vectoyaw(vec: vec3_t) -> f32 {
 /// Raven `VectorBetweenVectors`.
 ///
 /// Source: `oracle/codemp/botlib/be_aas_reach.cpp:1607-1614`
-pub fn VectorBetweenVectors(v: vec3_t, v1: vec3_t, v2: vec3_t) -> c_int {
+// Raven returns int; C truthiness call shape maps to a Rust bool (§C7).
+pub fn VectorBetweenVectors(v: vec3_t, v1: vec3_t, v2: vec3_t) -> bool {
     let dir1: vec3_t = [v[0] - v1[0], v[1] - v1[1], v[2] - v1[2]];
     let dir2: vec3_t = [v[0] - v2[0], v[1] - v2[1], v[2] - v2[2]];
-    (dir1[0] * dir2[0] + dir1[1] * dir2[1] + dir1[2] * dir2[2] <= 0.0) as c_int
+    dir1[0] * dir2[0] + dir1[1] * dir2[1] + dir1[2] * dir2[2] <= 0.0
 }
 
 /// Raven `VectorNPos` — component-wise absolute value.
@@ -985,17 +985,14 @@ pub fn VectorNPos(r#in: vec3_t, out: &mut vec3_t) {
 /// Raven `VectorCompare2` — epsilon (0.0001) component compare.
 ///
 /// Source: `oracle/codemp/game/w_saber.c:5275-5282`
-pub fn VectorCompare2(v1: vec3_t, v2: vec3_t) -> c_int {
-    if v1[0] > v2[0] + 0.0001f32
+// Raven returns int; C truthiness call shape maps to a Rust bool (§C7).
+pub fn VectorCompare2(v1: vec3_t, v2: vec3_t) -> bool {
+    !(v1[0] > v2[0] + 0.0001f32
         || v1[0] < v2[0] - 0.0001f32
         || v1[1] > v2[1] + 0.0001f32
         || v1[1] < v2[1] - 0.0001f32
         || v1[2] > v2[2] + 0.0001f32
-        || v1[2] < v2[2] - 0.0001f32
-    {
-        return 0;
-    }
-    1
+        || v1[2] < v2[2] - 0.0001f32)
 }
 
 /// Raven `VectorAdvance` (`q_shared.h` macro) — lerp `a`→`b` by `s` into `c`.

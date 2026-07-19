@@ -769,7 +769,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
 
         // FLAG (task #7): NPC pool gclient_t (gClPtrs) — deref stays raw.
         let client = ctx.world.entity(npc_id).client;
-        if VectorCompare((*client).ps.velocity, vec3_origin) == qfalse {
+        if !VectorCompare((*client).ps.velocity, vec3_origin) {
             // if moving at all, don't do this
             return;
         }
@@ -788,7 +788,7 @@ pub fn GM_CheckFireState(ctx: &mut GameContext) {
                     let mut dist: f32;
 
                     crate::NPC_utils::CalcEntitySpot(ctx, Some(npc_id), SPOT_HEAD, &mut muzzle);
-                    if VectorCompare(ctx.world.scratch.impact_pos_4, vec3_origin) != 0 {
+                    if VectorCompare(ctx.world.scratch.impact_pos_4, vec3_origin) {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut tr: trace_t = core::mem::zeroed();
                         let mut forward: vec3_t = [0.0; 3];
@@ -1413,7 +1413,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                 1500.0,
                 qtrue,
             );
-            if VectorCompare(vec3_origin, velocity) != 0
+            if VectorCompare(vec3_origin, velocity)
                 || (clearshot == 0
                     && ctx.world.globals.enemyLOS4 != 0
                     && ctx.world.globals.enemyCS4 != 0)

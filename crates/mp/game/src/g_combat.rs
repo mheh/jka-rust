@@ -5495,7 +5495,7 @@ pub fn G_Damage(
                 if (*(*tv).m_pVehicleInfo).r#type != VH_ANIMAL {
                     if !attacker.is_null()
                         && targ != attacker
-                        && VectorCompare((*tc).ps.origin, point) == qfalse
+                        && !VectorCompare((*tc).ps.origin, point)
                         && (*tv).m_LandTrace.fraction >= 1.0
                     {
                         // just took a hit, knock us around
@@ -6290,10 +6290,10 @@ pub fn G_RadiusDamage(
             let roast = !ctx.entity(ent).client.is_null()
                 && roastPeople
                 && missile.is_some_and(|missile_id| {
-                    VectorCompare(
+                    !VectorCompare(
                         ctx.entity(ent).r.currentOrigin,
                         ctx.entity(missile_id).r.currentOrigin,
-                    ) == qfalse
+                    )
                 });
             if roast {
                 let missile_id = missile.unwrap();

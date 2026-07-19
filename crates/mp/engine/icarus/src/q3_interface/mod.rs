@@ -932,7 +932,7 @@ pub fn Q3_Evaluate(
         TK_EQUALS => match p1_type {
             TK_FLOAT => (f1 == f2) as i32,
             TK_INT => (i1 == i2) as i32,
-            TK_VECTOR => VectorCompare(v1, v2),
+            TK_VECTOR => VectorCompare(v1, v2) as i32,
             // `!stricmp` — equal strings compare true.
             TK_STRING | TK_IDENTIFIER => (stricmp(p1, p2) == 0) as i32,
             _ => {
@@ -998,7 +998,7 @@ pub fn Q3_Evaluate(
         TK_NOT => match p1_type {
             TK_FLOAT => (f1 != f2) as i32,
             TK_INT => (i1 != i2) as i32,
-            TK_VECTOR => (VectorCompare(v1, v2) == 0) as i32,
+            TK_VECTOR => (!VectorCompare(v1, v2)) as i32,
             // Raven returns the raw `stricmp` result (nonzero when different).
             TK_STRING | TK_IDENTIFIER => stricmp(p1, p2),
             _ => {
@@ -1244,7 +1244,7 @@ mod tests {
 
     #[test]
     fn vector_compare_is_exact() {
-        assert!(VectorCompare([1.0, 2.0, 3.0], [1.0, 2.0, 3.0]) != 0);
-        assert!(VectorCompare([1.0, 2.0, 3.0], [1.0, 2.0, 3.1]) == 0);
+        assert!(VectorCompare([1.0, 2.0, 3.0], [1.0, 2.0, 3.0]));
+        assert!(!VectorCompare([1.0, 2.0, 3.0], [1.0, 2.0, 3.1]));
     }
 }

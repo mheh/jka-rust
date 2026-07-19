@@ -196,8 +196,7 @@ pub fn NAVNEW_PushBlocker(
     let client = ctx.world.entity(blocker).client;
     // Oracle: `!blocker->client || !VectorCompare(pushVec, vec3_origin)` — bail
     // when the blocker has no client OR is already being pushed elsewhere.
-    if client.is_null() || unsafe { VectorCompare((*client).pushVec, [0.0f32, 0.0, 0.0]) } == qfalse
-    {
+    if client.is_null() || !unsafe { VectorCompare((*client).pushVec, [0.0f32, 0.0, 0.0]) } {
         //someone else is pushing him, wait until they give up?
         return;
     }

@@ -349,7 +349,12 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             DistanceHorizontal(a, b).cbits(),
             DistanceHorizontalSquared(a, b).cbits()
         );
-        let _ = writeln!(o, "vcmp {} {}", VectorCompare(a, b), VectorCompare(a, a));
+        let _ = writeln!(
+            o,
+            "vcmp {} {}",
+            VectorCompare(a, b) as i32,
+            VectorCompare(a, a) as i32
+        );
         {
             let mut t = [0.0; 3];
             CrossProduct(a, b, &mut t);
@@ -441,7 +446,7 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
         {
             let mut pl = [0.0; 4];
             let ok = PlaneFromPoints(&mut pl, a, b, c);
-            let _ = write!(o, "pfp {} ", ok);
+            let _ = write!(o, "pfp {} ", ok as i32);
             v4(o, &pl);
         }
         let _ = writeln!(o, "angsub {:08x}", AngleSubtract(a[0], a[1]).cbits());

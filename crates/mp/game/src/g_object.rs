@@ -123,7 +123,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
         &mut ctx.entity_mut(id).r.currentAngles,
     );
 
-    if VectorCompare(ctx.entity(id).r.currentOrigin, origin) != 0 {
+    if VectorCompare(ctx.entity(id).r.currentOrigin, origin) {
         // error - didn't move at all!
         return;
     }
@@ -206,7 +206,7 @@ pub fn G_RunObject(ctx: &mut GameContext, id: EntityId) {
     let trace_ent = EntityId(tr.entityNum as u32);
 
     if tr.fraction > 0.0f32 || ctx.entity(trace_ent).takedamage != 0 {
-        if VectorCompare(ctx.entity(id).r.currentOrigin, old_org) == 0 {
+        if !VectorCompare(ctx.entity(id).r.currentOrigin, old_org) {
             // moved and impacted
             if ctx.entity(trace_ent).takedamage != 0 {
                 // hurt someone

@@ -1855,7 +1855,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
             return;
         }
 
-        if VectorCompare((*client).ps.velocity, vec3_origin) == qfalse {
+        if !VectorCompare((*client).ps.velocity, vec3_origin) {
             // if moving at all, don't do this
             return;
         }
@@ -1883,7 +1883,7 @@ pub fn ST_CheckFireState(ctx: &mut GameContext) {
                     let mut tooFar = qfalse;
 
                     CalcEntitySpot(ctx, Some(npc_id), SPOT_HEAD, &mut muzzle);
-                    if VectorCompare(ctx.world.globals.impactPos, vec3_origin) != qfalse {
+                    if VectorCompare(ctx.world.globals.impactPos, vec3_origin) {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut forward: vec3_t = [0.0; 3];
                         AngleVectors((*client).ps.viewangles, Some(&mut forward), None, None);

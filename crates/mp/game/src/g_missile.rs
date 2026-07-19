@@ -339,9 +339,9 @@ pub fn G_RunStuckMissile(ctx: &mut GameContext, ent: EntityId) {
         if ground >= 0 && (ground as usize) < ENTITYNUM_WORLD as usize {
             let other = EntityId(ground as u32);
 
-            let delta_moving = VectorCompare(vec3_origin, ctx.entity(other).s.pos.trDelta) == 0
+            let delta_moving = !VectorCompare(vec3_origin, ctx.entity(other).s.pos.trDelta)
                 && ctx.entity(other).s.pos.trType != TR_STATIONARY;
-            let apos_moving = VectorCompare(vec3_origin, ctx.entity(other).s.apos.trDelta) == 0
+            let apos_moving = !VectorCompare(vec3_origin, ctx.entity(other).s.apos.trDelta)
                 && ctx.entity(other).s.apos.trType != TR_STATIONARY;
 
             if delta_moving || apos_moving {
@@ -1189,7 +1189,7 @@ pub fn G_RunMissile(ctx: &mut GameContext, ent: EntityId) {
                     &mut ctx.entity_mut(ent).s.origin2,
                 );
 
-                if VectorCompare(ctx.entity(ent).s.origin, ctx.entity(ent).s.origin2) != 0 {
+                if VectorCompare(ctx.entity(ent).s.origin, ctx.entity(ent).s.origin2) {
                     ctx.entity_mut(ent).s.origin2[2] += 2.0;
                 }
             }

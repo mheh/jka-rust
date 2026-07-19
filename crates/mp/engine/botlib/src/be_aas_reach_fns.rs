@@ -591,7 +591,7 @@ pub fn AAS_ClosestEdgePoints(
         //
         founddist = qfalse;
         //
-        if VectorBetweenVectors(p1, v3, v4) != 0 {
+        if VectorBetweenVectors(p1, v3, v4) {
             dist = Distance(v1, p1);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
                 dist1 = Distance(*beststart1, v1);
@@ -621,7 +621,7 @@ pub fn AAS_ClosestEdgePoints(
             }
             founddist = qtrue;
         }
-        if VectorBetweenVectors(p2, v3, v4) != 0 {
+        if VectorBetweenVectors(p2, v3, v4) {
             dist = Distance(v2, p2);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
                 dist1 = Distance(*beststart1, v2);
@@ -651,7 +651,7 @@ pub fn AAS_ClosestEdgePoints(
             }
             founddist = qtrue;
         }
-        if VectorBetweenVectors(p3, v1, v2) != 0 {
+        if VectorBetweenVectors(p3, v1, v2) {
             dist = Distance(v3, p3);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
                 dist1 = Distance(*beststart1, p3);
@@ -681,7 +681,7 @@ pub fn AAS_ClosestEdgePoints(
             }
             founddist = qtrue;
         }
-        if VectorBetweenVectors(p4, v1, v2) != 0 {
+        if VectorBetweenVectors(p4, v1, v2) {
             dist = Distance(v4, p4);
             if dist > bestdist - 0.5 && dist < bestdist + 0.5 {
                 dist1 = Distance(*beststart1, p4);

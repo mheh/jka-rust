@@ -920,7 +920,7 @@ pub fn G_CheckLookTarget(
                 if !lcc.is_null() {
                     lookOrg = (*lcc).renderInfo.eyePoint;
                 } else if ctx.world.entity(look_cent).inuse != 0
-                    && VectorCompare(ctx.world.entity(look_cent).r.currentOrigin, vec3_origin) == 0
+                    && !VectorCompare(ctx.world.entity(look_cent).r.currentOrigin, vec3_origin)
                 {
                     lookOrg = ctx.world.entity(look_cent).r.currentOrigin;
                 } else {
@@ -1051,7 +1051,7 @@ pub fn G_G2NPCAngles(
 
                 // slowly lerp to this new value; remember last headAngles
                 oldLookAngles = (*sc).renderInfo.lastHeadAngles;
-                if VectorCompare(oldLookAngles, lookAngles) == qfalse {
+                if !VectorCompare(oldLookAngles, lookAngles) {
                     lookAngles[YAW as usize] = oldLookAngles[YAW as usize]
                         + (lookAngles[YAW as usize] - oldLookAngles[YAW as usize]) * 0.4f32;
                 }
@@ -3291,7 +3291,7 @@ pub fn G_SaberFaceCollisionCheck(
         let mut point: vec3_t = [0.0; 3];
         let mut i: c_int = 0;
 
-        if VectorCompare(*atkMins, vec3_origin) != 0 && VectorCompare(*atkMaxs, vec3_origin) != 0 {
+        if VectorCompare(*atkMins, vec3_origin) && VectorCompare(*atkMaxs, vec3_origin) {
             VectorSet(atkMins, -1.0f32, -1.0f32, -1.0f32);
             VectorSet(atkMaxs, 1.0f32, 1.0f32, 1.0f32);
         }
@@ -4276,10 +4276,10 @@ pub fn WP_SaberDamageAdd(
 
         let cv = curVictim as usize;
         g.totalDmg[cv] += trDmg as f32;
-        if VectorCompare(g.dmgDir[cv], vec3_origin) != 0 {
+        if VectorCompare(g.dmgDir[cv], vec3_origin) {
             g.dmgDir[cv] = trDmgDir;
         }
-        if VectorCompare(g.dmgSpot[cv], vec3_origin) != 0 {
+        if VectorCompare(g.dmgSpot[cv], vec3_origin) {
             g.dmgSpot[cv] = trDmgSpot;
         }
         if doDismemberment != 0 {
@@ -6393,7 +6393,7 @@ pub fn G_SPSaberDamageTraceLerped(
         ctx.world.globals.saberHitWall = qfalse;
         ctx.world.globals.saberHitSaber = qfalse;
         ctx.world.globals.saberHitFraction = 1.0f32;
-        if VectorCompare2(baseOld, *baseNew) != 0 && VectorCompare2(endOld, *endNew) != 0 {
+        if VectorCompare2(baseOld, *baseNew) && VectorCompare2(endOld, *endNew) {
             //no diff
             CheckSaberDamage(
                 ctx,
@@ -9237,7 +9237,7 @@ pub fn G_KickTrace(
         //FIXME: variable kick height?
         // Raven null-checks the `kickEnd` array param; by-value `vec3_t` can't be
         // NULL, so callers pass `vec3_origin` for Raven NULL (same branch taken).
-        if VectorCompare(kickEnd, vec3_origin) == 0 {
+        if !VectorCompare(kickEnd, vec3_origin) {
             //they passed us the end point of the trace, just use that
             //this makes the trace flat
             traceOrg = [

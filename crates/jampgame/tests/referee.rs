@@ -68,11 +68,11 @@ use std::path::{Path, PathBuf};
 
 use common::reflog::{self, Scenario};
 use common::{
-    referee_arm, referee_begin_frame, referee_error, referee_frame_syscall_digest,
-    referee_frame_syscalls, referee_import_name, referee_install_real_world, referee_load,
-    referee_clear_cmd, referee_locate, referee_reset, referee_set_cmd, referee_set_cvar,
-    referee_set_map, referee_set_usercmd,
-    referee_set_userinfo, referee_vm_call, run_on_engine_thread_fn, LocateData,
+    referee_arm, referee_begin_frame, referee_clear_cmd, referee_error,
+    referee_frame_syscall_digest, referee_frame_syscalls, referee_import_name,
+    referee_install_real_world, referee_load, referee_locate, referee_reset, referee_set_cmd,
+    referee_set_cvar, referee_set_map, referee_set_usercmd, referee_set_userinfo, referee_vm_call,
+    run_on_engine_thread_fn, LocateData,
 };
 
 use mp_abi::game::exports::MpGameExport;
