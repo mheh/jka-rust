@@ -16,6 +16,9 @@ use mp_qshared::common::mp::qcommon::qtime::qtime_t;
 use mp_qshared::shared::cvar::cvar_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::MAX_TOKEN_CHARS;
+use mp_qshared::shared::q_string::{
+    COM_DefaultExtension, Q_strcmp, Q_stricmp, Q_stricmpn, Q_strncpyz,
+};
 use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, MAX_QPATH, Q3_VERSION};
 
 use crate::collision_world::CollisionWorld;
@@ -303,8 +306,8 @@ pub fn Com_SafeMode(common: &mut Common) -> qboolean {
     for i in 0..common.com_numConsoleLines as usize {
         crate::cmd_common::Cmd_TokenizeString(common, common.com_consoleLines[i]);
         let argv0 = crate::cmd_common::Cmd_Argv(common, 0);
-        if q_stricmp(argv0, c"safe".as_ptr() as *mut c_char) == 0
-            || q_stricmp(argv0, c"cvar_restart".as_ptr() as *mut c_char) == 0
+        if Q_stricmp(argv0, c"safe".as_ptr()) == 0
+            || Q_stricmp(argv0, c"cvar_restart".as_ptr()) == 0
         {
             unsafe {
                 *common.com_consoleLines[i] = 0;
@@ -475,11 +478,11 @@ pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: *const c_char) {
     for i in 0..view.common.com_numConsoleLines as usize {
         crate::cmd_common::Cmd_TokenizeString(view.common, view.common.com_consoleLines[i]);
         let argv0 = crate::cmd_common::Cmd_Argv(view.common, 0);
-        if q_strcmp(argv0, c"set".as_ptr() as *mut c_char) != 0 {
+        if Q_strcmp(argv0, c"set".as_ptr()) != 0 {
             continue;
         }
         let s = crate::cmd_common::Cmd_Argv(view.common, 1);
-        if r#match.is_null() || q_strcmp(s, r#match as *mut c_char) == 0 {
+        if r#match.is_null() || Q_strcmp(s, r#match) == 0 {
             let arg2 = crate::cmd_common::Cmd_Argv(view.common, 2);
             Cvar_Set(view, s, arg2);
             let cv: *mut cvar_t = Cvar_Get(view, s, c"".as_ptr() as *mut c_char, 0);
@@ -503,7 +506,7 @@ pub fn Com_AddStartupCommands(common: &mut Common) -> qboolean {
             continue;
         }
         // set commands won't override menu startup
-        if q_stricmpn(line, c"set".as_ptr() as *mut c_char, 3) != 0 {
+        if Q_stricmpn(line, c"set".as_ptr(), 3) != 0 {
             added = qtrue;
         }
         crate::cmd_common::Cbuf_AddText(common, line);
@@ -927,15 +930,15 @@ pub fn Com_WriteConfig_f(view: &mut EngineHostView) {
         return;
     }
 
-    q_strncpyz(
+    Q_strncpyz(
         filename.as_mut_ptr(),
         crate::cmd_common::Cmd_Argv(view.common, 1),
-        core::mem::size_of_val(&filename),
+        core::mem::size_of_val(&filename) as c_int,
     );
-    com_default_extension(
+    COM_DefaultExtension(
         filename.as_mut_ptr(),
-        core::mem::size_of_val(&filename),
-        ".cfg",
+        core::mem::size_of_val(&filename) as c_int,
+        c".cfg".as_ptr(),
     );
     crate::common::com_printf(
         view.common,
@@ -2037,59 +2040,6 @@ unsafe fn libc_strlen(p: *const c_char) -> usize {
 
 fn to_upper(c: c_char) -> c_char {
     (c as u8 as char).to_ascii_uppercase() as c_char
-}
-
-fn q_stricmp(a: *mut c_char, b: *mut c_char) -> c_int {
-    unsafe {
-        let sa = c_str_to_string(a).to_ascii_lowercase();
-        let sb = c_str_to_string(b).to_ascii_lowercase();
-        sa.cmp(&sb) as c_int
-    }
-}
-
-fn q_stricmpn(a: *mut c_char, b: *mut c_char, n: usize) -> c_int {
-    unsafe {
-        let sa: String = c_str_to_string(a)
-            .chars()
-            .take(n)
-            .collect::<String>()
-            .to_ascii_lowercase();
-        let sb: String = c_str_to_string(b)
-            .chars()
-            .take(n)
-            .collect::<String>()
-            .to_ascii_lowercase();
-        sa.cmp(&sb) as c_int
-    }
-}
-
-fn q_strcmp(a: *mut c_char, b: *mut c_char) -> c_int {
-    unsafe { c_str_to_string(a).cmp(&c_str_to_string(b)) as c_int }
-}
-
-fn q_strncpyz(dest: *mut c_char, src: *mut c_char, destsize: usize) {
-    unsafe {
-        let s = c_str_to_string(src);
-        let bytes = s.as_bytes();
-        let n = bytes.len().min(destsize.saturating_sub(1));
-        for i in 0..n {
-            *dest.add(i) = bytes[i] as c_char;
-        }
-        *dest.add(n) = 0;
-    }
-}
-
-fn com_default_extension(path: *mut c_char, _size: usize, ext: &str) {
-    unsafe {
-        let s = c_str_to_string(path);
-        if !s.contains('.') {
-            let out = format!("{s}{ext}");
-            for (i, b) in out.as_bytes().iter().enumerate() {
-                *path.add(i) = *b as c_char;
-            }
-            *path.add(out.len()) = 0;
-        }
-    }
 }
 
 /// `Q_random(&seed)` external (qshared LCG surface) — packet-cited external,
