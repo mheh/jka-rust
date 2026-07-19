@@ -1534,7 +1534,7 @@ fn FS_ListFilteredFiles(
                     let name = (*buildBuffer.add(i as usize)).name;
                     if !filter.is_null() {
                         // case insensitive
-                        if Com_FilterPath(filter, name, qfalse) == 0 {
+                        if !Com_FilterPath(filter, name, false) {
                             continue;
                         }
                         nfiles = FS_AddFileToList(view, name, &mut list, nfiles);

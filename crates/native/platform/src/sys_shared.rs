@@ -20,201 +20,12 @@ use core::ffi::{c_char, c_int, c_void};
 use std::ffi::CStr;
 use std::sync::OnceLock;
 
-use native_types::{qboolean, qfalse, qtrue, MAX_QPATH};
+use native_string::filter::Com_FilterPathBytes;
+use native_types::{qboolean, qfalse, qtrue};
 
 /// `MAX_FOUND_FILES` — Raven's stack list cap in `Sys_ListFiles`.
 /// Source: `oracle/codemp/unix/unix_shared.cpp:103`
 const MAX_FOUND_FILES: usize = 0x1000;
-
-/// `MAX_TOKEN_CHARS` — `Com_Filter`'s wildcard-segment buffer size.
-/// Source: `oracle/codemp/game/q_shared.h:382`
-const MAX_TOKEN_CHARS: usize = 1024;
-
-// ===========================================================================
-// Pure glob matching — a native copy of qcommon's `Com_Filter` family.
-//
-// `Sys_ListFiles`'s filter branch (`Sys_ListFilteredFiles`) calls
-// `Com_FilterPath`, which lives in `qcommon/common.cpp`. native_platform is a
-// base-tier crate below qcommon, so it cannot reach the ported symbol; the
-// matcher is a pure algorithm (no engine state), so it is transcribed here
-// verbatim to keep the native `Sys_ListFiles` self-contained and faithful.
-// ===========================================================================
-
-/// `toupper`, matching the ported `to_upper` helper.
-/// Source: `oracle/codemp/qcommon/common.cpp` (`Com_Filter` uses `toupper`).
-fn to_upper(c: c_char) -> c_char {
-    (c as u8).to_ascii_uppercase() as c_char
-}
-
-/// `strlen` over a raw `c_char` pointer.
-unsafe fn c_strlen(p: *const c_char) -> usize {
-    let mut n = 0usize;
-    while *p.add(n) != 0 {
-        n += 1;
-    }
-    n
-}
-
-/// `Com_StringContains`.
-///
-/// Source: `oracle/codemp/qcommon/common.cpp:551-578`
-fn Com_StringContains(
-    mut str1: *mut c_char,
-    str2: *mut c_char,
-    casesensitive: c_int,
-) -> *mut c_char {
-    unsafe {
-        let len1 = c_strlen(str1);
-        let len2 = c_strlen(str2);
-        let len = len1 as isize - len2 as isize;
-        let mut i = 0isize;
-        while i <= len {
-            let mut j = 0isize;
-            while *str2.offset(j) != 0 {
-                if casesensitive != 0 {
-                    if *str1.offset(j) != *str2.offset(j) {
-                        break;
-                    }
-                } else if to_upper(*str1.offset(j)) != to_upper(*str2.offset(j)) {
-                    break;
-                }
-                j += 1;
-            }
-            if *str2.offset(j) == 0 {
-                return str1;
-            }
-            i += 1;
-            str1 = str1.add(1);
-        }
-    }
-    core::ptr::null_mut()
-}
-
-/// `Com_Filter`.
-///
-/// Source: `oracle/codemp/qcommon/common.cpp:585-658`
-fn Com_Filter(mut filter: *mut c_char, mut name: *mut c_char, casesensitive: c_int) -> c_int {
-    let mut buf = [0 as c_char; MAX_TOKEN_CHARS];
-    unsafe {
-        while *filter != 0 {
-            if *filter == b'*' as c_char {
-                filter = filter.add(1);
-                let mut i = 0usize;
-                while *filter != 0 {
-                    if *filter == b'*' as c_char || *filter == b'?' as c_char {
-                        break;
-                    }
-                    buf[i] = *filter;
-                    filter = filter.add(1);
-                    i += 1;
-                }
-                buf[i] = 0;
-                if c_strlen(buf.as_ptr()) > 0 {
-                    let ptr = Com_StringContains(name, buf.as_mut_ptr(), casesensitive);
-                    if ptr.is_null() {
-                        return qfalse;
-                    }
-                    name = ptr.add(c_strlen(buf.as_ptr()));
-                }
-            } else if *filter == b'?' as c_char {
-                filter = filter.add(1);
-                name = name.add(1);
-            } else if *filter == b'[' as c_char && *filter.add(1) == b'[' as c_char {
-                filter = filter.add(1);
-            } else if *filter == b'[' as c_char {
-                filter = filter.add(1);
-                let mut found = qfalse;
-                while *filter != 0 && found == qfalse {
-                    if *filter == b']' as c_char && *filter.add(1) != b']' as c_char {
-                        break;
-                    }
-                    if *filter.add(1) == b'-' as c_char
-                        && *filter.add(2) != 0
-                        && (*filter.add(2) != b']' as c_char || *filter.add(3) == b']' as c_char)
-                    {
-                        if casesensitive != 0 {
-                            if *name >= *filter && *name <= *filter.add(2) {
-                                found = qtrue;
-                            }
-                        } else if to_upper(*name) >= to_upper(*filter)
-                            && to_upper(*name) <= to_upper(*filter.add(2))
-                        {
-                            found = qtrue;
-                        }
-                        filter = filter.add(3);
-                    } else {
-                        if casesensitive != 0 {
-                            if *filter == *name {
-                                found = qtrue;
-                            }
-                        } else if to_upper(*filter) == to_upper(*name) {
-                            found = qtrue;
-                        }
-                        filter = filter.add(1);
-                    }
-                }
-                if found == qfalse {
-                    return qfalse;
-                }
-                while *filter != 0 {
-                    if *filter == b']' as c_char && *filter.add(1) != b']' as c_char {
-                        break;
-                    }
-                    filter = filter.add(1);
-                }
-                filter = filter.add(1);
-                name = name.add(1);
-            } else {
-                if casesensitive != 0 {
-                    if *filter != *name {
-                        return qfalse;
-                    }
-                } else if to_upper(*filter) != to_upper(*name) {
-                    return qfalse;
-                }
-                filter = filter.add(1);
-                name = name.add(1);
-            }
-        }
-    }
-    qtrue
-}
-
-/// `Com_FilterPath`.
-///
-/// Source: `oracle/codemp/qcommon/common.cpp:665-690`
-fn Com_FilterPath(filter: *mut c_char, name: *mut c_char, casesensitive: c_int) -> c_int {
-    let mut new_filter = [0 as c_char; MAX_QPATH];
-    let mut new_name = [0 as c_char; MAX_QPATH];
-    unsafe {
-        let mut i = 0usize;
-        while i < MAX_QPATH - 1 && *filter.add(i) != 0 {
-            new_filter[i] = if *filter.add(i) == b'\\' as c_char || *filter.add(i) == b':' as c_char
-            {
-                b'/' as c_char
-            } else {
-                *filter.add(i)
-            };
-            i += 1;
-        }
-        new_filter[i] = 0;
-        let mut i = 0usize;
-        while i < MAX_QPATH - 1 && *name.add(i) != 0 {
-            new_name[i] = if *name.add(i) == b'\\' as c_char || *name.add(i) == b':' as c_char {
-                b'/' as c_char
-            } else {
-                *name.add(i)
-            };
-            i += 1;
-        }
-        new_name[i] = 0;
-    }
-    Com_Filter(
-        new_filter.as_mut_ptr(),
-        new_name.as_mut_ptr(),
-        casesensitive,
-    )
-}
 
 // ===========================================================================
 // Directory scanning
@@ -310,7 +121,11 @@ unsafe fn Sys_ListFilteredFiles(
             Ok(c) => c,
             Err(_) => continue,
         };
-        if Com_FilterPath(filter, relname_c.as_ptr() as *mut c_char, qfalse) == qfalse {
+        if !Com_FilterPathBytes(
+            CStr::from_ptr(filter).to_bytes(),
+            relname_c.to_bytes(),
+            false,
+        ) {
             continue;
         }
         list.push(libc::strdup(relname_c.as_ptr()));

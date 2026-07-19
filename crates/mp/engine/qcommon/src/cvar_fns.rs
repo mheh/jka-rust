@@ -734,7 +734,7 @@ pub fn Cvar_List_f(common: &mut Common) {
                 continue;
             }
 
-            if !r#match.is_null() && Com_Filter(r#match, (*cur).name, qfalse) == 0 {
+            if !r#match.is_null() && !Com_Filter(r#match, (*cur).name, false) {
                 continue;
             }
 

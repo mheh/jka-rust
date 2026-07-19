@@ -115,7 +115,7 @@ pub fn Cmd_List_f(common: &mut Common) {
     let mut cmd: *mut cmd_function_t = common.cmd_functions;
     while !cmd.is_null() {
         unsafe {
-            if !match_.is_null() && Com_Filter(match_, (*cmd).name as *mut c_char, 0) == 0 {
+            if !match_.is_null() && !Com_Filter(match_, (*cmd).name as *mut c_char, false) {
                 cmd = (*cmd).next;
                 continue;
             }

@@ -13,6 +13,9 @@ libloading = "0.8"
 # Raven-free scalar/handle primitives (`qboolean`, `fileHandle_t`, `MAX_QPATH`)
 # the native `Sys_*` platform surface is written in terms of.
 native_types = { path = "../types" }
+# Canonical string runtime (DEC-32): `Sys_ListFiles`'s filter branch calls the
+# `Com_FilterPath` glob matcher from here.
+native_string = { path = "../string" }
 # The deliberately-native OS surface (`Sys_ListFiles`/`Sys_Mkdir`/default paths/
 # `Sys_UnloadDll`) is a direct libc transcription of Raven's unix tree.
 libc = "0.2"
