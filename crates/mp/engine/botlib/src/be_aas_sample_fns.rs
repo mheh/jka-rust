@@ -28,9 +28,10 @@ use crate::aasfile::aas_node_s::aas_node_t;
 use crate::aasfile::aas_plane_s::aas_plane_t;
 use crate::aasfile::face_flags::FACE_GROUND;
 use crate::aasfile::presence_type::{PRESENCE_CROUCH, PRESENCE_NONE, PRESENCE_NORMAL};
-use crate::be_aas_bspq3::be_aas_bspq3_cpp_consts::ON_EPSILON;
 use crate::be_aas_def::aas_link_s::aas_link_t;
-use crate::be_aas_sample::be_aas_sample_cpp_consts::{BBOX_NORMAL_EPSILON, TRACEPLANE_EPSILON};
+use crate::be_aas_sample::be_aas_sample_cpp_consts::{
+    BBOX_NORMAL_EPSILON, ON_EPSILON, TRACEPLANE_EPSILON,
+};
 use crate::BotLib;
 
 // Raven's `DotProduct`/`VectorCopy`/`VectorSubtract`/`VectorClear`/`VectorMA`/
