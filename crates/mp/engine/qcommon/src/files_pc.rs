@@ -598,12 +598,8 @@ pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
 pub fn FS_SV_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
     let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
-        let testpath = crate::files_common::FS_BuildOSPath4(
-            common,
-            homepath.as_ptr(),
-            file,
-            c"".as_ptr(),
-        );
+        let testpath =
+            crate::files_common::FS_BuildOSPath4(common, homepath.as_ptr(), file, c"".as_ptr());
         let len = libc::strlen(testpath);
         *testpath.add(len - 1) = 0;
 
@@ -717,12 +713,8 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
 
     let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
-        let ospath = crate::files_common::FS_BuildOSPath4(
-            common,
-            homepath.as_ptr(),
-            filename,
-            c"".as_ptr(),
-        );
+        let ospath =
+            crate::files_common::FS_BuildOSPath4(common, homepath.as_ptr(), filename, c"".as_ptr());
         let len = libc::strlen(ospath);
         *ospath.add(len - 1) = 0;
 
@@ -1288,8 +1280,7 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
             // we drop "base" "." and ".."
             if !name_str.eq_ignore_ascii_case(BASEGAME) && !name_str.starts_with('.') {
                 // now we need to find some .pk3 files to validate the mod
-                let mut path =
-                    FS_BuildOSPath4(view.common, basepath.as_ptr(), name, c"".as_ptr());
+                let mut path = FS_BuildOSPath4(view.common, basepath.as_ptr(), name, c"".as_ptr());
                 let mut n_paks: c_int = 0;
                 let mut p_paks = Sys_ListFiles(
                     path,

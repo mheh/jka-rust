@@ -1817,7 +1817,12 @@ pub fn FS_Startup(view: &mut EngineHostView, gameName: &str) {
     let installpath_default = unsafe { CStr::from_ptr(Sys_DefaultInstallPath()) }
         .to_string_lossy()
         .into_owned();
-    view.common.fs_basepath = Some(Cvar_Get(view, "fs_basepath", &installpath_default, CVAR_INIT));
+    view.common.fs_basepath = Some(Cvar_Get(
+        view,
+        "fs_basepath",
+        &installpath_default,
+        CVAR_INIT,
+    ));
     view.common.fs_basegame = Some(Cvar_Get(view, "fs_basegame", "", CVAR_INIT));
 
     let default_home = Sys_DefaultHomePath();
@@ -1857,14 +1862,22 @@ pub fn FS_Startup(view: &mut EngineHostView, gameName: &str) {
     if !basepath.is_empty() {
         FS_AddGameDirectory(view, basepath_c.as_ptr(), game_name_c.as_ptr());
     }
-    if !basepath.is_empty() && !homepath.as_bytes().eq_ignore_ascii_case(basepath.as_bytes()) {
+    if !basepath.is_empty()
+        && !homepath
+            .as_bytes()
+            .eq_ignore_ascii_case(basepath.as_bytes())
+    {
         FS_AddGameDirectory(view, homepath_c.as_ptr(), game_name_c.as_ptr());
     }
 
     // additional base game so mods can be based upon other mods
     if !fs_basegame.is_empty()
-        && gameName.as_bytes().eq_ignore_ascii_case(basegame.as_bytes())
-        && !fs_basegame.as_bytes().eq_ignore_ascii_case(gameName.as_bytes())
+        && gameName
+            .as_bytes()
+            .eq_ignore_ascii_case(basegame.as_bytes())
+        && !fs_basegame
+            .as_bytes()
+            .eq_ignore_ascii_case(gameName.as_bytes())
     {
         if !cdpath.is_empty() {
             FS_AddGameDirectory(view, cdpath_c.as_ptr(), fs_basegame_c.as_ptr());
@@ -1872,15 +1885,23 @@ pub fn FS_Startup(view: &mut EngineHostView, gameName: &str) {
         if !basepath.is_empty() {
             FS_AddGameDirectory(view, basepath_c.as_ptr(), fs_basegame_c.as_ptr());
         }
-        if !homepath.is_empty() && !homepath.as_bytes().eq_ignore_ascii_case(basepath.as_bytes()) {
+        if !homepath.is_empty()
+            && !homepath
+                .as_bytes()
+                .eq_ignore_ascii_case(basepath.as_bytes())
+        {
             FS_AddGameDirectory(view, homepath_c.as_ptr(), fs_basegame_c.as_ptr());
         }
     }
 
     // additional game folder for mods
     if !gamedirvar.is_empty()
-        && gameName.as_bytes().eq_ignore_ascii_case(basegame.as_bytes())
-        && !gamedirvar.as_bytes().eq_ignore_ascii_case(gameName.as_bytes())
+        && gameName
+            .as_bytes()
+            .eq_ignore_ascii_case(basegame.as_bytes())
+        && !gamedirvar
+            .as_bytes()
+            .eq_ignore_ascii_case(gameName.as_bytes())
     {
         if !cdpath.is_empty() {
             FS_AddGameDirectory(view, cdpath_c.as_ptr(), gamedirvar_c.as_ptr());
@@ -1888,7 +1909,11 @@ pub fn FS_Startup(view: &mut EngineHostView, gameName: &str) {
         if !basepath.is_empty() {
             FS_AddGameDirectory(view, basepath_c.as_ptr(), gamedirvar_c.as_ptr());
         }
-        if !homepath.is_empty() && !homepath.as_bytes().eq_ignore_ascii_case(basepath.as_bytes()) {
+        if !homepath.is_empty()
+            && !homepath
+                .as_bytes()
+                .eq_ignore_ascii_case(basepath.as_bytes())
+        {
             FS_AddGameDirectory(view, homepath_c.as_ptr(), gamedirvar_c.as_ptr());
         }
     }

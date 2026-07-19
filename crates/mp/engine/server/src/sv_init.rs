@@ -680,7 +680,9 @@ pub fn SV_SpawnServer(
     SV_SendMapChange(view, sv);
 
     // set serverinfo visible name
-    let server_s = unsafe { CStr::from_ptr(server) }.to_string_lossy().into_owned();
+    let server_s = unsafe { CStr::from_ptr(server) }
+        .to_string_lossy()
+        .into_owned();
     Cvar_Set(view, "mapname", &server_s);
 
     Cvar_Set(view, "sv_mapChecksum", &format!("{checksum}"));
@@ -840,7 +842,8 @@ pub fn SV_SpawnServer(
     }
 
     // save systeminfo and serverinfo strings
-    let systeminfo_big = Cvar_InfoString_Big(view.common, mp_qshared::shared::cvar::CVAR_SYSTEMINFO);
+    let systeminfo_big =
+        Cvar_InfoString_Big(view.common, mp_qshared::shared::cvar::CVAR_SYSTEMINFO);
     let systeminfo_big_c = CString::new(systeminfo_big.as_str()).unwrap_or_default();
     Q_strncpyz(
         systemInfo.as_mut_ptr(),
@@ -985,10 +988,7 @@ pub fn SV_Init(view: &mut EngineHostView) {
     Cvar_Get(
         view,
         "protocol",
-        &format!(
-            "{}",
-            mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION
-        ),
+        &format!("{}", mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION),
         mp_qshared::shared::cvar::CVAR_SERVERINFO | mp_qshared::shared::cvar::CVAR_ROM,
     );
     view.common.sv_mapname = Some(Cvar_Get(
@@ -1116,12 +1116,7 @@ pub fn SV_Init(view: &mut EngineHostView) {
         "2",
         mp_qshared::shared::cvar::CVAR_TEMP,
     ));
-    Cvar_Get(
-        view,
-        "nextmap",
-        "",
-        mp_qshared::shared::cvar::CVAR_TEMP,
-    );
+    Cvar_Get(view, "nextmap", "", mp_qshared::shared::cvar::CVAR_TEMP);
 
     // (Xbox master/download exclusion branch not taken; retail non-Xbox path kept)
     view.common.sv_allowDownload = Some(Cvar_Get(
@@ -1132,12 +1127,7 @@ pub fn SV_Init(view: &mut EngineHostView) {
     ));
     // `MASTER_SERVER_NAME` (`qcommon/protocol.rs`) as a c-string cvar default,
     // matching the inline-literal precedent of the sibling sv_masterN defaults.
-    view.common.sv_master[0] = Some(Cvar_Get(
-        view,
-        "sv_master1",
-        "masterjk3.ravensoft.com",
-        0,
-    ));
+    view.common.sv_master[0] = Some(Cvar_Get(view, "sv_master1", "masterjk3.ravensoft.com", 0));
     view.common.sv_master[1] = Some(Cvar_Get(
         view,
         "sv_master2",

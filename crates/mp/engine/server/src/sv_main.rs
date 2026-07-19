@@ -216,7 +216,9 @@ pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut clien
             .collect();
         let expanded = unsafe {
             let expanded = SV_ExpandNewlines(sv, message.as_mut_ptr());
-            core::ffi::CStr::from_ptr(expanded).to_string_lossy().into_owned()
+            core::ffi::CStr::from_ptr(expanded)
+                .to_string_lossy()
+                .into_owned()
         };
         com_printf(common, &format!("broadcast: {}\n", expanded));
     }
@@ -554,7 +556,9 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             c"gametype".as_ptr(),
             va(
                 c"%i".as_ptr(),
-                &[FmtArg::Int(view.common.cvar(view.common.sv_gametype).integer)],
+                &[FmtArg::Int(
+                    view.common.cvar(view.common.sv_gametype).integer,
+                )],
             ),
         );
         Info_SetValueForKey(
@@ -562,7 +566,9 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             c"needpass".as_ptr(),
             va(
                 c"%i".as_ptr(),
-                &[FmtArg::Int(view.common.cvar(view.common.sv_needpass).integer)],
+                &[FmtArg::Int(
+                    view.common.cvar(view.common.sv_needpass).integer,
+                )],
             ),
         );
         Info_SetValueForKey(
@@ -607,7 +613,9 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
                 c"minPing".as_ptr(),
                 va(
                     c"%i".as_ptr(),
-                    &[FmtArg::Int(view.common.cvar(view.common.sv_minPing).integer)],
+                    &[FmtArg::Int(
+                        view.common.cvar(view.common.sv_minPing).integer,
+                    )],
                 ),
             );
         }
@@ -617,12 +625,18 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
                 c"maxPing".as_ptr(),
                 va(
                     c"%i".as_ptr(),
-                    &[FmtArg::Int(view.common.cvar(view.common.sv_maxPing).integer)],
+                    &[FmtArg::Int(
+                        view.common.cvar(view.common.sv_maxPing).integer,
+                    )],
                 ),
             );
         }
         if !gamedir.is_empty() {
-            Info_SetValueForKey(infostring.as_mut_ptr(), c"game".as_ptr(), gamedir_c.as_ptr());
+            Info_SetValueForKey(
+                infostring.as_mut_ptr(),
+                c"game".as_ptr(),
+                gamedir_c.as_ptr(),
+            );
         }
 
         NET_OutOfBandPrint(
@@ -996,8 +1010,8 @@ pub fn SV_CheckCvars(view: &mut EngineHostView, sv: &mut Server) {
         let mut hostname = [0 as c_char; MAX_INFO_STRING];
         sv.sv_check_cvars_last_mod = view.common.cvar(view.common.sv_hostname).modificationCount;
 
-        let sv_hostname_c =
-            CString::new(view.common.cvar(view.common.sv_hostname).string.as_str()).unwrap_or_default();
+        let sv_hostname_c = CString::new(view.common.cvar(view.common.sv_hostname).string.as_str())
+            .unwrap_or_default();
         unsafe {
             strcpy(hostname.as_mut_ptr(), sv_hostname_c.as_ptr());
             let mut ci: usize = 0;
@@ -1054,7 +1068,6 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
     let frame_msec = 1000 / view.common.cvar(view.common.sv_fps).integer;
 
     unsafe {
-
         // Engine referee: RECORD appends `F <msec>`; REPLAY forces msec from the
         // tape so timeResidual (and thus the game-run cadence and sv.svs.time)
         // evolves identically to the recorded run. On tape end it schedules a

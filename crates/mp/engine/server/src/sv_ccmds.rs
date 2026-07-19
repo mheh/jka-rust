@@ -902,7 +902,11 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
         let mut mapname = [0 as c_char; MAX_QPATH as usize];
         let mapname_str = Cvar_VariableString(view.common, "mapname");
         let mapname_c = CString::new(mapname_str).unwrap_or_default();
-        Q_strncpyz(mapname.as_mut_ptr(), mapname_c.as_ptr(), mapname.len() as c_int);
+        Q_strncpyz(
+            mapname.as_mut_ptr(),
+            mapname_c.as_ptr(),
+            mapname.len() as c_int,
+        );
 
         com_printf(view.common, "variable change -- restarting.\n");
 

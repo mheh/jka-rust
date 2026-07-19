@@ -907,7 +907,10 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 let password =
                     Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
                 let sv_privatePassword_c = CString::new(
-                    view.common.cvar(view.common.sv_privatePassword).string.as_str(),
+                    view.common
+                        .cvar(view.common.sv_privatePassword)
+                        .string
+                        .as_str(),
                 )
                 .unwrap_or_default();
                 let start_index: c_int = if strcmp(password, sv_privatePassword_c.as_ptr()) == 0 {

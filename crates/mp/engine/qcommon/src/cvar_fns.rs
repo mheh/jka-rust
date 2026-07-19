@@ -73,11 +73,13 @@ pub fn Cvar_ValidateString(s: &str) -> bool {
 /// linked set with Raven's `Q_stricmp` ASCII-case fold.
 /// Source: `oracle/codemp/qcommon/cvar.cpp:83-96`
 pub fn Cvar_FindVar(common: &Common, var_name: &str) -> Option<CvarHandle> {
-    common
-        .cvar_vars
-        .iter()
-        .copied()
-        .find(|&h| common.cvar(h).name.as_bytes().eq_ignore_ascii_case(var_name.as_bytes()))
+    common.cvar_vars.iter().copied().find(|&h| {
+        common
+            .cvar(h)
+            .name
+            .as_bytes()
+            .eq_ignore_ascii_case(var_name.as_bytes())
+    })
 }
 
 /// Raven `Cvar_VariableValue`.
@@ -436,7 +438,11 @@ pub fn Cvar_Command(view: &mut EngineHostView) -> bool {
     let name = view.common.cvar(h).name.clone();
     if value.as_bytes().first() == Some(&b'!') {
         // toggle
-        let nv = if view.common.cvar(h).value == 0.0 { 1 } else { 0 };
+        let nv = if view.common.cvar(h).value == 0.0 {
+            1
+        } else {
+            0
+        };
         Cvar_Set2(view, &name, Some(&format!("{nv}")), false); // toggle the value
     } else {
         Cvar_Set2(view, &name, Some(&value), false); // set the value if forcing isn't required
@@ -625,15 +631,31 @@ pub fn Cvar_List_f(common: &mut Common) {
             } else {
                 ' '
             });
-            line.push(if (cur.flags & CVAR_ROM) != 0 { 'R' } else { ' ' });
-            line.push(if (cur.flags & CVAR_INIT) != 0 { 'I' } else { ' ' });
+            line.push(if (cur.flags & CVAR_ROM) != 0 {
+                'R'
+            } else {
+                ' '
+            });
+            line.push(if (cur.flags & CVAR_INIT) != 0 {
+                'I'
+            } else {
+                ' '
+            });
             line.push(if (cur.flags & CVAR_ARCHIVE) != 0 {
                 'A'
             } else {
                 ' '
             });
-            line.push(if (cur.flags & CVAR_LATCH) != 0 { 'L' } else { ' ' });
-            line.push(if (cur.flags & CVAR_CHEAT) != 0 { 'C' } else { ' ' });
+            line.push(if (cur.flags & CVAR_LATCH) != 0 {
+                'L'
+            } else {
+                ' '
+            });
+            line.push(if (cur.flags & CVAR_CHEAT) != 0 {
+                'C'
+            } else {
+                ' '
+            });
             line.push_str(&format!(" {} \"{}\"\n", cur.name, cur.string));
             line
         };

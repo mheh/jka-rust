@@ -269,24 +269,23 @@ impl RealWorld {
             // Point fs_basepath at the assets dir BEFORE FS_Startup reads it.
             // Cvar_Get keeps this value when FS_Startup re-registers the cvar
             // with its platform default (cvar_fns.rs:230-272).
-            let bp = CString::new(basepath).expect("basepath cstring");
-            Cvar_Get(&mut view, c"fs_basepath".as_ptr(), bp.as_ptr(), CVAR_INIT);
+            Cvar_Get(&mut view, "fs_basepath", basepath, CVAR_INIT);
             FS_InitFilesystem(&mut view);
 
-            let ded = Cvar_Get(&mut view, c"dedicated".as_ptr(), c"0".as_ptr(), 0);
-            view.common.com_dedicated = ded;
+            let ded = Cvar_Get(&mut view, "dedicated", "0", 0);
+            view.common.com_dedicated = Some(ded);
             // The trace path dereferences `com_terrainPhysics` directly
-            // (cm_trace.rs:1216); an unregistered (null) field aborts. Register
-            // it exactly as `Com_Init` does (common_fns.rs:1662). The routed
-            // arms' other `com_*` reads are null-safe (`com_optvehtrace` via
-            // name lookup; `com_RMG` behind an `is_null` guard), so only this
-            // one is required.
-            view.common.com_terrainPhysics = Cvar_Get(
+            // (cm_trace.rs:1216); an unregistered (`None`) field aborts.
+            // Register it exactly as `Com_Init` does (common_fns.rs:1662). The
+            // routed arms' other `com_*` reads are null-safe
+            // (`com_optvehtrace` via name lookup; `com_RMG` behind a
+            // registered-guard), so only this one is required.
+            view.common.com_terrainPhysics = Some(Cvar_Get(
                 &mut view,
-                c"com_terrainPhysics".as_ptr(),
-                c"1".as_ptr(),
+                "com_terrainPhysics",
+                "1",
                 mp_qshared::shared::cvar::CVAR_CHEAT,
-            );
+            ));
             Com_InitHunkMemory(&mut view);
 
             let map = CString::new(map_bsp).expect("map cstring");

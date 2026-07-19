@@ -330,11 +330,10 @@ pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: *const c_char) {
             let s_str = unsafe { core::ffi::CStr::from_ptr(s) }
                 .to_string_lossy()
                 .into_owned();
-            let arg2 = unsafe {
-                core::ffi::CStr::from_ptr(crate::cmd_common::Cmd_Argv(view.common, 2))
-            }
-            .to_string_lossy()
-            .into_owned();
+            let arg2 =
+                unsafe { core::ffi::CStr::from_ptr(crate::cmd_common::Cmd_Argv(view.common, 2)) }
+                    .to_string_lossy()
+                    .into_owned();
             Cvar_Set(view, &s_str, &arg2);
             let cv = Cvar_Get(view, &s_str, "", 0);
             view.common.cvar_mut(cv).flags |= CVAR_USER_CREATED;
@@ -1459,8 +1458,12 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         view.common.com_vmdebug = Some(Cvar_Get(view, "vmdebug", "0", CVAR_TEMP));
         view.common.com_logfile = Some(Cvar_Get(view, "logfile", "0", CVAR_TEMP));
 
-        view.common.com_timescale =
-            Some(Cvar_Get(view, "timescale", "1", CVAR_CHEAT | CVAR_SYSTEMINFO));
+        view.common.com_timescale = Some(Cvar_Get(
+            view,
+            "timescale",
+            "1",
+            CVAR_CHEAT | CVAR_SYSTEMINFO,
+        ));
         view.common.com_fixedtime = Some(Cvar_Get(view, "fixedtime", "0", CVAR_CHEAT));
         view.common.com_showtrace = Some(Cvar_Get(view, "com_showtrace", "0", CVAR_CHEAT));
 

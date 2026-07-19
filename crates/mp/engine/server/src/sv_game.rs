@@ -3712,7 +3712,12 @@ pub fn SV_GameSystemCalls(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1731-1756`
 pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
-    let var = Cvar_Get(view, "bot_enable", "1", mp_qshared::shared::cvar::CVAR_LATCH);
+    let var = Cvar_Get(
+        view,
+        "bot_enable",
+        "1",
+        mp_qshared::shared::cvar::CVAR_LATCH,
+    );
     view.common.bot_enable = view.common.cvar(var).integer;
 
     if Cvar_VariableValue(view, "fs_restrict") == 0.0

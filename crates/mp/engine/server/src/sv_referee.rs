@@ -1494,8 +1494,8 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     view.common.ref_seed_pin = 0;
     view.common.ref_seed_used = 0;
 
-    let record = cvar_string(view, "ref_record");
-    let replay = cvar_string(view, "ref_replay");
+    let record = Cvar_VariableString(view.common, "ref_record").to_string();
+    let replay = Cvar_VariableString(view.common, "ref_replay").to_string();
     let follow = Cvar_VariableIntegerValue(view.common, "ref_follow") != 0;
     let ref_seed = Cvar_VariableIntegerValue(view.common, "ref_seed");
     let fps = Cvar_VariableIntegerValue(view.common, "sv_fps");
@@ -1552,7 +1552,7 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     }
 
     // Wire tap, armed independently of record/replay.
-    let snaps = cvar_string(view, "ref_snaps");
+    let snaps = Cvar_VariableString(view.common, "ref_snaps").to_string();
     if !snaps.is_empty() {
         match File::create(&snaps) {
             Ok(f) => {
@@ -1573,7 +1573,7 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     ref_sys_reset(sv);
 
     // Syscall-stream dump (`ref_calls <file>`), armed independently.
-    let calls = cvar_string(view, "ref_calls");
+    let calls = Cvar_VariableString(view.common, "ref_calls").to_string();
     if !calls.is_empty() {
         match File::create(&calls) {
             Ok(f) => {
@@ -1589,8 +1589,7 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
 
     // Divergence policy + the halt back-channel (`<tape>.halt`). The record
     // side clears any stale halt file so a fresh session never boots frozen.
-    sv.referee.halt_on_diverge =
-        Cvar_VariableIntegerValue(view.common, "ref_haltOnDiverge") != 0;
+    sv.referee.halt_on_diverge = Cvar_VariableIntegerValue(view.common, "ref_haltOnDiverge") != 0;
     let tape_path = if !replay.is_empty() {
         Some(replay.clone())
     } else if !record.is_empty() {
@@ -1629,11 +1628,6 @@ pub fn ref_spawn_write_header(view: &mut EngineHostView, sv: &mut Server, map: &
     let maxclients = view.common.cvar(view.common.sv_maxclients).integer;
     let seed = view.common.ref_seed_used;
     ref_record_header(sv, map, fps, maxclients, seed);
-}
-
-/// The value of cvar `name` as an owned `String` (empty if unset/blank).
-fn cvar_string(view: &mut EngineHostView, name: &str) -> String {
-    Cvar_VariableString(view.common, name).to_string()
 }
 
 /// Parse tape text into records.

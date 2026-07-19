@@ -604,13 +604,17 @@ impl Common {
     /// both `CvarHandle` and the cached `Option<CvarHandle>` fields directly;
     /// an unregistered `None` panics where Raven's null deref would crash.
     pub fn cvar(&self, h: impl Into<Option<CvarHandle>>) -> &cvar_t {
-        let h = h.into().expect("cvar read through an unregistered handle (Raven null cvar_t*)");
+        let h = h
+            .into()
+            .expect("cvar read through an unregistered handle (Raven null cvar_t*)");
         &self.cvar_indexes[h.slot()]
     }
 
     /// Mutable twin of [`Common::cvar`] — Raven's write through a `cvar_t*`.
     pub fn cvar_mut(&mut self, h: impl Into<Option<CvarHandle>>) -> &mut cvar_t {
-        let h = h.into().expect("cvar write through an unregistered handle (Raven null cvar_t*)");
+        let h = h
+            .into()
+            .expect("cvar write through an unregistered handle (Raven null cvar_t*)");
         &mut self.cvar_indexes[h.slot()]
     }
 

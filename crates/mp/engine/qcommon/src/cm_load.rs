@@ -1302,8 +1302,7 @@ pub fn CM_LoadMap_Actual(
         // (but not if this gets ported to a big-endian machine, because some
         // of the map data will have been Little-Long'd, but some hasn't).
         //
-        if Sys_LowPhysicalMemory() != 0
-            || view.common.cvar(view.common.com_dedicated).integer != 0
+        if Sys_LowPhysicalMemory() != 0 || view.common.cvar(view.common.com_dedicated).integer != 0
         {
             unsafe {
                 Z_Free(view.common, view.cm.gpvCachedMapDiskImage);

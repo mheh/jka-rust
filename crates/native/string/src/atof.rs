@@ -36,7 +36,11 @@ pub fn atof_bytes(bytes: &[u8]) -> f64 {
 
     let rest = &bytes[i..];
     if starts_with_ignore_case(rest, b"infinity") || starts_with_ignore_case(rest, b"inf") {
-        return if neg { f64::NEG_INFINITY } else { f64::INFINITY };
+        return if neg {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
     }
     if starts_with_ignore_case(rest, b"nan") {
         // strtod sets the NaN sign bit for "-nan"; no caller distinguishes it.
