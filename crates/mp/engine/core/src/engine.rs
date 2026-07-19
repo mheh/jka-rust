@@ -150,6 +150,12 @@ impl Engine {
             // Common.cmd_functions: Vec-backed registered-command list
             // (String-field migration), not zero-valid.
             addr_of_mut!((*p).common.cmd_functions).write(Vec::new());
+            // Common.cvar_indexes / cvar_vars: Vec-backed cvar slot arena +
+            // enumeration order (String-field migration), not zero-valid. The
+            // cached Option<CvarHandle> fields are NonZero-niche zero-valid
+            // (all None) under the alloc_zeroed mass.
+            addr_of_mut!((*p).common.cvar_indexes).write(Vec::new());
+            addr_of_mut!((*p).common.cvar_vars).write(Vec::new());
             // Common.hooks (ruling 2026-07-12): the qcommon->server/client/sound
             // upcall table. Option<fn> is null-niche zero-valid (all None under
             // the alloc_zeroed mass), but boot installs the null-build client/

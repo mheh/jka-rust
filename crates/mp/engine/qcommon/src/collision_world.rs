@@ -3,7 +3,7 @@
 use core::ffi::{c_char, c_int, c_uint};
 
 use mp_qshared::shared::collision::cplane_t;
-use mp_qshared::shared::cvar::cvar_t;
+use mp_qshared::shared::cvar::CvarHandle;
 use mp_qshared::shared::limits::MAX_SUB_BSP;
 use mp_qshared::shared::qboolean;
 use mp_qshared::shared::surface_flags::MATERIAL_LAST;
@@ -158,12 +158,13 @@ pub struct CollisionWorld {
 
     /// Raven `cvar_t *cm_noAreas` / `*cm_noCurves` / `*cm_playerCurveClip` —
     /// cheat cvars gating area-portal culling, patch collision, and player
-    /// curve clipping.
+    /// curve clipping (cached registration handles into `Common.cvar_indexes`;
+    /// `None` = Raven's not-yet-registered null).
     ///
     /// Source: `oracle/codemp/qcommon/cm_local.h:223-225`
-    pub cm_noAreas: *mut cvar_t,
-    pub cm_noCurves: *mut cvar_t,
-    pub cm_playerCurveClip: *mut cvar_t,
+    pub cm_noAreas: Option<CvarHandle>,
+    pub cm_noCurves: Option<CvarHandle>,
+    pub cm_playerCurveClip: Option<CvarHandle>,
 
     /// Raven `void *gpvCachedMapDiskImage` / `char gsCachedMapDiskImage[MAX_QPATH]`
     /// / `qboolean gbUsingCachedMapDataRightNow` — the cached-map-diskimage

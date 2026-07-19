@@ -4,11 +4,11 @@ use core::ffi::{c_char, c_int};
 use std::time::Instant;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
-use mp_qshared::shared::cvar::cvar_t;
+use mp_qshared::shared::cvar::{cvar_t, CvarHandle};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::limits::{
-    BIG_INFO_STRING, MAX_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
+    BIG_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
 };
 use mp_qshared::shared::{qboolean, qtrue};
 
@@ -28,7 +28,6 @@ use super::qrand::QRand;
 use super::sys_event_queue::SysEventQueue;
 use crate::cmd::cmd_consts::MAX_CMD_BUFFER;
 use crate::common::common_consts::{MAX_CONSOLE_LINES, MAX_PUSHED_EVENTS};
-use crate::cvar::cvar_consts::{FILE_HASH_SIZE, MAX_CVARS};
 use crate::files::file_handle_data_t::fileHandleData_t;
 use crate::files::files_consts::MAX_SEARCH_PATHS;
 use crate::files::searchpath_s::searchpath_t;
@@ -229,69 +228,70 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:33`
     pub logfile: fileHandle_t,
-    /// Raven `com_*` cvar pointers.
+    /// Raven `com_*` cvar pointers — cached registration handles into
+    /// `cvar_indexes` (`None` = Raven's not-yet-registered null).
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:37-75`
-    pub com_speeds: *mut cvar_t,
-    pub com_viewlog: *mut cvar_t,
-    pub com_developer: *mut cvar_t,
-    pub com_vmdebug: *mut cvar_t,
-    pub com_dedicated: *mut cvar_t,
-    pub com_timescale: *mut cvar_t,
-    pub com_fixedtime: *mut cvar_t,
-    pub com_dropsim: *mut cvar_t,
-    pub com_journal: *mut cvar_t,
-    pub com_maxfps: *mut cvar_t,
-    pub com_timedemo: *mut cvar_t,
-    pub com_sv_running: *mut cvar_t,
-    pub com_cl_running: *mut cvar_t,
-    pub com_logfile: *mut cvar_t,
-    pub com_showtrace: *mut cvar_t,
-    pub com_optvehtrace: *mut cvar_t,
-    pub com_G2Report: *mut cvar_t,
-    pub com_terrainPhysics: *mut cvar_t,
-    pub com_version: *mut cvar_t,
-    pub com_blood: *mut cvar_t,
-    pub com_buildScript: *mut cvar_t,
-    pub com_introPlayed: *mut cvar_t,
-    pub cl_paused: *mut cvar_t,
-    pub sv_paused: *mut cvar_t,
-    pub com_cameraMode: *mut cvar_t,
-    pub com_RMG: *mut cvar_t,
-    pub com_validateZone: *mut cvar_t,
+    pub com_speeds: Option<CvarHandle>,
+    pub com_viewlog: Option<CvarHandle>,
+    pub com_developer: Option<CvarHandle>,
+    pub com_vmdebug: Option<CvarHandle>,
+    pub com_dedicated: Option<CvarHandle>,
+    pub com_timescale: Option<CvarHandle>,
+    pub com_fixedtime: Option<CvarHandle>,
+    pub com_dropsim: Option<CvarHandle>,
+    pub com_journal: Option<CvarHandle>,
+    pub com_maxfps: Option<CvarHandle>,
+    pub com_timedemo: Option<CvarHandle>,
+    pub com_sv_running: Option<CvarHandle>,
+    pub com_cl_running: Option<CvarHandle>,
+    pub com_logfile: Option<CvarHandle>,
+    pub com_showtrace: Option<CvarHandle>,
+    pub com_optvehtrace: Option<CvarHandle>,
+    pub com_G2Report: Option<CvarHandle>,
+    pub com_terrainPhysics: Option<CvarHandle>,
+    pub com_version: Option<CvarHandle>,
+    pub com_blood: Option<CvarHandle>,
+    pub com_buildScript: Option<CvarHandle>,
+    pub com_introPlayed: Option<CvarHandle>,
+    pub cl_paused: Option<CvarHandle>,
+    pub sv_paused: Option<CvarHandle>,
+    pub com_cameraMode: Option<CvarHandle>,
+    pub com_RMG: Option<CvarHandle>,
+    pub com_validateZone: Option<CvarHandle>,
     /// Raven `server.h` `sv_maxclients` cvar pointer.
     ///
     /// Source: `oracle/codemp/server/server.h:244`
-    pub sv_maxclients: *mut cvar_t,
+    pub sv_maxclients: Option<CvarHandle>,
     /// Raven `sv_main.cpp` server file-scope `cvar_t*` globals (the `sv_*` set),
     /// homed on `Common` alongside `sv_maxclients`/`sv_paused`.
     ///
     /// Source: `oracle/codemp/server/sv_main.cpp:14-42`; `server.h:238-264`
-    pub sv_fps: *mut cvar_t,
-    pub sv_timeout: *mut cvar_t,
-    pub sv_zombietime: *mut cvar_t,
-    pub sv_rconPassword: *mut cvar_t,
-    pub sv_privatePassword: *mut cvar_t,
-    pub sv_privateClients: *mut cvar_t,
-    pub sv_hostname: *mut cvar_t,
-    pub sv_allowDownload: *mut cvar_t,
+    pub sv_fps: Option<CvarHandle>,
+    pub sv_timeout: Option<CvarHandle>,
+    pub sv_zombietime: Option<CvarHandle>,
+    pub sv_rconPassword: Option<CvarHandle>,
+    pub sv_privatePassword: Option<CvarHandle>,
+    pub sv_privateClients: Option<CvarHandle>,
+    pub sv_hostname: Option<CvarHandle>,
+    pub sv_allowDownload: Option<CvarHandle>,
     /// `cvar_t *sv_master[MAX_MASTER_SERVERS]` (MAX_MASTER_SERVERS == 5).
-    pub sv_master: [*mut cvar_t; 5],
-    pub sv_reconnectlimit: *mut cvar_t,
-    pub sv_showghoultraces: *mut cvar_t,
-    pub sv_showloss: *mut cvar_t,
-    pub sv_padPackets: *mut cvar_t,
-    pub sv_killserver: *mut cvar_t,
-    pub sv_mapname: *mut cvar_t,
-    pub sv_mapChecksum: *mut cvar_t,
-    pub sv_serverid: *mut cvar_t,
-    pub sv_maxRate: *mut cvar_t,
-    pub sv_minPing: *mut cvar_t,
-    pub sv_maxPing: *mut cvar_t,
-    pub sv_gametype: *mut cvar_t,
-    pub sv_pure: *mut cvar_t,
-    pub sv_floodProtect: *mut cvar_t,
-    pub sv_needpass: *mut cvar_t,
+    pub sv_master: [Option<CvarHandle>; 5],
+    pub sv_reconnectlimit: Option<CvarHandle>,
+    pub sv_showghoultraces: Option<CvarHandle>,
+    pub sv_showloss: Option<CvarHandle>,
+    pub sv_padPackets: Option<CvarHandle>,
+    pub sv_killserver: Option<CvarHandle>,
+    pub sv_mapname: Option<CvarHandle>,
+    pub sv_mapChecksum: Option<CvarHandle>,
+    pub sv_serverid: Option<CvarHandle>,
+    pub sv_maxRate: Option<CvarHandle>,
+    pub sv_minPing: Option<CvarHandle>,
+    pub sv_maxPing: Option<CvarHandle>,
+    pub sv_gametype: Option<CvarHandle>,
+    pub sv_pure: Option<CvarHandle>,
+    pub sv_floodProtect: Option<CvarHandle>,
+    pub sv_needpass: Option<CvarHandle>,
     /// Raven `SV_AddOperatorCommands`'s `static qboolean initialized` guard
     /// (fn-static hoist).
     ///
@@ -358,46 +358,28 @@ pub struct Common {
     pub cmd_functions: Vec<crate::cmd::cmd_function_t::cmd_function_t>,
 
     // ---- `cvar.cpp` ----
-    /// Raven `cvar_vars` — head of the registered-cvar linked list.
+    /// Raven `cvar_vars` — the registered-cvar linked list, owned (index 0 =
+    /// Raven's head-inserted list head). Not zero-valid: written through
+    /// `Engine::new`'s LIFE-Q9 in-place init.
     ///
     /// Source: `oracle/codemp/qcommon/cvar.cpp:6`
-    pub cvar_vars: *mut cvar_t,
+    pub cvar_vars: Vec<CvarHandle>,
     /// Raven `cvar_cheats` — cached `sv_cheats` cvar (set by `Cvar_Init`).
     ///
     /// Source: `oracle/codemp/qcommon/cvar.cpp:7`
-    pub cvar_cheats: *mut cvar_t,
+    pub cvar_cheats: Option<CvarHandle>,
     /// Raven `cvar_modifiedFlags`.
     ///
     /// Source: `oracle/codemp/qcommon/cvar.cpp:8`
     pub cvar_modifiedFlags: c_int,
-    /// Raven `cvar_indexes[MAX_CVARS]` — the static cvar storage pool.
+    /// Raven `cvar_indexes[MAX_CVARS]` — the cvar slot arena, owned. Slot order
+    /// is allocation order and never reused (a `cvar_restart` clears
+    /// user-created slots in place), so indices are Raven's `cvarHandle_t`
+    /// values. Not zero-valid: written through `Engine::new`'s LIFE-Q9 in-place
+    /// init.
     ///
-    /// Source: `oracle/codemp/qcommon/cvar.cpp:11`
-    pub cvar_indexes: [cvar_t; MAX_CVARS],
-    /// Raven `cvar_numIndexes` — count of used `cvar_indexes` slots.
-    ///
-    /// Source: `oracle/codemp/qcommon/cvar.cpp:12`
-    pub cvar_numIndexes: c_int,
-    /// Raven `static cvar_t *hashTable[FILE_HASH_SIZE]` — cvar-name hash chains.
-    ///
-    /// Source: `oracle/codemp/qcommon/cvar.cpp:15`
-    pub cvar_hashTable: [*mut cvar_t; FILE_HASH_SIZE],
-    /// Raven `Cvar_FreeString`'s file-static `lastMemPool`/`memPoolSize` — the
-    /// last `Cvar_Defrag` pool; strings inside it are not individually freed.
-    ///
-    /// Source: `oracle/codemp/qcommon/cvar.cpp:20-21`
-    pub cvar_lastMemPool: *mut c_char,
-    pub cvar_memPoolSize: c_int,
-    /// Raven `Cvar_InfoString`'s `static char info[MAX_INFO_STRING]` return
-    /// buffer (fork-3 return-buffer static → owning host field).
-    ///
-    /// Source: `oracle/codemp/qcommon/cvar.cpp:812`
-    pub cvar_info_string: [c_char; MAX_INFO_STRING],
-    /// Raven `Cvar_InfoString_Big`'s `static char info[BIG_INFO_STRING]`
-    /// return buffer (fork-3 return-buffer static → owning host field).
-    ///
-    /// Source: `oracle/codemp/qcommon/cvar.cpp:855`
-    pub cvar_info_string_big: [c_char; BIG_INFO_STRING],
+    /// Source: `oracle/codemp/qcommon/cvar.cpp:11-12`
+    pub cvar_indexes: Vec<cvar_t>,
 
     // ---- filesystem (`files_common.cpp` / `files_pc.cpp`) ----
     /// Raven `fs_searchpaths` / `fsh[MAX_FILE_HANDLES]`.
@@ -405,21 +387,21 @@ pub struct Common {
     /// Source: `oracle/codemp/qcommon/files_common.cpp:193,279`
     pub fs_searchpaths: *mut searchpath_t,
     pub fsh: [fileHandleData_t; MAX_FILE_HANDLES],
-    /// Raven `fs_*` cvar pointers.
+    /// Raven `fs_*` cvar pointers (cached registration handles).
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:184-241`
-    pub fs_debug: *mut cvar_t,
-    pub fs_basepath: *mut cvar_t,
-    pub fs_cdpath: *mut cvar_t,
-    pub fs_homepath: *mut cvar_t,
-    pub fs_gamedirvar: *mut cvar_t,
+    pub fs_debug: Option<CvarHandle>,
+    pub fs_basepath: Option<CvarHandle>,
+    pub fs_cdpath: Option<CvarHandle>,
+    pub fs_homepath: Option<CvarHandle>,
+    pub fs_gamedirvar: Option<CvarHandle>,
     /// Raven `fs_basegame`/`fs_copyfiles`/`fs_restrict`/`fs_dirbeforepak` cvars.
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:187-192`
-    pub fs_basegame: *mut cvar_t,
-    pub fs_copyfiles: *mut cvar_t,
-    pub fs_restrict: *mut cvar_t,
-    pub fs_dirbeforepak: *mut cvar_t,
+    pub fs_basegame: Option<CvarHandle>,
+    pub fs_copyfiles: Option<CvarHandle>,
+    pub fs_restrict: Option<CvarHandle>,
+    pub fs_dirbeforepak: Option<CvarHandle>,
     /// Raven `fs_readCount`/`fs_loadCount`/`fs_packFiles` byte/file counters.
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:194-197`
@@ -617,6 +599,29 @@ pub struct Common {
     pub ref_seed_used: c_int,
 }
 
+impl Common {
+    /// Live read of a registered cvar slot — Raven's `cvar_t*` deref. Accepts
+    /// both `CvarHandle` and the cached `Option<CvarHandle>` fields directly;
+    /// an unregistered `None` panics where Raven's null deref would crash.
+    pub fn cvar(&self, h: impl Into<Option<CvarHandle>>) -> &cvar_t {
+        let h = h.into().expect("cvar read through an unregistered handle (Raven null cvar_t*)");
+        &self.cvar_indexes[h.slot()]
+    }
+
+    /// Mutable twin of [`Common::cvar`] — Raven's write through a `cvar_t*`.
+    pub fn cvar_mut(&mut self, h: impl Into<Option<CvarHandle>>) -> &mut cvar_t {
+        let h = h.into().expect("cvar write through an unregistered handle (Raven null cvar_t*)");
+        &mut self.cvar_indexes[h.slot()]
+    }
+
+    /// [`Common::cvar`]'s string as an owned `CString` — the bridge into
+    /// still-C consumers (the FS path builders); retires with the files-crate
+    /// string migration.
+    pub fn cvar_cstring(&self, h: impl Into<Option<CvarHandle>>) -> std::ffi::CString {
+        std::ffi::CString::new(self.cvar(h).string.as_str()).unwrap()
+    }
+}
+
 /// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching the FS field sizes).
 ///
 /// Source: `oracle/codemp/qcommon/q_shared.h` (`MAX_OSPATH`)
@@ -681,7 +686,7 @@ pub fn com_printf(common: &mut Common, msg: &str) {
 
     // logfile
     unsafe {
-        if !common.com_logfile.is_null() && (*common.com_logfile).integer != 0 {
+        if common.com_logfile.is_some() && common.cvar(common.com_logfile).integer != 0 {
             if common.logfile == 0 && FS_Initialized(common) == qtrue {
                 let mut aclock: libc::time_t = 0;
                 libc::time(&mut aclock);
@@ -712,7 +717,7 @@ pub fn com_printf(common: &mut Common, msg: &str) {
                 let lf = FS_FOpenFileWrite(common, c"qconsole.log".as_ptr());
                 common.logfile = lf;
                 com_printf(common, &format!("logfile opened on {asc}\n"));
-                if (*common.com_logfile).integer > 1 {
+                if common.cvar(common.com_logfile).integer > 1 {
                     // force it to not buffer so we get valid data even if we
                     // are crashing
                     let h = common.logfile;

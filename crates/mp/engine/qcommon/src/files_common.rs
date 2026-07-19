@@ -15,6 +15,7 @@
 //! Source: `oracle/codemp/qcommon/files_common.cpp`
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_void, CStr};
+use std::ffi::CString;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -171,7 +172,7 @@ pub fn FS_BuildOSPath(common: &mut Common, mut qpath: *const c_char) -> *mut c_c
         FS_ReplaceSeparators(temp.as_mut_ptr());
 
         let toggle = common.fs_build_os_path_toggle as usize;
-        let base_str = core::ffi::CStr::from_ptr((*common.fs_basepath).string).to_string_lossy();
+        let base_str = common.cvar(common.fs_basepath).string.clone();
         let temp_str = core::ffi::CStr::from_ptr(temp.as_ptr()).to_string_lossy();
         let ospath_ptr = common.fs_build_os_path_buf[toggle].as_mut_ptr();
         Com_sprintf(
@@ -304,8 +305,7 @@ pub fn FS_InitFilesystem(view: &mut EngineHostView) {
         Com_StartupVariable(view, c"fs_restrict".as_ptr());
 
         // try to start up normally
-        let basegame = std::ffi::CString::new(BASEGAME).unwrap();
-        FS_Startup(view, basegame.as_ptr());
+        FS_Startup(view, BASEGAME);
         view.common.initialized = qtrue;
 
         // see if we are going to allow add-ons
@@ -323,14 +323,16 @@ pub fn FS_InitFilesystem(view: &mut EngineHostView) {
             );
         }
 
+        let basepath = view.common.cvar_cstring(view.common.fs_basepath);
         Q_strncpyz(
             view.common.lastValidBase.as_mut_ptr(),
-            (*view.common.fs_basepath).string,
+            basepath.as_ptr(),
             view.common.lastValidBase.len() as c_int,
         );
+        let gamedirvar = view.common.cvar_cstring(view.common.fs_gamedirvar);
         Q_strncpyz(
             view.common.lastValidGame.as_mut_ptr(),
-            (*view.common.fs_gamedirvar).string,
+            gamedirvar.as_ptr(),
             view.common.lastValidGame.len() as c_int,
         );
 
@@ -578,15 +580,16 @@ pub fn FS_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fileHa
     let f = FS_HandleForFile(common);
     common.fsh[f as usize].zipFile = qfalse;
 
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
         let ospath = FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             common.fs_gamedir.as_ptr(),
             filename,
         );
 
-        if (*common.fs_debug).integer != 0 {
+        if common.cvar(common.fs_debug).integer != 0 {
             com_printf(common, &format!("FS_FOpenFileWrite: {}\n", cstr(ospath)));
         }
 
@@ -639,11 +642,11 @@ pub fn FS_SV_FOpenFileRead(
         // don't let sound stutter (null build: no-op)
 
         // search homepath
-        let mut ospath =
-            FS_BuildOSPath4(common, (*common.fs_homepath).string, filename, c"".as_ptr());
+        let homepath = common.cvar_cstring(common.fs_homepath);
+        let mut ospath = FS_BuildOSPath4(common, homepath.as_ptr(), filename, c"".as_ptr());
         *ospath.add(libc::strlen(ospath) - 1) = 0;
 
-        if (*common.fs_debug).integer != 0 {
+        if common.cvar(common.fs_debug).integer != 0 {
             com_printf(
                 common,
                 &format!("FS_SV_FOpenFileRead (fs_homepath): {}\n", cstr(ospath)),
@@ -655,13 +658,18 @@ pub fn FS_SV_FOpenFileRead(
         common.fsh[f as usize].handleSync = qfalse;
         if common.fsh[f as usize].handleFiles.file.o.is_null() {
             // NOTE: on non-*nix fs_homepath == fs_basepath
-            if Q_stricmp((*common.fs_homepath).string, (*common.fs_basepath).string) != 0 {
+            if !common
+                .cvar(common.fs_homepath)
+                .string
+                .as_bytes()
+                .eq_ignore_ascii_case(common.cvar(common.fs_basepath).string.as_bytes())
+            {
                 // search basepath
-                ospath =
-                    FS_BuildOSPath4(common, (*common.fs_basepath).string, filename, c"".as_ptr());
+                let basepath = common.cvar_cstring(common.fs_basepath);
+                ospath = FS_BuildOSPath4(common, basepath.as_ptr(), filename, c"".as_ptr());
                 *ospath.add(libc::strlen(ospath) - 1) = 0;
 
-                if (*common.fs_debug).integer != 0 {
+                if common.cvar(common.fs_debug).integer != 0 {
                     com_printf(
                         common,
                         &format!("FS_SV_FOpenFileRead (fs_basepath): {}\n", cstr(ospath)),
@@ -680,10 +688,11 @@ pub fn FS_SV_FOpenFileRead(
 
         if common.fsh[f as usize].handleFiles.file.o.is_null() {
             // search cd path
-            ospath = FS_BuildOSPath4(common, (*common.fs_cdpath).string, filename, c"".as_ptr());
+            let cdpath = common.cvar_cstring(common.fs_cdpath);
+            ospath = FS_BuildOSPath4(common, cdpath.as_ptr(), filename, c"".as_ptr());
             *ospath.add(libc::strlen(ospath) - 1) = 0;
 
-            if (*common.fs_debug).integer != 0 {
+            if common.cvar(common.fs_debug).integer != 0 {
                 com_printf(
                     common,
                     &format!("FS_SV_FOpenFileRead (fs_cdpath) : {}\n", cstr(ospath)),
@@ -905,7 +914,7 @@ pub fn FS_FOpenFileRead(
                             unzOpenCurrentFile(common.fsh[*file as usize].handleFiles.file.z);
                             common.fsh[*file as usize].zipFilePos = (*pakFile).pos as i32;
 
-                            if (*common.fs_debug).integer != 0 {
+                            if common.cvar(common.fs_debug).integer != 0 {
                                 com_printf(
                                     common,
                                     &format!(
@@ -925,7 +934,8 @@ pub fn FS_FOpenFileRead(
                 } else if !(*search).dir.is_null() {
                     // check a file in the directory tree
                     let l = libc::strlen(filename) as c_int;
-                    if (*common.fs_restrict).integer != 0 || common.fs_numServerPaks != 0 {
+                    if common.cvar(common.fs_restrict).integer != 0 || common.fs_numServerPaks != 0
+                    {
                         if Q_stricmp(filename.offset((l - 4) as isize), c".cfg".as_ptr()) != 0
                             && Q_stricmp(filename.offset((l - 4) as isize), c".fcf".as_ptr()) != 0
                             && Q_stricmp(filename.offset((l - 5) as isize), c".menu".as_ptr()) != 0
@@ -978,7 +988,7 @@ pub fn FS_FOpenFileRead(
                         common.fsh[*file as usize].name.len() as c_int,
                     );
                     common.fsh[*file as usize].zipFile = qfalse;
-                    if (*common.fs_debug).integer != 0 {
+                    if common.cvar(common.fs_debug).integer != 0 {
                         com_printf(
                             common,
                             &format!(
@@ -1132,7 +1142,9 @@ pub fn FS_ReadFile(view: &mut EngineHostView, qpath: *const c_char, buffer: *mut
         let isConfig: qboolean;
         if !libc::strstr(qpath, c".cfg".as_ptr()).is_null() {
             isConfig = qtrue;
-            if !view.common.com_journal.is_null() && (*view.common.com_journal).integer == 2 {
+            if view.common.com_journal.is_some()
+                && view.common.cvar(view.common.com_journal).integer == 2
+            {
                 Com_DPrintf(
                     view.common,
                     &format!("Loading {} from journal file.\n", cstr(qpath)),
@@ -1197,8 +1209,8 @@ pub fn FS_ReadFile(view: &mut EngineHostView, qpath: *const c_char, buffer: *mut
                 *buffer = core::ptr::null_mut();
             }
             if isConfig != qfalse
-                && !view.common.com_journal.is_null()
-                && (*view.common.com_journal).integer == 1
+                && view.common.com_journal.is_some()
+                && view.common.cvar(view.common.com_journal).integer == 1
             {
                 Com_DPrintf(
                     view.common,
@@ -1218,8 +1230,8 @@ pub fn FS_ReadFile(view: &mut EngineHostView, qpath: *const c_char, buffer: *mut
 
         if buffer.is_null() {
             if isConfig != qfalse
-                && !view.common.com_journal.is_null()
-                && (*view.common.com_journal).integer == 1
+                && view.common.com_journal.is_some()
+                && view.common.cvar(view.common.com_journal).integer == 1
             {
                 Com_DPrintf(
                     view.common,
@@ -1251,8 +1263,8 @@ pub fn FS_ReadFile(view: &mut EngineHostView, qpath: *const c_char, buffer: *mut
 
         // if journalling a config file, write it to the journal file
         if isConfig != qfalse
-            && !view.common.com_journal.is_null()
-            && (*view.common.com_journal).integer == 1
+            && view.common.com_journal.is_some()
+            && view.common.cvar(view.common.com_journal).integer == 1
         {
             Com_DPrintf(
                 view.common,
@@ -1575,10 +1587,11 @@ fn FS_ListFilteredFiles(
                 }
             } else if !(*search).dir.is_null() {
                 // don't scan directories for files if we are pure or restricted
-                if ((*view.common.fs_restrict).integer != 0 || view.common.fs_numServerPaks != 0)
+                if (view.common.cvar(view.common.fs_restrict).integer != 0
+                    || view.common.fs_numServerPaks != 0)
                     && (extension.is_null()
                         || Q_stricmp(extension, c"fcf".as_ptr()) != 0
-                        || (*view.common.fs_restrict).integer != 0)
+                        || view.common.cvar(view.common.fs_restrict).integer != 0)
                 {
                     // rww - allow scanning for fcf files outside of pak even if pure
                     search = (*search).next;
@@ -1766,8 +1779,8 @@ pub fn FS_AddGameDirectory(view: &mut EngineHostView, path: *const c_char, dir: 
             ) as *mut searchpath_t;
             (*search).pack = pak;
 
-            if !view.common.fs_dirbeforepak.is_null()
-                && (*view.common.fs_dirbeforepak).integer != 0
+            if view.common.fs_dirbeforepak.is_some()
+                && view.common.cvar(view.common.fs_dirbeforepak).integer != 0
                 && !thedir.is_null()
             {
                 let mut oldnext = (*thedir).next;
@@ -1792,158 +1805,130 @@ pub fn FS_AddGameDirectory(view: &mut EngineHostView, path: *const c_char, dir: 
 /// Raven `FS_Startup`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2483-2576`
-pub fn FS_Startup(view: &mut EngineHostView, gameName: *const c_char) {
+pub fn FS_Startup(view: &mut EngineHostView, gameName: &str) {
     com_printf(view.common, "----- FS_Startup -----\n");
 
-    view.common.fs_debug = Cvar_Get(view, c"fs_debug".as_ptr(), c"0".as_ptr(), 0);
-    view.common.fs_copyfiles = Cvar_Get(view, c"fs_copyfiles".as_ptr(), c"0".as_ptr(), CVAR_INIT);
-    view.common.fs_cdpath = Cvar_Get(view, c"fs_cdpath".as_ptr(), Sys_DefaultCDPath(), CVAR_INIT);
-    view.common.fs_basepath = Cvar_Get(
-        view,
-        c"fs_basepath".as_ptr(),
-        Sys_DefaultInstallPath(),
-        CVAR_INIT,
-    );
-    view.common.fs_basegame = Cvar_Get(view, c"fs_basegame".as_ptr(), c"".as_ptr(), CVAR_INIT);
+    view.common.fs_debug = Some(Cvar_Get(view, "fs_debug", "0", 0));
+    view.common.fs_copyfiles = Some(Cvar_Get(view, "fs_copyfiles", "0", CVAR_INIT));
+    let cdpath_default = unsafe { CStr::from_ptr(Sys_DefaultCDPath()) }
+        .to_string_lossy()
+        .into_owned();
+    view.common.fs_cdpath = Some(Cvar_Get(view, "fs_cdpath", &cdpath_default, CVAR_INIT));
+    let installpath_default = unsafe { CStr::from_ptr(Sys_DefaultInstallPath()) }
+        .to_string_lossy()
+        .into_owned();
+    view.common.fs_basepath = Some(Cvar_Get(view, "fs_basepath", &installpath_default, CVAR_INIT));
+    view.common.fs_basegame = Some(Cvar_Get(view, "fs_basegame", "", CVAR_INIT));
 
-    unsafe {
-        let mut homePath = Sys_DefaultHomePath();
-        if homePath.is_null() || *homePath == 0 {
-            homePath = (*view.common.fs_basepath).string;
-        }
-        view.common.fs_homepath = Cvar_Get(view, c"fs_homepath".as_ptr(), homePath, CVAR_INIT);
-        view.common.fs_gamedirvar = Cvar_Get(
-            view,
-            c"fs_game".as_ptr(),
-            c"".as_ptr(),
-            CVAR_INIT | CVAR_SYSTEMINFO,
-        );
-        view.common.fs_restrict = Cvar_Get(view, c"fs_restrict".as_ptr(), c"".as_ptr(), CVAR_INIT);
-        view.common.fs_dirbeforepak =
-            Cvar_Get(view, c"fs_dirbeforepak".as_ptr(), c"0".as_ptr(), CVAR_INIT);
+    let default_home = Sys_DefaultHomePath();
+    let home_path = if default_home.is_null() || unsafe { *default_home } == 0 {
+        view.common.cvar(view.common.fs_basepath).string.clone()
+    } else {
+        unsafe { CStr::from_ptr(default_home) }
+            .to_string_lossy()
+            .into_owned()
+    };
+    view.common.fs_homepath = Some(Cvar_Get(view, "fs_homepath", &home_path, CVAR_INIT));
+    view.common.fs_gamedirvar = Some(Cvar_Get(view, "fs_game", "", CVAR_INIT | CVAR_SYSTEMINFO));
+    view.common.fs_restrict = Some(Cvar_Get(view, "fs_restrict", "", CVAR_INIT));
+    view.common.fs_dirbeforepak = Some(Cvar_Get(view, "fs_dirbeforepak", "0", CVAR_INIT));
 
-        // BASEGAME is Raven's hardcoded "base".
-        let basegame = c"base".as_ptr();
+    // BASEGAME is Raven's hardcoded "base".
+    let basegame = "base";
 
-        // add search path elements in reverse priority order
-        if *(*view.common.fs_cdpath).string != 0 {
-            FS_AddGameDirectory(view, (*view.common.fs_cdpath).string, gameName);
-        }
-        if *(*view.common.fs_basepath).string != 0 {
-            FS_AddGameDirectory(view, (*view.common.fs_basepath).string, gameName);
-        }
-        if *(*view.common.fs_basepath).string != 0
-            && Q_stricmp(
-                (*view.common.fs_homepath).string,
-                (*view.common.fs_basepath).string,
-            ) != 0
-        {
-            FS_AddGameDirectory(view, (*view.common.fs_homepath).string, gameName);
-        }
+    // FS_AddGameDirectory never touches the fs_* cvars, so the values (and
+    // their C copies for the still-C directory adder) are snapshotted once.
+    let cdpath = view.common.cvar(view.common.fs_cdpath).string.clone();
+    let basepath = view.common.cvar(view.common.fs_basepath).string.clone();
+    let homepath = view.common.cvar(view.common.fs_homepath).string.clone();
+    let fs_basegame = view.common.cvar(view.common.fs_basegame).string.clone();
+    let gamedirvar = view.common.cvar(view.common.fs_gamedirvar).string.clone();
+    let cdpath_c = view.common.cvar_cstring(view.common.fs_cdpath);
+    let basepath_c = view.common.cvar_cstring(view.common.fs_basepath);
+    let homepath_c = view.common.cvar_cstring(view.common.fs_homepath);
+    let fs_basegame_c = view.common.cvar_cstring(view.common.fs_basegame);
+    let gamedirvar_c = view.common.cvar_cstring(view.common.fs_gamedirvar);
+    let game_name_c = CString::new(gameName).unwrap();
 
-        // additional base game so mods can be based upon other mods
-        if *(*view.common.fs_basegame).string != 0
-            && Q_stricmp(gameName, basegame) == 0
-            && Q_stricmp((*view.common.fs_basegame).string, gameName) != 0
-        {
-            if *(*view.common.fs_cdpath).string != 0 {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_cdpath).string,
-                    (*view.common.fs_basegame).string,
-                );
-            }
-            if *(*view.common.fs_basepath).string != 0 {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_basepath).string,
-                    (*view.common.fs_basegame).string,
-                );
-            }
-            if *(*view.common.fs_homepath).string != 0
-                && Q_stricmp(
-                    (*view.common.fs_homepath).string,
-                    (*view.common.fs_basepath).string,
-                ) != 0
-            {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_homepath).string,
-                    (*view.common.fs_basegame).string,
-                );
-            }
-        }
-
-        // additional game folder for mods
-        if *(*view.common.fs_gamedirvar).string != 0
-            && Q_stricmp(gameName, basegame) == 0
-            && Q_stricmp((*view.common.fs_gamedirvar).string, gameName) != 0
-        {
-            if *(*view.common.fs_cdpath).string != 0 {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_cdpath).string,
-                    (*view.common.fs_gamedirvar).string,
-                );
-            }
-            if *(*view.common.fs_basepath).string != 0 {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_basepath).string,
-                    (*view.common.fs_gamedirvar).string,
-                );
-            }
-            if *(*view.common.fs_homepath).string != 0
-                && Q_stricmp(
-                    (*view.common.fs_homepath).string,
-                    (*view.common.fs_basepath).string,
-                ) != 0
-            {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_homepath).string,
-                    (*view.common.fs_gamedirvar).string,
-                );
-            }
-        }
-
-        // add our commands
-        Cmd_AddCommand(
-            view,
-            "path",
-            Some(|view: &mut EngineHostView| FS_Path_f(view.common)),
-        );
-        Cmd_AddCommand(
-            view,
-            "dir",
-            Some(|view: &mut EngineHostView| FS_Dir_f(view)),
-        );
-        Cmd_AddCommand(
-            view,
-            "fdir",
-            Some(|view: &mut EngineHostView| FS_NewDir_f(view)),
-        );
-        Cmd_AddCommand(
-            view,
-            "touchFile",
-            Some(|view: &mut EngineHostView| FS_TouchFile_f(view)),
-        );
-
-        // reorder the pure pk3 files according to server order
-        FS_ReorderPurePaks(view.common);
-
-        // print the current search paths
-        FS_Path_f(view.common);
-
-        (*view.common.fs_gamedirvar).modified = qfalse; // just loaded, not modified
-
-        com_printf(view.common, "----------------------\n");
-
-        com_printf(
-            view.common,
-            &format!("{} files in pk3 files\n", view.common.fs_packFiles),
-        );
+    // add search path elements in reverse priority order
+    if !cdpath.is_empty() {
+        FS_AddGameDirectory(view, cdpath_c.as_ptr(), game_name_c.as_ptr());
     }
+    if !basepath.is_empty() {
+        FS_AddGameDirectory(view, basepath_c.as_ptr(), game_name_c.as_ptr());
+    }
+    if !basepath.is_empty() && !homepath.as_bytes().eq_ignore_ascii_case(basepath.as_bytes()) {
+        FS_AddGameDirectory(view, homepath_c.as_ptr(), game_name_c.as_ptr());
+    }
+
+    // additional base game so mods can be based upon other mods
+    if !fs_basegame.is_empty()
+        && gameName.as_bytes().eq_ignore_ascii_case(basegame.as_bytes())
+        && !fs_basegame.as_bytes().eq_ignore_ascii_case(gameName.as_bytes())
+    {
+        if !cdpath.is_empty() {
+            FS_AddGameDirectory(view, cdpath_c.as_ptr(), fs_basegame_c.as_ptr());
+        }
+        if !basepath.is_empty() {
+            FS_AddGameDirectory(view, basepath_c.as_ptr(), fs_basegame_c.as_ptr());
+        }
+        if !homepath.is_empty() && !homepath.as_bytes().eq_ignore_ascii_case(basepath.as_bytes()) {
+            FS_AddGameDirectory(view, homepath_c.as_ptr(), fs_basegame_c.as_ptr());
+        }
+    }
+
+    // additional game folder for mods
+    if !gamedirvar.is_empty()
+        && gameName.as_bytes().eq_ignore_ascii_case(basegame.as_bytes())
+        && !gamedirvar.as_bytes().eq_ignore_ascii_case(gameName.as_bytes())
+    {
+        if !cdpath.is_empty() {
+            FS_AddGameDirectory(view, cdpath_c.as_ptr(), gamedirvar_c.as_ptr());
+        }
+        if !basepath.is_empty() {
+            FS_AddGameDirectory(view, basepath_c.as_ptr(), gamedirvar_c.as_ptr());
+        }
+        if !homepath.is_empty() && !homepath.as_bytes().eq_ignore_ascii_case(basepath.as_bytes()) {
+            FS_AddGameDirectory(view, homepath_c.as_ptr(), gamedirvar_c.as_ptr());
+        }
+    }
+
+    // add our commands
+    Cmd_AddCommand(
+        view,
+        "path",
+        Some(|view: &mut EngineHostView| FS_Path_f(view.common)),
+    );
+    Cmd_AddCommand(
+        view,
+        "dir",
+        Some(|view: &mut EngineHostView| FS_Dir_f(view)),
+    );
+    Cmd_AddCommand(
+        view,
+        "fdir",
+        Some(|view: &mut EngineHostView| FS_NewDir_f(view)),
+    );
+    Cmd_AddCommand(
+        view,
+        "touchFile",
+        Some(|view: &mut EngineHostView| FS_TouchFile_f(view)),
+    );
+
+    // reorder the pure pk3 files according to server order
+    FS_ReorderPurePaks(view.common);
+
+    // print the current search paths
+    FS_Path_f(view.common);
+
+    view.common.cvar_mut(view.common.fs_gamedirvar).modified = false; // just loaded, not modified
+
+    com_printf(view.common, "----------------------\n");
+
+    com_printf(
+        view.common,
+        &format!("{} files in pk3 files\n", view.common.fs_packFiles),
+    );
 }
 
 /// Raven `FS_SetRestrictions`.
@@ -1952,7 +1937,7 @@ pub fn FS_Startup(view: &mut EngineHostView, gameName: *const c_char) {
 pub fn FS_SetRestrictions(view: &mut EngineHostView) {
     unsafe {
         // if fs_restrict is set, don't even look for the id file
-        if (*view.common.fs_restrict).integer == 0 {
+        if view.common.cvar(view.common.fs_restrict).integer == 0 {
             // look for the full game id
             let mut productId: *mut c_char = core::ptr::null_mut();
             FS_ReadFile(
@@ -1988,13 +1973,13 @@ pub fn FS_SetRestrictions(view: &mut EngineHostView) {
         }
     }
 
-    Cvar_Set(view, c"fs_restrict".as_ptr(), c"1".as_ptr());
+    Cvar_Set(view, "fs_restrict", "1");
 
     com_printf(view.common, "\nRunning in restricted demo mode.\n\n");
 
     // restart the filesystem with just the demo directory
     FS_Shutdown(view.common, qfalse);
-    FS_Startup(view, c"demo".as_ptr());
+    FS_Startup(view, "demo");
 
     // make sure the pak file has the header checksum we expect
     unsafe {
@@ -2123,7 +2108,7 @@ pub fn FS_Restart(view: &mut EngineHostView, checksumFeed: c_int) {
     FS_ClearPakReferences(view.common, 0);
 
     // try to start up normally
-    FS_Startup(view, c"base".as_ptr());
+    FS_Startup(view, "base");
 
     // see if we are going to allow add-ons
     FS_SetRestrictions(view);
@@ -2134,19 +2119,17 @@ pub fn FS_Restart(view: &mut EngineHostView, checksumFeed: c_int) {
             // might happen when connecting to a pure server not using BASEGAME/pak0.pk3
             if view.common.lastValidBase[0] != 0 {
                 FS_PureServerSetLoadedPaks(view, c"".as_ptr(), c"".as_ptr());
-                Cvar_Set(
-                    view,
-                    c"fs_basepath".as_ptr(),
-                    view.common.lastValidBase.as_ptr(),
-                );
-                Cvar_Set(
-                    view,
-                    c"fs_gamedirvar".as_ptr(),
-                    view.common.lastValidGame.as_ptr(),
-                );
+                let last_base = CStr::from_ptr(view.common.lastValidBase.as_ptr())
+                    .to_string_lossy()
+                    .into_owned();
+                Cvar_Set(view, "fs_basepath", &last_base);
+                let last_game = CStr::from_ptr(view.common.lastValidGame.as_ptr())
+                    .to_string_lossy()
+                    .into_owned();
+                Cvar_Set(view, "fs_gamedirvar", &last_game);
                 view.common.lastValidBase[0] = 0;
                 view.common.lastValidGame[0] = 0;
-                Cvar_Set(view, c"fs_restrict".as_ptr(), c"0".as_ptr());
+                Cvar_Set(view, "fs_restrict", "0");
                 FS_Restart(view, checksumFeed);
                 com_error(errorParm_t::ERR_DROP, "Invalid game folder\n".to_string());
             }
@@ -2157,11 +2140,8 @@ pub fn FS_Restart(view: &mut EngineHostView, checksumFeed: c_int) {
         }
 
         // new check before safeMode
-        if Q_stricmp(
-            (*view.common.fs_gamedirvar).string,
-            view.common.lastValidGame.as_ptr(),
-        ) != 0
-        {
+        let gamedirvar_c = view.common.cvar_cstring(view.common.fs_gamedirvar);
+        if Q_stricmp(gamedirvar_c.as_ptr(), view.common.lastValidGame.as_ptr()) != 0 {
             // skip the jampconfig.cfg if "safe" is on the command line
             if Com_SafeMode(view.common) == qfalse {
                 // MP dedicated build (`#ifdef DEDICATED`) execs jampserver.cfg.
@@ -2169,14 +2149,16 @@ pub fn FS_Restart(view: &mut EngineHostView, checksumFeed: c_int) {
             }
         }
 
+        let basepath = view.common.cvar_cstring(view.common.fs_basepath);
         Q_strncpyz(
             view.common.lastValidBase.as_mut_ptr(),
-            (*view.common.fs_basepath).string,
+            basepath.as_ptr(),
             view.common.lastValidBase.len() as c_int,
         );
+        let gamedirvar = view.common.cvar_cstring(view.common.fs_gamedirvar);
         Q_strncpyz(
             view.common.lastValidGame.as_mut_ptr(),
-            (*view.common.fs_gamedirvar).string,
+            gamedirvar.as_ptr(),
             view.common.lastValidGame.len() as c_int,
         );
     }

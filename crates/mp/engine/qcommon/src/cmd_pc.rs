@@ -140,7 +140,7 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     }
 
     // check cvars
-    if Cvar_Command(view) != 0 {
+    if Cvar_Command(view) {
         return;
     }
 
@@ -150,8 +150,9 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
         .hooks
         .CL_GameCommand
         .expect("CL_GameCommand hook");
-    if !view.common.com_cl_running.is_null()
-        && unsafe { (*view.common.com_cl_running).integer != 0 && cl_game_command(view) != 0 }
+    if view.common.com_cl_running.is_some()
+        && view.common.cvar(view.common.com_cl_running).integer != 0
+        && cl_game_command(view) != 0
     {
         return;
     }
@@ -162,8 +163,9 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
         .hooks
         .SV_GameCommand
         .expect("SV_GameCommand hook — installed by mp_engine_server at boot");
-    if !view.common.com_sv_running.is_null()
-        && unsafe { (*view.common.com_sv_running).integer != 0 && sv_game_command(view) != 0 }
+    if view.common.com_sv_running.is_some()
+        && view.common.cvar(view.common.com_sv_running).integer != 0
+        && sv_game_command(view) != 0
     {
         return;
     }
@@ -174,8 +176,9 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
         .hooks
         .UI_GameCommand
         .expect("UI_GameCommand hook");
-    if !view.common.com_cl_running.is_null()
-        && unsafe { (*view.common.com_cl_running).integer != 0 && ui_game_command(view) != 0 }
+    if view.common.com_cl_running.is_some()
+        && view.common.cvar(view.common.com_cl_running).integer != 0
+        && ui_game_command(view) != 0
     {
         return;
     }

@@ -889,7 +889,7 @@ pub fn ref_frame_begin(view: &mut EngineHostView, sv: &mut Server, msec: c_int) 
                     // One full game frame per step: force frame_msec so the
                     // stepped frame reaches its S digest (and tape flush)
                     // instead of accumulating a few real-time milliseconds.
-                    let fps = unsafe { (*view.common.sv_fps).integer }.max(1);
+                    let fps = view.common.cvar(view.common.sv_fps).integer.max(1);
                     let m = 1000 / fps;
                     sv.referee.emit(&format!("F {m}"));
                     return Some(m);
@@ -1013,7 +1013,7 @@ pub fn ref_frame_end(view: &mut EngineHostView, sv: &mut Server, ran_game: bool)
     if !sv.referee.active() || sv.referee.done {
         return;
     }
-    let maxclients = unsafe { (*view.common.sv_maxclients).integer };
+    let maxclients = view.common.cvar(view.common.sv_maxclients).integer;
     match sv.referee.mode {
         RefMode::Record => {
             if ran_game {
@@ -1316,7 +1316,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
 
 /// Whether `client` is a valid slot index.
 fn ref_client_in_range(view: &mut EngineHostView, client: c_int) -> bool {
-    let maxclients = unsafe { (*view.common.sv_maxclients).integer };
+    let maxclients = view.common.cvar(view.common.sv_maxclients).integer;
     client >= 0 && client < maxclients
 }
 
@@ -1494,12 +1494,12 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     view.common.ref_seed_pin = 0;
     view.common.ref_seed_used = 0;
 
-    let record = cvar_string(view, c"ref_record".as_ptr());
-    let replay = cvar_string(view, c"ref_replay".as_ptr());
-    let follow = Cvar_VariableIntegerValue(view.common, c"ref_follow".as_ptr()) != 0;
-    let ref_seed = Cvar_VariableIntegerValue(view.common, c"ref_seed".as_ptr());
-    let fps = Cvar_VariableIntegerValue(view.common, c"sv_fps".as_ptr());
-    let maxclients = unsafe { (*view.common.sv_maxclients).integer };
+    let record = cvar_string(view, "ref_record");
+    let replay = cvar_string(view, "ref_replay");
+    let follow = Cvar_VariableIntegerValue(view.common, "ref_follow") != 0;
+    let ref_seed = Cvar_VariableIntegerValue(view.common, "ref_seed");
+    let fps = Cvar_VariableIntegerValue(view.common, "sv_fps");
+    let maxclients = view.common.cvar(view.common.sv_maxclients).integer;
 
     if !replay.is_empty() {
         let opened = if follow {
@@ -1552,7 +1552,7 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     }
 
     // Wire tap, armed independently of record/replay.
-    let snaps = cvar_string(view, c"ref_snaps".as_ptr());
+    let snaps = cvar_string(view, "ref_snaps");
     if !snaps.is_empty() {
         match File::create(&snaps) {
             Ok(f) => {
@@ -1569,11 +1569,11 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     // Verbose state records (`ref_state 1`, record side) and the syscall-digest
     // window basis (both modes).
     sv.referee.verbose = sv.referee.mode == RefMode::Record
-        && Cvar_VariableIntegerValue(view.common, c"ref_state".as_ptr()) != 0;
+        && Cvar_VariableIntegerValue(view.common, "ref_state") != 0;
     ref_sys_reset(sv);
 
     // Syscall-stream dump (`ref_calls <file>`), armed independently.
-    let calls = cvar_string(view, c"ref_calls".as_ptr());
+    let calls = cvar_string(view, "ref_calls");
     if !calls.is_empty() {
         match File::create(&calls) {
             Ok(f) => {
@@ -1590,7 +1590,7 @@ pub fn ref_spawn_setup(view: &mut EngineHostView, sv: &mut Server, map: &str) {
     // Divergence policy + the halt back-channel (`<tape>.halt`). The record
     // side clears any stale halt file so a fresh session never boots frozen.
     sv.referee.halt_on_diverge =
-        Cvar_VariableIntegerValue(view.common, c"ref_haltOnDiverge".as_ptr()) != 0;
+        Cvar_VariableIntegerValue(view.common, "ref_haltOnDiverge") != 0;
     let tape_path = if !replay.is_empty() {
         Some(replay.clone())
     } else if !record.is_empty() {
@@ -1625,19 +1625,15 @@ pub fn ref_spawn_write_header(view: &mut EngineHostView, sv: &mut Server, map: &
     if sv.referee.mode != RefMode::Record {
         return;
     }
-    let fps = Cvar_VariableIntegerValue(view.common, c"sv_fps".as_ptr());
-    let maxclients = unsafe { (*view.common.sv_maxclients).integer };
+    let fps = Cvar_VariableIntegerValue(view.common, "sv_fps");
+    let maxclients = view.common.cvar(view.common.sv_maxclients).integer;
     let seed = view.common.ref_seed_used;
     ref_record_header(sv, map, fps, maxclients, seed);
 }
 
 /// The value of cvar `name` as an owned `String` (empty if unset/blank).
-fn cvar_string(view: &mut EngineHostView, name: *const c_char) -> String {
-    let p = Cvar_VariableString(view.common, name);
-    if p.is_null() {
-        return String::new();
-    }
-    unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
+fn cvar_string(view: &mut EngineHostView, name: &str) -> String {
+    Cvar_VariableString(view.common, name).to_string()
 }
 
 /// Parse tape text into records.

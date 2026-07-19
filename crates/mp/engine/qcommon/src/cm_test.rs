@@ -20,6 +20,7 @@ use crate::cm::cmodel_s::cmodel_t;
 use crate::cm::leaf_list_s::leafList_t;
 use crate::cm_load::CM_ClipHandleToModel;
 use crate::collision_world::CollisionWorld;
+use crate::common::Common;
 use crate::common_fns::Com_Memset;
 use mp_qshared::shared::q_math::{_DotProduct, _VectorCopy, _VectorSubtract};
 
@@ -247,8 +248,13 @@ pub fn CM_BoxBrushes(
 /// Raven `CM_AreasConnected`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_test.cpp:509-529`
-pub fn CM_AreasConnected(cm: &mut CollisionWorld, area1: c_int, area2: c_int) -> qboolean {
-    if unsafe { (*cm.cm_noAreas).integer } != 0 {
+pub fn CM_AreasConnected(
+    common: &Common,
+    cm: &mut CollisionWorld,
+    area1: c_int,
+    area2: c_int,
+) -> qboolean {
+    if common.cvar(cm.cm_noAreas).integer != 0 {
         return qtrue;
     }
 
@@ -271,12 +277,17 @@ pub fn CM_AreasConnected(cm: &mut CollisionWorld, area1: c_int, area2: c_int) ->
 /// Raven `CM_WriteAreaBits`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_test.cpp:545-572`
-pub fn CM_WriteAreaBits(cm: &mut CollisionWorld, buffer: *mut byte, area: c_int) -> c_int {
+pub fn CM_WriteAreaBits(
+    common: &Common,
+    cm: &mut CollisionWorld,
+    buffer: *mut byte,
+    area: c_int,
+) -> c_int {
     let bytes = (cm.cmg.numAreas + 7) >> 3;
 
     // `#ifndef BSPC` retail arm kept; the BSPC (bsp-compiler-only) arm is
     // dropped — out of the engine port surface.
-    if unsafe { (*cm.cm_noAreas).integer } != 0 || area == -1 {
+    if common.cvar(cm.cm_noAreas).integer != 0 || area == -1 {
         // for debugging, send everything
         Com_Memset(buffer as *mut (), 255, bytes as usize);
     } else {

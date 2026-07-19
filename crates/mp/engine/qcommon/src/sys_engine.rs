@@ -87,11 +87,11 @@ pub unsafe fn Sys_LoadDll(
     // bk001129 - was RTLD_LAZY: `#define Q_RTLD RTLD_NOW`.
     let q_rtld = libc::RTLD_NOW;
 
-    let basepath = Cvar_VariableString(common, c"fs_basepath".as_ptr());
-    let cdpath = Cvar_VariableString(common, c"fs_cdpath".as_ptr());
-    let gamedir = Cvar_VariableString(common, c"fs_game".as_ptr());
+    let basepath = std::ffi::CString::new(Cvar_VariableString(common, "fs_basepath")).unwrap();
+    let cdpath = std::ffi::CString::new(Cvar_VariableString(common, "fs_cdpath")).unwrap();
+    let gamedir = std::ffi::CString::new(Cvar_VariableString(common, "fs_game")).unwrap();
 
-    let mut path = FS_BuildOSPath4(common, basepath, gamedir, fname.as_ptr());
+    let mut path = FS_BuildOSPath4(common, basepath.as_ptr(), gamedir.as_ptr(), fname.as_ptr());
     // bk001206 - verbose
     let path_str = core::ffi::CStr::from_ptr(path)
         .to_string_lossy()
@@ -102,14 +102,14 @@ pub unsafe fn Sys_LoadDll(
     let mut lib_handle = libc::dlopen(path, q_rtld);
 
     if lib_handle.is_null() {
-        if *cdpath != 0 {
+        if !cdpath.to_bytes().is_empty() {
             // bk001206 - report any problem
             com_printf(
                 common,
                 &format!("Sys_LoadDll({path_str}) failed: \"{}\"\n", dlerror_string()),
             );
 
-            path = FS_BuildOSPath4(common, cdpath, gamedir, fname.as_ptr());
+            path = FS_BuildOSPath4(common, cdpath.as_ptr(), gamedir.as_ptr(), fname.as_ptr());
             lib_handle = libc::dlopen(path, q_rtld);
             let path2 = core::ffi::CStr::from_ptr(path)
                 .to_string_lossy()
@@ -346,9 +346,7 @@ const SYS_ARCH: &str = "unknown";
 ///
 /// Source: `oracle/codemp/unix/unix_main.c:160-206`
 pub fn Sys_Init(view: &mut EngineHostView) {
-    let arch = std::ffi::CString::new(SYS_ARCH).unwrap();
-    Cvar_Set(view, c"arch".as_ptr(), arch.as_ptr());
-    let username = std::ffi::CString::new(native_platform::sys_main::Sys_GetCurrentUser())
-        .unwrap_or_else(|_| std::ffi::CString::new("player").unwrap());
-    Cvar_Set(view, c"username".as_ptr(), username.as_ptr());
+    Cvar_Set(view, "arch", SYS_ARCH);
+    let username = native_platform::sys_main::Sys_GetCurrentUser();
+    Cvar_Set(view, "username", &username);
 }

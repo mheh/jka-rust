@@ -6,7 +6,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_short, c_uint, c_void};
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 
 use libc::{sscanf, strcat, strcmp, strcpy, strlen, strstr};
 
@@ -208,21 +208,22 @@ pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut clien
         return;
     }
 
-    unsafe {
-        // hack to echo broadcast prints to console
-        if (*common.com_dedicated).integer != 0 && fmt.as_bytes().starts_with(b"print") {
-            let mut message: Vec<c_char> = fmt
-                .bytes()
-                .map(|b| b as c_char)
-                .chain(core::iter::once(0))
-                .collect();
+    if common.cvar(common.com_dedicated).integer != 0 && fmt.as_bytes().starts_with(b"print") {
+        let mut message: Vec<c_char> = fmt
+            .bytes()
+            .map(|b| b as c_char)
+            .chain(core::iter::once(0))
+            .collect();
+        let expanded = unsafe {
             let expanded = SV_ExpandNewlines(sv, message.as_mut_ptr());
-            let expanded = core::ffi::CStr::from_ptr(expanded).to_string_lossy();
-            com_printf(common, &format!("broadcast: {}\n", expanded));
-        }
+            core::ffi::CStr::from_ptr(expanded).to_string_lossy().into_owned()
+        };
+        com_printf(common, &format!("broadcast: {}\n", expanded));
+    }
 
+    unsafe {
         // send the data to all relevent clients
-        for j in 0..(*common.sv_maxclients).integer {
+        for j in 0..common.cvar(common.sv_maxclients).integer {
             let client = sv.svs.clients.offset(j as isize);
             if ((*client).state as c_int) < clientState_t::CS_PRIMED as c_int {
                 continue;
@@ -237,14 +238,14 @@ pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut clien
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:759-784`
 pub fn SV_CheckPaused(common: &mut Common, sv: &mut Server) -> qboolean {
-    unsafe {
-        if (*common.cl_paused).integer == 0 {
-            return qfalse;
-        }
+    if common.cvar(common.cl_paused).integer == 0 {
+        return qfalse;
+    }
 
-        // only pause if there is just a single client connected
-        let mut count = 0;
-        for i in 0..(*common.sv_maxclients).integer {
+    // only pause if there is just a single client connected
+    let mut count = 0;
+    unsafe {
+        for i in 0..common.cvar(common.sv_maxclients).integer {
             let cl = sv.svs.clients.offset(i as isize);
             if (*cl).state as c_int >= clientState_t::CS_CONNECTED as c_int
                 && (*cl).netchan.remoteAddress.r#type != netadrtype_t::NA_BOT
@@ -252,16 +253,16 @@ pub fn SV_CheckPaused(common: &mut Common, sv: &mut Server) -> qboolean {
                 count += 1;
             }
         }
-
-        if count > 1 {
-            // don't pause
-            (*common.sv_paused).integer = 0;
-            return qfalse;
-        }
-
-        (*common.sv_paused).integer = 1;
-        qtrue
     }
+
+    if count > 1 {
+        // don't pause
+        common.cvar_mut(common.sv_paused).integer = 0;
+        return qfalse;
+    }
+
+    common.cvar_mut(common.sv_paused).integer = 1;
+    qtrue
 }
 
 /// Raven `SV_MasterNeedsResolving` — refresh every so often regardless of if the
@@ -288,7 +289,9 @@ pub fn SV_MasterNeedsResolving(sv: &mut Server, server: c_int, time: c_int) -> b
 /// Source: `oracle/codemp/server/sv_main.cpp:222-280`
 pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
     // "dedicated 1" is for lan play, "dedicated 2" is for inet public play
-    if view.common.com_dedicated.is_null() || unsafe { (*view.common.com_dedicated).integer } != 2 {
+    if view.common.com_dedicated.is_none()
+        || view.common.cvar(view.common.com_dedicated).integer != 2
+    {
         return; // only dedicated servers send heartbeats
     }
 
@@ -306,45 +309,37 @@ pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
     // send to group masters
     for i in 0..MAX_MASTER_SERVERS {
         let master = view.common.sv_master[i];
-        if unsafe { *(*master).string } == 0 {
+        if view.common.cvar(master).string.is_empty() {
             continue;
         }
 
         // see if we haven't already resolved the name
         // resolving usually causes hitches on win95, so only
         // do it when needed
-        if unsafe { (*master).modified } != qfalse || SV_MasterNeedsResolving(sv, i as c_int, time)
-        {
-            unsafe {
-                (*master).modified = qfalse;
-            }
+        if view.common.cvar(master).modified || SV_MasterNeedsResolving(sv, i as c_int, time) {
+            view.common.cvar_mut(master).modified = false;
 
             sv.master_heartbeat[i] = time;
 
-            com_printf(
-                view.common,
-                &format!("Resolving {}\n", unsafe {
-                    core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-                }),
-            );
-            if NET_StringToAdr(unsafe { (*master).string }, &mut sv.master_adr[i]) == qfalse {
+            let master_string = view.common.cvar(master).string.clone();
+            com_printf(view.common, &format!("Resolving {}\n", master_string));
+
+            let master_string_c = CString::new(master_string.as_str()).unwrap_or_default();
+            if NET_StringToAdr(master_string_c.as_ptr(), &mut sv.master_adr[i]) == qfalse {
                 // if the address failed to resolve, clear it
                 // so we don't take repeated dns hits
                 com_printf(
                     view.common,
-                    &format!("Couldn't resolve address: {}\n", unsafe {
-                        core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-                    }),
+                    &format!("Couldn't resolve address: {}\n", master_string),
                 );
-                Cvar_Set(view, unsafe { (*master).name }, c"".as_ptr());
-                unsafe {
-                    (*master).modified = qfalse;
-                }
+                let name = view.common.cvar(master).name.clone();
+                Cvar_Set(view, &name, "");
+                view.common.cvar_mut(master).modified = false;
                 continue;
             }
             // Raven passes `strstr(":", ...)` with the needle/haystack reversed —
             // preserved verbatim (emergent quirk).
-            if unsafe { strstr(c":".as_ptr(), (*master).string) }.is_null() {
+            if unsafe { strstr(c":".as_ptr(), master_string_c.as_ptr()) }.is_null() {
                 sv.master_adr[i].port = BigShort(PORT_MASTER as c_short) as u16;
             }
             let adr = sv.master_adr[i];
@@ -352,7 +347,7 @@ pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
                 view.common,
                 &format!(
                     "{} resolved to {}.{}.{}.{}:{}\n",
-                    unsafe { core::ffi::CStr::from_ptr((*master).string).to_string_lossy() },
+                    master_string,
                     adr.ip[0],
                     adr.ip[1],
                     adr.ip[2],
@@ -362,11 +357,10 @@ pub fn SV_MasterHeartbeat(view: &mut EngineHostView, sv: &mut Server) {
             );
         }
 
+        let master_string = view.common.cvar(master).string.clone();
         com_printf(
             view.common,
-            &format!("Sending heartbeat to {}\n", unsafe {
-                core::ffi::CStr::from_ptr((*master).string).to_string_lossy()
-            }),
+            &format!("Sending heartbeat to {}\n", master_string),
         );
         // this command should be changed if the server info / status format
         // ever incompatably changes
@@ -410,11 +404,10 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
     let mut status = [0 as c_char; MAX_MSGLEN];
     let mut infostring = [0 as c_char; MAX_INFO_STRING];
 
+    let serverinfo = Cvar_InfoString(view.common, CVAR_SERVERINFO);
+    let serverinfo_c = CString::new(serverinfo.as_str()).unwrap_or_default();
     unsafe {
-        strcpy(
-            infostring.as_mut_ptr(),
-            Cvar_InfoString(view.common, CVAR_SERVERINFO),
-        );
+        strcpy(infostring.as_mut_ptr(), serverinfo_c.as_ptr());
 
         // echo back the parameter to status, so master servers can use it as a
         // challenge to prevent timed spoofed reply packets that add ghost servers
@@ -425,7 +418,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         );
 
         // add "demo" to the sv_keywords if restricted
-        if Cvar_VariableValue(view, c"fs_restrict".as_ptr()) != 0.0 {
+        if Cvar_VariableValue(view, "fs_restrict") != 0.0 {
             let mut keywords = [0 as c_char; MAX_INFO_STRING];
             let existing = CStr::from_ptr(Info_ValueForKey(
                 infostring.as_ptr(),
@@ -448,7 +441,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         status[0] = 0;
         let mut status_length: usize = 0;
 
-        for i in 0..(*view.common.sv_maxclients).integer {
+        for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
             let cl = sv.svs.clients.offset(i as isize);
             if (*cl).state as c_int >= clientState_t::CS_CONNECTED as c_int {
                 let ps = SV_GameClientNum(sv, i);
@@ -489,16 +482,25 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:381-469`
 pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
-    if Cvar_VariableValue(view, c"ui_singlePlayerActive".as_ptr()) != 0.0 {
+    if Cvar_VariableValue(view, "ui_singlePlayerActive") != 0.0 {
         return;
     }
 
     let mut infostring = [0 as c_char; MAX_INFO_STRING];
 
+    let sv_hostname_c =
+        CString::new(view.common.cvar(view.common.sv_hostname).string.as_str()).unwrap_or_default();
+    let sv_mapname_c =
+        CString::new(view.common.cvar(view.common.sv_mapname).string.as_str()).unwrap_or_default();
+    let gamedir = Cvar_VariableString(view.common, "fs_game").to_string();
+    let gamedir_c = CString::new(gamedir.as_str()).unwrap_or_default();
+
     unsafe {
         // don't count privateclients
         let mut count = 0;
-        for i in (*view.common.sv_privateClients).integer..(*view.common.sv_maxclients).integer {
+        for i in view.common.cvar(view.common.sv_privateClients).integer
+            ..view.common.cvar(view.common.sv_maxclients).integer
+        {
             if (*sv.svs.clients.offset(i as isize)).state as c_int
                 >= clientState_t::CS_CONNECTED as c_int
             {
@@ -524,12 +526,12 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         Info_SetValueForKey(
             infostring.as_mut_ptr(),
             c"hostname".as_ptr(),
-            (*view.common.sv_hostname).string,
+            sv_hostname_c.as_ptr(),
         );
         Info_SetValueForKey(
             infostring.as_mut_ptr(),
             c"mapname".as_ptr(),
-            (*view.common.sv_mapname).string,
+            sv_mapname_c.as_ptr(),
         );
         Info_SetValueForKey(
             infostring.as_mut_ptr(),
@@ -542,7 +544,8 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             va(
                 c"%i".as_ptr(),
                 &[FmtArg::Int(
-                    (*view.common.sv_maxclients).integer - (*view.common.sv_privateClients).integer,
+                    view.common.cvar(view.common.sv_maxclients).integer
+                        - view.common.cvar(view.common.sv_privateClients).integer,
                 )],
             ),
         );
@@ -551,7 +554,7 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             c"gametype".as_ptr(),
             va(
                 c"%i".as_ptr(),
-                &[FmtArg::Int((*view.common.sv_gametype).integer)],
+                &[FmtArg::Int(view.common.cvar(view.common.sv_gametype).integer)],
             ),
         );
         Info_SetValueForKey(
@@ -559,7 +562,7 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             c"needpass".as_ptr(),
             va(
                 c"%i".as_ptr(),
-                &[FmtArg::Int((*view.common.sv_needpass).integer)],
+                &[FmtArg::Int(view.common.cvar(view.common.sv_needpass).integer)],
             ),
         );
         Info_SetValueForKey(
@@ -569,16 +572,16 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
                 c"%i".as_ptr(),
                 &[FmtArg::Int(Cvar_VariableIntegerValue(
                     view.common,
-                    c"g_jediVmerc".as_ptr(),
+                    "g_jediVmerc",
                 ))],
             ),
         );
-        let w_disable = if (*view.common.sv_gametype).integer == GT_DUEL
-            || (*view.common.sv_gametype).integer == GT_POWERDUEL
+        let w_disable = if view.common.cvar(view.common.sv_gametype).integer == GT_DUEL
+            || view.common.cvar(view.common.sv_gametype).integer == GT_POWERDUEL
         {
-            Cvar_VariableIntegerValue(view.common, c"g_duelWeaponDisable".as_ptr())
+            Cvar_VariableIntegerValue(view.common, "g_duelWeaponDisable")
         } else {
-            Cvar_VariableIntegerValue(view.common, c"g_weaponDisable".as_ptr())
+            Cvar_VariableIntegerValue(view.common, "g_weaponDisable")
         };
         Info_SetValueForKey(
             infostring.as_mut_ptr(),
@@ -592,35 +595,34 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
                 c"%i".as_ptr(),
                 &[FmtArg::Int(Cvar_VariableIntegerValue(
                     view.common,
-                    c"g_forcePowerDisable".as_ptr(),
+                    "g_forcePowerDisable",
                 ))],
             ),
         );
         //Info_SetValueForKey( infostring, "pure", va("%i", sv_pure->integer) );
 
-        if (*view.common.sv_minPing).integer != 0 {
+        if view.common.cvar(view.common.sv_minPing).integer != 0 {
             Info_SetValueForKey(
                 infostring.as_mut_ptr(),
                 c"minPing".as_ptr(),
                 va(
                     c"%i".as_ptr(),
-                    &[FmtArg::Int((*view.common.sv_minPing).integer)],
+                    &[FmtArg::Int(view.common.cvar(view.common.sv_minPing).integer)],
                 ),
             );
         }
-        if (*view.common.sv_maxPing).integer != 0 {
+        if view.common.cvar(view.common.sv_maxPing).integer != 0 {
             Info_SetValueForKey(
                 infostring.as_mut_ptr(),
                 c"maxPing".as_ptr(),
                 va(
                     c"%i".as_ptr(),
-                    &[FmtArg::Int((*view.common.sv_maxPing).integer)],
+                    &[FmtArg::Int(view.common.cvar(view.common.sv_maxPing).integer)],
                 ),
             );
         }
-        let gamedir = Cvar_VariableString(view.common, c"fs_game".as_ptr());
-        if *gamedir != 0 {
-            Info_SetValueForKey(infostring.as_mut_ptr(), c"game".as_ptr(), gamedir);
+        if !gamedir.is_empty() {
+            Info_SetValueForKey(infostring.as_mut_ptr(), c"game".as_ptr(), gamedir_c.as_ptr());
         }
 
         NET_OutOfBandPrint(
@@ -680,14 +682,12 @@ pub fn SVC_RemoteCommand(
     }
     sv.svc_remote_command_lasttime = time;
 
+    let rconpw = view.common.cvar(view.common.sv_rconPassword).string.clone();
+    let rconpw_c = CString::new(rconpw.as_str()).unwrap_or_default();
+
     unsafe {
         let valid: qboolean;
-        if strlen((*view.common.sv_rconPassword).string) == 0
-            || strcmp(
-                Cmd_Argv(view.common, 1),
-                (*view.common.sv_rconPassword).string,
-            ) != 0
-        {
+        if rconpw.is_empty() || strcmp(Cmd_Argv(view.common, 1), rconpw_c.as_ptr()) != 0 {
             valid = qfalse;
             let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
                 .to_string_lossy()
@@ -721,7 +721,7 @@ pub fn SVC_RemoteCommand(
             &mut flush_slot as *mut extern "C" fn(*mut c_char) as *mut *mut c_void,
         );
 
-        if strlen((*view.common.sv_rconPassword).string) == 0 {
+        if rconpw.is_empty() {
             com_printf(view.common, "No rconpassword set.\n");
         } else if valid == qfalse {
             com_printf(view.common, "Bad rconpassword.\n");
@@ -839,7 +839,7 @@ pub fn SV_PacketEvent(view: &mut EngineHostView, from: netadr_t, msg: *mut msg_t
         let qport = MSG_ReadShort(view.common, msg) & 0xffff;
 
         // find which client the message is from
-        for i in 0..(*view.common.sv_maxclients).integer {
+        for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
             let cl = sv.svs.clients.offset(i as isize);
             if (*cl).state == clientState_t::CS_FREE {
                 continue;
@@ -889,7 +889,7 @@ pub fn SV_PacketEvent(view: &mut EngineHostView, from: netadr_t, msg: *mut msg_t
 /// Source: `oracle/codemp/server/sv_main.cpp:659-704`
 pub fn SV_CalcPings(common: &mut Common, sv: &mut Server) {
     unsafe {
-        for i in 0..(*common.sv_maxclients).integer {
+        for i in 0..common.cvar(common.sv_maxclients).integer {
             let cl = sv.svs.clients.offset(i as isize);
             if (*cl).state != clientState_t::CS_ACTIVE {
                 (*cl).ping = 999;
@@ -948,11 +948,11 @@ pub fn SV_CalcPings(common: &mut Common, sv: &mut Server) {
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:719-751`
 pub fn SV_CheckTimeouts(common: &mut Common, sv: &mut Server) {
-    unsafe {
-        let droppoint = sv.svs.time - 1000 * (*common.sv_timeout).integer;
-        let zombiepoint = sv.svs.time - 1000 * (*common.sv_zombietime).integer;
+    let droppoint = sv.svs.time - 1000 * common.cvar(common.sv_timeout).integer;
+    let zombiepoint = sv.svs.time - 1000 * common.cvar(common.sv_zombietime).integer;
 
-        for i in 0..(*common.sv_maxclients).integer {
+    unsafe {
+        for i in 0..common.cvar(common.sv_maxclients).integer {
             let cl = sv.svs.clients.offset(i as isize);
             // message times may be wrong across a changelevel
             if (*cl).lastPacketTime > sv.svs.time {
@@ -992,12 +992,14 @@ pub fn SV_CheckTimeouts(common: &mut Common, sv: &mut Server) {
 pub fn SV_CheckCvars(view: &mut EngineHostView, sv: &mut Server) {
     let mut changed = qfalse;
 
-    unsafe {
-        if (*view.common.sv_hostname).modificationCount != sv.sv_check_cvars_last_mod {
-            let mut hostname = [0 as c_char; MAX_INFO_STRING];
-            sv.sv_check_cvars_last_mod = (*view.common.sv_hostname).modificationCount;
+    if view.common.cvar(view.common.sv_hostname).modificationCount != sv.sv_check_cvars_last_mod {
+        let mut hostname = [0 as c_char; MAX_INFO_STRING];
+        sv.sv_check_cvars_last_mod = view.common.cvar(view.common.sv_hostname).modificationCount;
 
-            strcpy(hostname.as_mut_ptr(), (*view.common.sv_hostname).string);
+        let sv_hostname_c =
+            CString::new(view.common.cvar(view.common.sv_hostname).string.as_str()).unwrap_or_default();
+        unsafe {
+            strcpy(hostname.as_mut_ptr(), sv_hostname_c.as_ptr());
             let mut ci: usize = 0;
             while hostname[ci] != 0 {
                 let ch = hostname[ci];
@@ -1007,9 +1009,12 @@ pub fn SV_CheckCvars(view: &mut EngineHostView, sv: &mut Server) {
                 }
                 ci += 1;
             }
-            if changed != qfalse {
-                Cvar_Set(view, c"sv_hostname".as_ptr(), hostname.as_ptr());
-            }
+        }
+        if changed != qfalse {
+            let hostname_s = unsafe { CStr::from_ptr(hostname.as_ptr()) }
+                .to_string_lossy()
+                .into_owned();
+            Cvar_Set(view, "sv_hostname", &hostname_s);
         }
     }
 }
@@ -1026,28 +1031,29 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
     // exception). SV_GameCommand precedent.
     let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
 
+    // the menu kills the server with this cvar
+    if view.common.cvar(view.common.sv_killserver).integer != 0 {
+        SV_Shutdown(view, "Server was killed.\n");
+        Cvar_Set(view, "sv_killserver", "0");
+        return;
+    }
+
+    if view.common.cvar(view.common.com_sv_running).integer == 0 {
+        return;
+    }
+
+    // allow pause if only the local client is connected
+    if SV_CheckPaused(view.common, sv) == qtrue {
+        return;
+    }
+
+    // if it isn't time for the next frame, do nothing
+    if view.common.cvar(view.common.sv_fps).integer < 1 {
+        Cvar_Set(view, "sv_fps", "10");
+    }
+    let frame_msec = 1000 / view.common.cvar(view.common.sv_fps).integer;
+
     unsafe {
-        // the menu kills the server with this cvar
-        if (*view.common.sv_killserver).integer != 0 {
-            SV_Shutdown(view, "Server was killed.\n");
-            Cvar_Set(view, c"sv_killserver".as_ptr(), c"0".as_ptr());
-            return;
-        }
-
-        if (*view.common.com_sv_running).integer == 0 {
-            return;
-        }
-
-        // allow pause if only the local client is connected
-        if SV_CheckPaused(view.common, sv) == qtrue {
-            return;
-        }
-
-        // if it isn't time for the next frame, do nothing
-        if (*view.common.sv_fps).integer < 1 {
-            Cvar_Set(view, c"sv_fps".as_ptr(), c"10".as_ptr());
-        }
-        let frame_msec = 1000 / (*view.common.sv_fps).integer;
 
         // Engine referee: RECORD appends `F <msec>`; REPLAY forces msec from the
         // tape so timeResidual (and thus the game-run cadence and sv.svs.time)
@@ -1061,13 +1067,14 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
 
         sv.sv.timeResidual += msec;
 
-        if (*view.common.com_dedicated).integer == 0 {
+        if view.common.cvar(view.common.com_dedicated).integer == 0 {
             SV_BotFrame(view.common, sv, sv.svs.time + sv.sv.timeResidual);
         }
 
-        if (*view.common.com_dedicated).integer != 0
+        if view.common.cvar(view.common.com_dedicated).integer != 0
             && sv.sv.timeResidual < frame_msec
-            && (view.common.com_timescale.is_null() || (*view.common.com_timescale).value >= 1.0)
+            && (view.common.com_timescale.is_none()
+                || view.common.cvar(view.common.com_timescale).value >= 1.0)
         {
             // NET_Sleep will give the OS time slices until either get a packet
             // or time enough for a server frame has gone by. Referee replay runs
@@ -1109,16 +1116,18 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         // update infostrings if anything has been changed
         if view.common.cvar_modifiedFlags & CVAR_SERVERINFO != 0 {
             let s = Cvar_InfoString(view.common, CVAR_SERVERINFO);
-            SV_SetConfigstring(view, sv, CS_SERVERINFO, s);
+            let s_c = CString::new(s.as_str()).unwrap_or_default();
+            SV_SetConfigstring(view, sv, CS_SERVERINFO, s_c.as_ptr());
             view.common.cvar_modifiedFlags &= !CVAR_SERVERINFO;
         }
         if view.common.cvar_modifiedFlags & CVAR_SYSTEMINFO != 0 {
             let s = Cvar_InfoString_Big(view.common, CVAR_SYSTEMINFO);
-            SV_SetConfigstring(view, sv, CS_SYSTEMINFO, s);
+            let s_c = CString::new(s.as_str()).unwrap_or_default();
+            SV_SetConfigstring(view, sv, CS_SYSTEMINFO, s_c.as_ptr());
             view.common.cvar_modifiedFlags &= !CVAR_SYSTEMINFO;
         }
 
-        let _start_time = if (*view.common.com_speeds).integer != 0 {
+        let _start_time = if view.common.cvar(view.common.com_speeds).integer != 0 {
             sys_milliseconds(view.common)
         } else {
             0 // quite a compiler warning
@@ -1135,7 +1144,7 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         // RECORD/OFF: no-op.
         crate::sv_referee::ref_frame_inject(view, sv);
 
-        if (*view.common.com_dedicated).integer != 0 {
+        if view.common.cvar(view.common.com_dedicated).integer != 0 {
             SV_BotFrame(view.common, sv, sv.svs.time);
         }
 
@@ -1167,7 +1176,7 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         g2api_set_time(g2, time, 0);
         //rww - RAGDOLL_END
 
-        if (*view.common.com_speeds).integer != 0 {
+        if view.common.cvar(view.common.com_speeds).integer != 0 {
             // Raven: `time_game = Sys_Milliseconds() - startTime;` — `Common` has
             // no `time_game` counter (com_speeds reporting is a silent no-op here,
             // matching the Com_Frame com_speeds precedent), so the elapsed value

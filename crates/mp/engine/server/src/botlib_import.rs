@@ -180,7 +180,12 @@ extern "C" fn bot_import_point_contents(point: *mut vec3_t) -> c_int {
 /// Raven `BotImport_inPVS` (`sv_bot.cpp:369-371`).
 extern "C" fn bot_import_in_pvs(p1: *mut vec3_t, p2: *mut vec3_t) -> c_int {
     let ctx = ctx();
-    SV_inPVS(unsafe { &mut *ctx.cm }, unsafe { *p1 }, unsafe { *p2 }) as c_int
+    SV_inPVS(
+        unsafe { &*ctx.common },
+        unsafe { &mut *ctx.cm },
+        unsafe { *p1 },
+        unsafe { *p2 },
+    ) as c_int
 }
 
 /// Raven `BotImport_BSPEntityData` (`sv_bot.cpp:378-380`).

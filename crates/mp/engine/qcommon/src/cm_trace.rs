@@ -791,7 +791,7 @@ pub fn CM_TestInLeaf(
                 continue;
             }
 
-            if (*view.common.com_terrainPhysics).integer != 0
+            if view.common.cvar(view.common.com_terrainPhysics).integer != 0
                 && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -810,7 +810,7 @@ pub fn CM_TestInLeaf(
         }
 
         // test against all patches
-        if (*view.cm.cm_noCurves).integer == 0 {
+        if view.common.cvar(view.cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -1156,7 +1156,7 @@ pub fn CM_TraceThroughLeaf(
                 continue;
             }
 
-            if (*view.common.com_terrainPhysics).integer != 0
+            if view.common.cvar(view.common.com_terrainPhysics).integer != 0
                 && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -1175,7 +1175,7 @@ pub fn CM_TraceThroughLeaf(
         }
 
         // trace line against all patches in the leaf
-        if (*view.cm.cm_noCurves).integer == 0 {
+        if view.common.cvar(view.cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)
@@ -1231,7 +1231,7 @@ pub fn CM_TraceToLeaf(
                 continue;
             }
 
-            if (*view.common.com_terrainPhysics).integer != 0
+            if view.common.cvar(view.common.com_terrainPhysics).integer != 0
                 && !view.cm.cmg.landScape.is_null()
                 && ((*b).contents & CONTENTS_TERRAIN != 0)
             {
@@ -1251,7 +1251,7 @@ pub fn CM_TraceToLeaf(
         }
 
         // trace line against all patches in the leaf
-        if (*view.cm.cm_noCurves).integer == 0 {
+        if view.common.cvar(view.cm.cm_noCurves).integer == 0 {
             for k in 0..(*leaf).numLeafSurfaces {
                 let patch: *mut cPatch_t = *(*local).surfaces.offset(
                     *(*local)

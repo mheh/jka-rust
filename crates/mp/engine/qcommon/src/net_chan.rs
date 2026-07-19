@@ -283,26 +283,18 @@ pub fn NET_StringToAdr(s: *const c_char, a: *mut netadr_t) -> qboolean {
 pub fn Netchan_Init(view: &mut EngineHostView, port: c_int) {
     let port = port & 0xffff;
 
-    unsafe {
-        // `->integer` is cached into a plain `i32` field once here, not re-read live like Raven's `cvar_t*` — a runtime `/set` won't be reflected after init.
-        let showpackets_cvar = Cvar_Get(view, c"showpackets".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
-        view.common.showpackets = (*showpackets_cvar).integer;
+    // `->integer` is cached into a plain `i32` field once here, not re-read live like Raven's `cvar_t*` — a runtime `/set` won't be reflected after init.
+    let showpackets_cvar = Cvar_Get(view, "showpackets", "0", CVAR_TEMP);
+    view.common.showpackets = view.common.cvar(showpackets_cvar).integer;
 
-        let showdrop_cvar = Cvar_Get(view, c"showdrop".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
-        view.common.showdrop = (*showdrop_cvar).integer;
+    let showdrop_cvar = Cvar_Get(view, "showdrop", "0", CVAR_TEMP);
+    view.common.showdrop = view.common.cvar(showdrop_cvar).integer;
 
-        let qport_val = std::ffi::CString::new(format!("{port}")).unwrap();
-        let qport_cvar = Cvar_Get(view, c"net_qport".as_ptr(), qport_val.as_ptr(), CVAR_INIT);
-        view.common.net_qport = (*qport_cvar).integer;
+    let qport_cvar = Cvar_Get(view, "net_qport", &format!("{port}"), CVAR_INIT);
+    view.common.net_qport = view.common.cvar(qport_cvar).integer;
 
-        let killdropped_cvar = Cvar_Get(
-            view,
-            c"net_killdroppedfragments".as_ptr(),
-            c"0".as_ptr(),
-            CVAR_TEMP,
-        );
-        view.common.net_killdroppedfragments = (*killdropped_cvar).integer;
-    }
+    let killdropped_cvar = Cvar_Get(view, "net_killdroppedfragments", "0", CVAR_TEMP);
+    view.common.net_killdroppedfragments = view.common.cvar(killdropped_cvar).integer;
 }
 
 /// Raven `NET_CompareBaseAdr`.

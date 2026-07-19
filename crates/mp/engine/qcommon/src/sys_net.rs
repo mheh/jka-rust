@@ -16,7 +16,6 @@
 #![allow(non_snake_case)]
 
 use core::ffi::c_int;
-use std::ffi::{CStr, CString};
 
 use native_platform::net::{
     ip_socket, ipx_socket, net_collect_local_addresses, net_ip_socket, net_is_lan_ip, net_recvfrom,
@@ -188,15 +187,11 @@ pub fn Sys_IsLANAddress(adr: &netadr_t) -> bool {
 /// Source: `oracle/codemp/unix/unix_net.c:457-476`
 pub fn NET_OpenIP(view: &mut EngineHostView) {
     // ip = Cvar_Get("net_ip", "localhost", 0);
-    let ip = Cvar_Get(view, c"net_ip".as_ptr(), c"localhost".as_ptr(), 0);
+    let ip = Cvar_Get(view, "net_ip", "localhost", 0);
     // port = Cvar_Get("net_port", va("%i", PORT_SERVER), 0)->value;
-    let port_default = CString::new(format!("{PORT_SERVER}")).unwrap();
-    let port_cvar = Cvar_Get(view, c"net_port".as_ptr(), port_default.as_ptr(), 0);
-    // SAFETY: Cvar_Get returns a live cvar node; read its numeric value/string.
-    let port = unsafe { (*port_cvar).value } as i32;
-    let ip_string = unsafe { CStr::from_ptr((*ip).string) }
-        .to_string_lossy()
-        .into_owned();
+    let port_cvar = Cvar_Get(view, "net_port", &format!("{PORT_SERVER}"), 0);
+    let port = view.common.cvar(port_cvar).value as i32;
+    let ip_string = view.common.cvar(ip).string.clone();
 
     for i in 0..10 {
         let fd = {
@@ -205,7 +200,7 @@ pub fn NET_OpenIP(view: &mut EngineHostView) {
         };
         set_ip_socket(fd);
         if fd != 0 {
-            Cvar_SetValue(view, c"net_port".as_ptr(), (port + i) as f32);
+            Cvar_SetValue(view, "net_port", (port + i) as f32);
             // NET_GetLocalAddress().
             let print = &mut |s: &str| com_printf(view.common, s);
             net_collect_local_addresses(print);
@@ -224,10 +219,9 @@ pub fn NET_OpenIP(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/unix/unix_net.c:484-491`
 pub fn NET_Init(view: &mut EngineHostView) {
     // noudp = Cvar_Get("net_noudp", "0", 0);
-    let noudp = Cvar_Get(view, c"net_noudp".as_ptr(), c"0".as_ptr(), 0);
+    let noudp = Cvar_Get(view, "net_noudp", "0", 0);
     // open sockets
-    // SAFETY: Cvar_Get returns a live cvar node; read its numeric value.
-    if unsafe { (*noudp).value } == 0.0 {
+    if view.common.cvar(noudp).value == 0.0 {
         NET_OpenIP(view);
     }
 }
@@ -240,8 +234,7 @@ pub fn NET_Init(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/unix/unix_net.c:582-598`
 pub fn NET_Sleep(common: &mut Common, msec: c_int) {
     // if (!ip_socket || !com_dedicated->integer) return; — not a server.
-    // SAFETY: com_dedicated is the live cvar registered at Com_Init.
-    if ip_socket() == 0 || unsafe { (*common.com_dedicated).integer } == 0 {
+    if ip_socket() == 0 || common.cvar(common.com_dedicated).integer == 0 {
         return; // we're not a server, just run full speed
     }
     net_select_sleep(ip_socket(), msec);

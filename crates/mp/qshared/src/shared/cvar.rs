@@ -4,7 +4,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_float, c_int};
-use native_types::qboolean;
+use core::num::NonZeroU32;
 
 /// Raven `cvarHandle_t`.
 ///
@@ -50,54 +50,49 @@ pub const CVAR_INTERNAL: c_int = 0x0000_0800;
 /// Raven comment: "nothing outside the Cvar_*() functions should modify these
 /// fields!".
 ///
+/// Engine-internal only — modules receive `vmCvar_t` copies, never this struct
+/// — so the C layout is dropped (string-data migration, DEC-32): strings are
+/// owned, and the `next`/`hashNext` intrusive chains live as the
+/// `Common.cvar_vars` order list over the `Common.cvar_indexes` slot arena.
 /// Type definition source: `oracle/codemp/game/q_shared.h:1804-1816`
-#[repr(C)]
 pub struct cvar_t {
-    pub name: *mut c_char,
-    pub string: *mut c_char,
+    pub name: String,
+    pub string: String,
     /// cvar_restart will reset to this value.
-    pub resetString: *mut c_char,
-    /// for CVAR_LATCH vars.
-    pub latchedString: *mut c_char,
+    pub resetString: String,
+    /// for CVAR_LATCH vars. `None` = Raven's null (no latched value pending).
+    pub latchedString: Option<String>,
     pub flags: c_int,
     /// set each time the cvar is changed.
-    pub modified: qboolean,
+    pub modified: bool,
     /// incremented each time the cvar is changed.
     pub modificationCount: c_int,
     /// atof( string ).
     pub value: c_float,
     /// atoi( string ).
     pub integer: c_int,
-    pub next: *mut cvar_t,
-    pub hashNext: *mut cvar_t,
 }
 
-/// Raven `cvar_s` tag alias (`cvar_t`'s C struct tag).
-pub type cvar_s = cvar_t;
+/// Engine-internal handle to a `Common.cvar_indexes` slot — replaces Raven's
+/// cached file-scope `cvar_t*` globals (§B5 index-not-pointer). The slot index
+/// is Raven's `cvarHandle_t` (minted by `Cvar_Register`), so numbering stays
+/// oracle-identical.
+///
+/// Stored as slot+1 in a `NonZeroU32` so `Option<CvarHandle>`'s all-zero bytes
+/// are `None` (Raven's null pointer) inside the zero-allocated `Engine`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CvarHandle(NonZeroU32);
 
-const _: () = assert!(core::mem::offset_of!(cvar_t, name) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, string) == 8);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, resetString) == 16);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, latchedString) == 24);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, flags) == 32);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, modified) == 36);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, modificationCount) == 40);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, value) == 44);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, integer) == 48);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, next) == 56);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(cvar_t, hashNext) == 64);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<cvar_t>() == 72);
+impl CvarHandle {
+    pub fn from_slot(slot: usize) -> CvarHandle {
+        CvarHandle(NonZeroU32::new(slot as u32 + 1).expect("cvar slot overflow"))
+    }
+
+    /// The `Common.cvar_indexes` index — Raven's `cvarHandle_t` value.
+    pub fn slot(self) -> usize {
+        (self.0.get() - 1) as usize
+    }
+}
 
 /// Raven `vmCvar_t`.
 ///

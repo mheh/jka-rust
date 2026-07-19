@@ -39,9 +39,9 @@ mod null {
 // `z_memman_pc`. All genuinely unported; reported.
 use crate::files::unz_file::unzOpenCurrentFile;
 use crate::files_common::{
-    FS_AddGameDirectory, FS_CopyFile, FS_CreatePath, FS_FCloseFile, FS_FOpenFileRead,
-    FS_FOpenFileWrite, FS_FileForHandle, FS_FreeFileList, FS_HandleForFile, FS_ListFiles, FS_Read,
-    FS_Restart, FS_SV_FOpenFileRead,
+    FS_AddGameDirectory, FS_BuildOSPath4, FS_CopyFile, FS_CreatePath, FS_FCloseFile,
+    FS_FOpenFileRead, FS_FOpenFileWrite, FS_FileForHandle, FS_FreeFileList, FS_HandleForFile,
+    FS_ListFiles, FS_Read, FS_Restart, FS_SV_FOpenFileRead,
 };
 use crate::sys_engine::{Sys_StreamSeek, Sys_StreamedRead};
 use crate::z_memman_pc::{CopyString, Z_Free};
@@ -135,7 +135,7 @@ pub fn Sys_FileOutOfDate(
     }
 
     // extra error check, report as suspicious if you find a file locally but not out on the net.,.
-    if unsafe { (*common.com_developer).integer } != 0 {
+    if common.cvar(common.com_developer).integer != 0 {
         if !Sys_GetFileTime(psDataFileName, &mut ftDataFile) {
             crate::common::com_printf(
                 common,
@@ -154,7 +154,7 @@ pub fn Sys_FileOutOfDate(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:634-642`
 pub fn FS_FileCacheable(common: &mut Common, filename: *const c_char) -> bool {
-    if !common.com_buildScript.is_null() && unsafe { (*common.com_buildScript).integer } != 0 {
+    if common.com_buildScript.is_some() && common.cvar(common.com_buildScript).integer != 0 {
         return true;
     }
     unsafe { !libc::strchr(filename, b'/' as c_int).is_null() }
@@ -575,10 +575,11 @@ pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:227-240`
 pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
         let testpath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             common.fs_gamedir.as_ptr(),
             file,
         );
@@ -595,10 +596,11 @@ pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:249-263`
 pub fn FS_SV_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
         let testpath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             file,
             c"".as_ptr(),
         );
@@ -713,10 +715,11 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
         );
     }
 
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
         let ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             filename,
             c"".as_ptr(),
         );
@@ -726,7 +729,7 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
         let f = FS_HandleForFile(common);
         common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
-        if (*common.fs_debug).integer != 0 {
+        if common.cvar(common.fs_debug).integer != 0 {
             crate::common::com_printf(
                 common,
                 &format!("FS_SV_FOpenFileWrite: {}\n", c_str_to_string(ospath)),
@@ -769,23 +772,14 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
     // don't let sound stutter
     null::S_ClearSoundBuffer();
 
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
-        let from_ospath = crate::files_common::FS_BuildOSPath4(
-            common,
-            (*common.fs_homepath).string,
-            from,
-            c"".as_ptr(),
-        );
-        let to_ospath = crate::files_common::FS_BuildOSPath4(
-            common,
-            (*common.fs_homepath).string,
-            to,
-            c"".as_ptr(),
-        );
+        let from_ospath = FS_BuildOSPath4(common, homepath.as_ptr(), from, c"".as_ptr());
+        let to_ospath = FS_BuildOSPath4(common, homepath.as_ptr(), to, c"".as_ptr());
         *from_ospath.add(libc::strlen(from_ospath) - 1) = 0;
         *to_ospath.add(libc::strlen(to_ospath) - 1) = 0;
 
-        if (*common.fs_debug).integer != 0 {
+        if common.cvar(common.fs_debug).integer != 0 {
             crate::common::com_printf(
                 common,
                 &format!(
@@ -818,21 +812,22 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     // don't let sound stutter
     null::S_ClearSoundBuffer();
 
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
         let from_ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             common.fs_gamedir.as_ptr(),
             from,
         );
         let to_ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             common.fs_gamedir.as_ptr(),
             to,
         );
 
-        if (*common.fs_debug).integer != 0 {
+        if common.cvar(common.fs_debug).integer != 0 {
             crate::common::com_printf(
                 common,
                 &format!(
@@ -874,15 +869,16 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
     // don't let sound stutter
     null::S_ClearSoundBuffer();
 
+    let homepath = common.cvar_cstring(common.fs_homepath);
     unsafe {
         let ospath = crate::files_common::FS_BuildOSPath4(
             common,
-            (*common.fs_homepath).string,
+            homepath.as_ptr(),
             common.fs_gamedir.as_ptr(),
             filename,
         );
 
-        if (*common.fs_debug).integer != 0 {
+        if common.cvar(common.fs_debug).integer != 0 {
             crate::common::com_printf(
                 common,
                 &format!("FS_FOpenFileAppend: {}\n", c_str_to_string(ospath)),
@@ -1144,33 +1140,23 @@ pub fn Sys_ConcatenateFileLists(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2419-2436`
 pub fn FS_UpdateGamedir(view: &mut EngineHostView) {
-    unsafe {
-        let gamedirvar_str = c_str_to_string((*view.common.fs_gamedirvar).string);
-        if !gamedirvar_str.is_empty() && !gamedirvar_str.eq_ignore_ascii_case(BASEGAME) {
-            let cdpath_str = c_str_to_string((*view.common.fs_cdpath).string);
-            if !cdpath_str.is_empty() {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_cdpath).string,
-                    (*view.common.fs_gamedirvar).string,
-                );
-            }
-            let basepath_str = c_str_to_string((*view.common.fs_basepath).string);
-            if !basepath_str.is_empty() {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_basepath).string,
-                    (*view.common.fs_gamedirvar).string,
-                );
-            }
-            let homepath_str = c_str_to_string((*view.common.fs_homepath).string);
-            if !homepath_str.is_empty() && !homepath_str.eq_ignore_ascii_case(&basepath_str) {
-                FS_AddGameDirectory(
-                    view,
-                    (*view.common.fs_homepath).string,
-                    (*view.common.fs_gamedirvar).string,
-                );
-            }
+    let gamedirvar_str = view.common.cvar(view.common.fs_gamedirvar).string.clone();
+    if !gamedirvar_str.is_empty() && !gamedirvar_str.eq_ignore_ascii_case(BASEGAME) {
+        let gamedirvar = view.common.cvar_cstring(view.common.fs_gamedirvar);
+        let cdpath_str = view.common.cvar(view.common.fs_cdpath).string.clone();
+        if !cdpath_str.is_empty() {
+            let cdpath = view.common.cvar_cstring(view.common.fs_cdpath);
+            FS_AddGameDirectory(view, cdpath.as_ptr(), gamedirvar.as_ptr());
+        }
+        let basepath_str = view.common.cvar(view.common.fs_basepath).string.clone();
+        if !basepath_str.is_empty() {
+            let basepath = view.common.cvar_cstring(view.common.fs_basepath);
+            FS_AddGameDirectory(view, basepath.as_ptr(), gamedirvar.as_ptr());
+        }
+        let homepath_str = view.common.cvar(view.common.fs_homepath).string.clone();
+        if !homepath_str.is_empty() && !homepath_str.eq_ignore_ascii_case(&basepath_str) {
+            let homepath = view.common.cvar_cstring(view.common.fs_homepath);
+            FS_AddGameDirectory(view, homepath.as_ptr(), gamedirvar.as_ptr());
         }
     }
 }
@@ -1232,12 +1218,11 @@ pub fn FS_PureServerSetReferencedPaks(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3048-3054`
 pub fn FS_ConditionalRestart(view: &mut EngineHostView, checksumFeed: c_int) -> qboolean {
-    unsafe {
-        if (*view.common.fs_gamedirvar).modified != 0 || checksumFeed != view.common.fs_checksumFeed
-        {
-            FS_Restart(view, checksumFeed);
-            return mp_qshared::shared::qtrue;
-        }
+    if view.common.cvar(view.common.fs_gamedirvar).modified
+        || checksumFeed != view.common.fs_checksumFeed
+    {
+        FS_Restart(view, checksumFeed);
+        return mp_qshared::shared::qtrue;
     }
     mp_qshared::shared::qfalse
 }
@@ -1249,26 +1234,29 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
     let mut n_mods: c_int = 0;
     let mut n_total: c_int = 0;
 
+    let homepath = view.common.cvar_cstring(view.common.fs_homepath);
+    let basepath = view.common.cvar_cstring(view.common.fs_basepath);
+    let cdpath = view.common.cvar_cstring(view.common.fs_cdpath);
     unsafe {
         *listbuf = 0;
 
         let mut dummy: c_int = 0;
         let p_files0 = Sys_ListFiles(
-            (*view.common.fs_homepath).string,
+            homepath.as_ptr(),
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
             mp_qshared::shared::qtrue,
         );
         let p_files1 = Sys_ListFiles(
-            (*view.common.fs_basepath).string,
+            basepath.as_ptr(),
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
             mp_qshared::shared::qtrue,
         );
         let p_files2 = Sys_ListFiles(
-            (*view.common.fs_cdpath).string,
+            cdpath.as_ptr(),
             core::ptr::null(),
             core::ptr::null_mut(),
             &mut dummy,
@@ -1300,12 +1288,8 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
             // we drop "base" "." and ".."
             if !name_str.eq_ignore_ascii_case(BASEGAME) && !name_str.starts_with('.') {
                 // now we need to find some .pk3 files to validate the mod
-                let mut path = crate::files_common::FS_BuildOSPath4(
-                    view.common,
-                    (*view.common.fs_basepath).string,
-                    name,
-                    c"".as_ptr(),
-                );
+                let mut path =
+                    FS_BuildOSPath4(view.common, basepath.as_ptr(), name, c"".as_ptr());
                 let mut n_paks: c_int = 0;
                 let mut p_paks = Sys_ListFiles(
                     path,
@@ -1318,12 +1302,7 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
 
                 // Try on cd path
                 if n_paks <= 0 {
-                    path = crate::files_common::FS_BuildOSPath4(
-                        view.common,
-                        (*view.common.fs_cdpath).string,
-                        name,
-                        c"".as_ptr(),
-                    );
+                    path = FS_BuildOSPath4(view.common, cdpath.as_ptr(), name, c"".as_ptr());
                     n_paks = 0;
                     p_paks = Sys_ListFiles(
                         path,
@@ -1337,12 +1316,7 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
 
                 // try on home path
                 if n_paks <= 0 {
-                    path = crate::files_common::FS_BuildOSPath4(
-                        view.common,
-                        (*view.common.fs_homepath).string,
-                        name,
-                        c"".as_ptr(),
-                    );
+                    path = FS_BuildOSPath4(view.common, homepath.as_ptr(), name, c"".as_ptr());
                     n_paks = 0;
                     p_paks = Sys_ListFiles(
                         path,

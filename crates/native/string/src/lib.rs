@@ -6,6 +6,7 @@
 #![allow(non_snake_case)]
 #![forbid(unsafe_code)]
 
+pub mod atof;
 pub mod atoi;
 pub mod ctype;
 pub mod filter;

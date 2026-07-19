@@ -221,7 +221,7 @@ fn CL_Shutdown_null(_view: &mut EngineHostView) {}
 /// Source: `oracle/codemp/null/null_client.cpp:12-14`
 #[allow(non_snake_case)]
 fn CL_Init_null(view: &mut EngineHostView) {
-    Cvar_Get(view, c"cl_shownet".as_ptr(), c"0".as_ptr(), CVAR_TEMP);
+    Cvar_Get(view, "cl_shownet", "0", CVAR_TEMP);
 }
 
 /// Raven null `CL_Disconnect`. Source: `oracle/codemp/null/null_client.cpp:31-32`

@@ -7,10 +7,11 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, CStr};
+use std::ffi::CString;
 
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
-use mp_engine_qcommon::cvar_fns::Cvar_VariableValue;
+use mp_engine_qcommon::cvar_fns::{Cvar_Set, Cvar_VariableValue};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::game::g_public::SVF_BOT;
@@ -54,7 +55,7 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
         if view.is_lan_address(&(*cl).netchan.remoteAddress)
-            && (*view.common.com_dedicated).integer != 2
+            && view.common.cvar(view.common.com_dedicated).integer != 2
         {
             // lans should not rate limit
             (*cl).rate = 99999;
@@ -112,7 +113,7 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:31-130`
 pub fn SV_GetChallenge(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
-    if Cvar_VariableValue(view, c"ui_singlePlayerActive".as_ptr() as *const c_char) != 0.0 {
+    if Cvar_VariableValue(view, "ui_singlePlayerActive") != 0.0 {
         return;
     }
 
@@ -572,7 +573,7 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
         )
     } == 0
     {
-        if Cvar_VariableValue(view, c"fs_restrict".as_ptr() as *const c_char) != 0.0 {
+        if Cvar_VariableValue(view, "fs_restrict") != 0.0 {
             // a demo client connecting to a demo server
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 view.common,
@@ -702,7 +703,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             c"qport".as_ptr() as *mut c_char,
         ));
 
-        let max_clients = (*view.common.sv_maxclients).integer;
+        let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
 
         // quick reject
         let mut reconnect_cl: *mut client_t = core::ptr::null_mut();
@@ -719,7 +720,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         || from.port == (*cl).netchan.remoteAddress.port)
                 {
                     if (sv.svs.time - (*cl).lastConnectTime)
-                        < ((*view.common.sv_reconnectlimit).integer * 1000)
+                        < (view.common.cvar(view.common.sv_reconnectlimit).integer * 1000)
                     {
                         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                             view.common,
@@ -788,7 +789,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
 
             // never reject a LAN client based on ping
             if !view.is_lan_address(&from) {
-                let min_ping = (*view.common.sv_minPing).value;
+                let min_ping = view.common.cvar(view.common.sv_minPing).value;
                 if min_ping != 0.0 && (ping as f32) < min_ping {
                     // don't let them keep trying until they get a big delay
                     let high_ping_msg = mp_engine_qcommon::stringed::SE_GetString2(
@@ -814,7 +815,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                     sv.svs.challenges[i].adr.port = 0;
                     return;
                 }
-                let max_ping = (*view.common.sv_maxPing).value;
+                let max_ping = view.common.cvar(view.common.sv_maxPing).value;
                 if max_ping != 0.0 && (ping as f32) > max_ping {
                     let low_ping_msg = mp_engine_qcommon::stringed::SE_GetString2(
                         view,
@@ -905,12 +906,15 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 // have "password" set to the value of "sv_privatePassword"
                 let password =
                     Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
-                let start_index: c_int =
-                    if strcmp(password, (*view.common.sv_privatePassword).string) == 0 {
-                        0
-                    } else {
-                        (*view.common.sv_privateClients).integer
-                    };
+                let sv_privatePassword_c = CString::new(
+                    view.common.cvar(view.common.sv_privatePassword).string.as_str(),
+                )
+                .unwrap_or_default();
+                let start_index: c_int = if strcmp(password, sv_privatePassword_c.as_ptr()) == 0 {
+                    0
+                } else {
+                    view.common.cvar(view.common.sv_privateClients).integer
+                };
 
                 let mut new_slot: *mut client_t = core::ptr::null_mut();
                 {
@@ -1289,7 +1293,7 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
 /// Source: `oracle/codemp/server/sv_client.cpp:1283-1433`
 pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     // _XBOX is not defined in this build — the whole body is live.
-    if unsafe { (*view.common.sv_pure).integer } == 0 {
+    if view.common.cvar(view.common.sv_pure).integer == 0 {
         return;
     }
 
@@ -1297,9 +1301,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
     let mut n_chk_sum2: c_int = 0;
     let mut b_good;
 
-    if mp_engine_qcommon::cvar_fns::Cvar_VariableValue(view, c"vm_cgame".as_ptr() as *const c_char)
-        != 0.0
-    {
+    if Cvar_VariableValue(view, "vm_cgame") != 0.0 {
         let mut cs1 = 0;
         b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
             view.common,
@@ -1318,9 +1320,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
     }
 
     if b_good {
-        if mp_engine_qcommon::cvar_fns::Cvar_VariableValue(view, c"vm_ui".as_ptr() as *const c_char)
-            != 0.0
-        {
+        if Cvar_VariableValue(view, "vm_ui") != 0.0 {
             let mut cs2 = 0;
             b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
                 view.common,
@@ -1564,9 +1564,9 @@ pub fn SV_ClientCommand(
         // but not other people
         // We don't do this when the client hasn't been active yet since its
         // normal to spam a lot of commands when downloading
-        if (*view.common.com_cl_running).integer == 0
+        if view.common.cvar(view.common.com_cl_running).integer == 0
             && (*cl).state as c_int >= clientState_t::CS_ACTIVE as c_int
-            && (*view.common.sv_floodProtect).integer != 0
+            && view.common.cvar(view.common.sv_floodProtect).integer != 0
             && sv.svs.time < (*cl).nextReliableTime
         {
             // ignore any other text messages from this client but let them keep playing
@@ -1668,7 +1668,7 @@ pub fn SV_UserMove(
         }
 
         // _XBOX is not defined — pure check is live
-        if (*common.sv_pure).integer != 0 && (*cl).pureAuthentic == 0 {
+        if common.cvar(common.sv_pure).integer != 0 && (*cl).pureAuthentic == 0 {
             crate::SV_DropClient(
                 common,
                 sv,
@@ -1891,13 +1891,13 @@ pub fn SV_DropClient(
         // if this was the last client on the server, send a heartbeat
         // to the master so it is known the server is empty
         let mut i = 0;
-        while i < (*common.sv_maxclients).integer {
+        while i < common.cvar(common.sv_maxclients).integer {
             if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
                 break;
             }
             i += 1;
         }
-        if i == (*common.sv_maxclients).integer {
+        if i == common.cvar(common.sv_maxclients).integer {
             crate::sv_ccmds::SV_Heartbeat_f(sv);
         }
     }
@@ -1966,7 +1966,7 @@ pub fn SV_WriteDownloadToClient(
                 ) != qfalse;
 
             let mut downloadOpenFailed = false;
-            if (*view.common.sv_allowDownload).integer == 0 || idPack {
+            if view.common.cvar(view.common.sv_allowDownload).integer == 0 || idPack {
                 downloadOpenFailed = true;
             } else {
                 (*cl).downloadSize = mp_engine_qcommon::files_common::FS_SV_FOpenFileRead(
@@ -2012,7 +2012,7 @@ pub fn SV_WriteDownloadToClient(
                             ),
                         );
                     }
-                } else if (*view.common.sv_allowDownload).integer == 0 {
+                } else if view.common.cvar(view.common.sv_allowDownload).integer == 0 {
                     mp_engine_qcommon::common::common::com_printf(
                         view.common,
                         &format!(
@@ -2022,7 +2022,7 @@ pub fn SV_WriteDownloadToClient(
                                 .to_string_lossy()
                         ),
                     );
-                    if (*view.common.sv_pure).integer != 0 {
+                    if view.common.cvar(view.common.sv_pure).integer != 0 {
                         Com_sprintf(
                             errorMessage.as_mut_ptr(),
                             errorMessage.len() as c_int,
@@ -2135,16 +2135,12 @@ pub fn SV_WriteDownloadToClient(
         // based on the rate, how many bytes can we fit in the snapMsec time of the client
         // normal rate / snapshotMsec calculation
         let mut rate = (*cl).rate;
-        if (*view.common.sv_maxRate).integer != 0 {
-            if (*view.common.sv_maxRate).integer < 1000 {
-                mp_engine_qcommon::cvar_fns::Cvar_Set(
-                    view,
-                    c"sv_MaxRate".as_ptr(),
-                    c"1000".as_ptr(),
-                );
+        if view.common.cvar(view.common.sv_maxRate).integer != 0 {
+            if view.common.cvar(view.common.sv_maxRate).integer < 1000 {
+                Cvar_Set(view, "sv_MaxRate", "1000");
             }
-            if (*view.common.sv_maxRate).integer < rate {
-                rate = (*view.common.sv_maxRate).integer;
+            if view.common.cvar(view.common.sv_maxRate).integer < rate {
+                rate = view.common.cvar(view.common.sv_maxRate).integer;
             }
         }
 

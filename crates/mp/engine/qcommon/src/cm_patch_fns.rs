@@ -1327,6 +1327,7 @@ TRACE TESTING
 ///
 /// Source: `oracle/codemp/qcommon/cm_patch.cpp:1246-1339`
 fn CM_TracePointThroughPatchCollide(
+    common: &Common,
     cm: &CollisionWorld,
     tw: *mut traceWork_t,
     trace: &mut trace_t,
@@ -1334,9 +1335,9 @@ fn CM_TracePointThroughPatchCollide(
 ) {
     unsafe {
         // §19: guard the not-yet-registered `cm_playerCurveClip` cvar (Raven
-        // dereferences it unconditionally) — a null handle reads as 0 here.
-        if cm.cm_playerCurveClip.is_null()
-            || (*cm.cm_playerCurveClip).integer == 0
+        // dereferences it unconditionally) — a `None` handle reads as 0 here.
+        if cm.cm_playerCurveClip.is_none()
+            || common.cvar(cm.cm_playerCurveClip).integer == 0
             || (*tw).isPoint == qfalse
         {
             return;
@@ -1494,7 +1495,7 @@ pub fn CM_TraceThroughPatchCollide(
         }
 
         if (*tw).isPoint != qfalse {
-            CM_TracePointThroughPatchCollide(view.cm, tw, trace, pc);
+            CM_TracePointThroughPatchCollide(view.common, view.cm, tw, trace, pc);
             return;
         }
 

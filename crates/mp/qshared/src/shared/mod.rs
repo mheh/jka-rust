@@ -81,7 +81,7 @@ pub use cinematic_status::{
 pub use collision::{cplane_t, CollisionRecord_t, PLANE_X, PLANE_Y, PLANE_Z};
 pub use connstate::connstate_t;
 pub use ct_table::ct_table_t;
-pub use cvar::{cvarHandle_t, cvar_s, cvar_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
+pub use cvar::{cvarHandle_t, cvar_t, vmCvar_t, CvarHandle, MAX_CVAR_VALUE_STRING};
 pub use effect_trail_arg::effectTrailArgStruct_t;
 pub use effect_trail_vert::effectTrailVertStruct_t;
 pub use entity_shared::entityShared_t;

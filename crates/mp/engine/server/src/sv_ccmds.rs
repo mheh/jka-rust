@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int};
+use std::ffi::CString;
 
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cmd::cmd_function_t::CmdFunction;
@@ -91,13 +92,13 @@ pub fn SV_GetPlayerByFedName(
     name: *const c_char,
 ) -> *mut client_t {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         return core::ptr::null_mut();
     }
 
     // check for a name match
     let n = sv.svs.clients;
-    for i in 0..unsafe { (*common.sv_maxclients).integer } {
+    for i in 0..common.cvar(common.sv_maxclients).integer {
         let cl = unsafe { n.offset(i as isize) };
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
@@ -145,7 +146,7 @@ pub fn SV_RemoveOperatorCommands() {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:43-80`
 pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         return core::ptr::null_mut();
     }
 
@@ -158,7 +159,7 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
 
     // check for a name match
     let n = sv.svs.clients;
-    for i in 0..unsafe { (*common.sv_maxclients).integer } {
+    for i in 0..common.cvar(common.sv_maxclients).integer {
         let cl = unsafe { n.offset(i as isize) };
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
@@ -199,7 +200,7 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:89-125`
 pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         return core::ptr::null_mut();
     }
 
@@ -220,7 +221,7 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
         }
     }
     let idnum = unsafe { libc::atoi(s) };
-    if idnum < 0 || idnum >= unsafe { (*common.sv_maxclients).integer } {
+    if idnum < 0 || idnum >= common.cvar(common.sv_maxclients).integer {
         com_printf(common, &format!("Bad client slot: {}\n", idnum));
         return core::ptr::null_mut();
     }
@@ -238,7 +239,7 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:389-446`
 pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         return;
     }
 
@@ -246,7 +247,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
     if cl.is_null() {
         if Q_stricmp(name, c"all".as_ptr()) == 0 {
             let n = sv.svs.clients;
-            for i in 0..unsafe { (*common.sv_maxclients).integer } {
+            for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
                     continue;
@@ -266,7 +267,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
             }
         } else if Q_stricmp(name, c"allbots".as_ptr()) == 0 {
             let n = sv.svs.clients;
-            for i in 0..unsafe { (*common.sv_maxclients).integer } {
+            for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
                     continue;
@@ -324,7 +325,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
     let mut avoidTruncation = qfalse;
 
     // make sure server is running
-    if unsafe { (*view.common.com_sv_running).integer } == 0 {
+    if view.common.cvar(view.common.com_sv_running).integer == 0 {
         let msg = SE_GetString(view, "STR_SERVER_SERVER_NOT_RUNNING");
         com_printf(view.common, &msg);
         return;
@@ -338,9 +339,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
 
     com_printf(
         view.common,
-        &format!("map: {}\n", unsafe {
-            core::ffi::CStr::from_ptr((*view.common.sv_mapname).string).to_string_lossy()
-        }),
+        &format!("map: {}\n", view.common.cvar(view.common.sv_mapname).string),
     );
 
     com_printf(
@@ -351,7 +350,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
         view.common,
         "--- ----- ---- --------------- ------- --------------------- ----- -----\n",
     );
-    for i in 0..unsafe { (*view.common.sv_maxclients).integer } {
+    for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
         let cl = unsafe { sv.svs.clients.offset(i as isize) };
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
@@ -417,13 +416,13 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:757-787`
 pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
-    if unsafe { (*common.com_dedicated).integer } == 0 {
+    if common.cvar(common.com_dedicated).integer == 0 {
         com_printf(common, "Server is not dedicated.\n");
         return;
     }
 
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         com_printf(common, "Server is not running.\n");
         return;
     }
@@ -459,7 +458,7 @@ pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:817-867`
 pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
     let _ = sv;
-    let mut fpDisabled = Cvar_VariableValue(view, c"g_forcePowerDisable".as_ptr()) as c_int;
+    let mut fpDisabled = Cvar_VariableValue(view, "g_forcePowerDisable") as c_int;
     let targetPower: c_int;
     let mut powerDisabled;
 
@@ -508,11 +507,7 @@ pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
         fpDisabled |= 1 << targetPower;
     }
 
-    Cvar_Set(
-        view,
-        c"g_forcePowerDisable".as_ptr() as *mut c_char,
-        format!("{}\0", fpDisabled).as_ptr() as *mut c_char,
-    );
+    Cvar_Set(view, "g_forcePowerDisable", &format!("{}", fpDisabled));
 
     com_printf(
         view.common,
@@ -562,7 +557,7 @@ pub fn SV_KillServer_f(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:455-511`
 pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         com_printf(common, "Server is not running.\n");
         return;
     }
@@ -584,7 +579,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     if cl.is_null() {
         if { Q_stricmp(Cmd_Argv(common, 1), c"all".as_ptr()) } == 0 {
             let n = sv.svs.clients;
-            for i in 0..unsafe { (*common.sv_maxclients).integer } {
+            for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
                     continue;
@@ -604,7 +599,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
             }
         } else if { Q_stricmp(Cmd_Argv(common, 1), c"allbots".as_ptr()) } == 0 {
             let n = sv.svs.clients;
-            for i in 0..unsafe { (*common.sv_maxclients).integer } {
+            for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
                     continue;
@@ -660,7 +655,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:636-662`
 pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         com_printf(common, "Server is not running.\n");
         return;
     }
@@ -710,11 +705,12 @@ pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
 pub fn SV_Serverinfo_f(common: &mut Common) {
     com_printf(common, "Server info settings:\n");
     let info = Cvar_InfoString(common, CVAR_SERVERINFO);
-    Info_Print(common, info as *const c_char);
+    let info_c = CString::new(info.as_str()).unwrap_or_default();
+    Info_Print(common, info_c.as_ptr());
     // NOTE: com_sv_running is threaded through `Common` per the Cvar_Get
     // registration precedent elsewhere in this crate, not `Server`, since
     // this fn takes no `sv` receiver (LAW per resolved signature).
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         com_printf(common, "Server is not running.\n");
     }
 }
@@ -725,7 +721,8 @@ pub fn SV_Serverinfo_f(common: &mut Common) {
 pub fn SV_Systeminfo_f(common: &mut Common) {
     com_printf(common, "System info settings:\n");
     let info = Cvar_InfoString(common, CVAR_SYSTEMINFO);
-    Info_Print(common, info as *const c_char);
+    let info_c = CString::new(info.as_str()).unwrap_or_default();
+    Info_Print(common, info_c.as_ptr());
 }
 
 /// Raven `SV_DumpUser_f`.
@@ -733,7 +730,7 @@ pub fn SV_Systeminfo_f(common: &mut Common) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:917-939`
 pub fn SV_DumpUser_f(common: &mut Common, sv: &mut Server) {
     // make sure server is running
-    if unsafe { (*common.com_sv_running).integer } == 0 {
+    if common.cvar(common.com_sv_running).integer == 0 {
         com_printf(common, "Server is not running.\n");
         return;
     }
@@ -787,12 +784,7 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
     }
 
     // force latched values to get set
-    Cvar_Get(
-        view,
-        c"g_gametype".as_ptr() as *mut c_char,
-        c"0".as_ptr() as *mut c_char,
-        CVAR_SERVERINFO | CVAR_LATCH,
-    );
+    Cvar_Get(view, "g_gametype", "0", CVAR_SERVERINFO | CVAR_LATCH);
 
     let mut cmd = unsafe { core::ffi::CStr::from_ptr(Cmd_Argv(view.common, 0)) }
         .to_string_lossy()
@@ -808,16 +800,12 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
     {
         Cvar_SetValue(
             view,
-            c"g_gametype".as_ptr() as *const c_char,
+            "g_gametype",
             mp_bg::public::gametype::GT_SINGLE_PLAYER as c_int as f32,
         );
-        Cvar_SetValue(view, c"g_doWarmup".as_ptr() as *const c_char, 0.0);
+        Cvar_SetValue(view, "g_doWarmup", 0.0);
         // may not set sv_maxclients directly, always set latched
-        Cvar_SetLatched(
-            view,
-            c"sv_maxclients".as_ptr() as *mut c_char,
-            c"8".as_ptr() as *mut c_char,
-        );
+        Cvar_SetLatched(view, "sv_maxclients", "8");
         cmd = cmd[2..].to_string();
         cheat = qfalse;
         killBots = qtrue;
@@ -864,17 +852,9 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
     // cheats will not be allowed.  If started with "devmap <levelname>"
     // then cheats will be allowed
     if cheat == qtrue {
-        Cvar_Set(
-            view,
-            c"sv_cheats".as_ptr() as *mut c_char,
-            c"1".as_ptr() as *mut c_char,
-        );
+        Cvar_Set(view, "sv_cheats", "1");
     } else {
-        Cvar_Set(
-            view,
-            c"sv_cheats".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-        );
+        Cvar_Set(view, "sv_cheats", "0");
     }
 }
 
@@ -888,7 +868,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
     }
 
     // make sure server is running
-    if unsafe { (*view.common.com_sv_running).integer } == 0 {
+    if view.common.cvar(view.common.com_sv_running).integer == 0 {
         com_printf(view.common, "Server is not running.\n");
         return;
     }
@@ -915,16 +895,14 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
 
     // check for changes in variables that can't just be restarted
     // check for maxclients change
-    if unsafe {
-        (*view.common.sv_maxclients).modified != 0 || (*view.common.sv_gametype).modified != 0
-    } {
+    if view.common.cvar(view.common.sv_maxclients).modified
+        || view.common.cvar(view.common.sv_gametype).modified
+    {
         // restart the map the slow way
         let mut mapname = [0 as c_char; MAX_QPATH as usize];
-        Q_strncpyz(
-            mapname.as_mut_ptr(),
-            Cvar_VariableString(view.common, c"mapname".as_ptr()),
-            mapname.len() as c_int,
-        );
+        let mapname_str = Cvar_VariableString(view.common, "mapname");
+        let mapname_c = CString::new(mapname_str).unwrap_or_default();
+        Q_strncpyz(mapname.as_mut_ptr(), mapname_c.as_ptr(), mapname.len() as c_int);
 
         com_printf(view.common, "variable change -- restarting.\n");
 
@@ -946,11 +924,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
     // generate a new serverid
     sv.sv.restartedServerId = sv.sv.serverId;
     sv.sv.serverId = view.common.com_frameTime;
-    Cvar_Set(
-        view,
-        c"sv_serverid".as_ptr() as *mut c_char,
-        format!("{}\0", sv.sv.serverId).as_ptr() as *mut c_char,
-    );
+    Cvar_Set(view, "sv_serverid", &format!("{}", sv.sv.serverId));
 
     // reset all the vm data in place without changing memory allocation
     // note that we do NOT set sv.state = SS_LOADING, so configstrings that
@@ -975,7 +949,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
     sv.sv.restarting = qfalse;
 
     // connect and begin all the clients
-    for i in 0..unsafe { (*view.common.sv_maxclients).integer } {
+    for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
         let client = unsafe { sv.svs.clients.offset(i as isize) };
 
         // send the new gamestate to all connected clients

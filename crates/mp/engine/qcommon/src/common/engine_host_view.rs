@@ -26,7 +26,7 @@ use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::{fileHandle_t, qboolean, qfalse, qhandle_t, vec3_t, FS_WRITE};
+use mp_qshared::shared::{fileHandle_t, qboolean, qhandle_t, vec3_t, FS_WRITE};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::common::{com_printf, Common};
@@ -187,10 +187,7 @@ impl EngineHost for EngineHostView<'_> {
     /// Raven `Cvar_VariableIntegerValue` (unregistered name reads 0).
     /// Source: `oracle/codemp/qcommon/cvar.cpp:118-124`
     fn cvar_integer(&mut self, name: &str) -> i32 {
-        let Ok(cname) = CString::new(name) else {
-            return 0;
-        };
-        Cvar_VariableIntegerValue(self.common, cname.as_ptr())
+        Cvar_VariableIntegerValue(self.common, name)
     }
 
     /// Raven `svs.time` — server-installed accessor.
@@ -267,40 +264,25 @@ impl EngineHost for EngineHostView<'_> {
     /// `cvar_t*` collapses away; reads go through the by-name services.
     /// Source: `oracle/codemp/qcommon/cvar.cpp:188`
     fn cvar_register(&mut self, name: &str, default: &str, flags: i32) {
-        let (Ok(cname), Ok(cdefault)) = (CString::new(name), CString::new(default)) else {
-            return;
-        };
-        Cvar_Get(self, cname.as_ptr(), cdefault.as_ptr(), flags);
+        Cvar_Get(self, name, default, flags);
     }
 
     /// Raven `Cvar_VariableString` (missing name reads `""`).
     /// Source: `oracle/codemp/qcommon/cvar.cpp:133-140`
     fn cvar_string(&mut self, name: &str) -> String {
-        let Ok(cname) = CString::new(name) else {
-            return String::new();
-        };
-        let s = Cvar_VariableString(self.common, cname.as_ptr());
-        // SAFETY: Cvar_VariableString returns the live cvar string or a static
-        // ""; copied out before any further cvar mutation.
-        unsafe { CStr::from_ptr(s) }.to_string_lossy().into_owned()
+        Cvar_VariableString(self.common, name).to_string()
     }
 
     /// Read-and-clear of Raven's `cvar_t->modified` (ruling 55).
     /// Source: `oracle/codemp/qcommon/stringed_ingame.cpp:1252-1259`
     fn cvar_take_modified(&mut self, name: &str) -> bool {
-        let Ok(cname) = CString::new(name) else {
+        let Some(h) = Cvar_FindVar(self.common, name) else {
             return false;
         };
-        let var = Cvar_FindVar(self.common, cname.as_ptr());
-        if var.is_null() {
-            return false;
-        }
-        // SAFETY: Cvar_FindVar returned a live cvar node from the table.
-        unsafe {
-            let was = (*var).modified != qfalse;
-            (*var).modified = qfalse;
-            was
-        }
+        let var = self.common.cvar_mut(h);
+        let was = var.modified;
+        var.modified = false;
+        was
     }
 
     /// Raven `FS_ListFiles` + `FS_FreeFileList` collapsed (ruling 55).

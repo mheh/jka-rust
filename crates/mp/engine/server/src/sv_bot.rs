@@ -81,8 +81,7 @@ pub fn SV_BotInitBotLib(view: &mut EngineHostView, sv: &mut Server, bot: &mut Bo
     if !sv.bot.debugpolygons.is_null() {
         Z_Free(view.common, sv.bot.debugpolygons as *mut ());
     }
-    sv.bot.bot_maxdebugpolys =
-        Cvar_VariableIntegerValue(view.common, c"bot_maxdebugpolys".as_ptr());
+    sv.bot.bot_maxdebugpolys = Cvar_VariableIntegerValue(view.common, "bot_maxdebugpolys");
     sv.bot.debugpolygons = Z_Malloc(
         view,
         core::mem::size_of::<bot_debugpoly_t>() as c_int * sv.bot.bot_maxdebugpolys,
@@ -499,7 +498,7 @@ pub fn SV_BotAllocateClient(common: &mut Common, sv: &mut Server) -> c_int {
         // find a client slot
         let mut i: c_int = 0;
         let mut cl = sv.svs.clients;
-        while i < (*common.sv_maxclients).integer {
+        while i < common.cvar(common.sv_maxclients).integer {
             if (*cl).state == clientState_t::CS_FREE {
                 break;
             }
@@ -507,7 +506,7 @@ pub fn SV_BotAllocateClient(common: &mut Common, sv: &mut Server) -> c_int {
             cl = cl.offset(1);
         }
 
-        if i == (*common.sv_maxclients).integer {
+        if i == common.cvar(common.sv_maxclients).integer {
             return -1;
         }
 
@@ -531,7 +530,7 @@ pub fn SV_BotAllocateClient(common: &mut Common, sv: &mut Server) -> c_int {
 /// Source: `oracle/codemp/server/sv_bot.cpp:208-221`
 pub fn SV_BotFreeClient(common: &mut Common, sv: &mut Server, clientNum: c_int) {
     unsafe {
-        if clientNum < 0 || clientNum >= (*common.sv_maxclients).integer {
+        if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
             com_error(
                 errorParm_t::ERR_DROP,
                 format!("SV_BotFreeClient: bad clientNum: {}", clientNum),
@@ -578,64 +577,34 @@ pub fn SV_BotFrame(common: &mut Common, sv: &mut Server, time: c_int) {
 ///
 /// Source: `oracle/codemp/server/sv_bot.cpp:633-665`
 pub fn SV_BotInitCvars(view: &mut EngineHostView) {
-    Cvar_Get(view, c"bot_enable".as_ptr(), c"1".as_ptr(), 0); //enable the bot
-    Cvar_Get(view, c"bot_developer".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //bot developer mode
-    Cvar_Get(view, c"bot_debug".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //enable bot debugging
-    Cvar_Get(view, c"bot_maxdebugpolys".as_ptr(), c"2".as_ptr(), 0); //maximum number of debug polys
-    Cvar_Get(view, c"bot_groundonly".as_ptr(), c"1".as_ptr(), 0); //only show ground faces of areas
-    Cvar_Get(view, c"bot_reachability".as_ptr(), c"0".as_ptr(), 0); //show all reachabilities to other areas
-    Cvar_Get(
-        view,
-        c"bot_visualizejumppads".as_ptr(),
-        c"0".as_ptr(),
-        CVAR_CHEAT,
-    ); //show jumppads
-    Cvar_Get(view, c"bot_forceclustering".as_ptr(), c"0".as_ptr(), 0); //force cluster calculations
-    Cvar_Get(view, c"bot_forcereachability".as_ptr(), c"0".as_ptr(), 0); //force reachability calculations
-    Cvar_Get(view, c"bot_forcewrite".as_ptr(), c"0".as_ptr(), 0); //force writing aas file
-    Cvar_Get(view, c"bot_aasoptimize".as_ptr(), c"0".as_ptr(), 0); //no aas file optimisation
-    Cvar_Get(view, c"bot_saveroutingcache".as_ptr(), c"0".as_ptr(), 0); //save routing cache
-    Cvar_Get(view, c"bot_thinktime".as_ptr(), c"100".as_ptr(), CVAR_CHEAT); //msec the bots thinks
-    Cvar_Get(view, c"bot_reloadcharacters".as_ptr(), c"0".as_ptr(), 0); //reload the bot characters each time
-    Cvar_Get(view, c"bot_testichat".as_ptr(), c"0".as_ptr(), 0); //test ichats
-    Cvar_Get(view, c"bot_testrchat".as_ptr(), c"0".as_ptr(), 0); //test rchats
-    Cvar_Get(view, c"bot_testsolid".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //test for solid areas
-    Cvar_Get(
-        view,
-        c"bot_testclusters".as_ptr(),
-        c"0".as_ptr(),
-        CVAR_CHEAT,
-    ); //test the AAS clusters
-    Cvar_Get(view, c"bot_fastchat".as_ptr(), c"0".as_ptr(), 0); //fast chatting bots
-    Cvar_Get(view, c"bot_nochat".as_ptr(), c"0".as_ptr(), 0); //disable chats
-    Cvar_Get(view, c"bot_pause".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //pause the bots thinking
-    Cvar_Get(view, c"bot_report".as_ptr(), c"0".as_ptr(), CVAR_CHEAT); //get a full report in ctf
-    Cvar_Get(view, c"bot_grapple".as_ptr(), c"0".as_ptr(), 0); //enable grapple
-    Cvar_Get(view, c"bot_rocketjump".as_ptr(), c"1".as_ptr(), 0); //enable rocket jumping
-    Cvar_Get(view, c"bot_challenge".as_ptr(), c"0".as_ptr(), 0); //challenging bot
-    Cvar_Get(view, c"bot_minplayers".as_ptr(), c"0".as_ptr(), 0); //minimum players in a team or the game
-    Cvar_Get(
-        view,
-        c"bot_interbreedchar".as_ptr(),
-        c"".as_ptr(),
-        CVAR_CHEAT,
-    ); //bot character used for interbreeding
-    Cvar_Get(
-        view,
-        c"bot_interbreedbots".as_ptr(),
-        c"10".as_ptr(),
-        CVAR_CHEAT,
-    ); //number of bots used for interbreeding
-    Cvar_Get(
-        view,
-        c"bot_interbreedcycle".as_ptr(),
-        c"20".as_ptr(),
-        CVAR_CHEAT,
-    ); //bot interbreeding cycle
-    Cvar_Get(
-        view,
-        c"bot_interbreedwrite".as_ptr(),
-        c"".as_ptr(),
-        CVAR_CHEAT,
-    ); //write interbreeded bots to this file
+    Cvar_Get(view, "bot_enable", "1", 0); //enable the bot
+    Cvar_Get(view, "bot_developer", "0", CVAR_CHEAT); //bot developer mode
+    Cvar_Get(view, "bot_debug", "0", CVAR_CHEAT); //enable bot debugging
+    Cvar_Get(view, "bot_maxdebugpolys", "2", 0); //maximum number of debug polys
+    Cvar_Get(view, "bot_groundonly", "1", 0); //only show ground faces of areas
+    Cvar_Get(view, "bot_reachability", "0", 0); //show all reachabilities to other areas
+    Cvar_Get(view, "bot_visualizejumppads", "0", CVAR_CHEAT); //show jumppads
+    Cvar_Get(view, "bot_forceclustering", "0", 0); //force cluster calculations
+    Cvar_Get(view, "bot_forcereachability", "0", 0); //force reachability calculations
+    Cvar_Get(view, "bot_forcewrite", "0", 0); //force writing aas file
+    Cvar_Get(view, "bot_aasoptimize", "0", 0); //no aas file optimisation
+    Cvar_Get(view, "bot_saveroutingcache", "0", 0); //save routing cache
+    Cvar_Get(view, "bot_thinktime", "100", CVAR_CHEAT); //msec the bots thinks
+    Cvar_Get(view, "bot_reloadcharacters", "0", 0); //reload the bot characters each time
+    Cvar_Get(view, "bot_testichat", "0", 0); //test ichats
+    Cvar_Get(view, "bot_testrchat", "0", 0); //test rchats
+    Cvar_Get(view, "bot_testsolid", "0", CVAR_CHEAT); //test for solid areas
+    Cvar_Get(view, "bot_testclusters", "0", CVAR_CHEAT); //test the AAS clusters
+    Cvar_Get(view, "bot_fastchat", "0", 0); //fast chatting bots
+    Cvar_Get(view, "bot_nochat", "0", 0); //disable chats
+    Cvar_Get(view, "bot_pause", "0", CVAR_CHEAT); //pause the bots thinking
+    Cvar_Get(view, "bot_report", "0", CVAR_CHEAT); //get a full report in ctf
+    Cvar_Get(view, "bot_grapple", "0", 0); //enable grapple
+    Cvar_Get(view, "bot_rocketjump", "1", 0); //enable rocket jumping
+    Cvar_Get(view, "bot_challenge", "0", 0); //challenging bot
+    Cvar_Get(view, "bot_minplayers", "0", 0); //minimum players in a team or the game
+    Cvar_Get(view, "bot_interbreedchar", "", CVAR_CHEAT); //bot character used for interbreeding
+    Cvar_Get(view, "bot_interbreedbots", "10", CVAR_CHEAT); //number of bots used for interbreeding
+    Cvar_Get(view, "bot_interbreedcycle", "20", CVAR_CHEAT); //bot interbreeding cycle
+    Cvar_Get(view, "bot_interbreedwrite", "", CVAR_CHEAT); //write interbreeded bots to this file
 }

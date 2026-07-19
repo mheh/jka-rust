@@ -10,6 +10,7 @@
 
 use core::ffi::{c_char, c_int, c_ulong, c_void};
 use core::sync::atomic::{AtomicU64, Ordering};
+use std::ffi::CString;
 
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
@@ -364,7 +365,7 @@ pub fn SV_GameSendServerCommand(
     if clientNum == -1 {
         SV_SendServerCommand(common, sv, core::ptr::null_mut(), &msg);
     } else {
-        if clientNum < 0 || clientNum >= (unsafe { (*common.sv_maxclients).integer }) {
+        if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
             return;
         }
         let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
@@ -381,7 +382,7 @@ pub fn SV_GameDropClient(
     clientNum: c_int,
     reason: *const c_char,
 ) {
-    if clientNum < 0 || clientNum >= (unsafe { (*common.sv_maxclients).integer }) {
+    if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
         return;
     }
     let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
@@ -391,7 +392,7 @@ pub fn SV_GameDropClient(
 /// Raven `SV_inPVS`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:209-233`
-pub fn SV_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
+pub fn SV_inPVS(common: &Common, cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
     let mut leafnum = mp_engine_qcommon::cm_test::CM_PointLeafnum(cm, p1);
     let mut cluster = CM_LeafCluster(cm, leafnum);
     let area1 = CM_LeafArea(cm, leafnum);
@@ -406,7 +407,7 @@ pub fn SV_inPVS(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t) -> qboolean {
             return qfalse;
         }
     }
-    if CM_AreasConnected(cm, area1, area2) == qfalse {
+    if CM_AreasConnected(common, cm, area1, area2) == qfalse {
         // a door blocks sight
         return qfalse;
     }
@@ -447,7 +448,8 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
         );
     }
     let info = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    Q_strncpyz(buffer, info as *const c_char, bufferSize);
+    let info_c = CString::new(info.as_str()).unwrap_or_default();
+    Q_strncpyz(buffer, info_c.as_ptr(), bufferSize);
 }
 
 /// Raven `SV_GetUsercmd`.
@@ -457,10 +459,10 @@ pub fn SV_GetUsercmd(common: &mut Common, sv: &mut Server, clientNum: c_int, cmd
     // `sv_maxclients` is a `Common`-owned cvar handle; `common` is threaded in
     // to reach it (the `ERR_DROP`/`Com_Error` unwind on a bad clientNum is not
     // yet reachable from this crate — its call is unported).
+    if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
+        // Com_Error(ERR_DROP, ...) — unported in this crate; see SV_GameError.
+    }
     unsafe {
-        if clientNum < 0 || clientNum >= (*common.sv_maxclients).integer {
-            // Com_Error(ERR_DROP, ...) — unported in this crate; see SV_GameError.
-        }
         *cmd = (*sv.svs.clients.offset(clientNum as isize)).lastUsercmd;
     }
 }
@@ -479,7 +481,7 @@ pub fn SV_InitGameVM(view: &mut EngineHostView, sv: &mut Server, restart: qboole
         &[sv.svs.time as isize, ms as isize, restart as isize],
     );
 
-    let max_clients = unsafe { (*view.common.sv_maxclients).integer };
+    let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
     for i in 0..max_clients {
         unsafe {
             (*sv.svs.clients.offset(i as isize)).gentity = core::ptr::null_mut();
@@ -628,7 +630,7 @@ pub fn SV_SetBrushModel(
             (*ent).r.bmodel = qtrue;
 
             let com_rmg = view.common.com_RMG;
-            if !com_rmg.is_null() && (*com_rmg).integer != 0 {
+            if com_rmg.is_some() && view.common.cvar(com_rmg).integer != 0 {
                 (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(
                     view.cm,
                     h,
@@ -851,8 +853,10 @@ pub fn SV_GameSystemCalls(
             Cvar_Register(
                 view,
                 vma(view.common, args, 1) as *mut mp_qshared::shared::cvar::vmCvar_t,
-                vma(view.common, args, 2) as *const c_char,
-                vma(view.common, args, 3) as *const c_char,
+                &core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                    .to_string_lossy(),
+                &core::ffi::CStr::from_ptr(vma(view.common, args, 3) as *const c_char)
+                    .to_string_lossy(),
                 *args.offset(4) as c_int,
             );
             return 0;
@@ -865,19 +869,23 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_CVAR_SET as isize {
             Cvar_Set(
                 view,
-                vma(view.common, args, 1) as *const c_char,
-                vma(view.common, args, 2) as *const c_char,
+                &core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                    .to_string_lossy(),
+                &core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                    .to_string_lossy(),
             );
             return 0;
         } else if trap == G::G_CVAR_VARIABLE_INTEGER_VALUE as isize {
             return Cvar_VariableIntegerValue(
                 view.common,
-                vma(view.common, args, 1) as *const c_char,
+                &core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                    .to_string_lossy(),
             ) as isize;
         } else if trap == G::G_CVAR_VARIABLE_STRING_BUFFER as isize {
             Cvar_VariableStringBuffer(
                 view.common,
-                vma(view.common, args, 1) as *const c_char,
+                &core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                    .to_string_lossy(),
                 vma(view.common, args, 2) as *mut c_char,
                 *args.offset(3) as c_int,
             );
@@ -1083,6 +1091,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_IN_PVS as isize {
             let r = SV_inPVS(
+                view.common,
                 view.cm,
                 *(vma(view.common, args, 1) as *const vec3_t),
                 *(vma(view.common, args, 2) as *const vec3_t),
@@ -1170,8 +1179,12 @@ pub fn SV_GameSystemCalls(
             );
             return 0;
         } else if trap == G::G_AREAS_CONNECTED as isize {
-            return CM_AreasConnected(view.cm, *args.offset(1) as c_int, *args.offset(2) as c_int)
-                as isize;
+            return CM_AreasConnected(
+                view.common,
+                view.cm,
+                *args.offset(1) as c_int,
+                *args.offset(2) as c_int,
+            ) as isize;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
@@ -3636,7 +3649,7 @@ pub fn SV_GameSystemCalls(
             // so `SpawnMission(qtrue)` is unreachable and §20-dropped — the whole
             // generation subtree is dead code on the dedicated server.
             let com_rmg = view.common.com_RMG;
-            if !com_rmg.is_null() && (*com_rmg).integer != 0 {
+            if com_rmg.is_some() && view.common.cvar(com_rmg).integer != 0 {
                 // SAFETY: view-constructor slots, single-threaded, no other live
                 // cast. `load_mission`'s host calls (print/error) never touch
                 // `view.cm` or `view.rmg`, so the DEC-23 per-slot raw reborrows of
@@ -3699,20 +3712,11 @@ pub fn SV_GameSystemCalls(
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:1731-1756`
 pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
-    let var = Cvar_Get(
-        view,
-        c"bot_enable".as_ptr(),
-        c"1".as_ptr(),
-        mp_qshared::shared::cvar::CVAR_LATCH,
-    );
-    if !var.is_null() {
-        view.common.bot_enable = unsafe { (*var).integer };
-    } else {
-        view.common.bot_enable = 0;
-    }
+    let var = Cvar_Get(view, "bot_enable", "1", mp_qshared::shared::cvar::CVAR_LATCH);
+    view.common.bot_enable = view.common.cvar(var).integer;
 
-    if Cvar_VariableValue(view, c"fs_restrict".as_ptr()) == 0.0
-        && unsafe { (*view.common.com_dedicated).integer } == 0
+    if Cvar_VariableValue(view, "fs_restrict") == 0.0
+        && view.common.cvar(view.common.com_dedicated).integer == 0
         && Sys_CheckCD() == qfalse
     {
         let need_cd = SE_GetString(view, "CON_TEXT_NEED_CD");
@@ -3721,7 +3725,7 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     }
 
     // load the dll or bytecode
-    let vm_game = Cvar_VariableValue(view, c"vm_game".as_ptr());
+    let vm_game = Cvar_VariableValue(view, "vm_game");
     // SEAM-D11: the game slot is armed once at boot by
     // `mp_engine_core::install_engine_hooks` (with the `GameDispatchCtx` note);
     // re-arming here at map load with a raw `sv` pointer would clobber that note

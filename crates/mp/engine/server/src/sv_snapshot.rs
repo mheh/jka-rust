@@ -80,7 +80,7 @@ pub fn SV_AddEntToSnapshot(
 /// Source: `oracle/codemp/server/sv_snapshot.cpp:806-832`
 pub fn SV_SendClientMessages(view: &mut EngineHostView, sv: &mut Server) {
     // send a message to each connected client
-    let max_clients = unsafe { (*view.common.sv_maxclients).integer };
+    let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
     for i in 0..max_clients {
         let c = unsafe { sv.svs.clients.offset(i as isize) };
         unsafe {
@@ -148,12 +148,12 @@ pub fn SV_RateMsec(
             messageSize = 1500;
         }
         let mut rate = (*client).rate;
-        if (*view.common.sv_maxRate).integer != 0 {
-            if (*view.common.sv_maxRate).integer < 1000 {
-                Cvar_Set(view, c"sv_MaxRate".as_ptr(), c"1000".as_ptr());
+        if view.common.cvar(view.common.sv_maxRate).integer != 0 {
+            if view.common.cvar(view.common.sv_maxRate).integer < 1000 {
+                Cvar_Set(view, "sv_MaxRate", "1000");
             }
-            if (*view.common.sv_maxRate).integer < rate {
-                rate = (*view.common.sv_maxRate).integer;
+            if view.common.cvar(view.common.sv_maxRate).integer < rate {
+                rate = view.common.cvar(view.common.sv_maxRate).integer;
             }
         }
         (messageSize + HEADER_RATE_BYTES) * 1000 / rate
@@ -290,8 +290,6 @@ pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client:
         if (*client).sentGamedir == qfalse {
             // rww - if this is the case then make sure there is an svc_setgame
             // sent before this snap
-            let mut i = 0;
-
             mp_engine_qcommon::msg::MSG_Init(
                 view,
                 &mut msg,
@@ -312,13 +310,9 @@ pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client:
                 svc_ops_e::svc_setgame as c_int,
             );
 
-            while *(*view.common.fs_gamedirvar).string.offset(i) != 0 {
-                mp_engine_qcommon::msg::MSG_WriteByte(
-                    view.common,
-                    &mut msg,
-                    *(*view.common.fs_gamedirvar).string.offset(i) as c_int,
-                );
-                i += 1;
+            let fs_gamedir = view.common.cvar(view.common.fs_gamedirvar).string.clone();
+            for b in fs_gamedir.bytes() {
+                mp_engine_qcommon::msg::MSG_WriteByte(view.common, &mut msg, b as c_int);
             }
             mp_engine_qcommon::msg::MSG_WriteByte(view.common, &mut msg, 0);
 
@@ -605,8 +599,8 @@ pub fn SV_WriteSnapshotToClient(
         SV_EmitPacketEntities(common, sv, oldframe, frame, msg);
 
         // padding for rate debugging
-        if (*common.sv_padPackets).integer != 0 {
-            for _ in 0..(*common.sv_padPackets).integer {
+        if common.cvar(common.sv_padPackets).integer != 0 {
+            for _ in 0..common.cvar(common.sv_padPackets).integer {
                 MSG_WriteByte(common, msg, svc_ops_e::svc_nop as c_int);
             }
         }
@@ -643,7 +637,8 @@ fn SV_AddEntitiesVisibleFromPoint(
         let clientcluster = CM_LeafCluster(cm, leafnum);
 
         // calculate the visible areas
-        (*frame).areabytes = CM_WriteAreaBits(cm, (*frame).areabits.as_mut_ptr(), clientarea);
+        (*frame).areabytes =
+            CM_WriteAreaBits(common, cm, (*frame).areabits.as_mut_ptr(), clientarea);
 
         let clientpvs = CM_ClusterPVS(cm, clientcluster);
 
@@ -709,7 +704,7 @@ fn SV_AddEntitiesVisibleFromPoint(
                 continue;
             }
 
-            if !common.com_RMG.is_null() && (*common.com_RMG).integer != 0 {
+            if common.com_RMG.is_some() && common.cvar(common.com_RMG).integer != 0 {
                 let mut difference: vec3_t = [0.0; 3];
                 _VectorAdd((*ent).r.absmax, (*ent).r.absmin, &mut difference);
                 _VectorScale(difference, 0.5, &mut difference);
@@ -726,10 +721,10 @@ fn SV_AddEntitiesVisibleFromPoint(
             } else {
                 // ignore if not touching a PV leaf
                 // check area
-                if CM_AreasConnected(cm, clientarea, (*svEnt).areanum) == qfalse {
+                if CM_AreasConnected(common, cm, clientarea, (*svEnt).areanum) == qfalse {
                     // doors can legally straddle two areas, so
                     // we may need to check another one
-                    if CM_AreasConnected(cm, clientarea, (*svEnt).areanum2) == qfalse {
+                    if CM_AreasConnected(common, cm, clientarea, (*svEnt).areanum2) == qfalse {
                         continue; // blocked by a door
                     }
                 }

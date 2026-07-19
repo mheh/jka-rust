@@ -13,7 +13,10 @@ use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::qtime::qtime_t;
-use mp_qshared::shared::cvar::cvar_t;
+use mp_qshared::shared::cvar::{
+    CVAR_ARCHIVE, CVAR_CHEAT, CVAR_INIT, CVAR_LATCH, CVAR_ROM, CVAR_SERVERINFO, CVAR_SYSTEMINFO,
+    CVAR_TEMP, CVAR_USER_CREATED,
+};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::q_string::{
     COM_DefaultExtension, Q_strcmp, Q_stricmp, Q_stricmpn, Q_strncpyz,
@@ -65,12 +68,10 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 /// Source: `oracle/codemp/qcommon/common.cpp:210-224`
 pub fn Com_DPrintf(common: &mut Common, msg: &str) {
     // don't confuse non-developers with techie stuff...
-    unsafe {
-        if common.com_developer.is_null() || (*common.com_developer).integer == 0 {
-            return;
-        }
+    if common.com_developer.is_none() || common.cvar(common.com_developer).integer == 0 {
+        return;
     }
-    crate::common::com_printf(common, msg);
+    com_printf(common, msg);
 }
 
 /// `Com_BeginRedirect`.
@@ -326,12 +327,17 @@ pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: *const c_char) {
         }
         let s = crate::cmd_common::Cmd_Argv(view.common, 1);
         if r#match.is_null() || Q_strcmp(s, r#match) == 0 {
-            let arg2 = crate::cmd_common::Cmd_Argv(view.common, 2);
-            Cvar_Set(view, s, arg2);
-            let cv: *mut cvar_t = Cvar_Get(view, s, c"".as_ptr() as *mut c_char, 0);
-            unsafe {
-                (*cv).flags |= mp_qshared::shared::cvar::CVAR_USER_CREATED;
+            let s_str = unsafe { core::ffi::CStr::from_ptr(s) }
+                .to_string_lossy()
+                .into_owned();
+            let arg2 = unsafe {
+                core::ffi::CStr::from_ptr(crate::cmd_common::Cmd_Argv(view.common, 2))
             }
+            .to_string_lossy()
+            .into_owned();
+            Cvar_Set(view, &s_str, &arg2);
+            let cv = Cvar_Get(view, &s_str, "", 0);
+            view.common.cvar_mut(cv).flags |= CVAR_USER_CREATED;
             // com_consoleLines[i] = 0;
         }
     }
@@ -429,7 +435,7 @@ pub fn Com_GetRealEvent(view: &mut EngineHostView) -> sysEvent_t {
     let mut ev: sysEvent_t = unsafe { core::mem::zeroed() };
 
     // either get an event from the system or the journal file
-    if unsafe { (*view.common.com_journal).integer } == 2 {
+    if view.common.cvar(view.common.com_journal).integer == 2 {
         let r = FS_Read(
             view.common,
             &mut ev as *mut sysEvent_t as *mut (),
@@ -461,7 +467,7 @@ pub fn Com_GetRealEvent(view: &mut EngineHostView) -> sysEvent_t {
         ev = Sys_GetEvent(view);
 
         // write the journal value out if needed
-        if unsafe { (*view.common.com_journal).integer } == 1 {
+        if view.common.cvar(view.common.com_journal).integer == 1 {
             let r = FS_Write(
                 view.common,
                 &ev as *const sysEvent_t as *const (),
@@ -568,7 +574,7 @@ pub fn Com_Shutdown(common: &mut Common, cm: &mut CollisionWorld, rmg: &mut RmMa
     if common.logfile != 0 {
         FS_FCloseFile(common, common.logfile);
         common.logfile = 0;
-        unsafe { (*common.com_logfile).integer = 0 }; // don't open up the log file again!!
+        common.cvar_mut(common.com_logfile).integer = 0; // don't open up the log file again!!
     }
 
     if common.com_journalFile != 0 {
@@ -622,21 +628,21 @@ pub fn Com_ModifyMsec(common: &mut Common, mut msec: c_int) -> c_int {
     //
     // modify time for debugging values
     //
-    unsafe {
-        if (*common.com_fixedtime).integer != 0 {
-            msec = (*common.com_fixedtime).integer;
-        } else if (*common.com_timescale).value != 0.0 {
-            msec = (msec as f32 * (*common.com_timescale).value) as c_int;
-        } else if (*common.com_cameraMode).integer != 0 {
-            msec = (msec as f32 * (*common.com_timescale).value) as c_int;
+    {
+        if common.cvar(common.com_fixedtime).integer != 0 {
+            msec = common.cvar(common.com_fixedtime).integer;
+        } else if common.cvar(common.com_timescale).value != 0.0 {
+            msec = (msec as f32 * common.cvar(common.com_timescale).value) as c_int;
+        } else if common.cvar(common.com_cameraMode).integer != 0 {
+            msec = (msec as f32 * common.cvar(common.com_timescale).value) as c_int;
         }
 
         // don't let it scale below 1 msec
-        if msec < 1 && (*common.com_timescale).value != 0.0 {
+        if msec < 1 && common.cvar(common.com_timescale).value != 0.0 {
             msec = 1;
         }
 
-        if (*common.com_dedicated).integer != 0 {
+        if common.cvar(common.com_dedicated).integer != 0 {
             // dedicated servers don't want to clamp for a much longer
             // period, because it would mess up all the client's views
             // of time.
@@ -647,7 +653,7 @@ pub fn Com_ModifyMsec(common: &mut Common, mut msec: c_int) -> c_int {
                 );
             }
             clamp_time = 5000;
-        } else if (*common.com_sv_running).integer == 0 {
+        } else if common.cvar(common.com_sv_running).integer == 0 {
             // clients of remote servers do not want to clamp time, because
             // it would skew their view of the server's time temporarily
             clamp_time = 5000;
@@ -671,23 +677,18 @@ pub fn Com_ModifyMsec(common: &mut Common, mut msec: c_int) -> c_int {
 /// Source: `oracle/codemp/qcommon/common.cpp:759-782`
 pub fn Com_InitJournaling(view: &mut EngineHostView) {
     Com_StartupVariable(view, c"journal".as_ptr());
-    view.common.com_journal = Cvar_Get(
-        view,
-        c"journal".as_ptr() as *mut c_char,
-        c"0".as_ptr() as *mut c_char,
-        mp_qshared::shared::cvar::CVAR_INIT,
-    );
-    unsafe {
-        if (*view.common.com_journal).integer == 0 {
+    view.common.com_journal = Some(Cvar_Get(view, "journal", "0", CVAR_INIT));
+    {
+        if view.common.cvar(view.common.com_journal).integer == 0 {
             return;
         }
 
-        if (*view.common.com_journal).integer == 1 {
+        if view.common.cvar(view.common.com_journal).integer == 1 {
             crate::common::com_printf(view.common, "Journaling events\n");
             view.common.com_journalFile = FS_FOpenFileWrite(view.common, c"journal.dat".as_ptr());
             view.common.com_journalDataFile =
                 FS_FOpenFileWrite(view.common, c"journaldata.dat".as_ptr());
-        } else if (*view.common.com_journal).integer == 2 {
+        } else if view.common.cvar(view.common.com_journal).integer == 2 {
             crate::common::com_printf(view.common, "Replaying journaled events\n");
             let mut jf = view.common.com_journalFile;
             FS_FOpenFileRead(view, c"journal.dat".as_ptr(), &mut jf, qtrue);
@@ -698,11 +699,7 @@ pub fn Com_InitJournaling(view: &mut EngineHostView) {
         }
 
         if view.common.com_journalFile == 0 || view.common.com_journalDataFile == 0 {
-            Cvar_Set(
-                view,
-                c"com_journal".as_ptr() as *mut c_char,
-                c"0".as_ptr() as *mut c_char,
-            );
+            Cvar_Set(view, "com_journal", "0");
             view.common.com_journalFile = 0;
             view.common.com_journalDataFile = 0;
             crate::common::com_printf(view.common, "Couldn't open journal files\n");
@@ -803,7 +800,7 @@ pub fn Com_RunAndTimeServerPacket(
     let mut t1 = 0;
 
     unsafe {
-        if (*view.common.com_speeds).integer != 0 {
+        if view.common.cvar(view.common.com_speeds).integer != 0 {
             t1 = crate::timing::sys_milliseconds(view.common);
         }
 
@@ -814,10 +811,10 @@ pub fn Com_RunAndTimeServerPacket(
             .expect("SV_PacketEvent hook — installed by mp_engine_server at boot");
         sv_packet_event(view, *evFrom, buf);
 
-        if (*view.common.com_speeds).integer != 0 {
+        if view.common.cvar(view.common.com_speeds).integer != 0 {
             let t2 = crate::timing::sys_milliseconds(view.common);
             let msec = t2 - t1;
-            if (*view.common.com_speeds).integer == 3 {
+            if view.common.cvar(view.common.com_speeds).integer == 3 {
                 crate::common::com_printf(view.common, &format!("SV_PacketEvent time: {msec}\n"));
             }
         }
@@ -862,7 +859,7 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
             ) != qfalse
             {
                 // if the server just shut down, flush the events
-                if unsafe { (*view.common.com_sv_running).integer != 0 } {
+                if view.common.cvar(view.common.com_sv_running).integer != 0 {
                     Com_RunAndTimeServerPacket(view, &mut ev_from, &mut buf);
                 }
             }
@@ -907,11 +904,11 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
                 // this cvar allows simulation of connections that
                 // drop a lot of packets.  Note that loopback connections
                 // don't go through here at all.
-                if unsafe { (*view.common.com_dropsim).value > 0.0 } {
+                if view.common.cvar(view.common.com_dropsim).value > 0.0 {
                     // §B3 fn-static: `static int seed` is genuine cross-frame
                     // state — hoisted onto `Common` per the three-kind rule.
                     if q_random(&mut view.common.com_eventloop_seed)
-                        < unsafe { (*view.common.com_dropsim).value }
+                        < view.common.cvar(view.common.com_dropsim).value
                     {
                         continue; // drop this packet
                     }
@@ -934,7 +931,7 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
                         (ev.evPtr as *mut netadr_t).add(1) as *const (),
                         buf.cursize as usize,
                     );
-                    if (*view.common.com_sv_running).integer != 0 {
+                    if view.common.cvar(view.common.com_sv_running).integer != 0 {
                         Com_RunAndTimeServerPacket(view, &mut ev_from, &mut buf);
                     } else {
                         let hook_fn = view
@@ -978,10 +975,10 @@ pub fn com_error_recover(view: &mut EngineHostView, err: &ComError) -> &'static 
 
     // when we are running automated scripts, make sure we
     // know if anything failed
-    unsafe {
-        if !view.common.com_buildScript.is_null() && (*view.common.com_buildScript).integer != 0 {
-            code = errorParm_t::ERR_FATAL;
-        }
+    if view.common.com_buildScript.is_some()
+        && view.common.cvar(view.common.com_buildScript).integer != 0
+    {
+        code = errorParm_t::ERR_FATAL;
     }
 
     // make sure we can get at our local stuff
@@ -1012,14 +1009,9 @@ pub fn com_error_recover(view: &mut EngineHostView, err: &ComError) -> &'static 
     if code != errorParm_t::ERR_DISCONNECT {
         // give com_errorMessage a default so it won't come back to life after
         // a resetDefaults
-        Cvar_Get(
-            view,
-            c"com_errorMessage".as_ptr(),
-            c"".as_ptr(),
-            mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        let cmsg = std::ffi::CString::new(err.msg.as_str()).unwrap_or_default();
-        Cvar_Set(view, c"com_errorMessage".as_ptr(), cmsg.as_ptr());
+        Cvar_Get(view, "com_errorMessage", "", CVAR_ROM);
+        let cmsg = err.msg.clone();
+        Cvar_Set(view, "com_errorMessage", &cmsg);
     }
 
     if code == errorParm_t::ERR_SERVERDISCONNECT {
@@ -1072,9 +1064,8 @@ pub fn com_error_recover(view: &mut EngineHostView, err: &ComError) -> &'static 
             .SV_Shutdown
             .expect("SV_Shutdown hook — installed by mp_engine_server at boot");
         sv_shutdown(view, "Server didn't have CD\n");
-        let cl_running = unsafe {
-            !view.common.com_cl_running.is_null() && (*view.common.com_cl_running).integer != 0
-        };
+        let cl_running = view.common.com_cl_running.is_some()
+            && view.common.cvar(view.common.com_cl_running).integer != 0;
         if cl_running {
             let cl_disconnect = view
                 .common
@@ -1123,29 +1114,28 @@ pub fn Com_Frame(view: &mut EngineHostView) {
         Com_WriteConfiguration(view);
 
         // if "viewlog" has been modified, show or hide the log console
-        unsafe {
-            if (*view.common.com_viewlog).modified != 0 {
-                if (*view.common.com_dedicated).value == 0.0 {
-                    view.sys_show_console((*view.common.com_viewlog).integer, qfalse);
-                }
-                (*view.common.com_viewlog).modified = qfalse;
+        if view.common.cvar(view.common.com_viewlog).modified {
+            if view.common.cvar(view.common.com_dedicated).value == 0.0 {
+                let viewlog = view.common.cvar(view.common.com_viewlog).integer;
+                view.sys_show_console(viewlog, qfalse);
             }
+            view.common.cvar_mut(view.common.com_viewlog).modified = false;
         }
 
         //
         // main event loop
         //
-        unsafe {
-            if (*view.common.com_speeds).integer != 0 {
+        {
+            if view.common.cvar(view.common.com_speeds).integer != 0 {
                 let _time_before_first_events = crate::timing::sys_milliseconds(view.common);
             }
 
             // we may want to spin here if things are going too fast
-            if (*view.common.com_dedicated).integer == 0
-                && (*view.common.com_maxfps).integer > 0
-                && (*view.common.com_timedemo).integer == 0
+            if view.common.cvar(view.common.com_dedicated).integer == 0
+                && view.common.cvar(view.common.com_maxfps).integer > 0
+                && view.common.cvar(view.common.com_timedemo).integer == 0
             {
-                minMsec = 1000 / (*view.common.com_maxfps).integer;
+                minMsec = 1000 / view.common.cvar(view.common.com_maxfps).integer;
             } else {
                 minMsec = 1;
             }
@@ -1171,8 +1161,8 @@ pub fn Com_Frame(view: &mut EngineHostView) {
         //
         // server side
         //
-        unsafe {
-            if (*view.common.com_speeds).integer != 0 {
+        {
+            if view.common.cvar(view.common.com_speeds).integer != 0 {
                 let _time_before_server = crate::timing::sys_milliseconds(view.common);
             }
         }
@@ -1188,20 +1178,16 @@ pub fn Com_Frame(view: &mut EngineHostView) {
         // or shut down the client system.
         // Do this after the server may have started,
         // but before the client tries to auto-connect
-        unsafe {
-            if (*view.common.com_dedicated).modified != 0 {
+        {
+            if view.common.cvar(view.common.com_dedicated).modified {
                 // get the latched value
-                Cvar_Get(
-                    view,
-                    c"dedicated".as_ptr() as *mut c_char,
-                    c"0".as_ptr() as *mut c_char,
-                    0,
-                );
-                (*view.common.com_dedicated).modified = qfalse;
-                if (*view.common.com_dedicated).integer == 0 {
+                Cvar_Get(view, "dedicated", "0", 0);
+                view.common.cvar_mut(view.common.com_dedicated).modified = false;
+                if view.common.cvar(view.common.com_dedicated).integer == 0 {
                     let cl_init = view.common.hooks.CL_Init.expect("CL_Init hook");
                     cl_init(view);
-                    view.sys_show_console((*view.common.com_viewlog).integer, qfalse);
+                    let viewlog = view.common.cvar(view.common.com_viewlog).integer;
+                    view.sys_show_console(viewlog, qfalse);
                     let hook_fn = view
                         .common
                         .hooks
@@ -1219,13 +1205,13 @@ pub fn Com_Frame(view: &mut EngineHostView) {
         //
         // client system
         //
-        unsafe {
-            if (*view.common.com_dedicated).integer == 0 {
+        {
+            if view.common.cvar(view.common.com_dedicated).integer == 0 {
                 //
                 // run event loop a second time to get server to client packets
                 // without a frame of latency
                 //
-                if (*view.common.com_speeds).integer != 0 {
+                if view.common.cvar(view.common.com_speeds).integer != 0 {
                     let _time_before_events = crate::timing::sys_milliseconds(view.common);
                 }
                 Com_EventLoop(view);
@@ -1234,14 +1220,14 @@ pub fn Com_Frame(view: &mut EngineHostView) {
                 //
                 // client side
                 //
-                if (*view.common.com_speeds).integer != 0 {
+                if view.common.cvar(view.common.com_speeds).integer != 0 {
                     let _time_before_client = crate::timing::sys_milliseconds(view.common);
                 }
 
                 let hook_fn = view.common.hooks.CL_Frame.expect("CL_Frame hook");
                 hook_fn(view, msec);
 
-                if (*view.common.com_speeds).integer != 0 {
+                if view.common.cvar(view.common.com_speeds).integer != 0 {
                     let _time_after = crate::timing::sys_milliseconds(view.common);
                 }
             }
@@ -1255,8 +1241,8 @@ pub fn Com_Frame(view: &mut EngineHostView) {
         //
         // trace optimization tracking
         //
-        unsafe {
-            if (*view.common.com_showtrace).integer != 0 {
+        {
+            if view.common.cvar(view.common.com_showtrace).integer != 0 {
                 crate::common::com_printf(
                     view.common,
                     &format!(
@@ -1455,285 +1441,89 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         Com_StartupVariable(view, core::ptr::null());
 
         // get dedicated here for proper hunk megs initialization
-        view.common.com_dedicated = Cvar_Get(
-            view,
-            c"dedicated".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_LATCH,
-        );
+        view.common.com_dedicated = Some(Cvar_Get(view, "dedicated", "0", CVAR_LATCH));
         // allocate the stack based hunk allocator
         crate::z_memman_pc::Com_InitHunkMemory(view);
 
         // if any archived cvars are modified after this, we will trigger a writing
         // of the config file
-        view.common.cvar_modifiedFlags &= !mp_qshared::shared::cvar::CVAR_ARCHIVE;
+        view.common.cvar_modifiedFlags &= !CVAR_ARCHIVE;
 
         //
         // init commands and vars
         //
-        view.common.com_maxfps = Cvar_Get(
-            view,
-            c"com_maxfps".as_ptr() as *mut c_char,
-            c"85".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
-        view.common.com_blood = Cvar_Get(
-            view,
-            c"com_blood".as_ptr() as *mut c_char,
-            c"1".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
+        view.common.com_maxfps = Some(Cvar_Get(view, "com_maxfps", "85", CVAR_ARCHIVE));
+        view.common.com_blood = Some(Cvar_Get(view, "com_blood", "1", CVAR_ARCHIVE));
 
-        view.common.com_developer = Cvar_Get(
-            view,
-            c"developer".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_TEMP,
-        );
-        view.common.com_vmdebug = Cvar_Get(
-            view,
-            c"vmdebug".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_TEMP,
-        );
-        view.common.com_logfile = Cvar_Get(
-            view,
-            c"logfile".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_TEMP,
-        );
+        view.common.com_developer = Some(Cvar_Get(view, "developer", "0", CVAR_TEMP));
+        view.common.com_vmdebug = Some(Cvar_Get(view, "vmdebug", "0", CVAR_TEMP));
+        view.common.com_logfile = Some(Cvar_Get(view, "logfile", "0", CVAR_TEMP));
 
-        view.common.com_timescale = Cvar_Get(
-            view,
-            c"timescale".as_ptr() as *mut c_char,
-            c"1".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        view.common.com_fixedtime = Cvar_Get(
-            view,
-            c"fixedtime".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        view.common.com_showtrace = Cvar_Get(
-            view,
-            c"com_showtrace".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        view.common.com_timescale =
+            Some(Cvar_Get(view, "timescale", "1", CVAR_CHEAT | CVAR_SYSTEMINFO));
+        view.common.com_fixedtime = Some(Cvar_Get(view, "fixedtime", "0", CVAR_CHEAT));
+        view.common.com_showtrace = Some(Cvar_Get(view, "com_showtrace", "0", CVAR_CHEAT));
 
-        view.common.com_terrainPhysics = Cvar_Get(
-            view,
-            c"com_terrainPhysics".as_ptr() as *mut c_char,
-            c"1".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        view.common.com_terrainPhysics =
+            Some(Cvar_Get(view, "com_terrainPhysics", "1", CVAR_CHEAT));
 
-        view.common.com_dropsim = Cvar_Get(
-            view,
-            c"com_dropsim".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        view.common.com_viewlog = Cvar_Get(
-            view,
-            c"viewlog".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        view.common.com_speeds = Cvar_Get(
-            view,
-            c"com_speeds".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
-        view.common.com_timedemo = Cvar_Get(
-            view,
-            c"timedemo".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
-        view.common.com_cameraMode = Cvar_Get(
-            view,
-            c"com_cameraMode".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        view.common.com_dropsim = Some(Cvar_Get(view, "com_dropsim", "0", CVAR_CHEAT));
+        view.common.com_viewlog = Some(Cvar_Get(view, "viewlog", "0", CVAR_CHEAT));
+        view.common.com_speeds = Some(Cvar_Get(view, "com_speeds", "0", 0));
+        view.common.com_timedemo = Some(Cvar_Get(view, "timedemo", "0", 0));
+        view.common.com_cameraMode = Some(Cvar_Get(view, "com_cameraMode", "0", CVAR_CHEAT));
 
-        view.common.com_optvehtrace = Cvar_Get(
-            view,
-            c"com_optvehtrace".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
+        view.common.com_optvehtrace = Some(Cvar_Get(view, "com_optvehtrace", "0", 0));
 
-        view.common.cl_paused = Cvar_Get(
-            view,
-            c"cl_paused".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        view.common.sv_paused = Cvar_Get(
-            view,
-            c"sv_paused".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        view.common.com_sv_running = Cvar_Get(
-            view,
-            c"sv_running".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        view.common.com_cl_running = Cvar_Get(
-            view,
-            c"cl_running".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ROM,
-        );
-        view.common.com_buildScript = Cvar_Get(
-            view,
-            c"com_buildScript".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
+        view.common.cl_paused = Some(Cvar_Get(view, "cl_paused", "0", CVAR_ROM));
+        view.common.sv_paused = Some(Cvar_Get(view, "sv_paused", "0", CVAR_ROM));
+        view.common.com_sv_running = Some(Cvar_Get(view, "sv_running", "0", CVAR_ROM));
+        view.common.com_cl_running = Some(Cvar_Get(view, "cl_running", "0", CVAR_ROM));
+        view.common.com_buildScript = Some(Cvar_Get(view, "com_buildScript", "0", 0));
 
         // G2_PERFORMANCE_ANALYSIS gated in retail (unresolved const,
         // escalated) — com_G2Report registers unconditionally here since the
         // engine ships that build config.
-        view.common.com_G2Report = Cvar_Get(
-            view,
-            c"com_G2Report".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
+        view.common.com_G2Report = Some(Cvar_Get(view, "com_G2Report", "0", 0));
 
-        view.common.com_RMG = Cvar_Get(
-            view,
-            c"RMG".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
+        view.common.com_RMG = Some(Cvar_Get(view, "RMG", "0", 0));
 
-        Cvar_Get(
-            view,
-            c"RMG_seed".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            0,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_time".as_ptr() as *mut c_char,
-            c"day".as_ptr() as *mut c_char,
-            0,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_soundset".as_ptr() as *mut c_char,
-            c"".as_ptr() as *mut c_char,
-            0,
-        );
+        Cvar_Get(view, "RMG_seed", "0", 0);
+        Cvar_Get(view, "RMG_time", "day", 0);
+        Cvar_Get(view, "RMG_soundset", "", 0);
 
-        Cvar_Get(
-            view,
-            c"RMG_textseed".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO | mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_map".as_ptr() as *mut c_char,
-            c"small".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_timefile".as_ptr() as *mut c_char,
-            c"day".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_terrain".as_ptr() as *mut c_char,
-            c"grassyhills".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
+        Cvar_Get(view, "RMG_textseed", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE);
+        Cvar_Get(view, "RMG_map", "small", CVAR_ARCHIVE | CVAR_SYSTEMINFO);
+        Cvar_Get(view, "RMG_timefile", "day", CVAR_ARCHIVE);
+        Cvar_Get(view, "RMG_terrain", "grassyhills", CVAR_ARCHIVE);
 
+        Cvar_Get(view, "RMG_sky", "", CVAR_SYSTEMINFO);
+        Cvar_Get(view, "RMG_fog", "", CVAR_SYSTEMINFO);
         Cvar_Get(
             view,
-            c"RMG_sky".as_ptr() as *mut c_char,
-            c"".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
+            "RMG_weather",
+            "",
+            CVAR_SYSTEMINFO | CVAR_SERVERINFO | CVAR_CHEAT,
         );
-        Cvar_Get(
-            view,
-            c"RMG_fog".as_ptr() as *mut c_char,
-            c"".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_weather".as_ptr() as *mut c_char,
-            c"".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO
-                | mp_qshared::shared::cvar::CVAR_SERVERINFO
-                | mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_instances".as_ptr() as *mut c_char,
-            c"colombia".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_miscents".as_ptr() as *mut c_char,
-            c"deciduous".as_ptr() as *mut c_char,
-            0,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_music".as_ptr() as *mut c_char,
-            c"music/dm_kam1".as_ptr() as *mut c_char,
-            0,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_mission".as_ptr() as *mut c_char,
-            c"ctf".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_course".as_ptr() as *mut c_char,
-            c"standard".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_SYSTEMINFO,
-        );
-        Cvar_Get(
-            view,
-            c"RMG_distancecull".as_ptr() as *mut c_char,
-            c"5000".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+        Cvar_Get(view, "RMG_instances", "colombia", CVAR_SYSTEMINFO);
+        Cvar_Get(view, "RMG_miscents", "deciduous", 0);
+        Cvar_Get(view, "RMG_music", "music/dm_kam1", 0);
+        Cvar_Get(view, "RMG_mission", "ctf", CVAR_SYSTEMINFO);
+        Cvar_Get(view, "RMG_course", "standard", CVAR_SYSTEMINFO);
+        Cvar_Get(view, "RMG_distancecull", "5000", CVAR_CHEAT);
 
-        view.common.com_introPlayed = Cvar_Get(
-            view,
-            c"com_introplayed".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ARCHIVE,
-        );
+        view.common.com_introPlayed = Some(Cvar_Get(view, "com_introplayed", "0", CVAR_ARCHIVE));
 
-        unsafe {
-            if (*view.common.com_dedicated).integer != 0 && (*view.common.com_viewlog).integer == 0
+        {
+            if view.common.cvar(view.common.com_dedicated).integer != 0
+                && view.common.cvar(view.common.com_viewlog).integer == 0
             {
-                Cvar_Set(
-                    view,
-                    c"viewlog".as_ptr() as *mut c_char,
-                    c"1".as_ptr() as *mut c_char,
-                );
+                Cvar_Set(view, "viewlog", "1");
             }
 
-            if !view.common.com_developer.is_null() && (*view.common.com_developer).integer != 0 {
+            if view.common.com_developer.is_some()
+                && view.common.cvar(view.common.com_developer).integer != 0
+            {
                 Cmd_AddCommand(view, "error", Some(|view| Com_Error_f(view.common)));
                 Cmd_AddCommand(view, "crash", Some(|_view| Com_Crash_f()));
                 Cmd_AddCommand(view, "freeze", Some(|view| Com_Freeze_f(view)));
@@ -1753,12 +1543,7 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             CPUSTRING,
             option_env!("BUILD_DATE").unwrap_or("unknown"),
         );
-        view.common.com_version = Cvar_Get(
-            view,
-            c"version".as_ptr() as *mut c_char,
-            s.as_ptr() as *mut c_char,
-            mp_qshared::shared::cvar::CVAR_ROM | mp_qshared::shared::cvar::CVAR_SERVERINFO,
-        );
+        view.common.com_version = Some(Cvar_Get(view, "version", &s, CVAR_ROM | CVAR_SERVERINFO));
 
         SE_Init(view);
 
@@ -1773,12 +1558,13 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             .expect("SV_Init hook — installed by mp_engine_server at boot");
         sv_init(view);
 
-        unsafe {
-            (*view.common.com_dedicated).modified = qfalse;
-            if (*view.common.com_dedicated).integer == 0 {
+        {
+            view.common.cvar_mut(view.common.com_dedicated).modified = false;
+            if view.common.cvar(view.common.com_dedicated).integer == 0 {
                 let cl_init = view.common.hooks.CL_Init.expect("CL_Init hook");
                 cl_init(view);
-                view.sys_show_console((*view.common.com_viewlog).integer, qfalse);
+                let viewlog = view.common.cvar(view.common.com_viewlog).integer;
+                view.sys_show_console(viewlog, qfalse);
             }
         }
 
@@ -1788,10 +1574,10 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         view.common.com_frameTime = Com_Milliseconds(view);
 
         // add + commands from command line
-        unsafe {
+        {
             if Com_AddStartupCommands(view.common) == qfalse {
                 // if the user didn't give any commands, run default action
-                if (*view.common.com_dedicated).integer == 0 {
+                if view.common.cvar(view.common.com_dedicated).integer == 0 {
                     crate::cmd_common::Cbuf_AddText(
                         view.common,
                         c"cinematic openinglogos.roq\n".as_ptr() as *mut c_char,
@@ -1801,11 +1587,7 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         }
 
         // start in full screen ui mode
-        Cvar_Set(
-            view,
-            c"r_uiFullScreen".as_ptr() as *mut c_char,
-            c"1".as_ptr() as *mut c_char,
-        );
+        Cvar_Set(view, "r_uiFullScreen", "1");
 
         let hook_fn = view
             .common
@@ -1815,11 +1597,7 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         hook_fn(view);
 
         // make sure single player is off by default
-        Cvar_Set(
-            view,
-            c"ui_singlePlayerActive".as_ptr() as *mut c_char,
-            c"0".as_ptr() as *mut c_char,
-        );
+        Cvar_Set(view, "ui_singlePlayerActive", "0");
 
         view.common.com_fullyInitialized = true;
         crate::common::com_printf(view.common, "--- Common Initialization Complete ---\n");

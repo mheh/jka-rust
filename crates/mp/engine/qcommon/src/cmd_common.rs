@@ -6,7 +6,7 @@
 //!
 //! Source: `oracle/codemp/qcommon/cmd_common.cpp`
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, CStr};
 
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 
@@ -364,11 +364,16 @@ pub fn Cmd_Vstr_f(common: &mut Common) {
     }
 
     unsafe {
-        let arg1 = Cmd_Argv(common, 1);
-        let v = Cvar_VariableString(common, arg1);
+        let arg1 = CStr::from_ptr(Cmd_Argv(common, 1))
+            .to_string_lossy()
+            .into_owned();
+        let v = std::ffi::CString::new(Cvar_VariableString(common, &arg1)).unwrap();
         Cbuf_InsertText(
             common,
-            va(b"%s\n\0".as_ptr() as *const c_char, &[FmtArg::cstr(v)]),
+            va(
+                b"%s\n\0".as_ptr() as *const c_char,
+                &[FmtArg::cstr(v.as_ptr())],
+            ),
         );
     }
 }

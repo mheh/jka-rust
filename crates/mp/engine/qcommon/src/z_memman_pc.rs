@@ -172,7 +172,7 @@ static gNumberString: ZoneStatic<[StaticMem_t; 10]> = ZoneStatic([
 ///
 /// Source: `oracle/codemp/qcommon/z_memman_pc.cpp:82-116`
 pub fn Z_Validate(common: &Common) {
-    if common.com_validateZone.is_null() || unsafe { (*common.com_validateZone).integer } == 0 {
+    if common.com_validateZone.is_none() || common.cvar(common.com_validateZone).integer == 0 {
         return;
     }
 
@@ -601,7 +601,7 @@ pub fn Com_InitZoneMemory(view: &mut EngineHostView) {
     //#ifdef _DEBUG
     //	com_validateZone = Cvar_Get("com_validateZone", "1", 0);
     //#else
-    view.common.com_validateZone = Cvar_Get(view, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
+    view.common.com_validateZone = Some(Cvar_Get(view, "com_validateZone", "0", 0));
     //#endif
 
     Cmd_AddCommand(view, "zone_stats", Some(|view| Z_Stats_f(view.common)));

@@ -23,6 +23,7 @@ use core::ffi::{c_char, c_int, c_uint};
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::collision::cplane_t;
+use mp_qshared::shared::cvar::{CVAR_ARCHIVE, CVAR_CHEAT};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::limits::MAX_SUB_BSP;
 use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
@@ -1150,24 +1151,14 @@ pub fn CM_LoadMap_Actual(
             com_error(errorParm_t::ERR_DROP, "CM_LoadMap: NULL name".into());
         }
 
-        view.cm.cm_noAreas = Cvar_Get(
+        view.cm.cm_noAreas = Some(Cvar_Get(view, "cm_noAreas", "0", CVAR_CHEAT));
+        view.cm.cm_noCurves = Some(Cvar_Get(view, "cm_noCurves", "0", CVAR_CHEAT));
+        view.cm.cm_playerCurveClip = Some(Cvar_Get(
             view,
-            c"cm_noAreas".as_ptr(),
-            c"0".as_ptr(),
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        view.cm.cm_noCurves = Cvar_Get(
-            view,
-            c"cm_noCurves".as_ptr(),
-            c"0".as_ptr(),
-            mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
-        view.cm.cm_playerCurveClip = Cvar_Get(
-            view,
-            c"cm_playerCurveClip".as_ptr(),
-            c"1".as_ptr(),
-            mp_qshared::shared::cvar::CVAR_ARCHIVE | mp_qshared::shared::cvar::CVAR_CHEAT,
-        );
+            "cm_playerCurveClip",
+            "1",
+            CVAR_ARCHIVE | CVAR_CHEAT,
+        ));
 
         let name_cstr = std::ffi::CStr::from_ptr(name);
         Com_DPrintf(
@@ -1311,7 +1302,9 @@ pub fn CM_LoadMap_Actual(
         // (but not if this gets ported to a big-endian machine, because some
         // of the map data will have been Little-Long'd, but some hasn't).
         //
-        if Sys_LowPhysicalMemory() != 0 || (*view.common.com_dedicated).integer != 0 {
+        if Sys_LowPhysicalMemory() != 0
+            || view.common.cvar(view.common.com_dedicated).integer != 0
+        {
             unsafe {
                 Z_Free(view.common, view.cm.gpvCachedMapDiskImage);
             }
