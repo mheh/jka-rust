@@ -335,6 +335,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "native_string"
+version = "0.1.0"
+
+[[package]]
 name = "native_types"
 version = "0.1.0"
 

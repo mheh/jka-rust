@@ -4,6 +4,7 @@
 resolver = "2"
 members = [
     "crates/native/math",
+    "crates/native/string",
     "crates/native/platform",
     "crates/native/containers",
     "crates/native/types",
