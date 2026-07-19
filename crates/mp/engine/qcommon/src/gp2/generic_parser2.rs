@@ -1,9 +1,10 @@
 //! `GenericParser2` — the GP2 document: parser plus group arena.
 
+use native_string::gp2_tokenizer::Tokenizer;
+
 use super::gp2_parse_error::Gp2ParseError;
 use super::gp_group::{GpGroup, GpGroupId, GpGroupNode};
 use super::gp_value::GpValue;
-use super::tokenizer::Tokenizer;
 
 /// Raven `CGenericParser2` — parses Raven's `{`/`[` text format (effects,
 /// ambient music sets, terrain/RMG instance files) into a group tree.

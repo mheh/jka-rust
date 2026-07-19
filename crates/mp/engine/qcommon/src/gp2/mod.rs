@@ -17,7 +17,6 @@ pub mod generic_parser2;
 pub mod gp2_parse_error;
 pub mod gp_group;
 pub mod gp_value;
-pub(crate) mod tokenizer;
 
 pub mod tgeneric_parser2;
 pub mod tgpgroup;

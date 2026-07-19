@@ -4,6 +4,7 @@
 
 /// Raven `MAX_TOKEN_SIZE` — a token that fills the buffer is discarded as empty.
 /// Source: `oracle/codemp/qcommon/GenericParser2.cpp:12`
+/// Source: `oracle/code/game/genericparser2.cpp:21` (SP twin)
 pub const MAX_TOKEN_SIZE: usize = 1024;
 
 /// Raven `GetToken` — GP2's private whitespace/comment-aware tokenizer.
@@ -14,6 +15,7 @@ pub const MAX_TOKEN_SIZE: usize = 1024;
 /// and act as whitespace/delimiters outside quoted strings — the `as i8` casts
 /// preserve that.
 /// Source: `oracle/codemp/qcommon/GenericParser2.cpp:15-161`
+/// Source: `oracle/code/game/genericparser2.cpp:24-170` (SP twin, byte-identical)
 pub struct Tokenizer<'a> {
     data: &'a [u8],
     /// Byte cursor. `None` mirrors Raven nulling the caller's pointer on end of

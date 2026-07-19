@@ -219,6 +219,7 @@ dependencies = [
  "mp_qshared",
  "native_math",
  "native_platform",
+ "native_string",
  "native_types",
 ]
 
@@ -454,6 +455,7 @@ version = "0.1.0"
 dependencies = [
  "native_math",
  "native_platform",
+ "native_string",
  "native_types",
 ]
 
