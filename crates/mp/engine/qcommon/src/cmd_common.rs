@@ -440,31 +440,11 @@ pub fn Cbuf_Execute(view: &mut EngineHostView) {
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:501-507`
 pub fn Cmd_Init(view: &mut EngineHostView) {
-    Cmd_AddCommand(
-        view,
-        b"cmdlist\0".as_ptr() as *const c_char,
-        Some(|view| Cmd_List_f(view.common)),
-    );
-    Cmd_AddCommand(
-        view,
-        b"exec\0".as_ptr() as *const c_char,
-        Some(|view| Cmd_Exec_f(view)),
-    );
-    Cmd_AddCommand(
-        view,
-        b"vstr\0".as_ptr() as *const c_char,
-        Some(|view| Cmd_Vstr_f(view.common)),
-    );
-    Cmd_AddCommand(
-        view,
-        b"echo\0".as_ptr() as *const c_char,
-        Some(|view| Cmd_Echo_f(view.common)),
-    );
-    Cmd_AddCommand(
-        view,
-        b"wait\0".as_ptr() as *const c_char,
-        Some(|view| Cmd_Wait_f(view.common)),
-    );
+    Cmd_AddCommand(view, "cmdlist", Some(|view| Cmd_List_f(view.common)));
+    Cmd_AddCommand(view, "exec", Some(|view| Cmd_Exec_f(view)));
+    Cmd_AddCommand(view, "vstr", Some(|view| Cmd_Vstr_f(view.common)));
+    Cmd_AddCommand(view, "echo", Some(|view| Cmd_Echo_f(view.common)));
+    Cmd_AddCommand(view, "wait", Some(|view| Cmd_Wait_f(view.common)));
 }
 
 /// `Cbuf_ExecuteText`.

@@ -8,7 +8,6 @@
 //! Source: `oracle/codemp/qcommon/common.cpp`
 
 use core::ffi::{c_char, c_int, c_void};
-use std::ffi::CStr;
 
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
@@ -20,7 +19,6 @@ use mp_qshared::shared::q_string::{
     COM_DefaultExtension, Q_strcmp, Q_stricmp, Q_stricmpn, Q_strncpyz,
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, MAX_QPATH, Q3_VERSION};
-use native_string::filter::{Com_FilterBytes, Com_FilterPathBytes};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::com_printf;
@@ -141,9 +139,6 @@ pub fn Com_ParseCommandLine(common: &mut Common, commandLine: *mut c_char) {
         }
     }
 }
-
-// `Com_StringContains` (common.cpp:556-578) lives in `native_string::filter`;
-// its only Raven caller is `Com_Filter`, which now delegates there.
 
 /// `Com_HashKey`.
 ///
@@ -287,33 +282,10 @@ pub fn Com_SafeMode(common: &mut Common) -> qboolean {
     qfalse
 }
 
-/// Raven `Com_Filter` — pointer seam over the canonical
-/// `native_string::filter::Com_FilterBytes` (§C7: qboolean return -> bool).
-///
-/// Source: `oracle/codemp/qcommon/common.cpp:585-658`
-pub fn Com_Filter(filter: *mut c_char, name: *mut c_char, casesensitive: bool) -> bool {
-    unsafe {
-        Com_FilterBytes(
-            CStr::from_ptr(filter).to_bytes(),
-            CStr::from_ptr(name).to_bytes(),
-            casesensitive,
-        )
-    }
-}
-
-/// Raven `Com_FilterPath` — pointer seam over
-/// `native_string::filter::Com_FilterPathBytes` (§C7: qboolean return -> bool).
-///
-/// Source: `oracle/codemp/qcommon/common.cpp:665-690`
-pub fn Com_FilterPath(filter: *mut c_char, name: *mut c_char, casesensitive: bool) -> bool {
-    unsafe {
-        Com_FilterPathBytes(
-            CStr::from_ptr(filter).to_bytes(),
-            CStr::from_ptr(name).to_bytes(),
-            casesensitive,
-        )
-    }
-}
+// Raven's `Com_StringContains`/`Com_Filter`/`Com_FilterPath` family
+// (common.cpp:551-690) lives in `native_string::filter`; pointer-holding call
+// sites (cvar_fns/cmd_pc/files_common) convert with `CStr` at the site and
+// call the `Bytes` canonicals directly.
 
 /// `Com_ParseTextFileDestroy`.
 ///
@@ -1762,26 +1734,18 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             }
 
             if !view.common.com_developer.is_null() && (*view.common.com_developer).integer != 0 {
-                Cmd_AddCommand(
-                    view,
-                    c"error".as_ptr(),
-                    Some(|view| Com_Error_f(view.common)),
-                );
-                Cmd_AddCommand(view, c"crash".as_ptr(), Some(|_view| Com_Crash_f()));
-                Cmd_AddCommand(view, c"freeze".as_ptr(), Some(|view| Com_Freeze_f(view)));
+                Cmd_AddCommand(view, "error", Some(|view| Com_Error_f(view.common)));
+                Cmd_AddCommand(view, "crash", Some(|_view| Com_Crash_f()));
+                Cmd_AddCommand(view, "freeze", Some(|view| Com_Freeze_f(view)));
             }
         }
-        Cmd_AddCommand(view, c"quit".as_ptr(), Some(|view| Com_Quit_f(view)));
+        Cmd_AddCommand(view, "quit", Some(|view| Com_Quit_f(view)));
         Cmd_AddCommand(
             view,
-            c"changeVectors".as_ptr(),
+            "changeVectors",
             Some(|view| crate::msg::MSG_ReportChangeVectors_f(view.common)),
         );
-        Cmd_AddCommand(
-            view,
-            c"writeconfig".as_ptr(),
-            Some(|view| Com_WriteConfig_f(view)),
-        );
+        Cmd_AddCommand(view, "writeconfig", Some(|view| Com_WriteConfig_f(view)));
 
         let s = format!(
             "{} {} {}",

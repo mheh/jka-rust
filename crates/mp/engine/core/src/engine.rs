@@ -147,6 +147,9 @@ impl Engine {
             // Raven static initializer is 0x89abcdef (non-zero), so it is
             // written through its Default rather than left zeroed.
             addr_of_mut!((*p).common.qrand).write(Default::default());
+            // Common.cmd_functions: Vec-backed registered-command list
+            // (String-field migration), not zero-valid.
+            addr_of_mut!((*p).common.cmd_functions).write(Vec::new());
             // Common.hooks (ruling 2026-07-12): the qcommon->server/client/sound
             // upcall table. Option<fn> is null-niche zero-valid (all None under
             // the alloc_zeroed mass), but boot installs the null-build client/

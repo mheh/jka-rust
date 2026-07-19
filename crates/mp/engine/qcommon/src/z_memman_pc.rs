@@ -568,8 +568,8 @@ pub fn Z_Size(pvAddress: *mut ()) -> c_int {
 pub fn Com_ShutdownZoneMemory(common: &mut Common) {
     //	Com_Printf("Shutting down zone memory .....\n");
 
-    Cmd_RemoveCommand(common, c"zone_stats".as_ptr());
-    Cmd_RemoveCommand(common, c"zone_details".as_ptr());
+    Cmd_RemoveCommand(common, "zone_stats");
+    Cmd_RemoveCommand(common, "zone_details");
 
     if common.TheZone.Stats.iCount != 0 {
         // §E0382: `common` moves into the call as the first arg, so the
@@ -604,16 +604,8 @@ pub fn Com_InitZoneMemory(view: &mut EngineHostView) {
     view.common.com_validateZone = Cvar_Get(view, c"com_validateZone".as_ptr(), c"0".as_ptr(), 0);
     //#endif
 
-    Cmd_AddCommand(
-        view,
-        c"zone_stats".as_ptr(),
-        Some(|view| Z_Stats_f(view.common)),
-    );
-    Cmd_AddCommand(
-        view,
-        c"zone_details".as_ptr(),
-        Some(|view| Z_Details_f(view.common)),
-    );
+    Cmd_AddCommand(view, "zone_stats", Some(|view| Z_Stats_f(view.common)));
+    Cmd_AddCommand(view, "zone_details", Some(|view| Z_Details_f(view.common)));
 
     // #ifdef _DEBUG: zone_memrecovertest is a debug-only command; this is a
     // release build, so the block is dropped per its own guard.

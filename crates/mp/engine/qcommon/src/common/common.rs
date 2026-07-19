@@ -350,11 +350,12 @@ pub struct Common {
     /// Source: `oracle/codemp/qcommon/cmd_common.cpp:337,359`
     pub cmd_args_buf: [c_char; MAX_STRING_CHARS],
     pub cmd_args_from_buf: [c_char; BIG_INFO_STRING],
-    /// Raven `static cmd_function_t *cmd_functions` — head of the
-    /// registered-command linked list.
+    /// Raven `static cmd_function_t *cmd_functions` — the registered-command
+    /// list, owned (index 0 = Raven's head). Not zero-valid: written through
+    /// `Engine::new`'s LIFE-Q9 in-place init.
     ///
     /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:11`
-    pub cmd_functions: *mut crate::cmd::cmd_function_t::cmd_function_t,
+    pub cmd_functions: Vec<crate::cmd::cmd_function_t::cmd_function_t>,
 
     // ---- `cvar.cpp` ----
     /// Raven `cvar_vars` — head of the registered-cvar linked list.

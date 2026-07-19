@@ -4,13 +4,14 @@
 //!
 //! Source: `oracle/codemp/qcommon/cmd_pc.cpp`
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_char, CStr};
+use std::ffi::CString;
+
+use native_string::filter::Com_Filter;
 
 use crate::cmd::cmd_function_t::{cmd_function_t, CmdFunction};
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
-use crate::common_fns::Com_Filter;
-use crate::z_memman_pc::{CopyString, S_Malloc, Z_Free};
 
 // `Server` is a type-erased receiver slot: the real type lives in
 // mp_engine_server, which depends on this crate (importing it would cycle).
@@ -19,85 +20,56 @@ pub use crate::common::opaque_slots::Server;
 
 use crate::common::com_printf;
 use crate::cvar_fns::Cvar_Command;
-use mp_qshared::shared::q_string::Q_stricmp;
 
 /// `Cmd_AddCommand`.
 ///
+/// Raven `strcmp`s the exact name, `S_Malloc`s a node, `CopyString`s the
+/// name, and links it at the list head; the owned Vec front-inserts a
+/// `String`-named entry.
+///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:18-39`
-pub fn Cmd_AddCommand(
-    view: &mut EngineHostView,
-    cmd_name: *const c_char,
-    function: Option<CmdFunction>,
-) {
-    unsafe {
-        // fail if the command already exists
-        let mut cmd: *mut cmd_function_t = view.common.cmd_functions;
-        while !cmd.is_null() {
-            if libc::strcmp(cmd_name, (*cmd).name) == 0 {
-                // allow completion-only commands to be silently doubled
-                if function.is_some() {
-                    let name = CStr::from_ptr(cmd_name).to_string_lossy();
-                    com_printf(
-                        view.common,
-                        &format!("Cmd_AddCommand: {name} already defined\n"),
-                    );
-                }
-                return;
-            }
-            cmd = (*cmd).next;
+pub fn Cmd_AddCommand(view: &mut EngineHostView, cmd_name: &str, function: Option<CmdFunction>) {
+    // fail if the command already exists
+    if view.common.cmd_functions.iter().any(|c| c.name == cmd_name) {
+        // allow completion-only commands to be silently doubled
+        if function.is_some() {
+            com_printf(
+                view.common,
+                &format!("Cmd_AddCommand: {cmd_name} already defined\n"),
+            );
         }
-
-        // use a small malloc to avoid zone fragmentation
-        let cmd =
-            S_Malloc(view, core::mem::size_of::<cmd_function_t>() as c_int) as *mut cmd_function_t;
-        (*cmd).name = CopyString(view, cmd_name);
-        (*cmd).function = function;
-        (*cmd).next = view.common.cmd_functions;
-        view.common.cmd_functions = cmd;
+        return;
     }
+    view.common.cmd_functions.insert(
+        0,
+        cmd_function_t {
+            name: cmd_name.to_owned(),
+            function,
+        },
+    );
 }
 
 /// `Cmd_RemoveCommand`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:46-67`
-pub fn Cmd_RemoveCommand(common: &mut Common, cmd_name: *const c_char) {
-    // Raw double-pointer walk (as `Cmd_ExecuteString`): `&mut …` is cast to a
-    // raw `*mut *mut` immediately so no borrow of `common` outlives the
-    // `Z_Free(common, …)` calls in the removal branch.
-    let mut back: *mut *mut cmd_function_t = &mut common.cmd_functions as *mut _;
-    loop {
-        unsafe {
-            let cmd = *back;
-            if cmd.is_null() {
-                // command wasn't active
-                return;
-            }
-            if libc::strcmp(cmd_name, (*cmd).name) == 0 {
-                *back = (*cmd).next;
-                if !(*cmd).name.is_null() {
-                    Z_Free(common, (*cmd).name as *mut ());
-                }
-                Z_Free(common, cmd as *mut ());
-                return;
-            }
-            back = &mut (*cmd).next as *mut _;
-        }
+pub fn Cmd_RemoveCommand(common: &mut Common, cmd_name: &str) {
+    // Raven unlinks and frees the node; absent names return silently.
+    if let Some(i) = common.cmd_functions.iter().position(|c| c.name == cmd_name) {
+        common.cmd_functions.remove(i);
     }
 }
 
 /// `Cmd_CommandCompletion`.
 ///
 /// Raven walks the registered-command list, invoking `callback` with each
-/// command's name.
+/// command's name. The callback is a C seam: each name crosses as a
+/// NUL-terminated `CString` for the call's duration.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:75-81`
 pub fn Cmd_CommandCompletion(common: &mut Common, callback: extern "C" fn(*const c_char)) {
-    let mut cmd: *mut cmd_function_t = common.cmd_functions;
-    while !cmd.is_null() {
-        unsafe {
-            callback((*cmd).name);
-            cmd = (*cmd).next;
-        }
+    for cmd in &common.cmd_functions {
+        let name = CString::new(cmd.name.as_str()).unwrap_or_default();
+        callback(name.as_ptr());
     }
 }
 
@@ -105,30 +77,31 @@ pub fn Cmd_CommandCompletion(common: &mut Common, callback: extern "C" fn(*const
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:153-173`
 pub fn Cmd_List_f(common: &mut Common) {
-    let match_: *mut c_char = if crate::cmd_common::Cmd_Argc(common) > 1 {
-        crate::cmd_common::Cmd_Argv(common, 1)
+    let match_: Option<String> = if crate::cmd_common::Cmd_Argc(common) > 1 {
+        let arg = crate::cmd_common::Cmd_Argv(common, 1);
+        Some(
+            unsafe { CStr::from_ptr(arg) }
+                .to_string_lossy()
+                .into_owned(),
+        )
     } else {
-        core::ptr::null_mut()
+        None
     };
 
-    let mut i: c_int = 0;
-    let mut cmd: *mut cmd_function_t = common.cmd_functions;
-    while !cmd.is_null() {
-        unsafe {
-            if !match_.is_null() && !Com_Filter(match_, (*cmd).name as *mut c_char, false) {
-                cmd = (*cmd).next;
-                continue;
-            }
-
-            // No safe C-variadic fn defs — pre-format the name here, matching
-            // the `cmd_common.rs` `Cmd_Echo_f` precedent.
-            let name = core::ffi::CStr::from_ptr((*cmd).name).to_string_lossy();
-            com_printf(common, &format!("{}\n", name));
-            i += 1;
-            cmd = (*cmd).next;
-        }
+    let names: Vec<String> = common
+        .cmd_functions
+        .iter()
+        .filter(|cmd| {
+            match_
+                .as_deref()
+                .map_or(true, |m| Com_Filter(m, &cmd.name, false))
+        })
+        .map(|cmd| cmd.name.clone())
+        .collect();
+    for name in &names {
+        com_printf(common, &format!("{name}\n"));
     }
-    com_printf(common, &format!("{} commands\n", i));
+    com_printf(common, &format!("{} commands\n", names.len()));
 }
 
 /// `Cmd_ExecuteString`.
@@ -142,30 +115,28 @@ pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
     }
 
     // check registered command functions
-    // The `prev`/`cmd` double-pointer walk is transcribed with raw pointers
-    // to match Raven's link-rearrangement exactly.
-    unsafe {
-        let mut prev: *mut *mut cmd_function_t = &mut view.common.cmd_functions as *mut _;
-        while !(*prev).is_null() {
-            let cmd = *prev;
-            if Q_stricmp(crate::cmd_common::Cmd_Argv(view.common, 0), (*cmd).name) == 0 {
-                // rearrange the links so that the command will be
-                // near the head of the list next time it is used
-                *prev = (*cmd).next;
-                (*cmd).next = view.common.cmd_functions;
-                view.common.cmd_functions = cmd;
+    let arg0 = unsafe { CStr::from_ptr(crate::cmd_common::Cmd_Argv(view.common, 0)) }
+        .to_bytes()
+        .to_vec();
+    if let Some(idx) = view
+        .common
+        .cmd_functions
+        .iter()
+        .position(|c| c.name.as_bytes().eq_ignore_ascii_case(&arg0))
+    {
+        // rearrange the links so that the command will be
+        // near the head of the list next time it is used
+        let cmd = view.common.cmd_functions.remove(idx);
+        let function = cmd.function;
+        view.common.cmd_functions.insert(0, cmd);
 
-                // perform the action
-                if let Some(function) = (*cmd).function {
-                    function(view);
-                } else {
-                    // let the cgame or game handle it
-                    break;
-                }
-                return;
-            }
-            prev = &mut (*cmd).next as *mut _;
+        // perform the action
+        if let Some(function) = function {
+            function(view);
+            return;
         }
+        // NULL function: let the cgame or game handle it (fall through, as
+        // Raven's `break`)
     }
 
     // check cvars

@@ -1055,7 +1055,7 @@ unsafe fn g2_from_view<'a>(view: &mut EngineHostView) -> &'a mut Ghoul2System {
 /// Register one console command whose handler is a view-threaded forwarding
 /// closure (host-seam restructure, user 2026-07-11); thin wrapper over
 /// `Cmd_AddCommand` that supplies `Some(function)`.
-fn add(view: &mut EngineHostView, name: *const c_char, function: CmdFunction) {
+fn add(view: &mut EngineHostView, name: &str, function: CmdFunction) {
     Cmd_AddCommand(view, name, Some(function));
 }
 
@@ -1077,11 +1077,11 @@ pub fn SV_AddOperatorCommands(view: &mut EngineHostView, _sv: &mut Server) {
     // `Server`/`Ghoul2System` it casts the view's type-erased slot back
     // (`sv_from_view`/`g2_from_view`, the single documented unsafe pair) and
     // calls the real receiver-threaded command body.
-    add(view, c"heartbeat".as_ptr(), |view| {
+    add(view, "heartbeat", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_Heartbeat_f(sv)
     });
-    add(view, c"kick".as_ptr(), |view| {
+    add(view, "kick", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_Kick_f(view.common, sv)
     });
@@ -1090,61 +1090,57 @@ pub fn SV_AddOperatorCommands(view: &mut EngineHostView, _sv: &mut Server) {
     //     Cmd_AddCommand ("banClient", SV_BanNum_f);
     // #endif	// USE_CD_KEY
 
-    add(view, c"clientkick".as_ptr(), |view| {
+    add(view, "clientkick", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_KickNum_f(view.common, sv)
     });
-    add(view, c"status".as_ptr(), |view| {
+    add(view, "status", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_Status_f(view, sv)
     });
-    add(view, c"serverinfo".as_ptr(), |view| {
-        SV_Serverinfo_f(view.common)
-    });
-    add(view, c"systeminfo".as_ptr(), |view| {
-        SV_Systeminfo_f(view.common)
-    });
-    add(view, c"dumpuser".as_ptr(), |view| {
+    add(view, "serverinfo", |view| SV_Serverinfo_f(view.common));
+    add(view, "systeminfo", |view| SV_Systeminfo_f(view.common));
+    add(view, "dumpuser", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_DumpUser_f(view.common, sv)
     });
     // Engine referee divergence UX (lockstep plan G5; see sv_referee.rs).
-    add(view, c"ref_step".as_ptr(), |view| {
+    add(view, "ref_step", |view| {
         let sv = unsafe { sv_from_view(view) };
         crate::sv_referee::ref_step_cmd(view, sv)
     });
-    add(view, c"ref_resume".as_ptr(), |view| {
+    add(view, "ref_resume", |view| {
         let sv = unsafe { sv_from_view(view) };
         crate::sv_referee::ref_resume_cmd(view, sv)
     });
-    add(view, c"ref_diff".as_ptr(), |view| {
+    add(view, "ref_diff", |view| {
         let sv = unsafe { sv_from_view(view) };
         crate::sv_referee::ref_diff_cmd(view, sv)
     });
-    add(view, c"map_restart".as_ptr(), SV_MapRestart_f_cmd);
-    add(view, c"sectorlist".as_ptr(), |view| {
+    add(view, "map_restart", SV_MapRestart_f_cmd);
+    add(view, "sectorlist", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_SectorList_f(view.common, sv)
     });
-    add(view, c"map".as_ptr(), SV_Map_f_cmd);
+    add(view, "map", SV_Map_f_cmd);
     // #ifndef PRE_RELEASE_DEMO
-    add(view, c"devmap".as_ptr(), SV_Map_f_cmd);
-    add(view, c"spmap".as_ptr(), SV_Map_f_cmd);
-    add(view, c"spdevmap".as_ptr(), SV_Map_f_cmd);
+    add(view, "devmap", SV_Map_f_cmd);
+    add(view, "spmap", SV_Map_f_cmd);
+    add(view, "spdevmap", SV_Map_f_cmd);
     // Cmd_AddCommand ("devmapbsp", SV_Map_f);	// not used in MP codebase, no server BSP_cacheing
-    add(view, c"devmapmdl".as_ptr(), SV_Map_f_cmd);
-    add(view, c"devmapall".as_ptr(), SV_Map_f_cmd);
+    add(view, "devmapmdl", SV_Map_f_cmd);
+    add(view, "devmapall", SV_Map_f_cmd);
     // #endif
-    add(view, c"killserver".as_ptr(), |view| SV_KillServer_f(view));
+    add(view, "killserver", |view| SV_KillServer_f(view));
     // if( com_dedicated->integer )
     {
-        add(view, c"svsay".as_ptr(), |view| {
+        add(view, "svsay", |view| {
             let sv = unsafe { sv_from_view(view) };
             SV_ConSay_f(view.common, sv)
         });
     }
 
-    add(view, c"forcetoggle".as_ptr(), |view| {
+    add(view, "forcetoggle", |view| {
         let sv = unsafe { sv_from_view(view) };
         SV_ForceToggle_f(view, sv)
     });

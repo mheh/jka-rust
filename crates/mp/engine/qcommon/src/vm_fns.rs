@@ -559,16 +559,8 @@ pub fn VM_Init(view: &mut EngineHostView) {
     // client wants to know if the server is using vm's for certain modules,
     // so if pure we can force the same method (be it vm or dll) -rww
 
-    Cmd_AddCommand(
-        view,
-        c"vmprofile".as_ptr(),
-        Some(|view| VM_VmProfile_f(view)),
-    );
-    Cmd_AddCommand(
-        view,
-        c"vminfo".as_ptr(),
-        Some(|view| VM_VmInfo_f(view.common)),
-    );
+    Cmd_AddCommand(view, "vmprofile", Some(|view| VM_VmProfile_f(view)));
+    Cmd_AddCommand(view, "vminfo", Some(|view| VM_VmInfo_f(view.common)));
 
     view.common.vmTable = unsafe { core::mem::zeroed() };
 }

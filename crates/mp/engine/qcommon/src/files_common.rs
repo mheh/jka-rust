@@ -14,7 +14,7 @@
 //!
 //! Source: `oracle/codemp/qcommon/files_common.cpp`
 
-use core::ffi::{c_char, c_int, c_long, c_uint, c_void};
+use core::ffi::{c_char, c_int, c_long, c_uint, c_void, CStr};
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
@@ -31,10 +31,11 @@ use crate::files::files_consts::BASEGAME;
 // (files_common.cpp subject) referenced at their canonical homes — the `FS_*`
 // left bare at their home; reported.
 use crate::common::{com_error, com_printf};
-use crate::common_fns::{Com_FilterPath, Com_StartupVariable};
+use crate::common_fns::Com_StartupVariable;
 use mp_qshared::shared::cvar::{CVAR_INIT, CVAR_SYSTEMINFO};
 use mp_qshared::shared::q_string::{Com_sprintf, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncpyz};
 use mp_qshared::shared::swap::LittleLong;
+use native_string::filter::Com_FilterPathBytes;
 
 use crate::cmd_common::{Cbuf_AddText, Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use crate::cmd_pc::{Cmd_AddCommand, Cmd_RemoveCommand};
@@ -1534,7 +1535,11 @@ fn FS_ListFilteredFiles(
                     let name = (*buildBuffer.add(i as usize)).name;
                     if !filter.is_null() {
                         // case insensitive
-                        if !Com_FilterPath(filter, name, false) {
+                        if !Com_FilterPathBytes(
+                            CStr::from_ptr(filter).to_bytes(),
+                            CStr::from_ptr(name).to_bytes(),
+                            false,
+                        ) {
                             continue;
                         }
                         nfiles = FS_AddFileToList(view, name, &mut list, nfiles);
@@ -1905,22 +1910,22 @@ pub fn FS_Startup(view: &mut EngineHostView, gameName: *const c_char) {
         // add our commands
         Cmd_AddCommand(
             view,
-            c"path".as_ptr(),
+            "path",
             Some(|view: &mut EngineHostView| FS_Path_f(view.common)),
         );
         Cmd_AddCommand(
             view,
-            c"dir".as_ptr(),
+            "dir",
             Some(|view: &mut EngineHostView| FS_Dir_f(view)),
         );
         Cmd_AddCommand(
             view,
-            c"fdir".as_ptr(),
+            "fdir",
             Some(|view: &mut EngineHostView| FS_NewDir_f(view)),
         );
         Cmd_AddCommand(
             view,
-            c"touchFile".as_ptr(),
+            "touchFile",
             Some(|view: &mut EngineHostView| FS_TouchFile_f(view)),
         );
 
@@ -2045,10 +2050,10 @@ pub fn FS_Shutdown(common: &mut Common, closemfp: qboolean) {
     // any FS_ calls will now be an error until reinitialized
     common.fs_searchpaths = core::ptr::null_mut();
 
-    Cmd_RemoveCommand(common, c"path".as_ptr());
-    Cmd_RemoveCommand(common, c"dir".as_ptr());
-    Cmd_RemoveCommand(common, c"fdir".as_ptr());
-    Cmd_RemoveCommand(common, c"touchFile".as_ptr());
+    Cmd_RemoveCommand(common, "path");
+    Cmd_RemoveCommand(common, "dir");
+    Cmd_RemoveCommand(common, "fdir");
+    Cmd_RemoveCommand(common, "touchFile");
 }
 
 /// Raven `FS_PureServerSetLoadedPaks`.

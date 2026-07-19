@@ -27,7 +27,8 @@ use crate::cmd_common::{Cmd_Argc, Cmd_Argv};
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::error::com_error;
 use crate::common::{com_printf, Common};
-use crate::common_fns::Com_Filter;
+use native_string::filter::Com_FilterBytes;
+
 use crate::cvar::cvar_consts::{FILE_HASH_SIZE, MAX_CVARS};
 use crate::files_common::FS_Printf;
 use crate::z_memman_pc::{CopyString, Z_Free, Z_Malloc};
@@ -734,7 +735,13 @@ pub fn Cvar_List_f(common: &mut Common) {
                 continue;
             }
 
-            if !r#match.is_null() && !Com_Filter(r#match, (*cur).name, false) {
+            if !r#match.is_null()
+                && !Com_FilterBytes(
+                    CStr::from_ptr(r#match).to_bytes(),
+                    CStr::from_ptr((*cur).name).to_bytes(),
+                    false,
+                )
+            {
                 continue;
             }
 
@@ -979,22 +986,14 @@ pub fn Cvar_Init(view: &mut EngineHostView) {
     );
     view.common.cvar_cheats = cheats;
 
-    Cmd_AddCommand(view, c"toggle".as_ptr(), Some(|view| Cvar_Toggle_f(view)));
-    Cmd_AddCommand(view, c"set".as_ptr(), Some(|view| Cvar_Set_f(view)));
-    Cmd_AddCommand(view, c"sets".as_ptr(), Some(|view| Cvar_SetS_f(view)));
-    Cmd_AddCommand(view, c"setu".as_ptr(), Some(|view| Cvar_SetU_f(view)));
-    Cmd_AddCommand(view, c"seta".as_ptr(), Some(|view| Cvar_SetA_f(view)));
-    Cmd_AddCommand(view, c"reset".as_ptr(), Some(|view| Cvar_Reset_f(view)));
-    Cmd_AddCommand(
-        view,
-        c"cvarlist".as_ptr(),
-        Some(|view| Cvar_List_f(view.common)),
-    );
-    Cmd_AddCommand(
-        view,
-        c"cvar_restart".as_ptr(),
-        Some(|view| Cvar_Restart_f(view)),
-    );
+    Cmd_AddCommand(view, "toggle", Some(|view| Cvar_Toggle_f(view)));
+    Cmd_AddCommand(view, "set", Some(|view| Cvar_Set_f(view)));
+    Cmd_AddCommand(view, "sets", Some(|view| Cvar_SetS_f(view)));
+    Cmd_AddCommand(view, "setu", Some(|view| Cvar_SetU_f(view)));
+    Cmd_AddCommand(view, "seta", Some(|view| Cvar_SetA_f(view)));
+    Cmd_AddCommand(view, "reset", Some(|view| Cvar_Reset_f(view)));
+    Cmd_AddCommand(view, "cvarlist", Some(|view| Cvar_List_f(view.common)));
+    Cmd_AddCommand(view, "cvar_restart", Some(|view| Cvar_Restart_f(view)));
 }
 
 /// Raven `Cvar_Realloc` — copies one cvar string into the defrag pool.
