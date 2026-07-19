@@ -21,12 +21,13 @@ use crate::shared::{vec3_t, vec_t};
 pub use native_math::qmath::PerpendicularVectorMP as PerpendicularVector;
 pub use native_math::qmath::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
-    vectoangles, vectoyaw, AngleDelta, AngleMod, AngleNormalize180, AngleNormalize360,
-    AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, CrossProduct, Distance,
-    DistanceSquared, DotProductRow, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand, Q_random,
-    RadiusFromBounds, VectorBetweenVectors, VectorClear, VectorCompare, VectorCompare2,
+    vectoangles, vectoyaw, AngleDelta, AngleDifference, AngleMod, AngleNormZero, AngleNormalize180,
+    AngleNormalize360, AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, CrossProduct,
+    Distance, DistanceSquared, DotProductRow, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand,
+    Q_random, RadiusFromBounds, VectorBetweenVectors, VectorClear, VectorCompare, VectorCompare2,
     VectorInverse, VectorLength, VectorLengthSquared, VectorNPos, VectorNormalize,
-    VectorNormalize2, VectorNormalizeRow, VectorSet, PITCH, ROLL, VEC3_ORIGIN, YAW,
+    VectorNormalize2, VectorNormalizeRow, VectorSet, ANGLE2SHORT, PITCH, ROLL, SHORT2ANGLE,
+    VEC3_ORIGIN, YAW,
 };
 
 /// Raven `SetPlaneSignbits`.

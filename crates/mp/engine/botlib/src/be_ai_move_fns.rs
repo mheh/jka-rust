@@ -64,8 +64,8 @@ use mp_qshared::shared::limits::MAX_MODELS;
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS};
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
-    DistanceSquared, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2,
-    VectorSet, PITCH,
+    AngleDifference, DistanceSquared, VectorLength, VectorLengthSquared, VectorNormalize,
+    VectorNormalize2, VectorSet, PITCH,
 };
 use mp_qshared::shared::surface_flags::{
     CONTENTS_BODY, CONTENTS_LAVA, CONTENTS_PLAYERCLIP, CONTENTS_SLIME, CONTENTS_SOLID,
@@ -124,24 +124,6 @@ pub fn BotMoveStateFromHandle(bot: &mut BotLib, handle: c_int) -> *mut bot_moves
         }
         bot.botmovestates[handle as usize]
     }
-}
-
-/// Raven `AngleDiff`.
-/// Source: `oracle/codemp/botlib/be_ai_move.cpp:203-217`
-pub fn AngleDiff(ang1: f32, ang2: f32) -> f32 {
-    let mut diff: f32;
-
-    diff = ang1 - ang2;
-    if ang1 > ang2 {
-        if diff > 180.0 {
-            diff -= 360.0;
-        }
-    } else {
-        if diff < -180.0 {
-            diff += 360.0;
-        }
-    }
-    diff
 }
 
 /// Raven `BotAddToTarget`.
@@ -937,8 +919,8 @@ pub fn BotTravel_RocketJump(
         result.ideal_viewangles[PITCH as usize] = 90.0;
         //
         if dist < 5.0
-            && AngleDiff(result.ideal_viewangles[0], (*ms).viewangles[0]).abs() < 5.0
-            && AngleDiff(result.ideal_viewangles[1], (*ms).viewangles[1]).abs() < 5.0
+            && AngleDifference(result.ideal_viewangles[0], (*ms).viewangles[0]).abs() < 5.0
+            && AngleDifference(result.ideal_viewangles[1], (*ms).viewangles[1]).abs() < 5.0
         {
             hordir[0] = (*reach).end[0] - (*ms).origin[0];
             hordir[1] = (*reach).end[1] - (*ms).origin[1];
@@ -1003,8 +985,8 @@ pub fn BotTravel_BFGJump(
         dist = VectorNormalize(&mut hordir);
         //
         if dist < 5.0
-            && AngleDiff(result.ideal_viewangles[0], (*ms).viewangles[0]).abs() < 5.0
-            && AngleDiff(result.ideal_viewangles[1], (*ms).viewangles[1]).abs() < 5.0
+            && AngleDifference(result.ideal_viewangles[0], (*ms).viewangles[0]).abs() < 5.0
+            && AngleDifference(result.ideal_viewangles[1], (*ms).viewangles[1]).abs() < 5.0
         {
             hordir[0] = (*reach).end[0] - (*ms).origin[0];
             hordir[1] = (*reach).end[1] - (*ms).origin[1];
@@ -2055,8 +2037,8 @@ pub fn BotTravel_Grapple(
             result.flags |= MOVERESULT_MOVEMENTVIEW;
             //
             if dist < 5.0
-                && AngleDiff(result.ideal_viewangles[0], (*ms).viewangles[0]).abs() < 2.0
-                && AngleDiff(result.ideal_viewangles[1], (*ms).viewangles[1]).abs() < 2.0
+                && AngleDifference(result.ideal_viewangles[0], (*ms).viewangles[0]).abs() < 2.0
+                && AngleDifference(result.ideal_viewangles[1], (*ms).viewangles[1]).abs() < 2.0
             {
                 //check if the grapple missile path is clear
                 _VectorAdd((*ms).origin, (*ms).viewoffset, &mut org);

@@ -98,18 +98,6 @@ const WORLD_SIZE: f32 = 131072.0;
 // Source: `oracle/codemp/game/NPC_utils.c:1243`
 const MAX_RADIUS_ENTS: usize = 256;
 
-/// Raven `ANGLE2SHORT(x)` — `((int)((x)*65536/360) & 65535)`.
-/// Source: `oracle/codemp/game/q_shared.h:1972`
-pub(crate) fn ANGLE2SHORT(x: f32) -> c_int {
-    (((x * 65536.0 / 360.0) as c_int) & 65535) as c_int
-}
-
-/// Raven `SHORT2ANGLE(x)` — `((x)*(360.0/65536))`.
-/// Source: `oracle/codemp/game/q_shared.h:1973`
-pub(crate) fn SHORT2ANGLE(x: c_int) -> f32 {
-    (x as f32) * (360.0 / 65536.0)
-}
-
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
 // via the prelude glob (no per-file copy).
 

@@ -745,6 +745,49 @@ pub fn LerpAngle(from: f32, to: f32, frac: f32) -> f32 {
     from + frac * (to - from)
 }
 
+/// Raven `AngleDifference` — signed shortest-arc difference between two
+/// angles; duplicated verbatim in botlib as `AngleDiff`.
+///
+/// Source: `oracle/codemp/game/ai_main.c:425-436`
+/// Source: `oracle/codemp/botlib/be_ai_move.cpp:203-217` (`AngleDiff`)
+pub fn AngleDifference(ang1: f32, ang2: f32) -> f32 {
+    let mut diff = ang1 - ang2;
+    if ang1 > ang2 {
+        if diff > 180.0 {
+            diff -= 360.0;
+        }
+    } else if diff < -180.0 {
+        diff += 360.0;
+    }
+    diff
+}
+
+/// Raven `static float AngleNormZero(float theta)` — `fmodf` into
+/// `[-180, 180]` (distinct from the quantizing `AngleNormalize180`).
+///
+/// Source: `oracle/codemp/ghoul2/G2_bones.cpp:3936-3949`
+pub fn AngleNormZero(theta: f32) -> f32 {
+    let mut ret = theta % 360.0;
+    if ret < -180.0 {
+        ret += 360.0;
+    } else if ret > 180.0 {
+        ret -= 360.0;
+    }
+    ret
+}
+
+/// Raven `ANGLE2SHORT(x)` — `((int)((x)*65536/360) & 65535)`.
+/// Source: `oracle/codemp/game/q_shared.h:1972`
+pub fn ANGLE2SHORT(x: f32) -> c_int {
+    ((x * 65536.0 / 360.0) as c_int) & 65535
+}
+
+/// Raven `SHORT2ANGLE(x)` — `((x)*(360.0/65536))`.
+/// Source: `oracle/codemp/game/q_shared.h:1973`
+pub fn SHORT2ANGLE(x: c_int) -> f32 {
+    (x as f32) * (360.0 / 65536.0)
+}
+
 /// Raven `AngleSubtract`.
 ///
 /// Always returns a value from -180 to 180.

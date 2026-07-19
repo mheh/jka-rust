@@ -320,9 +320,10 @@ pub use crate::g_utils::{
 };
 pub use crate::g_weapon::{laserTrapStick, LogAccuracyHit};
 pub use crate::q_math::{
-    AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance,
-    DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorCompare,
-    VectorCompare2, VectorLength, VectorLengthSquared, VectorNPos, VectorNormalize,
+    AddPointToBounds, AngleDifference, AngleSubtract, AngleVectors, CrossProduct, DirToByte,
+    Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorCompare,
+    VectorCompare2, VectorLength, VectorLengthSquared, VectorNPos, VectorNormalize, ANGLE2SHORT,
+    SHORT2ANGLE,
 };
 pub use crate::q_shared::{
     va, COM_StripExtension, GetIDForString, Info_ValueForKey, Q_strchr, Q_strcmp, Q_stricmp,

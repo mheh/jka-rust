@@ -28,8 +28,8 @@ use mp_qshared::shared::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_math::{
     _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA,
-    _VectorSubtract as VectorSubtract, CrossProduct, VectorClear, VectorLengthSquared,
-    VectorNormalize,
+    _VectorSubtract as VectorSubtract, CrossProduct, DotProductRow, VectorClear,
+    VectorLengthSquared, VectorNormalize,
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, vec4_t};
 
@@ -52,13 +52,6 @@ use crate::common::engine_host_view::EngineHostView;
 use crate::common::{com_error, com_printf, Common};
 use crate::common_fns::{Com_DPrintf, Com_Memcpy, Com_Memset};
 use crate::z_memman_pc::{Hunk_Alloc, Z_Free, Z_Malloc};
-
-/// `DotProduct` against the xyz of a `[f32; 4]` plane (Raven treats `plane` as a
-/// `vec3_t` in `DotProduct( v, plane )`); op order matches `_DotProduct`.
-#[inline]
-fn dot_plane(v: vec3_t, plane: &[f32; 4]) -> f32 {
-    DotProduct(v, [plane[0], plane[1], plane[2]])
-}
 
 /// Raven `CM_ClearLevelPatches` — clears the `debugPatchCollide`/`debugFacet`
 /// debug pointers.
@@ -460,17 +453,18 @@ fn CM_FindPlane(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t, p3: vec3_t) -> 
             continue; // allow backwards planes?
         }
 
-        let mut d = dot_plane(p1, &cm.planes[i as usize].plane) - cm.planes[i as usize].plane[3];
+        let mut d =
+            DotProductRow(&cm.planes[i as usize].plane, p1) - cm.planes[i as usize].plane[3];
         if d < -PLANE_TRI_EPSILON || d > PLANE_TRI_EPSILON {
             continue;
         }
 
-        d = dot_plane(p2, &cm.planes[i as usize].plane) - cm.planes[i as usize].plane[3];
+        d = DotProductRow(&cm.planes[i as usize].plane, p2) - cm.planes[i as usize].plane[3];
         if d < -PLANE_TRI_EPSILON || d > PLANE_TRI_EPSILON {
             continue;
         }
 
-        d = dot_plane(p3, &cm.planes[i as usize].plane) - cm.planes[i as usize].plane[3];
+        d = DotProductRow(&cm.planes[i as usize].plane, p3) - cm.planes[i as usize].plane[3];
         if d < -PLANE_TRI_EPSILON || d > PLANE_TRI_EPSILON {
             continue;
         }
@@ -502,7 +496,7 @@ fn CM_PointOnPlaneSide(cm: &CollisionWorld, p: vec3_t, planeNum: c_int) -> c_int
     }
     let plane = &cm.planes[planeNum as usize].plane;
 
-    let d = dot_plane(p, plane) - plane[3];
+    let d = DotProductRow(plane, p) - plane[3];
 
     if d > PLANE_TRI_EPSILON {
         return SIDE_FRONT;
@@ -1354,9 +1348,10 @@ fn CM_TracePointThroughPatchCollide(
         // determine the trace's relationship to all planes
         let mut planes = (*pc).planes;
         for i in 0..(*pc).numPlanes {
-            let offset = dot_plane((*tw).offsets[(*planes).signbits as usize], &(*planes).plane);
-            let d1 = dot_plane((*tw).start, &(*planes).plane) - (*planes).plane[3] + offset;
-            let d2 = dot_plane((*tw).end, &(*planes).plane) - (*planes).plane[3] + offset;
+            let offset =
+                DotProductRow(&(*planes).plane, (*tw).offsets[(*planes).signbits as usize]);
+            let d1 = DotProductRow(&(*planes).plane, (*tw).start) - (*planes).plane[3] + offset;
+            let d2 = DotProductRow(&(*planes).plane, (*tw).end) - (*planes).plane[3] + offset;
             if d1 <= 0.0 {
                 front_facing[i as usize] = qfalse;
             } else {
@@ -1409,9 +1404,9 @@ fn CM_TracePointThroughPatchCollide(
 
                 // calculate intersection with a slight pushoff
                 let offset =
-                    dot_plane((*tw).offsets[(*planes).signbits as usize], &(*planes).plane);
-                let d1 = dot_plane((*tw).start, &(*planes).plane) - (*planes).plane[3] + offset;
-                let d2 = dot_plane((*tw).end, &(*planes).plane) - (*planes).plane[3] + offset;
+                    DotProductRow(&(*planes).plane, (*tw).offsets[(*planes).signbits as usize]);
+                let d1 = DotProductRow(&(*planes).plane, (*tw).start) - (*planes).plane[3] + offset;
+                let d2 = DotProductRow(&(*planes).plane, (*tw).end) - (*planes).plane[3] + offset;
                 trace.fraction = (d1 - SURFACE_CLIP_EPSILON) / (d1 - d2);
 
                 if trace.fraction < 0.0 {
@@ -1439,8 +1434,8 @@ fn CM_CheckFacetPlane(
 ) -> c_int {
     *hit = qfalse;
 
-    let d1 = dot_plane(start, plane) - plane[3];
-    let d2 = dot_plane(end, plane) - plane[3];
+    let d1 = DotProductRow(plane, start) - plane[3];
+    let d2 = DotProductRow(plane, end) - plane[3];
 
     // if completely in front of face, no intersection with the entire facet
     if d1 > 0.0 && (d2 >= SURFACE_CLIP_EPSILON || d2 >= d1) {
@@ -1523,7 +1518,7 @@ pub fn CM_TraceThroughPatchCollide(
                 plane[3] += (*tw).sphere.radius;
 
                 // find the closest point on the capsule to the plane
-                let t = dot_plane((*tw).sphere.offset, &plane);
+                let t = DotProductRow(&plane, (*tw).sphere.offset);
                 if t > 0.0 {
                     startp = [0.0; 3];
                     endp = [0.0; 3];
@@ -1536,7 +1531,7 @@ pub fn CM_TraceThroughPatchCollide(
                     VectorAdd((*tw).end, (*tw).sphere.offset, &mut endp);
                 }
             } else {
-                let offset = dot_plane((*tw).offsets[(*planes).signbits as usize], &plane);
+                let offset = DotProductRow(&plane, (*tw).offsets[(*planes).signbits as usize]);
                 plane[3] -= offset;
                 startp = (*tw).start;
                 endp = (*tw).end;
@@ -1585,7 +1580,7 @@ pub fn CM_TraceThroughPatchCollide(
                     plane[3] += (*tw).sphere.radius;
 
                     // find the closest point on the capsule to the plane
-                    let t = dot_plane((*tw).sphere.offset, &plane);
+                    let t = DotProductRow(&plane, (*tw).sphere.offset);
                     if t > 0.0 {
                         startp = [0.0; 3];
                         endp = [0.0; 3];
@@ -1599,7 +1594,7 @@ pub fn CM_TraceThroughPatchCollide(
                     }
                 } else {
                     // NOTE: this works even though the plane might be flipped because the bbox is centered
-                    let offset = dot_plane((*tw).offsets[(*planes).signbits as usize], &plane);
+                    let offset = DotProductRow(&plane, (*tw).offsets[(*planes).signbits as usize]);
                     plane[3] += offset.abs();
                     startp = (*tw).start;
                     endp = (*tw).end;
@@ -1680,7 +1675,7 @@ pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchColli
                 plane[3] += (*tw).sphere.radius;
 
                 // find the closest point on the capsule to the plane
-                let t = dot_plane((*tw).sphere.offset, &plane);
+                let t = DotProductRow(&plane, (*tw).sphere.offset);
                 if t > 0.0 {
                     startp = [0.0; 3];
                     VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
@@ -1689,12 +1684,12 @@ pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchColli
                     VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
                 }
             } else {
-                let offset = dot_plane((*tw).offsets[(*planes).signbits as usize], &plane);
+                let offset = DotProductRow(&plane, (*tw).offsets[(*planes).signbits as usize]);
                 plane[3] -= offset;
                 startp = (*tw).start;
             }
 
-            if dot_plane(startp, &plane) - plane[3] > 0.0 {
+            if DotProductRow(&plane, startp) - plane[3] > 0.0 {
                 facet = facet.add(1);
                 continue;
             }
@@ -1722,7 +1717,7 @@ pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchColli
                     plane[3] += (*tw).sphere.radius;
 
                     // find the closest point on the capsule to the plane
-                    let t = dot_plane((*tw).sphere.offset, &plane);
+                    let t = DotProductRow(&plane, (*tw).sphere.offset);
                     if t > 0.0 {
                         startp = [0.0; 3];
                         VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
@@ -1732,12 +1727,12 @@ pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchColli
                     }
                 } else {
                     // NOTE: this works even though the plane might be flipped because the bbox is centered
-                    let offset = dot_plane((*tw).offsets[(*planes).signbits as usize], &plane);
+                    let offset = DotProductRow(&plane, (*tw).offsets[(*planes).signbits as usize]);
                     plane[3] += offset.abs();
                     startp = (*tw).start;
                 }
 
-                if dot_plane(startp, &plane) - plane[3] > 0.0 {
+                if DotProductRow(&plane, startp) - plane[3] > 0.0 {
                     break;
                 }
                 j += 1;

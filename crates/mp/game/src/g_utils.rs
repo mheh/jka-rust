@@ -15,7 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_math::_DotProduct;
+use crate::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
 
 use crate::client::gclient_t;
 use crate::g_main::G_Printf;
@@ -2615,30 +2615,23 @@ pub fn ShortestLineSegBewteen2LineSegs(
     close_pnt1: &mut vec3_t,
     close_pnt2: &mut vec3_t,
 ) -> f32 {
-    fn sub(a: vec3_t, b: vec3_t) -> vec3_t {
-        [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-    }
-    fn dot(a: vec3_t, b: vec3_t) -> f32 {
-        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-    }
-    fn ma(a: vec3_t, s: f32, b: vec3_t) -> vec3_t {
-        [a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2]]
-    }
+    let mut start_dif = [0.0f32; 3];
+    _VectorSubtract(start2, start1, &mut start_dif);
+    let mut v1 = [0.0f32; 3];
+    _VectorSubtract(end1, start1, &mut v1);
+    let mut v2 = [0.0f32; 3];
+    _VectorSubtract(end2, start2, &mut v2);
 
-    let start_dif = sub(start2, start1);
-    let v1 = sub(end1, start1);
-    let v2 = sub(end2, start2);
-
-    let v1v1 = dot(v1, v1);
-    let v2v2 = dot(v2, v2);
-    let v1v2 = dot(v1, v2);
+    let v1v1 = _DotProduct(v1, v1);
+    let v2v2 = _DotProduct(v2, v2);
+    let v1v2 = _DotProduct(v1, v2);
 
     let denom = (v1v2 * v1v2) - (v1v1 * v2v2);
 
     let mut current_dist;
     if denom.abs() > 0.001 {
-        let s_num = -((v2v2 * dot(v1, start_dif)) - (v1v2 * dot(v2, start_dif)));
-        let t_num = (v1v1 * dot(v2, start_dif)) - (v1v2 * dot(v1, start_dif));
+        let s_num = -((v2v2 * _DotProduct(v1, start_dif)) - (v1v2 * _DotProduct(v2, start_dif)));
+        let t_num = (v1v1 * _DotProduct(v2, start_dif)) - (v1v2 * _DotProduct(v1, start_dif));
         let mut s = s_num / denom;
         let mut t = t_num / denom;
         let mut done = true;
@@ -2660,8 +2653,8 @@ pub fn ShortestLineSegBewteen2LineSegs(
             t = 1.0;
         }
 
-        *close_pnt1 = ma(start1, s, v1);
-        *close_pnt2 = ma(start2, t, v2);
+        _VectorMA(start1, s, v1, close_pnt1);
+        _VectorMA(start2, t, v2, close_pnt2);
 
         current_dist = Distance(*close_pnt1, *close_pnt2);
         if done {

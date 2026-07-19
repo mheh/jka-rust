@@ -52,7 +52,6 @@ use crate::botai::bweaponrange::{
 use crate::client::client_connected::CON_CONNECTED;
 use crate::g_combat::G_ThereIsAMaster;
 use crate::trap;
-use crate::NPC_utils::{ANGLE2SHORT, SHORT2ANGLE};
 use mp_abi::game::syscalls::BOTLIB_AAS_ENTITY_INFO::BotlibAasEntityInfoArgs;
 use mp_abi::game::syscalls::BOTLIB_AI_RESET_AVOID_GOALS::BotlibAiResetAvoidGoalsArgs;
 use mp_abi::game::syscalls::BOTLIB_AI_RESET_AVOID_REACH::BotlibAiResetAvoidReachArgs;
@@ -433,22 +432,6 @@ pub fn BotEntityInfo(ctx: &mut GameContext, entnum: c_int, info: *mut aas_entity
 /// Source: `oracle/codemp/game/ai_main.c:416-418`
 pub fn NumBots(ctx: &mut GameContext) -> c_int {
     ctx.world.globals.numbots
-}
-
-/// Raven `AngleDifference`.
-///
-/// Source: `oracle/codemp/game/ai_main.c:425-436`
-pub fn AngleDifference(ang1: f32, ang2: f32) -> f32 {
-    // Raven: signed shortest-arc difference between two yaw angles.
-    let mut diff = ang1 - ang2;
-    if ang1 > ang2 {
-        if diff > 180.0 {
-            diff -= 360.0;
-        }
-    } else if diff < -180.0 {
-        diff += 360.0;
-    }
-    diff
 }
 
 /// Raven `BotChangeViewAngle`.

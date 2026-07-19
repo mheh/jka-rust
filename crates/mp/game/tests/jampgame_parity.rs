@@ -98,10 +98,6 @@ fn v4(o: &mut String, v: &[f32; 4]) {
         v[3].cbits()
     );
 }
-fn dot_nz(v: &[f32; 3]) -> bool {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) != 0.0
-}
-
 fn load_vectors() -> Vec<[f32; 3]> {
     let path = oracle_dir().join("fixtures/vectors.txt");
     let text = std::fs::read_to_string(&path).unwrap();
@@ -405,7 +401,7 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
             let _ = write!(o, "v4s ");
             v4(o, &ov);
         }
-        if dot_nz(&b) {
+        if VectorLengthSquared(b) != 0.0 {
             let mut t = [0.0; 3];
             ProjectPointOnPlane(&mut t, a, b);
             let _ = write!(o, "proj ");
@@ -427,7 +423,7 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
                 u[2].cbits()
             );
         }
-        if dot_nz(&a) {
+        if VectorLengthSquared(a) != 0.0 {
             let mut t = [0.0; 3];
             PerpendicularVector(&mut t, a);
             let _ = write!(o, "perp ");
@@ -435,7 +431,7 @@ fn dump_vecmath(o: &mut String, vecs: &[[f32; 3]]) {
         } else {
             o.push_str("perp SKIP\n");
         }
-        if dot_nz(&a) {
+        if VectorLengthSquared(a) != 0.0 {
             let mut t = [0.0; 3];
             RotatePointAroundVector(&mut t, a, b, a[0]);
             let _ = write!(o, "rot ");

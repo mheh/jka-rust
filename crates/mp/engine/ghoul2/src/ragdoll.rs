@@ -141,7 +141,7 @@ use core::ffi::c_void;
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
+    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vectoangles, AngleNormZero,
     AngleNormalize180, AngleVectors, AnglesToAxis, DistanceSquared, VectorInverse,
 };
 use mp_qshared::shared::{
@@ -1635,20 +1635,6 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
     any_solid
 }
 
-/// Raven `static float AngleNormZero(float theta)` — normalizes `theta`
-/// (mod 360) into `[-180, 180]`.
-///
-/// Source: `oracle/codemp/ghoul2/G2_bones.cpp:3936-3949`
-pub fn angle_norm_zero(theta: f32) -> f32 {
-    let mut ret = theta % 360.0;
-    if ret < -180.0 {
-        ret += 360.0;
-    } else if ret > 180.0 {
-        ret -= 360.0;
-    }
-    ret
-}
-
 /// Raven `static inline void G2_BoneSnap(CGhoul2Info_v &ghoul2V, boneInfo_t
 /// &bone, CRagDollUpdateParams *params)` — cgame bone-snap-effect callback;
 /// `#ifdef DEDICATED return;` is the **entire** body's live arm (the
@@ -1834,7 +1820,7 @@ fn g2_rag_doll_solve_instances(
                     bone.currentAngles[k] = (bone.lastAngles[k] - bone.currentAngles[k])
                         * magic_factor9
                         + bone.currentAngles[k];
-                    bone.currentAngles[k] = angle_norm_zero(bone.currentAngles[k]);
+                    bone.currentAngles[k] = AngleNormZero(bone.currentAngles[k]);
                     if limit_angles
                         && (all_solid_count < 32 || rag_flags & RAG_UNSNAPPABLE != 0)
                         && (!bone.snapped || rag_flags & RAG_UNSNAPPABLE != 0)
@@ -2030,7 +2016,7 @@ fn g2_ik_solve_instances(
                 bone.currentAngles[k] = (bone.lastAngles[k] - bone.currentAngles[k])
                     * magic_factor9
                     + bone.currentAngles[k];
-                bone.currentAngles[k] = angle_norm_zero(bone.currentAngles[k]);
+                bone.currentAngles[k] = AngleNormZero(bone.currentAngles[k]);
                 if limit_angles && !free_this_bone {
                     if bone.currentAngles[k] > bone.maxAngles[k] * MAGIC_FACTOR32 {
                         bone.currentAngles[k] = bone.maxAngles[k] * MAGIC_FACTOR32;

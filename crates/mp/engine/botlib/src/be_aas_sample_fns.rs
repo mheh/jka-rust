@@ -34,15 +34,13 @@ use crate::be_aas_sample::be_aas_sample_cpp_consts::{
 };
 use crate::BotLib;
 
-// Raven's `DotProduct`/`VectorCopy`/`VectorSubtract`/`VectorClear`/`VectorMA`/
+// Raven's `VectorCopy`/`VectorSubtract`/`VectorClear`/`VectorMA`/
 // `AAS_OrthogonalToVectors` are `#define`s; they expand inline here, faithful
 // to the preprocessor.
-#[inline]
-fn DotProduct(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
 
-use mp_qshared::shared::q_math::{CrossProduct, VectorInverse, VectorLength, VectorNormalize};
+use mp_qshared::shared::q_math::{
+    _DotProduct, CrossProduct, VectorInverse, VectorLength, VectorNormalize,
+};
 
 use crate::be_aas_bspq3_fns::AAS_EntityCollision;
 use crate::be_aas_reach_fns::AAS_AreaReachability;
@@ -176,7 +174,7 @@ pub fn AAS_PointAreaNum(bot: &mut BotLib, point: vec3_t) -> c_int {
         while nodenum > 0 {
             let node: *mut aas_node_t = bot.aasworld.nodes.add(nodenum as usize);
             let plane: *mut aas_plane_t = bot.aasworld.planes.add((*node).planenum as usize);
-            let dist = DotProduct(point, (*plane).normal) - (*plane).dist;
+            let dist = _DotProduct(point, (*plane).normal) - (*plane).dist;
             if dist > 0.0 {
                 nodenum = (*node).children[0];
             } else {
@@ -265,7 +263,7 @@ pub fn AAS_BoxOriginDistanceFromPlane(
     //
     let mut v2 = normal;
     VectorInverse(&mut v2);
-    DotProduct(v1, v2)
+    _DotProduct(v1, v2)
 }
 
 /// Raven `AAS_TraceAreas`.
@@ -335,8 +333,8 @@ pub fn AAS_TraceAreas(
             //the current node plane
             let plane: *mut aas_plane_t = bot.aasworld.planes.add((*aasnode).planenum as usize);
 
-            let front = DotProduct(cur_start, (*plane).normal) - (*plane).dist;
-            let back = DotProduct(cur_end, (*plane).normal) - (*plane).dist;
+            let front = _DotProduct(cur_start, (*plane).normal) - (*plane).dist;
+            let back = _DotProduct(cur_end, (*plane).normal) - (*plane).dist;
 
             //if the whole to be traced line is totally at the front of this node
             //only go down the tree with the front child
@@ -466,7 +464,7 @@ pub fn AAS_InsideFace(
             //vector orthogonal vector from above and the vector from the
             //origin (first vertex of edge) to the point
             //if the dotproduct is smaller than zero the point is outside the face
-            if DotProduct(pointvec, sepnormal) < -epsilon {
+            if _DotProduct(pointvec, sepnormal) < -epsilon {
                 return qfalse;
             }
         }
@@ -517,7 +515,7 @@ pub fn AAS_PointInsideFace(
             let mut sepnormal: vec3_t = [0.0; 3];
             CrossProduct(edgevec, (*plane).normal, &mut sepnormal);
             //
-            if DotProduct(pointvec, sepnormal) < -epsilon {
+            if _DotProduct(pointvec, sepnormal) < -epsilon {
                 return qfalse;
             }
         }
@@ -555,8 +553,8 @@ pub fn AAS_BoxOnPlaneSide2(absmins: vec3_t, absmaxs: vec3_t, p: *mut aas_plane_t
                 corners[0][i] = absmaxs[i];
             }
         }
-        let dist1 = DotProduct((*p).normal, corners[0]) - (*p).dist;
-        let dist2 = DotProduct((*p).normal, corners[1]) - (*p).dist;
+        let dist1 = _DotProduct((*p).normal, corners[0]) - (*p).dist;
+        let dist2 = _DotProduct((*p).normal, corners[1]) - (*p).dist;
         let mut sides = 0;
         if dist1 >= 0.0 {
             sides = 1;
@@ -1123,7 +1121,7 @@ pub fn AAS_TraceClientBBox(
                     trace.planenum = tracestack[tstack_p].planenum;
                     //always take the plane with normal facing towards the trace start
                     let plane = bot.aasworld.planes.add(trace.planenum as usize);
-                    if DotProduct(v1, (*plane).normal) > 0.0 {
+                    if _DotProduct(v1, (*plane).normal) > 0.0 {
                         trace.planenum ^= 1;
                     }
                     return trace;
@@ -1191,7 +1189,7 @@ pub fn AAS_TraceClientBBox(
                 trace.planenum = tracestack[tstack_p].planenum;
                 //always take the plane with normal facing towards the trace start
                 let plane = bot.aasworld.planes.add(trace.planenum as usize);
-                if DotProduct(v1, (*plane).normal) > 0.0 {
+                if _DotProduct(v1, (*plane).normal) > 0.0 {
                     trace.planenum ^= 1;
                 }
                 return trace;
@@ -1205,8 +1203,8 @@ pub fn AAS_TraceClientBBox(
             //the current node plane
             let plane: *mut aas_plane_t = bot.aasworld.planes.add((*aasnode).planenum as usize);
 
-            let mut front = DotProduct(cur_start, (*plane).normal) - (*plane).dist;
-            let back = DotProduct(cur_end, (*plane).normal) - (*plane).dist;
+            let mut front = _DotProduct(cur_start, (*plane).normal) - (*plane).dist;
+            let back = _DotProduct(cur_end, (*plane).normal) - (*plane).dist;
             // bk010221 - old location of FPE hack and divide by zero expression
             //if the whole to be traced line is totally at the front of this node
             //only go down the tree with the front child
