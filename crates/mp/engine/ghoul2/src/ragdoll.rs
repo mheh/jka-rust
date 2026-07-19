@@ -140,6 +140,10 @@ use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
+use mp_qshared::shared::q_math::{
+    _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
+    AngleNormalize180, AnglesToAxis, AngleVectors, DistanceSquared, VectorInverse,
+};
 use mp_qshared::shared::{
     cplane_t, mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID,
     CONTENTS_TERRAIN, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
@@ -350,101 +354,6 @@ impl Default for RagDollSolver {
 // ports cover this set at time of writing).
 // ---------------------------------------------------------------------------
 
-fn vector_add(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-fn vector_subtract(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-fn vector_scale(a: vec3_t, s: f32) -> vec3_t {
-    [a[0] * s, a[1] * s, a[2] * s]
-}
-fn vector_ma(a: vec3_t, s: f32, b: vec3_t) -> vec3_t {
-    [a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2]]
-}
-fn vector_inverse(a: vec3_t) -> vec3_t {
-    [-a[0], -a[1], -a[2]]
-}
-fn dot_product(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-fn distance_squared(a: vec3_t, b: vec3_t) -> f32 {
-    let d = vector_subtract(a, b);
-    dot_product(d, d)
-}
-
-/// Raven `void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t
-/// right, vec3_t up)`. Source: `oracle/codemp/game/q_math.c:1315-1348`
-fn angle_vectors(angles: vec3_t) -> (vec3_t, vec3_t, vec3_t) {
-    const DEG2RAD: f32 = core::f32::consts::PI * 2.0 / 360.0;
-    let yaw = angles[1] * DEG2RAD;
-    let pitch = angles[0] * DEG2RAD;
-    let roll = angles[2] * DEG2RAD;
-    let (sy, cy) = yaw.sin_cos();
-    let (sp, cp) = pitch.sin_cos();
-    let (sr, cr) = roll.sin_cos();
-    let forward = [cp * cy, cp * sy, -sp];
-    let right = [
-        -sr * sp * cy + -cr * -sy,
-        -sr * sp * sy + -cr * cy,
-        -sr * cp,
-    ];
-    let up = [cr * sp * cy + -sr * -sy, cr * sp * sy + -sr * cy, cr * cp];
-    (forward, right, up)
-}
-
-/// Raven `void AnglesToAxis(const vec3_t angles, vec3_t axis[3])`.
-/// Source: `oracle/codemp/game/q_math.c:530-536`
-fn angles_to_axis(angles: vec3_t) -> [vec3_t; 3] {
-    let (forward, right, up) = angle_vectors(angles);
-    [forward, vector_inverse(right), up]
-}
-
-/// Raven `void vectoangles(const vec3_t value1, vec3_t angles)`.
-/// Source: `oracle/codemp/game/q_math.c:485-521`
-fn vectoangles(v: vec3_t) -> vec3_t {
-    let (yaw, pitch);
-    if v[1] == 0.0 && v[0] == 0.0 {
-        yaw = 0.0;
-        pitch = if v[2] > 0.0 { 90.0 } else { 270.0 };
-    } else {
-        let mut y = if v[0] != 0.0 {
-            v[1].atan2(v[0]) * 180.0 / core::f32::consts::PI
-        } else if v[1] > 0.0 {
-            90.0
-        } else {
-            270.0
-        };
-        if y < 0.0 {
-            y += 360.0;
-        }
-        yaw = y;
-        let forward = (v[0] * v[0] + v[1] * v[1]).sqrt();
-        let mut p = v[2].atan2(forward) * 180.0 / core::f32::consts::PI;
-        if p < 0.0 {
-            p += 360.0;
-        }
-        pitch = p;
-    }
-    [-pitch, yaw, 0.0]
-}
-
-/// Raven `float AngleNormalize360(float angle)`.
-/// Source: `oracle/codemp/game/q_math.c:706-711`
-fn angle_normalize360(angle: f32) -> f32 {
-    (360.0 / 65536.0) * (((angle * (65536.0 / 360.0)) as i32) & 65535) as f32
-}
-
-/// Raven `float AngleNormalize180(float angle)`.
-/// Source: `oracle/codemp/game/q_math.c:722-728`
-fn angle_normalize180(angle: f32) -> f32 {
-    let a = angle_normalize360(angle);
-    if a > 180.0 {
-        a - 360.0
-    } else {
-        a
-    }
-}
 
 /// Raven `void Create_Matrix(const float *angle, mdxaBone_t *matrix)` — file-
 /// local twin of `misc.rs`'s private (also-stubbed) `create_matrix`; see this
@@ -452,7 +361,8 @@ fn angle_normalize180(angle: f32) -> f32 {
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1628-1651`
 fn create_matrix(angle: vec3_t) -> mdxaBone_t {
-    let axis = angles_to_axis(angle);
+    let mut axis = [[0.0f32; 3]; 3];
+    AnglesToAxis(angle, axis.as_mut_ptr());
     let mut matrix = ZERO_BONE;
     for row in 0..3 {
         matrix.matrix[row][0] = axis[0][row];
@@ -1050,7 +960,7 @@ fn g2_rag_doll_current_position_instances(
         g2.rag.effectors[i].current_origin = current_origin;
 
         if i == 0 {
-            g2.rag.bone_cm = vector_scale(current_origin, cm_weight);
+            _VectorScale(current_origin, cm_weight, &mut g2.rag.bone_cm);
             g2.rag.bone_maxs = current_origin;
             g2.rag.bone_mins = current_origin;
         } else {
@@ -1238,8 +1148,14 @@ pub fn g2_apply_real_bone_physics(
         return true;
     }
 
-    let projected_origin = vector_ma(e.current_origin, velocity_scaling, bone.epVelocity);
-    bone.epVelocity = vector_scale(bone.epVelocity, 1.0 - mass);
+    let mut projected_origin = [0.0f32; 3];
+    _VectorMA(
+        e.current_origin,
+        velocity_scaling,
+        bone.epVelocity,
+        &mut projected_origin,
+    );
+    _VectorScale(bone.epVelocity, 1.0 - mass, &mut bone.epVelocity);
 
     let mut v_norm = bone.epVelocity;
     let v_total = VectorNormalize(&mut v_norm);
@@ -1277,14 +1193,15 @@ pub fn g2_apply_real_bone_physics(
 
     if bounce != 0.0 {
         let v_total = v_total * bounce;
-        let v_norm = vector_scale(tr.plane.normal, v_total);
+        let mut v_norm = [0.0f32; 3];
+        _VectorScale(tr.plane.normal, v_total, &mut v_norm);
         if v_norm[2] > 0.0 {
             bone.epGravFactor -= v_norm[2] * (1.0 - mass);
             if bone.epGravFactor < 0.0 {
                 bone.epGravFactor = 0.0;
             }
         }
-        bone.epVelocity = vector_add(bone.epVelocity, v_norm);
+        _VectorAdd(bone.epVelocity, v_norm, &mut bone.epVelocity);
     } else {
         bone.epVelocity[0] = 0.0;
         bone.epVelocity[1] = 0.0;
@@ -1426,8 +1343,8 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
         );
         pelvis_dir[2] = 0.0;
         anim_pelvis_dir[2] = 0.0;
-        pelvis_dir = vectoangles(pelvis_dir);
-        anim_pelvis_dir = vectoangles(anim_pelvis_dir);
+        vectoangles(pelvis_dir, &mut pelvis_dir);
+        vectoangles(anim_pelvis_dir, &mut anim_pelvis_dir);
     }
 
     let num_rags = g2.rag.num_rags;
@@ -1449,8 +1366,11 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                 (params.position[2] + DEFAULT_MINS_2)
                     + (g2.rag.effectors[i].radius * ent_scale[2] + 2.0),
             ];
-            g2.rag.desired_pelvis_offset =
-                vector_subtract(goal_spot, g2.rag.effectors[i].current_origin);
+            _VectorSubtract(
+                goal_spot,
+                g2.rag.effectors[i].current_origin,
+                &mut g2.rag.desired_pelvis_offset,
+            );
             g2.rag.have_desired_pelvis_offset = true;
             instances[idx].blist[blist_idx].lastPosition = g2.rag.effectors[i].current_origin;
             continue;
@@ -1557,7 +1477,7 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
 
             if broadsword_ragtobase > 1 {
                 let offset_rotation = instances[idx].blist[blist_idx].offsetRotation;
-                let fa_raw = angle_normalize180(anim_pelvis_dir[1] - pelvis_dir[1]);
+                let fa_raw = AngleNormalize180(anim_pelvis_dir[1] - pelvis_dir[1]);
                 let d = fa_raw - offset_rotation;
                 let fa = if !(-16.0..=16.0).contains(&d) {
                     instances[idx].blist[blist_idx].offsetRotation = fa_raw;
@@ -1565,16 +1485,17 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                 } else {
                     offset_rotation
                 };
-                let mut v = vector_subtract(base_pos, anim_pelvis_pos);
+                let mut v = [0.0f32; 3];
+                _VectorSubtract(base_pos, anim_pelvis_pos, &mut v);
                 let f = VectorLength(v);
-                let mut a = vectoangles(v);
+                let mut a = [0.0f32; 3];
+                vectoangles(v, &mut a);
                 a[1] -= fa;
-                let (fwd, _right, _up) = angle_vectors(a);
-                v = fwd;
+                AngleVectors(a, Some(&mut v), None, None);
                 VectorNormalize(&mut v);
-                base_pos = vector_ma(anim_pelvis_pos, f, v);
-                v = vector_subtract(base_pos, anim_pelvis_pos);
-                base_pos = vector_add(pelvis_pos, v);
+                _VectorMA(anim_pelvis_pos, f, v, &mut base_pos);
+                _VectorSubtract(base_pos, anim_pelvis_pos, &mut v);
+                _VectorAdd(pelvis_pos, v, &mut base_pos);
             }
             has_base_pos = true;
         }
@@ -1609,9 +1530,11 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                     goal_spot = base_pos;
                     goal_spot[2] = (params.position[2] - 23.0) - test_mins[2];
                 } else {
-                    let mut v_sub = vector_subtract(current_origin, params.position);
+                    let mut v_sub = [0.0f32; 3];
+                    _VectorSubtract(current_origin, params.position, &mut v_sub);
                     VectorNormalize(&mut v_sub);
-                    goal_spot = vector_ma(params.position, 40.0, v_sub);
+                    goal_spot = [0.0f32; 3];
+                    _VectorMA(params.position, 40.0, v_sub, &mut goal_spot);
                     goal_spot[2] = (params.position[2] - 23.0) - test_mins[2];
                 }
                 let mut tr2 = zero_trace();
@@ -1630,36 +1553,37 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                 goal_spot = tr2.endpos;
             } else {
                 start_solid = false;
-                let mut vel_dir;
+                let mut vel_dir = [0.0f32; 3];
                 if has_daddy || has_base_pos {
-                    vel_dir = if has_base_pos {
-                        vector_subtract(base_pos, current_origin)
+                    if has_base_pos {
+                        _VectorSubtract(base_pos, current_origin, &mut vel_dir);
                     } else {
-                        vector_subtract(current_origin, parent_origin)
-                    };
+                        _VectorSubtract(current_origin, parent_origin, &mut vel_dir);
+                    }
                 } else {
-                    vel_dir = vector_subtract(current_origin, params.position);
+                    _VectorSubtract(current_origin, params.position, &mut vel_dir);
                 }
                 if VectorLength(vel_dir) > 2.0 {
                     VectorNormalize(&mut vel_dir);
-                    vel_dir = vector_scale(vel_dir, 8.0);
+                    _VectorScale(vel_dir, 8.0, &mut vel_dir);
                     vel_dir[2] = 0.0;
                     let bone = &mut instances[idx].blist[blist_idx];
-                    bone.epVelocity = vector_add(bone.epVelocity, vel_dir);
+                    _VectorAdd(bone.epVelocity, vel_dir, &mut bone.epVelocity);
                 }
 
                 if rag_flags & RAG_BONE_LIGHTWEIGHT != 0 {
-                    let mut vel = vector_scale(params.velocity, 0.5);
+                    let mut vel = [0.0f32; 3];
+                    _VectorScale(params.velocity, 0.5, &mut vel);
                     let vellen = VectorLength(vel);
                     if vellen > 64.0 {
-                        vel = vector_scale(vel, 64.0 / vellen);
+                        _VectorScale(vel, 64.0 / vellen, &mut vel);
                     }
-                    vel = vector_inverse(vel);
+                    VectorInverse(&mut vel);
                     let bone = &mut instances[idx].blist[blist_idx];
                     if vel[2] != 0.0 {
                         bone.epVelocity = vel;
                     } else {
-                        bone.epVelocity = vector_add(bone.epVelocity, vel);
+                        _VectorAdd(bone.epVelocity, vel, &mut bone.epVelocity);
                     }
                 }
 
@@ -1882,10 +1806,14 @@ fn g2_rag_doll_solve_instances(
                     let mut enew = ZERO_BONE;
                     multiply_3x4_matrix(&mut enew, &gs[k], &g2.rag.bones[dep_index]);
                     let t_position = [enew.matrix[0][3], enew.matrix[1][3], enew.matrix[2][3]];
-                    let change =
-                        vector_subtract(t_position, g2.rag.effectors[dep_index].current_origin);
+                    let mut change = [0.0f32; 3];
+                    _VectorSubtract(
+                        t_position,
+                        g2.rag.effectors[dep_index].current_origin,
+                        &mut change,
+                    );
                     let goodness =
-                        dot_product(change, g2.rag.effectors[dep_index].desired_direction)
+                        _DotProduct(change, g2.rag.effectors[dep_index].desired_direction)
                             * dep_weight;
                     del_angles[k] += goodness;
                 }
@@ -2082,10 +2010,14 @@ fn g2_ik_solve_instances(
                 let mut enew = ZERO_BONE;
                 multiply_3x4_matrix(&mut enew, &gs[k], &g2.rag.bones[dep_index]);
                 let t_position = [enew.matrix[0][3], enew.matrix[1][3], enew.matrix[2][3]];
-                let change =
-                    vector_subtract(t_position, g2.rag.effectors[dep_index].current_origin);
+                let mut change = [0.0f32; 3];
+                _VectorSubtract(
+                    t_position,
+                    g2.rag.effectors[dep_index].current_origin,
+                    &mut change,
+                );
                 let goodness =
-                    dot_product(change, g2.rag.effectors[dep_index].desired_direction) * dep_weight;
+                    _DotProduct(change, g2.rag.effectors[dep_index].desired_direction) * dep_weight;
                 del_angles[k] += goodness;
             }
         }
@@ -2246,8 +2178,8 @@ pub fn g2_rag_set_state(
 ) -> f32 {
     let _ = reset_origin; // never written by Raven's own body either (see doc comment).
 
-    g2.rag.origin_change = distance_squared(origin, bone.extraVec1);
-    g2.rag.origin_change_dir = vector_subtract(origin, bone.extraVec1);
+    g2.rag.origin_change = DistanceSquared(origin, bone.extraVec1);
+    _VectorSubtract(origin, bone.extraVec1, &mut g2.rag.origin_change_dir);
 
     let mut decay = 1.0f32;
     const DYNAMIC_TIME: i32 = 1000;

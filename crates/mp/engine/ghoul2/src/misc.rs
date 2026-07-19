@@ -159,6 +159,7 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
+use mp_qshared::shared::q_math::AnglesToAxis;
 use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRecord_t};
 
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
@@ -423,34 +424,6 @@ fn v_normalize(a: &mut vec3_t) -> f32 {
 /// declared width).
 fn row3(row: [f32; 4]) -> vec3_t {
     [row[0], row[1], row[2]]
-}
-
-/// Raven `AngleVectors` (`q_math.c:1315-1347`).
-fn angle_vectors(angles: vec3_t) -> (vec3_t, vec3_t, vec3_t) {
-    const DEG2RAD: f32 = core::f32::consts::PI * 2.0 / 360.0;
-    // Raven indices: `angles[YAW]`=1, `angles[PITCH]`=0, `angles[ROLL]`=2.
-    let angle_yaw = angles[1] * DEG2RAD;
-    let (sy, cy) = (angle_yaw.sin(), angle_yaw.cos());
-    let angle_pitch = angles[0] * DEG2RAD;
-    let (sp, cp) = (angle_pitch.sin(), angle_pitch.cos());
-    let angle_roll = angles[2] * DEG2RAD;
-    let (sr, cr) = (angle_roll.sin(), angle_roll.cos());
-
-    let forward = [cp * cy, cp * sy, -sp];
-    let right = [
-        -1.0 * sr * sp * cy + -1.0 * cr * -sy,
-        -1.0 * sr * sp * sy + -1.0 * cr * cy,
-        -1.0 * sr * cp,
-    ];
-    let up = [cr * sp * cy + -sr * -sy, cr * sp * sy + -sr * cy, cr * cp];
-    (forward, right, up)
-}
-
-/// Raven `AnglesToAxis` (`q_math.c:530-536`): `axis[1] = vec3_origin - right`.
-fn angles_to_axis(angles: vec3_t) -> [vec3_t; 3] {
-    let (forward, right, up) = angle_vectors(angles);
-    let axis1 = v_sub([0.0, 0.0, 0.0], right);
-    [forward, axis1, up]
 }
 
 /// The identity `mdxaBone_t` (test fixture; formerly gap note #6's stand-in
@@ -1771,7 +1744,8 @@ pub fn g2_transform_model(
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1630-1653`
 fn create_matrix(angle: vec3_t) -> mdxaBone_t {
-    let axis = angles_to_axis(angle);
+    let mut axis = [[0.0f32; 3]; 3];
+    AnglesToAxis(angle, axis.as_mut_ptr());
     let mut matrix = [[0.0f32; 4]; 3];
     matrix[0][0] = axis[0][0];
     matrix[1][0] = axis[0][1];
