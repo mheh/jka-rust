@@ -1803,15 +1803,9 @@ pub fn BG_FullBodyTauntAnim(anim: c_int) -> qboolean {
 /// Source: `oracle/codemp/game/bg_panimate.c:1573-1581`
 impl PmoveContext<'_> {
     pub fn BG_AnimLength(&mut self, index: c_int, anim: c_int) -> c_int {
-        if anim >= MAX_ANIMATIONS as c_int {
-            return -1;
-        }
-        unsafe {
-            let anim_ptr = self.bg.bgAllAnims[index as usize]
-                .anims
-                .offset(anim as isize);
-            ((*anim_ptr).numFrames as f32 * ((*anim_ptr).frameLerp as f32).abs()) as c_int
-        }
+        // Delegates to the free-fn form so both carry the same out-of-range
+        // `index` guard (Raven indexes unchecked — UB; -1 is the picked behavior).
+        BG_AnimLength(self.bg, index, anim)
     }
 }
 
