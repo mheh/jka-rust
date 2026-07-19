@@ -191,31 +191,6 @@ pub const BYTEDIRS: [vec3_t; 162] = [
     [-0.688191f32, -0.587785f32, -0.425325f32],
 ];
 
-// Local transcriptions of `q_shared.h`'s `VectorCopy`/`VectorAdd`/`VectorSubtract`/
-// `VectorScale`/`VectorMA`/`DotProduct` macros. They have no C linkage (macros,
-// inlined at each call site) and are not manifest functions — small `#[inline]`
-// helpers here stand in for the same inlining, reused across the bodies below.
-#[inline]
-fn vec_dot(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-#[inline]
-fn vec_sub(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-#[inline]
-fn vec_ma(a: vec3_t, scale: f32, b: vec3_t) -> vec3_t {
-    [
-        a[0] + scale * b[0],
-        a[1] + scale * b[1],
-        a[2] + scale * b[2],
-    ]
-}
-#[inline]
-fn vec_length_sq(v: vec3_t) -> f32 {
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-}
-
 /// Raven `qboolean` true/false values.
 /// Source: `oracle/codemp/game/q_shared.h` (`qtrue`/`qfalse`).
 const Q_TRUE: qboolean = 1;
@@ -248,7 +223,9 @@ pub fn VectorLengthSquared(v: vec3_t) -> vec_t {
 /// Raven `Distance` (header-inline helper).
 /// Source: `oracle/codemp/game/q_shared.h:1520-1525`
 pub fn Distance(p1: vec3_t, p2: vec3_t) -> vec_t {
-    VectorLength(vec_sub(p2, p1))
+    let mut v: vec3_t = [0.0; 3];
+    _VectorSubtract(p2, p1, &mut v);
+    VectorLength(v)
 }
 
 /// Raven `VectorCompare` (header-inline helper).
@@ -283,8 +260,9 @@ pub fn VectorSet(v: &mut vec3_t, x: f32, y: f32, z: f32) {
 /// Source: `oracle/codemp/game/q_shared.h:1527-1532`
 #[inline]
 pub fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
-    let v = vec_sub(p2, p1);
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
+    let mut v: vec3_t = [0.0; 3];
+    _VectorSubtract(p2, p1, &mut v);
+    VectorLengthSquared(v)
 }
 
 /// Raven `Q_rand`.
@@ -376,7 +354,7 @@ pub fn DirToByte(dir: vec3_t) -> c_int {
     let mut bestd = 0.0f32;
     let mut best = 0i32;
     for (i, bd) in BYTEDIRS.iter().enumerate() {
-        let d = vec_dot(dir, *bd);
+        let d = _DotProduct(dir, *bd);
         if d > bestd {
             bestd = d;
             best = i as i32;
@@ -498,8 +476,10 @@ pub fn PerpendicularVectorSP(dst: &mut vec3_t, src: vec3_t) {
 /// Source: `oracle/codemp/game/q_math.c:384-396`
 // Raven returns qboolean; C truthiness call shape maps to a Rust bool (§C7).
 pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> bool {
-    let d1 = vec_sub(b, a);
-    let d2 = vec_sub(c, a);
+    let mut d1: vec3_t = [0.0; 3];
+    _VectorSubtract(b, a, &mut d1);
+    let mut d2: vec3_t = [0.0; 3];
+    _VectorSubtract(c, a, &mut d2);
     let mut n: vec3_t = [0.0; 3];
     CrossProduct(d2, d1, &mut n);
     let len = VectorNormalize(&mut n);
@@ -509,7 +489,7 @@ pub fn PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> b
     if len == 0.0 {
         return false;
     }
-    plane[3] = vec_dot(a, n);
+    plane[3] = _DotProduct(a, n);
     true
 }
 
@@ -652,7 +632,7 @@ pub fn AnglesToAxis(angles: vec3_t, axis: *mut vec3_t) {
             Some(&mut third[0]),
         );
     }
-    axis[1] = vec_sub(VEC3_ORIGIN, right);
+    _VectorSubtract(VEC3_ORIGIN, right, &mut axis[1]);
 }
 
 /// Raven `AxisClear`.
@@ -680,14 +660,14 @@ pub fn AxisCopy(r#in: *mut vec3_t, out: *mut vec3_t) {
 ///
 /// Source: `oracle/codemp/game/q_math.c:556-577`
 pub fn ProjectPointOnPlane(dst: &mut vec3_t, p: vec3_t, normal: vec3_t) {
-    let mut inv_denom = vec_dot(normal, normal);
+    let mut inv_denom = _DotProduct(normal, normal);
     // Raven's debug assert (`Q_fabs(inv_denom) != 0.0f`) catches a zero
     // normal; that's a caller bug (division by zero), not something to
     // silently normalize away.
     debug_assert!(Q_fabs(inv_denom) != 0.0);
     inv_denom = 1.0 / inv_denom;
 
-    let d = vec_dot(normal, p) * inv_denom;
+    let d = _DotProduct(normal, p) * inv_denom;
 
     let n = [
         normal[0] * inv_denom,
@@ -710,8 +690,9 @@ pub fn MakeNormalVectors(forward: vec3_t, right: &mut vec3_t, up: &mut vec3_t) {
     right[2] = forward[1];
     right[0] = forward[2];
 
-    let d = vec_dot(*right, forward);
-    *right = vec_ma(*right, -d, forward);
+    let d = _DotProduct(*right, forward);
+    let r = *right;
+    _VectorMA(r, -d, forward, right);
     VectorNormalize(right);
     CrossProduct(*right, forward, up);
 }
@@ -721,9 +702,9 @@ pub fn MakeNormalVectors(forward: vec3_t, right: &mut vec3_t, up: &mut vec3_t) {
 /// Source: `oracle/codemp/game/q_math.c:603-608`
 pub fn VectorRotate(r#in: vec3_t, matrix: *mut vec3_t, out: &mut vec3_t) {
     let matrix: &[vec3_t; 3] = unsafe { &*(matrix as *const [vec3_t; 3]) };
-    out[0] = vec_dot(r#in, matrix[0]);
-    out[1] = vec_dot(r#in, matrix[1]);
-    out[2] = vec_dot(r#in, matrix[2]);
+    out[0] = _DotProduct(r#in, matrix[0]);
+    out[1] = _DotProduct(r#in, matrix[1]);
+    out[2] = _DotProduct(r#in, matrix[2]);
 }
 
 /// Raven `Q_rsqrt` ("fast inverse square root"; evil floating point bit level
@@ -845,7 +826,8 @@ pub fn RadiusFromBounds(mins: vec3_t, maxs: vec3_t) -> f32 {
 ///
 /// Source: `oracle/codemp/game/q_math.c:1134-1139`
 pub fn DistanceHorizontal(p1: vec3_t, p2: vec3_t) -> vec_t {
-    let v = vec_sub(p2, p1);
+    let mut v: vec3_t = [0.0; 3];
+    _VectorSubtract(p2, p1, &mut v);
     ((v[0] * v[0] + v[1] * v[1]) as f64).sqrt() as f32 // z left off; sqrt in f64 (Raven double libm)
 }
 
@@ -853,7 +835,8 @@ pub fn DistanceHorizontal(p1: vec3_t, p2: vec3_t) -> vec_t {
 ///
 /// Source: `oracle/codemp/game/q_math.c:1141-1146`
 pub fn DistanceHorizontalSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
-    let v = vec_sub(p2, p1);
+    let mut v: vec3_t = [0.0; 3];
+    _VectorSubtract(p2, p1, &mut v);
     v[0] * v[0] + v[1] * v[1] // Leave off the z component
 }
 
@@ -1207,7 +1190,7 @@ pub fn DotProductNormalize(inVec1: vec3_t, inVec2: vec3_t) -> f32 {
     let mut v2: vec3_t = [0.0; 3];
     VectorNormalize2(inVec1, &mut v1);
     VectorNormalize2(inVec2, &mut v2);
-    vec_dot(v1, v2)
+    _DotProduct(v1, v2)
 }
 
 /// Raven `G_FindClosestPointOnLineSegment`.
@@ -1220,8 +1203,10 @@ pub fn G_FindClosestPointOnLineSegment(
     result: &mut vec3_t,
 ) -> qboolean {
     // Find the perpendicular vector to vec from start to end
-    let vec_start2from = vec_sub(from, start);
-    let vec_start2end = vec_sub(end, start);
+    let mut vec_start2from: vec3_t = [0.0; 3];
+    _VectorSubtract(from, start, &mut vec_start2from);
+    let mut vec_start2end: vec3_t = [0.0; 3];
+    _VectorSubtract(end, start, &mut vec_start2end);
 
     let mut dot = DotProductNormalize(vec_start2from, vec_start2end);
 
@@ -1233,7 +1218,7 @@ pub fn G_FindClosestPointOnLineSegment(
 
     if dot == 1.0 {
         // parallel, closer of 2 points will be the target
-        if vec_length_sq(vec_start2from) < vec_length_sq(vec_start2end) {
+        if VectorLengthSquared(vec_start2from) < VectorLengthSquared(vec_start2end) {
             *result = from;
         } else {
             *result = end;
@@ -1242,8 +1227,10 @@ pub fn G_FindClosestPointOnLineSegment(
     }
 
     // Try other end
-    let vec_end2from = vec_sub(from, end);
-    let mut vec_end2start = vec_sub(start, end);
+    let mut vec_end2from: vec3_t = [0.0; 3];
+    _VectorSubtract(from, end, &mut vec_end2from);
+    let mut vec_end2start: vec3_t = [0.0; 3];
+    _VectorSubtract(start, end, &mut vec_end2start);
 
     dot = DotProductNormalize(vec_end2from, vec_end2start);
 
@@ -1255,7 +1242,7 @@ pub fn G_FindClosestPointOnLineSegment(
 
     if dot == 1.0 {
         // parallel, closer of 2 points will be the target
-        if vec_length_sq(vec_end2from) < vec_length_sq(vec_end2start) {
+        if VectorLengthSquared(vec_end2from) < VectorLengthSquared(vec_end2start) {
             *result = from;
         } else {
             *result = end;
@@ -1274,7 +1261,7 @@ pub fn G_FindClosestPointOnLineSegment(
 
     // Extrapolate to find result
     VectorNormalize(&mut vec_end2start);
-    *result = vec_ma(end, dist_end2result, vec_end2start);
+    _VectorMA(end, dist_end2result, vec_end2start, result);
 
     // perpendicular intersection is between the 2 endpoints
     Q_TRUE
@@ -1285,10 +1272,14 @@ pub fn G_FindClosestPointOnLineSegment(
 /// Source: `oracle/codemp/game/q_math.c:1606-1670`
 pub fn G_PointDistFromLineSegment(start: vec3_t, end: vec3_t, from: vec3_t) -> f32 {
     // Find the perpendicular vector to vec from start to end
-    let vec_start2from = vec_sub(from, start);
-    let vec_start2end = vec_sub(end, start);
-    let vec_end2from = vec_sub(from, end);
-    let mut vec_end2start = vec_sub(start, end);
+    let mut vec_start2from: vec3_t = [0.0; 3];
+    _VectorSubtract(from, start, &mut vec_start2from);
+    let mut vec_start2end: vec3_t = [0.0; 3];
+    _VectorSubtract(end, start, &mut vec_start2end);
+    let mut vec_end2from: vec3_t = [0.0; 3];
+    _VectorSubtract(from, end, &mut vec_end2from);
+    let mut vec_end2start: vec3_t = [0.0; 3];
+    _VectorSubtract(start, end, &mut vec_end2start);
 
     let mut dot = DotProductNormalize(vec_start2from, vec_start2end);
 
@@ -1335,7 +1326,8 @@ pub fn G_PointDistFromLineSegment(start: vec3_t, end: vec3_t, from: vec3_t) -> f
 
     // Extrapolate to find result
     VectorNormalize(&mut vec_end2start);
-    let intersection = vec_ma(end, dist_end2result, vec_end2start);
+    let mut intersection: vec3_t = [0.0; 3];
+    _VectorMA(end, dist_end2result, vec_end2start, &mut intersection);
 
     // perpendicular intersection is between the 2 endpoints, return dist to it from `from`
     Distance(intersection, from)
