@@ -16,6 +16,7 @@
 use std::collections::BTreeMap;
 
 use mp_host_interface::EngineHost;
+use native_string::atoi::atoi_bytes;
 
 use super::entry::SeEntry;
 use super::{
@@ -23,31 +24,6 @@ use super::{
     SE_KEYWORD_ENDMARKER, SE_KEYWORD_FILENOTES, SE_KEYWORD_FLAGS, SE_KEYWORD_LANG,
     SE_KEYWORD_NOTES, SE_KEYWORD_REFERENCE, SE_KEYWORD_VERSION, SE_VERSION,
 };
-
-/// Minimal `atoi`-semantics parse for the `VERSION` line's number field: skip
-/// leading whitespace, an optional sign, then digits; non-numeric input (or
-/// none) is `0` — matching C `atoi` (`stringed_ingame.cpp:583`), not
-/// `str::parse` (which rejects trailing garbage instead of stopping at it).
-fn c_atoi(bytes: &[u8]) -> i32 {
-    let mut i = 0;
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    let negative = i < bytes.len() && bytes[i] == b'-';
-    if i < bytes.len() && (bytes[i] == b'-' || bytes[i] == b'+') {
-        i += 1;
-    }
-    let mut value: i64 = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        value = value * 10 + i64::from(bytes[i] - b'0');
-        i += 1;
-    }
-    if negative {
-        (-value) as i32
-    } else {
-        value as i32
-    }
-}
 
 /// Raven `CStringEdPackage` — the localized-string store: the parse-only
 /// scratch fields, the entry store, the flag tables, and the language cache.
@@ -251,7 +227,7 @@ impl StringEdPackage {
         if self.check_line_for_keyword(SE_KEYWORD_VERSION, &mut rest) {
             // VERSION "1"
             let version_bytes = self.inside_quotes(rest);
-            let version_number = c_atoi(&version_bytes);
+            let version_number = atoi_bytes(&version_bytes);
 
             if version_number != SE_VERSION {
                 Some(format!(

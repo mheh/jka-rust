@@ -43,6 +43,8 @@ use core::ffi::{c_char, c_ulong, c_void};
 
 use std::collections::{BTreeMap, VecDeque};
 
+use native_string::atoi::atoi;
+
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
@@ -77,26 +79,6 @@ pub struct MockCvar {
     pub default: String,
     /// Raven `cvar_t->flags` — ORed on re-registration (`cvar.cpp:223`).
     pub flags: i32,
-}
-
-/// C `atoi` over a Rust string: skip leading whitespace, optional sign, then
-/// the digit prefix; empty/non-numeric prefix = 0. (C overflow is UB; here it
-/// wraps via `i64 as i32` — a defined stand-in, per porting-rules §19.)
-fn c_atoi(s: &str) -> i32 {
-    let t = s.trim_start();
-    let (neg, t) = match t.strip_prefix('-') {
-        Some(rest) => (true, rest),
-        None => (false, t.strip_prefix('+').unwrap_or(t)),
-    };
-    let digits: String = t.chars().take_while(|c| c.is_ascii_digit()).collect();
-    let mut v: i64 = 0;
-    for c in digits.chars() {
-        v = v.wrapping_mul(10).wrapping_add((c as u8 - b'0') as i64);
-    }
-    if neg {
-        v = v.wrapping_neg();
-    }
-    v as i32
 }
 
 /// Fixture-backed [`EngineHost`] + [`PlatformHost`] for goldens and the referee.
@@ -365,7 +347,7 @@ impl EngineHost for MockHost {
         // Derived from the string per read — Raven's `var->integer =
         // atoi(var->string)` invariant. Missing name reads 0
         // (Cvar_VariableIntegerValue, cvar.cpp:118-124).
-        self.cvars.get(name).map(|c| c_atoi(&c.string)).unwrap_or(0)
+        self.cvars.get(name).map(|c| atoi(&c.string)).unwrap_or(0)
     }
 
     fn sv_time(&mut self) -> i32 {

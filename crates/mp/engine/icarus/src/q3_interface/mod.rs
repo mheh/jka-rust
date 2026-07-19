@@ -40,6 +40,7 @@ use mp_qshared::shared::limits::MAX_GENTITIES;
 use mp_qshared::shared::q_math::VectorCompare;
 use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::wl_e::WL_e;
+use native_string::atoi::atoi;
 
 use crate::game_interface::{icarus_get_script, ICARUS_LinkEntity};
 use crate::interface::interface_export_s::InterfaceExport;
@@ -160,29 +161,6 @@ fn c_atof(s: &str) -> f32 {
         return 0.0;
     }
     s[start..i].parse::<f32>().unwrap_or(0.0)
-}
-
-/// C `atoi`/`sscanf("%d")` — parse the leading integer prefix, `0` on no match.
-fn c_atoi(s: &str) -> i32 {
-    let b = s.as_bytes();
-    let n = b.len();
-    let mut i = 0;
-    while i < n && b[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    let start = i;
-    if i < n && (b[i] == b'+' || b[i] == b'-') {
-        i += 1;
-    }
-    let mut has_digits = false;
-    while i < n && b[i].is_ascii_digit() {
-        i += 1;
-        has_digits = true;
-    }
-    if !has_digits {
-        return 0;
-    }
-    s[start..i].parse::<i32>().unwrap_or(0)
 }
 
 /// C `stricmp` — case-insensitive byte compare returning sign of the first
@@ -345,7 +323,7 @@ pub fn Q3_DebugPrint(icarus: &mut Icarus, host: &mut dyn EngineHost, level: i32,
         WL_DEBUG => {
             // §19: Raven leaves `entNum` uninitialized on a failed `sscanf`;
             // seed 0 (the range check below folds most garbage to 0 anyway).
-            let mut ent_num = c_atoi(msg);
+            let mut ent_num = atoi(msg);
 
             if icarus.ent_filter >= 0 && icarus.ent_filter != ent_num {
                 return;
@@ -910,8 +888,8 @@ pub fn Q3_Evaluate(
             f2 = c_atof(p2);
         }
         TK_INT => {
-            i1 = c_atoi(p1);
-            i2 = c_atoi(p2);
+            i1 = atoi(p1);
+            i2 = atoi(p2);
         }
         TK_VECTOR => {
             v1 = sscanf_vec(p1);
@@ -1212,11 +1190,11 @@ mod tests {
     }
 
     #[test]
-    fn c_atoi_parses_leading_int() {
-        assert_eq!(c_atoi("42"), 42);
-        assert_eq!(c_atoi("-7x"), -7);
-        assert_eq!(c_atoi("  3 4"), 3);
-        assert_eq!(c_atoi("x"), 0);
+    fn atoi_parses_leading_int() {
+        assert_eq!(atoi("42"), 42);
+        assert_eq!(atoi("-7x"), -7);
+        assert_eq!(atoi("  3 4"), 3);
+        assert_eq!(atoi("x"), 0);
     }
 
     #[test]
