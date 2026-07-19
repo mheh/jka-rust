@@ -22,6 +22,7 @@ use mp_qshared::common::mp::botlib::travel_flags::{
     TFL_STRAFEJUMP, TFL_SWIM, TFL_TELEPORT, TFL_WALK, TFL_WALKOFFLEDGE, TFL_WATER, TFL_WATERJUMP,
 };
 use mp_qshared::shared::file_mode::{FS_READ, FS_WRITE};
+use mp_qshared::shared::q_math::{_VectorSubtract, VectorLength};
 use mp_qshared::shared::{fileHandle_t, qfalse, qtrue, vec3_t};
 
 use crate::aasfile::aas_area_s::aas_area_t;
@@ -47,6 +48,7 @@ use crate::be_aas_def::aas_reversedlink_s::aas_reversedlink_t;
 use crate::be_aas_def::aas_reversedreachability_s::aas_reversedreachability_t;
 use crate::be_aas_def::aas_routingcache_s::{aas_routingcache_t, CACHETYPE_AREA, CACHETYPE_PORTAL};
 use crate::be_aas_def::aas_routingupdate_s::aas_routingupdate_t;
+use crate::be_aas_main::AAS_ProjectPointOntoVector;
 use crate::BotLib;
 use mp_engine_qcommon::common::Common;
 
@@ -564,9 +566,10 @@ pub fn AAS_NextModelReachability(bot: &mut BotLib, num: c_int, modelnum: c_int) 
 /// Source: `oracle/codemp/botlib/be_aas_route.cpp:2049-2056`
 pub fn DistancePointToLine(v1: vec3_t, v2: vec3_t, point: vec3_t) -> f32 {
     let mut p2: vec3_t = [0.0, 0.0, 0.0];
-    crate::be_aas_main::AAS_ProjectPointOntoVector(point, v1, v2, &mut p2);
-    let vec = [point[0] - p2[0], point[1] - p2[1], point[2] - p2[2]];
-    (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt()
+    let mut vec: vec3_t = [0.0; 3];
+    AAS_ProjectPointOntoVector(point, v1, v2, &mut p2);
+    _VectorSubtract(point, p2, &mut vec);
+    VectorLength(vec)
 }
 
 /// Raven `AAS_AreaVisible` — always false (stub; visarea data is never built).
