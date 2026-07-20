@@ -15,6 +15,7 @@
 
 use core::ffi::{c_char, CStr};
 use core::ptr::{addr_of, addr_of_mut, null_mut};
+use core::slice::from_mut;
 
 use mp_host_interface::vm_slot::VmSlot;
 use mp_host_interface::EngineHost;
@@ -40,7 +41,10 @@ use mp_qshared::shared::limits::MAX_GENTITIES;
 use mp_qshared::shared::q_math::VectorCompare;
 use mp_qshared::shared::vec3_t;
 use mp_qshared::shared::wl_e::WL_e;
+use native_string::atof::atof;
 use native_string::atoi::atoi;
+use native_string::sscanf::sscanf_f32s;
+use native_string::stricmp::stricmp;
 
 use crate::game_interface::{icarus_get_script, ICARUS_LinkEntity};
 use crate::interface::interface_export_s::InterfaceExport;
@@ -116,77 +120,6 @@ unsafe fn read_c_field(ptr: *const u8, cap: usize) -> String {
     }
     let slice = core::slice::from_raw_parts(ptr, len);
     String::from_utf8_lossy(slice).into_owned()
-}
-
-/// C `atof` — parse the leading floating-point prefix, `0.0` on no match.
-fn c_atof(s: &str) -> f32 {
-    let b = s.as_bytes();
-    let n = b.len();
-    let mut i = 0;
-    while i < n && b[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    let start = i;
-    if i < n && (b[i] == b'+' || b[i] == b'-') {
-        i += 1;
-    }
-    let mut has_digits = false;
-    while i < n && b[i].is_ascii_digit() {
-        i += 1;
-        has_digits = true;
-    }
-    if i < n && b[i] == b'.' {
-        i += 1;
-        while i < n && b[i].is_ascii_digit() {
-            i += 1;
-            has_digits = true;
-        }
-    }
-    if has_digits && i < n && (b[i] == b'e' || b[i] == b'E') {
-        let save = i;
-        i += 1;
-        if i < n && (b[i] == b'+' || b[i] == b'-') {
-            i += 1;
-        }
-        let mut exp_digits = false;
-        while i < n && b[i].is_ascii_digit() {
-            i += 1;
-            exp_digits = true;
-        }
-        if !exp_digits {
-            i = save;
-        }
-    }
-    if !has_digits {
-        return 0.0;
-    }
-    s[start..i].parse::<f32>().unwrap_or(0.0)
-}
-
-/// C `stricmp` — case-insensitive byte compare returning sign of the first
-/// differing (lowercased) byte, `0` when equal (missing bytes read as NUL).
-fn stricmp(a: &str, b: &str) -> i32 {
-    let ab = a.as_bytes();
-    let bb = b.as_bytes();
-    let n = ab.len().max(bb.len());
-    for i in 0..n {
-        let x = ab.get(i).map(|c| c.to_ascii_lowercase()).unwrap_or(0);
-        let y = bb.get(i).map(|c| c.to_ascii_lowercase()).unwrap_or(0);
-        if x != y {
-            return x as i32 - y as i32;
-        }
-    }
-    0
-}
-
-/// `sscanf(s, "%f %f %f", …)` — whitespace-split, leading-float per token,
-/// unmatched axes stay `0.0`.
-fn sscanf_vec(s: &str) -> vec3_t {
-    let mut v = [0.0f32; 3];
-    for (i, tok) in s.split_whitespace().take(3).enumerate() {
-        v[i] = c_atof(tok);
-    }
-    v
 }
 
 /// Inlines Raven `CTaskManager::Completed(int id)` (`TaskManager.cpp:912-925`):
@@ -884,16 +817,16 @@ pub fn Q3_Evaluate(
     // Format the parameters.
     match p1_type {
         TK_FLOAT => {
-            f1 = c_atof(p1);
-            f2 = c_atof(p2);
+            sscanf_f32s(p1, from_mut(&mut f1));
+            sscanf_f32s(p2, from_mut(&mut f2));
         }
         TK_INT => {
             i1 = atoi(p1);
             i2 = atoi(p2);
         }
         TK_VECTOR => {
-            v1 = sscanf_vec(p1);
-            v2 = sscanf_vec(p2);
+            sscanf_f32s(p1, &mut v1);
+            sscanf_f32s(p2, &mut v2);
         }
         TK_STRING | TK_IDENTIFIER => {
             // c1/c2 are p1/p2 directly.
@@ -1032,10 +965,10 @@ fn Q3_CheckStringCounterIncrement(string: &str) -> f32 {
     let mut val = 0.0f32;
     if b.first() == Some(&b'+') {
         if b.len() > 1 {
-            val = c_atof(&string[1..]);
+            val = atof(&string[1..]) as f32;
         }
     } else if b.first() == Some(&b'-') && b.len() > 1 {
-        val = c_atof(&string[1..]) * -1.0;
+        val = atof(&string[1..]) as f32 * -1.0;
     }
     val
 }
@@ -1060,7 +993,7 @@ pub fn q3_set_var(
                 let float_data = if val != 0.0 {
                     q3_get_float_variable(icarus, host, type_name).unwrap_or(0.0) + val
                 } else {
-                    c_atof(data)
+                    atof(data) as f32
                 };
                 Q3_SetFloatVariable(icarus, type_name, float_data);
             }
@@ -1180,44 +1113,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn c_atof_parses_leading_float() {
-        assert_eq!(c_atof("5"), 5.0);
-        assert_eq!(c_atof("5.5abc"), 5.5);
-        assert_eq!(c_atof("  -2.25"), -2.25);
-        assert_eq!(c_atof("1e3"), 1000.0);
-        assert_eq!(c_atof("nope"), 0.0);
-        assert_eq!(c_atof(""), 0.0);
-    }
-
-    #[test]
-    fn atoi_parses_leading_int() {
-        assert_eq!(atoi("42"), 42);
-        assert_eq!(atoi("-7x"), -7);
-        assert_eq!(atoi("  3 4"), 3);
-        assert_eq!(atoi("x"), 0);
-    }
-
-    #[test]
-    fn stricmp_is_case_insensitive() {
-        assert_eq!(stricmp("Hello", "hello"), 0);
-        assert!(stricmp("abc", "abd") < 0);
-        assert!(stricmp("abd", "abc") > 0);
-        assert!(stricmp("ab", "abc") < 0);
-    }
-
-    #[test]
     fn check_string_counter_increment() {
         assert_eq!(Q3_CheckStringCounterIncrement("+3"), 3.0);
         assert_eq!(Q3_CheckStringCounterIncrement("-2.5"), -2.5);
         assert_eq!(Q3_CheckStringCounterIncrement("5"), 0.0);
         assert_eq!(Q3_CheckStringCounterIncrement("+"), 0.0);
-    }
-
-    #[test]
-    fn sscanf_vec_fills_present_axes() {
-        assert_eq!(sscanf_vec("1 2 3"), [1.0, 2.0, 3.0]);
-        assert_eq!(sscanf_vec("1.5 -2"), [1.5, -2.0, 0.0]);
-        assert_eq!(sscanf_vec(""), [0.0, 0.0, 0.0]);
     }
 
     #[test]

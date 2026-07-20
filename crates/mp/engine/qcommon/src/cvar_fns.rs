@@ -68,12 +68,10 @@ pub fn Cvar_FindVar(common: &Common, var_name: &str) -> Option<CvarHandle> {
 
 /// Raven `Cvar_VariableValue`.
 ///
-/// Divergence: the sole in-engine caller (`vm_fns`) threads the full pinned
-/// receiver set, so this keeps all four though only `common` is used.
 /// Source: `oracle/codemp/qcommon/cvar.cpp:103-110`
-pub fn Cvar_VariableValue(view: &mut EngineHostView, var_name: &str) -> f32 {
-    match Cvar_FindVar(view.common, var_name) {
-        Some(h) => view.common.cvar(h).value,
+pub fn Cvar_VariableValue(common: &Common, var_name: &str) -> f32 {
+    match Cvar_FindVar(common, var_name) {
+        Some(h) => common.cvar(h).value,
         None => 0.0,
     }
 }
@@ -449,7 +447,7 @@ pub fn Cvar_Toggle_f(view: &mut EngineHostView) {
     }
 
     let arg1 = Cmd_Argv(view.common, 1).to_owned();
-    let mut v = Cvar_VariableValue(view, &arg1) as c_int;
+    let mut v = Cvar_VariableValue(view.common, &arg1) as c_int;
     v = if v == 0 { 1 } else { 0 };
 
     Cvar_Set2(view, &arg1, Some(&format!("{v}")), false);

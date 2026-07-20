@@ -424,7 +424,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         );
 
         // add "demo" to the sv_keywords if restricted
-        if Cvar_VariableValue(view, "fs_restrict") != 0.0 {
+        if Cvar_VariableValue(view.common, "fs_restrict") != 0.0 {
             let mut keywords = [0 as c_char; MAX_INFO_STRING];
             let existing = CStr::from_ptr(Info_ValueForKey(
                 infostring.as_ptr(),
@@ -488,7 +488,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
 ///
 /// Source: `oracle/codemp/server/sv_main.cpp:381-469`
 pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
-    if Cvar_VariableValue(view, "ui_singlePlayerActive") != 0.0 {
+    if Cvar_VariableValue(view.common, "ui_singlePlayerActive") != 0.0 {
         return;
     }
 

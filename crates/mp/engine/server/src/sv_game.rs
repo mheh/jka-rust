@@ -3733,7 +3733,7 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     );
     view.common.bot_enable = view.common.cvar(var).integer;
 
-    if Cvar_VariableValue(view, "fs_restrict") == 0.0
+    if Cvar_VariableValue(view.common, "fs_restrict") == 0.0
         && view.common.cvar(view.common.com_dedicated).integer == 0
         && Sys_CheckCD() == qfalse
     {
@@ -3743,7 +3743,7 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     }
 
     // load the dll or bytecode
-    let vm_game = Cvar_VariableValue(view, "vm_game");
+    let vm_game = Cvar_VariableValue(view.common, "vm_game");
     // SEAM-D11: the game slot is armed once at boot by
     // `mp_engine_core::install_engine_hooks` (with the `GameDispatchCtx` note);
     // re-arming here at map load with a raw `sv` pointer would clobber that note

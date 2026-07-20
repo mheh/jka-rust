@@ -121,7 +121,7 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:31-130`
 pub fn SV_GetChallenge(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
-    if Cvar_VariableValue(view, "ui_singlePlayerActive") != 0.0 {
+    if Cvar_VariableValue(view.common, "ui_singlePlayerActive") != 0.0 {
         return;
     }
 
@@ -566,7 +566,7 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
     let r = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 3).to_owned(); // reason
 
     if Q_stricmp(&s, "demo") == 0 {
-        if Cvar_VariableValue(view, "fs_restrict") != 0.0 {
+        if Cvar_VariableValue(view.common, "fs_restrict") != 0.0 {
             // a demo client connecting to a demo server
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 view.common,
@@ -1277,7 +1277,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
     let mut n_chk_sum2: c_int = 0;
     let mut b_good;
 
-    if Cvar_VariableValue(view, "vm_cgame") != 0.0 {
+    if Cvar_VariableValue(view.common, "vm_cgame") != 0.0 {
         let chk = mp_engine_qcommon::files_pc::FS_FileIsInPAK(view.common, "vm/cgame.qvm");
         b_good = chk.is_some();
         n_chk_sum1 = chk.unwrap_or(0);
@@ -1288,7 +1288,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
     }
 
     if b_good {
-        if Cvar_VariableValue(view, "vm_ui") != 0.0 {
+        if Cvar_VariableValue(view.common, "vm_ui") != 0.0 {
             let chk = mp_engine_qcommon::files_pc::FS_FileIsInPAK(view.common, "vm/ui.qvm");
             b_good = chk.is_some();
             n_chk_sum2 = chk.unwrap_or(0);

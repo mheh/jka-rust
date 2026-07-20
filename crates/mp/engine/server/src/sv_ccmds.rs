@@ -420,7 +420,7 @@ pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:817-867`
 pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
     let _ = sv;
-    let mut fpDisabled = Cvar_VariableValue(view, "g_forcePowerDisable") as c_int;
+    let mut fpDisabled = Cvar_VariableValue(view.common, "g_forcePowerDisable") as c_int;
     let targetPower: c_int;
     let mut powerDisabled;
 

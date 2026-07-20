@@ -79,6 +79,8 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::collision::cplane_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{vec3_t, vec3pair_t};
+use native_string::atof::atof;
+use native_string::atoi::atoi;
 
 use crate::cm::cbrush_s::cbrush_t;
 use crate::cm::cbrushside_s::cbrushside_t;
@@ -140,64 +142,6 @@ fn info_value_for_key<'a>(s: &'a str, key: &str) -> &'a str {
             _ => return "",
         }
     }
-}
-
-/// C `atol` on a leading-integer prefix (Raven parses config values with
-/// `atol`, which returns `0` on no leading digits — `str::parse` would instead
-/// error, so this faithful C-semantics helper is used).
-///
-/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:134-136` (the `atol` call sites)
-fn atol_c(s: &str) -> i32 {
-    let bytes = s.trim_start().as_bytes();
-    let mut i = 0;
-    let mut sign: i64 = 1;
-    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
-        if bytes[i] == b'-' {
-            sign = -1;
-        }
-        i += 1;
-    }
-    let mut val: i64 = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        val = val * 10 + i64::from(bytes[i] - b'0');
-        i += 1;
-    }
-    (sign * val) as i32
-}
-
-/// C `atof` on a leading-float prefix (Raven parses the bounds with `atof`;
-/// same C-vs-Rust-`parse` divergence as [`atol_c`]).
-///
-/// Source: `oracle/codemp/qcommon/cm_terrain.cpp:139-144` (the `atof` call sites)
-fn atof_c(s: &str) -> f32 {
-    let s = s.trim_start();
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
-        i += 1;
-    }
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        i += 1;
-    }
-    if i < bytes.len() && bytes[i] == b'.' {
-        i += 1;
-        while i < bytes.len() && bytes[i].is_ascii_digit() {
-            i += 1;
-        }
-    }
-    if i < bytes.len() && (bytes[i] == b'e' || bytes[i] == b'E') {
-        let mut j = i + 1;
-        if j < bytes.len() && (bytes[j] == b'+' || bytes[j] == b'-') {
-            j += 1;
-        }
-        if j < bytes.len() && bytes[j].is_ascii_digit() {
-            i = j;
-            while i < bytes.len() && bytes[i].is_ascii_digit() {
-                i += 1;
-            }
-        }
-    }
-    s[..i].parse::<f32>().unwrap_or(0.0)
 }
 
 /// Raven `Com_ParseTextFile(file, parser, cleanFirst)` — opens `file`, reads it
@@ -415,22 +359,23 @@ impl CmLandScape {
 
         // Extract the relevant data from the config string.
         let height_map_key = info_value_for_key(configstring, "heightMap");
-        let num_patches = atol_c(info_value_for_key(configstring, "numPatches"));
-        let terxels = atol_c(info_value_for_key(configstring, "terxels"));
-        let has_physics = atol_c(info_value_for_key(configstring, "physics")) != 0;
+        // Raven `atol`; identical to `atoi` on the 32-bit retail target.
+        let num_patches = atoi(info_value_for_key(configstring, "numPatches"));
+        let terxels = atoi(info_value_for_key(configstring, "terxels"));
+        let has_physics = atoi(info_value_for_key(configstring, "physics")) != 0;
         // Raven parses `seed` with `strtoul` into a local that is never read
         // (`cm_terrain.cpp:137`, dead) — dropped (§C10), no observable effect.
 
         let bounds: vec3pair_t = [
             [
-                atof_c(info_value_for_key(configstring, "minx")),
-                atof_c(info_value_for_key(configstring, "miny")),
-                atof_c(info_value_for_key(configstring, "minz")),
+                atof(info_value_for_key(configstring, "minx")) as f32,
+                atof(info_value_for_key(configstring, "miny")) as f32,
+                atof(info_value_for_key(configstring, "minz")) as f32,
             ],
             [
-                atof_c(info_value_for_key(configstring, "maxx")),
-                atof_c(info_value_for_key(configstring, "maxy")),
-                atof_c(info_value_for_key(configstring, "maxz")),
+                atof(info_value_for_key(configstring, "maxx")) as f32,
+                atof(info_value_for_key(configstring, "maxy")) as f32,
+                atof(info_value_for_key(configstring, "maxz")) as f32,
             ],
         ];
 
@@ -571,7 +516,7 @@ impl CmLandScape {
             for items in classes.subgroups() {
                 if items.name().eq_ignore_ascii_case("altitudetexture") {
                     // Height must exist — the rest are optional (`:74`).
-                    let height = atol_c(items.find_pair_value("height").unwrap_or("0"));
+                    let height = atoi(items.find_pair_value("height").unwrap_or("0"));
 
                     // Shader for this height (`:77-85`).
                     let shader_name = items.find_pair_value("shader").unwrap_or("");
@@ -582,7 +527,7 @@ impl CmLandScape {
                     }
                 } else if items.name().eq_ignore_ascii_case("water") {
                     // Grab the height of the water (`:93-94`).
-                    self.base_water_height = atol_c(items.find_pair_value("height").unwrap_or("0"));
+                    self.base_water_height = atoi(items.find_pair_value("height").unwrap_or("0"));
                     // SetRealWaterHeight (`:94`, `cm_landscape.h:231`):
                     // mWaterHeight = height * mTerxelSize[2].
                     self.water_height = self.base_water_height as f32 * self.terxel_size[2];

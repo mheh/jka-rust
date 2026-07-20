@@ -311,7 +311,7 @@ pub fn SV_BoundMaxClients(view: &mut EngineHostView, sv: &mut Server, minimum: c
 /// Source: `oracle/codemp/server/sv_init.cpp:396-412`
 pub fn SV_TouchCGame(view: &mut EngineHostView) {
     let mut f: fileHandle_t = 0;
-    let filename: String = if Cvar_VariableValue(view, "vm_cgame") != 0.0 {
+    let filename: String = if Cvar_VariableValue(view.common, "vm_cgame") != 0.0 {
         Com_sprintf_vm_qvm("cgame")
     } else {
         "cgamex86.dll".to_string()
@@ -574,7 +574,7 @@ pub fn SV_SpawnServer(
     R_InitShaders(view, qboolean::from(1));
 
     // init client structures and svs.numSnapshotEntities
-    if Cvar_VariableValue(view, "sv_running") == 0.0 {
+    if Cvar_VariableValue(view.common, "sv_running") == 0.0 {
         SV_Startup(view, sv);
     } else {
         // check for maxclients change

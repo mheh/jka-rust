@@ -721,7 +721,7 @@ pub fn VM_Create(
 
         // never allow dll loading with a demo
         if interpret == vmInterpret_t::VMI_NATIVE {
-            if Cvar_VariableValue(view, "fs_restrict") != 0.0 {
+            if Cvar_VariableValue(view.common, "fs_restrict") != 0.0 {
                 interpret = vmInterpret_t::VMI_COMPILED;
             }
         }
