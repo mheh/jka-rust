@@ -26,6 +26,8 @@ use crate::ai_main::{GetNearestVisibleWP, OrgVisible, OrgVisibleBox};
 use crate::ai_util::{B_Alloc, B_TempAlloc, B_TempFree};
 use crate::g_cmds::ConcatArgs;
 use crate::g_main::G_Printf;
+use core::ffi::CStr;
+
 use crate::g_utils::{G_Find, G_TempEntity};
 use crate::prelude::*;
 use crate::q_math::VectorLength;
@@ -44,6 +46,7 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
+use native_string::atof::atof_bytes;
 use std::ffi::CString;
 
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
@@ -2199,7 +2202,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
                 i += 1;
             }
             *current_var.offset(i_cv) = 0;
-            thiswp.weight = atof(current_var) as f32;
+            thiswp.weight = atof_bytes(CStr::from_ptr(current_var).to_bytes()) as f32;
 
             i_cv = 0;
             i += 1;
@@ -2211,7 +2214,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
                 i += 1;
             }
             *current_var.offset(i_cv) = 0;
-            thiswp.origin[0] = atof(current_var) as f32;
+            thiswp.origin[0] = atof_bytes(CStr::from_ptr(current_var).to_bytes()) as f32;
 
             i_cv = 0;
             i += 1;
@@ -2222,7 +2225,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
                 i += 1;
             }
             *current_var.offset(i_cv) = 0;
-            thiswp.origin[1] = atof(current_var) as f32;
+            thiswp.origin[1] = atof_bytes(CStr::from_ptr(current_var).to_bytes()) as f32;
 
             i_cv = 0;
             i += 1;
@@ -2233,7 +2236,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
                 i += 1;
             }
             *current_var.offset(i_cv) = 0;
-            thiswp.origin[2] = atof(current_var) as f32;
+            thiswp.origin[2] = atof_bytes(CStr::from_ptr(current_var).to_bytes()) as f32;
 
             i += 4;
 
@@ -2283,7 +2286,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
             }
             *current_var.offset(i_cv) = 0;
 
-            thiswp.disttonext = atof(current_var) as f32;
+            thiswp.disttonext = atof_bytes(CStr::from_ptr(current_var).to_bytes()) as f32;
 
             CreateNewWP_FromObject(ctx, &mut thiswp);
             i += 1;

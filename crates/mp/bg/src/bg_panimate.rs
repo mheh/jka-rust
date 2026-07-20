@@ -30,10 +30,13 @@
 //! read game-side, mirroring the compiled-out C global.)
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::bg_channel::GameCallbacks;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::prelude::*;
 use mp_qshared::shared::com_parse::COM_Parse;
+use native_string::atof::atof_bytes;
 
 // Raven `#define MAX_ANIM_FILES 64`.
 // Source: `oracle/codemp/game/bg_public.h:255`
@@ -2107,7 +2110,7 @@ impl PmoveContext<'_> {
             if token.is_null() {
                 break;
             }
-            fps = atof(token) as f32;
+            fps = atof_bytes(unsafe { CStr::from_ptr(token) }.to_bytes()) as f32;
             if fps == 0.0 {
                 fps = 1.0;
             }

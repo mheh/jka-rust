@@ -16,7 +16,10 @@
 //! when unregistered (in-process tests).
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::prelude::*;
+use native_string::atof::atof_bytes;
 use std::ffi::CString;
 
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
@@ -3432,7 +3435,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                         buf.len() as c_int,
                     ),
                 );
-                let t_fval = atof(buf.as_ptr()) as f32;
+                let t_fval = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32;
                 trap::Cvar_Set(
                     ctx.engine,
                     mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
@@ -3481,7 +3484,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                             buf.len() as c_int,
                         ),
                     );
-                    let t_fval = atof(buf.as_ptr()) as f32;
+                    let t_fval = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32;
                     trap::Cvar_Set(
                         ctx.engine,
                         mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(

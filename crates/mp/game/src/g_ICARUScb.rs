@@ -15,9 +15,12 @@
 //! byte-identical, referee-verified.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::g_nav::NAV_FindClosestWaypointForEnt;
 use crate::prelude::*;
 use crate::q_math::vec3_origin;
+use native_string::atof::{atof, atof_bytes};
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -268,7 +271,7 @@ pub fn Q3_PlaySound(
                 buf.len() as c_int,
             ),
         );
-        let t_f_val = atof(buf.as_ptr()) as f32;
+        let t_f_val = atof_bytes(unsafe { CStr::from_ptr(buf.as_ptr()) }.to_bytes()) as f32;
 
         if t_f_val > 1.0 {
             // Skip the damn sound!
@@ -1021,7 +1024,10 @@ pub fn Q3_GetFloat(
                     return 0;
                 }
                 // Parms pool struct: deref raw through the copied pointer.
-                *value = atof((*parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr()) as f32;
+                *value = atof_bytes(
+                    CStr::from_ptr((*parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr())
+                        .to_bytes(),
+                ) as f32;
             }
             _ if toGet == SET_COUNT as i32 => *value = ctx.world.entity(id).count as f32,
             _ if toGet == SET_HEALTH as i32 => *value = ctx.world.entity(id).health as f32,
@@ -2974,11 +2980,11 @@ pub fn Q3_GameSideCheckStringCounterIncrement(string: *const c_char) -> f32 {
 
         if let Some(rest) = s.strip_prefix('+') {
             if !rest.is_empty() {
-                val = atof(cstr(rest).as_ptr()) as f32;
+                val = atof(rest) as f32;
             }
         } else if let Some(rest) = s.strip_prefix('-') {
             if !rest.is_empty() {
-                val = atof(cstr(rest).as_ptr()) as f32 * -1.0;
+                val = atof(rest) as f32 * -1.0;
             }
         }
 
@@ -3133,7 +3139,9 @@ pub fn Q3_SetParm(ctx: &mut GameContext, entID: c_int, parmNum: c_int, parmValue
             // promotes, adds in f64, narrows once. `%f` promotes the float back
             // to double for its 6-decimal print, so format via f64.
             // Source: `oracle/codemp/game/g_ICARUScb.c:3676-3677`
-            let total = (val as f64 + atof((*parms).parm[parmNum as usize].as_ptr())) as f32;
+            let total = (val as f64
+                + atof_bytes(CStr::from_ptr((*parms).parm[parmNum as usize].as_ptr()).to_bytes()))
+                as f32;
             write_cstr_field(
                 &mut (*parms).parm[parmNum as usize],
                 &format!("{:.6}", total as f64),
@@ -4217,6 +4225,10 @@ pub fn Q3_Set(
         let mut int_data: c_int;
         let mut vector_data: vec3_t = [0.0, 0.0, 0.0];
 
+        // Convert the shared-memory value once; every scalar `atof` arm below
+        // parses these bytes (libc strtod semantics via `native_string`).
+        let data_b = CStr::from_ptr(data).to_bytes();
+
         // Set this for callbacks
         let toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, type_name);
 
@@ -4268,20 +4280,20 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_XVELOCITY as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetVelocity(ctx, entID, 0, float_data);
             }
             _ if toSet == SET_YVELOCITY as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetVelocity(ctx, entID, 1, float_data);
             }
             _ if toSet == SET_ZVELOCITY as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetVelocity(ctx, entID, 2, float_data);
             }
 
             _ if toSet == SET_Z_OFFSET as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetOriginOffset(ctx, entID, 2, float_data);
             }
 
@@ -4524,7 +4536,7 @@ pub fn Q3_Set(
 
             _ if toSet == SET_DPITCH as i32 => {
                 //FIXME: make these set tempBehavior to BS_FACE and await completion?  Or set lockedDesiredPitch/Yaw and aimTime?
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetDPitch(ctx, entID, float_data);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
@@ -4538,7 +4550,7 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_DYAW as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetDYaw(ctx, entID, float_data);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
@@ -4603,7 +4615,7 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_YAWSPEED as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetYawSpeed(ctx, entID, float_data);
             }
 
@@ -4623,22 +4635,22 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_GRAVITY as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetGravity(ctx, entID, float_data);
             }
 
             _ if toSet == SET_WAIT as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetWait(ctx, entID, float_data);
             }
 
             _ if toSet == SET_FOLLOWDIST as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetFollowDist(ctx, entID, float_data);
             }
 
             _ if toSet == SET_SCALE as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetScale(ctx, entID, float_data);
             }
 
@@ -4714,24 +4726,24 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_SHOOTDIST as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetShootDist(ctx, entID, float_data);
             }
 
             _ if toSet == SET_TIMESCALE as i32 => Q3_SetTimeScale(ctx, entID, data),
 
             _ if toSet == SET_VISRANGE as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetVisrange(ctx, entID, float_data);
             }
 
             _ if toSet == SET_EARSHOT as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetEarshot(ctx, entID, float_data);
             }
 
             _ if toSet == SET_VIGILANCE as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_SetVigilance(ctx, entID, float_data);
             }
 
@@ -5117,7 +5129,7 @@ pub fn Q3_Set(
                 Q3_CameraGroup(ctx, entID, data as *mut c_char)
             }
             _ if toSet == SET_CAMERA_GROUP_Z_OFS as i32 => {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_CameraGroupZOfs(ctx, float_data);
             }
             _ if toSet == SET_CAMERA_GROUP_TAG as i32 => {
@@ -5147,7 +5159,7 @@ pub fn Q3_Set(
                 || toSet == SET_FACEFROWN as i32
                 || toSet == SET_FACENORMAL as i32 =>
             {
-                float_data = atof(data) as f32;
+                float_data = atof_bytes(data_b) as f32;
                 Q3_Face(ctx, entID, toSet, float_data);
             }
 

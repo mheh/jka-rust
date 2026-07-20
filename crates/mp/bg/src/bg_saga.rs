@@ -20,9 +20,12 @@
 //! cross-file signature; parked rather than fabricated.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::prelude::*;
 use mp_qshared::shared::q_string::Q_strcmp;
 use mp_qshared::shared::q_string::Q_stricmp;
+use native_string::atof::atof_bytes;
 // `strlen` resolves to `Q_strlen` (the `g_spawn.rs` precedent for aliasing the
 // libc name); `strcpy`/`strcat` are the file-local unchecked helpers below,
 // matching the `c_strcpy` house pattern in `q_shared.rs` / `bg_saberLoad.rs`
@@ -1356,7 +1359,7 @@ pub fn BG_SiegeParseClassFile(
         ) != 0
         {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed =
-                atof(parse_buf.as_ptr()) as f32;
+                atof_bytes(unsafe { CStr::from_ptr(parse_buf.as_ptr()) }.to_bytes()) as f32;
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed = 1.0f32;
         }

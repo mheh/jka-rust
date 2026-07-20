@@ -15,7 +15,10 @@
 //! compile + golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::prelude::*;
+use native_string::atof::atof_bytes;
 
 // Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
 // (voice/entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s —
@@ -295,7 +298,7 @@ pub fn WP_ResistForcePush(
                 ),
             );
 
-            tFVal = mp_bg::bg_lib::atof(buf.as_ptr()) as f32;
+            tFVal = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32;
 
             if runningResist == qfalse {
                 (*client).ps.velocity = [0.0, 0.0, 0.0];

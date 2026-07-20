@@ -12,6 +12,8 @@
 //! same way.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::botai::bot_state_s::MAX_LOVED_ONES;
 use crate::prelude::*;
 use crate::trap;
@@ -20,6 +22,7 @@ use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFile;
 use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFile;
 use mp_abi::game::syscalls::G_FS_READ::GFsRead;
 use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
+use native_string::atof::atof_bytes;
 
 /// Raven `B_TempAlloc`.
 ///
@@ -732,7 +735,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         // Parse accuracy (default: 10.0)
         if failed == 0 && GetPairedValue(group, "accuracy\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.skills.accuracy = atof(readbuf) as f32;
+            bs_ref.skills.accuracy = atof_bytes(CStr::from_ptr(readbuf).to_bytes()) as f32;
         } else {
             bs_ref.skills.accuracy = 10.0;
         }
@@ -740,7 +743,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         // Parse turnspeed (default: 0.01)
         if failed == 0 && GetPairedValue(group, "turnspeed\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.skills.turnspeed = atof(readbuf) as f32;
+            bs_ref.skills.turnspeed = atof_bytes(CStr::from_ptr(readbuf).to_bytes()) as f32;
         } else {
             bs_ref.skills.turnspeed = 0.01;
         }
@@ -749,14 +752,14 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if failed == 0
             && GetPairedValue(group, "turnspeed_combat\0".as_ptr() as *mut c_char, readbuf) != 0
         {
-            bs_ref.skills.turnspeed_combat = atof(readbuf) as f32;
+            bs_ref.skills.turnspeed_combat = atof_bytes(CStr::from_ptr(readbuf).to_bytes()) as f32;
         } else {
             bs_ref.skills.turnspeed_combat = 0.05;
         }
 
         // Parse maxturn (default: 360.0)
         if failed == 0 && GetPairedValue(group, "maxturn\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.skills.maxturn = atof(readbuf) as f32;
+            bs_ref.skills.maxturn = atof_bytes(CStr::from_ptr(readbuf).to_bytes()) as f32;
         } else {
             bs_ref.skills.maxturn = 360.0;
         }

@@ -13,9 +13,12 @@
 //! entry point itself is not invoked).
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::c_format::{c_vsprintf, FmtArg};
 use crate::prelude::*;
 use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING};
+use native_string::atof::atof_bytes;
 
 // S5-5: the `QSharedScratch` type and the `QSharedScratch`-threaded
 // `COM_Parse*` family are canonical in `mp_qshared` now (below the bg tier so
@@ -470,7 +473,7 @@ pub fn COM_ParseFloat(qs: &mut QSharedScratch, data: *mut *const c_char, f: *mut
             com_printf_lit("unexpected EOF\n");
             return qtrue;
         }
-        *f = mp_bg::bg_lib::atof(token as *const c_char) as f32;
+        *f = atof_bytes(CStr::from_ptr(token).to_bytes()) as f32;
         qfalse
     }
 }
@@ -518,7 +521,7 @@ pub fn Parse1DMatrix(qs: &mut QSharedScratch, buf_p: *mut *const c_char, x: c_in
         crate::q_shared::COM_MatchToken(qs, buf_p, c"(".as_ptr() as *mut c_char);
         for i in 0..x {
             let token = crate::q_shared::COM_Parse(qs, buf_p);
-            *m.offset(i as isize) = mp_bg::bg_lib::atof(token as *const c_char) as f32;
+            *m.offset(i as isize) = atof_bytes(CStr::from_ptr(token).to_bytes()) as f32;
         }
         crate::q_shared::COM_MatchToken(qs, buf_p, c")".as_ptr() as *mut c_char);
     }

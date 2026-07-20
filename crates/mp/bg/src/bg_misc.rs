@@ -24,9 +24,11 @@
 
 use crate::prelude::*;
 
-use crate::bg_lib::atof;
+use core::ffi::CStr;
+
 use mp_qshared::shared::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
 use mp_qshared::shared::q_string::{Q_stricmp, Q_strlen};
+use native_string::atof::atof_bytes;
 
 /// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
 /// Source: `oracle/codemp/game/bg_public.h:25`
@@ -289,11 +291,11 @@ pub fn BG_ParseField(
                         *(b.offset((*f).ofs as isize) as *mut c_int) = v;
                     }
                     fieldtype_t::F_FLOAT => {
-                        let v = atof(value) as f32;
+                        let v = atof_bytes(CStr::from_ptr(value).to_bytes()) as f32;
                         *(b.offset((*f).ofs as isize) as *mut f32) = v;
                     }
                     fieldtype_t::F_ANGLEHACK => {
-                        let v = atof(value) as f32;
+                        let v = atof_bytes(CStr::from_ptr(value).to_bytes()) as f32;
                         let dst = b.offset((*f).ofs as isize) as *mut f32;
                         *dst = 0.0;
                         *dst.add(1) = v;

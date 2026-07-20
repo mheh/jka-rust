@@ -33,6 +33,7 @@ use std::ffi::{CStr, CString};
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
+use native_string::atof::atof_bytes;
 
 use crate::g_items::G_SpawnItem;
 use crate::g_main::{G_Error, G_Printf};
@@ -141,7 +142,7 @@ pub fn G_SpawnFloat(
     unsafe {
         let mut s: *mut c_char = std::ptr::null_mut();
         let present = G_SpawnString(ctx, key, defaultString, &mut s);
-        *out = atof(s) as f32;
+        *out = atof_bytes(CStr::from_ptr(s).to_bytes()) as f32;
         present
     }
 }
@@ -190,9 +191,9 @@ pub fn G_SpawnVector(
 // ---------------------------------------------------------------------
 // Local helpers mirroring libc semantics used throughout this file
 // (`atoi`/`sscanf("%f %f %f", ...)` — house rule: libc/other symbols use the
-// Rust std equivalent, no resolved signature needed). `atof` itself now
-// routes through `mp_bg::bg_lib::atof` (verified faithful to the oracle DLL's
-// linked Raven `atof`, `bg_lib.c:774-839`); `sscanf_3f`/`sscanf_1f` route
+// Rust std equivalent, no resolved signature needed). `atof` is libc strtod —
+// `native_string::atof` (retail's JK2_game.vcproj excludes bg_lib.c from the
+// native DLL, so its QVM `atof` never linked); `sscanf_3f`/`sscanf_1f` route
 // through the shared libc-`%f` scanner `cstr_util::sscanf_f32s`.
 // ---------------------------------------------------------------------
 

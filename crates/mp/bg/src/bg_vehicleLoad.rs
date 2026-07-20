@@ -13,6 +13,7 @@ use crate::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
 use mp_qshared::shared::com_parse::{
     COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine,
 };
+use native_string::atof::atof;
 
 /// Raven `BG_ClearVehicleParseParms`.
 ///
@@ -52,8 +53,7 @@ pub fn BG_ParseVehWeaponParm(
                         *(b.add(field.ofs as usize) as *mut c_int) = atoi(cstr(&value).as_ptr());
                     }
                     VF_FLOAT => {
-                        *(b.add(field.ofs as usize) as *mut f32) =
-                            atof(cstr(&value).as_ptr()) as f32;
+                        *(b.add(field.ofs as usize) as *mut f32) = atof(&value) as f32;
                     }
                     VF_LSTRING => {
                         let slot = b.add(field.ofs as usize) as *mut *mut c_char;
@@ -89,11 +89,7 @@ pub fn BG_ParseVehWeaponParm(
                     }
                     VF_BOOL => {
                         *(b.add(field.ofs as usize) as *mut qboolean) =
-                            if atof(cstr(&value).as_ptr()) != 0.0 {
-                                qtrue
-                            } else {
-                                qfalse
-                            };
+                            if atof(&value) != 0.0 { qtrue } else { qfalse };
                     }
                     VF_VEHTYPE => {
                         let vt = GetIDForString(
@@ -396,8 +392,7 @@ pub fn BG_ParseVehicleParm(
                         *(b.add(field.ofs as usize) as *mut c_int) = atoi(cstr(&value).as_ptr());
                     }
                     VF_FLOAT => {
-                        *(b.add(field.ofs as usize) as *mut f32) =
-                            atof(cstr(&value).as_ptr()) as f32;
+                        *(b.add(field.ofs as usize) as *mut f32) = atof(&value) as f32;
                     }
                     VF_LSTRING => {
                         let slot = b.add(field.ofs as usize) as *mut *mut c_char;
@@ -436,11 +431,7 @@ pub fn BG_ParseVehicleParm(
                     }
                     VF_BOOL => {
                         *(b.add(field.ofs as usize) as *mut qboolean) =
-                            if atof(cstr(&value).as_ptr()) != 0.0 {
-                                qtrue
-                            } else {
-                                qfalse
-                            };
+                            if atof(&value) != 0.0 { qtrue } else { qfalse };
                     }
                     VF_VEHTYPE => {
                         let vt = GetIDForString(

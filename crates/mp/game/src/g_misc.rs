@@ -4,7 +4,10 @@
 //! Filled by the jampgame mega-pass.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use core::ffi::CStr;
+
 use crate::prelude::*;
+use native_string::atof::atof_bytes;
 
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
 use crate::g_client::SetClientViewAngle;
@@ -725,7 +728,11 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"texturescale".as_ptr(),
-            cstr(&format!("{:.6}", mp_bg::bg_lib::atof(value))).as_ptr(),
+            cstr(&format!(
+                "{:.6}",
+                atof_bytes(CStr::from_ptr(value).to_bytes())
+            ))
+            .as_ptr(),
         );
 
         // Initialise the common aspects of the terrain
@@ -840,7 +847,7 @@ pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
 
     let mut fov: *mut c_char = core::ptr::null_mut();
     G_SpawnString(ctx, c"fov".as_ptr(), c"80".as_ptr(), &mut fov);
-    let fov_x = mp_bg::bg_lib::atof(fov) as f32;
+    let fov_x = atof_bytes(unsafe { CStr::from_ptr(fov) }.to_bytes()) as f32;
 
     let mut fogv: vec3_t = [0.0, 0.0, 0.0];
     let mut isfog: c_int = 0;

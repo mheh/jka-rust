@@ -9,6 +9,7 @@ use core::ffi::CStr;
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
 };
+use native_string::atof::atof_bytes;
 use std::ffi::CString;
 
 use crate::ai_main::BotAISetupClient;
@@ -72,7 +73,7 @@ pub fn trap_Cvar_VariableValue(ctx: &mut GameContext, var_name: *const c_char) -
                 buf.len() as c_int,
             ),
         );
-        mp_bg::bg_lib::atof(buf.as_ptr()) as f32
+        atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32
     }
 }
 
@@ -777,11 +778,14 @@ pub fn G_BotConnect(ctx: &mut GameContext, clientNum: c_int, restart: qboolean) 
                 cstr("personality").as_ptr(),
             )),
         );
-        settings.skill = mp_bg::bg_lib::atof(Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            cstr("skill").as_ptr(),
-        )) as f32;
+        settings.skill = atof_bytes(
+            CStr::from_ptr(Info_ValueForKey(
+                &mut ctx.world.bg_state.qs,
+                userinfo.as_ptr(),
+                cstr("skill").as_ptr(),
+            ))
+            .to_bytes(),
+        ) as f32;
         write_cstr_field(
             &mut settings.team,
             &cstr_to_str(Info_ValueForKey(
@@ -1148,7 +1152,7 @@ pub fn Svcmd_AddBot_f(ctx: &mut GameContext) {
     let skill: f32 = if string[0] == 0 {
         4.0
     } else {
-        mp_bg::bg_lib::atof(string.as_ptr()) as f32
+        atof_bytes(unsafe { CStr::from_ptr(string.as_ptr()) }.to_bytes()) as f32
     };
 
     // team

@@ -14,7 +14,7 @@ use core::ffi::{c_char, c_int, c_void};
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use mp_bg::bg_lib::{__builtin___memmove_chk, _atof, atof, atoi, qsort};
+use mp_bg::bg_lib::{__builtin___memmove_chk, atoi, qsort};
 use mp_game::bg_channel::Rng;
 use mp_game::q_math::*;
 use mp_game::shared::cplane_t;
@@ -581,11 +581,6 @@ fn dump_atox(o: &mut String) {
         cbuf.push(0);
         let p0 = cbuf.as_ptr() as *const c_char;
         let _ = writeln!(o, "a {} atoi {}", idx, atoi(p0));
-        let _ = writeln!(o, "a {} atof {:016x}", idx, atof(p0).cbits());
-        let mut sp: *const c_char = cbuf.as_ptr() as *const c_char;
-        let v = _atof(&mut sp as *mut *const c_char);
-        let adv = (sp as usize) - (cbuf.as_ptr() as usize);
-        let _ = writeln!(o, "a {} _atof {:016x} adv {}", idx, v.cbits(), adv);
         idx += 1;
     }
     let _ = writeln!(o, "atox count {}", idx);

@@ -65,8 +65,9 @@ use crate::NPC_senses::{
     G_ClearLOS, G_ClearLOS2, G_ClearLOS3, G_ClearLOS4, G_ClearLOS5, InFOV, NPC_CheckAlertEvents,
 };
 use crate::NPC_sounds::G_AddVoiceEvent;
-use mp_bg::bg_lib::atof;
+use core::ffi::CStr;
 use mp_qshared::shared::force_powers::FP_SPEED;
+use native_string::atof::atof_bytes;
 
 use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
@@ -360,7 +361,7 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
                     buf.len() as c_int,
                 ),
             );
-            let t_f_val = atof(buf.as_ptr());
+            let t_f_val = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes());
             yaw_speed *= 1.0 / (t_f_val as f32);
         }
 

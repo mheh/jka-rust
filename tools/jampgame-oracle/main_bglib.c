@@ -8,10 +8,12 @@
 #include "dumpcommon.h"
 
 // Raven bg_lib functions not visible without bg_lib.h (Q3_VM-only header).
-double _atof(const char **stringPtr);
 int    raven_atoi(const char *string);
-// atof/qsort/memmove/srand/rand come from bg_lib.c (declared by <stdlib.h>/
-// <string.h> which the shim pulls in; signatures match Raven's).
+// qsort/memmove/srand/rand come from bg_lib.c (declared by <stdlib.h>/
+// <string.h> which the shim pulls in; signatures match Raven's). bg_lib's
+// atof/_atof rows were retired 2026-07-19: retail's JK2_game.vcproj excludes
+// bg_lib.c from the native DLL, so game code binds libc atof — pinned by
+// native_string::atof's own tests, not by this oracle dump.
 
 static void dump_atox(const char *dir) {
 	char path[1024];
@@ -24,12 +26,8 @@ static void dump_atox(const char *dir) {
 	while (off < len) {
 		const char *s = buf + off;
 		size_t l = strlen(s);
-		// atoi (Raven's) / atof / _atof over the same record.
+		// atoi (Raven's) over each record.
 		printf("a %d atoi %d\n", idx, raven_atoi(s));
-		printf("a %d atof %016llx\n", idx, d2b(atof(s)));
-		const char *p = s;
-		double v = _atof(&p);
-		printf("a %d _atof %016llx adv %ld\n", idx, d2b(v), (long)(p - s));
 		off += l + 1;
 		idx++;
 	}

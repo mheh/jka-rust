@@ -361,7 +361,6 @@ pub use crate::NPC_senses::{InFOV3, NPC_CheckAlertEvents, NPC_CheckForDanger};
 pub use crate::NPC_utils::{
     CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_UpdateAngles,
 };
-pub use mp_bg::bg_lib::atof;
 pub use mp_bg::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
 pub use mp_bg::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use mp_bg::bg_pmove::BG_SabersOff;

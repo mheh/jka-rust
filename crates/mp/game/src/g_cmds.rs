@@ -15,7 +15,9 @@ use crate::client::player_team_state::playerTeamStateState_t;
 use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
 use crate::prelude::*;
 use crate::trap;
+use core::ffi::CStr;
 use mp_bg::bg_misc::selected_holdable_tag;
+use native_string::atof::atof_bytes;
 
 /// Raven `SAY_ALL`/`SAY_TEAM`/`SAY_TELL` chat-mode `#define`s.
 ///
@@ -3657,7 +3659,7 @@ pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
                     MAX_TOKEN_CHARS as c_int,
                 ),
             );
-            origin[i] = mp_bg::bg_lib::atof(buffer.as_ptr()) as f32;
+            origin[i] = atof_bytes(CStr::from_ptr(buffer.as_ptr()).to_bytes()) as f32;
         }
 
         trap::Argv(
@@ -3668,7 +3670,7 @@ pub fn Cmd_SetViewpos_f(ctx: &mut GameContext, ent: EntityId) {
                 MAX_TOKEN_CHARS as c_int,
             ),
         );
-        angles[YAW as usize] = mp_bg::bg_lib::atof(buffer.as_ptr()) as f32;
+        angles[YAW as usize] = atof_bytes(CStr::from_ptr(buffer.as_ptr()).to_bytes()) as f32;
 
         crate::g_misc::TeleportPlayer(ctx, ent, origin, angles);
     }

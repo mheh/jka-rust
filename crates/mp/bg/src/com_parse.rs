@@ -11,14 +11,14 @@
 //! Source: `oracle/codemp/game/q_shared.c:588-638`
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, CStr};
 
 use mp_qshared::shared::com_parse::{COM_ParseExt, QSharedScratch};
 use mp_qshared::shared::{qboolean, qfalse, qtrue};
 
 use crate::bg_channel::bg_traps::BgTraps;
-use crate::bg_lib::atof;
 use crate::cstr_util::atoi;
+use native_string::atof::atof_bytes;
 
 /// Raven `COM_ParseString` — bg twin routing the EOF print via `traps`.
 /// Source: `oracle/codemp/game/q_shared.c:588-598`
@@ -76,7 +76,7 @@ pub fn COM_ParseFloat(
             traps.com_printf(c"unexpected EOF\n".as_ptr());
             return qtrue;
         }
-        *f = atof(token as *const c_char) as f32;
+        *f = atof_bytes(CStr::from_ptr(token).to_bytes()) as f32;
         qfalse
     }
 }
