@@ -21,7 +21,6 @@ use crate::level::damage_flags::DAMAGE_NO_PROTECTION;
 use crate::NPC_utils::G_ActivateBehavior;
 use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
 use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
-use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
 use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
@@ -1170,10 +1169,8 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
             );
             trap::ICARUS_RunScript(
                 ctx.engine,
-                GIcarusRunscriptArgs::new(
-                    core::ptr::from_mut(ctx.entity_mut(activator_id)).cast(),
-                    cstr(&script_path).as_ptr(),
-                ),
+                core::ptr::from_mut(ctx.entity_mut(activator_id)).cast(),
+                &script_path,
             );
         } else {
             let self_ptr: *mut gentity_t = ctx.entity_mut(self_);

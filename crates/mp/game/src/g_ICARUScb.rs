@@ -46,18 +46,11 @@ use crate::g_misc::{TAG_GetAngles, TAG_GetOrigin, TAG_GetOrigin2, TAG_GetRadius}
 use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
 use crate::veh_dispatch::eject_all;
-use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
-use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
-use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
-use mp_abi::game::syscalls::G_ICARUS_SETVAR::GIcarusSetvarArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDSET::GIcarusTaskidsetArgs;
-use mp_abi::game::syscalls::G_ICARUS_VARIABLEDECLARED::GIcarusVariabledeclaredArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
-use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
 use mp_abi::game::syscalls::G_ROFF_PLAY::GRoffPlayArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
-use std::ffi::CString;
 
 /// Raven `Q3_TaskIDClear`.
 ///
@@ -296,10 +289,7 @@ pub fn Q3_Play(
     let id = EntityId(entID as u32);
 
     if Q_stricmp(r#type, b"PLAY_ROFF\0".as_ptr() as *const c_char) == 0 {
-        // Raven passes `name` (already a `char*`) straight to `trap_ROFF_Cache`;
-        // the ABI arg is an owned `CString` here.
-        let file = CString::new(unsafe { std::ffi::CStr::from_ptr(name) }.to_bytes()).unwrap();
-        let roffid = trap::ROFF_Cache(ctx.engine, GRoffCacheArgs::new(file));
+        let roffid = trap::ROFF_Cache(ctx.engine, &unsafe { cstr_to_str(name) });
         ctx.world.entity_mut(id).roffid = roffid;
         if roffid != 0 {
             let roffname = G_NewString(ctx, name);
@@ -1265,15 +1255,10 @@ pub fn Q3_GetFloat(
                 return 0
             }
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name))
-                    != VTYPE_FLOAT
-                {
+                if trap::ICARUS_VariableDeclared(ctx.engine, &cstr_to_str(name)) != VTYPE_FLOAT {
                     return 0;
                 }
-                return trap::ICARUS_GetFloatVariable(
-                    ctx.engine,
-                    GIcarusGetfloatvariableArgs::new(name, value),
-                );
+                return trap::ICARUS_GetFloatVariable(ctx.engine, &cstr_to_str(name), &mut *value);
             }
         }
 
@@ -1335,15 +1320,10 @@ pub fn Q3_GetVector(
                 return 0;
             }
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name))
-                    != VTYPE_VECTOR
-                {
+                if trap::ICARUS_VariableDeclared(ctx.engine, &cstr_to_str(name)) != VTYPE_VECTOR {
                     return 0;
                 }
-                return trap::ICARUS_GetVectorVariable(
-                    ctx.engine,
-                    GIcarusGetvectorvariableArgs::new(name, value as *mut vec3_t),
-                );
+                return trap::ICARUS_GetVectorVariable(ctx.engine, &cstr_to_str(name), value);
             }
         }
 
@@ -1590,14 +1570,13 @@ pub fn Q3_GetString(
             }
             _ if toGet == SET_FULLNAME as i32 => *value = ctx.world.entity(id).fullName,
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name))
-                    != VTYPE_STRING
-                {
+                if trap::ICARUS_VariableDeclared(ctx.engine, &cstr_to_str(name)) != VTYPE_STRING {
                     return 0;
                 }
                 return trap::ICARUS_GetStringVariable(
                     ctx.engine,
-                    GIcarusGetstringvariableArgs::new(name, *value as *const c_char),
+                    &cstr_to_str(name),
+                    *value as *const c_char,
                 );
             }
         }
@@ -5467,7 +5446,10 @@ pub fn Q3_Set(
                 //G_DebugPrint( WL_ERROR, "Q3_Set: '%s' is not a valid set field\n", type_name );
                 trap::ICARUS_SetVar(
                     ctx.engine,
-                    GIcarusSetvarArgs::new(taskID, entID, type_name, data),
+                    taskID,
+                    entID,
+                    &cstr_to_str(type_name),
+                    &cstr_to_str(data),
                 );
             }
         }

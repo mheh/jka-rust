@@ -174,8 +174,33 @@ use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentity;
 use core::ffi::{c_char, c_int};
 use core::ptr::null_mut;
 
+use mp_abi::game::syscalls::BOTLIB_EA_SAY::BotlibEaSayArgs;
+use mp_abi::game::syscalls::BOTLIB_EA_SAY_TEAM::BotlibEaSayTeamArgs;
+use mp_abi::game::syscalls::BOTLIB_GET_CONSOLE_MESSAGE::BotlibGetConsoleMessageArgs;
 use mp_abi::game::syscalls::G_ARGC::GArgcArgs;
 use mp_abi::game::syscalls::G_ARGV::GArgvArgs;
+use mp_abi::game::syscalls::G_CM_REGISTER_TERRAIN::GCmRegisterTerrainArgs;
+use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
+use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
+use mp_abi::game::syscalls::G_G2_GETBONEANIM::GG2GetboneanimArgs;
+use mp_abi::game::syscalls::G_G2_GETGLANAME::GG2GetglanameArgs;
+use mp_abi::game::syscalls::G_G2_GETSURFACENAME::GG2GetsurfacenameArgs;
+use mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs;
+use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs;
+use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs;
+use mp_abi::game::syscalls::G_G2_SETBONEIKSTATE::GG2SetboneikstateArgs;
+use mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
+use mp_abi::game::syscalls::G_ICARUS_SETVAR::GIcarusSetvarArgs;
+use mp_abi::game::syscalls::G_ICARUS_VARIABLEDECLARED::GIcarusVariabledeclaredArgs;
+use mp_abi::game::syscalls::G_NAV_LOAD::GNavLoadArgs;
+use mp_abi::game::syscalls::G_NAV_SAVE::GNavSaveArgs;
+use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
+use mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs;
+use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
 use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 use mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs;
@@ -199,7 +224,11 @@ use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
 use mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs;
 use mp_abi::{Execute, OutboundSysCall};
 use mp_engine_select::Engine;
-use mp_qshared::shared::{fileHandle_t, fsMode_t, vmCvar_t};
+use core::ffi::c_void;
+
+use mp_qshared::common::mp::gentity_s;
+use mp_qshared::common::mp::qcommon::sharedSetBoneIKStateParams_t;
+use mp_qshared::shared::{fileHandle_t, fsMode_t, qhandle_t, vec3_t, vmCvar_t};
 use native_string::cstr::{buf_to_string, cstr};
 
 /// Raven `trap_AAS_EntityInfo` (`g_syscalls.c:655-657`) — `BOTLIB_AAS_ENTITY_INFO`.
@@ -320,13 +349,13 @@ pub fn BotFreeWeaponState(
 
 /// Raven `trap_BotGetServerCommand` (`g_syscalls.c:647-649`) — `BOTLIB_GET_CONSOLE_MESSAGE`.
 /// C: `int trap_BotGetServerCommand(int clientNum, char *message, int size)`
-pub fn BotGetServerCommand(
-    engine: &Engine,
-    args: <BotlibGetConsoleMessage as OutboundSysCall>::Args,
-) -> <BotlibGetConsoleMessage as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<BotlibGetConsoleMessage>>::execute(engine, args)
+pub fn BotGetServerCommand(engine: &Engine, clientNum: c_int, size: usize) -> Option<String> {
+    let mut buffer = vec![0u8; size];
+    let status = <Engine as Execute<BotlibGetConsoleMessage>>::execute(
+        engine,
+        BotlibGetConsoleMessageArgs::new(clientNum, buffer.as_mut_ptr() as *mut c_char, size as c_int),
+    );
+    (status != 0).then(|| buf_to_string(&buffer))
 }
 
 /// Raven `trap_BotGetSnapshotEntity` (`g_syscalls.c:643-645`) — `BOTLIB_GET_SNAPSHOT_ENTITY`.
@@ -463,13 +492,11 @@ pub fn Bot_UpdateWaypoints(
 
 /// Raven `trap_CM_RegisterTerrain` (`g_syscalls.c:1473-1476`) — `G_CM_REGISTER_TERRAIN`.
 /// C: `int trap_CM_RegisterTerrain(const char *config)`
-pub fn CM_RegisterTerrain(
-    engine: &Engine,
-    args: <GCmRegisterTerrain as OutboundSysCall>::Args,
-) -> <GCmRegisterTerrain as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GCmRegisterTerrain>>::execute(engine, args)
+pub fn CM_RegisterTerrain(engine: &Engine, config: &str) -> c_int {
+    <Engine as Execute<GCmRegisterTerrain>>::execute(
+        engine,
+        GCmRegisterTerrainArgs::new(cstr(config)),
+    )
 }
 
 /// Raven `trap_Cvar_Register` (`g_syscalls.c:57-59`) — `G_CVAR_REGISTER`.
@@ -675,24 +702,17 @@ pub fn EA_ResetInput(
 
 /// Raven `trap_EA_Say` (`g_syscalls.c:749-751`) — `BOTLIB_EA_SAY`.
 /// C: `void trap_EA_Say(int client, char *str)`
-pub fn EA_Say(
-    engine: &Engine,
-    args: <BotlibEaSay as OutboundSysCall>::Args,
-) -> <BotlibEaSay as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<BotlibEaSay>>::execute(engine, args)
+pub fn EA_Say(engine: &Engine, client: c_int, text: &str) {
+    <Engine as Execute<BotlibEaSay>>::execute(engine, BotlibEaSayArgs::new(client, cstr(text)))
 }
 
 /// Raven `trap_EA_SayTeam` (`g_syscalls.c:753-755`) — `BOTLIB_EA_SAY_TEAM`.
 /// C: `void trap_EA_SayTeam(int client, char *str)`
-pub fn EA_SayTeam(
-    engine: &Engine,
-    args: <BotlibEaSayTeam as OutboundSysCall>::Args,
-) -> <BotlibEaSayTeam as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<BotlibEaSayTeam>>::execute(engine, args)
+pub fn EA_SayTeam(engine: &Engine, client: c_int, text: &str) {
+    <Engine as Execute<BotlibEaSayTeam>>::execute(
+        engine,
+        BotlibEaSayTeamArgs::new(client, cstr(text)),
+    )
 }
 
 /// Raven `trap_EA_SelectWeapon` (`g_syscalls.c:821-823`) — `BOTLIB_EA_SELECT_WEAPON`.
@@ -809,11 +829,14 @@ pub fn FS_Write(engine: &Engine, buffer: &[u8], f: fileHandle_t) {
 /// C: `int trap_G2API_AddBolt(void *ghoul2, int modelIndex, const char *boneName)`
 pub fn G2API_AddBolt(
     engine: &Engine,
-    args: <GG2Addbolt as OutboundSysCall>::Args,
-) -> <GG2Addbolt as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Addbolt>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    modelIndex: c_int,
+    boneName: &str,
+) -> c_int {
+    <Engine as Execute<GG2Addbolt>>::execute(
+        engine,
+        GG2AddboltArgs::new(ghoul2, modelIndex, cstr(boneName)),
+    )
 }
 
 /// Raven `trap_G2API_AnimateG2Models` (`g_syscalls.c:1387-1390`) — `G_G2_ANIMATEG2MODELS`.
@@ -939,46 +962,87 @@ pub fn G2API_GetBoltMatrix_NoReconstruct(
 
 /// Raven `trap_G2API_GetBoneAnim` (`g_syscalls.c:1262-1266`) — `G_G2_GETBONEANIM`.
 /// C: `qboolean trap_G2API_GetBoneAnim(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex)`
+#[allow(clippy::too_many_arguments)]
 pub fn G2API_GetBoneAnim(
     engine: &Engine,
-    args: <GG2Getboneanim as OutboundSysCall>::Args,
-) -> <GG2Getboneanim as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Getboneanim>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    boneName: &str,
+    currentTime: c_int,
+    currentFrame: *mut f32,
+    startFrame: *mut c_int,
+    endFrame: *mut c_int,
+    flags: *mut c_int,
+    animSpeed: *mut f32,
+    modelList: *mut c_int,
+    modelIndex: c_int,
+) -> bool {
+    <Engine as Execute<GG2Getboneanim>>::execute(
+        engine,
+        GG2GetboneanimArgs::new(
+            ghoul2,
+            cstr(boneName),
+            currentTime,
+            currentFrame,
+            startFrame,
+            endFrame,
+            flags,
+            animSpeed,
+            modelList,
+            modelIndex,
+        ),
+    ) != 0
 }
 
 /// Raven `trap_G2API_GetGLAName` (`g_syscalls.c:1268-1271`) — `G_G2_GETGLANAME`.
 /// C: `void trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)`
 pub fn G2API_GetGLAName(
     engine: &Engine,
-    args: <GG2Getglaname as OutboundSysCall>::Args,
-) -> <GG2Getglaname as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Getglaname>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    modelIndex: c_int,
+    buffer_len: usize,
+) -> String {
+    let mut buffer = vec![0u8; buffer_len];
+    <Engine as Execute<GG2Getglaname>>::execute(
+        engine,
+        GG2GetglanameArgs::new(ghoul2, modelIndex, buffer.as_mut_ptr() as *mut c_char),
+    );
+    buf_to_string(&buffer)
 }
 
 /// Raven `trap_G2API_GetSurfaceName` (`g_syscalls.c:1344-1347`) — `G_G2_GETSURFACENAME`.
 /// C: `void trap_G2API_GetSurfaceName(void *ghoul2, int surfNumber, int modelIndex, char *fillBuf)`
 pub fn G2API_GetSurfaceName(
     engine: &Engine,
-    args: <GG2Getsurfacename as OutboundSysCall>::Args,
-) -> <GG2Getsurfacename as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Getsurfacename>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    surfNumber: c_int,
+    modelIndex: c_int,
+    buffer_len: usize,
+) -> String {
+    let mut buffer = vec![0u8; buffer_len];
+    <Engine as Execute<GG2Getsurfacename>>::execute(
+        engine,
+        GG2GetsurfacenameArgs::new(
+            ghoul2,
+            surfNumber,
+            modelIndex,
+            buffer.as_mut_ptr() as *mut c_char,
+        ),
+    );
+    buf_to_string(&buffer)
 }
 
 /// Raven `trap_G2API_GetSurfaceRenderStatus` (`g_syscalls.c:1370-1373`) — `G_G2_GETSURFACERENDERSTATUS`.
 /// C: `int trap_G2API_GetSurfaceRenderStatus(void *ghoul2, const int modelIndex, const char *surfaceName)`
 pub fn G2API_GetSurfaceRenderStatus(
     engine: &Engine,
-    args: <GG2Getsurfacerenderstatus as OutboundSysCall>::Args,
-) -> <GG2Getsurfacerenderstatus as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Getsurfacerenderstatus>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    modelIndex: c_int,
+    surfaceName: &str,
+) -> c_int {
+    <Engine as Execute<GG2Getsurfacerenderstatus>>::execute(
+        engine,
+        GG2GetsurfacerenderstatusArgs::new(ghoul2, modelIndex, cstr(surfaceName)),
+    )
 }
 
 /// Raven `trap_G2API_IKMove` (`g_syscalls.c:1429-1432`) — `G_G2_IKMOVE`.
@@ -994,13 +1058,29 @@ pub fn G2API_IKMove(
 
 /// Raven `trap_G2API_InitGhoul2Model` (`g_syscalls.c:1223-1227`) — `G_G2_INITGHOUL2MODEL`.
 /// C: `int trap_G2API_InitGhoul2Model(void **ghoul2Ptr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias)`
+#[allow(clippy::too_many_arguments)]
 pub fn G2API_InitGhoul2Model(
     engine: &Engine,
-    args: <GG2Initghoul2Model as OutboundSysCall>::Args,
-) -> <GG2Initghoul2Model as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Initghoul2Model>>::execute(engine, args)
+    ghoul2Ptr: *mut *mut c_void,
+    fileName: &str,
+    modelIndex: c_int,
+    customSkin: qhandle_t,
+    customShader: qhandle_t,
+    modelFlags: c_int,
+    lodBias: c_int,
+) -> c_int {
+    <Engine as Execute<GG2Initghoul2Model>>::execute(
+        engine,
+        GG2Initghoul2ModelArgs::new(
+            ghoul2Ptr,
+            cstr(fileName),
+            modelIndex,
+            customSkin,
+            customShader,
+            modelFlags,
+            lodBias,
+        ),
+    )
 }
 
 /// Raven `trap_G2API_OverrideServer` (`g_syscalls.c:1459-1462`) — `G_G2_OVERRIDESERVER`.
@@ -1049,35 +1129,87 @@ pub fn G2API_SetBoltInfo(
 
 /// Raven `trap_G2API_SetBoneAngles` (`g_syscalls.c:1249-1254`) — `G_G2_ANGLEOVERRIDE`.
 /// C: `qboolean trap_G2API_SetBoneAngles(void *ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime)`
+#[allow(clippy::too_many_arguments)]
 pub fn G2API_SetBoneAngles(
     engine: &Engine,
-    args: <GG2Angleoverride as OutboundSysCall>::Args,
-) -> <GG2Angleoverride as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Angleoverride>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    modelIndex: c_int,
+    boneName: &str,
+    angles: *const vec3_t,
+    flags: c_int,
+    up: c_int,
+    right: c_int,
+    forward: c_int,
+    modelList: *mut qhandle_t,
+    blendTime: c_int,
+    currentTime: c_int,
+) -> bool {
+    <Engine as Execute<GG2Angleoverride>>::execute(
+        engine,
+        GG2AngleoverrideArgs::new(
+            ghoul2,
+            modelIndex,
+            cstr(boneName),
+            angles,
+            flags,
+            up,
+            right,
+            forward,
+            modelList,
+            blendTime,
+            currentTime,
+        ),
+    ) != 0
 }
 
 /// Raven `trap_G2API_SetBoneAnim` (`g_syscalls.c:1256-1260`) — `G_G2_PLAYANIM`.
 /// C: `qboolean trap_G2API_SetBoneAnim(void *ghoul2, const int modelIndex, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame , const int blendTime)`
+#[allow(clippy::too_many_arguments)]
 pub fn G2API_SetBoneAnim(
     engine: &Engine,
-    args: <GG2Playanim as OutboundSysCall>::Args,
-) -> <GG2Playanim as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Playanim>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    modelIndex: c_int,
+    boneName: &str,
+    startFrame: c_int,
+    endFrame: c_int,
+    flags: c_int,
+    animSpeed: f32,
+    currentTime: c_int,
+    setFrame: f32,
+    blendTime: c_int,
+) -> bool {
+    let bone = cstr(boneName);
+    <Engine as Execute<GG2Playanim>>::execute(
+        engine,
+        GG2PlayanimArgs::new(
+            ghoul2,
+            modelIndex,
+            bone.as_ptr(),
+            startFrame,
+            endFrame,
+            flags,
+            animSpeed,
+            currentTime,
+            setFrame,
+            blendTime,
+        ),
+    ) != 0
 }
 
 /// Raven `trap_G2API_SetBoneIKState` (`g_syscalls.c:1424-1427`) — `G_G2_SETBONEIKSTATE`.
 /// C: `qboolean trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params)`
 pub fn G2API_SetBoneIKState(
     engine: &Engine,
-    args: <GG2Setboneikstate as OutboundSysCall>::Args,
-) -> <GG2Setboneikstate as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Setboneikstate>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    time: c_int,
+    boneName: &str,
+    ikState: c_int,
+    params: *mut sharedSetBoneIKStateParams_t,
+) -> bool {
+    <Engine as Execute<GG2Setboneikstate>>::execute(
+        engine,
+        GG2SetboneikstateArgs::new(ghoul2, time, cstr(boneName), ikState, params),
+    ) != 0
 }
 
 /// Raven `trap_G2API_SetRagDoll` (`g_syscalls.c:1382-1385`) — `G_G2_SETRAGDOLL`.
@@ -1106,11 +1238,15 @@ pub fn G2API_SetSkin(
 /// C: `qboolean trap_G2API_SetSurfaceOnOff(void *ghoul2, const char *surfaceName, const int flags)`
 pub fn G2API_SetSurfaceOnOff(
     engine: &Engine,
-    args: <GG2Setsurfaceonoff as OutboundSysCall>::Args,
-) -> <GG2Setsurfaceonoff as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GG2Setsurfaceonoff>>::execute(engine, args)
+    ghoul2: *mut c_void,
+    surfaceName: &str,
+    flags: c_int,
+) -> bool {
+    let surface = cstr(surfaceName);
+    <Engine as Execute<GG2Setsurfaceonoff>>::execute(
+        engine,
+        GG2SetsurfaceonoffArgs::new(ghoul2, surface.as_ptr(), flags),
+    ) != 0
 }
 
 /// Raven `trap_G2Trace` (`g_syscalls.c:153-155`) — `G_G2TRACE`.
@@ -1205,35 +1341,34 @@ pub fn ICARUS_FreeEnt(
 
 /// Raven `trap_ICARUS_GetFloatVariable` (`g_syscalls.c:374-377`) — `G_ICARUS_GETFLOATVARIABLE`.
 /// C: `int trap_ICARUS_GetFloatVariable(const char *name, float *value)`
-pub fn ICARUS_GetFloatVariable(
-    engine: &Engine,
-    args: <GIcarusGetfloatvariable as OutboundSysCall>::Args,
-) -> <GIcarusGetfloatvariable as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GIcarusGetfloatvariable>>::execute(engine, args)
+pub fn ICARUS_GetFloatVariable(engine: &Engine, name: &str, value: &mut f32) -> c_int {
+    let name_c = cstr(name);
+    <Engine as Execute<GIcarusGetfloatvariable>>::execute(
+        engine,
+        GIcarusGetfloatvariableArgs::new(name_c.as_ptr(), value as *mut f32),
+    )
 }
 
 /// Raven `trap_ICARUS_GetStringVariable` (`g_syscalls.c:379-382`) — `G_ICARUS_GETSTRINGVARIABLE`.
 /// C: `int trap_ICARUS_GetStringVariable(const char *name, const char *value)`
-pub fn ICARUS_GetStringVariable(
-    engine: &Engine,
-    args: <GIcarusGetstringvariable as OutboundSysCall>::Args,
-) -> <GIcarusGetstringvariable as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GIcarusGetstringvariable>>::execute(engine, args)
+/// Raven passes the fill buffer through a `const char *` (engine writes
+/// through it anyway); the buffer stays a caller pointer at this seam.
+pub fn ICARUS_GetStringVariable(engine: &Engine, name: &str, value: *const c_char) -> c_int {
+    let name_c = cstr(name);
+    <Engine as Execute<GIcarusGetstringvariable>>::execute(
+        engine,
+        GIcarusGetstringvariableArgs::new(name_c.as_ptr(), value),
+    )
 }
 
 /// Raven `trap_ICARUS_GetVectorVariable` (`g_syscalls.c:384-387`) — `G_ICARUS_GETVECTORVARIABLE`.
 /// C: `int trap_ICARUS_GetVectorVariable(const char *name, const vec3_t value)`
-pub fn ICARUS_GetVectorVariable(
-    engine: &Engine,
-    args: <GIcarusGetvectorvariable as OutboundSysCall>::Args,
-) -> <GIcarusGetvectorvariable as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GIcarusGetvectorvariable>>::execute(engine, args)
+pub fn ICARUS_GetVectorVariable(engine: &Engine, name: &str, value: &mut vec3_t) -> c_int {
+    let name_c = cstr(name);
+    <Engine as Execute<GIcarusGetvectorvariable>>::execute(
+        engine,
+        GIcarusGetvectorvariableArgs::new(name_c.as_ptr(), value as *mut vec3_t),
+    )
 }
 
 /// Raven `trap_ICARUS_Init` (`g_syscalls.c:304-307`) — `G_ICARUS_INIT`.
@@ -1293,24 +1428,23 @@ pub fn ICARUS_MaintainTaskManager(
 
 /// Raven `trap_ICARUS_RunScript` (`g_syscalls.c:294-297`) — `G_ICARUS_RUNSCRIPT`.
 /// C: `int trap_ICARUS_RunScript(gentity_t *ent, const char *name)`
-pub fn ICARUS_RunScript(
-    engine: &Engine,
-    args: <GIcarusRunscript as OutboundSysCall>::Args,
-) -> <GIcarusRunscript as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GIcarusRunscript>>::execute(engine, args)
+pub fn ICARUS_RunScript(engine: &Engine, ent: *mut gentity_s, name: &str) -> c_int {
+    let name_c = cstr(name);
+    <Engine as Execute<GIcarusRunscript>>::execute(
+        engine,
+        GIcarusRunscriptArgs::new(ent, name_c.as_ptr()),
+    )
 }
 
 /// Raven `trap_ICARUS_SetVar` (`g_syscalls.c:364-367`) — `G_ICARUS_SETVAR`.
 /// C: `void trap_ICARUS_SetVar(int taskID, int entID, const char *type_name, const char *data)`
-pub fn ICARUS_SetVar(
-    engine: &Engine,
-    args: <GIcarusSetvar as OutboundSysCall>::Args,
-) -> <GIcarusSetvar as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GIcarusSetvar>>::execute(engine, args)
+pub fn ICARUS_SetVar(engine: &Engine, taskID: c_int, entID: c_int, type_name: &str, data: &str) {
+    let type_name_c = cstr(type_name);
+    let data_c = cstr(data);
+    <Engine as Execute<GIcarusSetvar>>::execute(
+        engine,
+        GIcarusSetvarArgs::new(taskID, entID, type_name_c.as_ptr(), data_c.as_ptr()),
+    )
 }
 
 /// Raven `trap_ICARUS_Shutdown` (`g_syscalls.c:349-352`) — `G_ICARUS_SHUTDOWN`.
@@ -1370,13 +1504,12 @@ pub fn ICARUS_ValidEnt(
 
 /// Raven `trap_ICARUS_VariableDeclared` (`g_syscalls.c:369-372`) — `G_ICARUS_VARIABLEDECLARED`.
 /// C: `int trap_ICARUS_VariableDeclared(const char *type_name)`
-pub fn ICARUS_VariableDeclared(
-    engine: &Engine,
-    args: <GIcarusVariabledeclared as OutboundSysCall>::Args,
-) -> <GIcarusVariabledeclared as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GIcarusVariabledeclared>>::execute(engine, args)
+pub fn ICARUS_VariableDeclared(engine: &Engine, type_name: &str) -> c_int {
+    let type_name_c = cstr(type_name);
+    <Engine as Execute<GIcarusVariabledeclared>>::execute(
+        engine,
+        GIcarusVariabledeclaredArgs::new(type_name_c.as_ptr()),
+    )
 }
 
 /// Raven `trap_InPVS` (`g_syscalls.c:162-164`) — `G_IN_PVS`.
@@ -1634,13 +1767,8 @@ pub fn Nav_HardConnect(
 
 /// Raven `trap_Nav_Load` (`g_syscalls.c:400-403`) — `G_NAV_LOAD`.
 /// C: `qboolean trap_Nav_Load(const char *filename, int checksum)`
-pub fn Nav_Load(
-    engine: &Engine,
-    args: <GNavLoad as OutboundSysCall>::Args,
-) -> <GNavLoad as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GNavLoad>>::execute(engine, args)
+pub fn Nav_Load(engine: &Engine, filename: &str, checksum: c_int) -> bool {
+    <Engine as Execute<GNavLoad>>::execute(engine, GNavLoadArgs::new(cstr(filename), checksum)) != 0
 }
 
 /// Raven `trap_Nav_NodesAreNeighbors` (`g_syscalls.c:505-508`) — `G_NAV_NODESARENEIGHBORS`.
@@ -1656,13 +1784,8 @@ pub fn Nav_NodesAreNeighbors(
 
 /// Raven `trap_Nav_Save` (`g_syscalls.c:405-408`) — `G_NAV_SAVE`.
 /// C: `qboolean trap_Nav_Save(const char *filename, int checksum)`
-pub fn Nav_Save(
-    engine: &Engine,
-    args: <GNavSave as OutboundSysCall>::Args,
-) -> <GNavSave as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GNavSave>>::execute(engine, args)
+pub fn Nav_Save(engine: &Engine, filename: &str, checksum: c_int) -> bool {
+    <Engine as Execute<GNavSave>>::execute(engine, GNavSaveArgs::new(cstr(filename), checksum)) != 0
 }
 
 /// Raven `trap_Nav_SetPathsCalculated` (`g_syscalls.c:595-598`) — `G_NAV_SETPATHSCALCULATED`.
@@ -1739,13 +1862,8 @@ pub fn RMG_Init(
 
 /// Raven `trap_ROFF_Cache` (`g_syscalls.c:267-270`) — `G_ROFF_CACHE`.
 /// C: `int trap_ROFF_Cache(char *file)`
-pub fn ROFF_Cache(
-    engine: &Engine,
-    args: <GRoffCache as OutboundSysCall>::Args,
-) -> <GRoffCache as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GRoffCache>>::execute(engine, args)
+pub fn ROFF_Cache(engine: &Engine, file: &str) -> c_int {
+    <Engine as Execute<GRoffCache>>::execute(engine, GRoffCacheArgs::new(cstr(file)))
 }
 
 /// Raven `trap_ROFF_Clean` (`g_syscalls.c:257-260`) — `G_ROFF_CLEAN`.
@@ -1783,13 +1901,8 @@ pub fn ROFF_UpdateEntities(
 
 /// Raven `trap_R_RegisterSkin` (`g_syscalls.c:1179-1182`) — `G_R_REGISTERSKIN`.
 /// C: `qhandle_t trap_R_RegisterSkin(const char *name)`
-pub fn R_RegisterSkin(
-    engine: &Engine,
-    args: <GRRegisterskin as OutboundSysCall>::Args,
-) -> <GRRegisterskin as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GRRegisterskin>>::execute(engine, args)
+pub fn R_RegisterSkin(engine: &Engine, name: &str) -> qhandle_t {
+    <Engine as Execute<GRRegisterskin>>::execute(engine, GRRegisterskinArgs::new(cstr(name)))
 }
 
 /// Raven `trap_SV_RegisterSharedMemory` (`g_syscalls.c:601-604`) — `G_SET_SHARED_BUFFER`.
@@ -1834,13 +1947,11 @@ pub fn SetActiveSubBSP(
 
 /// Raven `trap_SetBrushModel` (`g_syscalls.c:144-146`) — `G_SET_BRUSH_MODEL`.
 /// C: `void trap_SetBrushModel(gentity_t *ent, const char *name)`
-pub fn SetBrushModel(
-    engine: &Engine,
-    args: <GSetBrushModel as OutboundSysCall>::Args,
-) -> <GSetBrushModel as OutboundSysCall>::Output {
-    // UFCS spelling of the frozen `engine.execute(args)` — the bare
-    // method call cannot infer `C` from `Args` alone (SEAM-D13).
-    <Engine as Execute<GSetBrushModel>>::execute(engine, args)
+pub fn SetBrushModel(engine: &Engine, ent: *mut gentity_s, name: &str) {
+    <Engine as Execute<GSetBrushModel>>::execute(
+        engine,
+        GSetBrushModelArgs::new(ent, cstr(name)),
+    )
 }
 
 /// Raven `trap_SetConfigstring` (`g_syscalls.c:118-120`) — `G_SET_CONFIGSTRING`.

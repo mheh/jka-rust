@@ -42,7 +42,6 @@ use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
-use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
@@ -97,12 +96,7 @@ pub fn InitTrigger(ctx: &mut GameContext, self_id: EntityId) {
 
     let self_ptr = ctx.world.entity_mut(self_id) as *mut gentity_t;
     let model = ctx.world.entity(self_id).model;
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(self_ptr.cast(), unsafe {
-            std::ffi::CStr::from_ptr(model).to_owned()
-        }),
-    );
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
     ctx.world.entity_mut(self_id).r.contents = CONTENTS_TRIGGER; // replaces the -1 from trap_SetBrushModel
     ctx.world.entity_mut(self_id).r.svFlags = SVF_NOCLIENT;
 
@@ -2487,12 +2481,7 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
 pub fn SP_trigger_asteroid_field(ctx: &mut GameContext, self_: EntityId) {
     let self_ptr = ctx.world.entity_mut(self_) as *mut gentity_t;
     let model = ctx.world.entity(self_).model;
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(self_ptr.cast(), unsafe {
-            std::ffi::CStr::from_ptr(model).to_owned()
-        }),
-    );
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
     // self->r.contents = CONTENTS_TRIGGER; // replaces the -1 from trap_SetBrushModel
     ctx.world.entity_mut(self_).r.contents = 0;
     ctx.world.entity_mut(self_).r.svFlags = SVF_NOCLIENT;

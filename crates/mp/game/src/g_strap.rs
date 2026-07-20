@@ -189,22 +189,21 @@ pub fn strap_G2API_SetBoneAngles(
     currentTime: c_int,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    crate::trap::G2API_SetBoneAngles(
+    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    (crate::trap::G2API_SetBoneAngles(
         strap_engine(),
-        mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs::new(
-            ghoul2,
-            modelIndex,
-            unsafe { CStr::from_ptr(boneName) }.to_owned(),
-            &angles,
-            flags,
-            up,
-            right,
-            forward,
-            modelList,
-            blendTime,
-            currentTime,
-        ),
-    )
+        ghoul2,
+        modelIndex,
+        &bone,
+        &angles,
+        flags,
+        up,
+        right,
+        forward,
+        modelList,
+        blendTime,
+        currentTime,
+    )) as qboolean
 }
 
 /// Raven `strap_G2API_SetBoneAnim`.
@@ -223,21 +222,20 @@ pub fn strap_G2API_SetBoneAnim(
     blendTime: c_int,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    crate::trap::G2API_SetBoneAnim(
+    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    (crate::trap::G2API_SetBoneAnim(
         strap_engine(),
-        mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs::new(
-            ghoul2,
-            modelIndex,
-            boneName,
-            startFrame,
-            endFrame,
-            flags,
-            animSpeed,
-            currentTime,
-            setFrame,
-            blendTime,
-        ),
-    )
+        ghoul2,
+        modelIndex,
+        &bone,
+        startFrame,
+        endFrame,
+        flags,
+        animSpeed,
+        currentTime,
+        setFrame,
+        blendTime,
+    )) as qboolean
 }
 
 /// Raven `strap_G2API_GetBoneAnim`.
@@ -256,21 +254,20 @@ pub fn strap_G2API_GetBoneAnim(
     modelIndex: c_int,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    crate::trap::G2API_GetBoneAnim(
+    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    (crate::trap::G2API_GetBoneAnim(
         strap_engine(),
-        mp_abi::game::syscalls::G_G2_GETBONEANIM::GG2GetboneanimArgs::new(
-            ghoul2,
-            unsafe { CStr::from_ptr(boneName) }.to_owned(),
-            currentTime,
-            currentFrame,
-            startFrame,
-            endFrame,
-            flags,
-            animSpeed,
-            modelList,
-            modelIndex,
-        ),
-    )
+        ghoul2,
+        &bone,
+        currentTime,
+        currentFrame,
+        startFrame,
+        endFrame,
+        flags,
+        animSpeed,
+        modelList,
+        modelIndex,
+    )) as qboolean
 }
 
 /// Raven `strap_G2API_SetRagDoll`.
@@ -312,16 +309,9 @@ pub fn strap_G2API_SetBoneIKState(
     params: *mut sharedSetBoneIKStateParams_t,
 ) -> qboolean {
     // ctx-less bg-boundary wrapper; engine via the seam cell.
-    crate::trap::G2API_SetBoneIKState(
-        strap_engine(),
-        mp_abi::game::syscalls::G_G2_SETBONEIKSTATE::GG2SetboneikstateArgs::new(
-            ghoul2,
-            time,
-            unsafe { CStr::from_ptr(boneName) }.to_owned(),
-            ikState,
-            params,
-        ),
-    )
+    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
+    (crate::trap::G2API_SetBoneIKState(strap_engine(), ghoul2, time, &bone, ikState, params))
+        as qboolean
 }
 
 /// Raven `strap_G2API_IKMove`.

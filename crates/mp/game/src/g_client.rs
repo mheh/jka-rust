@@ -1615,10 +1615,8 @@ pub fn ClientCleanName(
 ///
 /// Source: `oracle/codemp/game/g_client.c:1423-1499`
 pub fn G_SaberModelSetup(ctx: &mut GameContext, ent: EntityId) -> qboolean {
-    use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
     use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
     use mp_abi::game::syscalls::G_G2_COPYSPECIFICGHOUL2MODEL::GG2Copyspecificghoul2ModelArgs;
-    use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs;
     use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs;
     use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs;
 
@@ -1642,15 +1640,13 @@ pub fn G_SaberModelSetup(ctx: &mut GameContext, ent: EntityId) -> qboolean {
                 let model_name = cstr_to_str((*((*ent).client)).saber[i].model.as_ptr());
                 trap::G2API_InitGhoul2Model(
                     ctx.engine,
-                    GG2Initghoul2ModelArgs::new(
-                        &mut (*((*ent).client)).weaponGhoul2[i] as *mut *mut c_void,
-                        cstr(&model_name),
-                        0,
-                        0,
-                        -20,
-                        0,
-                        0,
-                    ),
+                    &mut (*((*ent).client)).weaponGhoul2[i] as *mut *mut c_void,
+                    &model_name,
+                    0,
+                    0,
+                    -20,
+                    0,
+                    0,
                 );
 
                 if !(*((*ent).client)).weaponGhoul2[i].is_null() {
@@ -1695,11 +1691,9 @@ pub fn G_SaberModelSetup(ctx: &mut GameContext, ent: EntityId) -> qboolean {
                         let tag_name = format!("*blade{}", j + 1);
                         tag_bolt = trap::G2API_AddBolt(
                             ctx.engine,
-                            GG2AddboltArgs::new(
-                                (*((*ent).client)).weaponGhoul2[i],
-                                0,
-                                cstr(&tag_name),
-                            ),
+                            (*((*ent).client)).weaponGhoul2[i],
+                            0,
+                            &tag_name,
                         );
 
                         if tag_bolt == -1 {
@@ -1707,11 +1701,9 @@ pub fn G_SaberModelSetup(ctx: &mut GameContext, ent: EntityId) -> qboolean {
                                 // guess this is an 0ldsk3wl saber
                                 let _ = trap::G2API_AddBolt(
                                     ctx.engine,
-                                    GG2AddboltArgs::new(
-                                        (*((*ent).client)).weaponGhoul2[i],
-                                        0,
-                                        cstr("*flash"),
-                                    ),
+                                    (*((*ent).client)).weaponGhoul2[i],
+                                    0,
+                                    "*flash",
                                 );
                                 fallback_for_saber = qfalse;
                                 break;
@@ -2218,8 +2210,6 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:2681-2926`
 pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeedScale: f32) {
-    use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs as GG2SetboneanimArgs;
-
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let self_: *mut gentity_t = ctx.entity_mut(self_);
     // The `#if 0` broken-limb bone block (g_client.c:2804-2925) is disabled in
@@ -2240,48 +2230,42 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
             let frame = (*((*self_).client)).ps.saberLockFrame;
             trap::G2API_SetBoneAnim(
                 ctx.engine,
-                GG2SetboneanimArgs::new(
-                    (*self_).ghoul2,
-                    0,
-                    cstr("model_root").as_ptr(),
-                    frame,
-                    frame + 1,
-                    BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
-                    animSpeedScale,
-                    ctx.world.level.time,
-                    -1.0,
-                    150,
-                ),
+                (*self_).ghoul2,
+                0,
+                "model_root",
+                frame,
+                frame + 1,
+                BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
+                animSpeedScale,
+                ctx.world.level.time,
+                -1.0,
+                150,
             );
             trap::G2API_SetBoneAnim(
                 ctx.engine,
-                GG2SetboneanimArgs::new(
-                    (*self_).ghoul2,
-                    0,
-                    cstr("lower_lumbar").as_ptr(),
-                    frame,
-                    frame + 1,
-                    BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
-                    animSpeedScale,
-                    ctx.world.level.time,
-                    -1.0,
-                    150,
-                ),
+                (*self_).ghoul2,
+                0,
+                "lower_lumbar",
+                frame,
+                frame + 1,
+                BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
+                animSpeedScale,
+                ctx.world.level.time,
+                -1.0,
+                150,
             );
             trap::G2API_SetBoneAnim(
                 ctx.engine,
-                GG2SetboneanimArgs::new(
-                    (*self_).ghoul2,
-                    0,
-                    cstr("Motion").as_ptr(),
-                    frame,
-                    frame + 1,
-                    BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
-                    animSpeedScale,
-                    ctx.world.level.time,
-                    -1.0,
-                    150,
-                ),
+                (*self_).ghoul2,
+                0,
+                "Motion",
+                frame,
+                frame + 1,
+                BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
+                animSpeedScale,
+                ctx.world.level.time,
+                -1.0,
+                150,
             );
             return;
         }
@@ -2319,18 +2303,16 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
 
                 trap::G2API_SetBoneAnim(
                     ctx.engine,
-                    GG2SetboneanimArgs::new(
-                        (*self_).ghoul2,
-                        0,
-                        cstr("model_root").as_ptr(),
-                        first_frame,
-                        last_frame,
-                        a_flags,
-                        l_anim_speed_scale,
-                        ctx.world.level.time,
-                        -1.0,
-                        150,
-                    ),
+                    (*self_).ghoul2,
+                    0,
+                    "model_root",
+                    first_frame,
+                    last_frame,
+                    a_flags,
+                    l_anim_speed_scale,
+                    ctx.world.level.time,
+                    -1.0,
+                    150,
                 );
                 (*((*self_).client)).legsAnimExecute = legs_anim;
                 (*((*self_).client)).legsLastFlip = (*((*self_).client)).ps.legsFlip;
@@ -2399,18 +2381,16 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
 
             trap::G2API_SetBoneAnim(
                 ctx.engine,
-                GG2SetboneanimArgs::new(
-                    (*self_).ghoul2,
-                    0,
-                    cstr("lower_lumbar").as_ptr(),
-                    first2,
-                    last2,
-                    a_flags2,
-                    speed2,
-                    ctx.world.level.time,
-                    -1.0,
-                    150,
-                ),
+                (*self_).ghoul2,
+                0,
+                "lower_lumbar",
+                first2,
+                last2,
+                a_flags2,
+                speed2,
+                ctx.world.level.time,
+                -1.0,
+                150,
             );
 
             (*((*self_).client)).torsoAnimExecute = torso_anim;
@@ -2430,18 +2410,16 @@ pub fn G_UpdateClientAnims(ctx: &mut GameContext, self_: EntityId, mut animSpeed
             // only set the motion bone for humanoids.
             trap::G2API_SetBoneAnim(
                 ctx.engine,
-                GG2SetboneanimArgs::new(
-                    (*self_).ghoul2,
-                    0,
-                    cstr("Motion").as_ptr(),
-                    first_frame,
-                    last_frame,
-                    a_flags,
-                    l_anim_speed_scale,
-                    ctx.world.level.time,
-                    -1.0,
-                    150,
-                ),
+                (*self_).ghoul2,
+                0,
+                "Motion",
+                first_frame,
+                last_frame,
+                a_flags,
+                l_anim_speed_scale,
+                ctx.world.level.time,
+                -1.0,
+                150,
             );
         }
     }
@@ -3411,16 +3389,11 @@ pub fn SetupGameGhoul2Model(
     modelname: *mut c_char,
     skinName: *mut c_char,
 ) {
-    use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs as GG2AddBoltArgs;
-    use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs as GG2SetBoneAnglesArgs;
     use mp_abi::game::syscalls::G_G2_ATTACHINSTANCETOENTNUM::GG2AttachinstancetoentnumArgs as GG2AttachInstanceToEntNumArgs;
     use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
     use mp_abi::game::syscalls::G_G2_COPYSPECIFICGHOUL2MODEL::GG2Copyspecificghoul2ModelArgs as GG2CopySpecificGhoul2ModelArgs;
     use mp_abi::game::syscalls::G_G2_DUPLICATEGHOUL2INSTANCE::GG2Duplicateghoul2InstanceArgs as GG2DuplicateGhoul2InstanceArgs;
-    use mp_abi::game::syscalls::G_G2_GETGLANAME::GG2GetglanameArgs as GG2GetGLANameArgs;
     use mp_abi::game::syscalls::G_G2_HAVEWEGHOULMODELS::GG2HaveweghoulmodelsArgs as GG2Haveweghoul2ModelsArgs;
-    use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs as GG2InitghoulModelArgs;
-    use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs as GG2SetBoneAnimArgs;
     use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltInfoArgs;
     use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 
@@ -3453,27 +3426,21 @@ pub fn SetupGameGhoul2Model(
             write_cstr_field(&mut afilename, "models/players/kyle/model.glm");
             handle = trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                GG2InitghoulModelArgs::new(
-                    &mut ctx.world.globals.precachedKyle as *mut *mut c_void,
-                    cstr(&cstr_to_str(afilename.as_ptr())),
-                    0,
-                    0,
-                    -20,
-                    0,
-                    0,
-                ),
+                &mut ctx.world.globals.precachedKyle as *mut *mut c_void,
+                &cstr_to_str(afilename.as_ptr()),
+                0,
+                0,
+                -20,
+                0,
+                0,
             );
 
             if handle < 0 {
                 return;
             }
 
-            defSkin = trap::R_RegisterSkin(
-                ctx.engine,
-                mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(cstr(
-                    "models/players/kyle/model_default.skin",
-                )),
-            );
+            defSkin =
+                trap::R_RegisterSkin(ctx.engine, "models/players/kyle/model_default.skin");
             trap::G2API_SetSkin(
                 ctx.engine,
                 GG2SetSkinArgs::new(ctx.world.globals.precachedKyle, 0, defSkin, defSkin),
@@ -3526,23 +3493,13 @@ pub fn SetupGameGhoul2Model(
                             cstr_to_str(modelname),
                             cstr_to_str((*(*((*ent).m_pVehicle)).m_pVehicleInfo).skin)
                         );
-                        skinHandle = trap::R_RegisterSkin(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(
-                                cstr(&skin_str),
-                            ),
-                        );
+                        skinHandle = trap::R_RegisterSkin(ctx.engine, &skin_str);
                     } else {
                         let skin_str = format!(
                             "models/players/{}/model_default.skin",
                             cstr_to_str(modelname)
                         );
-                        skinHandle = trap::R_RegisterSkin(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(
-                                cstr(&skin_str),
-                            ),
-                        );
+                        skinHandle = trap::R_RegisterSkin(ctx.engine, &skin_str);
                     }
                 } else {
                     if !skinName.is_null() && *skinName as c_int != 0 {
@@ -3620,12 +3577,7 @@ pub fn SetupGameGhoul2Model(
                         )
                     };
 
-                    skinHandle = trap::R_RegisterSkin(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(cstr(
-                            &useSkinName,
-                        )),
-                    );
+                    skinHandle = trap::R_RegisterSkin(ctx.engine, &useSkinName);
                 }
 
                 write_cstr_field(
@@ -3637,15 +3589,13 @@ pub fn SetupGameGhoul2Model(
                 );
                 handle = trap::G2API_InitGhoul2Model(
                     ctx.engine,
-                    GG2InitghoulModelArgs::new(
-                        &mut (*ent).ghoul2 as *mut *mut c_void,
-                        cstr(&cstr_to_str(modelFullPath.as_ptr())),
-                        0,
-                        skinHandle,
-                        -20,
-                        0,
-                        0,
-                    ),
+                    &mut (*ent).ghoul2 as *mut *mut c_void,
+                    &cstr_to_str(modelFullPath.as_ptr()),
+                    0,
+                    skinHandle,
+                    -20,
+                    0,
+                    0,
                 );
 
                 if handle < 0 {
@@ -3676,10 +3626,8 @@ pub fn SetupGameGhoul2Model(
                     );
 
                     GLAName[0] = 0;
-                    trap::G2API_GetGLAName(
-                        ctx.engine,
-                        GG2GetGLANameArgs::new((*ent).ghoul2, 0, GLAName.as_mut_ptr()),
-                    );
+                    let glaName = trap::G2API_GetGLAName(ctx.engine, (*ent).ghoul2, 0, 260);
+                        write_cstr_field(&mut GLAName, &glaName);
 
                     if GLAName[0] as c_int == 0
                         || crate::q_shared::Q_strstr(
@@ -3776,10 +3724,8 @@ pub fn SetupGameGhoul2Model(
             (*ent).localAnimIndex = -1;
 
             GLAName[0] = 0;
-            trap::G2API_GetGLAName(
-                ctx.engine,
-                GG2GetGLANameArgs::new((*ent).ghoul2, 0, GLAName.as_mut_ptr()),
-            );
+            let glaName = trap::G2API_GetGLAName(ctx.engine, (*ent).ghoul2, 0, 260);
+                write_cstr_field(&mut GLAName, &glaName);
 
             if GLAName[0] as c_int != 0
                 && crate::q_shared::Q_strstr(
@@ -3837,10 +3783,8 @@ pub fn SetupGameGhoul2Model(
             }
         } else {
             GLAName[0] = 0;
-            trap::G2API_GetGLAName(
-                ctx.engine,
-                GG2GetGLANameArgs::new((*ent).ghoul2, 0, GLAName.as_mut_ptr()),
-            );
+            let glaName = trap::G2API_GetGLAName(ctx.engine, (*ent).ghoul2, 0, 260);
+                write_cstr_field(&mut GLAName, &glaName);
 
             if !crate::q_shared::Q_strstr(
                 GLAName.as_ptr(),
@@ -3861,25 +3805,16 @@ pub fn SetupGameGhoul2Model(
             let mut i: c_int = 0;
 
             // Setup the default first bolt
-            i = trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("model_root")),
-            );
+            i = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "model_root");
 
             // Setup the droid unit.
-            (*((*ent).m_pVehicle)).m_iDroidUnitTag = trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*droidunit")),
-            );
+            (*((*ent).m_pVehicle)).m_iDroidUnitTag = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*droidunit");
 
             // Setup the Exhausts.
             i = 0;
             while i < (MAX_VEHICLE_EXHAUSTS) as i32 {
                 write_cstr_field(&mut strTemp, &format!("*exhaust{}", i + 1));
-                (*((*ent).m_pVehicle)).m_iExhaustTag[i as usize] = trap::G2API_AddBolt(
-                    ctx.engine,
-                    GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr(&cstr_to_str(strTemp.as_ptr()))),
-                );
+                (*((*ent).m_pVehicle)).m_iExhaustTag[i as usize] = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, &cstr_to_str(strTemp.as_ptr()));
                 i += 1;
             }
 
@@ -3887,17 +3822,11 @@ pub fn SetupGameGhoul2Model(
             i = 0;
             while i < (MAX_VEHICLE_MUZZLES) as i32 {
                 write_cstr_field(&mut strTemp, &format!("*muzzle{}", i + 1));
-                (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
-                    ctx.engine,
-                    GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr(&cstr_to_str(strTemp.as_ptr()))),
-                );
+                (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, &cstr_to_str(strTemp.as_ptr()));
                 if (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] == -1 {
                     // ergh, try *flash?
                     write_cstr_field(&mut strTemp, &format!("*flash{}", i + 1));
-                    (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
-                        ctx.engine,
-                        GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr(&cstr_to_str(strTemp.as_ptr()))),
-                    );
+                    (*((*ent).m_pVehicle)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, &cstr_to_str(strTemp.as_ptr()));
                 }
                 i += 1;
             }
@@ -3911,13 +3840,11 @@ pub fn SetupGameGhoul2Model(
                 {
                     (*((*ent).m_pVehicle)).m_iGunnerViewTag[i as usize] = trap::G2API_AddBolt(
                         ctx.engine,
-                        GG2AddBoltArgs::new(
-                            (*ent).ghoul2,
-                            0,
-                            cstr(&cstr_to_str(
-                                (*(*((*ent).m_pVehicle)).m_pVehicleInfo).turret[i as usize]
-                                    .gunnerViewTag,
-                            )),
+                        (*ent).ghoul2,
+                        0,
+                        &cstr_to_str(
+                            (*(*((*ent).m_pVehicle)).m_pVehicleInfo).turret[i as usize]
+                                .gunnerViewTag,
                         ),
                     );
                 } else {
@@ -3931,92 +3858,69 @@ pub fn SetupGameGhoul2Model(
             && ((*((*ent).client)).ps.weapon == WP_SABER || (*ent).s.number < (MAX_CLIENTS) as i32)
         {
             // a player or NPC saber user
-            trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*r_hand")),
-            );
-            trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*l_hand")),
-            );
+            trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*r_hand");
+            trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*l_hand");
 
             // rhand must always be first bolt. lhand always second. Whichever you want the
             // jetpack bolted to must always be third.
-            trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*chestg")),
-            );
+            trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*chestg");
 
             // claw bolts
-            trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*r_hand_cap_r_arm")),
-            );
-            trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*l_hand_cap_l_arm")),
-            );
+            trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*r_hand_cap_r_arm");
+            trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*l_hand_cap_l_arm");
 
             trap::G2API_SetBoneAnim(
                 ctx.engine,
-                GG2SetBoneAnimArgs::new(
-                    (*ent).ghoul2,
-                    0,
-                    cstr("model_root").as_ptr(),
-                    0,
-                    12,
-                    BONE_ANIM_OVERRIDE_LOOP,
-                    1.0f32,
-                    ctx.world.level.time,
-                    -1.0,
-                    -1,
-                ),
+                (*ent).ghoul2,
+                0,
+                "model_root",
+                0,
+                12,
+                BONE_ANIM_OVERRIDE_LOOP,
+                1.0f32,
+                ctx.world.level.time,
+                -1.0,
+                -1,
             );
             trap::G2API_SetBoneAngles(
                 ctx.engine,
-                GG2SetBoneAnglesArgs::new(
-                    (*ent).ghoul2,
-                    0,
-                    cstr("upper_lumbar"),
-                    &tempVec as *const vec3_t,
-                    BONE_ANGLES_POSTMULT,
-                    POSITIVE_X as c_int,
-                    NEGATIVE_Y as c_int,
-                    NEGATIVE_Z as c_int,
-                    core::ptr::null_mut(),
-                    0,
-                    ctx.world.level.time,
-                ),
+                (*ent).ghoul2,
+                0,
+                "upper_lumbar",
+                &tempVec as *const vec3_t,
+                BONE_ANGLES_POSTMULT,
+                POSITIVE_X as c_int,
+                NEGATIVE_Y as c_int,
+                NEGATIVE_Z as c_int,
+                core::ptr::null_mut(),
+                0,
+                ctx.world.level.time,
             );
             trap::G2API_SetBoneAngles(
                 ctx.engine,
-                GG2SetBoneAnglesArgs::new(
-                    (*ent).ghoul2,
-                    0,
-                    cstr("cranium"),
-                    &tempVec as *const vec3_t,
-                    BONE_ANGLES_POSTMULT,
-                    POSITIVE_Z as c_int,
-                    NEGATIVE_Y as c_int,
-                    POSITIVE_X as c_int,
-                    core::ptr::null_mut(),
-                    0,
-                    ctx.world.level.time,
-                ),
+                (*ent).ghoul2,
+                0,
+                "cranium",
+                &tempVec as *const vec3_t,
+                BONE_ANGLES_POSTMULT,
+                POSITIVE_Z as c_int,
+                NEGATIVE_Y as c_int,
+                POSITIVE_X as c_int,
+                core::ptr::null_mut(),
+                0,
+                ctx.world.level.time,
             );
 
             if ctx.world.globals.g2SaberInstance.is_null() {
                 trap::G2API_InitGhoul2Model(
                     ctx.engine,
-                    GG2InitghoulModelArgs::new(
-                        &mut ctx.world.globals.g2SaberInstance as *mut *mut c_void,
-                        cstr("models/weapons2/saber/saber_w.glm"),
-                        0,
-                        0,
-                        -20,
-                        0,
-                        0,
-                    ),
+                    &mut ctx.world.globals.g2SaberInstance as *mut *mut c_void,
+                    "models/weapons2/saber/saber_w.glm",
+                    0,
+                    0,
+                    -20,
+                    0,
+                    0,
                 );
 
                 if !ctx.world.globals.g2SaberInstance.is_null() {
@@ -4027,10 +3931,7 @@ pub fn SetupGameGhoul2Model(
                         GG2SetBoltInfoArgs::new(ctx.world.globals.g2SaberInstance, 0, 0),
                     );
                     // now set up the gun bolt on it
-                    trap::G2API_AddBolt(
-                        ctx.engine,
-                        GG2AddBoltArgs::new(ctx.world.globals.g2SaberInstance, 0, cstr("*blade1")),
-                    );
+                    trap::G2API_AddBolt(ctx.engine, ctx.world.globals.g2SaberInstance, 0, "*blade1");
                 }
             }
 
@@ -4051,10 +3952,7 @@ pub fn SetupGameGhoul2Model(
 
         if (*ent).s.number >= (MAX_CLIENTS) as i32 {
             // some extra NPC stuff
-            if trap::G2API_AddBolt(
-                ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("lower_lumbar")),
-            ) == -1
+            if trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "lower_lumbar") == -1
             {
                 // check now to see if we have this bone for setting anims and such
                 (*ent).noLumbar = qtrue;

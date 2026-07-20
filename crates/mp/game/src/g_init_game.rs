@@ -36,7 +36,6 @@ use mp_abi::game::vmcalls::GAME_INIT::GameInitArgs;
 use mp_abi::game::syscalls::G_G2_CLEANENTATTACHMENTS::GG2CleanentattachmentsArgs;
 use mp_abi::game::syscalls::G_ICARUS_INIT::GIcarusInitArgs;
 use mp_abi::game::syscalls::G_LOCATE_GAME_DATA::GLocateGameDataArgs;
-use mp_abi::game::syscalls::G_NAV_LOAD::GNavLoadArgs;
 use mp_abi::game::syscalls::G_NAV_SETPATHSCALCULATED::GNavSetpathscalculatedArgs;
 use mp_abi::game::syscalls::G_SET_SHARED_BUFFER::GSetSharedBufferArgs;
 
@@ -251,10 +250,9 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             CVAR_ROM,
         );
 
-        let mapname_cstr = cstr_from_chars(&mapname.string).to_owned();
-        let nav_loaded =
-            trap::Nav_Load(ctx.engine, GNavLoadArgs::new(mapname_cstr, ck_sum.integer));
-        ctx.world.globals.navCalculatePaths = if nav_loaded == qfalse { qtrue } else { qfalse };
+        let mapname_str = unsafe { cstr_to_str(mapname.string.as_ptr()) };
+        let nav_loaded = trap::Nav_Load(ctx.engine, &mapname_str, ck_sum.integer);
+        ctx.world.globals.navCalculatePaths = if !nav_loaded { qtrue } else { qfalse };
 
         // parse the key/value pairs and spawn gentities
         G_SpawnEntitiesFromString(ctx, qfalse);

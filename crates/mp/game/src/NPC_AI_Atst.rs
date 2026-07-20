@@ -220,22 +220,8 @@ pub fn ATST_Attack(ctx: &mut GameContext) {
             // rwwFIXMEFIXME: make atst weaps work.
 
             // See if the side weapons are there
-            blaster_test = trap::G2API_GetSurfaceRenderStatus(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                    ctx.entity(npc_id).ghoul2,
-                    0,
-                    cstr("head_light_blaster_cann"),
-                ),
-            );
-            charger_test = trap::G2API_GetSurfaceRenderStatus(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                    ctx.entity(npc_id).ghoul2,
-                    0,
-                    cstr("head_concussion_charger"),
-                ),
-            );
+            blaster_test = trap::G2API_GetSurfaceRenderStatus(ctx.engine, ctx.entity(npc_id).ghoul2, 0, "head_light_blaster_cann");
+            charger_test = trap::G2API_GetSurfaceRenderStatus(ctx.engine, ctx.entity(npc_id).ghoul2, 0, "head_concussion_charger");
 
             // It has both side weapons
             if blaster_test != -1

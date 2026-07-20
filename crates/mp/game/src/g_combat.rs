@@ -2934,14 +2934,7 @@ pub fn player_die(
             }
             // droids throw heads if they haven't yet
             if (*cl).NPC_class == class_t::CLASS_R2D2 {
-                if trap::G2API_GetSurfaceRenderStatus(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                        (*self_).ghoul2,
-                        0,
-                        c"head".to_owned(),
-                    ),
-                ) == 0
+                if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, "head") == 0
                 {
                     let mut up: vec3_t = [0.0; 3];
                     AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
@@ -2952,14 +2945,7 @@ pub fn player_die(
                     );
                 }
             } else if (*cl).NPC_class == class_t::CLASS_R5D2 {
-                if trap::G2API_GetSurfaceRenderStatus(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                        (*self_).ghoul2,
-                        0,
-                        c"head".to_owned(),
-                    ),
-                ) == 0
+                if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, "head") == 0
                 {
                     let mut up: vec3_t = [0.0; 3];
                     AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
@@ -3514,12 +3500,7 @@ pub fn G_GetDismemberBolt(
     };
 
     let ghoul2 = ctx.entity(self_).ghoul2;
-    useBolt = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, unsafe {
-            core::ffi::CStr::from_ptr(rotateBone).to_owned()
-        }),
-    );
+    useBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &unsafe { cstr_to_str(rotateBone) });
 
     unsafe {
         _VectorCopy((*client).ps.origin, &mut properOrigin);
@@ -3748,11 +3729,9 @@ pub fn G_Dismember(
         if !ghoul2.is_null()
             && trap::G2API_GetSurfaceRenderStatus(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                    ghoul2,
-                    0,
-                    core::ffi::CStr::from_ptr(limbName.as_ptr()).to_owned(),
-                ),
+                ghoul2,
+                0,
+                &cstr_to_str(limbName.as_ptr()),
             ) != 0
         {
             // is it already off? If so there's no reason to be doing it again.
@@ -3888,20 +3867,11 @@ pub fn G_Dismember(
             // if it's an npc remove these surfs on the server too.
             trap::G2API_SetSurfaceOnOff(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs::new(
-                    ghoul2,
-                    limbName.as_ptr(),
-                    0x00000100,
-                ),
+                ghoul2,
+                &cstr_to_str(limbName.as_ptr()),
+                0x00000100,
             );
-            trap::G2API_SetSurfaceOnOff(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs::new(
-                    ghoul2,
-                    stubCapName.as_ptr(),
-                    0,
-                ),
-            );
+            trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, &cstr_to_str(stubCapName.as_ptr()), 0);
         }
 
         let customRGBA = ctx.entity(ent).s.customRGBA;
@@ -4099,54 +4069,12 @@ pub fn G_GetHitLocFromSurfName(
 
         if ctx.entity(ent).localAnimIndex <= 1 {
             // humanoid
-            handLBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    0,
-                    c"*l_hand".to_owned(),
-                ),
-            );
-            handRBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    0,
-                    c"*r_hand".to_owned(),
-                ),
-            );
-            kneeLBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    0,
-                    c"*hips_l_knee".to_owned(),
-                ),
-            );
-            kneeRBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    0,
-                    c"*hips_r_knee".to_owned(),
-                ),
-            );
-            footLBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    0,
-                    c"*l_leg_foot".to_owned(),
-                ),
-            );
-            footRBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    0,
-                    c"*r_leg_foot".to_owned(),
-                ),
-            );
+            handLBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*l_hand");
+            handRBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*r_hand");
+            kneeLBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*hips_l_knee");
+            kneeRBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*hips_r_knee");
+            footLBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*l_leg_foot");
+            footRBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*r_leg_foot");
         }
 
         let stricmp = |lit: &CStr| crate::q_shared::Q_stricmp(lit.as_ptr(), surfName) == 0;
@@ -4489,11 +4417,9 @@ pub fn G_GetHitLocFromSurfName(
                     if !tagName.is_null() {
                         let tagBolt = trap::G2API_AddBolt(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ctx.entity(ent).ghoul2,
-                                0,
-                                core::ffi::CStr::from_ptr(tagName).to_owned(),
-                            ),
+                            ctx.entity(ent).ghoul2,
+                            0,
+                            &cstr_to_str(tagName),
                         );
                         if tagBolt != -1 {
                             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -4611,15 +4537,14 @@ pub fn G_CheckForDismemberment(
             {
                 let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-                trap::G2API_GetSurfaceName(
+                let hitSurfaceName = trap::G2API_GetSurfaceName(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_GETSURFACENAME::GG2GetsurfacenameArgs::new(
-                        ctx.entity(ent).ghoul2,
-                        (*client).g2LastSurfaceHit,
-                        0,
-                        hitSurface.as_mut_ptr(),
-                    ),
+                    ctx.entity(ent).ghoul2,
+                    (*client).g2LastSurfaceHit,
+                    0,
+                    MAX_QPATH as usize,
                 );
+                write_cstr_field(&mut hitSurface, &hitSurfaceName);
 
                 if hitSurface[0] != 0 {
                     G_GetHitLocFromSurfName(
@@ -4729,15 +4654,14 @@ pub fn G_LocationBasedDamageModifier(
         {
             let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-            trap::G2API_GetSurfaceName(
+            let hitSurfaceName = trap::G2API_GetSurfaceName(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_GETSURFACENAME::GG2GetsurfacenameArgs::new(
-                    ctx.entity(ent).ghoul2,
-                    (*client).g2LastSurfaceHit,
-                    0,
-                    hitSurface.as_mut_ptr(),
-                ),
+                ctx.entity(ent).ghoul2,
+                (*client).g2LastSurfaceHit,
+                0,
+                MAX_QPATH as usize,
             );
+            write_cstr_field(&mut hitSurface, &hitSurfaceName);
 
             if hitSurface[0] != 0 {
                 G_GetHitLocFromSurfName(
@@ -5415,15 +5339,14 @@ pub fn G_Damage(
                     {
                         let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-                        trap::G2API_GetSurfaceName(
+                        let hitSurfaceName = trap::G2API_GetSurfaceName(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACENAME::GG2GetsurfacenameArgs::new(
-                                (*targ).ghoul2,
-                                (*tc).g2LastSurfaceHit,
-                                0,
-                                hitSurface.as_mut_ptr(),
-                            ),
+                            (*targ).ghoul2,
+                            (*tc).g2LastSurfaceHit,
+                            0,
+                            MAX_QPATH as usize,
                         );
+                        write_cstr_field(&mut hitSurface, &hitSurfaceName);
 
                         if hitSurface[0] != 0 {
                             surface =
@@ -5831,15 +5754,14 @@ pub fn G_Damage(
                 let tc = (*targ).client;
                 let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-                trap::G2API_GetSurfaceName(
+                let hitSurfaceName = trap::G2API_GetSurfaceName(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_GETSURFACENAME::GG2GetsurfacenameArgs::new(
-                        (*targ).ghoul2,
-                        (*tc).g2LastSurfaceHit,
-                        0,
-                        hitSurface.as_mut_ptr(),
-                    ),
+                    (*targ).ghoul2,
+                    (*tc).g2LastSurfaceHit,
+                    0,
+                    MAX_QPATH as usize,
                 );
+                write_cstr_field(&mut hitSurface, &hitSurfaceName);
 
                 if hitSurface[0] != 0 {
                     let targ_eid = ctx.entity_id_of(targ).unwrap();

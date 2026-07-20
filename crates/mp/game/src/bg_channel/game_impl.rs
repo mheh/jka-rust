@@ -103,13 +103,9 @@ impl BgTraps for GameBgTraps<'_> {
     }
 
     fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
-        // Mechanical delegation, matching `g2api_add_bolt`'s
-        // CString-conversion shape. Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
-        let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_owned();
-        crate::trap::R_RegisterSkin(
-            self.engine,
-            mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(name),
-        )
+        // Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
+        let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_string_lossy();
+        crate::trap::R_RegisterSkin(self.engine, &name)
     }
 
     fn g2api_init_ghoul2_model(
@@ -124,18 +120,16 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> c_int {
         // Mechanical delegation. Raven: `trap_G2API_InitGhoul2Model`
         // (`G_G2_INITGHOUL2MODEL`).
-        let file_name = unsafe { std::ffi::CStr::from_ptr(fileName) }.to_owned();
+        let file_name = unsafe { std::ffi::CStr::from_ptr(fileName) }.to_string_lossy();
         crate::trap::G2API_InitGhoul2Model(
             self.engine,
-            mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
-                ghoul2Ptr,
-                file_name,
-                modelIndex,
-                customSkin,
-                customShader,
-                modelFlags,
-                lodBias,
-            ),
+            ghoul2Ptr,
+            &file_name,
+            modelIndex,
+            customSkin,
+            customShader,
+            modelFlags,
+            lodBias,
         )
     }
     fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void) {
@@ -155,13 +149,8 @@ impl BgTraps for GameBgTraps<'_> {
         // Real delegation to the already-wired `trap_G2API_AddBolt` seam
         // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)
         // only carry `&dyn BgTraps`, not `&Engine`.
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
-        crate::trap::G2API_AddBolt(
-            self.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2, modelIndex, bone_name,
-            ),
-        )
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
+        crate::trap::G2API_AddBolt(self.engine, ghoul2, modelIndex, &bone_name)
     }
     fn g2api_get_bolt_matrix(
         &self,
@@ -251,24 +240,21 @@ impl BgTraps for GameBgTraps<'_> {
         currentTime: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneAngles` (`G_G2_ANGLEOVERRIDE`).
-        use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
-        crate::trap::G2API_SetBoneAngles(
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
+        (crate::trap::G2API_SetBoneAngles(
             self.engine,
-            GG2AngleoverrideArgs::new(
-                ghoul2,
-                modelIndex,
-                bone_name,
-                angles,
-                flags,
-                up,
-                right,
-                forward,
-                modelList,
-                blendTime,
-                currentTime,
-            ),
-        )
+            ghoul2,
+            modelIndex,
+            &bone_name,
+            angles,
+            flags,
+            up,
+            right,
+            forward,
+            modelList,
+            blendTime,
+            currentTime,
+        )) as qboolean
     }
     fn g2api_set_bone_anim(
         &self,
@@ -284,22 +270,20 @@ impl BgTraps for GameBgTraps<'_> {
         blendTime: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneAnim` (`G_G2_PLAYANIM`).
-        use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs;
-        crate::trap::G2API_SetBoneAnim(
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
+        (crate::trap::G2API_SetBoneAnim(
             self.engine,
-            GG2PlayanimArgs::new(
-                ghoul2,
-                modelIndex,
-                boneName,
-                startFrame,
-                endFrame,
-                flags,
-                animSpeed,
-                currentTime,
-                setFrame,
-                blendTime,
-            ),
-        )
+            ghoul2,
+            modelIndex,
+            &bone_name,
+            startFrame,
+            endFrame,
+            flags,
+            animSpeed,
+            currentTime,
+            setFrame,
+            blendTime,
+        )) as qboolean
     }
     fn g2api_get_bone_anim(
         &self,
@@ -315,23 +299,20 @@ impl BgTraps for GameBgTraps<'_> {
         modelIndex: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_GetBoneAnim` (`G_G2_GETBONEANIM`).
-        use mp_abi::game::syscalls::G_G2_GETBONEANIM::GG2GetboneanimArgs;
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
-        crate::trap::G2API_GetBoneAnim(
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
+        (crate::trap::G2API_GetBoneAnim(
             self.engine,
-            GG2GetboneanimArgs::new(
-                ghoul2,
-                bone_name,
-                currentTime,
-                currentFrame,
-                startFrame,
-                endFrame,
-                flags,
-                animSpeed,
-                modelList,
-                modelIndex,
-            ),
-        )
+            ghoul2,
+            &bone_name,
+            currentTime,
+            currentFrame,
+            startFrame,
+            endFrame,
+            flags,
+            animSpeed,
+            modelList,
+            modelIndex,
+        )) as qboolean
     }
     fn g2api_set_rag_doll(&self, ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
         // Raven: `trap_G2API_SetRagDoll` (`G_G2_SETRAGDOLL`).
@@ -360,12 +341,9 @@ impl BgTraps for GameBgTraps<'_> {
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneIKState` (`G_G2_SETBONEIKSTATE`).
-        use mp_abi::game::syscalls::G_G2_SETBONEIKSTATE::GG2SetboneikstateArgs;
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
-        crate::trap::G2API_SetBoneIKState(
-            self.engine,
-            GG2SetboneikstateArgs::new(ghoul2, time, bone_name, ikState, params),
-        )
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
+        (crate::trap::G2API_SetBoneIKState(self.engine, ghoul2, time, &bone_name, ikState, params))
+            as qboolean
     }
     fn g2api_ik_move(
         &self,
@@ -383,14 +361,10 @@ impl BgTraps for GameBgTraps<'_> {
         modelIndex: c_int,
         surfaceName: *const c_char,
     ) -> c_int {
-        use mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs;
-        // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus` (G_G2_GETSURFACERENDERSTATUS);
-        // args ABI wants an owned `CString`, so the borrowed C string is copied.
-        let surface_name = unsafe { core::ffi::CStr::from_ptr(surfaceName) }.to_owned();
-        crate::trap::G2API_GetSurfaceRenderStatus(
-            self.engine,
-            GG2GetsurfacerenderstatusArgs::new(ghoul2, modelIndex, surface_name),
-        )
+        // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus`
+        // (G_G2_GETSURFACERENDERSTATUS).
+        let surface_name = unsafe { core::ffi::CStr::from_ptr(surfaceName) }.to_string_lossy();
+        crate::trap::G2API_GetSurfaceRenderStatus(self.engine, ghoul2, modelIndex, &surface_name)
     }
 
     fn fx_play_effect_id(

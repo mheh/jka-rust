@@ -251,159 +251,54 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
                 match ctx.world.bg_state.rng.Q_irand(1, 14) {
                     // Find place to generate explosion
                     1 => {
-                        if trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("r_hand").unwrap(),
-                            ),
-                        ) == 0
+                        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "r_hand") == 0
                         {
                             // r_hand still there
-                            let newBolt = trap::G2API_AddBolt(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                    ghoul2,
-                                    0,
-                                    std::ffi::CString::new("*flasha").unwrap(),
-                                ),
-                            );
+                            let newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flasha");
                             GM_CreateExplosion(ctx, self_, newBolt, 1);
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"r_hand".as_ptr(), TURN_OFF);
-                        } else if trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("r_arm_middle").unwrap(),
-                            ),
-                        ) == 0
+                        } else if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "r_arm_middle") == 0
                         {
                             // r_arm_middle still there
-                            newBolt = trap::G2API_AddBolt(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                    ghoul2,
-                                    0,
-                                    std::ffi::CString::new("*r_arm_elbow").unwrap(),
-                                ),
-                            );
+                            newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*r_arm_elbow");
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"r_arm_middle".as_ptr(), TURN_OFF);
                         }
                     }
                     2 => {
                         // FIXME: do only once?
-                        if trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("l_hand").unwrap(),
-                            ),
-                        ) == 0
+                        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_hand") == 0
                         {
                             // l_hand still there
-                            let newBolt = trap::G2API_AddBolt(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                    ghoul2,
-                                    0,
-                                    std::ffi::CString::new("*flashc").unwrap(),
-                                ),
-                            );
+                            let newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flashc");
                             GM_CreateExplosion(ctx, self_, newBolt, 0);
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_hand".as_ptr(), TURN_OFF);
-                        } else if trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("l_arm_wrist").unwrap(),
-                            ),
-                        ) == 0
+                        } else if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_arm_wrist") == 0
                         {
                             // l_arm_wrist still there
-                            newBolt = trap::G2API_AddBolt(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                    ghoul2,
-                                    0,
-                                    std::ffi::CString::new("*l_arm_cap_l_hand").unwrap(),
-                                ),
-                            );
+                            newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_arm_cap_l_hand");
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm_wrist".as_ptr(), TURN_OFF);
-                        } else if trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("l_arm_middle").unwrap(),
-                            ),
-                        ) == 0
+                        } else if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_arm_middle") == 0
                         {
                             // l_arm_middle still there
-                            newBolt = trap::G2API_AddBolt(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                    ghoul2,
-                                    0,
-                                    std::ffi::CString::new("*l_arm_cap_l_hand").unwrap(),
-                                ),
-                            );
+                            newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_arm_cap_l_hand");
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm_middle".as_ptr(), TURN_OFF);
-                        } else if trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("l_arm_augment").unwrap(),
-                            ),
-                        ) == 0
+                        } else if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_arm_augment") == 0
                         {
                             // l_arm_augment still there
-                            newBolt = trap::G2API_AddBolt(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                    ghoul2,
-                                    0,
-                                    std::ffi::CString::new("*l_arm_elbow").unwrap(),
-                                ),
-                            );
+                            newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_arm_elbow");
                             crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm_augment".as_ptr(), TURN_OFF);
                         }
                     }
                     3 | 4 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*hip_fr").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*hip_fr");
                         GM_CreateExplosion(ctx, self_, newBolt, 0);
                     }
                     5 | 6 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*shldr_l").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*shldr_l");
                         GM_CreateExplosion(ctx, self_, newBolt, 0);
                     }
                     7 | 8 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*uchest_r").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*uchest_r");
                         GM_CreateExplosion(ctx, self_, newBolt, 0);
                     }
                     9 | 10 => {
@@ -411,47 +306,19 @@ pub fn GM_Dying(ctx: &mut GameContext, self_: EntityId) {
                         GM_CreateExplosion(ctx, self_, head_bolt, 0);
                     }
                     11 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*l_leg_knee").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_leg_knee");
                         GM_CreateExplosion(ctx, self_, newBolt, 1);
                     }
                     12 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*r_leg_knee").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*r_leg_knee");
                         GM_CreateExplosion(ctx, self_, newBolt, 1);
                     }
                     13 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*l_leg_foot").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_leg_foot");
                         GM_CreateExplosion(ctx, self_, newBolt, 1);
                     }
                     14 => {
-                        newBolt = trap::G2API_AddBolt(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                                ghoul2,
-                                0,
-                                std::ffi::CString::new("*r_leg_foot").unwrap(),
-                            ),
-                        );
+                        newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*r_leg_foot");
                         GM_CreateExplosion(ctx, self_, newBolt, 1);
                     }
                     _ => {}

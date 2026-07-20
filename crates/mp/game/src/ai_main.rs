@@ -103,10 +103,7 @@ use mp_abi::game::syscalls::BOTLIB_EA_MOVE_FORWARD::BotlibEaMoveForwardArgs;
 use mp_abi::game::syscalls::BOTLIB_EA_MOVE_LEFT::BotlibEaMoveLeftArgs;
 use mp_abi::game::syscalls::BOTLIB_EA_MOVE_RIGHT::BotlibEaMoveRightArgs;
 use mp_abi::game::syscalls::BOTLIB_EA_RESET_INPUT::BotlibEaResetInputArgs;
-use mp_abi::game::syscalls::BOTLIB_EA_SAY::BotlibEaSayArgs;
-use mp_abi::game::syscalls::BOTLIB_EA_SAY_TEAM::BotlibEaSayTeamArgs;
 use mp_abi::game::syscalls::BOTLIB_EA_USE::BotlibEaUseArgs;
-use mp_abi::game::syscalls::BOTLIB_GET_CONSOLE_MESSAGE::BotlibGetConsoleMessageArgs;
 use mp_abi::game::syscalls::BOTLIB_SETUP::BotlibSetupArgs;
 use mp_abi::game::syscalls::BOTLIB_SHUTDOWN::BotlibShutdownArgs;
 use mp_abi::game::syscalls::BOTLIB_USER_COMMAND::BotlibUserCommandArgs;
@@ -180,13 +177,13 @@ pub fn BotReportStatus(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let gt = ctx.world.cvars.g_gametype.integer;
         if gt == GT_TEAM {
             let s = cstr_to_str(teamplayStateDescriptions[(*bs).teamplayState as usize].as_ptr());
-            trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
+            trap::EA_SayTeam(ctx.engine, (*bs).client, &s);
         } else if gt == GT_SIEGE {
             let s = cstr_to_str(siegeStateDescriptions[(*bs).siegeState as usize].as_ptr());
-            trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
+            trap::EA_SayTeam(ctx.engine, (*bs).client, &s);
         } else if gt == GT_CTF || gt == GT_CTY {
             let s = cstr_to_str(ctfStateDescriptions[(*bs).ctfState as usize].as_ptr());
-            trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
+            trap::EA_SayTeam(ctx.engine, (*bs).client, &s);
         }
     }
 }
@@ -766,30 +763,13 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
         BotAI_GetClientState(ctx, client, &mut (*bs).cur_ps);
 
         // retrieve any waiting server commands
-        let mut buf: [c_char; 1024] = [0; 1024];
-        while trap::BotGetServerCommand(
-            ctx.engine,
-            BotlibGetConsoleMessageArgs::new(client, buf.as_mut_ptr(), 1024),
-        ) != 0
-        {
+        while let Some(msg) = trap::BotGetServerCommand(ctx.engine, client, 1024) {
             // have buf point to the command and args to the command arguments
-            let sp = b' ' as c_char;
-            let mut k = 0usize;
-            let mut args_ptr: *mut c_char = core::ptr::null_mut();
-            while buf[k] != 0 {
-                if buf[k] == sp {
-                    args_ptr = buf.as_mut_ptr().add(k);
-                    break;
-                }
-                k += 1;
+            if let Some(pos) = msg.find(' ') {
+                let args = cstr(&msg[pos + 1..]);
+                // remove color escape sequences from the arguments
+                RemoveColorEscapeSequences(args.as_ptr() as *mut c_char);
             }
-            if args_ptr.is_null() {
-                continue;
-            }
-            *args_ptr = 0;
-            let args = args_ptr.add(1);
-            // remove color escape sequences from the arguments
-            RemoveColorEscapeSequences(args);
             // Raven's Q_stricmp dispatch over "cp "/"cs"/"scores"/"clientLevelShot"
             // has empty bodies in MP — no observable effect, dropped.
         }
@@ -7662,14 +7642,11 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
         } else if (*bs).doChat != 0 && (*bs).chatTime <= lt as f32 {
             if (*bs).chatTeam != 0 {
                 let chat = cstr_to_str((*bs).currentChat.as_ptr() as *const c_char);
-                trap::EA_SayTeam(
-                    ctx.engine,
-                    BotlibEaSayTeamArgs::new((*bs).client, cstr(&chat)),
-                );
+                trap::EA_SayTeam(ctx.engine, (*bs).client, &chat);
                 (*bs).chatTeam = 0;
             } else {
                 let chat = cstr_to_str((*bs).currentChat.as_ptr() as *const c_char);
-                trap::EA_Say(ctx.engine, BotlibEaSayArgs::new((*bs).client, cstr(&chat)));
+                trap::EA_Say(ctx.engine, (*bs).client, &chat);
             }
             if (*bs).doChat == 2 {
                 BotReplyGreetings(ctx, bs);

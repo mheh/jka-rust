@@ -175,10 +175,7 @@ pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
 
     let damage = 50;
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-    let bolt = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash5".to_owned()),
-    );
+    let bolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash5");
 
     let current_angles = ctx.world.entity(npc_id).r.currentAngles;
     let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
@@ -260,10 +257,7 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
     let mut muzzle_dir: vec3_t = [0.0; 3];
 
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-    let bolt = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash1".to_owned()),
-    );
+    let bolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash1");
 
     let current_angles = ctx.world.entity(npc_id).r.currentAngles;
     let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
@@ -376,26 +370,12 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
             if num == 1 {
                 let random_num = ctx.world.bg_state.rng.Q_irand(8, 10);
                 let ghoul2 = ctx.world.entity(self_id).ghoul2;
-                let newBolt = trap::G2API_AddBolt(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                        ghoul2,
-                        0,
-                        std::ffi::CString::new(format!("*flash{}", random_num)).unwrap(),
-                    ),
-                );
+                let newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &format!("*flash{}", random_num));
                 NPC_Mark1_Part_Explode(ctx, self_id, newBolt);
             } else {
                 let random_num = ctx.world.bg_state.rng.Q_irand(1, 6);
                 let ghoul2 = ctx.world.entity(self_id).ghoul2;
-                let newBolt = trap::G2API_AddBolt(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                        ghoul2,
-                        0,
-                        std::ffi::CString::new(format!("*torso_tube{}", random_num)).unwrap(),
-                    ),
-                );
+                let newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &format!("*torso_tube{}", random_num));
                 NPC_Mark1_Part_Explode(ctx, self_id, newBolt);
                 crate::NPC_utils::NPC_SetSurfaceOnOff(
                     ctx,
@@ -414,14 +394,7 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
         // See which weapons are there
         // Randomly fire blaster
         let ghoul2 = ctx.world.entity(self_id).ghoul2;
-        if trap::G2API_GetSurfaceRenderStatus(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                ghoul2,
-                0,
-                c"l_arm".to_owned(),
-            ),
-        ) == 0
+        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_arm") == 0
         {
             if ctx.world.bg_state.rng.Q_irand(1, 5) == 1 {
                 crate::npc_c::SaveNPCGlobals(ctx);
@@ -433,14 +406,7 @@ pub fn Mark1_dying(ctx: &mut GameContext, self_: Option<EntityId>) {
 
         // Randomly fire rocket
         let ghoul2 = ctx.world.entity(self_id).ghoul2;
-        if trap::G2API_GetSurfaceRenderStatus(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                ghoul2,
-                0,
-                c"r_arm".to_owned(),
-            ),
-        ) == 0
+        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "r_arm") == 0
         {
             if ctx.world.bg_state.rng.Q_irand(1, 10) == 1 {
                 crate::npc_c::SaveNPCGlobals(ctx);
@@ -498,14 +464,7 @@ pub fn NPC_Mark1_Pain(
     {
         if ctx.world.entity(self_id).locationDamage[hitLoc as usize] >= LEFT_ARM_HEALTH {
             let ghoul2 = ctx.world.entity(self_id).ghoul2;
-            let newBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    c"*flash3".to_owned(),
-                ),
-            );
+            let newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash3");
             if newBolt != -1 {
                 NPC_Mark1_Part_Explode(ctx, self_id, newBolt);
             }
@@ -519,14 +478,7 @@ pub fn NPC_Mark1_Pain(
     {
         if ctx.world.entity(self_id).locationDamage[hitLoc as usize] >= RIGHT_ARM_HEALTH {
             let ghoul2 = ctx.world.entity(self_id).ghoul2;
-            let newBolt = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    c"*flash4".to_owned(),
-                ),
-            );
+            let newBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash4");
             if newBolt != -1 {
                 NPC_Mark1_Part_Explode(ctx, self_id, newBolt);
             }
@@ -543,15 +495,8 @@ pub fn NPC_Mark1_Pain(
             {
                 if ctx.world.entity(self_id).locationDamage[hitLoc as usize] >= AMMO_POD_HEALTH {
                     let ghoul2 = ctx.world.entity(self_id).ghoul2;
-                    let newBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            ghoul2,
-                            0,
-                            std::ffi::CString::new(format!("*torso_tube{}", (i + 1) as c_int))
-                                .unwrap(),
-                        ),
-                    );
+                    let newBolt =
+                        trap::G2API_AddBolt(ctx.engine, ghoul2, 0, &format!("*torso_tube{}", (i + 1) as c_int));
                     if newBolt != -1 {
                         NPC_Mark1_Part_Explode(ctx, self_id, newBolt);
                     }
@@ -576,22 +521,8 @@ pub fn NPC_Mark1_Pain(
 
     // Are both guns shot off?
     let ghoul2 = ctx.world.entity(self_id).ghoul2;
-    if trap::G2API_GetSurfaceRenderStatus(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-            ghoul2,
-            0,
-            c"l_arm".to_owned(),
-        ),
-    ) > 0
-        && trap::G2API_GetSurfaceRenderStatus(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                ghoul2,
-                0,
-                c"r_arm".to_owned(),
-            ),
-        ) > 0
+    if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_arm") > 0
+        && trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "r_arm") > 0
     {
         let health = ctx.world.entity(self_id).health;
         crate::g_combat::G_Damage(
@@ -666,50 +597,22 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
         unsafe {
             (*npc_info).localState = LSTATE_FIRED1;
         }
-        trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*flash1".to_owned(),
-            ),
-        )
+        trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash1")
     } else if localState == LSTATE_FIRED1 {
         unsafe {
             (*npc_info).localState = LSTATE_FIRED2;
         }
-        trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*flash2".to_owned(),
-            ),
-        )
+        trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash2")
     } else if localState == LSTATE_FIRED2 {
         unsafe {
             (*npc_info).localState = LSTATE_FIRED3;
         }
-        trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*flash3".to_owned(),
-            ),
-        )
+        trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash3")
     } else {
         unsafe {
             (*npc_info).localState = LSTATE_FIRED4;
         }
-        trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*flash4".to_owned(),
-            ),
-        )
+        trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash4")
     };
 
     let current_angles = ctx.world.entity(npc_id).r.currentAngles;
@@ -874,10 +777,7 @@ pub fn Mark1_FireRocket(ctx: &mut GameContext) {
 
     let damage = 50;
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-    let bolt = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash5".to_owned()),
-    );
+    let bolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash5");
 
     let current_angles = ctx.world.entity(npc_id).r.currentAngles;
     let current_origin = ctx.world.entity(npc_id).r.currentOrigin;
@@ -1030,22 +930,8 @@ pub fn Mark1_AttackDecision(ctx: &mut GameContext) {
 
     // See if the side weapons are there
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-    let blasterTest = trap::G2API_GetSurfaceRenderStatus(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-            ghoul2,
-            0,
-            c"l_arm".to_owned(),
-        ),
-    );
-    let rocketTest = trap::G2API_GetSurfaceRenderStatus(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-            ghoul2,
-            0,
-            c"r_arm".to_owned(),
-        ),
-    );
+    let blasterTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "l_arm");
+    let rocketTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "r_arm");
 
     let final_distRate =
             // It has both side weapons

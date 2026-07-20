@@ -322,10 +322,7 @@ pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
     let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
 
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-    let gen_bolt_1 = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash".to_owned()),
-    );
+    let gen_bolt_1 = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash");
 
     let current_angles = ctx.world.entity(npc_id).r.currentAngles;
     let current_origin = ctx.world.entity(npc_id).r.currentOrigin;

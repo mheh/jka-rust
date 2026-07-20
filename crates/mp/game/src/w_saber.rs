@@ -1223,14 +1223,7 @@ pub fn G_G2PlayerAngles(
                     && !(*other).client.is_null()
                     && !(*other).ghoul2.is_null()
                 {
-                    lHandBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*other).ghoul2,
-                            0,
-                            cstr("*l_hand"),
-                        ),
-                    );
+                    lHandBolt = trap::G2API_AddBolt(ctx.engine, (*other).ghoul2, 0, "*l_hand");
                 } else {
                     // they left the game, perhaps?
                     (*sc).ps.heldByClient = 0;
@@ -1291,14 +1284,7 @@ pub fn G_G2PlayerAngles(
                     && !(*ent).client.is_null()
                     && !(*ent).ghoul2.is_null()
                 {
-                    lHandBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*ent).ghoul2,
-                            0,
-                            cstr("*l_hand"),
-                        ),
-                    );
+                    lHandBolt = trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*l_hand");
                 } else {
                     // failsafe
                     (*sc).ikStatus = qfalse;
@@ -7970,9 +7956,9 @@ pub fn WP_SaberAddG2Model(
     ctx.world.entity_mut(saberent).s.modelindex = modelindex;
     // FIXME(Raven): use customSkin?
     let model_name = if saberModel.is_null() {
-        std::ffi::CString::default()
+        String::new()
     } else {
-        unsafe { std::ffi::CStr::from_ptr(saberModel).to_owned() }
+        unsafe { cstr_to_str(saberModel) }
     };
     let modelindex = ctx.entity(saberent).s.modelindex;
     // `ghoul2`'s address is handed to the engine seam as a raw pointer; it is
@@ -7980,9 +7966,13 @@ pub fn WP_SaberAddG2Model(
     let ghoul2 = &mut ctx.entity_mut(saberent).ghoul2 as *mut *mut c_void;
     trap::G2API_InitGhoul2Model(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
-            ghoul2, model_name, modelindex, saberSkin, 0, 0, 0,
-        ),
+        ghoul2,
+        &model_name,
+        modelindex,
+        saberSkin,
+        0,
+        0,
+        0,
     );
 }
 
@@ -8859,70 +8849,21 @@ pub fn UpdateClientRenderinfo(
                 (*ri).lastG2 = (*self_).ghoul2;
 
                 if (*self_).localAnimIndex <= 1 {
-                    (*ri).headBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"*head_eyes".to_owned(),
-                        ),
-                    );
-                    (*ri).handRBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"*r_hand".to_owned(),
-                        ),
-                    );
-                    (*ri).handLBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"*l_hand".to_owned(),
-                        ),
-                    );
-                    (*ri).torsoBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"thoracic".to_owned(),
-                        ),
-                    );
-                    (*ri).crotchBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"pelvis".to_owned(),
-                        ),
-                    );
-                    (*ri).footRBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"*r_leg_foot".to_owned(),
-                        ),
-                    );
-                    (*ri).footLBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"*l_leg_foot".to_owned(),
-                        ),
-                    );
-                    (*ri).motionBolt = trap::G2API_AddBolt(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                            (*self_).ghoul2,
-                            0,
-                            c"Motion".to_owned(),
-                        ),
-                    );
+                    (*ri).headBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "*head_eyes");
+                    (*ri).handRBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "*r_hand");
+                    (*ri).handLBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "*l_hand");
+                    (*ri).torsoBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "thoracic");
+                    (*ri).crotchBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "pelvis");
+                    (*ri).footRBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "*r_leg_foot");
+                    (*ri).footLBolt =
+                        trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "*l_leg_foot");
+                    (*ri).motionBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, "Motion");
                 } else {
                     (*ri).headBolt = -1;
                     (*ri).handRBolt = -1;

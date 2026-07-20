@@ -70,7 +70,6 @@ use native_string::atof::atof;
 
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
-use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
@@ -127,8 +126,6 @@ use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED, TEAM_SPECTATOR};
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
 use mp_qshared::shared::{MASK_PLAYERSOLID, MAX_CLIENTS};
 
-use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
-use mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 
 /// Raven `CalcEntitySpot`.
@@ -740,12 +737,8 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
                 cstr_to_str(bs_name)
             )
         };
-        let script_path_c = cstr(&script_path);
         let self_ptr = ctx.world.entity_mut(self_id) as *mut gentity_t;
-        trap::ICARUS_RunScript(
-            ctx.engine,
-            GIcarusRunscriptArgs::new(self_ptr.cast(), script_path_c.as_ptr()),
-        );
+        trap::ICARUS_RunScript(ctx.engine, self_ptr.cast(), &script_path);
     }
     qtrue
 }
@@ -833,24 +826,21 @@ pub fn NPC_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_char
     //first 3 bits is forward, second 3 bits is right, third 3 bits is up
     ctx.world.entity_mut(ent).s.boneOrient = forward | (right << 3) | (up << 6);
 
-    let bone_name = unsafe { std::ffi::CStr::from_ptr(bone as *const c_char).to_owned() };
     let ghoul2 = ctx.world.entity(ent).ghoul2;
     let level_time = ctx.world.level.time;
     trap::G2API_SetBoneAngles(
         ctx.engine,
-        GG2AngleoverrideArgs::new(
-            ghoul2,
-            0,
-            bone_name,
-            &angles as *const vec3_t,
-            flags,
-            up,
-            right,
-            forward,
-            core::ptr::null_mut(),
-            100,
-            level_time,
-        ),
+        ghoul2,
+        0,
+        unsafe { &cstr_to_str(bone as *const c_char) },
+        &angles as *const vec3_t,
+        flags,
+        up,
+        right,
+        forward,
+        core::ptr::null_mut(),
+        100,
+        level_time,
     );
 }
 
@@ -903,10 +893,7 @@ pub fn NPC_SetSurfaceOnOff(
     }
 
     let ghoul2 = ctx.world.entity(ent).ghoul2;
-    trap::G2API_SetSurfaceOnOff(
-        ctx.engine,
-        GG2SetsurfaceonoffArgs::new(ghoul2, surfaceName, surfaceFlags),
-    );
+    trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, unsafe { &cstr_to_str(surfaceName) }, surfaceFlags);
 }
 
 /// Raven `NPC_SomeoneLookingAtMe`.

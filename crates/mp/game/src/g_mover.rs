@@ -47,7 +47,6 @@ use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_abi::game::syscalls::G_ADJUST_AREA_PORTAL_STATE::GAdjustAreaPortalStateArgs;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
-use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 
@@ -1821,13 +1820,7 @@ pub fn SP_func_door(ctx: &mut GameContext, ent: EntityId) {
     // calculate second position
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
     // G_SetMovedir reads angles, writes movedir, then clears angles.
     let mut angles = ctx.entity(ent).s.angles;
     let mut movedir = ctx.entity(ent).movedir;
@@ -2035,13 +2028,7 @@ pub fn SP_func_plat(ctx: &mut GameContext, ent: EntityId) {
     // create second position
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     let mut height = 0.0f32;
     if G_SpawnFloat(
@@ -2129,13 +2116,7 @@ pub fn SP_func_button(ctx: &mut GameContext, ent: EntityId) {
     // calculate second position
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     let mut lip = 0.0f32;
     G_SpawnFloat(ctx, c"lip".as_ptr(), c"4".as_ptr(), &mut lip as *mut f32);
@@ -2381,13 +2362,7 @@ pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
 
     let model = ctx.entity(self_).model;
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            self_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
     InitMover(ctx, self_);
 
     ctx.entity_mut(self_).reached = Some(EntReached::Reached_Train).into();
@@ -2405,13 +2380,7 @@ pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
 pub fn SP_func_static(ctx: &mut GameContext, ent: EntityId) {
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     let origin = ctx.entity(ent).s.origin;
     ctx.entity_mut(ent).pos1 = origin;
@@ -2558,13 +2527,7 @@ pub fn SP_func_rotating(ctx: &mut GameContext, ent: EntityId) {
     } else {
         let model = ctx.entity(ent).model;
         let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                ent_ptr.cast(),
-                unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-            ),
-        );
+        trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
         InitMover(ctx, ent);
 
         let origin = ctx.entity(ent).s.origin;
@@ -2680,13 +2643,7 @@ pub fn SP_func_bobbing(ctx: &mut GameContext, ent: EntityId) {
 
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
     InitMover(ctx, ent);
 
     let origin = ctx.entity(ent).s.origin;
@@ -2739,13 +2696,7 @@ pub fn SP_func_pendulum(ctx: &mut GameContext, ent: EntityId) {
 
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     // find pendulum length
     let mut length = ctx.entity(ent).r.mins[2].abs();
@@ -3223,13 +3174,7 @@ pub fn InitBBrush(ctx: &mut GameContext, ent: EntityId) {
 
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     ctx.entity_mut(ent).die = Some(EntDie::funcBBrushDie).into();
     ctx.entity_mut(ent).flags |= crate::entity::flags::FL_BBRUSH;
@@ -3598,13 +3543,7 @@ pub fn GlassUse(
 pub fn SP_func_glass(ctx: &mut GameContext, ent: EntityId) {
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
     InitMover(ctx, ent);
 
     ctx.entity_mut(ent).r.svFlags = SVF_GLASS_BRUSH;
@@ -3649,13 +3588,7 @@ pub fn func_wait_return_solid(ctx: &mut GameContext, self_: EntityId) {
     if ctx.entity(self_).spawnflags & 16 == 0 || G_TestEntityPosition(ctx, self_).is_null() {
         let model = ctx.entity(self_).model;
         let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(
-                self_ptr.cast(),
-                unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-            ),
-        );
+        trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
         InitMover(ctx, self_);
         let origin = ctx.entity(self_).s.origin;
         ctx.entity_mut(self_).s.pos.trBase = origin;
@@ -3808,13 +3741,7 @@ pub fn func_usable_die(
 pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
     let model = ctx.entity(self_).model;
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            self_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
     InitMover(ctx, self_);
     let origin = ctx.entity(self_).s.origin;
     ctx.entity_mut(self_).s.pos.trBase = origin;
@@ -3922,13 +3849,7 @@ pub fn use_wall(
 pub fn SP_func_wall(ctx: &mut GameContext, ent: EntityId) {
     let model = ctx.entity(ent).model;
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(
-        ctx.engine,
-        GSetBrushModelArgs::new(
-            ent_ptr.cast(),
-            unsafe { std::ffi::CStr::from_ptr(model) }.to_owned(),
-        ),
-    );
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     let origin = ctx.entity(ent).s.origin;
     ctx.entity_mut(ent).pos1 = origin;

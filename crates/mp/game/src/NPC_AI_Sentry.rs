@@ -189,30 +189,9 @@ pub fn Sentry_Fire(ctx: &mut GameContext) {
         let which = (*NPCInfo).burstCount % 3;
         let ghoul2 = ctx.world.entity(npc_id).ghoul2;
         let bolt = match which {
-            0 => crate::trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    cstr("*flash1"),
-                ),
-            ),
-            1 => crate::trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    cstr("*flash2"),
-                ),
-            ),
-            _ => crate::trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    cstr("*flash03"),
-                ),
-            ),
+            0 => crate::trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash1"),
+            1 => crate::trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash2"),
+            _ => crate::trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash03"),
         };
 
         let current_angles = ctx.world.entity(npc_id).r.currentAngles;

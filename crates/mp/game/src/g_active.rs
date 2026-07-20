@@ -3128,22 +3128,10 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                 pm.ghoul2 = core::ptr::null_mut();
             } else {
                 pm.ghoul2 = (*ent).ghoul2;
-                pm.g2Bolts_LFoot = trap::G2API_AddBolt(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                        (*ent).ghoul2,
-                        0,
-                        c"*l_leg_foot".to_owned(),
-                    ),
-                );
-                pm.g2Bolts_RFoot = trap::G2API_AddBolt(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                        (*ent).ghoul2,
-                        0,
-                        c"*r_leg_foot".to_owned(),
-                    ),
-                );
+                pm.g2Bolts_LFoot =
+                    trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*l_leg_foot");
+                pm.g2Bolts_RFoot =
+                    trap::G2API_AddBolt(ctx.engine, (*ent).ghoul2, 0, "*r_leg_foot");
             }
         }
 

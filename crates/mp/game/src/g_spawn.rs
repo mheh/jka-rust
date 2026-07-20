@@ -50,11 +50,8 @@ use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
 use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
 
 // Missing trap Args types - will be resolved by integration
-use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
-use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs;
 use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltInfoArgs;
 use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
-use mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs as GR_RegisterSkinArgs;
 use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
 
 use mp_bg::public::fieldtype::fieldtype_t;
@@ -1198,22 +1195,17 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
 
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                GG2Initghoul2ModelArgs::new(
-                    &mut ctx.world.globals.precachedKyle as *mut *mut c_void,
-                    c"models/players/kyle/model.glm".to_owned(),
-                    0,
-                    0,
-                    -20,
-                    0,
-                    0,
-                ),
+                &mut ctx.world.globals.precachedKyle as *mut *mut c_void,
+                "models/players/kyle/model.glm",
+                0,
+                0,
+                -20,
+                0,
+                0,
             );
 
             if !ctx.world.globals.precachedKyle.is_null() {
-                defSkin = trap::R_RegisterSkin(
-                    ctx.engine,
-                    GR_RegisterSkinArgs::new(c"models/players/kyle/model_default.skin".to_owned()),
-                );
+                defSkin = trap::R_RegisterSkin(ctx.engine, "models/players/kyle/model_default.skin");
                 trap::G2API_SetSkin(
                     ctx.engine,
                     GG2SetSkinArgs::new(ctx.world.globals.precachedKyle, 0, defSkin, defSkin),
@@ -1224,15 +1216,13 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         if ctx.world.globals.g2SaberInstance.is_null() {
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                GG2Initghoul2ModelArgs::new(
-                    &mut ctx.world.globals.g2SaberInstance as *mut *mut c_void,
-                    c"models/weapons2/saber/saber_w.glm".to_owned(),
-                    0,
-                    0,
-                    -20,
-                    0,
-                    0,
-                ),
+                &mut ctx.world.globals.g2SaberInstance as *mut *mut c_void,
+                "models/weapons2/saber/saber_w.glm",
+                0,
+                0,
+                -20,
+                0,
+                0,
             );
 
             if !ctx.world.globals.g2SaberInstance.is_null() {
@@ -1242,14 +1232,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
                     GG2SetBoltInfoArgs::new(ctx.world.globals.g2SaberInstance, 0, 0),
                 );
                 // now set up the gun bolt on it
-                trap::G2API_AddBolt(
-                    ctx.engine,
-                    GG2AddboltArgs::new(
-                        ctx.world.globals.g2SaberInstance,
-                        0,
-                        c"*blade1".to_owned(),
-                    ),
-                );
+                trap::G2API_AddBolt(ctx.engine, ctx.world.globals.g2SaberInstance, 0, "*blade1");
             }
         }
 

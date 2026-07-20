@@ -19,7 +19,6 @@
 
 use crate::prelude::*;
 use native_string::atof::atof_bytes;
-use std::ffi::CString;
 
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
@@ -2736,14 +2735,11 @@ pub fn NAV_CheckCalcPaths(ctx: &mut GameContext) {
 
             if ctx.world.globals.fatalErrors != 0 {
                 Com_Printf("^1Not saving .nav file due to fatal nav errors\n");
-            } else if trap::Nav_Save(
+            } else if !trap::Nav_Save(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_SAVE::GNavSaveArgs::new(
-                    CString::new(cstr_from_chars(&mapname.string).to_bytes()).unwrap(),
-                    ck_sum.integer,
-                ),
-            ) == qfalse
-            {
+                &cstr_to_str(mapname.string.as_ptr()),
+                ck_sum.integer,
+            ) {
                 let name = cstr_to_str(mapname.string.as_ptr());
                 Com_Printf(&format!(
                         "Unable to save navigations data for map \"{}\" (checksum:{})\n",

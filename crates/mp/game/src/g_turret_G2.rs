@@ -152,24 +152,22 @@ pub fn G2Tur_SetBoneAngles(
     // first 3 bits is forward, second 3 bits is right, third 3 bits is up
     ctx.world.entity_mut(ent).s.boneOrient = forward | (right << 3) | (up << 6);
 
-    let boneName = unsafe { core::ffi::CStr::from_ptr(bone as *const c_char).to_owned() };
+    let boneName = unsafe { cstr_to_str(bone as *const c_char) };
     let ghoul2 = ctx.world.entity(ent).ghoul2;
     let level_time = ctx.world.level.time;
     trap::G2API_SetBoneAngles(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs::new(
-            ghoul2,
-            0,
-            boneName,
-            &angles as *const vec3_t,
-            flags,
-            up,
-            right,
-            forward,
-            core::ptr::null_mut(),
-            100,
-            level_time,
-        ),
+        ghoul2,
+        0,
+        &boneName,
+        &angles as *const vec3_t,
+        flags,
+        up,
+        right,
+        forward,
+        core::ptr::null_mut(),
+        100,
+        level_time,
     );
 }
 
@@ -213,15 +211,13 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
             // set the new one
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
-                    &mut ctx.world.entity_mut(self_).ghoul2 as *mut *mut c_void,
-                    NAME.to_owned(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                ),
+                &mut ctx.world.entity_mut(self_).ghoul2 as *mut *mut c_void,
+                NAME.to_str().unwrap(),
+                0,
+                0,
+                0,
+                0,
+                0,
             );
         } else {
             let mi = G_ModelIndex(NAME3.as_ptr());
@@ -229,15 +225,13 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
             // set the new one
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
-                    &mut ctx.world.entity_mut(self_).ghoul2 as *mut *mut c_void,
-                    NAME3.to_owned(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                ),
+                &mut ctx.world.entity_mut(self_).ghoul2 as *mut *mut c_void,
+                NAME3.to_str().unwrap(),
+                0,
+                0,
+                0,
+                0,
+                0,
             );
         }
 
@@ -255,24 +249,10 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
             // different pitch bone and muzzle flash points
             G2Tur_SetBoneAngles(ctx, self_, c"pitch".as_ptr() as *mut c_char, vec3_origin);
             let ghoul2 = ctx.world.entity(self_).ghoul2;
-            let b1 = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    c"*muzzle1".to_owned(),
-                ),
-            );
+            let b1 = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*muzzle1");
             ctx.world.entity_mut(self_).genericValue11 = b1;
             let ghoul2b = ctx.world.entity(self_).ghoul2;
-            let b2 = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2b,
-                    0,
-                    c"*muzzle2".to_owned(),
-                ),
-            );
+            let b2 = trap::G2API_AddBolt(ctx.engine, ghoul2b, 0, "*muzzle2");
             ctx.world.entity_mut(self_).genericValue12 = b2;
         } else {
             G2Tur_SetBoneAngles(
@@ -282,14 +262,7 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
                 vec3_origin,
             );
             let ghoul2 = ctx.world.entity(self_).ghoul2;
-            let b1 = trap::G2API_AddBolt(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                    ghoul2,
-                    0,
-                    c"*flash03".to_owned(),
-                ),
-            );
+            let b1 = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash03");
             ctx.world.entity_mut(self_).genericValue11 = b1;
         }
     }
@@ -482,18 +455,16 @@ pub fn TurboLaser_SetBoneAnim(
     let level_time = ctx.world.level.time;
     trap::G2API_SetBoneAnim(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs::new(
-            ghoul2,
-            0,
-            c"model_root".as_ptr(),
-            startFrame,
-            endFrame,
-            BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
-            1.0,
-            level_time,
-            -1.0,
-            100,
-        ),
+        ghoul2,
+        0,
+        "model_root",
+        startFrame,
+        endFrame,
+        BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
+        1.0,
+        level_time,
+        -1.0,
+        100,
     );
 }
 

@@ -443,7 +443,6 @@ pub fn SP_misc_portal_camera(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_misc.c:390-462`
 pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
     use mp_abi::game::syscalls::G_SET_ACTIVE_SUBBSP::GSetActiveSubbspArgs;
-    use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
     use mp_qshared::shared::MAX_QPATH;
     unsafe {
         let mut new_angle: f32 = 0.0;
@@ -478,10 +477,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         let mut temp: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         write_cstr_field(&mut temp, &format!("#{}", cstr_to_str(out)));
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(ep.cast(), cstr(&cstr_to_str(temp.as_ptr()))),
-        ); // SV_SetBrushModel -- sets mins and maxs
+        trap::SetBrushModel(ctx.engine, ep.cast(), &cstr_to_str(temp.as_ptr())); // SV_SetBrushModel -- sets mins and maxs
         crate::g_utils::G_BSPIndex(ctx, temp.as_ptr());
 
         ctx.world.level.mNumBSPInstances += 1;
@@ -530,9 +526,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:484-631`
 pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
-    use mp_abi::game::syscalls::G_CM_REGISTER_TERRAIN::GCmRegisterTerrainArgs;
     use mp_abi::game::syscalls::G_RMG_INIT::GRmgInitArgs;
-    use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
     use mp_qshared::shared::MAX_QPATH;
     // `MAX_INFO_STRING` resolves via the crate prelude glob
     // (`mp_qshared::shared::limits`).
@@ -544,10 +538,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.entity_mut(ent).s.angles = [0.0, 0.0, 0.0];
         let model = ctx.world.entity(ent).model;
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
-        trap::SetBrushModel(
-            ctx.engine,
-            GSetBrushModelArgs::new(ep.cast(), cstr(&cstr_to_str(model))),
-        );
+        trap::SetBrushModel(ctx.engine, ep.cast(), &cstr_to_str(model));
 
         // Get the shader from the top of the brush
         let shader_num: c_int = 0;
@@ -655,10 +646,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         );
 
         // Initialise the common aspects of the terrain
-        let terrain_id = trap::CM_RegisterTerrain(
-            ctx.engine,
-            GCmRegisterTerrainArgs::new(cstr(&temp)),
-        );
+        let terrain_id = trap::CM_RegisterTerrain(ctx.engine, &temp);
 
         Info_SetValueForKey(&mut temp, "terrainId", &format!("{}", terrain_id));
 

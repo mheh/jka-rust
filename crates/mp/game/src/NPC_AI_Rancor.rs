@@ -43,38 +43,10 @@ pub fn Rancor_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
         // `gentity_t.client` stays `*mut c_void` per the deferral; overlay-cast to
         // `gclient_t` at the use site.
         let ri = &mut (*client).renderInfo;
-        ri.handRBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*r_hand".to_owned(),
-            ),
-        );
-        ri.handLBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*l_hand".to_owned(),
-            ),
-        );
-        ri.headBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*head_eyes".to_owned(),
-            ),
-        );
-        ri.torsoBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"jaw_bone".to_owned(),
-            ),
-        );
+        ri.handRBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*r_hand");
+        ri.handLBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_hand");
+        ri.headBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*head_eyes");
+        ri.torsoBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "jaw_bone");
     }
 }
 

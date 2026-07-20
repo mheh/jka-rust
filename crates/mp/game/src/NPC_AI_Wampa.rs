@@ -57,62 +57,13 @@ pub fn Wampa_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
     let ghoul2 = ctx.world.entity(self_id).ghoul2;
     unsafe {
         let ri = &mut (*client).renderInfo;
-        ri.headBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*head_eyes".to_owned(),
-            ),
-        );
-        ri.torsoBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"lower_spine".to_owned(),
-            ),
-        );
-        ri.crotchBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"rear_bone".to_owned(),
-            ),
-        );
-        ri.handLBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*l_hand".to_owned(),
-            ),
-        );
-        ri.handRBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*r_hand".to_owned(),
-            ),
-        );
-        ri.footLBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*l_leg_foot".to_owned(),
-            ),
-        );
-        ri.footRBolt = trap::G2API_AddBolt(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                ghoul2,
-                0,
-                c"*r_leg_foot".to_owned(),
-            ),
-        );
+        ri.headBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*head_eyes");
+        ri.torsoBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "lower_spine");
+        ri.crotchBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "rear_bone");
+        ri.handLBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_hand");
+        ri.handRBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*r_hand");
+        ri.footLBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*l_leg_foot");
+        ri.footRBolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*r_leg_foot");
     }
 }
 

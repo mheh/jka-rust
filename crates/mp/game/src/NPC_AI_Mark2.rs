@@ -128,14 +128,7 @@ pub fn NPC_Mark2_Pain(
             if ctx.world.entity(self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
                 let surface_name = cstr(&format!("torso_canister{}", (i + 1) as c_int));
                 let ghoul2 = ctx.world.entity(self_).ghoul2;
-                let new_bolt = trap::G2API_AddBolt(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                        ghoul2,
-                        0,
-                        surface_name.clone(),
-                    ),
-                );
+                let new_bolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, surface_name.to_str().unwrap());
                 if new_bolt != -1 {
                     NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
                 }
@@ -212,10 +205,7 @@ pub fn Mark2_FireBlaster(ctx: &mut GameContext, advance: qboolean) {
     let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
 
     let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-    let bolt = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, 0, c"*flash".to_owned()),
-    );
+    let bolt = trap::G2API_AddBolt(ctx.engine, ghoul2, 0, "*flash");
 
     let angles = ctx.world.entity(npc_id).r.currentAngles;
     let origin = ctx.world.entity(npc_id).r.currentOrigin;

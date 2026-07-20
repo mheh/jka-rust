@@ -2040,23 +2040,21 @@ pub fn EWeb_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_cha
     // first 3 bits is forward, second 3 bits is right, third 3 bits is up
     ctx.entity_mut(ent).s.boneOrient = forward | (right << 3) | (up << 6);
 
-    // FLAG: `bone` is a raw `char*`; `CStr::from_ptr` deref stays unsafe.
-    let boneName = unsafe { core::ffi::CStr::from_ptr(bone as *const c_char) }.to_owned();
+    // FLAG: `bone` is a raw `char*`; `cstr_to_str` deref stays unsafe.
+    let boneName = unsafe { cstr_to_str(bone as *const c_char) };
     trap::G2API_SetBoneAngles(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs::new(
-            ctx.entity(ent).ghoul2,
-            0,
-            boneName,
-            &angles as *const vec3_t,
-            flags,
-            up,
-            right,
-            forward,
-            core::ptr::null_mut(),
-            100,
-            ctx.world.level.time,
-        ),
+        ctx.entity(ent).ghoul2,
+        0,
+        &boneName,
+        &angles as *const vec3_t,
+        flags,
+        up,
+        right,
+        forward,
+        core::ptr::null_mut(),
+        100,
+        ctx.world.level.time,
     );
 }
 
@@ -2087,18 +2085,16 @@ pub fn EWeb_SetBoneAnim(ctx: &mut GameContext, eweb: EntityId, startFrame: c_int
     debug_assert!(!ctx.entity(eweb).ghoul2.is_null());
     trap::G2API_SetBoneAnim(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs::new(
-            ctx.entity(eweb).ghoul2,
-            0,
-            c"model_root".as_ptr(),
-            startFrame,
-            endFrame,
-            BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
-            1.0,
-            ctx.world.level.time,
-            -1.0,
-            100,
-        ),
+        ctx.entity(eweb).ghoul2,
+        0,
+        "model_root",
+        startFrame,
+        endFrame,
+        BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND,
+        1.0,
+        ctx.world.level.time,
+        -1.0,
+        100,
     );
 }
 
@@ -2585,15 +2581,13 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
 
     trap::G2API_InitGhoul2Model(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
-            &mut ctx.entity_mut(ent).ghoul2 as *mut *mut c_void,
-            modelName.to_owned(),
-            0,
-            0,
-            0,
-            0,
-            0,
-        ),
+        &mut ctx.entity_mut(ent).ghoul2 as *mut *mut c_void,
+        modelName.to_str().unwrap(),
+        0,
+        0,
+        0,
+        0,
+        0,
     );
 
     if ctx.entity(ent).ghoul2.is_null() {
@@ -2617,23 +2611,10 @@ pub fn EWeb_Create(ctx: &mut GameContext, spawner: EntityId) -> *mut gentity_t {
         vec3_origin,
     );
 
-    let genericValue10 = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-            ctx.entity(ent).ghoul2,
-            0,
-            c"*cannonflash".to_owned(),
-        ),
-    ); // muzzle bolt
+    let genericValue10 =
+        trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*cannonflash"); // muzzle bolt
     ctx.entity_mut(ent).genericValue10 = genericValue10;
-    let genericValue9 = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-            ctx.entity(ent).ghoul2,
-            0,
-            c"cannon_Yrot".to_owned(),
-        ),
-    ); // for placing the owner relative to rotation
+    let genericValue9 = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "cannon_Yrot"); // for placing the owner relative to rotation
     ctx.entity_mut(ent).genericValue9 = genericValue9;
 
     // set the constraints for this guy as an emplaced weapon, and his constraint angles

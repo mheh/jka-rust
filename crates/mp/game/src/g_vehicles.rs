@@ -50,7 +50,6 @@ use crate::q_math::{
 use crate::q_shared::Q_strncmp;
 use crate::trap;
 use crate::NPC_spawn::NPC_Spawn_Do;
-use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
@@ -290,10 +289,7 @@ pub fn G_AttachToVehicle(ctx: &mut GameContext, pEnt: Option<EntityId>, ucmd: *m
         return;
     }
     let veh_ghoul2 = ctx.world.entity(veh_id).ghoul2 as *mut c_void;
-    let crotchBolt = trap::G2API_AddBolt(
-        ctx.engine,
-        GG2AddboltArgs::new(veh_ghoul2, 0, cstr("*driver")),
-    );
+    let crotchBolt = trap::G2API_AddBolt(ctx.engine, veh_ghoul2, 0, "*driver");
 
     // Get the driver tag.
     let entClient = ctx.world.entity(ent_id).client;
@@ -1758,10 +1754,7 @@ pub fn AttachRiders(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
 
                 let parent_ghoul2 = ctx.world.entity(parent_id).ghoul2 as *mut c_void;
                 debug_assert!(!parent_ghoul2.is_null());
-                let crotchBolt = trap::G2API_AddBolt(
-                    ctx.engine,
-                    GG2AddboltArgs::new(parent_ghoul2, 0, cstr("*driver")),
-                );
+                let crotchBolt = trap::G2API_AddBolt(ctx.engine, parent_ghoul2, 0, "*driver");
                 let ppcl = ctx.world.entity(parent_id).client;
                 debug_assert!(!ppcl.is_null());
                 debug_assert!(!ctx.world.entity(pilot_id).client.is_null());

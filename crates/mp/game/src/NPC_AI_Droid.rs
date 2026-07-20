@@ -334,14 +334,7 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
         // CLASS_R5D2, CLASS_R2D2
         // No head?
         let ghoul2 = ctx.world.entity(npc_id).ghoul2;
-        if trap::G2API_GetSurfaceRenderStatus(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                ghoul2,
-                0,
-                c"head".to_owned(),
-            ),
-        ) > 0
+        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "head") > 0
         {
             if TIMER_Done(ctx, Some(npc_id), b"smoke\0".as_ptr() as *const c_char) != 0
                 && TIMER_Done(
@@ -462,14 +455,7 @@ pub fn NPC_Droid_Pain(
                     let local_state = unsafe { (*npc_ptr).localState };
                     let ghoul2 = ctx.world.entity(self_).ghoul2;
                     if (local_state != LSTATE_SPINNING)
-                        && (trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                c"head".to_owned(),
-                            ),
-                        ) == 0)
+                        && (trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "head") == 0)
                     {
                         NPC_SetSurfaceOnOff(
                             ctx,
@@ -591,14 +577,7 @@ pub fn NPC_Droid_Pain(
                     let local_state = unsafe { (*npc_ptr).localState };
                     let ghoul2 = ctx.world.entity(self_).ghoul2;
                     if (local_state != LSTATE_SPINNING)
-                        && (trap::G2API_GetSurfaceRenderStatus(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
-                                ghoul2,
-                                0,
-                                c"head".to_owned(),
-                            ),
-                        ) == 0)
+                        && (trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, "head") == 0)
                     {
                         NPC_SetSurfaceOnOff(
                             ctx,

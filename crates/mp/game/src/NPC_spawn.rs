@@ -150,16 +150,8 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                 ctx.world.entity_mut(ent).pain =
                     Some(crate::ent_fn_enums::EntPain::NPC_ATST_Pain).into();
             }
-            let surf = cstr("head_hatchcover");
             let ghoul2 = ctx.world.entity(ent).ghoul2;
-            trap::G2API_SetSurfaceOnOff(
-                ctx.engine,
-                mp_abi::game::syscalls::G_G2_SETSURFACEONOFF::GG2SetsurfaceonoffArgs::new(
-                    ghoul2,
-                    surf.as_ptr(),
-                    0,
-                ),
-            );
+            trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, "head_hatchcover", 0);
         }
         let wampa = cstr("wampa");
         if crate::q_shared::Q_stricmp(wampa.as_ptr(), ctx.world.entity(ent).NPC_type) == 0 {
@@ -1649,50 +1641,33 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             let mut temp_g2: *mut c_void = core::ptr::null_mut();
             let mut skin: c_int = 0;
             if !p_veh_info.skin.is_null() && *p_veh_info.skin != 0 {
-                let path = cstr(&format!(
+                let path = format!(
                     "models/players/{}/model_{}.skin",
                     cstr_to_str(p_veh_info.model as *const c_char),
                     cstr_to_str(p_veh_info.skin as *const c_char)
-                ));
-                skin = trap::R_RegisterSkin(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(path),
                 );
+                skin = trap::R_RegisterSkin(ctx.engine, &path);
             }
-            let glm_path = cstr(&format!(
+            let glm_path = format!(
                 "models/players/{}/model.glm",
                 cstr_to_str(p_veh_info.model as *const c_char)
-            ));
+            );
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
-                    &mut temp_g2 as *mut *mut c_void,
-                    glm_path,
-                    0,
-                    skin,
-                    0,
-                    0,
-                    0,
-                ),
+                &mut temp_g2 as *mut *mut c_void,
+                &glm_path,
+                0,
+                skin,
+                0,
+                0,
+                0,
             );
             if !temp_g2.is_null() {
-                let mut gla_name: [c_char; 1024] = [0; 1024];
-                gla_name[0] = 0;
-                trap::G2API_GetGLAName(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_GETGLANAME::GG2GetglanameArgs::new(
-                        temp_g2,
-                        0,
-                        gla_name.as_mut_ptr(),
-                    ),
-                );
+                let gla_name = trap::G2API_GetGLAName(ctx.engine, temp_g2, 0, 1024);
 
-                if gla_name[0] != 0 {
-                    let slash = crate::q_shared::Q_strrchr(gla_name.as_ptr(), '/' as c_int);
-                    if !slash.is_null() {
-                        let anim_cfg = cstr("/animation.cfg");
-                        let n = crate::q_shared::Q_strlen(anim_cfg.as_ptr());
-                        core::ptr::copy_nonoverlapping(anim_cfg.as_ptr(), slash, n as usize + 1);
+                if !gla_name.is_empty() {
+                    if let Some(slash_pos) = gla_name.rfind('/') {
+                        let anim_path = cstr(&format!("{}/animation.cfg", &gla_name[..slash_pos]));
 
                         let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
                         // STAGE-2b: irreducible — `GameCallbacksImpl.world` is a raw
@@ -1705,7 +1680,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
                             &mut ctx.world.bg_state,
                             &traps,
                             &mut callbacks,
-                            gla_name.as_ptr(),
+                            anim_path.as_ptr(),
                             core::ptr::null_mut(),
                             qfalse,
                         );
