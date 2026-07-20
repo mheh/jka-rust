@@ -1734,7 +1734,8 @@ pub fn FS_Shutdown(common: &mut Common, closemfp: qboolean) {
                 drop(Box::from_raw((*p).pack));
             }
             if !(*p).dir.is_null() {
-                Z_Free(common, (*p).dir as *mut ());
+                // the Boxed directory_t owns its path/gamedir Strings
+                drop(Box::from_raw((*p).dir));
             }
             Z_Free(common, p as *mut ());
             p = next;
