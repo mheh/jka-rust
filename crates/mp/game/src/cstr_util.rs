@@ -1,17 +1,16 @@
 //! Seam string helpers for the C ABI boundary.
 //!
-//! The shared set (`sscanf_f32s`, `atoi`/`atoi_str`, `cstr`, `cstr_to_str`/
-//! `cstr_to_string`, `write_cstr_field`) lives in `mp_bg::cstr_util` — it
-//! moved down with the Stage-5 bg split and is re-exported here so game
-//! importers keep one canonical path. Only `cstr_from_chars` (no bg
-//! consumer) stays local.
+//! The shared set (`atoi`, `cstr`, `cstr_to_str`, `write_cstr_field`) lives in
+//! `mp_bg::cstr_util` — it moved down with the Stage-5 bg split and is
+//! re-exported here so game importers keep one canonical path. Only
+//! `cstr_from_chars` (no bg consumer) stays local. Every fn is a
+//! pointer-facing shape that retires with the trap-wrapper `String`
+//! migration — do not add to it (value logic lives in `native_string`).
 
 use core::ffi::c_char;
 use std::ffi::CStr;
 
-pub use mp_bg::cstr_util::{
-    atoi, atoi_str, cstr, cstr_to_str, cstr_to_string, sscanf_f32s, write_cstr_field,
-};
+pub use mp_bg::cstr_util::{atoi, cstr, cstr_to_str, write_cstr_field};
 
 /// Borrow a Rust-owned `[c_char]` buffer (a fixed `char[N]` struct field or a
 /// stack local) as a `&CStr`, reading up to the first NUL.

@@ -39,6 +39,7 @@ use crate::npc::g_npc_t::gNPC_t;
 use crate::prelude::*;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
+use native_string::atoi::atoi_bytes;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -357,7 +358,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         readBuf[i_r] = 0;
         //THE RANK
         // Source: oracle/codemp/game/w_force.c:316 — plain `atoi(readBuf)`.
-        (*cl).ps.fd.forceRank = atoi_str(&String::from_utf8_lossy(&readBuf[..i_r]));
+        (*cl).ps.fd.forceRank = atoi_bytes(&readBuf[..i_r]);
         i += 1;
 
         i_r = 0;
@@ -369,7 +370,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         readBuf[i_r] = 0;
         //THE SIDE
         // Source: oracle/codemp/game/w_force.c:328 — plain `atoi(readBuf)`.
-        (*cl).ps.fd.forceSide = atoi_str(&String::from_utf8_lossy(&readBuf[..i_r]));
+        (*cl).ps.fd.forceSide = atoi_bytes(&readBuf[..i_r]);
         i += 1;
 
         let mut fp_bytes = fp_bytes;

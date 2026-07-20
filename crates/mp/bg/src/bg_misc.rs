@@ -29,6 +29,7 @@ use core::ffi::CStr;
 use mp_qshared::shared::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
 use mp_qshared::shared::q_string::{Q_stricmp, Q_strlen};
 use native_string::atof::atof_bytes;
+use native_string::atoi::atoi_bytes;
 
 /// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
 /// Source: `oracle/codemp/game/bg_public.h:25`
@@ -378,7 +379,7 @@ pub fn BG_LegalizedForcePowers(
         let powers_field = parts.next().unwrap_or("");
 
         // Source: oracle/codemp/game/bg_misc.c:472 — plain `atoi(readBuf)`.
-        let mut final_side: c_int = atoi_str(&side_field);
+        let mut final_side: c_int = atoi_bytes(side_field.as_bytes());
         if final_side != FORCE_LIGHTSIDE && final_side != FORCE_DARKSIDE {
             // Not a valid side. You will be dark. Because I said so.
             final_side = FORCE_DARKSIDE;
@@ -1369,8 +1370,8 @@ pub fn BG_ValidateSkinForTeam(
     traps: &dyn BgTraps,
 ) -> qboolean {
     unsafe {
-        let model_name = cstr_to_string(modelName);
-        let mut skin = cstr_to_string(skinName);
+        let model_name = cstr_to_str(modelName);
+        let mut skin = cstr_to_str(skinName);
         let max_qpath = MAX_QPATH as usize;
 
         if model_name.len() >= 5 && model_name[..5].eq_ignore_ascii_case("jedi_") {

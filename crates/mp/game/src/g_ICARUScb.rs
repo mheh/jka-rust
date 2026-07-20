@@ -4234,7 +4234,7 @@ pub fn Q3_Set(
 
         // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms
         // below now routes through the shared libc-`%f` scanner
-        // `cstr_util::sscanf_f32s` (stop-at-first-failure, longest-prefix
+        // `native_string::sscanf::sscanf_f32s` (stop-at-first-failure, longest-prefix
         // parse — matching libc, not a naive whitespace-split).
         // §19: C leaves any component sscanf fails to parse UNINITIALIZED
         // (garbage-float UB on `vector_data`); we pick "leave the 0.0 seed

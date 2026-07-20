@@ -194,7 +194,7 @@ pub fn G_SpawnVector(
 // Rust std equivalent, no resolved signature needed). `atof` is libc strtod —
 // `native_string::atof` (retail's JK2_game.vcproj excludes bg_lib.c from the
 // native DLL, so its QVM `atof` never linked); `sscanf_3f`/`sscanf_1f` route
-// through the shared libc-`%f` scanner `cstr_util::sscanf_f32s`.
+// through the shared libc-`%f` scanner `native_string::sscanf::sscanf_f32s`.
 // ---------------------------------------------------------------------
 
 /// `sscanf(s, "%f %f %f", &out[0], &out[1], &out[2])` via the shared

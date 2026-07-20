@@ -354,7 +354,7 @@ impl BgTraps for TestTraps {
         }
         // Safety: `qpath` is the NUL-terminated vpath literal the animation.cfg
         // load path passes through `BG_ParseAnimationFile` / the `trap_FS_*` seam.
-        let vpath = unsafe { cstr_to_string(qpath) };
+        let vpath = unsafe { cstr_to_str(qpath) };
         let base = vpath.rsplit('/').next().unwrap_or(&vpath);
         let real = self.fixdir.join(base);
         match std::fs::read(&real) {

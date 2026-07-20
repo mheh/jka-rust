@@ -14,6 +14,7 @@ use mp_qshared::shared::com_parse::{
     COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine,
 };
 use native_string::atof::atof;
+use native_string::atoi::atoi;
 
 /// Raven `BG_ClearVehicleParseParms`.
 ///
@@ -50,7 +51,7 @@ pub fn BG_ParseVehWeaponParm(
             if !field.name.is_null() && Q_stricmp(field.name, parmName) == 0 {
                 match field.r#type {
                     VF_INT => {
-                        *(b.add(field.ofs as usize) as *mut c_int) = atoi(cstr(&value).as_ptr());
+                        *(b.add(field.ofs as usize) as *mut c_int) = atoi(&value);
                     }
                     VF_FLOAT => {
                         *(b.add(field.ofs as usize) as *mut f32) = atof(&value) as f32;
@@ -389,7 +390,7 @@ pub fn BG_ParseVehicleParm(
                 match field.r#type {
                     VF_IGNORE => {}
                     VF_INT => {
-                        *(b.add(field.ofs as usize) as *mut c_int) = atoi(cstr(&value).as_ptr());
+                        *(b.add(field.ofs as usize) as *mut c_int) = atoi(&value);
                     }
                     VF_FLOAT => {
                         *(b.add(field.ofs as usize) as *mut f32) = atof(&value) as f32;

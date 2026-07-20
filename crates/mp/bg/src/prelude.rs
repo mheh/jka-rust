@@ -198,9 +198,8 @@ pub use crate::bg_saga::{WPTable, SIEGECHAR_TAB};
 pub use crate::bg_slidemove::*;
 pub use crate::bg_vehicleLoad::BG_VehicleGetIndex;
 pub use crate::bg_vehicleLoad_tables::*;
-pub use crate::cstr_util::{
-    atoi, atoi_str, cstr, cstr_to_str, cstr_to_string, sscanf_f32s, write_cstr_field,
-};
+pub use crate::cstr_util::{atoi, cstr, cstr_to_str, write_cstr_field};
+pub use native_string::sscanf::sscanf_f32s;
 
 // Pin the first-winner of a const transcribed identically in two modules (same
 // value), matching the mp_game prelude, so the glob re-exports above are

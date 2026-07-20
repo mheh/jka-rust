@@ -1377,7 +1377,7 @@ pub fn target_level_change_use(
         ctx.engine,
         mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
             cbufExec_t::EXEC_NOW as c_int,
-            cstr(&format!("map {}", unsafe { cstr_to_string(message) })),
+            cstr(&format!("map {}", unsafe { cstr_to_str(message) })),
         ),
     );
 }

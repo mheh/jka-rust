@@ -78,9 +78,7 @@ pub use mp_bg::bg_misc::{
 // Canonical seam string helpers (porting-rules pass-3 packet primer contract).
 pub use crate::ai_main_consts::*;
 pub use crate::anim_table::animTable;
-pub use crate::cstr_util::{
-    atoi_str, cstr, cstr_from_chars, cstr_to_str, cstr_to_string, sscanf_f32s, write_cstr_field,
-};
+pub use crate::cstr_util::{cstr, cstr_from_chars, cstr_to_str, write_cstr_field};
 pub use crate::entity::flags::*;
 pub use crate::g_client::{playerMaxs, playerMins};
 pub use crate::g_items::FRAMETIME;
@@ -104,6 +102,7 @@ pub use crate::w_force::mindTrickTime;
 pub use mp_bg::bg_vehicleLoad_tables::*;
 pub use mp_bg::vehicles::{vehFieldType_t, vehFieldType_t::*, vehField_t};
 pub use mp_qshared::shared::RAND_MAX;
+pub use native_string::sscanf::sscanf_f32s;
 // `BG_GiveMeVectorFromMatrix` lives in `bg_misc` (its oracle home,
 // `bg_misc.c:736`); the canonical export for bare-use sites.
 pub use crate::saber::w_saber_consts::*;

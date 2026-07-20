@@ -1,15 +1,13 @@
 //! Seam string helpers for the C ABI boundary — the `*const c_char`/`CString`
 //! wrappers a port needs wherever it calls a `trap_*` syscall or crosses
-//! `va`/`Com_sprintf` string territory. The value logic (libc `atoi`,
-//! `sscanf_f32s`) lives in `native_string` (DEC-32); this module keeps the
-//! pointer-facing shapes and re-exports the shared names so `mp_game::cstr_util`
-//! importers keep one canonical path.
+//! `va`/`Com_sprintf` string territory. The value logic lives in
+//! `native_string` (DEC-32); every fn here is a pointer-facing shape that
+//! retires with the trap-wrapper `String` migration — do not add to it.
 
 use core::ffi::{c_char, c_int};
 use std::ffi::CStr;
 
 use native_string::atoi::atoi_bytes;
-pub use native_string::sscanf::sscanf_f32s;
 
 /// `atoi()` over a raw C string — [`native_string::atoi`] semantics (libc
 /// `(int)strtol`: skip `isspace`, optional sign, digit prefix, i64 clamp then
@@ -22,12 +20,6 @@ pub fn atoi(string: *const c_char) -> c_int {
         return 0;
     }
     atoi_bytes(unsafe { CStr::from_ptr(string) }.to_bytes())
-}
-
-/// [`atoi`] over an owned `&str`, for call sites that already hold a Rust
-/// string rather than a raw C pointer.
-pub fn atoi_str(text: &str) -> c_int {
-    atoi_bytes(text.as_bytes())
 }
 
 /// Own a NUL-terminated `CString` for a `trap_*` syscall argument, where
@@ -48,13 +40,6 @@ pub fn cstr(s: &str) -> std::ffi::CString {
 #[inline]
 pub unsafe fn cstr_to_str(p: *const c_char) -> String {
     std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
-}
-
-/// Alias of [`cstr_to_str`], kept for call sites written against the
-/// original private `bg_misc.rs` name.
-#[inline]
-pub unsafe fn cstr_to_string(p: *const c_char) -> String {
-    cstr_to_str(p)
 }
 
 /// Write `src` into the caller's fixed C buffer `dest`, NUL-terminated and
