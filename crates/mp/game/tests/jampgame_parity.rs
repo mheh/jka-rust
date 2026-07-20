@@ -1,7 +1,7 @@
-//! Differential parity test for the jampgame `q_math` + `bg_lib` ports against
+//! Differential parity test for the jampgame `q_math` + sort ports against
 //! the Raven oracle. Reproduces `tools/jampgame-oracle/`'s canonical bit-exact
 //! dumps by calling the PORTED functions (`mp_game::q_math`,
-//! `mp_bg::bg_lib`, `mp_game::bg_channel::Rng`) and byte-compares to the
+//! `native_sort::qsort`, `mp_game::bg_channel::Rng`) and byte-compares to the
 //! committed goldens under `tests/oracle/golden/`.
 //!
 //! Single-threaded by construction: the oracle keeps its RNG in file statics
@@ -10,14 +10,14 @@
 //! sequentially. See `tools/jampgame-oracle/README.md`.
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::c_int;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use mp_bg::bg_lib::{__builtin___memmove_chk, atoi, qsort};
 use mp_game::bg_channel::Rng;
 use mp_game::q_math::*;
 use mp_game::shared::cplane_t;
+use native_sort::qsort::qsort;
 
 fn oracle_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
@@ -566,43 +566,17 @@ fn qmath_parity() {
 
 // ============================ bg_lib family ============================
 
-// bg_lib's rand/srand are QVM-only surface (retail's JK2_game.vcproj excludes
-// bg_lib.c; the native module links the MSVC CRT rand — see
-// bg_channel::rng). Their 69069-LCG dump section was retired 2026-07-14;
-// Rng's CRT rand is pinned by a unit test in rng.rs instead.
+// bg_lib is §20-dropped (retail's JK2_game.vcproj excludes bg_lib.c; its
+// rand/srand section was retired 2026-07-14, atoi/atof/memmove 2026-07-19 —
+// canonical bodies live in native_string, pinned by their own tests). The
+// qsort section survives: it pins `native_sort::qsort`'s tie permutation
+// against the C ground truth (main_bglib.c still compiles bg_lib.c's BSD
+// body as the reference).
 
-fn dump_atox(o: &mut String) {
-    let path = oracle_dir().join("fixtures/strings.txt");
-    let data = std::fs::read(&path).unwrap();
-    o.push_str("== atox ==\n");
-    let mut idx = 0;
-    for rec in data.split(|&x| x == 0) {
-        let mut cbuf: Vec<u8> = rec.to_vec();
-        cbuf.push(0);
-        let p0 = cbuf.as_ptr() as *const c_char;
-        let _ = writeln!(o, "a {} atoi {}", idx, atoi(p0));
-        idx += 1;
-    }
-    let _ = writeln!(o, "atox count {}", idx);
-}
-
-extern "C" fn cmp_int(a: *const c_void, b: *const c_void) -> c_int {
-    let x = unsafe { *(a as *const c_int) };
-    let y = unsafe { *(b as *const c_int) };
-    (x > y) as c_int - (x < y) as c_int
-}
-
-#[repr(C)]
 #[derive(Clone, Copy)]
 struct Kv {
     key: c_int,
     payload: c_int,
-}
-
-extern "C" fn cmp_kv(a: *const c_void, b: *const c_void) -> c_int {
-    let x = unsafe { (*(a as *const Kv)).key };
-    let y = unsafe { (*(b as *const Kv)).key };
-    (x > y) as c_int - (x < y) as c_int
 }
 
 fn dump_qsort(o: &mut String) {
@@ -611,13 +585,9 @@ fn dump_qsort(o: &mut String) {
     let text = std::fs::read_to_string(&path).unwrap();
     let mut arr: Vec<c_int> = text.lines().filter_map(|l| l.trim().parse().ok()).collect();
     let n = arr.len();
-    let f = cmp_int as extern "C" fn(*const c_void, *const c_void) -> c_int;
-    qsort(
-        arr.as_mut_ptr() as *mut c_void,
-        n,
-        core::mem::size_of::<c_int>(),
-        f as usize as *mut c_void,
-    );
+    qsort(&mut arr, |&x: &c_int, &y: &c_int| {
+        (x > y) as c_int - (x < y) as c_int
+    });
     let _ = writeln!(o, "ints {}", n);
     for v in &arr {
         let _ = writeln!(o, "{}", v);
@@ -649,57 +619,19 @@ fn dump_qsort(o: &mut String) {
     .map(|&(key, payload)| Kv { key, payload })
     .collect();
     let kn = kv.len();
-    let fk = cmp_kv as extern "C" fn(*const c_void, *const c_void) -> c_int;
-    qsort(
-        kv.as_mut_ptr() as *mut c_void,
-        kn,
-        core::mem::size_of::<Kv>(),
-        fk as usize as *mut c_void,
-    );
+    qsort(&mut kv, |a: &Kv, b: &Kv| {
+        (a.key > b.key) as c_int - (a.key < b.key) as c_int
+    });
     let _ = writeln!(o, "kv {}", kn);
     for e in &kv {
         let _ = writeln!(o, "{} {}", e.key, e.payload);
     }
 }
 
-fn print_buf(o: &mut String, tag: &str, b: &[u8]) {
-    let mut s = tag.to_string();
-    for x in b {
-        let _ = write!(s, " {:02x}", x);
-    }
-    s.push('\n');
-    o.push_str(&s);
-}
-
-fn dump_memmove(o: &mut String) {
-    o.push_str("== memmove ==\n");
-    let mut dummy = 0u8;
-    let bos = &mut dummy as *mut u8 as *mut c_void;
-    let cases: [(&str, usize, usize, usize); 5] = [
-        ("fwd", 4, 0, 16),
-        ("back", 0, 4, 16),
-        ("nonov", 20, 0, 8),
-        ("same", 0, 0, 12),
-        ("zero", 1, 0, 0),
-    ];
-    for (tag, doff, soff, count) in cases {
-        let mut b = [0u8; 32];
-        for (i, e) in b.iter_mut().enumerate() {
-            *e = i as u8;
-        }
-        let dst = unsafe { b.as_mut_ptr().add(doff) } as *mut c_void;
-        let src = unsafe { b.as_ptr().add(soff) } as *const c_void;
-        __builtin___memmove_chk(dst, src, count, bos);
-        print_buf(o, tag, &b);
-    }
-}
-
 #[test]
 fn bglib_parity() {
     let mut o = String::new();
-    dump_atox(&mut o);
     dump_qsort(&mut o);
-    dump_memmove(&mut o);
     o.push_str("== end ==\n");
     compare("bglib", &o);
 }

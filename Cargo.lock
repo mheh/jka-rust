@@ -274,6 +274,7 @@ dependencies = [
  "mp_qshared",
  "native_math",
  "native_platform",
+ "native_sort",
  "native_string",
 ]
 
@@ -340,6 +341,10 @@ dependencies = [
  "native_string",
  "native_types",
 ]
+
+[[package]]
+name = "native_sort"
+version = "0.1.0"
 
 [[package]]
 name = "native_string"

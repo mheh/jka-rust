@@ -6,7 +6,8 @@
 //! here are byte-for-byte the same parse logic, but the EOF print is routed
 //! through the `BgTraps` seam (`traps.com_printf`), and the shared parse state /
 //! numeric conversions come from the lower tiers (`mp_qshared`'s `COM_ParseExt`,
-//! this crate's `cstr_util::atoi` and `bg_lib::atof`). Game copies untouched.
+//! this crate's `cstr_util::atoi` and `native_string`'s `atof`). Game copies
+//! untouched.
 //!
 //! Source: `oracle/codemp/game/q_shared.c:588-638`
 #![allow(non_snake_case)]

@@ -24,7 +24,6 @@ pub mod com_parse;
 pub mod cstr_util;
 
 pub mod bg_g2_utils;
-pub mod bg_lib;
 pub mod bg_misc;
 pub mod bg_panimate;
 pub mod bg_pmove;

@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 native_math = { path = "../../native/math" }
+native_sort = { path = "../../native/sort" }
 native_string = { path = "../../native/string" }
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }

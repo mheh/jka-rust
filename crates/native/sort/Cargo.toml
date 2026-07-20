@@ -1,0 +1,9 @@
+[package]
+name = "native_sort"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "native_sort"
+
+[dependencies]

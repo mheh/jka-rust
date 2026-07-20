@@ -49,7 +49,6 @@ use crate::world::GameWorld;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
 use crate::NPC_AI_Utils::AI_UpdateGroups;
 use crate::NPC_senses::ClearPlayerAlertEvents;
-use mp_bg::bg_lib::qsort;
 use mp_bg::public::configstring::{
     CS_CLIENT_DUELHEALTHS, CS_CLIENT_DUELISTS, CS_CLIENT_DUELWINNER, CS_INTERMISSION, CS_SCORES1,
     CS_SCORES2, CS_TEAMVOTE_TIME, CS_VOTE_TIME, CS_WARMUP, RANK_TIED_FLAG, SCORE_NOT_PRESENT,
@@ -59,6 +58,7 @@ use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_FREE, DUELT
 use mp_bg::public::entity_event::EVENT_VALID_MSEC;
 use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 use mp_qshared::shared::MAX_CLIENTS;
+use native_sort::qsort::qsort;
 
 // The QVM entry (`vmMain`) and `G_InitGame` / `G_ShutdownGame` are the
 // slice-0 live code, kept as-is: `vmMain` is the shell + the
@@ -952,36 +952,17 @@ pub fn AdjustTournamentScores(ctx: &mut GameContext) {
 /// Raven sorts a bare `int[]` and reaches `level` through the C global; §B3
 /// forbids that global, and a `qsort` comparator is a bare 2-arg C callback with
 /// no context slot. Widening the element to carry `world` alongside the index is
-/// the only channel that threads the world into the comparator without a global.
-/// `#[repr(C)]` because the pointer travels through `qsort`'s raw byte-swaps.
-///
-/// Source: `oracle/codemp/game/g_main.c:1624-1689`
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct SortRanksElem {
-    client: c_int,
-    world: *mut GameWorld,
-}
-
 /// Raven `SortRanks` — the `qsort` comparator for `level.sortedClients`.
 ///
-/// A real C comparator (`int QDECL SortRanks(const void *a, const void *b)`),
-/// reached by `bg_lib::qsort` through its raw fn-pointer slot. Elements are
-/// `SortRanksElem` (index + world) rather than Raven's bare `int`; `*(int *)a`
-/// becomes `elem.client` and `level` becomes `elem.world`. The comparison logic
-/// below is a verbatim transcription of the oracle. Sorting via `bg_lib::qsort`
-/// (the faithful port of Raven's own `bg_lib.c` quicksort, which the oracle DLL
-/// also links) makes the tie permutation deterministically identical to the
-/// oracle — parity holds for equal-ranked clients, not just distinct ones.
+/// Raven's `*(int *)a` void-pointer unpack becomes plain `c_int` params, and
+/// the C-global `level` reach becomes the threaded raw `world` (§B3); the
+/// comparison logic below is a verbatim transcription of the oracle. Sorted
+/// via `native_sort::qsort` (the canonical BSD body from `bg_lib.c`; see its
+/// module note on the retail-msvcrt tie-order question).
 ///
 /// Source: `oracle/codemp/game/g_main.c:1624-1689`
-extern "C" fn SortRanks(a: *const c_void, b: *const c_void) -> c_int {
+fn SortRanks(world: *mut GameWorld, ia: c_int, ib: c_int) -> c_int {
     unsafe {
-        let ea = &*(a as *const SortRanksElem);
-        let eb = &*(b as *const SortRanksElem);
-        let world = ea.world;
-        let ia = ea.client;
-        let ib = eb.client;
         let ca = (*world).clients.as_mut_ptr().add(ia as usize);
         let cb = (*world).clients.as_mut_ptr().add(ib as usize);
 
@@ -1167,29 +1148,15 @@ pub fn CalculateRanks(ctx: &mut GameContext) {
     ctx.world.level.warmupTime = 0;
 
     // `qsort( level.sortedClients, level.numConnectedClients, ..., SortRanks )`.
-    // Sort a scratch array of (index, world) pairs so the bare C comparator
-    // can reach the world (§B3: no global). `bg_lib::qsort` is deterministic,
-    // so the element widening leaves the index permutation — ties included —
-    // identical to Raven's bare-`int` sort; copy the indices back afterward.
+    // Sort a scratch copy so the comparator's raw `world` reads never alias a
+    // live `&mut` into `level` (§B3: no global — the closure captures the raw
+    // world instead); copy the indices back afterward.
     let n = ctx.world.level.numConnectedClients as usize;
-    // STAGE-2b: irreducible — SortRanksElem.world is a `*mut GameWorld` the bare
-    // C comparator reads (§B3); hoisted out of the closure so it doesn't also
-    // borrow ctx alongside the `ctx.world` field read.
     let world_ptr = ctx.world_raw();
-    let mut elems: Vec<SortRanksElem> = (0..n)
-        .map(|k| SortRanksElem {
-            client: ctx.world.level.sortedClients[k],
-            world: world_ptr,
-        })
-        .collect();
-    qsort(
-        elems.as_mut_ptr() as *mut c_void,
-        n,
-        core::mem::size_of::<SortRanksElem>(),
-        SortRanks as *mut c_void,
-    );
+    let mut elems: Vec<c_int> = (0..n).map(|k| ctx.world.level.sortedClients[k]).collect();
+    qsort(&mut elems, |&a, &b| SortRanks(world_ptr, a, b));
     for k in 0..n {
-        ctx.world.level.sortedClients[k] = elems[k].client;
+        ctx.world.level.sortedClients[k] = elems[k];
     }
 
     if ctx.world.cvars.g_gametype.integer >= GT_TEAM {

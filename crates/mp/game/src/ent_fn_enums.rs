@@ -93,7 +93,6 @@ use crate::NPC_utils::*;
 use crate::SpeederNPC::*;
 use crate::WalkerNPC::*;
 use mp_bg::bg_g2_utils::*;
-use mp_bg::bg_lib::*;
 use mp_bg::bg_misc::*;
 use mp_bg::bg_panimate::*;
 use mp_bg::bg_pmove::*;

@@ -15,13 +15,13 @@ use crate::g_combat::AddScore;
 use crate::g_items::RespawnItem;
 use crate::g_main::CalculateRanks;
 use crate::g_utils::{G_Find, G_FreeEntity, G_TempEntity};
-use mp_bg::bg_lib::qsort;
 use mp_bg::public::ctf_msg::ctfMsg_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::global_team_sound::global_team_sound_t;
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_qshared::shared::flag_status::{FLAG_ATBASE, FLAG_DROPPED};
 use mp_qshared::shared::MAX_CLIENTS;
+use native_sort::qsort::qsort;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -1360,8 +1360,8 @@ pub fn SelectSiegeSpawnPoint(
 /// Raven `SortClients`.
 ///
 /// Source: `oracle/codemp/game/g_team.c:1089-1091`
-pub fn SortClients(a: *const c_void, b: *const c_void) -> c_int {
-    unsafe { *(a as *const c_int) - *(b as *const c_int) }
+pub fn SortClients(a: &c_int, b: &c_int) -> c_int {
+    *a - *b
 }
 
 /// Raven `TeamplayInfoMessage`.
@@ -1395,12 +1395,7 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
             }
         }
 
-        qsort(
-            clients.as_mut_ptr() as *mut c_void,
-            cnt as usize,
-            core::mem::size_of::<c_int>(),
-            SortClients as *mut c_void,
-        );
+        qsort(&mut clients[..cnt as usize], SortClients);
 
         let mut string: [c_char; 8192] = [0; 8192];
         let mut stringlength: usize = 0;

@@ -1,40 +1,3 @@
-== atox ==
-a 0 atoi 0
-a 1 atoi 123
-a 2 atoi -123
-a 3 atoi 45
-a 4 atoi 42
-a 5 atoi -7
-a 6 atoi 9
-a 7 atoi 42
-a 8 atoi -5
-a 9 atoi 0
-a 10 atoi 0
-a 11 atoi 3
-a 12 atoi 0
-a 13 atoi 3
-a 14 atoi -2
-a 15 atoi 0
-a 16 atoi 1
-a 17 atoi 12
-a 18 atoi 0
-a 19 atoi 0
-a 20 atoi 0
-a 21 atoi 0
-a 22 atoi 2147483647
-a 23 atoi -2147483648
-a 24 atoi 1215752191
-a 25 atoi 12
-a 26 atoi 7
-a 27 atoi 0
-a 28 atoi 0
-a 29 atoi 0
-a 30 atoi 3
-a 31 atoi -8
-a 32 atoi 0
-a 33 atoi 1000000
-a 34 atoi 0
-atox count 35
 == qsort ==
 ints 30
 -1000000
@@ -88,10 +51,4 @@ kv 20
 8 13
 9 17
 9 5
-== memmove ==
-fwd 00 01 02 03 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
-back 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
-nonov 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 00 01 02 03 04 05 06 07 1c 1d 1e 1f
-same 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
-zero 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
 == end ==

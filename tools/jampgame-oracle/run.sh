@@ -89,14 +89,6 @@ sed -n '616,636p' build/codemp/game/q_math.c \
            -e '/assert\(/d' \
   >> build/codemp/game/raven_rng.c
 
-# raven_atoi.c: Raven's atoi (bg_lib.c:915-958) is guarded by #if defined(Q3_VM);
-# on a native build the linker would otherwise bind libc's atoi (which does not
-# do Raven's signed-char >0x7f whitespace skip). Extract it verbatim, renamed.
-{
-	echo '/* extracted verbatim from oracle bg_lib.c:915-958 (Raven Q3_VM atoi) */'
-	sed -n '915,958p' build/codemp/game/bg_lib.c | sed -E 's/int atoi\(/int raven_atoi(/'
-} > build/codemp/game/raven_atoi.c
-
 CFLAGS="-w -std=gnu11 -D__linux__ -D_FORTIFY_SOURCE=0 -ffp-contract=off \
         -include build/codemp/game/shim.h -I. -I build/codemp/game"
 
@@ -105,7 +97,7 @@ cc $CFLAGS -o build/qmath_dump main_qmath.c \
    build/codemp/game/q_math.c build/codemp/game/raven_rng.c
 # shellcheck disable=SC2086
 cc $CFLAGS -o build/bglib_dump main_bglib.c \
-   build/codemp/game/bg_lib.c build/codemp/game/raven_atoi.c
+   build/codemp/game/bg_lib.c
 
 # bg_saberLoad dumper: compiled with -DQAGAME (jampgame == Raven's QAGAME),
 # linking the unmodified bg_saberLoad.c + q_shared.c (COM_* parser + string
