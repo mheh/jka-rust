@@ -317,8 +317,7 @@ pub fn SV_TouchCGame(view: &mut EngineHostView) {
         "cgamex86.dll".to_string()
     };
 
-    let filename_c = CString::new(filename).unwrap_or_default();
-    FS_FOpenFileRead(view, filename_c.as_ptr(), &mut f, qboolean::from(0));
+    FS_FOpenFileRead(view, &filename, &mut f, false);
     if f != 0 {
         FS_FCloseFile(view.common, f);
     }
@@ -525,7 +524,7 @@ pub fn SV_SpawnServer(
     view: &mut EngineHostView,
     sv: &mut Server,
     g2: &mut Ghoul2System,
-    server: *mut c_char,
+    server: &str,
     killBots: qboolean,
     eForceReload: ForceReload_e,
 ) {
@@ -542,15 +541,7 @@ pub fn SV_SpawnServer(
     SV_ShutdownGameProgs_body(view.common, sv);
 
     com_printf(view.common, "------ Server Initialization ------\n");
-    unsafe {
-        com_printf(
-            view.common,
-            &format!(
-                "Server: {}\n",
-                core::ffi::CStr::from_ptr(server).to_string_lossy()
-            ),
-        );
-    }
+    com_printf(view.common, &format!("Server: {server}\n"));
 
     /*
     Ghoul2 Insert Start
@@ -668,22 +659,17 @@ pub fn SV_SpawnServer(
         ^ Com_Milliseconds(view);
     FS_Restart(view, sv.sv.checksumFeed);
 
-    unsafe {
-        let map_va = CString::new(format!(
-            "maps/{}.bsp",
-            core::ffi::CStr::from_ptr(server).to_string_lossy()
-        ))
-        .unwrap_or_default();
-        CM_LoadMap(view, map_va.as_ptr(), qboolean::from(0), &mut checksum);
-    }
+    CM_LoadMap(
+        view,
+        &format!("maps/{server}.bsp"),
+        qboolean::from(0),
+        &mut checksum,
+    );
 
     SV_SendMapChange(view, sv);
 
     // set serverinfo visible name
-    let server_s = unsafe { CStr::from_ptr(server) }
-        .to_string_lossy()
-        .into_owned();
-    Cvar_Set(view, "mapname", &server_s);
+    Cvar_Set(view, "mapname", server);
 
     Cvar_Set(view, "sv_mapChecksum", &format!("{checksum}"));
 
@@ -703,17 +689,14 @@ pub fn SV_SpawnServer(
     // Engine referee: arm record/replay for this map load. Placed just before
     // SV_InitGameProgs so the GAME_INIT randomSeed pin lands on its
     // Com_Milliseconds read.
-    let ref_map = unsafe { core::ffi::CStr::from_ptr(server) }
-        .to_string_lossy()
-        .into_owned();
-    crate::sv_referee::ref_spawn_setup(view, sv, &ref_map);
+    crate::sv_referee::ref_spawn_setup(view, sv, server);
 
     // load and spawn all other entities
     SV_InitGameProgs(view, sv);
 
     // Engine referee: now that GAME_INIT has run (and the seed is captured),
     // append the tape `H` header (record mode only).
-    crate::sv_referee::ref_spawn_write_header(view, sv, &ref_map);
+    crate::sv_referee::ref_spawn_write_header(view, sv, server);
 
     // don't allow a map_restart if game is modified
     view.common.cvar_mut(view.common.sv_gametype).modified = false;
@@ -746,7 +729,7 @@ pub fn SV_SpawnServer(
             if (*client).state >= clientState_t::CS_CONNECTED {
                 if (*client).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
                     if killBots != 0 {
-                        SV_DropClient(view.common, sv, client, c"".as_ptr());
+                        SV_DropClient(view.common, sv, client, "");
                         continue;
                     }
                     isBot = qboolean::from(1);
@@ -765,7 +748,9 @@ pub fn SV_SpawnServer(
                 if !denied.is_null() {
                     // this generally shouldn't happen, because the client
                     // was connected before the level change
-                    SV_DropClient(view.common, sv, client, denied);
+                    // (module-memory seam: convert the denial text at the arm)
+                    let denied = core::ffi::CStr::from_ptr(denied).to_string_lossy();
+                    SV_DropClient(view.common, sv, client, &denied);
                 } else if isBot == 0 {
                     // when we get the next packet from a connected client,
                     // the new gamestate will be sent

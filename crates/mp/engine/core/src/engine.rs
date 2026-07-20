@@ -156,6 +156,34 @@ impl Engine {
             // (all None) under the alloc_zeroed mass.
             addr_of_mut!((*p).common.cvar_indexes).write(Vec::new());
             addr_of_mut!((*p).common.cvar_vars).write(Vec::new());
+            // Common.fs_gamedir / lastValidBase / lastValidGame: owned Strings
+            // (string-data migration), not zero-valid.
+            addr_of_mut!((*p).common.fs_gamedir).write(String::new());
+            addr_of_mut!((*p).common.lastValidBase).write(String::new());
+            addr_of_mut!((*p).common.lastValidGame).write(String::new());
+            // Common.fs_serverPakNames / fs_serverReferencedPakNames: owned
+            // pak-name lists (string-data migration), not zero-valid; capacity
+            // pre-sized to Raven's MAX_SEARCH_PATHS bound (enforced by the
+            // single writer fns).
+            addr_of_mut!((*p).common.fs_serverPakNames).write(Vec::with_capacity(
+                mp_engine_qcommon::files::files_consts::MAX_SEARCH_PATHS,
+            ));
+            addr_of_mut!((*p).common.fs_serverReferencedPakNames).write(Vec::with_capacity(
+                mp_engine_qcommon::files::files_consts::MAX_SEARCH_PATHS,
+            ));
+            // Common.com_consoleLines: owned startup command-line split
+            // (string-data migration), not zero-valid; capacity pre-sized to
+            // Raven's MAX_CONSOLE_LINES bound (enforced by Com_ParseCommandLine).
+            addr_of_mut!((*p).common.com_consoleLines).write(Vec::with_capacity(
+                mp_engine_qcommon::common::common_consts::MAX_CONSOLE_LINES,
+            ));
+            // Common.cmd_argv: Vec-backed tokenized console args (string-data
+            // migration), not zero-valid; capacity pre-sized to Raven's
+            // MAX_STRING_TOKENS bound (enforced by Cmd_TokenizeString's own
+            // guard).
+            addr_of_mut!((*p).common.cmd_argv).write(Vec::with_capacity(
+                mp_qshared::shared::limits::MAX_STRING_TOKENS,
+            ));
             // Common.hooks (ruling 2026-07-12): the qcommon->server/client/sound
             // upcall table. Option<fn> is null-niche zero-valid (all None under
             // the alloc_zeroed mass), but boot installs the null-build client/

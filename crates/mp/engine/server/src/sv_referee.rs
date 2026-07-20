@@ -626,21 +626,15 @@ pub fn ref_tap_client_think(sv: &mut Server, cl: *const client_t, cmd: *const us
 
 /// RECORD tap at `SV_ExecuteClientCommand` entry — catches "begin"/userinfo/say
 /// (incl. bot chat via the botlib client-command trap).
-pub fn ref_tap_execute_command(
-    sv: &mut Server,
-    cl: *const client_t,
-    s: *const c_char,
-    client_ok: c_int,
-) {
+pub fn ref_tap_execute_command(sv: &mut Server, cl: *const client_t, s: &str, client_ok: c_int) {
     if sv.referee.mode != RefMode::Record {
         return;
     }
     let client = unsafe { client_index(sv, cl) };
-    let cmd = unsafe { CStr::from_ptr(s) }.to_bytes().to_vec();
     sv.referee.emit(&format!(
         "X {client} {} {}",
         if client_ok != 0 { 1 } else { 0 },
-        hex_encode(&cmd)
+        hex_encode(s.as_bytes())
     ));
 }
 
@@ -1241,15 +1235,8 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             unsafe {
                 (*cl).lastPacketTime = sv.svs.time; // see Rec::Think
             }
-            let mut cstr = cmd.clone();
-            cstr.push(0);
-            SV_ExecuteClientCommand(
-                view,
-                sv,
-                cl,
-                cstr.as_ptr() as *const c_char,
-                if ok != 0 { qtrue } else { qfalse },
-            );
+            let cmd_str = String::from_utf8_lossy(&cmd).into_owned();
+            SV_ExecuteClientCommand(view, sv, cl, &cmd_str, if ok != 0 { qtrue } else { qfalse });
         }
         Rec::Connect { client, userinfo } => {
             if !ref_client_in_range(view, client) {
@@ -1304,7 +1291,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             // frames remain I/O-suppressed; the next `C` on this slot resets it.
             sv.referee.injected_slots &= !(1u64 << (client as u32 & 63));
             let cl = unsafe { sv.svs.clients.add(client as usize) };
-            crate::SV_DropClient(view.common, sv, cl, c"replay drop".as_ptr());
+            crate::SV_DropClient(view.common, sv, cl, "replay drop");
         }
         Rec::Header { .. }
         | Rec::Frame { .. }
@@ -1387,7 +1374,7 @@ fn ref_replay_finish(view: &mut EngineHostView, sv: &mut Server) {
         view.common,
         &format!("REF REPLAY COMPLETE frames={n} divergences={d}\n"),
     );
-    Cbuf_AddText(view.common, c"quit\n".as_ptr());
+    Cbuf_AddText(view.common, "quit\n");
 }
 
 // ===========================================================================

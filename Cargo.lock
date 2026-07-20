@@ -259,6 +259,7 @@ dependencies = [
  "mp_renderer",
  "native_math",
  "native_platform",
+ "native_string",
  "native_types",
 ]
 

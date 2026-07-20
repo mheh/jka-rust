@@ -235,7 +235,11 @@ extern "C" fn bot_import_fs_fopen_file(
 ) -> c_int {
     // SAFETY: single-threaded callback; the armed slot's islands are live.
     let mut view = unsafe { ctx_view(ctx()) };
-    FS_FOpenFileByMode(&mut view, qpath, file, mode)
+    // botlib C-callback seam: one conversion at the head.
+    let qpath = unsafe { core::ffi::CStr::from_ptr(qpath) }
+        .to_string_lossy()
+        .into_owned();
+    FS_FOpenFileByMode(&mut view, &qpath, file, mode)
 }
 
 /// Raven `FS_Read2` (installed as `FS_Read`, `sv_bot.cpp:708`).
@@ -317,7 +321,9 @@ extern "C" fn bot_import_bot_client_command(client: c_int, command: *mut c_char)
         let mut view = ctx_view(c);
         let sv = &mut *c.sv;
         let cl = sv.svs.clients.offset(client as isize);
-        SV_ExecuteClientCommand(&mut view, sv, cl, command, qtrue);
+        // botlib C-callback seam: one conversion at the head.
+        let command = core::ffi::CStr::from_ptr(command).to_string_lossy();
+        SV_ExecuteClientCommand(&mut view, sv, cl, &command, qtrue);
     }
 }
 

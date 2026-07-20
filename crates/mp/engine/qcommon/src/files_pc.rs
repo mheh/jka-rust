@@ -7,20 +7,20 @@ use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
 
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
-use mp_qshared::shared::limits::MAX_STRING_TOKENS;
-use mp_qshared::shared::qboolean;
 use mp_qshared::shared::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
+use mp_qshared::shared::{qboolean, qfalse, qtrue};
 use native_types::fileHandle_t;
 
+use crate::common::com_error;
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
-use crate::files::file_in_pack_s::fileInPack_t;
 use crate::files::files_consts::{BASEGAME, MAX_SEARCH_PATHS};
 use crate::files::pack_t::pack_t;
 use crate::files::searchpath_s::searchpath_t;
 use crate::qcommon::filesystem_limits::{
     FS_CGAME_REF, FS_GENERAL_REF, FS_QAGAME_REF, FS_UI_REF, NUM_ID_PAKS,
 };
+use crate::unzip::unztell;
 
 // Raven `S_ClearSoundBuffer` (Raven: `return;` in the null/no-sound build) is
 // canonically ported at `mp_engine_client::null::null_snddma::S_ClearSoundBuffer`,
@@ -37,15 +37,17 @@ mod null {
 // canonical `files_common` home; `Sys_*` platform I/O at `native_platform`;
 // `unzOpenCurrentFile` at the unzip reader; `Z_Malloc`/`Z_Free` at
 // `z_memman_pc`. All genuinely unported; reported.
+use crate::cmd_common::{Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use crate::files::unz_file::unzOpenCurrentFile;
 use crate::files_common::{
     FS_AddGameDirectory, FS_BuildOSPath4, FS_CopyFile, FS_CreatePath, FS_FCloseFile,
-    FS_FOpenFileRead, FS_FOpenFileWrite, FS_FileForHandle, FS_FreeFileList, FS_HandleForFile,
+    FS_FOpenFileRead, FS_FOpenFileWrite, FS_FileForHandle, FS_FilenameCompare, FS_HandleForFile,
     FS_ListFiles, FS_Read, FS_Restart, FS_SV_FOpenFileRead,
 };
 use crate::sys_engine::{Sys_StreamSeek, Sys_StreamedRead};
-use crate::z_memman_pc::{CopyString, Z_Free};
-use native_platform::{Sys_BeginStreamedFile, Sys_FreeFileList, Sys_ListFiles};
+use native_platform::{sys_fopen, sys_remove, sys_rename, Sys_BeginStreamedFile, Sys_ListFiles};
+use native_string::atoi::atoi;
+use native_string::q_strncpyz::Q_strncpyz;
 
 /// Raven `FS_PakIsPure`.
 ///
@@ -63,31 +65,24 @@ pub fn FS_PakIsPure(common: &mut Common, pack: *mut pack_t) -> qboolean {
     mp_qshared::shared::qtrue
 }
 
-/// Raven `FS_HashFileName`.
+/// Raven `FS_HashFileName` (`letter` stays Raven's signed `char` in the
+/// accumulate, so high bytes contribute negatively).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:64-82`
-pub fn FS_HashFileName(fname: *const c_char, hashSize: c_int) -> c_long {
+pub fn FS_HashFileName(fname: &str, hashSize: c_int) -> c_long {
     let mut hash: c_long = 0;
-    let mut i: isize = 0;
-    unsafe {
-        loop {
-            let c = *fname.offset(i);
-            if c == 0 {
-                break;
-            }
-            let mut letter = (c as u8 as char).to_ascii_lowercase() as c_char;
-            if letter == b'.' as c_char {
-                break; // don't include extension
-            }
-            if letter == b'\\' as c_char {
-                letter = b'/' as c_char; // damn path names
-            }
-            if letter == b'/' as c_char {
-                letter = b'/' as c_char; // damn path names
-            }
-            hash += (letter as c_long) * (i as c_long + 119);
-            i += 1;
+    for (i, b) in fname.bytes().enumerate() {
+        let mut letter = b.to_ascii_lowercase() as i8;
+        if letter == b'.' as i8 {
+            break; // don't include extension
         }
+        if letter == b'\\' as i8 {
+            letter = b'/' as i8; // damn path names
+        }
+        if letter == b'/' as i8 {
+            letter = b'/' as i8; // damn path names
+        }
+        hash += (letter as c_long) * (i as c_long + 119);
     }
     hash = hash ^ (hash >> 10) ^ (hash >> 20);
     hash &= (hashSize as c_long) - 1;
@@ -97,10 +92,8 @@ pub fn FS_HashFileName(fname: *const c_char, hashSize: c_int) -> c_long {
 /// Raven `FS_Remove`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:213-215`
-pub fn FS_Remove(osPath: *const c_char) {
-    unsafe {
-        libc::remove(osPath);
-    }
+pub fn FS_Remove(osPath: &str) {
+    sys_remove(osPath);
 }
 
 /// Raven `Sys_GetFileTime`.
@@ -160,55 +153,39 @@ pub fn FS_FileCacheable(common: &mut Common, filename: *const c_char) -> bool {
     unsafe { !libc::strchr(filename, b'/' as c_int).is_null() }
 }
 
-/// Raven `FS_ShiftedStrStr`.
+/// Raven `FS_ShiftedStrStr` (§C7 bool: `true` = found) — `strstr` for the
+/// obfuscated pak-reference needles, un-shifting the needle first.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:649-658`
-pub fn FS_ShiftedStrStr(
-    string: *const c_char,
-    substring: *const c_char,
-    shift: c_int,
-) -> *mut c_char {
-    let mut buf = [0 as c_char; MAX_STRING_TOKENS];
-    let mut i: isize = 0;
-    unsafe {
-        loop {
-            let c = *substring.offset(i);
-            if c == 0 {
-                break;
-            }
-            buf[i as usize] = c + shift as c_char;
-            i += 1;
-        }
-        buf[i as usize] = 0;
-        libc::strstr(string, buf.as_ptr())
-    }
+pub fn FS_ShiftedStrStr(string: &str, substring: &str, shift: i8) -> bool {
+    let needle: Vec<u8> = substring
+        .bytes()
+        .map(|b| b.wrapping_add(shift as u8))
+        .collect();
+    !needle.is_empty()
+        && string
+            .as_bytes()
+            .windows(needle.len())
+            .any(|w| w == needle.as_slice())
 }
 
-/// Raven `FS_ReturnPath`.
+/// Raven `FS_ReturnPath` — the (last-separator offset, separator depth) of a
+/// qpath (Raven's `zpath` truncated-copy out-param is unread by its one
+/// caller and dropped).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1534-1555`
-pub fn FS_ReturnPath(zname: *const c_char, zpath: *mut c_char, depth: *mut c_int) -> c_int {
+pub fn FS_ReturnPath(zname: &str) -> (c_int, c_int) {
     let mut len: c_int = 0;
-    let mut at: isize = 0;
     let mut newdep: c_int = 0;
 
-    unsafe {
-        *zpath = 0;
-
-        while *zname.offset(at) != 0 {
-            let c = *zname.offset(at);
-            if c == b'/' as c_char || c == b'\\' as c_char {
-                len = at as c_int;
-                newdep += 1;
-            }
-            at += 1;
+    for (at, c) in zname.bytes().enumerate() {
+        if c == b'/' || c == b'\\' {
+            len = at as c_int;
+            newdep += 1;
         }
-        libc::strcpy(zpath, zname);
-        *zpath.offset(len as isize) = 0;
-        *depth = newdep;
     }
 
-    len
+    (len, newdep)
 }
 
 /// Raven `Sys_CountFileList`.
@@ -231,46 +208,30 @@ pub fn Sys_CountFileList(list: *mut *mut c_char) -> c_uint {
 /// Raven `FS_ConvertPath`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2025-2032`
-pub fn FS_ConvertPath(s: *mut c_char) {
-    unsafe {
-        let mut p = s;
-        while *p != 0 {
-            if *p == b'\\' as c_char || *p == b':' as c_char {
-                *p = b'/' as c_char;
-            }
-            p = p.add(1);
-        }
-    }
+pub fn FS_ConvertPath(s: &mut String) {
+    *s = s.replace(['\\', ':'], "/");
 }
 
-/// Raven `FS_PathCmp`.
+/// Raven `FS_PathCmp` — case-folded with `\`/`:` normalized to `/`, compared
+/// as Raven's signed-`char` ints (high bytes order negative).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2041-2071`
-pub fn FS_PathCmp(s1: *const c_char, s2: *const c_char) -> c_int {
-    let mut p1 = s1;
-    let mut p2 = s2;
+pub fn FS_PathCmp(s1: &str, s2: &str) -> c_int {
+    let fold = |c: u8| -> c_int {
+        let mut c = c as i8 as c_int;
+        if (b'a' as c_int..=b'z' as c_int).contains(&c) {
+            c -= b'a' as c_int - b'A' as c_int;
+        }
+        if c == b'\\' as c_int || c == b':' as c_int {
+            c = b'/' as c_int;
+        }
+        c
+    };
+    let mut it1 = s1.bytes();
+    let mut it2 = s2.bytes();
     loop {
-        let (mut c1, mut c2);
-        unsafe {
-            c1 = *p1 as c_int;
-            c2 = *p2 as c_int;
-            p1 = p1.add(1);
-            p2 = p2.add(1);
-        }
-
-        if (b'a' as c_int..=b'z' as c_int).contains(&c1) {
-            c1 -= b'a' as c_int - b'A' as c_int;
-        }
-        if (b'a' as c_int..=b'z' as c_int).contains(&c2) {
-            c2 -= b'a' as c_int - b'A' as c_int;
-        }
-
-        if c1 == b'\\' as c_int || c1 == b':' as c_int {
-            c1 = b'/' as c_int;
-        }
-        if c2 == b'\\' as c_int || c2 == b':' as c_int {
-            c2 = b'/' as c_int;
-        }
+        let c1 = it1.next().map_or(0, fold);
+        let c2 = it2.next().map_or(0, fold);
 
         if c1 < c2 {
             return -1; // strings not equal
@@ -383,7 +344,7 @@ pub fn FS_LoadedPakNames(common: &mut Common) -> *const c_char {
                 if !info.is_empty() {
                     info.push(' ');
                 }
-                info.push_str(&c_str_to_string((*(*search).pack).pakBasename.as_ptr()));
+                info.push_str(&(*(*search).pack).pakBasename);
             }
             search = (*search).next;
         }
@@ -418,8 +379,7 @@ pub fn FS_ReferencedPakChecksums(common: &mut Common) -> *const c_char {
         while !search.is_null() {
             if !(*search).pack.is_null() {
                 let pak = (*search).pack;
-                let gamename = c_str_to_string((*pak).pakGamename.as_ptr());
-                if (*pak).referenced != 0 || !gamename.eq_ignore_ascii_case(BASEGAME) {
+                if (*pak).referenced != 0 || !(*pak).pakGamename.eq_ignore_ascii_case(BASEGAME) {
                     info.push_str(&format!("{} ", (*pak).checksum));
                 }
             }
@@ -485,11 +445,10 @@ pub fn FS_ReferencedPakNames(common: &mut Common) -> *const c_char {
                     info.push(' ');
                 }
                 let pak = (*search).pack;
-                let gamename = c_str_to_string((*pak).pakGamename.as_ptr());
-                if (*pak).referenced != 0 || !gamename.eq_ignore_ascii_case(BASEGAME) {
-                    info.push_str(&gamename);
+                if (*pak).referenced != 0 || !(*pak).pakGamename.eq_ignore_ascii_case(BASEGAME) {
+                    info.push_str(&(*pak).pakGamename);
                     info.push('/');
-                    info.push_str(&c_str_to_string((*pak).pakBasename.as_ptr()));
+                    info.push_str(&(*pak).pakBasename);
                 }
             }
             search = (*search).next;
@@ -526,36 +485,19 @@ pub fn FS_Flush(common: &mut Common, f: fileHandle_t) {
     }
 }
 
-/// Raven `paksort`.
-///
-/// Source: `oracle/codemp/qcommon/files_pc.cpp:2194-2201`
-pub fn paksort(a: *const (), b: *const ()) -> c_int {
-    unsafe {
-        let aa = *(a as *const *const c_char);
-        let bb = *(b as *const *const c_char);
-        FS_PathCmp(aa, bb)
-    }
-}
+// Raven `paksort` (files_pc.cpp:2194-2201), the C `qsort` comparator shim, is
+// dropped: the owned pak lists sort directly through `FS_PathCmp`.
 
-/// Raven `FS_idPak`.
+/// Raven `FS_idPak` (§C7 bool: `true` = one of the id paks).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2301-2313`
-pub fn FS_idPak(pak: *mut c_char, base: *mut c_char) -> qboolean {
-    let base_str = unsafe { c_str_to_string(base) };
-    let mut i = 0;
-    while i < NUM_ID_PAKS {
-        let candidate = format!("{}/assets{}", base_str, i);
-        let candidate_c = std::ffi::CString::new(candidate).unwrap();
-        if crate::files_common::FS_FilenameCompare(pak, candidate_c.as_ptr()) == 0 {
-            break;
+pub fn FS_idPak(pak: &str, base: &str) -> bool {
+    for i in 0..NUM_ID_PAKS {
+        if FS_FilenameCompare(pak, &format!("{base}/assets{i}")) {
+            return true;
         }
-        i += 1;
     }
-    if i < NUM_ID_PAKS {
-        mp_qshared::shared::qtrue
-    } else {
-        mp_qshared::shared::qfalse
-    }
+    false
 }
 
 /// Raven `FS_FTell`.
@@ -571,45 +513,34 @@ pub fn FS_FTell(common: &mut Common, f: fileHandle_t) -> c_int {
     }
 }
 
-/// Raven `FS_FileExists`.
+/// Raven `FS_FileExists` (§C7 bool: `true` = present).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:227-240`
-pub fn FS_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
-    let homepath = common.cvar_cstring(common.fs_homepath);
-    unsafe {
-        let testpath = crate::files_common::FS_BuildOSPath4(
-            common,
-            homepath.as_ptr(),
-            common.fs_gamedir.as_ptr(),
-            file,
-        );
-        let f = libc::fopen(testpath, c"rb".as_ptr());
-        if !f.is_null() {
-            libc::fclose(f);
-            return mp_qshared::shared::qtrue;
-        }
+pub fn FS_FileExists(common: &mut Common, file: &str) -> bool {
+    let homepath = common.cvar(common.fs_homepath).string.clone();
+    let testpath = FS_BuildOSPath4(common, &homepath, &common.fs_gamedir.clone(), file);
+    let f = sys_fopen(&testpath, c"rb");
+    if !f.is_null() {
+        unsafe { libc::fclose(f) };
+        return true;
     }
-    mp_qshared::shared::qfalse
+    false
 }
 
-/// Raven `FS_SV_FileExists`.
+/// Raven `FS_SV_FileExists` (§C7 bool: `true` = present).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:249-263`
-pub fn FS_SV_FileExists(common: &mut Common, file: *const c_char) -> qboolean {
-    let homepath = common.cvar_cstring(common.fs_homepath);
-    unsafe {
-        let testpath =
-            crate::files_common::FS_BuildOSPath4(common, homepath.as_ptr(), file, c"".as_ptr());
-        let len = libc::strlen(testpath);
-        *testpath.add(len - 1) = 0;
+pub fn FS_SV_FileExists(common: &mut Common, file: &str) -> bool {
+    let homepath = common.cvar(common.fs_homepath).string.clone();
+    let mut testpath = FS_BuildOSPath4(common, &homepath, file, "");
+    testpath.pop(); // strip the trailing slash
 
-        let f = libc::fopen(testpath, c"rb".as_ptr());
-        if !f.is_null() {
-            libc::fclose(f);
-            return mp_qshared::shared::qtrue;
-        }
+    let f = sys_fopen(&testpath, c"rb");
+    if !f.is_null() {
+        unsafe { libc::fclose(f) };
+        return true;
     }
-    mp_qshared::shared::qfalse
+    false
 }
 
 /// Raven `FS_ComparePaks`.
@@ -629,18 +560,15 @@ pub fn FS_ComparePaks(
         *neededpaks = 0;
 
         for i in 0..common.fs_numServerReferencedPaks as usize {
-            let mut havepak = mp_qshared::shared::qfalse;
+            let mut havepak = false;
 
             // never autodownload any of the id paks
-            let base_c = c"base".as_ptr();
-            let missionpack_c = c"missionpack".as_ptr();
-            if FS_idPak(common.fs_serverReferencedPakNames[i], base_c as *mut c_char)
-                != mp_qshared::shared::qfalse
-                || FS_idPak(
-                    common.fs_serverReferencedPakNames[i],
-                    missionpack_c as *mut c_char,
-                ) != mp_qshared::shared::qfalse
-            {
+            let name = common
+                .fs_serverReferencedPakNames
+                .get(i)
+                .cloned()
+                .unwrap_or_default();
+            if FS_idPak(&name, "base") || FS_idPak(&name, "missionpack") {
                 continue;
             }
 
@@ -649,18 +577,14 @@ pub fn FS_ComparePaks(
                 if !(*sp).pack.is_null()
                     && (*(*sp).pack).checksum == common.fs_serverReferencedPaks[i]
                 {
-                    havepak = mp_qshared::shared::qtrue; // This is it!
+                    havepak = true; // This is it!
                     break;
                 }
                 sp = (*sp).next;
             }
 
-            if havepak == mp_qshared::shared::qfalse
-                && !common.fs_serverReferencedPakNames[i].is_null()
-                && *common.fs_serverReferencedPakNames[i] != 0
-            {
+            if !havepak && !name.is_empty() {
                 // Don't got it
-                let name = c_str_to_string(common.fs_serverReferencedPakNames[i]);
                 if dlstring != mp_qshared::shared::qfalse {
                     // Remote name
                     append_cstr(neededpaks, len, "@");
@@ -670,8 +594,7 @@ pub fn FS_ComparePaks(
                     // Local name
                     append_cstr(neededpaks, len, "@");
                     // Do we have one with the same name?
-                    let dl_name = std::ffi::CString::new(format!("{}.pk3", name)).unwrap();
-                    if FS_SV_FileExists(common, dl_name.as_ptr()) != mp_qshared::shared::qfalse {
+                    if FS_SV_FileExists(common, &format!("{}.pk3", name)) {
                         // We already have one called this, we need to download it to another name
                         // Make something up with the checksum in it
                         let st = format!("{}.{:08x}.pk3", name, common.fs_serverReferencedPaks[i]);
@@ -684,8 +607,7 @@ pub fn FS_ComparePaks(
                     append_cstr(neededpaks, len, &name);
                     append_cstr(neededpaks, len, ".pk3");
                     // Do we have one with the same name?
-                    let dl_name = std::ffi::CString::new(format!("{}.pk3", name)).unwrap();
-                    if FS_SV_FileExists(common, dl_name.as_ptr()) != mp_qshared::shared::qfalse {
+                    if FS_SV_FileExists(common, &format!("{}.pk3", name)) {
                         append_cstr(neededpaks, len, " (local file exists with wrong checksum)");
                     }
                     append_cstr(neededpaks, len, "\n");
@@ -703,7 +625,7 @@ pub fn FS_ComparePaks(
 /// Raven `FS_SV_FOpenFileWrite`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:272-304`
-pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fileHandle_t {
+pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: &str) -> fileHandle_t {
     if common.fs_searchpaths.is_null() {
         crate::common::com_error(
             errorParm_t::ERR_FATAL,
@@ -711,49 +633,40 @@ pub fn FS_SV_FOpenFileWrite(common: &mut Common, filename: *const c_char) -> fil
         );
     }
 
-    let homepath = common.cvar_cstring(common.fs_homepath);
+    let homepath = common.cvar(common.fs_homepath).string.clone();
+    let mut ospath = FS_BuildOSPath4(common, &homepath, filename, "");
+    ospath.pop(); // strip the trailing slash
+
+    let f = FS_HandleForFile(common);
+    common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
+
+    if common.cvar(common.fs_debug).integer != 0 {
+        crate::common::com_printf(common, &format!("FS_SV_FOpenFileWrite: {ospath}\n"));
+    }
+
+    if FS_CreatePath(common, &ospath) {
+        return 0;
+    }
+
     unsafe {
-        let ospath =
-            crate::files_common::FS_BuildOSPath4(common, homepath.as_ptr(), filename, c"".as_ptr());
-        let len = libc::strlen(ospath);
-        *ospath.add(len - 1) = 0;
-
-        let f = FS_HandleForFile(common);
-        common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
-
-        if common.cvar(common.fs_debug).integer != 0 {
-            crate::common::com_printf(
-                common,
-                &format!("FS_SV_FOpenFileWrite: {}\n", c_str_to_string(ospath)),
-            );
-        }
-
-        if FS_CreatePath(common, ospath) != 0 {
-            return 0;
-        }
-
         // Com_DPrintf( "writing to: %s\n", ospath );
-        common.fsh[f as usize].handleFiles.file.o =
-            libc::fopen(ospath, c"wb".as_ptr()) as *mut c_void;
+        common.fsh[f as usize].handleFiles.file.o = sys_fopen(&ospath, c"wb") as *mut c_void;
 
-        copy_cname(
-            common.fsh[f as usize].name.as_mut_ptr(),
-            filename,
-            common.fsh[f as usize].name.len(),
-        );
+        let name_len = common.fsh[f as usize].name.len();
+        Q_strncpyz(&mut common.fsh[f as usize].name, filename, name_len);
 
         common.fsh[f as usize].handleSync = mp_qshared::shared::qfalse;
         if common.fsh[f as usize].handleFiles.file.o.is_null() {
             return 0;
         }
-        f
     }
+    f
 }
 
 /// Raven `FS_SV_Rename`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:395-419`
-pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
+pub fn FS_SV_Rename(common: &mut Common, from: &str, to: &str) {
     if common.fs_searchpaths.is_null() {
         crate::common::com_error(
             errorParm_t::ERR_FATAL,
@@ -764,36 +677,30 @@ pub fn FS_SV_Rename(common: &mut Common, from: *const c_char, to: *const c_char)
     // don't let sound stutter
     null::S_ClearSoundBuffer();
 
-    let homepath = common.cvar_cstring(common.fs_homepath);
-    unsafe {
-        let from_ospath = FS_BuildOSPath4(common, homepath.as_ptr(), from, c"".as_ptr());
-        let to_ospath = FS_BuildOSPath4(common, homepath.as_ptr(), to, c"".as_ptr());
-        *from_ospath.add(libc::strlen(from_ospath) - 1) = 0;
-        *to_ospath.add(libc::strlen(to_ospath) - 1) = 0;
+    let homepath = common.cvar(common.fs_homepath).string.clone();
+    let mut from_ospath = FS_BuildOSPath4(common, &homepath, from, "");
+    let mut to_ospath = FS_BuildOSPath4(common, &homepath, to, "");
+    from_ospath.pop(); // strip the trailing slash
+    to_ospath.pop();
 
-        if common.cvar(common.fs_debug).integer != 0 {
-            crate::common::com_printf(
-                common,
-                &format!(
-                    "FS_SV_Rename: {} --> {}\n",
-                    c_str_to_string(from_ospath),
-                    c_str_to_string(to_ospath)
-                ),
-            );
-        }
+    if common.cvar(common.fs_debug).integer != 0 {
+        crate::common::com_printf(
+            common,
+            &format!("FS_SV_Rename: {from_ospath} --> {to_ospath}\n"),
+        );
+    }
 
-        if libc::rename(from_ospath, to_ospath) != 0 {
-            // Failed, try copying it and deleting the original
-            FS_CopyFile(common, from_ospath, to_ospath);
-            FS_Remove(from_ospath);
-        }
+    if sys_rename(&from_ospath, &to_ospath) != 0 {
+        // Failed, try copying it and deleting the original
+        FS_CopyFile(common, &from_ospath, &to_ospath);
+        FS_Remove(&from_ospath);
     }
 }
 
 /// Raven `FS_Rename`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:427-449`
-pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
+pub fn FS_Rename(common: &mut Common, from: &str, to: &str) {
     if common.fs_searchpaths.is_null() {
         crate::common::com_error(
             errorParm_t::ERR_FATAL,
@@ -804,44 +711,29 @@ pub fn FS_Rename(common: &mut Common, from: *const c_char, to: *const c_char) {
     // don't let sound stutter
     null::S_ClearSoundBuffer();
 
-    let homepath = common.cvar_cstring(common.fs_homepath);
-    unsafe {
-        let from_ospath = crate::files_common::FS_BuildOSPath4(
-            common,
-            homepath.as_ptr(),
-            common.fs_gamedir.as_ptr(),
-            from,
-        );
-        let to_ospath = crate::files_common::FS_BuildOSPath4(
-            common,
-            homepath.as_ptr(),
-            common.fs_gamedir.as_ptr(),
-            to,
-        );
+    let homepath = common.cvar(common.fs_homepath).string.clone();
+    let gamedir = common.fs_gamedir.clone();
+    let from_ospath = FS_BuildOSPath4(common, &homepath, &gamedir, from);
+    let to_ospath = FS_BuildOSPath4(common, &homepath, &gamedir, to);
 
-        if common.cvar(common.fs_debug).integer != 0 {
-            crate::common::com_printf(
-                common,
-                &format!(
-                    "FS_Rename: {} --> {}\n",
-                    c_str_to_string(from_ospath),
-                    c_str_to_string(to_ospath)
-                ),
-            );
-        }
+    if common.cvar(common.fs_debug).integer != 0 {
+        crate::common::com_printf(
+            common,
+            &format!("FS_Rename: {from_ospath} --> {to_ospath}\n"),
+        );
+    }
 
-        if libc::rename(from_ospath, to_ospath) != 0 {
-            // Failed, try copying it and deleting the original
-            FS_CopyFile(common, from_ospath, to_ospath);
-            FS_Remove(from_ospath);
-        }
+    if sys_rename(&from_ospath, &to_ospath) != 0 {
+        // Failed, try copying it and deleting the original
+        FS_CopyFile(common, &from_ospath, &to_ospath);
+        FS_Remove(&from_ospath);
     }
 }
 
 /// Raven `FS_FOpenFileAppend`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:532-564`
-pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileHandle_t {
+pub fn FS_FOpenFileAppend(common: &mut Common, filename: &str) -> fileHandle_t {
     if common.fs_searchpaths.is_null() {
         crate::common::com_error(
             errorParm_t::ERR_FATAL,
@@ -852,43 +744,31 @@ pub fn FS_FOpenFileAppend(common: &mut Common, filename: *const c_char) -> fileH
     let f = FS_HandleForFile(common);
     common.fsh[f as usize].zipFile = mp_qshared::shared::qfalse;
 
-    copy_cname(
-        common.fsh[f as usize].name.as_mut_ptr(),
-        filename,
-        common.fsh[f as usize].name.len(),
-    );
+    let name_len = common.fsh[f as usize].name.len();
+    Q_strncpyz(&mut common.fsh[f as usize].name, filename, name_len);
 
     // don't let sound stutter
     null::S_ClearSoundBuffer();
 
-    let homepath = common.cvar_cstring(common.fs_homepath);
+    let homepath = common.cvar(common.fs_homepath).string.clone();
+    let ospath = FS_BuildOSPath4(common, &homepath, &common.fs_gamedir.clone(), filename);
+
+    if common.cvar(common.fs_debug).integer != 0 {
+        crate::common::com_printf(common, &format!("FS_FOpenFileAppend: {ospath}\n"));
+    }
+
+    if FS_CreatePath(common, &ospath) {
+        return 0;
+    }
+
     unsafe {
-        let ospath = crate::files_common::FS_BuildOSPath4(
-            common,
-            homepath.as_ptr(),
-            common.fs_gamedir.as_ptr(),
-            filename,
-        );
-
-        if common.cvar(common.fs_debug).integer != 0 {
-            crate::common::com_printf(
-                common,
-                &format!("FS_FOpenFileAppend: {}\n", c_str_to_string(ospath)),
-            );
-        }
-
-        if FS_CreatePath(common, ospath) != 0 {
-            return 0;
-        }
-
-        common.fsh[f as usize].handleFiles.file.o =
-            libc::fopen(ospath, c"ab".as_ptr()) as *mut c_void;
+        common.fsh[f as usize].handleFiles.file.o = sys_fopen(&ospath, c"ab") as *mut c_void;
         common.fsh[f as usize].handleSync = mp_qshared::shared::qfalse;
         if common.fsh[f as usize].handleFiles.file.o.is_null() {
             return 0;
         }
-        f
     }
+    f
 }
 
 /// Raven `FS_Read2`.
@@ -980,39 +860,25 @@ pub fn FS_Seek(view: &mut EngineHostView, f: fileHandle_t, offset: c_long, origi
     }
 }
 
-/// Raven `FS_FileIsInPAK`.
+/// Raven `FS_FileIsInPAK` — Raven's `1`/`-1` return plus optional
+/// `int *pChecksum` out-param collapse per §C7: `Some(pure_checksum)` when the
+/// file is in an allowed pak (the ruling-59a shape at the host seam).
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1191-1249`
-pub fn FS_FileIsInPAK(
-    common: &mut Common,
-    mut filename: *const c_char,
-    pChecksum: *mut c_int,
-) -> c_int {
+pub fn FS_FileIsInPAK(common: &mut Common, filename: &str) -> Option<c_int> {
     if common.fs_searchpaths.is_null() {
-        crate::common::com_error(
+        com_error(
             errorParm_t::ERR_FATAL,
             "Filesystem call made without initialization\n".to_string(),
         );
     }
 
-    if filename.is_null() {
-        crate::common::com_error(
-            errorParm_t::ERR_FATAL,
-            "FS_FOpenFileRead: NULL 'filename' parameter passed\n".to_string(),
-        );
-    }
-
-    unsafe {
-        // qpaths are not supposed to have a leading slash
-        if *filename == b'/' as c_char || *filename == b'\\' as c_char {
-            filename = filename.add(1);
-        }
-    }
+    // qpaths are not supposed to have a leading slash
+    let filename = filename.strip_prefix(['/', '\\']).unwrap_or(filename);
 
     // make absolutely sure that it can't back up the path.
-    let name = unsafe { c_str_to_string(filename) };
-    if name.contains("..") || name.contains("::") {
-        return -1;
+    if filename.contains("..") || filename.contains("::") {
+        return None;
     }
 
     // search through the path, one element at a time
@@ -1024,12 +890,7 @@ pub fn FS_FileIsInPAK(
                 hash = FS_HashFileName(filename, (*(*search).pack).hashSize);
             }
             // is the element a pak file?
-            if !(*search).pack.is_null()
-                && !(*(*search).pack)
-                    .hashTable
-                    .add(hash as usize)
-                    .read()
-                    .is_null()
+            if !(*search).pack.is_null() && (&(*(*search).pack).hashTable)[hash as usize].is_some()
             {
                 // disregard if it doesn't match one of the allowed pure pak files
                 if FS_PakIsPure(common, (*search).pack) == mp_qshared::shared::qfalse {
@@ -1038,26 +899,20 @@ pub fn FS_FileIsInPAK(
                 }
 
                 // look through all the pak file elements
-                let pak = (*search).pack;
-                let mut pakFile: *mut fileInPack_t = *(*pak).hashTable.add(hash as usize);
-                loop {
+                let pak = &*(*search).pack;
+                let mut pakFile = pak.hashTable[hash as usize];
+                while let Some(fi) = pakFile {
                     // case and separator insensitive comparisons
-                    if crate::files_common::FS_FilenameCompare((*pakFile).name, filename) == 0 {
-                        if !pChecksum.is_null() {
-                            *pChecksum = (*pak).pure_checksum;
-                        }
-                        return 1;
+                    if FS_FilenameCompare(&pak.buildBuffer[fi as usize].name, filename) {
+                        return Some(pak.pure_checksum);
                     }
-                    pakFile = (*pakFile).next;
-                    if pakFile.is_null() {
-                        break;
-                    }
+                    pakFile = pak.buildBuffer[fi as usize].next;
                 }
             }
             search = (*search).next;
         }
     }
-    -1
+    None
 }
 
 /// Raven `Sys_ConcatenateFileLists`.
@@ -1132,23 +987,19 @@ pub fn Sys_ConcatenateFileLists(
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2419-2436`
 pub fn FS_UpdateGamedir(view: &mut EngineHostView) {
-    let gamedirvar_str = view.common.cvar(view.common.fs_gamedirvar).string.clone();
-    if !gamedirvar_str.is_empty() && !gamedirvar_str.eq_ignore_ascii_case(BASEGAME) {
-        let gamedirvar = view.common.cvar_cstring(view.common.fs_gamedirvar);
-        let cdpath_str = view.common.cvar(view.common.fs_cdpath).string.clone();
-        if !cdpath_str.is_empty() {
-            let cdpath = view.common.cvar_cstring(view.common.fs_cdpath);
-            FS_AddGameDirectory(view, cdpath.as_ptr(), gamedirvar.as_ptr());
+    let gamedirvar = view.common.cvar(view.common.fs_gamedirvar).string.clone();
+    if !gamedirvar.is_empty() && !gamedirvar.eq_ignore_ascii_case(BASEGAME) {
+        let cdpath = view.common.cvar(view.common.fs_cdpath).string.clone();
+        if !cdpath.is_empty() {
+            FS_AddGameDirectory(view, &cdpath, &gamedirvar);
         }
-        let basepath_str = view.common.cvar(view.common.fs_basepath).string.clone();
-        if !basepath_str.is_empty() {
-            let basepath = view.common.cvar_cstring(view.common.fs_basepath);
-            FS_AddGameDirectory(view, basepath.as_ptr(), gamedirvar.as_ptr());
+        let basepath = view.common.cvar(view.common.fs_basepath).string.clone();
+        if !basepath.is_empty() {
+            FS_AddGameDirectory(view, &basepath, &gamedirvar);
         }
-        let homepath_str = view.common.cvar(view.common.fs_homepath).string.clone();
-        if !homepath_str.is_empty() && !homepath_str.eq_ignore_ascii_case(&basepath_str) {
-            let homepath = view.common.cvar_cstring(view.common.fs_homepath);
-            FS_AddGameDirectory(view, homepath.as_ptr(), gamedirvar.as_ptr());
+        let homepath = view.common.cvar(view.common.fs_homepath).string.clone();
+        if !homepath.is_empty() && !homepath.eq_ignore_ascii_case(&basepath) {
+            FS_AddGameDirectory(view, &homepath, &gamedirvar);
         }
     }
 }
@@ -1156,14 +1007,10 @@ pub fn FS_UpdateGamedir(view: &mut EngineHostView) {
 /// Raven `FS_PureServerSetReferencedPaks`.
 ///
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:2947-2981`
-pub fn FS_PureServerSetReferencedPaks(
-    view: &mut EngineHostView,
-    pakSums: *const c_char,
-    pakNames: *const c_char,
-) {
-    crate::cmd_common::Cmd_TokenizeString(view.common, pakSums);
+pub fn FS_PureServerSetReferencedPaks(view: &mut EngineHostView, pakSums: &str, pakNames: &str) {
+    Cmd_TokenizeString(view.common, pakSums);
 
-    let mut c = crate::cmd_common::Cmd_Argc(view.common);
+    let mut c = Cmd_Argc(view.common);
     if c > MAX_SEARCH_PATHS as c_int {
         c = MAX_SEARCH_PATHS as c_int;
     }
@@ -1171,37 +1018,21 @@ pub fn FS_PureServerSetReferencedPaks(
     view.common.fs_numServerReferencedPaks = c;
 
     for i in 0..c as usize {
-        let arg = crate::cmd_common::Cmd_Argv(view.common, i as c_int);
-        view.common.fs_serverReferencedPaks[i] = unsafe { libc::atoi(arg) };
+        view.common.fs_serverReferencedPaks[i] = atoi(Cmd_Argv(view.common, i as c_int));
     }
 
-    for i in 0..c as usize {
-        if !view.common.fs_serverReferencedPakNames[i].is_null() {
-            Z_Free(
-                view.common,
-                view.common.fs_serverReferencedPakNames[i] as *mut (),
-            );
-        }
-        view.common.fs_serverReferencedPakNames[i] = core::ptr::null_mut();
-    }
-    let names_str = unsafe {
-        if pakNames.is_null() {
-            String::new()
-        } else {
-            c_str_to_string(pakNames)
-        }
-    };
-    if !names_str.is_empty() {
-        crate::cmd_common::Cmd_TokenizeString(view.common, pakNames);
+    view.common.fs_serverReferencedPakNames.clear();
+    if !pakNames.is_empty() {
+        Cmd_TokenizeString(view.common, pakNames);
 
-        let mut d = crate::cmd_common::Cmd_Argc(view.common);
+        let mut d = Cmd_Argc(view.common);
         if d > MAX_SEARCH_PATHS as c_int {
             d = MAX_SEARCH_PATHS as c_int;
         }
 
         for i in 0..d as usize {
-            let arg = crate::cmd_common::Cmd_Argv(view.common, i as c_int);
-            view.common.fs_serverReferencedPakNames[i] = CopyString(view, arg);
+            let name = Cmd_Argv(view.common, i as c_int).to_owned();
+            view.common.fs_serverReferencedPakNames.push(name);
         }
     }
 }
@@ -1225,48 +1056,29 @@ pub fn FS_ConditionalRestart(view: &mut EngineHostView, checksumFeed: c_int) -> 
 pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c_int) -> c_int {
     let mut n_mods: c_int = 0;
     let mut n_total: c_int = 0;
+    let mut listbuf = listbuf;
 
-    let homepath = view.common.cvar_cstring(view.common.fs_homepath);
-    let basepath = view.common.cvar_cstring(view.common.fs_basepath);
-    let cdpath = view.common.cvar_cstring(view.common.fs_cdpath);
+    let homepath = view.common.cvar(view.common.fs_homepath).string.clone();
+    let basepath = view.common.cvar(view.common.fs_basepath).string.clone();
+    let cdpath = view.common.cvar(view.common.fs_cdpath).string.clone();
     unsafe {
         *listbuf = 0;
 
-        let mut dummy: c_int = 0;
-        let p_files0 = Sys_ListFiles(
-            homepath.as_ptr(),
-            core::ptr::null(),
-            core::ptr::null_mut(),
-            &mut dummy,
-            mp_qshared::shared::qtrue,
-        );
-        let p_files1 = Sys_ListFiles(
-            basepath.as_ptr(),
-            core::ptr::null(),
-            core::ptr::null_mut(),
-            &mut dummy,
-            mp_qshared::shared::qtrue,
-        );
-        let p_files2 = Sys_ListFiles(
-            cdpath.as_ptr(),
-            core::ptr::null(),
-            core::ptr::null_mut(),
-            &mut dummy,
-            mp_qshared::shared::qtrue,
-        );
         // we searched for mods in the three paths
         // it is likely that we have duplicate names now, which we will cleanup below
-        let p_files = Sys_ConcatenateFileLists(view, p_files0, p_files1, p_files2);
-        let n_potential = Sys_CountFileList(p_files);
+        // (Raven's Sys_ConcatenateFileLists is a Vec extend now.)
+        let mut p_files = Sys_ListFiles(&homepath, None, None, true);
+        p_files.extend(Sys_ListFiles(&basepath, None, None, true));
+        p_files.extend(Sys_ListFiles(&cdpath, None, None, true));
 
-        for i in 0..n_potential as isize {
-            let name = *p_files.offset(i);
+        for i in 0..p_files.len() {
+            let name_str = p_files[i].clone();
             // NOTE: cleaner would involve more changes
             // ignore duplicate mod directories
             let mut b_drop = false;
             if i != 0 {
                 for j in 0..i {
-                    if libc::strcasecmp(*p_files.offset(j), name) == 0 {
+                    if p_files[j].eq_ignore_ascii_case(&name_str) {
                         // this one can be dropped
                         b_drop = true;
                         break;
@@ -1276,58 +1088,35 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
             if b_drop {
                 continue;
             }
-            let name_str = c_str_to_string(name);
             // we drop "base" "." and ".."
             if !name_str.eq_ignore_ascii_case(BASEGAME) && !name_str.starts_with('.') {
                 // now we need to find some .pk3 files to validate the mod
-                let mut path = FS_BuildOSPath4(view.common, basepath.as_ptr(), name, c"".as_ptr());
-                let mut n_paks: c_int = 0;
-                let mut p_paks = Sys_ListFiles(
-                    path,
-                    c".pk3".as_ptr(),
-                    core::ptr::null_mut(),
-                    &mut n_paks,
-                    mp_qshared::shared::qfalse,
-                );
-                Sys_FreeFileList(p_paks); // we only use Sys_ListFiles to check wether .pk3 files are present
+                // (we only use Sys_ListFiles to check whether .pk3 files are present)
+                let mut path = FS_BuildOSPath4(view.common, &basepath, &name_str, "");
+                let mut n_paks = Sys_ListFiles(&path, Some(".pk3"), None, false).len();
 
                 // Try on cd path
-                if n_paks <= 0 {
-                    path = FS_BuildOSPath4(view.common, cdpath.as_ptr(), name, c"".as_ptr());
-                    n_paks = 0;
-                    p_paks = Sys_ListFiles(
-                        path,
-                        c".pk3".as_ptr(),
-                        core::ptr::null_mut(),
-                        &mut n_paks,
-                        mp_qshared::shared::qfalse,
-                    );
-                    Sys_FreeFileList(p_paks);
+                if n_paks == 0 {
+                    path = FS_BuildOSPath4(view.common, &cdpath, &name_str, "");
+                    n_paks = Sys_ListFiles(&path, Some(".pk3"), None, false).len();
                 }
 
                 // try on home path
-                if n_paks <= 0 {
-                    path = FS_BuildOSPath4(view.common, homepath.as_ptr(), name, c"".as_ptr());
-                    n_paks = 0;
-                    p_paks = Sys_ListFiles(
-                        path,
-                        c".pk3".as_ptr(),
-                        core::ptr::null_mut(),
-                        &mut n_paks,
-                        mp_qshared::shared::qfalse,
-                    );
-                    Sys_FreeFileList(p_paks);
+                if n_paks == 0 {
+                    path = FS_BuildOSPath4(view.common, &homepath, &name_str, "");
+                    n_paks = Sys_ListFiles(&path, Some(".pk3"), None, false).len();
                 }
 
                 if n_paks > 0 {
                     let n_len = name_str.len() + 1;
                     // nLen is the length of the mod path
                     // we need to see if there is a description available
-                    let desc_path_str = format!("{}/description.txt", name_str);
-                    let desc_path_c = std::ffi::CString::new(desc_path_str).unwrap();
                     let mut desc_handle: fileHandle_t = 0;
-                    let mut n_desc_len =
-                        FS_SV_FOpenFileRead(view.common, desc_path_c.as_ptr(), &mut desc_handle);
+                    let mut n_desc_len = FS_SV_FOpenFileRead(
+                        view.common,
+                        &format!("{}/description.txt", name_str),
+                        &mut desc_handle,
+                    );
                     let desc_str: String;
                     if n_desc_len > 0 && desc_handle != 0 {
                         let file = FS_FileForHandle(view.common, desc_handle);
@@ -1344,10 +1133,21 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
                     let n_desc_len = desc_str.len() + 1;
 
                     if (n_total as usize) + n_len + 1 + n_desc_len + 1 < bufsize as usize {
-                        copy_cname(listbuf, name, n_len);
-                        let listbuf2 = listbuf.add(n_len);
-                        let desc_c = std::ffi::CString::new(desc_str).unwrap();
-                        copy_cname(listbuf2, desc_c.as_ptr(), n_desc_len);
+                        // module listbuf packing (the trap seam), advancing per
+                        // Raven's `listbuf += nLen` (the prior port rewrote
+                        // every mod at offset 0)
+                        Q_strncpyz(
+                            core::slice::from_raw_parts_mut(listbuf, n_len),
+                            &name_str,
+                            n_len,
+                        );
+                        listbuf = listbuf.add(n_len);
+                        Q_strncpyz(
+                            core::slice::from_raw_parts_mut(listbuf, n_desc_len),
+                            &desc_str,
+                            n_desc_len,
+                        );
+                        listbuf = listbuf.add(n_desc_len);
                         n_total += (n_len + n_desc_len) as c_int;
                         n_mods += 1;
                     } else {
@@ -1356,7 +1156,6 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
                 }
             }
         }
-        Sys_FreeFileList(p_files);
     }
 
     n_mods
@@ -1367,32 +1166,28 @@ pub fn FS_GetModList(view: &mut EngineHostView, listbuf: *mut c_char, bufsize: c
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:3064-3116`
 pub fn FS_FOpenFileByMode(
     view: &mut EngineHostView,
-    qpath: *const c_char,
+    qpath: &str,
     f: *mut fileHandle_t,
     mode: fsMode_t,
 ) -> c_int {
-    let mut sync = mp_qshared::shared::qfalse;
+    let mut sync = qfalse;
 
     let r;
     match mode {
         m if m == FS_READ => {
-            r = FS_FOpenFileRead(view, qpath, f, mp_qshared::shared::qtrue);
+            r = FS_FOpenFileRead(view, qpath, f, true);
         }
         m if m == FS_WRITE => unsafe {
             *f = FS_FOpenFileWrite(view.common, qpath);
             r = if *f == 0 { -1 } else { 0 };
         },
         m if m == FS_APPEND_SYNC || m == FS_APPEND => unsafe {
-            sync = if m == FS_APPEND_SYNC {
-                mp_qshared::shared::qtrue
-            } else {
-                sync
-            };
+            sync = if m == FS_APPEND_SYNC { qtrue } else { sync };
             *f = FS_FOpenFileAppend(view.common, qpath);
             r = if *f == 0 { -1 } else { 0 };
         },
         _ => {
-            crate::common::com_error(
+            com_error(
                 errorParm_t::ERR_FATAL,
                 "FSH_FOpenFile: bad mode".to_string(),
             );
@@ -1405,20 +1200,20 @@ pub fn FS_FOpenFileByMode(
 
     unsafe {
         if *f != 0 {
-            if view.common.fsh[*f as usize].zipFile == mp_qshared::shared::qtrue {
+            if view.common.fsh[*f as usize].zipFile == qtrue {
                 view.common.fsh[*f as usize].baseOffset =
-                    crate::unzip::unztell(view.common.fsh[*f as usize].handleFiles.file.z) as c_int;
+                    unztell(view.common.fsh[*f as usize].handleFiles.file.z) as c_int;
             } else {
                 view.common.fsh[*f as usize].baseOffset =
                     libc::ftell(view.common.fsh[*f as usize].handleFiles.file.o as *mut libc::FILE)
                         as c_int;
             }
             view.common.fsh[*f as usize].fileSize = r;
-            view.common.fsh[*f as usize].streamed = mp_qshared::shared::qfalse;
+            view.common.fsh[*f as usize].streamed = qfalse;
 
             if mode == FS_READ {
                 Sys_BeginStreamedFile(*f, 0x4000);
-                view.common.fsh[*f as usize].streamed = mp_qshared::shared::qtrue;
+                view.common.fsh[*f as usize].streamed = qtrue;
             }
         }
         view.common.fsh[*f as usize].handleSync = sync;
@@ -1432,8 +1227,8 @@ pub fn FS_FOpenFileByMode(
 /// Source: `oracle/codemp/qcommon/files_pc.cpp:1758-1788`
 pub fn FS_GetFileList(
     view: &mut EngineHostView,
-    path: *const c_char,
-    extension: *const c_char,
+    path: &str,
+    extension: &str,
     listbuf: *mut c_char,
     bufsize: c_int,
 ) -> c_int {
@@ -1442,30 +1237,29 @@ pub fn FS_GetFileList(
     unsafe {
         *listbuf = 0;
 
-        if c_str_to_string(path) == "$modlist" {
+        if path == "$modlist" {
             return FS_GetModList(view, listbuf, bufsize);
         }
 
-        let mut n_files: c_int = 0;
-        let p_files = FS_ListFiles(view, path, extension, &mut n_files);
+        let files = FS_ListFiles(view, path, extension);
 
-        let mut i = 0;
+        let mut n_files = files.len() as c_int;
         let mut listbuf = listbuf;
-        while i < n_files {
-            let entry = *p_files.offset(i as isize);
-            let n_len = libc::strlen(entry) + 1;
+        for (i, entry) in files.iter().enumerate() {
+            let n_len = entry.len() + 1;
             if (n_total as usize) + n_len + 1 < bufsize as usize {
-                copy_cname(listbuf, entry, n_len);
+                Q_strncpyz(
+                    core::slice::from_raw_parts_mut(listbuf, n_len),
+                    entry,
+                    n_len,
+                );
                 listbuf = listbuf.add(n_len);
                 n_total += n_len as c_int;
             } else {
-                n_files = i;
+                n_files = i as c_int;
                 break;
             }
-            i += 1;
         }
-
-        FS_FreeFileList(view.common, p_files);
 
         n_files
     }
@@ -1500,13 +1294,5 @@ fn append_cstr(dst: *mut c_char, size: c_int, s: &str) {
         let copy_len = (c.as_bytes().len()).min(remaining);
         core::ptr::copy_nonoverlapping(c.as_ptr(), dst.add(cur), copy_len);
         *dst.add(cur + copy_len) = 0;
-    }
-}
-
-fn copy_cname(dst: *mut c_char, src: *const c_char, size: usize) {
-    unsafe {
-        let len = libc::strlen(src).min(size.saturating_sub(1));
-        core::ptr::copy_nonoverlapping(src, dst, len);
-        *dst.add(len) = 0;
     }
 }

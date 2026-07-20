@@ -4,12 +4,13 @@
 //!
 //! Source: `oracle/codemp/qcommon/cmd_pc.cpp`
 
-use core::ffi::{c_char, CStr};
+use core::ffi::c_char;
 use std::ffi::CString;
 
 use native_string::filter::Com_Filter;
 
 use crate::cmd::cmd_function_t::{cmd_function_t, CmdFunction};
+use crate::cmd_common::{Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
 
@@ -77,13 +78,8 @@ pub fn Cmd_CommandCompletion(common: &mut Common, callback: extern "C" fn(*const
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:153-173`
 pub fn Cmd_List_f(common: &mut Common) {
-    let match_: Option<String> = if crate::cmd_common::Cmd_Argc(common) > 1 {
-        let arg = crate::cmd_common::Cmd_Argv(common, 1);
-        Some(
-            unsafe { CStr::from_ptr(arg) }
-                .to_string_lossy()
-                .into_owned(),
-        )
+    let match_: Option<String> = if Cmd_Argc(common) > 1 {
+        Some(Cmd_Argv(common, 1).to_owned())
     } else {
         None
     };
@@ -107,22 +103,20 @@ pub fn Cmd_List_f(common: &mut Common) {
 /// `Cmd_ExecuteString`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_pc.cpp:91-145`
-pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: *const c_char) {
+pub fn Cmd_ExecuteString(view: &mut EngineHostView, text: &str) {
     // execute the command line
-    crate::cmd_common::Cmd_TokenizeString(view.common, text);
-    if crate::cmd_common::Cmd_Argc(view.common) == 0 {
+    Cmd_TokenizeString(view.common, text);
+    if Cmd_Argc(view.common) == 0 {
         return; // no tokens
     }
 
     // check registered command functions
-    let arg0 = unsafe { CStr::from_ptr(crate::cmd_common::Cmd_Argv(view.common, 0)) }
-        .to_bytes()
-        .to_vec();
+    let arg0 = Cmd_Argv(view.common, 0).to_owned();
     if let Some(idx) = view
         .common
         .cmd_functions
         .iter()
-        .position(|c| c.name.as_bytes().eq_ignore_ascii_case(&arg0))
+        .position(|c| c.name.eq_ignore_ascii_case(&arg0))
     {
         // rearrange the links so that the command will be
         // near the head of the list next time it is used

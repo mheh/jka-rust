@@ -34,12 +34,12 @@ const S_COLOR_YELLOW: &str = "^3";
 // unported `FS_*` (files.cpp subject) and `Z_Malloc`/`Z_Free` (z_memman_pc.cpp
 // subject) referenced at their canonical homes; reported.
 use crate::common::com_error;
-use crate::files_common::{FS_FreeFile, FS_FreeFileList, FS_ListFiles, FS_ReadFile};
+use crate::files_common::{FS_FreeFile, FS_ListFiles, FS_ReadFile};
 use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_string::{
-    COM_ParseExt, Com_sprintf, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
+    COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
 };
 use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
 
@@ -143,23 +143,11 @@ pub fn CM_GetShaderText(view: &mut EngineHostView, key: *const c_char) -> *const
 ///
 /// Source: `oracle/codemp/qcommon/cm_shader.cpp:71-150`
 pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
-    let mut numShaders1: c_int = 0;
     // scan for shader files
-    let shaderFiles1 = FS_ListFiles(
-        view,
-        c"shaders".as_ptr(),
-        c".shader".as_ptr(),
-        &mut numShaders1,
-    );
-    let mut numShaders2: c_int = 0;
-    let shaderFiles2 = FS_ListFiles(
-        view,
-        c"shaders/test".as_ptr(),
-        c".shader".as_ptr(),
-        &mut numShaders2,
-    );
+    let shaderFiles1 = FS_ListFiles(view, "shaders", ".shader");
+    let shaderFiles2 = FS_ListFiles(view, "shaders/test", ".shader");
 
-    if shaderFiles1.is_null() || numShaders1 == 0 {
+    if shaderFiles1.is_empty() {
         crate::common::com_printf(
             view.common,
             &format!("{}WARNING: no shader files found\n", S_COLOR_YELLOW),
@@ -167,7 +155,8 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
         return;
     }
 
-    let mut numShaders = numShaders1 + numShaders2;
+    let numShaders1 = shaderFiles1.len() as c_int;
+    let mut numShaders = numShaders1 + shaderFiles2.len() as c_int;
     if numShaders > MAX_SHADER_FILES as c_int {
         numShaders = MAX_SHADER_FILES as c_int;
     }
@@ -178,77 +167,32 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
 
     // load and parse shader files
     while i < numShaders1 {
-        let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        unsafe {
-            Com_sprintf(
-                filename.as_mut_ptr(),
-                core::mem::size_of_val(&filename) as c_int,
-                &format!(
-                    "shaders/{}",
-                    core::ffi::CStr::from_ptr(*shaderFiles1.add(i as usize)).to_string_lossy()
-                ),
-            )
-        };
-        Com_DPrintf(
-            view.common,
-            &format!(
-                "...loading '{}'\n",
-                unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
-            ),
-        );
+        let filename = format!("shaders/{}", shaderFiles1[i as usize]);
+        Com_DPrintf(view.common, &format!("...loading '{filename}'\n"));
         sum += unsafe {
             FS_ReadFile(
                 view,
-                filename.as_ptr(),
+                &filename,
                 buffers.as_mut_ptr().add(i as usize) as *mut *mut (),
             )
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
-            com_error(
-                errorParm_t::ERR_FATAL,
-                format!(
-                    "Couldn't load {}",
-                    unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
-                ),
-            );
+            com_error(errorParm_t::ERR_FATAL, format!("Couldn't load {filename}"));
         }
         i += 1;
     }
     while i < numShaders {
-        let mut filename: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        unsafe {
-            Com_sprintf(
-                filename.as_mut_ptr(),
-                core::mem::size_of_val(&filename) as c_int,
-                &format!(
-                    "shaders/test/{}",
-                    core::ffi::CStr::from_ptr(*shaderFiles2.add((i - numShaders1) as usize))
-                        .to_string_lossy()
-                ),
-            )
-        };
-        Com_DPrintf(
-            view.common,
-            &format!(
-                "...loading '{}'\n",
-                unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
-            ),
-        );
+        let filename = format!("shaders/test/{}", shaderFiles2[(i - numShaders1) as usize]);
+        Com_DPrintf(view.common, &format!("...loading '{filename}'\n"));
         sum += unsafe {
             FS_ReadFile(
                 view,
-                filename.as_ptr(),
+                &filename,
                 buffers.as_mut_ptr().add(i as usize) as *mut *mut (),
             )
         };
         if unsafe { *buffers.as_ptr().add(i as usize) }.is_null() {
-            com_error(
-                errorParm_t::ERR_DROP,
-                format!(
-                    "Couldn't load {}",
-                    unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }.to_string_lossy()
-                ),
-            );
+            com_error(errorParm_t::ERR_DROP, format!("Couldn't load {filename}"));
         }
         i += 1;
     }
@@ -273,9 +217,7 @@ pub fn CM_LoadShaderFiles(view: &mut EngineHostView) {
         j -= 1;
     }
 
-    // free up memory
-    FS_FreeFileList(view.common, shaderFiles1);
-    FS_FreeFileList(view.common, shaderFiles2);
+    // (Raven's FS_FreeFileList pair: the owned lists free themselves.)
 }
 
 /// Raven `CM_FreeShaderText` — release the cached shader-text buffer and

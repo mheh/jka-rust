@@ -137,3 +137,10 @@ pub const SNAPFLAG_NOT_ACTIVE: c_int = 2;
 ///
 /// Source: `oracle/codemp/game/q_shared.h:1977`
 pub const SNAPFLAG_SERVERCOUNT: c_int = 4;
+
+/// Raven `MAX_OSPATH` (`PATH_MAX`, 1024 on this target) — max length of a
+/// filesystem pathname. The former FS `char[MAX_OSPATH]` buffers are owned
+/// `String`s now; this survives as their write-site truncation bound.
+///
+/// Source: `oracle/codemp/game/q_shared.h:395`
+pub const MAX_OSPATH: usize = 1024;

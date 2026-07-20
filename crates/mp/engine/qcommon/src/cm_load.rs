@@ -104,7 +104,7 @@ use crate::cm_test::CM_FloodAreaConnections;
 use crate::md4_fns::Com_BlockChecksum;
 use crate::z_memman_pc::Hunk_Alloc;
 use mp_qshared::shared::ha_pref;
-use mp_qshared::shared::q_string::Q_strncpyz;
+use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
 
 use crate::cm_patch_fns::{CM_ClearLevelPatches, CM_GeneratePatchCollide};
 use crate::common_fns::Com_DPrintf;
@@ -528,10 +528,11 @@ pub fn CMod_LoadShaders(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut cl
 
         let mut out = cmap.shaders;
         for _ in 0..count {
-            Q_strncpyz(
-                (*out).shader.as_mut_ptr(),
-                (*r#in).shader.as_ptr(),
-                MAX_QPATH as c_int,
+            // C-data site (raw BSP bytes): the byte-exact Bytes form.
+            Q_strncpyzBytes(
+                &mut (*out).shader,
+                core::slice::from_raw_parts((*r#in).shader.as_ptr() as *const u8, MAX_QPATH),
+                MAX_QPATH,
             );
             (*out).contentFlags = i32::from_le((*r#in).contentFlags);
             (*out).surfaceFlags = i32::from_le((*r#in).surfaceFlags);
@@ -1141,13 +1142,13 @@ pub fn CMod_LoadPatches(
 // rwwRMG - function needs heavy modification
 pub fn CM_LoadMap_Actual(
     view: &mut EngineHostView,
-    name: *const c_char,
+    name: &str,
     clientload: qboolean,
     checksum: *mut c_int,
     cmap: &mut clipMap_t,
 ) {
     unsafe {
-        if name.is_null() || *name == 0 {
+        if name.is_empty() {
             com_error(errorParm_t::ERR_DROP, "CM_LoadMap: NULL name".into());
         }
 
@@ -1160,23 +1161,19 @@ pub fn CM_LoadMap_Actual(
             CVAR_ARCHIVE | CVAR_CHEAT,
         ));
 
-        let name_cstr = std::ffi::CStr::from_ptr(name);
         Com_DPrintf(
             view.common,
-            &format!(
-                "CM_LoadMap( {}, {} )\n",
-                name_cstr.to_string_lossy(),
-                clientload
-            ),
+            &format!("CM_LoadMap( {name}, {clientload} )\n"),
         );
 
         let cmap_name = std::ffi::CStr::from_ptr(cmap.name.as_ptr());
-        if cmap_name == name_cstr && clientload != 0 {
+        if cmap_name.to_bytes() == name.as_bytes() && clientload != 0 {
             *checksum = view.cm.last_checksum as c_int;
             return;
         }
 
-        let orig_name = name_cstr.to_owned();
+        // Raven snapshots `origName` before the map data is torn down.
+        let orig_name = name.to_string();
 
         if core::ptr::eq(cmap as *const clipMap_t, &view.cm.cmg as *const clipMap_t) {
             // free old stuff
@@ -1191,7 +1188,7 @@ pub fn CM_LoadMap_Actual(
             core::mem::size_of::<clipMap_t>(),
         );
 
-        if name_cstr.to_bytes().is_empty() {
+        if name.is_empty() {
             cmap.numLeafs = 1;
             cmap.numClusters = 1;
             cmap.numAreas = 1;
@@ -1210,7 +1207,7 @@ pub fn CM_LoadMap_Actual(
         let mut buf: *mut c_int = core::ptr::null_mut();
         let new_buff: *mut ();
         let mut h: fileHandle_t = 0;
-        let bsp_len = FS_FOpenFileRead(view, name, &mut h, mp_qshared::shared::qfalse);
+        let bsp_len = FS_FOpenFileRead(view, name, &mut h, false);
         if h != 0 {
             new_buff = Z_Malloc(
                 view,
@@ -1229,10 +1226,7 @@ pub fn CM_LoadMap_Actual(
         }
 
         if buf.is_null() {
-            com_error(
-                errorParm_t::ERR_DROP,
-                format!("Couldn't load {}", name_cstr.to_string_lossy()),
-            );
+            com_error(errorParm_t::ERR_DROP, format!("Couldn't load {name}"));
         }
 
         view.cm.last_checksum =
@@ -1258,10 +1252,8 @@ pub fn CM_LoadMap_Actual(
             com_error(
                 errorParm_t::ERR_DROP,
                 format!(
-                    "CM_LoadMap: {} has wrong version number ({} should be {})",
-                    name_cstr.to_string_lossy(),
-                    header.version,
-                    BSP_VERSION
+                    "CM_LoadMap: {name} has wrong version number ({} should be {})",
+                    header.version, BSP_VERSION
                 ),
             );
         }
@@ -1317,11 +1309,7 @@ pub fn CM_LoadMap_Actual(
 
         // allow this to be cached if it is loaded by the server
         if clientload == 0 {
-            Q_strncpyz(
-                cmap.name.as_mut_ptr(),
-                orig_name.as_ptr(),
-                MAX_QPATH as c_int,
-            );
+            Q_strncpyz(&mut cmap.name, &orig_name, MAX_QPATH);
         }
     }
 }
@@ -1331,7 +1319,7 @@ pub fn CM_LoadMap_Actual(
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:775-782`
 pub fn CM_LoadMap(
     view: &mut EngineHostView,
-    name: *const c_char,
+    name: &str,
     clientload: qboolean,
     checksum: *mut c_int,
 ) {
@@ -1348,16 +1336,13 @@ pub fn CM_LoadMap(
 /// Raven `CM_LoadSubBSP`.
 ///
 /// Source: `oracle/codemp/qcommon/cm_load.cpp:1083-1108`
-pub fn CM_LoadSubBSP(
-    view: &mut EngineHostView,
-    name: *const c_char,
-    clientload: qboolean,
-) -> c_int {
+pub fn CM_LoadSubBSP(view: &mut EngineHostView, name: &str, clientload: qboolean) -> c_int {
     unsafe {
         let mut count = view.cm.cmg.numSubModels;
         for i in 0..view.cm.NumSubBSP {
-            let sub_name = view.cm.SubBSP[i as usize].name.as_ptr();
-            if libc::strcasecmp(name, sub_name) == 0 {
+            // Raven strcasecmp against the still-C SubBSP name array.
+            let sub_name = std::ffi::CStr::from_ptr(view.cm.SubBSP[i as usize].name.as_ptr());
+            if name.as_bytes().eq_ignore_ascii_case(sub_name.to_bytes()) {
                 return count;
             }
             count += view.cm.SubBSP[i as usize].numSubModels;

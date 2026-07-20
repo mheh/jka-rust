@@ -1,21 +1,18 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use std::os::raw::c_char;
-
-// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching this struct's field sizes).
-// Source: oracle/codemp/game/q_shared.h:395
-const MAX_OSPATH: usize = 1024;
-
 /// Raven `directory_t` — a search path directory (base path + game subdirectory).
+///
+/// Engine-internal only (reached through `searchpath_t.dir`, never crosses
+/// the module ABI), so the C layout + asserts are dropped (string-data
+/// migration, DEC-32). Raven's `MAX_OSPATH` field size survives as the
+/// truncation bound at the `Q_strncpyz` write sites (`cap_ospath` in
+/// `files_common`), matching the silent 1023-byte cut.
 ///
 /// Raven: none.
 /// Type definition source: `oracle/codemp/qcommon/files.h:58-61`
-#[repr(C)]
 pub struct directory_t {
-    pub path: [c_char; MAX_OSPATH],    // c:\jk2
-    pub gamedir: [c_char; MAX_OSPATH], // base
+    /// c:\jk2
+    pub path: String,
+    /// base
+    pub gamedir: String,
 }
-
-const _: () = assert!(core::mem::size_of::<directory_t>() == 2048);
-const _: () = assert!(core::mem::offset_of!(directory_t, path) == 0);
-const _: () = assert!(core::mem::offset_of!(directory_t, gamedir) == 1024);

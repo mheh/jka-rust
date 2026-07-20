@@ -288,9 +288,8 @@ impl RealWorld {
             ));
             Com_InitHunkMemory(&mut view);
 
-            let map = CString::new(map_bsp).expect("map cstring");
             let mut checksum: c_int = 0;
-            CM_LoadMap(&mut view, map.as_ptr(), qfalse, &mut checksum);
+            CM_LoadMap(&mut view, map_bsp, qfalse, &mut checksum);
         }
 
         // ---- Phase B: the SV_SpawnServer tail the routed arms read --------

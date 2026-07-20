@@ -8,7 +8,7 @@
 use core::ffi::{c_char, c_int, c_short, c_uint, c_void};
 use std::ffi::{CStr, CString};
 
-use libc::{sscanf, strcat, strcmp, strcpy, strlen, strstr};
+use libc::{sscanf, strcpy, strlen, strstr};
 
 use mp_abi::game::exports::MpGameExport;
 use mp_bg::public::configstring::{CS_SERVERINFO, CS_SYSTEMINFO};
@@ -48,10 +48,11 @@ use mp_qshared::shared::cvar::{CVAR_SERVERINFO, CVAR_SYSTEMINFO};
 use mp_qshared::shared::limits::MAX_INFO_STRING;
 use mp_qshared::shared::q_format::FmtArg;
 use mp_qshared::shared::q_string::{
-    va, Com_sprintf, Info_SetValueForKey, Info_ValueForKey, Q_stricmp, Q_strncmp, Q_strncpyz,
+    va, Com_sprintf, Info_SetValueForKey, Info_ValueForKey, Q_strncmp, Q_strncpyz,
 };
 use mp_qshared::shared::swap::BigShort;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, MAX_STRING_CHARS};
+use native_string::q_string::{Q_strcmp, Q_stricmp};
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
@@ -176,7 +177,7 @@ pub fn SV_AddServerCommand(common: &mut Common, sv: &mut Server, client: *mut cl
                 i += 1;
             }
             com_printf(common, &format!("cmd {:5}: {}\n", i, cmd));
-            SV_DropClient(common, sv, client, c"Server command overflow".as_ptr());
+            SV_DropClient(common, sv, client, "Server command overflow");
             return;
         }
         let index = ((*client).reliableSequence & (MAX_RELIABLE_COMMANDS as c_int - 1)) as usize;
@@ -413,10 +414,13 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
 
         // echo back the parameter to status, so master servers can use it as a
         // challenge to prevent timed spoofed reply packets that add ghost servers
+        // still-C infostring builder (Info_* migrates in P4): NUL-terminate
+        // the argv value for the call's duration.
+        let challenge = CString::new(Cmd_Argv(view.common, 1)).unwrap_or_default();
         Info_SetValueForKey(
             infostring.as_mut_ptr(),
             c"challenge".as_ptr(),
-            Cmd_Argv(view.common, 1),
+            challenge.as_ptr(),
         );
 
         // add "demo" to the sv_keywords if restricted
@@ -514,10 +518,13 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
 
         // echo back the parameter to status, so servers can use it as a
         // challenge to prevent timed spoofed reply packets that add ghost servers
+        // still-C infostring builder (Info_* migrates in P4): NUL-terminate
+        // the argv value for the call's duration.
+        let challenge = CString::new(Cmd_Argv(view.common, 1)).unwrap_or_default();
         Info_SetValueForKey(
             infostring.as_mut_ptr(),
             c"challenge".as_ptr(),
-            Cmd_Argv(view.common, 1),
+            challenge.as_ptr(),
         );
 
         Info_SetValueForKey(
@@ -687,7 +694,9 @@ pub fn SVC_RemoteCommand(
     // Raven takes `msg` but never reads it.
     let _ = msg;
 
-    let mut remaining = [0 as c_char; 1024];
+    // Raven's `char remaining[1024]` strcat scratch becomes an owned String
+    // (§19: the C strcat had no bound check).
+    let mut remaining = String::new();
     let mut sv_outputbuf = [0 as c_char; SV_OUTPUTBUF_LENGTH];
 
     let time = Com_Milliseconds(view) as c_uint;
@@ -697,28 +706,23 @@ pub fn SVC_RemoteCommand(
     sv.svc_remote_command_lasttime = time;
 
     let rconpw = view.common.cvar(view.common.sv_rconPassword).string.clone();
-    let rconpw_c = CString::new(rconpw.as_str()).unwrap_or_default();
 
     unsafe {
         let valid: qboolean;
-        if rconpw.is_empty() || strcmp(Cmd_Argv(view.common, 1), rconpw_c.as_ptr()) != 0 {
+        if rconpw.is_empty() || Q_strcmp(Cmd_Argv(view.common, 1), &rconpw) != 0 {
             valid = qfalse;
             let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
                 .to_string_lossy()
                 .into_owned();
-            let arg = CStr::from_ptr(Cmd_Argv(view.common, 2))
-                .to_string_lossy()
-                .into_owned();
-            Com_DPrintf(view.common, &format!("Bad rcon from {}:\n{}\n", adr, arg));
+            let arg = Cmd_Argv(view.common, 2).to_owned();
+            Com_DPrintf(view.common, &format!("Bad rcon from {adr}:\n{arg}\n"));
         } else {
             valid = qtrue;
             let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
                 .to_string_lossy()
                 .into_owned();
-            let arg = CStr::from_ptr(Cmd_Argv(view.common, 2))
-                .to_string_lossy()
-                .into_owned();
-            Com_DPrintf(view.common, &format!("Rcon from {}:\n{}\n", adr, arg));
+            let arg = Cmd_Argv(view.common, 2).to_owned();
+            Com_DPrintf(view.common, &format!("Rcon from {adr}:\n{arg}\n"));
         }
 
         // start redirecting all print outputs to the packet
@@ -740,15 +744,15 @@ pub fn SVC_RemoteCommand(
         } else if valid == qfalse {
             com_printf(view.common, "Bad rconpassword.\n");
         } else {
-            remaining[0] = 0;
+            remaining.clear();
 
             let argc = Cmd_Argc(view.common);
             for i in 2..argc {
-                strcat(remaining.as_mut_ptr(), Cmd_Argv(view.common, i));
-                strcat(remaining.as_mut_ptr(), c" ".as_ptr());
+                remaining.push_str(Cmd_Argv(view.common, i));
+                remaining.push(' ');
             }
 
-            Cmd_ExecuteString(view, remaining.as_ptr());
+            Cmd_ExecuteString(view, &remaining);
         }
 
         Com_EndRedirect(view.common);
@@ -783,46 +787,38 @@ pub fn SV_ConnectionlessPacket(
             Huff_Decompress(msg, 12);
         }
 
-        let s = MSG_ReadStringLine(view.common, msg);
-        Cmd_TokenizeString(view.common, s);
+        // wire seam: the message-scratch line converts once at the head.
+        let s = CStr::from_ptr(MSG_ReadStringLine(view.common, msg))
+            .to_string_lossy()
+            .into_owned();
+        Cmd_TokenizeString(view.common, &s);
 
-        let c = Cmd_Argv(view.common, 0);
+        let c = Cmd_Argv(view.common, 0).to_owned();
         let adr = CStr::from_ptr(NET_AdrToString(view.common, from))
             .to_string_lossy()
             .into_owned();
-        Com_DPrintf(
-            view.common,
-            &format!(
-                "SV packet {} : {}\n",
-                adr,
-                CStr::from_ptr(c).to_string_lossy()
-            ),
-        );
+        Com_DPrintf(view.common, &format!("SV packet {adr} : {c}\n"));
 
-        if Q_stricmp(c, c"getstatus".as_ptr()) == 0 {
+        if Q_stricmp(&c, "getstatus") == 0 {
             SVC_Status(view, sv, from);
-        } else if Q_stricmp(c, c"getinfo".as_ptr()) == 0 {
+        } else if Q_stricmp(&c, "getinfo") == 0 {
             SVC_Info(view, sv, from);
-        } else if Q_stricmp(c, c"getchallenge".as_ptr()) == 0 {
+        } else if Q_stricmp(&c, "getchallenge") == 0 {
             SV_GetChallenge(view, sv, from);
-        } else if Q_stricmp(c, c"connect".as_ptr()) == 0 {
+        } else if Q_stricmp(&c, "connect") == 0 {
             SV_DirectConnect(view, sv, from);
-        } else if Q_stricmp(c, c"ipAuthorize".as_ptr()) == 0 {
+        } else if Q_stricmp(&c, "ipAuthorize") == 0 {
             SV_AuthorizeIpPacket(view, sv, from);
-        } else if Q_stricmp(c, c"rcon".as_ptr()) == 0 {
+        } else if Q_stricmp(&c, "rcon") == 0 {
             SVC_RemoteCommand(view, sv, from, msg);
-        } else if Q_stricmp(c, c"disconnect".as_ptr()) == 0 {
+        } else if Q_stricmp(&c, "disconnect") == 0 {
             // if a client starts up a local server, we may see some spurious
             // server disconnect messages when their new server sees our final
             // sequenced messages to the old client
         } else {
             Com_DPrintf(
                 view.common,
-                &format!(
-                    "bad connectionless packet from {}:\n{}\n",
-                    adr,
-                    CStr::from_ptr(s).to_string_lossy()
-                ),
+                &format!("bad connectionless packet from {adr}:\n{s}\n"),
             );
         }
     }
@@ -990,7 +986,7 @@ pub fn SV_CheckTimeouts(common: &mut Common, sv: &mut Server) {
                 // wait several frames so a debugger session doesn't cause a timeout
                 (*cl).timeoutCount += 1;
                 if (*cl).timeoutCount > 5 {
-                    SV_DropClient(common, sv, cl, c"timed out".as_ptr());
+                    SV_DropClient(common, sv, cl, "timed out");
                     (*cl).state = clientState_t::CS_FREE; // don't bother with zombie state
                 }
             } else {
@@ -1105,7 +1101,7 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
         if sv.svs.time > 0x70000000 {
             SV_Shutdown(view, "Restarting server due to time wrapping");
             //Cbuf_AddText( "vstr nextmap\n" );
-            Cbuf_AddText(view.common, c"map_restart 0\n".as_ptr());
+            Cbuf_AddText(view.common, "map_restart 0\n");
             return;
         }
         // this can happen considerably earlier when lots of clients play and the
@@ -1116,13 +1112,13 @@ pub fn SV_Frame(view: &mut EngineHostView, msec: c_int) {
                 "Restarting server due to numSnapshotEntities wrapping",
             );
             //Cbuf_AddText( "vstr nextmap\n" );
-            Cbuf_AddText(view.common, c"map_restart 0\n".as_ptr());
+            Cbuf_AddText(view.common, "map_restart 0\n");
             return;
         }
 
         if sv.sv.restartTime != 0 && sv.svs.time >= sv.sv.restartTime {
             sv.sv.restartTime = 0;
-            Cbuf_AddText(view.common, c"map_restart 0\n".as_ptr());
+            Cbuf_AddText(view.common, "map_restart 0\n");
             return;
         }
 

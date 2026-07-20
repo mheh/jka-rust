@@ -18,7 +18,6 @@
 //! Source: `docs/plans/2026-07-11-host-seam-restructure.md`
 
 use core::ffi::{c_char, c_int, c_void};
-use std::ffi::{CStr, CString};
 
 use mp_host_interface::engine_host::EngineHost;
 use mp_host_interface::vm_slot::VmSlot;
@@ -33,10 +32,8 @@ use crate::common::common::{com_printf, Common};
 use crate::common::error::com_error;
 use crate::common::opaque_slots::{BotLib, Client, Ghoul2System, RenderModels, RmManager, Server};
 use crate::cvar_fns::{Cvar_FindVar, Cvar_Get, Cvar_VariableIntegerValue, Cvar_VariableString};
-use crate::files_common::{
-    FS_FCloseFile, FS_FreeFile, FS_FreeFileList, FS_ListFiles, FS_ReadFile, FS_Write,
-};
-use crate::files_pc::FS_FOpenFileByMode;
+use crate::files_common::{FS_FCloseFile, FS_FreeFile, FS_ListFiles, FS_ReadFile, FS_Write};
+use crate::files_pc::{FS_FOpenFileByMode, FS_FileIsInPAK};
 use crate::sys_net::Sys_IsLANAddress;
 
 /// The live engine world as qcommon sees it: the two real state structs this
@@ -112,9 +109,8 @@ impl EngineHost for EngineHostView<'_> {
     /// collapse at the seam, ruling 24).
     /// Source: `oracle/codemp/qcommon/files.cpp:1670,1798`
     fn fs_read_file(&mut self, qpath: &str) -> Option<Vec<u8>> {
-        let cpath = CString::new(qpath).ok()?;
         let mut buf: *mut () = core::ptr::null_mut();
-        let len = FS_ReadFile(self, cpath.as_ptr(), &mut buf);
+        let len = FS_ReadFile(self, qpath, &mut buf);
         if len < 0 || buf.is_null() {
             return None;
         }
@@ -206,11 +202,8 @@ impl EngineHost for EngineHostView<'_> {
     /// failure.
     /// Source: `oracle/codemp/server/NPCNav/navigator.cpp:670-699`
     fn fs_write_file(&mut self, qpath: &str, data: &[u8]) -> bool {
-        let Ok(cpath) = CString::new(qpath) else {
-            return false;
-        };
         let mut f: fileHandle_t = 0;
-        FS_FOpenFileByMode(self, cpath.as_ptr(), &mut f, FS_WRITE);
+        FS_FOpenFileByMode(self, qpath, &mut f, FS_WRITE);
         if f == 0 {
             return false;
         }
@@ -298,40 +291,14 @@ impl EngineHost for EngineHostView<'_> {
                 "fs_list_files: want_subs=true unported (no live caller)".to_string(),
             );
         }
-        let (Ok(cdir), Ok(cext)) = (CString::new(dir), CString::new(ext)) else {
-            return Vec::new();
-        };
-        let mut n: c_int = 0;
-        let list = FS_ListFiles(self, cdir.as_ptr(), cext.as_ptr(), &mut n);
-        if list.is_null() {
-            return Vec::new();
-        }
-        let mut out = Vec::with_capacity(n as usize);
-        // SAFETY: FS_ListFiles returned `n` live C strings; copied whole
-        // before FS_FreeFileList releases them.
-        unsafe {
-            for i in 0..n as usize {
-                let p = *list.add(i);
-                if !p.is_null() {
-                    out.push(CStr::from_ptr(p).to_string_lossy().into_owned());
-                }
-            }
-        }
-        FS_FreeFileList(self.common, list);
-        out
+        FS_ListFiles(self, dir, ext)
     }
 
     /// Raven `FS_FileIsInPAK` collapsed per §C7 (ruling 59a):
     /// `Some(pure_checksum)` = the `1` path, `None` = every `-1` path.
     /// Source: `oracle/codemp/qcommon/files.cpp:1602-1659`
     fn fs_file_is_in_pak(&mut self, qpath: &str) -> Option<i32> {
-        let cpath = CString::new(qpath).ok()?;
-        let mut checksum: c_int = 0;
-        if crate::files_pc::FS_FileIsInPAK(self.common, cpath.as_ptr(), &mut checksum) == 1 {
-            Some(checksum)
-        } else {
-            None
-        }
+        FS_FileIsInPAK(self.common, qpath)
     }
 
     /// Raven `MSG_ReadDeltaEntity`'s `cl_shownet` probe — server-installed

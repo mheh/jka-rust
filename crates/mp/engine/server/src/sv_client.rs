@@ -7,7 +7,6 @@
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int, CStr};
-use std::ffi::CString;
 
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
@@ -30,10 +29,11 @@ use crate::server::server_state_t::serverState_t;
 use crate::server::server_static_t::MAX_CHALLENGES;
 use crate::Server;
 
-use libc::{atoi, strcmp, strlen};
-use mp_qshared::shared::q_string::{
-    Com_sprintf, Info_SetValueForKey, Info_ValueForKey, Q_stricmp, Q_strncpyz,
-};
+use native_string::atoi::atoi;
+use native_string::q_string::{Q_strcmpBytes, Q_stricmp};
+use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
+
+use mp_qshared::shared::q_string::{Com_sprintf, Info_SetValueForKey, Info_ValueForKey};
 
 /// Raven `SV_ResetPureClient_f`.
 ///
@@ -50,7 +50,12 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
     unsafe {
         let name = Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"name".as_ptr() as *mut c_char);
-        Q_strncpyz((*cl).name.as_mut_ptr(), name, (*cl).name.len() as c_int);
+        let name_len = (*cl).name.len();
+        Q_strncpyzBytes(
+            &mut (*cl).name,
+            core::ffi::CStr::from_ptr(name).to_bytes(),
+            name_len,
+        );
 
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
@@ -62,8 +67,9 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
         } else {
             let val =
                 Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"rate".as_ptr() as *mut c_char);
-            if strlen(val) != 0 {
-                let i = atoi(val);
+            let val = core::ffi::CStr::from_ptr(val).to_string_lossy();
+            if !val.is_empty() {
+                let i = atoi(&val);
                 (*cl).rate = i;
                 if (*cl).rate < 1000 {
                     (*cl).rate = 1000;
@@ -79,9 +85,10 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
             (*cl).userinfo.as_mut_ptr(),
             c"handicap".as_ptr() as *mut c_char,
         );
-        if strlen(val) != 0 {
-            let i = atoi(val);
-            if i <= 0 || i > 100 || strlen(val) > 4 {
+        let val = core::ffi::CStr::from_ptr(val).to_string_lossy();
+        if !val.is_empty() {
+            let i = atoi(&val);
+            if i <= 0 || i > 100 || val.len() > 4 {
                 Info_SetValueForKey(
                     (*cl).userinfo.as_mut_ptr(),
                     c"handicap".as_ptr() as *mut c_char,
@@ -95,8 +102,9 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
             (*cl).userinfo.as_mut_ptr(),
             c"snaps".as_ptr() as *mut c_char,
         );
-        if strlen(val) != 0 {
-            let mut i = atoi(val);
+        let val = core::ffi::CStr::from_ptr(val).to_string_lossy();
+        if !val.is_empty() {
+            let mut i = atoi(&val);
             if i < 1 {
                 i = 1;
             } else if i > 30 {
@@ -345,7 +353,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
         // We aren't getting an acknowledge for the correct block, drop the client
         // FIXME: this is bad... the client will never parse the disconnect message
         //			because the cgame isn't loaded yet
-        crate::SV_DropClient(common, sv, cl, c"broken download".as_ptr() as *const c_char);
+        crate::SV_DropClient(common, sv, cl, "broken download");
     }
 }
 
@@ -359,10 +367,11 @@ pub fn SV_BeginDownload_f(common: &mut Common, cl: *mut client_t) {
     // cl->downloadName is non-zero now, SV_WriteDownloadToClient will see this and open
     // the file itself
     unsafe {
+        let name_len = (*cl).downloadName.len();
         Q_strncpyz(
-            (*cl).downloadName.as_mut_ptr(),
+            &mut (*cl).downloadName,
             mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
-            (*cl).downloadName.len() as c_int,
+            name_len,
         );
     }
 }
@@ -372,12 +381,8 @@ pub fn SV_BeginDownload_f(common: &mut Common, cl: *mut client_t) {
 /// Source: `oracle/codemp/server/sv_client.cpp:1265-1268`
 pub fn SV_Disconnect_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) {
     // SV_DropClient( cl, "disconnected" );
-    let msg = crate::sv_ccmds::SV_GetStringEdString(
-        sv,
-        c"MP_SVGAME".as_ptr() as *mut c_char,
-        c"DISCONNECTED".as_ptr() as *mut c_char,
-    );
-    crate::SV_DropClient(common, sv, cl, msg);
+    let msg = crate::sv_ccmds::SV_GetStringEdString(sv, "MP_SVGAME", "DISCONNECTED");
+    crate::SV_DropClient(common, sv, cl, &msg);
 }
 
 /// Raven `SV_UpdateUserinfo_f`.
@@ -385,10 +390,11 @@ pub fn SV_Disconnect_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) 
 /// Source: `oracle/codemp/server/sv_client.cpp:1510-1535`
 pub fn SV_UpdateUserinfo_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut client_t) {
     unsafe {
+        let ui_len = (*cl).userinfo.len();
         Q_strncpyz(
-            (*cl).userinfo.as_mut_ptr(),
+            &mut (*cl).userinfo,
             mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1),
-            (*cl).userinfo.len() as c_int,
+            ui_len,
         );
 
         // FINAL_BUILD is not defined in this build (porting-rules FINAL_BUILD
@@ -427,7 +433,7 @@ pub fn SV_ExecuteClientCommand(
     view: &mut EngineHostView,
     sv: &mut Server,
     cl: *mut client_t,
-    s: *const c_char,
+    s: &str,
     clientOK: qboolean,
 ) {
     // RECORD tap: "begin"/userinfo/say (incl. bot chat via the botlib
@@ -436,12 +442,9 @@ pub fn SV_ExecuteClientCommand(
     mp_engine_qcommon::cmd_common::Cmd_TokenizeString(view.common, s);
 
     // see if it is a server level command
-    let name = unsafe {
-        core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 0))
-    }
-    .to_string_lossy();
+    let name = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 0).to_owned();
     let mut matched = false;
-    match name.as_ref() {
+    match name.as_str() {
         "userinfo" => {
             SV_UpdateUserinfo_f(view, sv, cl);
             matched = true;
@@ -540,7 +543,7 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
         return;
     }
 
-    let challenge = unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1)) };
+    let challenge = atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1));
 
     let mut i: usize = 0;
     while i < MAX_CHALLENGES {
@@ -559,20 +562,10 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
 
     // send a packet back to the original client
     sv.svs.challenges[i].pingTime = sv.svs.time;
-    let s = unsafe {
-        core::ffi::CStr::from_ptr(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 2))
-    }
-    .to_string_lossy()
-    .into_owned();
-    let r = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 3); // reason
+    let s = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 2).to_owned();
+    let r = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 3).to_owned(); // reason
 
-    if {
-        Q_stricmp(
-            s.as_ptr() as *const c_char,
-            c"demo".as_ptr() as *const c_char,
-        )
-    } == 0
-    {
+    if Q_stricmp(&s, "demo") == 0 {
         if Cvar_VariableValue(view, "fs_restrict") != 0.0 {
             // a demo client connecting to a demo server
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
@@ -594,13 +587,7 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
         sv.svs.challenges[i] = unsafe { core::mem::zeroed::<challenge_t>() };
         return;
     }
-    if {
-        Q_stricmp(
-            s.as_ptr() as *const c_char,
-            c"accept".as_ptr() as *const c_char,
-        )
-    } == 0
-    {
+    if Q_stricmp(&s, "accept") == 0 {
         mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
             view.common,
             netsrc_t::NS_SERVER,
@@ -609,51 +596,28 @@ pub fn SV_AuthorizeIpPacket(view: &mut EngineHostView, sv: &mut Server, from: ne
         );
         return;
     }
-    if {
-        Q_stricmp(
-            s.as_ptr() as *const c_char,
-            c"unknown".as_ptr() as *const c_char,
-        )
-    } == 0
-    {
-        if r.is_null() {
-            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                view.common,
-                netsrc_t::NS_SERVER,
-                sv.svs.challenges[i].adr,
-                "print\nAwaiting CD key authorization\n".to_string(),
-            );
-        } else {
-            let r_str = unsafe { core::ffi::CStr::from_ptr(r) }.to_string_lossy();
-            mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-                view.common,
-                netsrc_t::NS_SERVER,
-                sv.svs.challenges[i].adr,
-                format!("print\n{}\n", r_str),
-            );
-        }
+    if Q_stricmp(&s, "unknown") == 0 {
+        // Raven's `if ( !r )` NULL branch can never fire (Cmd_Argv returns
+        // ""), so only the print-reason arm is live.
+        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
+            view.common,
+            netsrc_t::NS_SERVER,
+            sv.svs.challenges[i].adr,
+            format!("print\n{r}\n"),
+        );
         // clear the challenge record so it won't timeout and let them through
         sv.svs.challenges[i] = unsafe { core::mem::zeroed::<challenge_t>() };
         return;
     }
 
     // authorization failed
-    if r.is_null() {
-        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            view.common,
-            netsrc_t::NS_SERVER,
-            sv.svs.challenges[i].adr,
-            "print\nSomeone is using this CD Key\n".to_string(),
-        );
-    } else {
-        let r_str = unsafe { core::ffi::CStr::from_ptr(r) }.to_string_lossy();
-        mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
-            view.common,
-            netsrc_t::NS_SERVER,
-            sv.svs.challenges[i].adr,
-            format!("print\n{}\n", r_str),
-        );
-    }
+    // (Raven's `if ( !r )` NULL branch can never fire — Cmd_Argv returns "".)
+    mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
+        view.common,
+        netsrc_t::NS_SERVER,
+        sv.svs.challenges[i].adr,
+        format!("print\n{r}\n"),
+    );
 
     // clear the challenge record so it won't timeout and let them through
     sv.svs.challenges[i] = unsafe { core::mem::zeroed::<challenge_t>() };
@@ -669,14 +633,21 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
     unsafe {
         mp_engine_qcommon::common::common::com_printf(view.common, "SVC_DirectConnect ()\n");
 
-        let userinfo_ptr = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1);
         let mut userinfo = [0 as c_char; mp_qshared::shared::limits::MAX_INFO_STRING as usize];
-        Q_strncpyz(userinfo.as_mut_ptr(), userinfo_ptr, userinfo.len() as c_int);
+        let ui_len = userinfo.len();
+        Q_strncpyz(
+            &mut userinfo,
+            mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1),
+            ui_len,
+        );
 
-        let version = atoi(Info_ValueForKey(
-            userinfo.as_mut_ptr(),
-            c"protocol".as_ptr() as *mut c_char,
-        ));
+        let version = atoi(
+            &core::ffi::CStr::from_ptr(Info_ValueForKey(
+                userinfo.as_mut_ptr(),
+                c"protocol".as_ptr() as *mut c_char,
+            ))
+            .to_string_lossy(),
+        );
         if version != mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION {
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 view.common,
@@ -694,14 +665,20 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             return;
         }
 
-        let challenge = atoi(Info_ValueForKey(
-            userinfo.as_mut_ptr(),
-            c"challenge".as_ptr() as *mut c_char,
-        ));
-        let qport = atoi(Info_ValueForKey(
-            userinfo.as_mut_ptr(),
-            c"qport".as_ptr() as *mut c_char,
-        ));
+        let challenge = atoi(
+            &core::ffi::CStr::from_ptr(Info_ValueForKey(
+                userinfo.as_mut_ptr(),
+                c"challenge".as_ptr() as *mut c_char,
+            ))
+            .to_string_lossy(),
+        );
+        let qport = atoi(
+            &core::ffi::CStr::from_ptr(Info_ValueForKey(
+                userinfo.as_mut_ptr(),
+                c"qport".as_ptr() as *mut c_char,
+            ))
+            .to_string_lossy(),
+        );
 
         let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
 
@@ -906,14 +883,14 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 // have "password" set to the value of "sv_privatePassword"
                 let password =
                     Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
-                let sv_privatePassword_c = CString::new(
+                let start_index: c_int = if Q_strcmpBytes(
+                    core::ffi::CStr::from_ptr(password).to_bytes(),
                     view.common
                         .cvar(view.common.sv_privatePassword)
                         .string
-                        .as_str(),
-                )
-                .unwrap_or_default();
-                let start_index: c_int = if strcmp(password, sv_privatePassword_c.as_ptr()) == 0 {
+                        .as_bytes(),
+                ) == 0
+                {
                     0
                 } else {
                     view.common.cvar(view.common.sv_privateClients).integer
@@ -946,12 +923,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         // if they're all bots
                         if count >= max_clients - start_index {
                             let last = sv.svs.clients.offset((max_clients - 1) as isize);
-                            crate::SV_DropClient(
-                                view.common,
-                                sv,
-                                last,
-                                c"only bots on server".as_ptr() as *const c_char,
-                            );
+                            crate::SV_DropClient(view.common, sv, last, "only bots on server");
                             new_slot = sv.svs.clients.offset((max_clients - 1) as isize);
                         } else {
                             mp_engine_qcommon::common::com_error(
@@ -966,7 +938,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                             from,
                             format!(
                                 "print\n{}\n",
-                                crate::SV_GetStringEdString_str(sv, "MP_SVGAME", "SERVER_IS_FULL")
+                                crate::SV_GetStringEdString(sv, "MP_SVGAME", "SERVER_IS_FULL")
                             ),
                         );
                         mp_engine_qcommon::common::common::com_printf(
@@ -1007,11 +979,12 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             qport,
         );
 
-        // save the userinfo
-        Q_strncpyz(
-            (*cl_ptr).userinfo.as_mut_ptr(),
-            userinfo.as_ptr(),
-            (*cl_ptr).userinfo.len() as c_int,
+        // save the userinfo (C-array to C-array: the byte-exact Bytes form)
+        let cl_ui_len = (*cl_ptr).userinfo.len();
+        Q_strncpyzBytes(
+            &mut (*cl_ptr).userinfo,
+            core::ffi::CStr::from_ptr(userinfo.as_ptr()).to_bytes(),
+            cl_ui_len,
         );
 
         // get the game a chance to reject this connection or modify the userinfo
@@ -1305,40 +1278,24 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
     let mut b_good;
 
     if Cvar_VariableValue(view, "vm_cgame") != 0.0 {
-        let mut cs1 = 0;
-        b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-            view.common,
-            c"vm/cgame.qvm".as_ptr() as *const c_char,
-            &mut cs1,
-        ) == 1;
-        n_chk_sum1 = cs1;
+        let chk = mp_engine_qcommon::files_pc::FS_FileIsInPAK(view.common, "vm/cgame.qvm");
+        b_good = chk.is_some();
+        n_chk_sum1 = chk.unwrap_or(0);
     } else {
-        let mut cs1 = 0;
-        b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-            view.common,
-            c"cgamex86.dll".as_ptr() as *const c_char,
-            &mut cs1,
-        ) == 1;
-        n_chk_sum1 = cs1;
+        let chk = mp_engine_qcommon::files_pc::FS_FileIsInPAK(view.common, "cgamex86.dll");
+        b_good = chk.is_some();
+        n_chk_sum1 = chk.unwrap_or(0);
     }
 
     if b_good {
         if Cvar_VariableValue(view, "vm_ui") != 0.0 {
-            let mut cs2 = 0;
-            b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-                view.common,
-                c"vm/ui.qvm".as_ptr() as *const c_char,
-                &mut cs2,
-            ) == 1;
-            n_chk_sum2 = cs2;
+            let chk = mp_engine_qcommon::files_pc::FS_FileIsInPAK(view.common, "vm/ui.qvm");
+            b_good = chk.is_some();
+            n_chk_sum2 = chk.unwrap_or(0);
         } else {
-            let mut cs2 = 0;
-            b_good = mp_engine_qcommon::files_pc::FS_FileIsInPAK(
-                view.common,
-                c"uix86.dll".as_ptr() as *const c_char,
-                &mut cs2,
-            ) == 1;
-            n_chk_sum2 = cs2;
+            let chk = mp_engine_qcommon::files_pc::FS_FileIsInPAK(view.common, "uix86.dll");
+            b_good = chk.is_some();
+            n_chk_sum2 = chk.unwrap_or(0);
         }
     }
 
@@ -1357,41 +1314,34 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
             break;
         }
         // verify first to be the cgame checksum
+        // (Raven's `!pArg` NULL check can never fire — Cmd_Argv returns "".)
         let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg);
         n_cur_arg += 1;
-        if p_arg.is_null()
-            || unsafe { *p_arg } == b'@' as c_char
-            || unsafe { atoi(p_arg) } != n_chk_sum1
-        {
+        if p_arg.starts_with('@') || atoi(p_arg) != n_chk_sum1 {
             b_good = false;
             break;
         }
         // verify the second to be the ui checksum
         let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg);
         n_cur_arg += 1;
-        if p_arg.is_null()
-            || unsafe { *p_arg } == b'@' as c_char
-            || unsafe { atoi(p_arg) } != n_chk_sum2
-        {
+        if p_arg.starts_with('@') || atoi(p_arg) != n_chk_sum2 {
             b_good = false;
             break;
         }
         // should be sitting at the delimeter now
         let p_arg = mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, n_cur_arg);
         n_cur_arg += 1;
-        if unsafe { *p_arg } != b'@' as c_char {
+        if !p_arg.starts_with('@') {
             b_good = false;
             break;
         }
         // store checksums since tokenization is not re-entrant
         let mut i: usize = 0;
         while n_cur_arg < n_client_paks {
-            n_client_chk_sum[i] = unsafe {
-                atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(
-                    view.common,
-                    n_cur_arg,
-                ))
-            };
+            n_client_chk_sum[i] = atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(
+                view.common,
+                n_cur_arg,
+            ));
             n_cur_arg += 1;
             i += 1;
         }
@@ -1422,8 +1372,15 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
         }
 
         // get the pure checksums of the pk3 files loaded by the server
-        let p_paks = mp_engine_qcommon::files_pc::FS_LoadedPakPureChecksums(view.common);
-        mp_engine_qcommon::cmd_common::Cmd_TokenizeString(view.common, p_paks);
+        // (still-C rotating info scratch: one conversion at the read)
+        let p_paks = unsafe {
+            CStr::from_ptr(mp_engine_qcommon::files_pc::FS_LoadedPakPureChecksums(
+                view.common,
+            ))
+        }
+        .to_string_lossy()
+        .into_owned();
+        mp_engine_qcommon::cmd_common::Cmd_TokenizeString(view.common, &p_paks);
         let mut n_server_paks = mp_engine_qcommon::cmd_common::Cmd_Argc(view.common);
         if n_server_paks > 1024 {
             n_server_paks = 1024;
@@ -1432,7 +1389,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
         let mut i: c_int = 0;
         while i < n_server_paks {
             n_server_chk_sum[i as usize] =
-                unsafe { atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, i)) };
+                atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, i));
             i += 1;
         }
 
@@ -1490,7 +1447,7 @@ pub fn SV_VerifyPaks_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut clie
             view.common,
             sv,
             cl,
-            c"Unpure client detected. Invalid .PK3 files referenced!".as_ptr() as *const c_char,
+            "Unpure client detected. Invalid .PK3 files referenced!",
         );
     }
 }
@@ -1523,7 +1480,10 @@ pub fn SV_ClientCommand(
 ) -> qboolean {
     unsafe {
         let seq = mp_engine_qcommon::msg::MSG_ReadLong(view.common, msg);
-        let s = mp_engine_qcommon::msg::MSG_ReadString(view.common, msg);
+        // wire seam: the message-scratch command converts once at the read.
+        let s = CStr::from_ptr(mp_engine_qcommon::msg::MSG_ReadString(view.common, msg))
+            .to_string_lossy()
+            .into_owned();
         let mut client_ok = qtrue;
 
         // see if we have already executed it
@@ -1534,10 +1494,8 @@ pub fn SV_ClientCommand(
         mp_engine_qcommon::common::common::com_printf(
             view.common,
             &format!(
-                "clientCommand: {} : {} : {}\n",
+                "clientCommand: {} : {seq} : {s}\n",
                 CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy(),
-                seq,
-                CStr::from_ptr(s).to_string_lossy()
             ),
         );
 
@@ -1551,12 +1509,7 @@ pub fn SV_ClientCommand(
                     seq - (*cl).lastClientCommand + 1
                 ),
             );
-            crate::SV_DropClient(
-                view.common,
-                sv,
-                cl,
-                c"Lost reliable commands".as_ptr() as *const c_char,
-            );
+            crate::SV_DropClient(view.common, sv, cl, "Lost reliable commands");
             return qfalse;
         }
 
@@ -1586,14 +1539,13 @@ pub fn SV_ClientCommand(
         // don't allow another command for one second
         (*cl).nextReliableTime = sv.svs.time + 1000;
 
-        SV_ExecuteClientCommand(view, sv, cl, s, client_ok);
+        SV_ExecuteClientCommand(view, sv, cl, &s, client_ok);
 
         (*cl).lastClientCommand = seq;
-        let s_str = core::ffi::CStr::from_ptr(s).to_string_lossy();
         Com_sprintf(
             (*cl).lastClientCommandString.as_mut_ptr(),
             (*cl).lastClientCommandString.len() as c_int,
-            &s_str,
+            &s,
         );
 
         qtrue // continue procesing
@@ -1672,12 +1624,7 @@ pub fn SV_UserMove(
 
         // _XBOX is not defined — pure check is live
         if common.cvar(common.sv_pure).integer != 0 && (*cl).pureAuthentic == 0 {
-            crate::SV_DropClient(
-                common,
-                sv,
-                cl,
-                c"Cannot validate pure client!".as_ptr() as *const c_char,
-            );
+            crate::SV_DropClient(common, sv, cl, "Cannot validate pure client!");
             return;
         }
 
@@ -1814,12 +1761,7 @@ pub fn SV_ExecuteClientMessage(
 /// server is quiting or crashing — `SV_FinalMessage()` handles that.
 ///
 /// Source: `oracle/codemp/server/sv_client.cpp:580-666`
-pub fn SV_DropClient(
-    common: &mut Common,
-    sv: &mut Server,
-    drop: *mut client_t,
-    reason: *const c_char,
-) {
+pub fn SV_DropClient(common: &mut Common, sv: &mut Server, drop: *mut client_t, reason: &str) {
     unsafe {
         let drop_index = (drop as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize;
@@ -1852,13 +1794,12 @@ pub fn SV_DropClient(
 
         // tell everyone why they got dropped
         let name = core::ffi::CStr::from_ptr((*drop).name.as_ptr()).to_string_lossy();
-        let reason_str = core::ffi::CStr::from_ptr(reason).to_string_lossy();
         crate::SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
             // "%s" S_COLOR_WHITE " %s\n" — S_COLOR_WHITE is "^7"
-            &format!("print \"{}^7 {}\n\"", name, reason_str),
+            &format!("print \"{name}^7 {reason}\n\""),
         );
 
         mp_engine_qcommon::common_fns::Com_DPrintf(
@@ -1882,7 +1823,7 @@ pub fn SV_DropClient(
         );
 
         // add the disconnect command
-        crate::SV_SendServerCommand(common, sv, drop, &format!("disconnect \"{}\"", reason_str));
+        crate::SV_SendServerCommand(common, sv, drop, &format!("disconnect \"{reason}\""));
 
         if (*drop).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
             crate::SV_BotFreeClient(common, sv, drop_index as c_int);
@@ -1949,24 +1890,18 @@ pub fn SV_WriteDownloadToClient(
 
         if (*cl).download == 0 {
             // We open the file here
+            // (still-C client_t.downloadName: one conversion for the block)
+            let download_name = core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
+                .to_string_lossy()
+                .into_owned();
             mp_engine_qcommon::common::common::com_printf(
                 view.common,
-                &format!(
-                    "clientDownload: {} : begining \"{}\"\n",
-                    client_index,
-                    core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
-                ),
+                &format!("clientDownload: {client_index} : begining \"{download_name}\"\n"),
             );
 
-            let missionPack = mp_engine_qcommon::files_pc::FS_idPak(
-                (*cl).downloadName.as_mut_ptr(),
-                c"missionpack".as_ptr() as *mut c_char,
-            );
-            let idPack = missionPack != qfalse
-                || mp_engine_qcommon::files_pc::FS_idPak(
-                    (*cl).downloadName.as_mut_ptr(),
-                    c"base".as_ptr() as *mut c_char,
-                ) != qfalse;
+            let missionPack = mp_engine_qcommon::files_pc::FS_idPak(&download_name, "missionpack");
+            let idPack =
+                missionPack || mp_engine_qcommon::files_pc::FS_idPak(&download_name, "base");
 
             let mut downloadOpenFailed = false;
             if view.common.cvar(view.common.sv_allowDownload).integer == 0 || idPack {
@@ -1974,7 +1909,7 @@ pub fn SV_WriteDownloadToClient(
             } else {
                 (*cl).downloadSize = mp_engine_qcommon::files_common::FS_SV_FOpenFileRead(
                     view.common,
-                    (*cl).downloadName.as_ptr(),
+                    &download_name,
                     &mut (*cl).download,
                 );
                 if (*cl).downloadSize <= 0 {
@@ -1995,7 +1930,7 @@ pub fn SV_WriteDownloadToClient(
                                 .to_string_lossy()
                         ),
                     );
-                    if missionPack != qfalse {
+                    if missionPack {
                         Com_sprintf(
                             errorMessage.as_mut_ptr(),
                             errorMessage.len() as c_int,

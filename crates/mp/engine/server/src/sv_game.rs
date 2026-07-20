@@ -10,7 +10,6 @@
 
 use core::ffi::{c_char, c_int, c_ulong, c_void};
 use core::sync::atomic::{AtomicU64, Ordering};
-use std::ffi::CString;
 
 use mp_qshared::common::mp::botlib::bot_entitystate_s::bot_entitystate_t;
 use mp_qshared::common::mp::gentity::{NUM_BSETS, NUM_TIDS};
@@ -62,11 +61,13 @@ use mp_engine_icarus::q3_registers::{
 use mp_engine_icarus::Icarus;
 use mp_engine_qcommon::cm_load::{CM_LeafArea, CM_LeafCluster};
 use mp_engine_qcommon::cm_test::CM_AreasConnected;
+use mp_engine_qcommon::cmd_common::Cmd_Argv;
 use mp_engine_qcommon::collision_world::CollisionWorld;
 use mp_engine_qcommon::common::common::Common;
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::roff::RoffSystem;
 use mp_engine_qcommon::stringed::SE_GetString;
+use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
 
 use crate::npcnav::Navigator;
 
@@ -144,7 +145,7 @@ use mp_engine_qcommon::cvar_fns::{
     Cvar_VariableStringBuffer, Cvar_VariableValue,
 };
 use mp_engine_qcommon::files_common::{FS_FCloseFile, FS_Write};
-use mp_qshared::shared::q_string::{COM_ParseExt, Q_strncpyz};
+use mp_qshared::shared::q_string::COM_ParseExt;
 
 /// Raven `SV_NumForGentity`.
 ///
@@ -208,7 +209,11 @@ pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int
                 &mut sv.sv.entityParsePoint as *mut *mut c_char as *mut *const c_char,
                 qtrue,
             );
-            Q_strncpyz(buffer, s, bufferSize);
+            Q_strncpyzBytes(
+                core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
+                core::ffi::CStr::from_ptr(s).to_bytes(),
+                bufferSize as usize,
+            );
             if sv.sv.entityParsePoint.is_null() && *s == 0 {
                 qfalse
             } else {
@@ -219,7 +224,11 @@ pub fn SV_GetEntityToken(sv: &mut Server, buffer: *mut c_char, bufferSize: c_int
                 &mut sv.sv.mLocalSubBSPEntityParsePoint as *mut *mut c_char as *mut *const c_char,
                 qtrue,
             );
-            Q_strncpyz(buffer, s, bufferSize);
+            Q_strncpyzBytes(
+                core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
+                core::ffi::CStr::from_ptr(s).to_bytes(),
+                bufferSize as usize,
+            );
             if sv.sv.mLocalSubBSPEntityParsePoint.is_null() && *s == 0 {
                 qfalse
             } else {
@@ -376,12 +385,7 @@ pub fn SV_GameSendServerCommand(
 /// Raven `SV_GameDropClient`.
 ///
 /// Source: `oracle/codemp/server/sv_game.cpp:110-115`
-pub fn SV_GameDropClient(
-    common: &mut Common,
-    sv: &mut Server,
-    clientNum: c_int,
-    reason: *const c_char,
-) {
+pub fn SV_GameDropClient(common: &mut Common, sv: &mut Server, clientNum: c_int, reason: &str) {
     if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
         return;
     }
@@ -448,8 +452,13 @@ pub fn SV_GetServerinfo(common: &mut Common, buffer: *mut c_char, bufferSize: c_
         );
     }
     let info = Cvar_InfoString(common, mp_qshared::shared::cvar::CVAR_SERVERINFO);
-    let info_c = CString::new(info.as_str()).unwrap_or_default();
-    Q_strncpyz(buffer, info_c.as_ptr(), bufferSize);
+    unsafe {
+        Q_strncpyz(
+            core::slice::from_raw_parts_mut(buffer, bufferSize as usize),
+            &info,
+            bufferSize as usize,
+        );
+    }
 }
 
 /// Raven `SV_GetUsercmd`.
@@ -640,12 +649,9 @@ pub fn SV_SetBrushModel(
                 (*ent).r.contents = mp_engine_qcommon::cm_load::CM_ModelContents(view.cm, h, -1);
             }
         } else if *name == b'#' as c_char {
-            let bsp_name = format!("maps/{}.bsp\0", &name_str[1..]);
-            (*ent).s.modelindex = mp_engine_qcommon::cm_load::CM_LoadSubBSP(
-                view,
-                bsp_name.as_ptr() as *const c_char,
-                qfalse,
-            );
+            let bsp_name = format!("maps/{}.bsp", &name_str[1..]);
+            (*ent).s.modelindex =
+                mp_engine_qcommon::cm_load::CM_LoadSubBSP(view, &bsp_name, qfalse);
             mp_engine_qcommon::cm_load::CM_ModelBounds(
                 view.cm,
                 (*ent).s.modelindex,
@@ -893,24 +899,29 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_ARGC as isize {
             return mp_engine_qcommon::cmd_common::Cmd_Argc(view.common) as isize;
         } else if trap == G::G_ARGV as isize {
-            mp_engine_qcommon::cmd_common::Cmd_ArgvBuffer(
-                view.common,
-                *args.offset(1) as c_int,
-                vma(view.common, args, 2) as *mut c_char,
-                *args.offset(3) as c_int,
+            // Raven `Cmd_ArgvBuffer` inlined at its one caller: the module
+            // out-buffer fill (caller-owned memory, caller-supplied length).
+            let len = *args.offset(3) as usize;
+            Q_strncpyz(
+                core::slice::from_raw_parts_mut(vma(view.common, args, 2) as *mut c_char, len),
+                Cmd_Argv(view.common, *args.offset(1) as c_int),
+                len,
             );
             return 0;
         } else if trap == G::G_SEND_CONSOLE_COMMAND as isize {
-            mp_engine_qcommon::cmd_common::Cbuf_ExecuteText(
-                view,
-                *args.offset(1) as c_int,
-                vma(view.common, args, 2) as *const c_char,
-            );
+            // module-memory seam: one conversion at the trap arm.
+            let text = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                .to_string_lossy()
+                .into_owned();
+            mp_engine_qcommon::cmd_common::Cbuf_ExecuteText(view, *args.offset(1) as c_int, &text);
             return 0;
         } else if trap == G::G_FS_FOPEN_FILE as isize {
+            let qpath = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_string_lossy()
+                .into_owned();
             return mp_engine_qcommon::files_pc::FS_FOpenFileByMode(
                 view,
-                vma(view.common, args, 1) as *const c_char,
+                &qpath,
                 vma(view.common, args, 2) as *mut c_int,
                 core::mem::transmute(*args.offset(3) as c_int),
             ) as isize;
@@ -934,10 +945,18 @@ pub fn SV_GameSystemCalls(
             FS_FCloseFile(view.common, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::G_FS_GETFILELIST as isize {
+            // module-memory seam: path/extension convert at the trap arm; the
+            // out-buffer stays caller-owned module memory.
+            let path = core::ffi::CStr::from_ptr(vma(view.common, args, 1) as *const c_char)
+                .to_string_lossy()
+                .into_owned();
+            let extension = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                .to_string_lossy()
+                .into_owned();
             return mp_engine_qcommon::files_pc::FS_GetFileList(
                 view,
-                vma(view.common, args, 1) as *const c_char,
-                vma(view.common, args, 2) as *const c_char,
+                &path,
+                &extension,
                 vma(view.common, args, 3) as *mut c_char,
                 *args.offset(4) as c_int,
             ) as isize;
@@ -956,12 +975,11 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::G_DROP_CLIENT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
             let sv = &mut *(view.sv.as_raw() as *mut Server);
-            SV_GameDropClient(
-                view.common,
-                sv,
-                *args.offset(1) as c_int,
-                vma(view.common, args, 2) as *const c_char,
-            );
+            // module-memory seam: one conversion at the trap arm.
+            let reason = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
+                .to_string_lossy()
+                .into_owned();
+            SV_GameDropClient(view.common, sv, *args.offset(1) as c_int, &reason);
             return 0;
         } else if trap == G::G_SEND_SERVER_COMMAND as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
@@ -1250,19 +1268,14 @@ pub fn SV_GameSystemCalls(
                     .to_str()
                     .unwrap_or(""),
             );
+            let out_len = *args.offset(3) as usize;
+            let out =
+                core::slice::from_raw_parts_mut(vma(view.common, args, 2) as *mut c_char, out_len);
             if !text.is_empty() {
-                Q_strncpyz(
-                    vma(view.common, args, 2) as *mut c_char,
-                    text.as_ptr() as *const c_char,
-                    *args.offset(3) as c_int,
-                );
+                Q_strncpyz(out, &text, out_len);
                 return qtrue as isize;
             } else {
-                Q_strncpyz(
-                    vma(view.common, args, 2) as *mut c_char,
-                    c"??".as_ptr(),
-                    *args.offset(3) as c_int,
-                );
+                Q_strncpyz(out, "??", out_len);
                 return qfalse as isize;
             }
         } else if trap == G::G_ROFF_CLEAN as isize {
@@ -3738,12 +3751,10 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
     // parameter (Raven `SV_GameSystemCalls`, `vm.cpp:471-472`) takes the C-ABI
     // `sv_game_system_call` adapter, which routes the legacy `VM_DllSyscall`
     // path to the same slot.
-    sv.gvm = mp_engine_qcommon::vm_fns::VM_Create(
-        view,
-        c"jampgame".as_ptr(),
-        Some(sv_game_system_call),
-        unsafe { core::mem::transmute(vm_game as c_int) },
-    );
+    sv.gvm =
+        mp_engine_qcommon::vm_fns::VM_Create(view, "jampgame", Some(sv_game_system_call), unsafe {
+            core::mem::transmute(vm_game as c_int)
+        });
     if sv.gvm.is_null() {
         mp_engine_qcommon::common::com_error(
             errorParm_t::ERR_FATAL,

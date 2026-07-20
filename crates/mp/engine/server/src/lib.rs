@@ -34,7 +34,7 @@ pub use sv_bot::{
     SV_BotCalculatePaths, SV_BotFreeClient, SV_BotGetConsoleMessage, SV_BotGetSnapshotEntity,
     SV_BotLibSetup, SV_BotLibShutdown, SV_BotWaypointReception,
 };
-pub use sv_ccmds::SV_GetStringEdString_str;
+pub use sv_ccmds::SV_GetStringEdString;
 pub use sv_client::{SV_CloseDownload, SV_DropClient};
 pub use sv_init::SV_SetUserinfo;
 pub use sv_main::{SV_AddServerCommand, SV_SendServerCommand};

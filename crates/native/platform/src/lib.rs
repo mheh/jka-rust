@@ -26,6 +26,6 @@ pub use sys_main::{
 };
 #[cfg(unix)]
 pub use sys_shared::{
-    Sys_DefaultCDPath, Sys_DefaultHomePath, Sys_DefaultInstallPath, Sys_FreeFileList,
-    Sys_ListFiles, Sys_Mkdir,
+    sys_fopen, sys_remove, sys_rename, Sys_DefaultCDPath, Sys_DefaultHomePath,
+    Sys_DefaultInstallPath, Sys_ListFiles, Sys_Mkdir,
 };

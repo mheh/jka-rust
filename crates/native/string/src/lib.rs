@@ -11,4 +11,6 @@ pub mod atoi;
 pub mod ctype;
 pub mod filter;
 pub mod gp2_tokenizer;
+pub mod q_string;
+pub mod q_strncpyz;
 pub mod sscanf;

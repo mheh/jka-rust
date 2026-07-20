@@ -18,17 +18,14 @@ use crate::host_view::engine_host_view;
 /// delegated to the qcommon transcription (its own `catch_unwind` escalates a
 /// boot-time `ComError` to `Sys_Error("Error during initialization: …")`).
 ///
-/// The command line is leaked to process lifetime: `Com_ParseCommandLine`
-/// stores `com_consoleLines[]` pointers INTO the buffer, exactly as Raven's
-/// `WinMain` `lpCmdLine` persists for the process (`win_main.cpp:1524`).
+/// Raven leaks `WinMain`'s `lpCmdLine` for process lifetime so the
+/// `com_consoleLines[]` pointers stay live (`win_main.cpp:1524`);
+/// `Com_ParseCommandLine` owns its line copies now, so the borrow ends here.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1216`
 pub fn com_init(engine: &mut Engine, command_line: &str) {
-    let cmdline: &'static mut std::ffi::CString = Box::leak(Box::new(
-        std::ffi::CString::new(command_line).unwrap_or_default(),
-    ));
     let mut view = engine_host_view(engine);
-    Com_Init(&mut view, cmdline.as_ptr() as *mut core::ffi::c_char);
+    Com_Init(&mut view, command_line);
 }
 
 /// Raven `Com_Frame` (MP `common.cpp:1593`) — one frame, delegated to the

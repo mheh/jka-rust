@@ -1805,8 +1805,8 @@ pub fn MSG_CheckNETFPSFOverrides(view: &mut EngineHostView, psfOverrides: qboole
         }
     }
 
-    let path = std::ffi::CString::new(format!("ext_data/MP/{}", fileName)).unwrap();
-    len = FS_FOpenFileRead(view, path.as_ptr(), &mut f, qfalse);
+    let path = format!("ext_data/MP/{fileName}");
+    len = FS_FOpenFileRead(view, &path, &mut f, false);
 
     if f == 0 {
         //silently exit since this file is not needed to proceed.

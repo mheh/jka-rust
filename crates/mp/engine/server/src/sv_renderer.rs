@@ -13,8 +13,6 @@
 //! Source: `oracle/codemp/renderer/tr_model.cpp` (WinDed DEDICATED link set,
 //! `docs/plans/2026-07-08-mp-engine-build-out.md`).
 
-use core::ffi::c_char;
-
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::{qboolean, qhandle_t};
 
@@ -48,20 +46,14 @@ pub fn R_SVModelInit(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/renderer/tr_model.cpp:522-566`.
 pub fn RE_RegisterMedia_LevelLoadBegin(
     view: &mut EngineHostView,
-    ps_map_name: *mut c_char,
+    ps_map_name: &str,
     e_force_reload: ForceReload_e,
 ) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast of
     // this slot for the borrow's duration (`view.rm` casts back to the live
     // `Engine.render_models`).
     let rm = unsafe { &mut *(view.rm.as_raw() as *mut RealRenderModels) };
-    // Raven's `const char *psMapName` is a NUL-terminated map name.
-    let map_name = unsafe {
-        core::ffi::CStr::from_ptr(ps_map_name)
-            .to_str()
-            .unwrap_or("")
-    };
-    rm.media_level_load_begin(view, map_name, e_force_reload);
+    rm.media_level_load_begin(view, ps_map_name, e_force_reload);
 }
 
 /// Raven `R_InitShaders(qboolean server)`. On the WinDed DEDICATED build the

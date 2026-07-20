@@ -16,12 +16,10 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_void};
 use std::ffi::CStr;
 use std::sync::OnceLock;
 
 use native_string::filter::Com_FilterPathBytes;
-use native_types::{qboolean, qfalse, qtrue};
 
 /// `MAX_FOUND_FILES` — Raven's stack list cap in `Sys_ListFiles`.
 /// Source: `oracle/codemp/unix/unix_shared.cpp:103`
@@ -34,9 +32,42 @@ const MAX_FOUND_FILES: usize = 0x1000;
 /// `Sys_Mkdir` (unix): `mkdir(path, 0777)`, ignoring the result.
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:84-87`
-pub fn Sys_Mkdir(path: *const c_char) {
+pub fn Sys_Mkdir(path: &str) {
+    let Ok(path_c) = std::ffi::CString::new(path) else {
+        return;
+    };
     unsafe {
-        libc::mkdir(path, 0o777);
+        libc::mkdir(path_c.as_ptr(), 0o777);
+    }
+}
+
+// The libc path-call chokepoints for owned strings (not Raven fns — the
+// single CString conversions the FS string migration funnels through; an
+// interior-NUL path fails as a nonexistent one).
+
+/// libc `fopen` over an owned path.
+pub fn sys_fopen(path: &str, mode: &CStr) -> *mut libc::FILE {
+    let Ok(path_c) = std::ffi::CString::new(path) else {
+        return core::ptr::null_mut();
+    };
+    unsafe { libc::fopen(path_c.as_ptr(), mode.as_ptr()) }
+}
+
+/// libc `rename` over owned paths.
+pub fn sys_rename(from: &str, to: &str) -> core::ffi::c_int {
+    let (Ok(from_c), Ok(to_c)) = (std::ffi::CString::new(from), std::ffi::CString::new(to)) else {
+        return -1;
+    };
+    unsafe { libc::rename(from_c.as_ptr(), to_c.as_ptr()) }
+}
+
+/// libc `remove` over an owned path.
+pub fn sys_remove(path: &str) {
+    let Ok(path_c) = std::ffi::CString::new(path) else {
+        return;
+    };
+    unsafe {
+        libc::remove(path_c.as_ptr());
     }
 }
 
@@ -50,19 +81,18 @@ unsafe fn dirent_name(d: *const libc::dirent) -> Vec<u8> {
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:106-155`
 unsafe fn Sys_ListFilteredFiles(
-    basedir: &CStr,
+    basedir: &str,
     subdirs: &[u8],
-    filter: *mut c_char,
-    list: &mut Vec<*mut c_char>,
+    filter: &str,
+    list: &mut Vec<String>,
 ) {
     if list.len() >= MAX_FOUND_FILES - 1 {
         return;
     }
 
     // search = subdirs ? "basedir/subdirs" : "basedir"
-    let base_bytes = basedir.to_bytes();
     let mut search: Vec<u8> = Vec::new();
-    search.extend_from_slice(base_bytes);
+    search.extend_from_slice(basedir.as_bytes());
     if !subdirs.is_empty() {
         search.push(b'/');
         search.extend_from_slice(subdirs);
@@ -117,67 +147,54 @@ unsafe fn Sys_ListFilteredFiles(
         relname.extend_from_slice(subdirs);
         relname.push(b'/');
         relname.extend_from_slice(&dname);
-        let relname_c = match std::ffi::CString::new(relname) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        if !Com_FilterPathBytes(
-            CStr::from_ptr(filter).to_bytes(),
-            relname_c.to_bytes(),
-            false,
-        ) {
+        if !Com_FilterPathBytes(filter.as_bytes(), &relname, false) {
             continue;
         }
-        list.push(libc::strdup(relname_c.as_ptr()));
+        list.push(String::from_utf8_lossy(&relname).into_owned());
     }
 
     libc::closedir(fdir);
 }
 
 /// `Sys_ListFiles` (unix): directory scan with an extension filter (or a glob
-/// `filter`, or dirs-only when `wantsubs` / `extension == "/"`). Returns a
-/// libc-`malloc`'d `char**` list (freed by `Sys_FreeFileList`) and writes the
-/// count through `numfiles`.
+/// `filter`, or dirs-only when `wantsubs` / `extension == "/"`). Raven's
+/// libc-`malloc`'d `char**`/`numfiles` return (freed by `Sys_FreeFileList`)
+/// becomes an owned `Vec<String>` (string-data migration, DEC-32).
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:159-254`
 pub fn Sys_ListFiles(
-    directory: *const c_char,
-    extension: *const c_char,
-    filter: *mut c_char,
-    numfiles: *mut c_int,
-    wantsubs: qboolean,
-) -> *mut *mut c_char {
+    directory: &str,
+    extension: Option<&str>,
+    filter: Option<&str>,
+    wantsubs: bool,
+) -> Vec<String> {
     unsafe {
         let mut dironly = wantsubs;
-        let mut list: Vec<*mut c_char> = Vec::new();
+        let mut list: Vec<String> = Vec::new();
 
-        if !filter.is_null() {
-            let dir_c = CStr::from_ptr(directory);
-            Sys_ListFilteredFiles(dir_c, b"", filter, &mut list);
-            *numfiles = list.len() as c_int;
-            return finalize_list(list, numfiles);
+        if let Some(filter) = filter {
+            Sys_ListFilteredFiles(directory, b"", filter, &mut list);
+            return list;
         }
 
         // extension = extension ? extension : ""
-        let mut ext: Vec<u8> = if extension.is_null() {
-            Vec::new()
-        } else {
-            CStr::from_ptr(extension).to_bytes().to_vec()
-        };
+        let mut ext: &[u8] = extension.map_or(b"", |e| e.as_bytes());
         // "/" alone means "directories only, no extension match"
         if ext == b"/" {
-            ext.clear();
-            dironly = qtrue;
+            ext = b"";
+            dironly = true;
         }
         let ext_len = ext.len();
 
-        let fdir = libc::opendir(directory);
+        let directory_c = match std::ffi::CString::new(directory) {
+            Ok(c) => c,
+            Err(_) => return list,
+        };
+        let fdir = libc::opendir(directory_c.as_ptr());
         if fdir.is_null() {
-            *numfiles = 0;
-            return core::ptr::null_mut();
+            return list;
         }
 
-        let dir_bytes = CStr::from_ptr(directory).to_bytes().to_vec();
         loop {
             let d = libc::readdir(fdir);
             if d.is_null() {
@@ -186,7 +203,7 @@ pub fn Sys_ListFiles(
             let dname = dirent_name(d);
 
             // search = "directory/dname"
-            let mut search: Vec<u8> = dir_bytes.clone();
+            let mut search: Vec<u8> = directory.as_bytes().to_vec();
             search.push(b'/');
             search.extend_from_slice(&dname);
             let search_c = match std::ffi::CString::new(search) {
@@ -198,13 +215,13 @@ pub fn Sys_ListFiles(
                 continue;
             }
             let is_dir = st.st_mode & libc::S_IFDIR != 0;
-            if (dironly != qfalse && !is_dir) || (dironly == qfalse && is_dir) {
+            if (dironly && !is_dir) || (!dironly && is_dir) {
                 continue;
             }
 
             if ext_len != 0 {
                 if dname.len() < ext_len
-                    || !dname[dname.len() - ext_len..].eq_ignore_ascii_case(&ext)
+                    || !dname[dname.len() - ext_len..].eq_ignore_ascii_case(ext)
                 {
                     continue; // didn't match
                 }
@@ -213,53 +230,11 @@ pub fn Sys_ListFiles(
             if list.len() == MAX_FOUND_FILES - 1 {
                 break;
             }
-            let dname_c = match std::ffi::CString::new(dname) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            list.push(libc::strdup(dname_c.as_ptr()));
+            list.push(String::from_utf8_lossy(&dname).into_owned());
         }
 
         libc::closedir(fdir);
-        *numfiles = list.len() as c_int;
-        finalize_list(list, numfiles)
-    }
-}
-
-/// Copy the accumulated entries into a libc-`malloc`'d, NULL-terminated
-/// `char**` (Raven's `listCopy` tail). Returns NULL for an empty list.
-///
-/// Source: `oracle/codemp/unix/unix_shared.cpp:243-253`
-unsafe fn finalize_list(list: Vec<*mut c_char>, numfiles: *mut c_int) -> *mut *mut c_char {
-    let n = list.len();
-    if n == 0 {
-        *numfiles = 0;
-        return core::ptr::null_mut();
-    }
-    let bytes = (n + 1) * core::mem::size_of::<*mut c_char>();
-    let arr = libc::malloc(bytes) as *mut *mut c_char;
-    for (i, &p) in list.iter().enumerate() {
-        *arr.add(i) = p;
-    }
-    *arr.add(n) = core::ptr::null_mut();
-    arr
-}
-
-/// `Sys_FreeFileList` (unix): free each string, then the array (libc `free`,
-/// pairing with `Sys_ListFiles`'s libc `malloc`/`strdup`).
-///
-/// Source: `oracle/codemp/unix/unix_shared.cpp:256-268`
-pub fn Sys_FreeFileList(list: *mut *mut c_char) {
-    if list.is_null() {
-        return;
-    }
-    unsafe {
-        let mut i = 0usize;
-        while !(*list.add(i)).is_null() {
-            libc::free(*list.add(i) as *mut c_void);
-            i += 1;
-        }
-        libc::free(list as *mut c_void);
+        list
     }
 }
 
@@ -270,14 +245,12 @@ pub fn Sys_FreeFileList(list: *mut *mut c_char) {
 /// `Sys_Cwd` (unix): the process working directory (Raven's static `cwd`).
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:270-278`
-fn sys_cwd() -> &'static CStr {
-    static CWD: OnceLock<std::ffi::CString> = OnceLock::new();
+fn sys_cwd() -> &'static str {
+    static CWD: OnceLock<String> = OnceLock::new();
     CWD.get_or_init(|| {
-        let dir = std::env::current_dir()
-            .ok()
-            .and_then(|p| std::ffi::CString::new(p.into_os_string().into_encoded_bytes()).ok())
-            .unwrap_or_default();
-        dir
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default()
     })
 }
 
@@ -285,16 +258,16 @@ fn sys_cwd() -> &'static CStr {
 /// entrypoint lands (oracle `main()` seeds it from `argv[0]` via `Sys_SetDefaultCDPath`).
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:285-288`
-pub fn Sys_DefaultCDPath() -> *const c_char {
-    c"".as_ptr()
+pub fn Sys_DefaultCDPath() -> &'static str {
+    ""
 }
 
 /// `Sys_DefaultInstallPath` (unix): the static `installPath`, or `Sys_Cwd` when
 /// unset (the dedicated path never sets it).
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:295-301`
-pub fn Sys_DefaultInstallPath() -> *const c_char {
-    sys_cwd().as_ptr()
+pub fn Sys_DefaultInstallPath() -> &'static str {
+    sys_cwd()
 }
 
 /// `Sys_DefaultHomePath` (unix): `$HOME` + platform suffix (macOS
@@ -302,23 +275,17 @@ pub fn Sys_DefaultInstallPath() -> *const c_char {
 /// when `$HOME` is unset.
 ///
 /// Source: `oracle/codemp/unix/unix_shared.cpp:308-329`
-pub fn Sys_DefaultHomePath() -> *const c_char {
-    static HOME: OnceLock<Option<std::ffi::CString>> = OnceLock::new();
+pub fn Sys_DefaultHomePath() -> &'static str {
+    static HOME: OnceLock<Option<String>> = OnceLock::new();
     let cell = HOME.get_or_init(|| {
         let home = std::env::var_os("HOME")?;
-        let mut bytes = home.into_encoded_bytes();
+        let mut path = home.to_string_lossy().into_owned();
         #[cfg(target_os = "macos")]
-        bytes.extend_from_slice(b"/Library/Application Support/Quake3");
+        path.push_str("/Library/Application Support/Quake3");
         #[cfg(not(target_os = "macos"))]
-        bytes.extend_from_slice(b"/.ja");
-        let path = std::ffi::CString::new(bytes).ok()?;
-        unsafe {
-            libc::mkdir(path.as_ptr(), 0o777);
-        }
+        path.push_str("/.ja");
+        Sys_Mkdir(&path);
         Some(path)
     });
-    match cell {
-        Some(p) => p.as_ptr(),
-        None => c"".as_ptr(),
-    }
+    cell.as_deref().unwrap_or("")
 }

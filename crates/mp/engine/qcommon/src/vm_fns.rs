@@ -678,13 +678,12 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
 /// Source: `oracle/codemp/qcommon/vm.cpp:471-597`
 pub fn VM_Create(
     view: &mut EngineHostView,
-    module: *const c_char,
+    module: &str,
     systemCalls: Option<extern "C" fn(*mut c_int) -> c_int>,
     mut interpret: vmInterpret_t,
 ) -> *mut vm_t {
     unsafe {
-        let module_str = std::ffi::CStr::from_ptr(module).to_string_lossy();
-        if module.is_null() || module_str.is_empty() || systemCalls.is_none() {
+        if module.is_empty() || systemCalls.is_none() {
             view.error(errorParm_t::ERR_FATAL, "VM_Create: bad parms");
         }
 
@@ -692,7 +691,7 @@ pub fn VM_Create(
         for i in 0..MAX_VM {
             let name =
                 std::ffi::CStr::from_ptr(view.common.vmTable[i].name.as_ptr()).to_string_lossy();
-            if name.eq_ignore_ascii_case(&module_str) {
+            if name.eq_ignore_ascii_case(module) {
                 return &mut view.common.vmTable[i] as *mut vm_t;
             }
         }
@@ -712,7 +711,7 @@ pub fn VM_Create(
 
         let vm = &mut view.common.vmTable[i] as *mut vm_t;
 
-        let name_bytes = module_str.as_bytes();
+        let name_bytes = module.as_bytes();
         let n = name_bytes.len().min((*vm).name.len() - 1);
         for (j, b) in name_bytes[..n].iter().enumerate() {
             (*vm).name[j] = *b as c_char;
@@ -916,8 +915,7 @@ pub fn VM_Restart(view: &mut EngineHostView, vm: *mut vm_t) -> *mut vm_t {
 
             VM_Free(view.common, vm);
 
-            let name_c = std::ffi::CString::new(name).unwrap();
-            return VM_Create(view, name_c.as_ptr(), systemCall, vmInterpret_t::VMI_NATIVE);
+            return VM_Create(view, &name, systemCall, vmInterpret_t::VMI_NATIVE);
         }
 
         // load the image

@@ -7,6 +7,7 @@
 //! Source: `oracle/codemp/qcommon/cmd_common.cpp`
 
 use core::ffi::{c_char, c_int, CStr};
+use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use mp_qshared::shared::limits::MAX_STRING_TOKENS;
 
@@ -17,21 +18,14 @@ use crate::cmd::cmd_consts::{MAX_CMD_BUFFER, MAX_CMD_LINE};
 use crate::cmd_pc::{Cmd_ExecuteString, Cmd_List_f};
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::Common;
-use crate::common_fns::Com_Memcpy;
 
-// Sweep: extern forward-declares eliminated. libc byte helpers (rule 3),
-// real in-crate `Com_Printf`/`Com_Error`, and genuinely-unported callees
-// referenced at their canonical future homes (q_string / cvar_fns / files /
-// cmd). `Com_Printf`'s C-format `%s` sites were already lossy (the decl was
-// non-variadic), so &str parity is preserved.
-use libc::{atoi, memmove, strcat, strlen};
+use libc::memmove;
+use native_string::atoi::atoi;
 
 use crate::cmd::Cmd_AddCommand;
 use crate::common::{com_error, com_printf};
 use crate::cvar_fns::Cvar_VariableString;
 use crate::files_common::{FS_FreeFile, FS_ReadFile};
-use mp_qshared::shared::q_format::FmtArg;
-use mp_qshared::shared::q_string::{va, COM_DefaultExtension, Q_strncpyz};
 
 /// `Cbuf_Init`.
 ///
@@ -45,182 +39,124 @@ pub fn Cbuf_Init(common: &mut Common) {
 /// `Cmd_Argc`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:300-302`
-pub fn Cmd_Argc(common: &mut Common) -> c_int {
-    common.cmd_argc
+pub fn Cmd_Argc(common: &Common) -> c_int {
+    common.cmd_argv.len() as c_int
 }
 
-/// `Cmd_Argv`.
+/// `Cmd_Argv` (out of range reads Raven's `""` literal).
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:309-314`
-pub fn Cmd_Argv(common: &mut Common, arg: c_int) -> *mut c_char {
-    if (arg as u32) >= common.cmd_argc as u32 {
-        // Raven returns a `""` literal here; mirror with a static empty
-        // C string (never written through by callers).
-        static EMPTY: [c_char; 1] = [0];
-        return EMPTY.as_ptr() as *mut c_char;
-    }
-    common.cmd_argv[arg as usize]
+pub fn Cmd_Argv(common: &Common, arg: c_int) -> &str {
+    common.cmd_argv.get(arg as usize).map_or("", |s| s.as_str())
 }
 
-/// `Cmd_Args`.
-///
-/// Raven's `static char cmd_args[MAX_STRING_CHARS]` is genuine cross-call
-/// scratch reused every invocation (the resolved signature returns a raw
-/// pointer into it) — three-kind rule case 2/3: threaded as a `Common` field
-/// (`cmd_args_buf`), never a hidden Rust static.
+/// `Cmd_Args` — args 1.. space-joined. Raven's `static char
+/// cmd_args[MAX_STRING_CHARS]` return scratch becomes the owned return (its
+/// size was an unchecked `strcat` target, no defined cap to keep).
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:336-349`
-pub fn Cmd_Args(common: &mut Common) -> *mut c_char {
-    common.cmd_args_buf[0] = 0;
-    for i in 1..common.cmd_argc {
-        unsafe {
-            strcat(
-                common.cmd_args_buf.as_mut_ptr() as *mut c_char,
-                common.cmd_argv[i as usize],
-            );
-        }
-        if i != common.cmd_argc - 1 {
-            unsafe {
-                strcat(
-                    common.cmd_args_buf.as_mut_ptr() as *mut c_char,
-                    b" \0".as_ptr() as *const c_char,
-                );
-            }
-        }
-    }
-    common.cmd_args_buf.as_mut_ptr() as *mut c_char
+pub fn Cmd_Args(common: &Common) -> String {
+    common.cmd_argv.get(1..).unwrap_or(&[]).join(" ")
 }
 
-/// `Cmd_ArgsFrom`.
-///
-/// Raven's `static char cmd_args[BIG_INFO_STRING]` — a distinct local static
-/// from `Cmd_Args`'s same-named one (different scope/size); threaded as its
-/// own `Common` field (`cmd_args_from_buf`) per the three-kind rule.
+/// `Cmd_ArgsFrom` — args `arg`.. space-joined (negative clamps to 0).
+/// Raven's distinct `static char cmd_args[BIG_INFO_STRING]` scratch becomes
+/// the owned return.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:358-373`
-pub fn Cmd_ArgsFrom(common: &mut Common, arg: c_int) -> *mut c_char {
-    let mut arg = arg;
-    common.cmd_args_from_buf[0] = 0;
-    if arg < 0 {
-        arg = 0;
-    }
-    for i in arg..common.cmd_argc {
-        unsafe {
-            strcat(
-                common.cmd_args_from_buf.as_mut_ptr() as *mut c_char,
-                common.cmd_argv[i as usize],
-            );
-        }
-        if i != common.cmd_argc - 1 {
-            unsafe {
-                strcat(
-                    common.cmd_args_from_buf.as_mut_ptr() as *mut c_char,
-                    b" \0".as_ptr() as *const c_char,
-                );
-            }
-        }
-    }
-    common.cmd_args_from_buf.as_mut_ptr() as *mut c_char
+pub fn Cmd_ArgsFrom(common: &Common, arg: c_int) -> String {
+    let arg = arg.max(0) as usize;
+    common.cmd_argv.get(arg..).unwrap_or(&[]).join(" ")
 }
 
-/// `Cmd_TokenizeString`.
+/// `Cmd_TokenizeString`. Raven's signed-`char` whitespace skip (high bytes
+/// count as whitespace) and its unsigned token loop are both kept.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:398-491`
-pub fn Cmd_TokenizeString(common: &mut Common, text_in: *const c_char) {
+pub fn Cmd_TokenizeString(common: &mut Common, text_in: &str) {
     // clear previous args
-    common.cmd_argc = 0;
+    common.cmd_argv.clear();
 
-    if text_in.is_null() {
-        return;
-    }
+    let text = text_in.as_bytes();
+    let mut i = 0usize;
 
-    unsafe {
-        let mut text = text_in;
-        let mut text_out = common.cmd_tokenized.as_mut_ptr() as *mut c_char;
+    loop {
+        if common.cmd_argv.len() == MAX_STRING_TOKENS {
+            return; // this is usually something malicious
+        }
 
         loop {
-            if common.cmd_argc == MAX_STRING_TOKENS as c_int {
-                return; // this is usually something malicious
+            // skip whitespace
+            while i < text.len() && text[i] != 0 && (text[i] as i8) <= b' ' as i8 {
+                i += 1;
             }
-
-            loop {
-                // skip whitespace
-                while *text != 0 && *text <= b' ' as c_char {
-                    text = text.add(1);
-                }
-                if *text == 0 {
-                    return; // all tokens parsed
-                }
-
-                // skip // comments
-                if *text == b'/' as c_char && *text.add(1) == b'/' as c_char {
-                    return; // all tokens parsed
-                }
-
-                // skip /* */ comments
-                if *text == b'/' as c_char && *text.add(1) == b'*' as c_char {
-                    while *text != 0 && (*text != b'*' as c_char || *text.add(1) != b'/' as c_char)
-                    {
-                        text = text.add(1);
-                    }
-                    if *text == 0 {
-                        return; // all tokens parsed
-                    }
-                    text = text.add(2);
-                } else {
-                    break; // we are ready to parse a token
-                }
-            }
-
-            // handle quoted strings
-            if *text == b'"' as c_char {
-                common.cmd_argv[common.cmd_argc as usize] = text_out;
-                common.cmd_argc += 1;
-                text = text.add(1);
-                while *text != 0 && *text != b'"' as c_char {
-                    *text_out = *text;
-                    text_out = text_out.add(1);
-                    text = text.add(1);
-                }
-                *text_out = 0;
-                text_out = text_out.add(1);
-                if *text == 0 {
-                    return; // all tokens parsed
-                }
-                text = text.add(1);
-                continue;
-            }
-
-            // regular token
-            common.cmd_argv[common.cmd_argc as usize] = text_out;
-            common.cmd_argc += 1;
-
-            // skip until whitespace, quote, or command
-            while *(text as *const u8) > b' ' {
-                if *text == b'"' as c_char {
-                    break;
-                }
-
-                if *text == b'/' as c_char && *text.add(1) == b'/' as c_char {
-                    break;
-                }
-
-                // skip /* */ comments
-                if *text == b'/' as c_char && *text.add(1) == b'*' as c_char {
-                    break;
-                }
-
-                *text_out = *text;
-                text_out = text_out.add(1);
-                text = text.add(1);
-            }
-
-            *text_out = 0;
-            text_out = text_out.add(1);
-
-            if *text == 0 {
+            if i >= text.len() || text[i] == 0 {
                 return; // all tokens parsed
             }
+
+            // skip // comments
+            if text[i] == b'/' && text.get(i + 1) == Some(&b'/') {
+                return; // all tokens parsed
+            }
+
+            // skip /* */ comments
+            if text[i] == b'/' && text.get(i + 1) == Some(&b'*') {
+                while i < text.len()
+                    && text[i] != 0
+                    && !(text[i] == b'*' && text.get(i + 1) == Some(&b'/'))
+                {
+                    i += 1;
+                }
+                if i >= text.len() || text[i] == 0 {
+                    return; // all tokens parsed
+                }
+                i += 2;
+            } else {
+                break; // we are ready to parse a token
+            }
+        }
+
+        // handle quoted strings
+        if text[i] == b'"' {
+            i += 1;
+            let start = i;
+            while i < text.len() && text[i] != 0 && text[i] != b'"' {
+                i += 1;
+            }
+            common
+                .cmd_argv
+                .push(String::from_utf8_lossy(&text[start..i]).into_owned());
+            if i >= text.len() || text[i] == 0 {
+                return; // all tokens parsed
+            }
+            i += 1;
+            continue;
+        }
+
+        // regular token: skip until whitespace, quote, or command
+        let start = i;
+        while i < text.len() && text[i] > b' ' {
+            if text[i] == b'"' {
+                break;
+            }
+
+            if text[i] == b'/' && text.get(i + 1) == Some(&b'/') {
+                break;
+            }
+
+            // skip /* */ comments
+            if text[i] == b'/' && text.get(i + 1) == Some(&b'*') {
+                break;
+            }
+
+            i += 1;
+        }
+        common
+            .cmd_argv
+            .push(String::from_utf8_lossy(&text[start..i]).into_owned());
+
+        if i >= text.len() || text[i] == 0 {
+            return; // all tokens parsed
         }
     }
 }
@@ -230,59 +166,52 @@ pub fn Cmd_TokenizeString(common: &mut Common, text_in: *const c_char) {
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:32-38`
 pub fn Cmd_Wait_f(common: &mut Common) {
     if Cmd_Argc(common) == 2 {
-        common.cmd_wait = unsafe { atoi(Cmd_Argv(common, 1)) };
+        common.cmd_wait = atoi(Cmd_Argv(common, 1));
     } else {
         common.cmd_wait = 1;
     }
 }
 
-/// `Cmd_ArgvBuffer`.
-///
-/// Source: `oracle/codemp/qcommon/cmd_common.cpp:324-326`
-pub fn Cmd_ArgvBuffer(common: &mut Common, arg: c_int, buffer: *mut c_char, bufferLength: c_int) {
-    Q_strncpyz(buffer, Cmd_Argv(common, arg), bufferLength);
-}
-
-/// `Cmd_ArgsBuffer`.
-///
-/// Source: `oracle/codemp/qcommon/cmd_common.cpp:383-385`
-pub fn Cmd_ArgsBuffer(common: &mut Common, buffer: *mut c_char, bufferLength: c_int) {
-    Q_strncpyz(buffer, Cmd_Args(common), bufferLength);
-}
+// Raven `Cmd_ArgvBuffer` (cmd_common.cpp:324-326) is inlined at its one
+// caller, sv_game's `G_ARGV` trap arm (the module out-buffer seam).
+// Raven `Cmd_ArgsBuffer` (cmd_common.cpp:383-385) has no caller in the
+// dedicated island (its consumers are the client/UI trap arms) — dropped.
 
 /// `Cbuf_AddText`.
 ///
 /// Adds command text at the end of the buffer, does NOT add a final \n.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:68-78`
-pub fn Cbuf_AddText(common: &mut Common, text: *const c_char) {
-    unsafe {
-        let l = strlen(text) as c_int;
+pub fn Cbuf_AddText(common: &mut Common, text: &str) {
+    let bytes = text.as_bytes();
+    let l = bytes.len() as c_int;
 
-        if common.cmd_text.cursize + l >= common.cmd_text.maxsize {
-            com_printf(common, "Cbuf_AddText: overflow\n");
-            return;
-        }
-        Com_Memcpy(
-            common.cmd_text.data.add(common.cmd_text.cursize as usize) as *mut (),
-            text as *const (),
-            l as usize,
-        );
-        common.cmd_text.cursize += l;
+    if common.cmd_text.cursize + l >= common.cmd_text.maxsize {
+        com_printf(common, "Cbuf_AddText: overflow\n");
+        return;
     }
+    unsafe {
+        from_raw_parts_mut(
+            common.cmd_text.data.add(common.cmd_text.cursize as usize),
+            bytes.len(),
+        )
+        .copy_from_slice(bytes);
+    }
+    common.cmd_text.cursize += l;
 }
 
 /// `Cbuf_InsertText`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:91-113`
-pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
-    unsafe {
-        let len = strlen(text) as c_int + 1;
-        if len + common.cmd_text.cursize > common.cmd_text.maxsize {
-            com_printf(common, "Cbuf_InsertText overflowed\n");
-            return;
-        }
+pub fn Cbuf_InsertText(common: &mut Common, text: &str) {
+    let bytes = text.as_bytes();
+    let len = bytes.len() as c_int + 1;
+    if len + common.cmd_text.cursize > common.cmd_text.maxsize {
+        com_printf(common, "Cbuf_InsertText overflowed\n");
+        return;
+    }
 
+    unsafe {
         // move the existing command text
         let data = common.cmd_text.data;
         let mut i = common.cmd_text.cursize - 1;
@@ -292,13 +221,13 @@ pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
         }
 
         // copy the new text in
-        Com_Memcpy(data as *mut (), text as *const (), (len - 1) as usize);
+        from_raw_parts_mut(data, bytes.len()).copy_from_slice(bytes);
 
         // add a \n
         *data.add((len - 1) as usize) = b'\n';
-
-        common.cmd_text.cursize += len;
     }
+
+    common.cmd_text.cursize += len;
 }
 
 /// `Cmd_Echo_f`.
@@ -306,11 +235,8 @@ pub fn Cbuf_InsertText(common: &mut Common, text: *const c_char) {
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:271-278`
 pub fn Cmd_Echo_f(common: &mut Common) {
     for i in 1..Cmd_Argc(common) {
-        unsafe {
-            let arg = core::ffi::CStr::from_ptr(Cmd_Argv(common, i)).to_string_lossy();
-            let msg = format!("{} ", arg);
-            com_printf(common, &msg);
-        }
+        let msg = format!("{} ", Cmd_Argv(common, i));
+        com_printf(common, &msg);
     }
     com_printf(common, "\n");
 }
@@ -319,37 +245,33 @@ pub fn Cmd_Echo_f(common: &mut Common) {
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:219-241`
 pub fn Cmd_Exec_f(view: &mut EngineHostView) {
-    let mut filename: [c_char; native_types::MAX_QPATH as usize] =
-        [0; native_types::MAX_QPATH as usize];
-
     if Cmd_Argc(view.common) != 2 {
         com_printf(view.common, "exec <filename> : execute a script file\n");
         return;
     }
 
-    Q_strncpyz(
-        filename.as_mut_ptr(),
-        Cmd_Argv(view.common, 1),
-        core::mem::size_of_val(&filename) as c_int,
-    );
-    COM_DefaultExtension(
-        filename.as_mut_ptr(),
-        core::mem::size_of_val(&filename) as c_int,
-        b".cfg\0".as_ptr() as *const c_char,
-    );
+    // Raven's Q_strncpyz into a MAX_QPATH buffer + COM_DefaultExtension: the
+    // ".cfg" default appends when the name has no extension.
+    let mut filename = Cmd_Argv(view.common, 1).to_string();
+    if !filename
+        .rsplit('/')
+        .next()
+        .unwrap_or(&filename)
+        .contains('.')
+    {
+        filename.push_str(".cfg");
+    }
 
     let mut f: *mut c_char = core::ptr::null_mut();
-    let _len = FS_ReadFile(view, filename.as_ptr(), &mut f as *mut _ as *mut *mut ());
-    let name = unsafe { core::ffi::CStr::from_ptr(filename.as_ptr()) }
-        .to_string_lossy()
-        .into_owned();
+    let _len = FS_ReadFile(view, &filename, &mut f as *mut _ as *mut *mut ());
     if f.is_null() {
-        com_printf(view.common, &format!("couldn't exec {name}\n"));
+        com_printf(view.common, &format!("couldn't exec {filename}\n"));
         return;
     }
-    com_printf(view.common, &format!("execing {name}\n"));
+    com_printf(view.common, &format!("execing {filename}\n"));
 
-    Cbuf_InsertText(view.common, f as *const c_char);
+    let text = unsafe { CStr::from_ptr(f) }.to_string_lossy().into_owned();
+    Cbuf_InsertText(view.common, &text);
 
     FS_FreeFile(view.common, f as *mut ());
 }
@@ -363,27 +285,17 @@ pub fn Cmd_Vstr_f(common: &mut Common) {
         return;
     }
 
-    unsafe {
-        let arg1 = CStr::from_ptr(Cmd_Argv(common, 1))
-            .to_string_lossy()
-            .into_owned();
-        let v = std::ffi::CString::new(Cvar_VariableString(common, &arg1)).unwrap();
-        Cbuf_InsertText(
-            common,
-            va(
-                b"%s\n\0".as_ptr() as *const c_char,
-                &[FmtArg::cstr(v.as_ptr())],
-            ),
-        );
-    }
+    let cmd = format!("{}\n", Cvar_VariableString(common, Cmd_Argv(common, 1)));
+    Cbuf_InsertText(common, &cmd);
 }
 
-/// `Cbuf_Execute`.
+/// `Cbuf_Execute`. Raven's `char line[MAX_CMD_LINE]` copy scratch becomes an
+/// owned `String` built from the ring before the deletion `memmove`; the
+/// `MAX_CMD_LINE - 1` truncation clamp is kept (including its quirk: the
+/// unexecuted tail of an over-long line stays in the buffer as the next line).
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:148-202`
 pub fn Cbuf_Execute(view: &mut EngineHostView) {
-    let mut line: [c_char; MAX_CMD_LINE as usize] = [0; MAX_CMD_LINE as usize];
-
     while view.common.cmd_text.cursize != 0 {
         if view.common.cmd_wait != 0 {
             // skip out while text still remains in buffer, leaving it
@@ -397,6 +309,7 @@ pub fn Cbuf_Execute(view: &mut EngineHostView) {
 
         let mut quotes = 0;
         let mut i: c_int = 0;
+        let line;
         unsafe {
             while i < view.common.cmd_text.cursize {
                 let c = *text.add(i as usize);
@@ -416,8 +329,7 @@ pub fn Cbuf_Execute(view: &mut EngineHostView) {
                 i = MAX_CMD_LINE as c_int - 1;
             }
 
-            Com_Memcpy(line.as_mut_ptr() as *mut (), text as *const (), i as usize);
-            line[i as usize] = 0;
+            line = String::from_utf8_lossy(from_raw_parts(text, i as usize)).into_owned();
 
             // delete the text from the command buffer and move remaining commands down
             // this is necessary because commands (exec) can insert data at the
@@ -437,7 +349,7 @@ pub fn Cbuf_Execute(view: &mut EngineHostView) {
         }
 
         // execute the command line
-        Cmd_ExecuteString(view, line.as_ptr() as *const c_char);
+        Cmd_ExecuteString(view, &line);
     }
 }
 
@@ -455,10 +367,10 @@ pub fn Cmd_Init(view: &mut EngineHostView) {
 /// `Cbuf_ExecuteText`.
 ///
 /// Source: `oracle/codemp/qcommon/cmd_common.cpp:121-141`
-pub fn Cbuf_ExecuteText(view: &mut EngineHostView, exec_when: c_int, text: *const c_char) {
+pub fn Cbuf_ExecuteText(view: &mut EngineHostView, exec_when: c_int, text: &str) {
     match exec_when {
         x if x == cbufExec_t::EXEC_NOW as c_int => {
-            if !text.is_null() && unsafe { strlen(text) } > 0 {
+            if !text.is_empty() {
                 Cmd_ExecuteString(view, text);
             } else {
                 Cbuf_Execute(view);

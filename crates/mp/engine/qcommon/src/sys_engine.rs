@@ -13,7 +13,7 @@
 
 #![allow(non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_long, c_void};
+use core::ffi::{c_int, c_long, c_void};
 
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 use mp_qshared::common::mp::qcommon::netadr_t::netadr_t;
@@ -64,11 +64,11 @@ fn dlerror_string() -> String {
 /// Source: `oracle/codemp/unix/unix_main.c:323-447`
 ///
 /// # Safety
-/// `name` must be a valid NUL-terminated C string; `entryPoint`/`systemcalls`
-/// cross the module ABI seam (porting-rules §D11 exemption).
+/// `entryPoint`/`systemcalls` cross the module ABI seam, and the loaded
+/// module's `dllEntry` runs foreign code (porting-rules §D11 exemption).
 pub unsafe fn Sys_LoadDll(
     common: &mut Common,
-    name: *const c_char,
+    name: &str,
     entryPoint: &mut Option<native_platform::entrypoints::RawVmMain>,
     systemcalls: Option<unsafe extern "C-unwind" fn(isize, ...) -> isize>,
 ) -> *mut c_void {
@@ -79,59 +79,53 @@ pub unsafe fn Sys_LoadDll(
     // branch (`%si386.so`) — the only unix arch the oracle defines and the name
     // CI ships (`jampgamei386.so`).
     // Source: `oracle/codemp/unix/unix_main.c:342-356`
-    let name_str = core::ffi::CStr::from_ptr(name)
-        .to_string_lossy()
-        .into_owned();
-    let fname = std::ffi::CString::new(format!("{name_str}i386.so")).unwrap_or_default();
+    let fname = format!("{name}i386.so");
 
     // bk001129 - was RTLD_LAZY: `#define Q_RTLD RTLD_NOW`.
     let q_rtld = libc::RTLD_NOW;
 
-    let basepath = std::ffi::CString::new(Cvar_VariableString(common, "fs_basepath")).unwrap();
-    let cdpath = std::ffi::CString::new(Cvar_VariableString(common, "fs_cdpath")).unwrap();
-    let gamedir = std::ffi::CString::new(Cvar_VariableString(common, "fs_game")).unwrap();
+    let basepath = Cvar_VariableString(common, "fs_basepath").to_owned();
+    let cdpath = Cvar_VariableString(common, "fs_cdpath").to_owned();
+    let gamedir = Cvar_VariableString(common, "fs_game").to_owned();
 
-    let mut path = FS_BuildOSPath4(common, basepath.as_ptr(), gamedir.as_ptr(), fname.as_ptr());
+    let mut path = FS_BuildOSPath4(common, &basepath, &gamedir, &fname);
     // bk001206 - verbose
-    let path_str = core::ffi::CStr::from_ptr(path)
-        .to_string_lossy()
-        .into_owned();
-    com_printf(common, &format!("Sys_LoadDll({path_str})... \n"));
+    com_printf(common, &format!("Sys_LoadDll({path})... \n"));
 
     // bk001129 - from cvs1.17 (mkv), was fname not fn
-    let mut lib_handle = libc::dlopen(path, q_rtld);
+    // dlopen is the libc seam: NUL-terminate for the call's duration only.
+    let path_c = std::ffi::CString::new(path.clone()).unwrap_or_default();
+    let mut lib_handle = libc::dlopen(path_c.as_ptr(), q_rtld);
 
     if lib_handle.is_null() {
-        if !cdpath.to_bytes().is_empty() {
+        if !cdpath.is_empty() {
             // bk001206 - report any problem
             com_printf(
                 common,
-                &format!("Sys_LoadDll({path_str}) failed: \"{}\"\n", dlerror_string()),
+                &format!("Sys_LoadDll({path}) failed: \"{}\"\n", dlerror_string()),
             );
 
-            path = FS_BuildOSPath4(common, cdpath.as_ptr(), gamedir.as_ptr(), fname.as_ptr());
-            lib_handle = libc::dlopen(path, q_rtld);
-            let path2 = core::ffi::CStr::from_ptr(path)
-                .to_string_lossy()
-                .into_owned();
+            path = FS_BuildOSPath4(common, &cdpath, &gamedir, &fname);
+            let path_c = std::ffi::CString::new(path.clone()).unwrap_or_default();
+            lib_handle = libc::dlopen(path_c.as_ptr(), q_rtld);
             if lib_handle.is_null() {
                 // bk001206 - report any problem
                 com_printf(
                     common,
-                    &format!("Sys_LoadDll({path2}) failed: \"{}\"\n", dlerror_string()),
+                    &format!("Sys_LoadDll({path}) failed: \"{}\"\n", dlerror_string()),
                 );
             } else {
-                com_printf(common, &format!("Sys_LoadDll({path2}): succeeded ...\n"));
+                com_printf(common, &format!("Sys_LoadDll({path}): succeeded ...\n"));
             }
         } else {
-            com_printf(common, &format!("Sys_LoadDll({path_str}): succeeded ...\n"));
+            com_printf(common, &format!("Sys_LoadDll({path}): succeeded ...\n"));
         }
 
         if lib_handle.is_null() {
             // NDEBUG (retail release) branch: abort on failure.
             com_error(
                 errorParm_t::ERR_FATAL,
-                format!("Sys_LoadDll({name_str}) failed dlopen() completely!\n"),
+                format!("Sys_LoadDll({name}) failed dlopen() completely!\n"),
             );
         }
     }
@@ -141,7 +135,7 @@ pub unsafe fn Sys_LoadDll(
         let err = dlerror_string();
         com_printf(
             common,
-            &format!("Sys_LoadDLL({name_str}) failed dlsym(dllEntry): \"{err}\" ! \n"),
+            &format!("Sys_LoadDLL({name}) failed dlsym(dllEntry): \"{err}\" ! \n"),
         );
     }
 
@@ -159,7 +153,7 @@ pub unsafe fn Sys_LoadDll(
         com_error(
             errorParm_t::ERR_FATAL,
             format!(
-                "Sys_LoadDll({name_str}) failed dlsym(vmMain): \"{}\" !\n",
+                "Sys_LoadDll({name}) failed dlsym(vmMain): \"{}\" !\n",
                 dlerror_string()
             ),
         );
@@ -168,11 +162,11 @@ pub unsafe fn Sys_LoadDll(
     // bk001212
     com_printf(
         common,
-        &format!("Sys_LoadDll({name_str}) found **vmMain** at  {vm_main:p}  \n"),
+        &format!("Sys_LoadDll({name}) found **vmMain** at  {vm_main:p}  \n"),
     );
     let dll_entry: DllEntryFn = core::mem::transmute::<*mut c_void, DllEntryFn>(dll_entry);
     dll_entry(systemcalls);
-    com_printf(common, &format!("Sys_LoadDll({name_str}) succeeded!\n"));
+    com_printf(common, &format!("Sys_LoadDll({name}) succeeded!\n"));
     lib_handle
 }
 

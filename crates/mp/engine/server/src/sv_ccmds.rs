@@ -31,8 +31,10 @@ use mp_qshared::shared::cvar::{CVAR_LATCH, CVAR_SERVERINFO, CVAR_SYSTEMINFO};
 use mp_qshared::shared::force_powers::NUM_FORCE_POWERS;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::q_string::Q_CleanStr;
-use mp_qshared::shared::q_string::{Q_stricmp, Q_stricmpn, Q_strncpyz};
-use mp_qshared::shared::{qfalse, qtrue, MAX_QPATH, SNAPFLAG_SERVERCOUNT};
+use mp_qshared::shared::{qfalse, qtrue, SNAPFLAG_SERVERCOUNT};
+use native_string::atoi::atoi;
+use native_string::q_string::{Q_stricmp, Q_stricmpBytes, Q_stricmpn};
+use native_string::q_strncpyz::Q_strncpyzBytes;
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
@@ -52,45 +54,17 @@ use crate::{SV_AddServerCommand, SV_DropClient, SV_SendServerCommand, Server};
 /// stringed reference indication and dealt with properly.
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:16-32`
-pub fn SV_GetStringEdString(
-    sv: &mut Server,
-    refSection: *mut c_char,
-    refName: *mut c_char,
-) -> *const c_char {
+pub fn SV_GetStringEdString(sv: &mut Server, _refSection: &str, refName: &str) -> String {
     let _ = sv;
-    let _ = refSection;
     // Function-scope static `text` (fork-3 kind 2: rotating scratch/return
     // buffer) becomes an owned return value instead of a hidden cell.
-    let refname = unsafe { core::ffi::CStr::from_ptr(refName) }
-        .to_string_lossy()
-        .into_owned();
-    let mut text = format!("@@@{}", refname);
-    text.push('\0');
-    // Leak the owned CString-shaped buffer to hand back a raw `*const
-    // c_char` matching Raven's `static char text[1024]` return-by-pointer
-    // shape (the buffer must outlive the call, exactly as the C static did).
-    let boxed: Box<str> = text.into_boxed_str();
-    Box::leak(boxed).as_ptr() as *const c_char
-}
-
-/// Rust-native twin of `SV_GetStringEdString` returning an owned `String`
-/// (used where callers `format!` the result directly rather than needing the
-/// raw `*const c_char` return). Same `@@@`-marked stringed reference shape.
-///
-/// Source: `oracle/codemp/server/sv_ccmds.cpp:16-32`
-pub fn SV_GetStringEdString_str(sv: &mut Server, _refSection: &str, refName: &str) -> String {
-    let _ = sv;
-    format!("@@@{}", refName)
+    format!("@@@{refName}")
 }
 
 /// Raven `SV_GetPlayerByFedName`.
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:354-387`
-pub fn SV_GetPlayerByFedName(
-    common: &mut Common,
-    sv: &mut Server,
-    name: *const c_char,
-) -> *mut client_t {
+pub fn SV_GetPlayerByFedName(common: &mut Common, sv: &mut Server, name: &str) -> *mut client_t {
     // make sure server is running
     if common.cvar(common.com_sv_running).integer == 0 {
         return core::ptr::null_mut();
@@ -103,21 +77,31 @@ pub fn SV_GetPlayerByFedName(
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
-        if unsafe { Q_stricmp((*cl).name.as_ptr(), name) } == 0 {
-            return cl;
-        }
-
-        let mut cleanName = [0 as c_char; 64];
+        // still-C client_t name field: byte-exact compares at the site.
         unsafe {
-            Q_strncpyz(
-                cleanName.as_mut_ptr(),
-                (*cl).name.as_ptr(),
-                cleanName.len() as c_int,
+            if Q_stricmpBytes(
+                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                name.as_bytes(),
+            ) == 0
+            {
+                return cl;
+            }
+
+            let mut cleanName = [0 as c_char; 64];
+            let clean_len = cleanName.len();
+            Q_strncpyzBytes(
+                &mut cleanName,
+                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                clean_len,
             );
             Q_CleanStr(cleanName.as_mut_ptr());
-        }
-        if Q_stricmp(cleanName.as_ptr(), name) == 0 {
-            return cl;
+            if Q_stricmpBytes(
+                core::ffi::CStr::from_ptr(cleanName.as_ptr()).to_bytes(),
+                name.as_bytes(),
+            ) == 0
+            {
+                return cl;
+            }
         }
     }
 
@@ -155,7 +139,7 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
         return core::ptr::null_mut();
     }
 
-    let s = Cmd_Argv(common, 1);
+    let s = Cmd_Argv(common, 1).to_owned();
 
     // check for a name match
     let n = sv.svs.clients;
@@ -164,33 +148,35 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
-        if unsafe { Q_stricmp((*cl).name.as_ptr(), s) } == 0 {
-            return cl;
-        }
-
-        let mut cleanName = [0 as c_char; 64];
+        // still-C client_t name field: byte-exact compares at the site.
         unsafe {
-            Q_strncpyz(
-                cleanName.as_mut_ptr(),
-                (*cl).name.as_ptr(),
-                cleanName.len() as c_int,
+            if Q_stricmpBytes(
+                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                s.as_bytes(),
+            ) == 0
+            {
+                return cl;
+            }
+
+            let mut cleanName = [0 as c_char; 64];
+            let clean_len = cleanName.len();
+            Q_strncpyzBytes(
+                &mut cleanName,
+                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                clean_len,
             );
             Q_CleanStr(cleanName.as_mut_ptr());
-        }
-        if Q_stricmp(cleanName.as_ptr(), s) == 0 {
-            return cl;
+            if Q_stricmpBytes(
+                core::ffi::CStr::from_ptr(cleanName.as_ptr()).to_bytes(),
+                s.as_bytes(),
+            ) == 0
+            {
+                return cl;
+            }
         }
     }
 
-    unsafe {
-        com_printf(
-            common,
-            &format!(
-                "Player {} is not on the server\n",
-                core::ffi::CStr::from_ptr(s).to_string_lossy()
-            ),
-        );
-    }
+    com_printf(common, &format!("Player {s} is not on the server\n"));
 
     core::ptr::null_mut()
 }
@@ -209,18 +195,15 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
         return core::ptr::null_mut();
     }
 
-    let s = Cmd_Argv(common, 1);
-    let s_str = unsafe { core::ffi::CStr::from_ptr(s) }
-        .to_string_lossy()
-        .into_owned();
+    let s = Cmd_Argv(common, 1).to_owned();
 
-    for c in s_str.bytes() {
+    for c in s.bytes() {
         if !c.is_ascii_digit() {
-            com_printf(common, &format!("Bad slot number: {}\n", s_str));
+            com_printf(common, &format!("Bad slot number: {s}\n"));
             return core::ptr::null_mut();
         }
     }
-    let idnum = unsafe { libc::atoi(s) };
+    let idnum = atoi(&s);
     if idnum < 0 || idnum >= common.cvar(common.sv_maxclients).integer {
         com_printf(common, &format!("Bad client slot: {}\n", idnum));
         return core::ptr::null_mut();
@@ -237,7 +220,7 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
 /// Raven `SV_KickByName`.
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:389-446`
-pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) {
+pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: &str) {
     // make sure server is running
     if common.cvar(common.com_sv_running).integer == 0 {
         return;
@@ -245,7 +228,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
 
     let cl = SV_GetPlayerByFedName(common, sv, name);
     if cl.is_null() {
-        if Q_stricmp(name, c"all".as_ptr()) == 0 {
+        if Q_stricmp(name, "all") == 0 {
             let n = sv.svs.clients;
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
@@ -255,17 +238,13 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
                 if unsafe { (*cl).netchan.remoteAddress.r#type } == netadrtype_t::NA_LOOPBACK {
                     continue;
                 }
-                let reason = SV_GetStringEdString(
-                    sv,
-                    c"MP_SVGAME".as_ptr() as *mut c_char,
-                    c"WAS_KICKED".as_ptr() as *mut c_char,
-                );
-                SV_DropClient(common, sv, cl, reason); // "was kicked"
+                let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+                SV_DropClient(common, sv, cl, &reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if Q_stricmp(name, c"allbots".as_ptr()) == 0 {
+        } else if Q_stricmp(name, "allbots") == 0 {
             let n = sv.svs.clients;
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
@@ -275,12 +254,8 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
                 if unsafe { (*cl).netchan.remoteAddress.r#type } != netadrtype_t::NA_BOT {
                     continue;
                 }
-                let reason = SV_GetStringEdString(
-                    sv,
-                    c"MP_SVGAME".as_ptr() as *mut c_char,
-                    c"WAS_KICKED".as_ptr() as *mut c_char,
-                );
-                SV_DropClient(common, sv, cl, reason); // "was kicked"
+                let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+                SV_DropClient(common, sv, cl, &reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
@@ -290,29 +265,18 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: *const c_char) 
     }
     if unsafe { (*cl).netchan.remoteAddress.r#type } == netadrtype_t::NA_LOOPBACK {
         // SV_SendServerCommand(NULL, "print \"%s\"", "Cannot kick host player\n");
-        let reason = SV_GetStringEdString(
-            sv,
-            c"MP_SVGAME".as_ptr() as *mut c_char,
-            c"CANNOT_KICK_HOST".as_ptr() as *mut c_char,
-        );
+        let reason = SV_GetStringEdString(sv, "MP_SVGAME", "CANNOT_KICK_HOST");
         SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
-            &format!(
-                "print \"{}\"",
-                unsafe { core::ffi::CStr::from_ptr(reason) }.to_string_lossy()
-            ),
+            &format!("print \"{reason}\""),
         );
         return;
     }
 
-    let reason = SV_GetStringEdString(
-        sv,
-        c"MP_SVGAME".as_ptr() as *mut c_char,
-        c"WAS_KICKED".as_ptr() as *mut c_char,
-    );
-    SV_DropClient(common, sv, cl, reason); // "was kicked"
+    let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+    SV_DropClient(common, sv, cl, &reason); // "was kicked"
     unsafe {
         (*cl).lastPacketTime = sv.svs.time;
     } // in case there is a funny zombie
@@ -332,7 +296,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
     }
 
     if Cmd_Argc(view.common) > 1 {
-        if { Q_stricmp(c"notrunc".as_ptr(), Cmd_Argv(view.common, 1)) } == 0 {
+        if Q_stricmp("notrunc", Cmd_Argv(view.common, 1)) == 0 {
             avoidTruncation = qtrue;
         }
     }
@@ -432,9 +396,7 @@ pub fn SV_ConSay_f(common: &mut Common, sv: &mut Server) {
     }
 
     let mut text = "Server: ".to_string();
-    let mut p = unsafe { core::ffi::CStr::from_ptr(Cmd_Args(common)) }
-        .to_string_lossy()
-        .into_owned();
+    let mut p = Cmd_Args(common);
 
     if p.starts_with('"') {
         p.remove(0);
@@ -489,7 +451,7 @@ pub fn SV_ForceToggle_f(view: &mut EngineHostView, sv: &mut Server) {
         return;
     }
 
-    targetPower = unsafe { libc::atoi(Cmd_Argv(view.common, 1)) };
+    targetPower = atoi(Cmd_Argv(view.common, 1));
 
     if targetPower < 0 || targetPower >= NUM_FORCE_POWERS {
         com_printf(
@@ -570,14 +532,14 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
         return;
     }
 
-    if { Q_stricmp(Cmd_Argv(common, 1), c"Padawan".as_ptr()) } == 0 {
+    if Q_stricmp(Cmd_Argv(common, 1), "Padawan") == 0 {
         // if you try to kick the default name, also try to kick ""
-        SV_KickByName(common, sv, c"".as_ptr());
+        SV_KickByName(common, sv, "");
     }
 
     let cl = SV_GetPlayerByName(common, sv);
     if cl.is_null() {
-        if { Q_stricmp(Cmd_Argv(common, 1), c"all".as_ptr()) } == 0 {
+        if Q_stricmp(Cmd_Argv(common, 1), "all") == 0 {
             let n = sv.svs.clients;
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
@@ -587,17 +549,13 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                 if unsafe { (*cl).netchan.remoteAddress.r#type } == netadrtype_t::NA_LOOPBACK {
                     continue;
                 }
-                let reason = SV_GetStringEdString(
-                    sv,
-                    c"MP_SVGAME".as_ptr() as *mut c_char,
-                    c"WAS_KICKED".as_ptr() as *mut c_char,
-                );
-                SV_DropClient(common, sv, cl, reason); // "was kicked"
+                let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+                SV_DropClient(common, sv, cl, &reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
             }
-        } else if { Q_stricmp(Cmd_Argv(common, 1), c"allbots".as_ptr()) } == 0 {
+        } else if Q_stricmp(Cmd_Argv(common, 1), "allbots") == 0 {
             let n = sv.svs.clients;
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
@@ -607,12 +565,8 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                 if unsafe { (*cl).netchan.remoteAddress.r#type } != netadrtype_t::NA_BOT {
                     continue;
                 }
-                let reason = SV_GetStringEdString(
-                    sv,
-                    c"MP_SVGAME".as_ptr() as *mut c_char,
-                    c"WAS_KICKED".as_ptr() as *mut c_char,
-                );
-                SV_DropClient(common, sv, cl, reason); // "was kicked"
+                let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+                SV_DropClient(common, sv, cl, &reason); // "was kicked"
                 unsafe {
                     (*cl).lastPacketTime = sv.svs.time;
                 } // in case there is a funny zombie
@@ -622,29 +576,18 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     }
     if unsafe { (*cl).netchan.remoteAddress.r#type } == netadrtype_t::NA_LOOPBACK {
         // SV_SendServerCommand(NULL, "print \"%s\"", "Cannot kick host player\n");
-        let reason = SV_GetStringEdString(
-            sv,
-            c"MP_SVGAME".as_ptr() as *mut c_char,
-            c"CANNOT_KICK_HOST".as_ptr() as *mut c_char,
-        );
+        let reason = SV_GetStringEdString(sv, "MP_SVGAME", "CANNOT_KICK_HOST");
         SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
-            &format!(
-                "print \"{}\"",
-                unsafe { core::ffi::CStr::from_ptr(reason) }.to_string_lossy()
-            ),
+            &format!("print \"{reason}\""),
         );
         return;
     }
 
-    let reason = SV_GetStringEdString(
-        sv,
-        c"MP_SVGAME".as_ptr() as *mut c_char,
-        c"WAS_KICKED".as_ptr() as *mut c_char,
-    );
-    SV_DropClient(common, sv, cl, reason); // "was kicked"
+    let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+    SV_DropClient(common, sv, cl, &reason); // "was kicked"
     unsafe {
         (*cl).lastPacketTime = sv.svs.time;
     } // in case there is a funny zombie
@@ -671,29 +614,18 @@ pub fn SV_KickNum_f(common: &mut Common, sv: &mut Server) {
     }
     if unsafe { (*cl).netchan.remoteAddress.r#type } == netadrtype_t::NA_LOOPBACK {
         // SV_SendServerCommand(NULL, "print \"%s\"", "Cannot kick host player\n");
-        let reason = SV_GetStringEdString(
-            sv,
-            c"MP_SVGAME".as_ptr() as *mut c_char,
-            c"CANNOT_KICK_HOST".as_ptr() as *mut c_char,
-        );
+        let reason = SV_GetStringEdString(sv, "MP_SVGAME", "CANNOT_KICK_HOST");
         SV_SendServerCommand(
             common,
             sv,
             core::ptr::null_mut(),
-            &format!(
-                "print \"{}\"",
-                unsafe { core::ffi::CStr::from_ptr(reason) }.to_string_lossy()
-            ),
+            &format!("print \"{reason}\""),
         );
         return;
     }
 
-    let reason = SV_GetStringEdString(
-        sv,
-        c"MP_SVGAME".as_ptr() as *mut c_char,
-        c"WAS_KICKED".as_ptr() as *mut c_char,
-    );
-    SV_DropClient(common, sv, cl, reason); // "was kicked"
+    let reason = SV_GetStringEdString(sv, "MP_SVGAME", "WAS_KICKED");
+    SV_DropClient(common, sv, cl, &reason); // "was kicked"
     unsafe {
         (*cl).lastPacketTime = sv.svs.time;
     } // in case there is a funny zombie
@@ -754,50 +686,27 @@ pub fn SV_DumpUser_f(common: &mut Common, sv: &mut Server) {
 ///
 /// Source: `oracle/codemp/server/sv_ccmds.cpp:138-223`
 pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2System) {
-    let map = Cmd_Argv(view.common, 1);
-    if map.is_null() {
-        return;
-    }
+    let map = Cmd_Argv(view.common, 1).to_owned();
 
     // make sure the level exists before trying to change, so that
     // a typo at the server console won't end the game
-    let map_str = unsafe { core::ffi::CStr::from_ptr(map) }
-        .to_string_lossy()
-        .into_owned();
-    if map_str.contains('\\') {
+    if map.contains('\\') {
         com_printf(view.common, "Can't have mapnames with a \\\n");
         return;
     }
 
-    let expanded = format!("maps/{}.bsp\0", map_str);
-    if FS_ReadFile(
-        view,
-        expanded.as_ptr() as *const c_char,
-        core::ptr::null_mut(),
-    ) == -1
-    {
-        com_printf(
-            view.common,
-            &format!("Can't find map {}\n", expanded.trim_end_matches('\0')),
-        );
+    let expanded = format!("maps/{map}.bsp");
+    if FS_ReadFile(view, &expanded, core::ptr::null_mut()) == -1 {
+        com_printf(view.common, &format!("Can't find map {expanded}\n"));
         return;
     }
 
     // force latched values to get set
     Cvar_Get(view, "g_gametype", "0", CVAR_SERVERINFO | CVAR_LATCH);
 
-    let mut cmd = unsafe { core::ffi::CStr::from_ptr(Cmd_Argv(view.common, 0)) }
-        .to_string_lossy()
-        .into_owned();
+    let mut cmd = Cmd_Argv(view.common, 0).to_owned();
     let (cheat, killBots);
-    if {
-        Q_stricmpn(
-            format!("{}\0", cmd).as_ptr() as *const c_char,
-            c"sp".as_ptr(),
-            2,
-        )
-    } == 0
-    {
+    if Q_stricmpn(&cmd, "sp", 2) == 0 {
         Cvar_SetValue(
             view,
             "g_gametype",
@@ -810,11 +719,7 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
         cheat = qfalse;
         killBots = qtrue;
     } else {
-        let cmd_c = format!("{}\0", cmd);
-        if { Q_stricmpn(cmd_c.as_ptr() as *const c_char, c"devmap".as_ptr(), 6) } == 0 || {
-            Q_stricmp(cmd_c.as_ptr() as *const c_char, c"spdevmap".as_ptr())
-        } == 0
-        {
+        if Q_stricmpn(&cmd, "devmap", 6) == 0 || Q_stricmp(&cmd, "spdevmap") == 0 {
             cheat = qtrue;
             killBots = qtrue;
         } else {
@@ -828,8 +733,9 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
 
     // save the map name here cause on a map restart we reload the jampconfig.cfg
     // and thus nuke the arguments of the map command
-    let mut mapname = [0 as c_char; MAX_QPATH as usize];
-    Q_strncpyz(mapname.as_mut_ptr(), map, mapname.len() as c_int);
+    // (Raven's Q_strncpyz into a MAX_QPATH buffer; the owned snapshot keeps
+    // the same value — console tokens never reach the 64-byte bound.)
+    let mapname = map.clone();
 
     let mut eForceReload = ForceReload_e::eForceReload_NOTHING;
 
@@ -837,15 +743,14 @@ pub fn SV_Map_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghoul2Syste
     //     eForceReload = eForceReload_BSP;
     // }
     // else
-    let cmd_c = format!("{}\0", cmd);
-    if { Q_stricmp(cmd_c.as_ptr() as *const c_char, c"devmapmdl".as_ptr()) } == 0 {
+    if Q_stricmp(&cmd, "devmapmdl") == 0 {
         eForceReload = ForceReload_e::eForceReload_MODELS;
-    } else if { Q_stricmp(cmd_c.as_ptr() as *const c_char, c"devmapall".as_ptr()) } == 0 {
+    } else if Q_stricmp(&cmd, "devmapall") == 0 {
         eForceReload = ForceReload_e::eForceReload_ALL;
     }
 
     // start up the map
-    SV_SpawnServer(view, sv, g2, mapname.as_mut_ptr(), killBots, eForceReload);
+    SV_SpawnServer(view, sv, g2, &mapname, killBots, eForceReload);
 
     // set the cheat value
     // if the level was started with "map <levelname>", then
@@ -878,7 +783,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
     }
 
     let delay = if Cmd_Argc(view.common) > 1 {
-        unsafe { libc::atoi(Cmd_Argv(view.common, 1)) }
+        atoi(Cmd_Argv(view.common, 1))
     } else {
         5
     };
@@ -899,14 +804,9 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
         || view.common.cvar(view.common.sv_gametype).modified
     {
         // restart the map the slow way
-        let mut mapname = [0 as c_char; MAX_QPATH as usize];
-        let mapname_str = Cvar_VariableString(view.common, "mapname");
-        let mapname_c = CString::new(mapname_str).unwrap_or_default();
-        Q_strncpyz(
-            mapname.as_mut_ptr(),
-            mapname_c.as_ptr(),
-            mapname.len() as c_int,
-        );
+        // (Raven's Q_strncpyz into a MAX_QPATH buffer becomes the owned
+        // snapshot — the value must outlive the jampconfig.cfg reload.)
+        let mapname = Cvar_VariableString(view.common, "mapname").to_owned();
 
         com_printf(view.common, "variable change -- restarting.\n");
 
@@ -914,7 +814,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
             view,
             sv,
             g2,
-            mapname.as_mut_ptr(),
+            &mapname,
             qfalse,
             ForceReload_e::eForceReload_NOTHING,
         );
@@ -981,7 +881,9 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
         if !denied.is_null() {
             // this generally shouldn't happen, because the client
             // was connected before the level change
-            SV_DropClient(view.common, sv, client, denied);
+            // (module-memory seam: convert the denial text at the arm)
+            let denied = unsafe { core::ffi::CStr::from_ptr(denied) }.to_string_lossy();
+            SV_DropClient(view.common, sv, client, &denied);
             com_printf(
                 view.common,
                 &format!(

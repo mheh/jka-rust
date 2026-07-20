@@ -33,6 +33,7 @@ use mp_qshared::shared::q_string::{Info_SetValueForKey, Info_SetValueForKey_Big}
 use native_string::atof::atof;
 use native_string::atoi::atoi;
 use native_string::filter::Com_Filter;
+use native_string::q_strncpyz::Q_strncpyz;
 
 use crate::cmd::Cmd_AddCommand;
 use crate::cmd_common::{Cmd_Argc, Cmd_Argv};
@@ -42,23 +43,6 @@ use crate::common::{com_printf, Common};
 use crate::common_fns::Com_DPrintf;
 use crate::cvar::cvar_consts::MAX_CVARS;
 use crate::files_common::FS_Printf;
-
-/// Interim `Cmd_Argv` read as owned text (lossy) pending the cmd argv String
-/// migration (`cmd_argv` -> `Vec<String>`).
-fn argv_str(common: &mut Common, i: c_int) -> String {
-    unsafe { CStr::from_ptr(Cmd_Argv(common, i)) }
-        .to_string_lossy()
-        .into_owned()
-}
-
-/// `Q_strncpyz(dest, src, destsize)` over an owned `&str` source — the seam
-/// copy into a fixed C `char` buffer (truncate to destsize-1, always
-/// NUL-terminated).
-unsafe fn strncpyz_str(dest: *mut c_char, src: &str, destsize: c_int) {
-    let n = src.len().min(destsize as usize - 1);
-    core::ptr::copy_nonoverlapping(src.as_ptr() as *const c_char, dest, n);
-    *dest.add(n) = 0;
-}
 
 /// Raven `Cvar_ValidateString`.
 ///
@@ -127,7 +111,11 @@ pub fn Cvar_VariableStringBuffer(
     unsafe {
         match Cvar_FindVar(common, var_name) {
             None => *buffer = 0,
-            Some(h) => strncpyz_str(buffer, &common.cvar(h).string, bufsize),
+            Some(h) => Q_strncpyz(
+                core::slice::from_raw_parts_mut(buffer, bufsize as usize),
+                &common.cvar(h).string,
+                bufsize as usize,
+            ),
         }
     }
 }
@@ -412,7 +400,7 @@ pub fn Cvar_SetCheatState(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/qcommon/cvar.cpp:476-515`
 pub fn Cvar_Command(view: &mut EngineHostView) -> bool {
     // check variables
-    let arg0 = argv_str(view.common, 0);
+    let arg0 = Cmd_Argv(view.common, 0).to_owned();
     let Some(h) = Cvar_FindVar(view.common, &arg0) else {
         return false;
     };
@@ -434,7 +422,7 @@ pub fn Cvar_Command(view: &mut EngineHostView) -> bool {
     }
 
     // JFM toggle test
-    let value = argv_str(view.common, 1);
+    let value = Cmd_Argv(view.common, 1).to_owned();
     let name = view.common.cvar(h).name.clone();
     if value.as_bytes().first() == Some(&b'!') {
         // toggle
@@ -460,7 +448,7 @@ pub fn Cvar_Toggle_f(view: &mut EngineHostView) {
         return;
     }
 
-    let arg1 = argv_str(view.common, 1);
+    let arg1 = Cmd_Argv(view.common, 1).to_owned();
     let mut v = Cvar_VariableValue(view, &arg1) as c_int;
     v = if v == 0 { 1 } else { 0 };
 
@@ -481,7 +469,7 @@ pub fn Cvar_Set_f(view: &mut EngineHostView) {
     let mut combined = String::new();
     let mut l: c_int = 0;
     for i in 2..c {
-        let arg = argv_str(view.common, i);
+        let arg = Cmd_Argv(view.common, i).to_owned();
         // Raven's length bookkeeping is `strlen(arg+1)` — one short per arg
         // (and past-NUL UB on an empty arg; saturating 0 is the defined pick).
         let len = arg.len().saturating_sub(1) as c_int;
@@ -494,7 +482,7 @@ pub fn Cvar_Set_f(view: &mut EngineHostView) {
         }
         l += len;
     }
-    let arg1 = argv_str(view.common, 1);
+    let arg1 = Cmd_Argv(view.common, 1).to_owned();
     Cvar_Set2(view, &arg1, Some(&combined), false);
 }
 
@@ -507,7 +495,7 @@ pub fn Cvar_SetU_f(view: &mut EngineHostView) {
         return;
     }
     Cvar_Set_f(view);
-    let arg1 = argv_str(view.common, 1);
+    let arg1 = Cmd_Argv(view.common, 1).to_owned();
     let Some(h) = Cvar_FindVar(view.common, &arg1) else {
         return;
     };
@@ -523,7 +511,7 @@ pub fn Cvar_SetS_f(view: &mut EngineHostView) {
         return;
     }
     Cvar_Set_f(view);
-    let arg1 = argv_str(view.common, 1);
+    let arg1 = Cmd_Argv(view.common, 1).to_owned();
     let Some(h) = Cvar_FindVar(view.common, &arg1) else {
         return;
     };
@@ -539,7 +527,7 @@ pub fn Cvar_SetA_f(view: &mut EngineHostView) {
         return;
     }
     Cvar_Set_f(view);
-    let arg1 = argv_str(view.common, 1);
+    let arg1 = Cmd_Argv(view.common, 1).to_owned();
     let Some(h) = Cvar_FindVar(view.common, &arg1) else {
         return;
     };
@@ -554,7 +542,7 @@ pub fn Cvar_Reset_f(view: &mut EngineHostView) {
         com_printf(view.common, "usage: reset <variable>\n");
         return;
     }
-    let arg1 = argv_str(view.common, 1);
+    let arg1 = Cmd_Argv(view.common, 1).to_owned();
     Cvar_Reset(view, &arg1);
 }
 
@@ -593,7 +581,7 @@ pub fn Cvar_WriteVariables(common: &mut Common, f: fileHandle_t) {
 /// Source: `oracle/codemp/qcommon/cvar.cpp:687-750`
 pub fn Cvar_List_f(common: &mut Common) {
     let r#match: Option<String> = if Cmd_Argc(common) > 1 {
-        Some(argv_str(common, 1))
+        Some(Cmd_Argv(common, 1).to_owned())
     } else {
         None
     };
@@ -754,7 +742,13 @@ pub fn Cvar_InfoString_Big(common: &Common, bit: c_int) -> String {
 /// Source: `oracle/codemp/qcommon/cvar.cpp:878-880`
 pub fn Cvar_InfoStringBuffer(common: &Common, bit: c_int, buff: *mut c_char, buffsize: c_int) {
     let info = Cvar_InfoString(common, bit);
-    unsafe { strncpyz_str(buff, &info, buffsize) };
+    unsafe {
+        Q_strncpyz(
+            core::slice::from_raw_parts_mut(buff, buffsize as usize),
+            &info,
+            buffsize as usize,
+        )
+    };
 }
 
 /// Raven `Cvar_Register` — basically a slightly modified `Cvar_Get` for the
@@ -814,11 +808,7 @@ pub fn Cvar_Update(common: &Common, vmCvar: *mut vmCvar_t) {
                 ),
             );
         }
-        strncpyz_str(
-            (*vmCvar).string.as_mut_ptr(),
-            &cv.string,
-            MAX_CVAR_VALUE_STRING as c_int,
-        );
+        Q_strncpyz(&mut (*vmCvar).string, &cv.string, MAX_CVAR_VALUE_STRING);
 
         (*vmCvar).value = cv.value;
         (*vmCvar).integer = cv.integer;

@@ -18,10 +18,8 @@ use mp_qshared::shared::cvar::{
     CVAR_TEMP, CVAR_USER_CREATED,
 };
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::q_string::{
-    COM_DefaultExtension, Q_strcmp, Q_stricmp, Q_stricmpn, Q_strncpyz,
-};
-use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, MAX_QPATH, Q3_VERSION};
+use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, Q3_VERSION};
+use native_string::q_string::{Q_strcmp, Q_stricmp, Q_stricmpn};
 
 use crate::collision_world::CollisionWorld;
 use crate::common::com_printf;
@@ -49,6 +47,7 @@ pub use crate::common::opaque_slots::Client;
 // server/client cycle seam with no importable home — left bare; reported.
 use crate::cm_load::CM_ClearMap;
 use crate::cmd::Cmd_AddCommand;
+use crate::cmd_common::{Cbuf_AddText, Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use crate::cvar_fns::{Cvar_Get, Cvar_Init, Cvar_Set, Cvar_WriteVariables};
 use crate::files_common::{
     FS_FCloseFile, FS_FOpenFileRead, FS_FOpenFileWrite, FS_PureServerSetLoadedPaks, FS_Read,
@@ -116,29 +115,28 @@ pub fn Com_OPrintf(msg: &str) {
     print!("{msg}");
 }
 
-/// `Com_ParseCommandLine`.
+/// `Com_ParseCommandLine`. Raven's in-place NUL-splitting of the command-line
+/// buffer becomes owned segments; the `MAX_CONSOLE_LINES` cap is kept
+/// (including its quirk: once full, the last line keeps the remaining
+/// separators verbatim).
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:397-414`
-pub fn Com_ParseCommandLine(common: &mut Common, commandLine: *mut c_char) {
-    common.com_consoleLines[0] = commandLine;
-    common.com_numConsoleLines = 1;
+pub fn Com_ParseCommandLine(common: &mut Common, commandLine: &str) {
+    common.com_consoleLines.clear();
 
-    unsafe {
-        let mut p = commandLine;
-        while *p != 0 {
-            // look for a + seperating character
-            // if commandLine came from a file, we might have real line seperators
-            if *p == b'+' as c_char || *p == b'\n' as c_char {
-                if common.com_numConsoleLines == MAX_CONSOLE_LINES as c_int {
-                    return;
-                }
-                common.com_consoleLines[common.com_numConsoleLines as usize] = p.add(1);
-                common.com_numConsoleLines += 1;
-                *p = 0;
+    let mut rest = commandLine;
+    // look for a + seperating character
+    // if commandLine came from a file, we might have real line seperators
+    while common.com_consoleLines.len() < MAX_CONSOLE_LINES - 1 {
+        match rest.find(['+', '\n']) {
+            Some(i) => {
+                common.com_consoleLines.push(rest[..i].to_string());
+                rest = &rest[i + 1..];
             }
-            p = p.add(1);
+            None => break,
         }
     }
+    common.com_consoleLines.push(rest.to_string());
 }
 
 /// `Com_HashKey`.
@@ -268,15 +266,12 @@ pub fn Q_asin(c: f32) -> f32 {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:425-437`
 pub fn Com_SafeMode(common: &mut Common) -> qboolean {
-    for i in 0..common.com_numConsoleLines as usize {
-        crate::cmd_common::Cmd_TokenizeString(common, common.com_consoleLines[i]);
-        let argv0 = crate::cmd_common::Cmd_Argv(common, 0);
-        if Q_stricmp(argv0, c"safe".as_ptr()) == 0
-            || Q_stricmp(argv0, c"cvar_restart".as_ptr()) == 0
-        {
-            unsafe {
-                *common.com_consoleLines[i] = 0;
-            }
+    for i in 0..common.com_consoleLines.len() {
+        let line = common.com_consoleLines[i].clone();
+        Cmd_TokenizeString(common, &line);
+        let argv0 = Cmd_Argv(common, 0);
+        if Q_stricmp(argv0, "safe") == 0 || Q_stricmp(argv0, "cvar_restart") == 0 {
+            common.com_consoleLines[i].clear();
             return qtrue;
         }
     }
@@ -315,27 +310,22 @@ pub fn Com_Quit_f(view: &mut EngineHostView) {
     view.sys_quit();
 }
 
-/// `Com_StartupVariable`.
+/// `Com_StartupVariable` (Raven's nullable `match` becomes `Option`: `None` =
+/// apply every `set` line).
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:451-470`
-pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: *const c_char) {
-    for i in 0..view.common.com_numConsoleLines as usize {
-        crate::cmd_common::Cmd_TokenizeString(view.common, view.common.com_consoleLines[i]);
-        let argv0 = crate::cmd_common::Cmd_Argv(view.common, 0);
-        if Q_strcmp(argv0, c"set".as_ptr()) != 0 {
+pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: Option<&str>) {
+    for i in 0..view.common.com_consoleLines.len() {
+        let line = view.common.com_consoleLines[i].clone();
+        Cmd_TokenizeString(view.common, &line);
+        if Q_strcmp(Cmd_Argv(view.common, 0), "set") != 0 {
             continue;
         }
-        let s = crate::cmd_common::Cmd_Argv(view.common, 1);
-        if r#match.is_null() || Q_strcmp(s, r#match) == 0 {
-            let s_str = unsafe { core::ffi::CStr::from_ptr(s) }
-                .to_string_lossy()
-                .into_owned();
-            let arg2 =
-                unsafe { core::ffi::CStr::from_ptr(crate::cmd_common::Cmd_Argv(view.common, 2)) }
-                    .to_string_lossy()
-                    .into_owned();
-            Cvar_Set(view, &s_str, &arg2);
-            let cv = Cvar_Get(view, &s_str, "", 0);
+        let s = Cmd_Argv(view.common, 1).to_owned();
+        if r#match.map_or(true, |m| Q_strcmp(&s, m) == 0) {
+            let arg2 = Cmd_Argv(view.common, 2).to_owned();
+            Cvar_Set(view, &s, &arg2);
+            let cv = Cvar_Get(view, &s, "", 0);
             view.common.cvar_mut(cv).flags |= CVAR_USER_CREATED;
             // com_consoleLines[i] = 0;
         }
@@ -348,17 +338,17 @@ pub fn Com_StartupVariable(view: &mut EngineHostView, r#match: *const c_char) {
 pub fn Com_AddStartupCommands(common: &mut Common) -> qboolean {
     let mut added = qfalse;
     // quote every token, so args with semicolons can work
-    for i in 0..common.com_numConsoleLines as usize {
-        let line = common.com_consoleLines[i];
-        if line.is_null() || unsafe { *line == 0 } {
+    for i in 0..common.com_consoleLines.len() {
+        let line = common.com_consoleLines[i].clone();
+        if line.is_empty() {
             continue;
         }
         // set commands won't override menu startup
-        if Q_stricmpn(line, c"set".as_ptr(), 3) != 0 {
+        if Q_stricmpn(&line, "set", 3) != 0 {
             added = qtrue;
         }
-        crate::cmd_common::Cbuf_AddText(common, line);
-        crate::cmd_common::Cbuf_AddText(common, c"\n".as_ptr() as *mut c_char);
+        Cbuf_AddText(common, &line);
+        Cbuf_AddText(common, "\n");
     }
     added
 }
@@ -599,14 +589,11 @@ pub fn Com_Error_f(common: &mut Common) {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1070-1088`
 pub fn Com_Freeze_f(view: &mut EngineHostView) {
-    if crate::cmd_common::Cmd_Argc(view.common) != 2 {
-        crate::common::com_printf(view.common, "freeze <seconds>\n");
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "freeze <seconds>\n");
         return;
     }
-    let s: f32 = unsafe { c_str_to_string(crate::cmd_common::Cmd_Argv(view.common, 1)) }
-        .trim()
-        .parse()
-        .unwrap_or(0.0);
+    let s: f32 = Cmd_Argv(view.common, 1).trim().parse().unwrap_or(0.0);
 
     let start = Com_Milliseconds(view);
 
@@ -675,7 +662,7 @@ pub fn Com_ModifyMsec(common: &mut Common, mut msec: c_int) -> c_int {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:759-782`
 pub fn Com_InitJournaling(view: &mut EngineHostView) {
-    Com_StartupVariable(view, c"journal".as_ptr());
+    Com_StartupVariable(view, Some("journal"));
     view.common.com_journal = Some(Cvar_Get(view, "journal", "0", CVAR_INIT));
     {
         if view.common.cvar(view.common.com_journal).integer == 0 {
@@ -684,16 +671,15 @@ pub fn Com_InitJournaling(view: &mut EngineHostView) {
 
         if view.common.cvar(view.common.com_journal).integer == 1 {
             crate::common::com_printf(view.common, "Journaling events\n");
-            view.common.com_journalFile = FS_FOpenFileWrite(view.common, c"journal.dat".as_ptr());
-            view.common.com_journalDataFile =
-                FS_FOpenFileWrite(view.common, c"journaldata.dat".as_ptr());
+            view.common.com_journalFile = FS_FOpenFileWrite(view.common, "journal.dat");
+            view.common.com_journalDataFile = FS_FOpenFileWrite(view.common, "journaldata.dat");
         } else if view.common.cvar(view.common.com_journal).integer == 2 {
             crate::common::com_printf(view.common, "Replaying journaled events\n");
             let mut jf = view.common.com_journalFile;
-            FS_FOpenFileRead(view, c"journal.dat".as_ptr(), &mut jf, qtrue);
+            FS_FOpenFileRead(view, "journal.dat", &mut jf, true);
             view.common.com_journalFile = jf;
             let mut jdf = view.common.com_journalDataFile;
-            FS_FOpenFileRead(view, c"journaldata.dat".as_ptr(), &mut jdf, qtrue);
+            FS_FOpenFileRead(view, "journaldata.dat", &mut jdf, true);
             view.common.com_journalDataFile = jdf;
         }
 
@@ -709,13 +695,10 @@ pub fn Com_InitJournaling(view: &mut EngineHostView) {
 /// `Com_WriteConfigToFile`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1446-1461`
-pub fn Com_WriteConfigToFile(view: &mut EngineHostView, filename: *const c_char) {
+pub fn Com_WriteConfigToFile(view: &mut EngineHostView, filename: &str) {
     let f = FS_FOpenFileWrite(view.common, filename);
     if f == 0 {
-        crate::common::com_printf(
-            view.common,
-            &format!("Couldn't write {}.\n", unsafe { c_str_to_string(filename) }),
-        );
+        com_printf(view.common, &format!("Couldn't write {filename}.\n"));
         return;
     }
 
@@ -751,7 +734,7 @@ pub fn Com_WriteConfiguration(view: &mut EngineHostView) {
 
     // dedicated vs. non-dedicated cfg name settled at the wave-20 seam;
     // MP dedicated build writes jampserver.cfg.
-    Com_WriteConfigToFile(view, c"jampserver.cfg".as_ptr());
+    Com_WriteConfigToFile(view, "jampserver.cfg");
 
     // USE_CD_KEY path is a dead #ifdef in the MP tree (§20-class, not
     // reachable under DEDICATED/no-CD-key builds) — dropped per the packet's
@@ -762,30 +745,24 @@ pub fn Com_WriteConfiguration(view: &mut EngineHostView) {
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1515-1527`
 pub fn Com_WriteConfig_f(view: &mut EngineHostView) {
-    let mut filename = [0 as c_char; MAX_QPATH];
-
-    if crate::cmd_common::Cmd_Argc(view.common) != 2 {
-        crate::common::com_printf(view.common, "Usage: writeconfig <filename>\n");
+    if Cmd_Argc(view.common) != 2 {
+        com_printf(view.common, "Usage: writeconfig <filename>\n");
         return;
     }
 
-    Q_strncpyz(
-        filename.as_mut_ptr(),
-        crate::cmd_common::Cmd_Argv(view.common, 1),
-        core::mem::size_of_val(&filename) as c_int,
-    );
-    COM_DefaultExtension(
-        filename.as_mut_ptr(),
-        core::mem::size_of_val(&filename) as c_int,
-        c".cfg".as_ptr(),
-    );
-    crate::common::com_printf(
-        view.common,
-        &format!("Writing {}.\n", unsafe {
-            c_str_to_string(filename.as_ptr())
-        }),
-    );
-    Com_WriteConfigToFile(view, filename.as_ptr());
+    // Raven's Q_strncpyz into a MAX_QPATH buffer + COM_DefaultExtension: the
+    // ".cfg" default appends when the name has no extension.
+    let mut filename = Cmd_Argv(view.common, 1).to_string();
+    if !filename
+        .rsplit('/')
+        .next()
+        .unwrap_or(&filename)
+        .contains('.')
+    {
+        filename.push_str(".cfg");
+    }
+    com_printf(view.common, &format!("Writing {filename}.\n"));
+    Com_WriteConfigToFile(view, &filename);
 }
 
 /// `Com_RunAndTimeServerPacket`.
@@ -889,15 +866,12 @@ pub fn Com_EventLoop(view: &mut EngineHostView) -> c_int {
                 hook_fn(view, ev.evValue, ev.evValue2, ev.evTime);
             }
             sysEventType_t::SE_CONSOLE => {
-                unsafe {
-                    let s = ev.evPtr as *mut c_char;
-                    if *s == b'\\' as c_char || *s == b'/' as c_char {
-                        crate::cmd_common::Cbuf_AddText(view.common, s.add(1));
-                    } else {
-                        crate::cmd_common::Cbuf_AddText(view.common, s);
-                    }
-                }
-                crate::cmd_common::Cbuf_AddText(view.common, c"\n".as_ptr() as *mut c_char);
+                // sys-event seam: evPtr is the C event payload; one lossy
+                // conversion at the head (console text precedent).
+                let s = unsafe { c_str_to_string(ev.evPtr as *const c_char) };
+                let cmd = s.strip_prefix(['\\', '/']).unwrap_or(&s);
+                Cbuf_AddText(view.common, cmd);
+                Cbuf_AddText(view.common, "\n");
             }
             sysEventType_t::SE_PACKET => {
                 // this cvar allows simulation of connections that
@@ -981,7 +955,7 @@ pub fn com_error_recover(view: &mut EngineHostView, err: &ComError) -> &'static 
     }
 
     // make sure we can get at our local stuff
-    FS_PureServerSetLoadedPaks(view, c"".as_ptr(), c"".as_ptr());
+    FS_PureServerSetLoadedPaks(view, "", "");
 
     // if we are getting a solid stream of ERR_DROP, do an ERR_FATAL
     let current_time = crate::timing::sys_milliseconds(view.common);
@@ -1303,7 +1277,7 @@ pub fn Com_Frame(view: &mut EngineHostView) {
 /// Source: `oracle/codemp/qcommon/common.cpp:2179-2202`
 pub fn Com_ParseTextFile(
     view: &mut EngineHostView,
-    file: *const c_char,
+    file: &str,
     parser: &mut GenericParser2,
     cleanFirst: bool,
 ) -> bool {
@@ -1336,7 +1310,7 @@ pub fn Com_ParseTextFile(
 /// writeable flag yet.
 pub fn Com_ParseTextFile2(
     view: &mut EngineHostView,
-    file: *const c_char,
+    file: &str,
     cleanFirst: bool,
     writeable: bool,
 ) -> *mut GenericParser2 {
@@ -1365,7 +1339,7 @@ pub fn Com_ParseTextFile2(
 /// `Com_Init`.
 ///
 /// Source: `oracle/codemp/qcommon/common.cpp:1216-1442`
-pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
+pub fn Com_Init(view: &mut EngineHostView, commandLine: &str) {
     crate::common::com_printf(
         view.common,
         &format!(
@@ -1393,7 +1367,7 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         crate::cmd_common::Cmd_Init(view);
 
         // override anything from the config files with command line args
-        Com_StartupVariable(view, core::ptr::null());
+        Com_StartupVariable(view, None);
 
         // Seed the random number generator — Raven `Rand_Init(Sys_Milliseconds(true))`
         // seeds the engine island's own LCG (ruling 21's `common.qrand`).
@@ -1402,7 +1376,7 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
         view.common.qrand.Rand_Init(rand_seed);
 
         // get the developer cvar set as early as possible
-        Com_StartupVariable(view, c"developer".as_ptr());
+        Com_StartupVariable(view, Some("developer"));
 
         // done early so bind command exists
         let hook_fn = view
@@ -1416,28 +1390,19 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
 
         Com_InitJournaling(view);
 
-        crate::cmd_common::Cbuf_AddText(
-            view.common,
-            c"exec mpdefault.cfg\n".as_ptr() as *mut c_char,
-        );
+        Cbuf_AddText(view.common, "exec mpdefault.cfg\n");
 
         // skip the jampconfig.cfg if "safe" is on the command line
         if Com_SafeMode(view.common) == qfalse {
-            crate::cmd_common::Cbuf_AddText(
-                view.common,
-                c"exec jampconfig.cfg\n".as_ptr() as *mut c_char,
-            );
+            Cbuf_AddText(view.common, "exec jampconfig.cfg\n");
         }
 
-        crate::cmd_common::Cbuf_AddText(
-            view.common,
-            c"exec autoexec.cfg\n".as_ptr() as *mut c_char,
-        );
+        Cbuf_AddText(view.common, "exec autoexec.cfg\n");
 
         crate::cmd_common::Cbuf_Execute(view);
 
         // override anything from the config files with command line args
-        Com_StartupVariable(view, core::ptr::null());
+        Com_StartupVariable(view, None);
 
         // get dedicated here for proper hunk megs initialization
         view.common.com_dedicated = Some(Cvar_Get(view, "dedicated", "0", CVAR_LATCH));
@@ -1581,10 +1546,7 @@ pub fn Com_Init(view: &mut EngineHostView, commandLine: *mut c_char) {
             if Com_AddStartupCommands(view.common) == qfalse {
                 // if the user didn't give any commands, run default action
                 if view.common.cvar(view.common.com_dedicated).integer == 0 {
-                    crate::cmd_common::Cbuf_AddText(
-                        view.common,
-                        c"cinematic openinglogos.roq\n".as_ptr() as *mut c_char,
-                    );
+                    Cbuf_AddText(view.common, "cinematic openinglogos.roq\n");
                 }
             }
         }

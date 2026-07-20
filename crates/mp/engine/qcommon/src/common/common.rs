@@ -7,9 +7,7 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::cvar::{cvar_t, CvarHandle};
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fileHandle_t;
-use mp_qshared::shared::limits::{
-    BIG_INFO_STRING, MAX_STRING_CHARS, MAX_STRING_TOKENS, MAX_TOKEN_CHARS,
-};
+use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_STRING_TOKENS, MAX_TOKEN_CHARS};
 use mp_qshared::shared::{qboolean, qtrue};
 
 use std::io::Write;
@@ -27,7 +25,7 @@ use super::journal::Journal;
 use super::qrand::QRand;
 use super::sys_event_queue::SysEventQueue;
 use crate::cmd::cmd_consts::MAX_CMD_BUFFER;
-use crate::common::common_consts::{MAX_CONSOLE_LINES, MAX_PUSHED_EVENTS};
+use crate::common::common_consts::MAX_PUSHED_EVENTS;
 use crate::files::file_handle_data_t::fileHandleData_t;
 use crate::files::files_consts::MAX_SEARCH_PATHS;
 use crate::files::searchpath_s::searchpath_t;
@@ -313,11 +311,14 @@ pub struct Common {
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:743`
     pub com_pushevent_printed_warning: c_int,
-    /// Raven `com_numConsoleLines` / `com_consoleLines[MAX_CONSOLE_LINES]`.
+    /// Raven `com_numConsoleLines` / `com_consoleLines[MAX_CONSOLE_LINES]` —
+    /// the startup command line split at `+`, owned (count = `len()`,
+    /// consumed lines cleared). `MAX_CONSOLE_LINES` stays the hard cap in the
+    /// one writer, `Com_ParseCommandLine`. Not zero-valid (LIFE-Q9 in-place
+    /// init).
     ///
     /// Source: `oracle/codemp/qcommon/common.cpp:387-388`
-    pub com_numConsoleLines: c_int,
-    pub com_consoleLines: [*mut c_char; MAX_CONSOLE_LINES],
+    pub com_consoleLines: Vec<String>,
     /// Raven `Com_BeginRedirect` state: `rd_buffer`/`rd_buffersize`/`rd_flush`
     /// (`rd_flush` is Raven's `void (*)(char *)` redirect callback pointer).
     ///
@@ -327,29 +328,25 @@ pub struct Common {
     pub rd_flush: *mut extern "C" fn(*mut c_char),
 
     // ---- `cmd_common.cpp` / `cmd_pc.cpp` command system ----
-    /// Raven `cmd_wait` / `cmd_argc`.
+    /// Raven `cmd_wait`.
     ///
-    /// Source: `oracle/codemp/qcommon/cmd_common.cpp:16,290`
+    /// Source: `oracle/codemp/qcommon/cmd_common.cpp:16`
     pub cmd_wait: c_int,
-    pub cmd_argc: c_int,
-    /// Raven `cmd_argv[MAX_STRING_TOKENS]` (points into `cmd_tokenized`) and the
-    /// `cmd_tokenized` scratch.
+    /// Raven's tokenized console arguments — `cmd_argc`, the
+    /// `cmd_argv[MAX_STRING_TOKENS]` pointer table, and the `cmd_tokenized`
+    /// scratch, collapsed into one owned list (count = `len()`).
     ///
-    /// Source: `oracle/codemp/qcommon/cmd_common.cpp:291-292`
-    pub cmd_argv: [*mut c_char; MAX_STRING_TOKENS],
-    pub cmd_tokenized: [c_char; BIG_INFO_STRING + MAX_STRING_TOKENS],
+    /// `MAX_STRING_TOKENS` remains the hard cap: `Cmd_TokenizeString` (the
+    /// only writer) keeps Raven's guard, and `Engine::new` pre-sizes the
+    /// capacity to it (LIFE-Q9; not zero-valid).
+    ///
+    /// Source: `oracle/codemp/qcommon/cmd_common.cpp:290-292`
+    pub cmd_argv: Vec<String>,
     /// Raven `cmd_text` (`cmd_t`) + its backing `cmd_text_buf[MAX_CMD_BUFFER]`.
     ///
     /// Source: `oracle/codemp/qcommon/cmd_common.cpp:17-18`
     pub cmd_text: cmd_t,
     pub cmd_text_buf: [u8; MAX_CMD_BUFFER],
-    /// Raven `Cmd_Args`'s `static char cmd_args[MAX_STRING_CHARS]` and
-    /// `Cmd_ArgsFrom`'s `static char cmd_args[BIG_INFO_STRING]` (fn-static hoists,
-    /// three-kind rule).
-    ///
-    /// Source: `oracle/codemp/qcommon/cmd_common.cpp:337,359`
-    pub cmd_args_buf: [c_char; MAX_STRING_CHARS],
-    pub cmd_args_from_buf: [c_char; BIG_INFO_STRING],
     /// Raven `static cmd_function_t *cmd_functions` — the registered-command
     /// list, owned (index 0 = Raven's head). Not zero-valid: written through
     /// `Engine::new`'s LIFE-Q9 in-place init.
@@ -409,13 +406,18 @@ pub struct Common {
     pub fs_loadCount: c_int,
     pub fs_packFiles: c_int,
     /// Raven `fs_serverPakNames[MAX_SEARCH_PATHS]` — pure-server pk3 names.
+    /// Raven's `CopyString`ed `char*` slots are owned strings (unset slots =
+    /// past `len()`); the `MAX_SEARCH_PATHS` cap stays in the one writer,
+    /// `FS_PureServerSetLoadedPaks`. Not zero-valid (LIFE-Q9 in-place init).
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:208`
-    pub fs_serverPakNames: [*mut c_char; MAX_SEARCH_PATHS],
-    /// Raven `fs_gamedir[MAX_OSPATH]` (single game-dir name).
+    pub fs_serverPakNames: Vec<String>,
+    /// Raven `fs_gamedir[MAX_OSPATH]` (single game-dir name), owned
+    /// (string-data migration). Not zero-valid: written through
+    /// `Engine::new`'s LIFE-Q9 in-place init.
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:183`
-    pub fs_gamedir: [c_char; MAX_OSPATH],
+    pub fs_gamedir: String,
     /// Raven `fs_checksumFeed` / `fs_fakeChkSum` / `fs_reordered`.
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:199-200`
@@ -429,7 +431,9 @@ pub struct Common {
     pub fs_serverPaks: [c_int; MAX_SEARCH_PATHS],
     pub fs_numServerReferencedPaks: c_int,
     pub fs_serverReferencedPaks: [c_int; MAX_SEARCH_PATHS],
-    pub fs_serverReferencedPakNames: [*mut c_char; MAX_SEARCH_PATHS],
+    /// Owned like `fs_serverPakNames`; single writer
+    /// `FS_PureServerSetReferencedPaks` keeps the `MAX_SEARCH_PATHS` cap.
+    pub fs_serverReferencedPakNames: Vec<String>,
     /// Raven `FS_*Checksums`/`FS_*Names` rotating `static char` return buffers
     /// (fn-static hoists, three-kind rule): `FS_GamePureChecksum` uses
     /// `MAX_STRING_TOKENS`; the loaded/referenced variants use `BIG_INFO_STRING`.
@@ -525,20 +529,11 @@ pub struct Common {
     pub TheZone: zone_t,
 
     // ---- filesystem (`files_common.cpp`) fn-static / init-state hoists ----
-    /// Raven `FS_BuildOSPath`'s `static char ospath[2][MAX_OSPATH]` /
-    /// `static int toggle` (fn-static hoists, three-kind rule).
-    ///
-    /// Source: `oracle/codemp/qcommon/files_common.cpp:296-297`
-    pub fs_build_os_path_buf: [[c_char; MAX_OSPATH]; 2],
-    pub fs_build_os_path_toggle: c_int,
-    /// Raven `FS_BuildOSPath` (`base`/`game`/`qpath` overload)'s
-    /// `static char ospath[4][MAX_OSPATH]` / `static int toggle` — a
-    /// SEPARATE fn-scope-static pair from the single-`qpath` overload above
-    /// (Raven gives each overload its own statics).
-    ///
-    /// Source: `oracle/codemp/qcommon/files_common.cpp:315-317`
-    pub fs_build_os_path4_buf: [[c_char; MAX_OSPATH]; 4],
-    pub fs_build_os_path4_toggle: c_int,
+    // Raven `FS_BuildOSPath`'s `static char ospath[2][MAX_OSPATH]`/`static int
+    // toggle` and the `base`/`game`/`qpath` overload's `ospath[4][MAX_OSPATH]`/
+    // `toggle` twin (files_common.cpp:296-297,315-317) are dropped
+    // (string-data migration, DEC-32): `FS_BuildOSPath`/`FS_BuildOSPath4`
+    // return an owned `String` instead of rotating through a static buffer.
     /// Raven `fs_loadStack` — total files currently loaded into memory.
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:196`
@@ -549,10 +544,12 @@ pub struct Common {
     pub initialized: qboolean,
     /// Raven `lastValidBase` / `lastValidGame` — the last known-good
     /// basepath/gamedir, restored on a failed `FS_SetBaseDir`/pure check.
+    /// Raven's `char [MAX_OSPATH]` buffers are owned strings; the bound is
+    /// applied by `cap_ospath` at the write sites.
     ///
     /// Source: `oracle/codemp/qcommon/files_common.cpp:217-218`
-    pub lastValidBase: [c_char; MAX_OSPATH],
-    pub lastValidGame: [c_char; MAX_OSPATH],
+    pub lastValidBase: String,
+    pub lastValidGame: String,
 
     // ---- networking (`net_chan.cpp`) ----
     /// Raven `loopbacks[2]` — the localhost transport's per-direction
@@ -617,19 +614,7 @@ impl Common {
             .expect("cvar write through an unregistered handle (Raven null cvar_t*)");
         &mut self.cvar_indexes[h.slot()]
     }
-
-    /// [`Common::cvar`]'s string as an owned `CString` — the bridge into
-    /// still-C consumers (the FS path builders); retires with the files-crate
-    /// string migration.
-    pub fn cvar_cstring(&self, h: impl Into<Option<CvarHandle>>) -> std::ffi::CString {
-        std::ffi::CString::new(self.cvar(h).string.as_str()).unwrap()
-    }
 }
-
-/// Raven `#define MAX_OSPATH PATH_MAX` (1024 here, matching the FS field sizes).
-///
-/// Source: `oracle/codemp/qcommon/q_shared.h` (`MAX_OSPATH`)
-const MAX_OSPATH: usize = 1024;
 
 /// Raven `Com_Printf` (`common.cpp:128`). Threads `&mut Common` and lives in
 /// `mp_engine_qcommon` (com_printf resolution, LIFE-D2 amendment) — mutates the
@@ -718,7 +703,7 @@ pub fn com_printf(common: &mut Common, msg: &str) {
                     )
                 };
 
-                let lf = FS_FOpenFileWrite(common, c"qconsole.log".as_ptr());
+                let lf = FS_FOpenFileWrite(common, "qconsole.log");
                 common.logfile = lf;
                 com_printf(common, &format!("logfile opened on {asc}\n"));
                 if common.cvar(common.com_logfile).integer > 1 {
