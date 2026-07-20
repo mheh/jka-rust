@@ -27,19 +27,18 @@ pub fn G_Alloc(ctx: &mut GameContext, size: c_int) -> *mut c_void {
         if ctx.world.cvars.g_debugAlloc.integer != 0 {
             G_Printf(
                 ctx,
-                cstr(&format!(
+                &format!(
                     "G_Alloc of {} bytes ({} left)\n",
                     size,
                     POOLSIZE - ctx.world.allocPoint - ((size + 31) & !31)
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
         if ctx.world.allocPoint + size > POOLSIZE {
             G_Error(
                 ctx,
-                cstr(&format!("G_Alloc: failed on allocation of {size} bytes\n")).as_ptr(),
+                &format!("G_Alloc: failed on allocation of {size} bytes\n"),
             );
             return core::ptr::null_mut();
         }
@@ -73,6 +72,5 @@ pub fn Svcmd_GameMem_f(ctx: &mut GameContext) {
         "Game memory status: {} out of {} bytes allocated\n",
         ctx.world.allocPoint, poolsize
     );
-    let msg_cstr = cstr(&msg);
-    G_Printf(ctx, msg_cstr.as_ptr());
+    G_Printf(ctx, &msg);
 }

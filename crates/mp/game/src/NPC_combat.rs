@@ -2417,7 +2417,7 @@ pub fn SP_point_combat(ctx: &mut GameContext, self_: EntityId) {
                 S_COLOR_RED.to_str().unwrap(),
                 MAX_COMBAT_POINTS
             );
-            Com_Printf(cstr(&s).as_ptr());
+            Com_Printf(&s);
             G_FreeEntity(ctx, Some(self_));
             return;
         }
@@ -2438,7 +2438,7 @@ pub fn SP_point_combat(ctx: &mut GameContext, self_: EntityId) {
                 S_COLOR_RED.to_str().unwrap(),
                 cstr_to_str(vtos(ctx, currentOrigin))
             );
-            Com_Printf(cstr(&s).as_ptr());
+            Com_Printf(&s);
         }
 
         let currentOrigin = ctx.world.entity(self_).r.currentOrigin;
@@ -2473,7 +2473,7 @@ pub fn CP_FindCombatPointWaypoints(ctx: &mut GameContext) {
                     S_COLOR_RED.to_str().unwrap(),
                     name_str
                 );
-                Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(&s);
             }
         }
     }

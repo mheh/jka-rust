@@ -14,12 +14,7 @@
 use crate::g_combat::modNames;
 use crate::g_main::G_LogPrintf;
 use crate::prelude::*;
-use crate::q_shared::Info_ValueForKey;
 use crate::w_saber::HasSetSaberOnly;
-use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
-use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
-use mp_abi::game::syscalls::G_GET_SERVERINFO::GGetServerinfoArgs;
 
 /// Raven `char *weaponNameFromIndex[WP_NUM_WEAPONS]` — display names for the
 /// per-weapon log tables written by `G_LogWeaponOutput`. Raven's initializer
@@ -190,10 +185,7 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
             return;
         }
 
-        G_LogPrintf(
-            ctx,
-            cstr("*****************************Weapon Log:\n").as_ptr(),
-        );
+        G_LogPrintf(ctx, "*****************************Weapon Log:\n");
 
         let mut totalpickups = [0i32; WPN];
         let mut totaltime = [0i32; WPN];
@@ -229,22 +221,21 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
             }
         }
 
-        G_LogPrintf(ctx, cstr("\n****Data by Weapon:\n").as_ptr());
+        G_LogPrintf(ctx, "\n****Data by Weapon:\n");
         for j in 0..WPN {
             G_LogPrintf(
                 ctx,
-                cstr(&format!(
+                &format!(
                     "{:>15}:  Pickups: {:>4},  Time:  {:>5},  Deaths: {:>5}\n",
                     weaponName(j),
                     totalpickups[j],
                     totaltime[j] / 1000,
                     totaldeaths[j]
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
-        G_LogPrintf(ctx, cstr("\n****Combat Data by Weapon:\n").as_ptr());
+        G_LogPrintf(ctx, "\n****Combat Data by Weapon:\n");
         for j in 0..WPN {
             let pershot = if totalshots[j] > 0 {
                 totaldamage[j] as f32 / totalshots[j] as f32
@@ -253,32 +244,30 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
             };
             G_LogPrintf(
                 ctx,
-                cstr(&format!(
+                &format!(
                     "{:>15}:  Damage: {:>6},  Kills: {:>5},  Dmg per Shot: {:.6}\n",
                     weaponName(j),
                     totaldamage[j],
                     totalkills[j],
                     pershot
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
-        G_LogPrintf(ctx, cstr("\n****Combat Data By Damage Type:\n").as_ptr());
+        G_LogPrintf(ctx, "\n****Combat Data By Damage Type:\n");
         for j in 0..MODN {
             G_LogPrintf(
                 ctx,
-                cstr(&format!(
+                &format!(
                     "{:>25}:  Damage: {:>6},  Kills: {:>5}\n",
                     modName(j),
                     totaldamage_mod[j],
                     totalkills_mod[j]
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
-        G_LogPrintf(ctx, cstr("\n").as_ptr());
+        G_LogPrintf(ctx, "\n");
 
         // Write the whole weapon statistic log out to a file.
         let mut weaponfile: fileHandle_t = 0;
@@ -288,11 +277,8 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
         // it returns the pointer; the raw world pointer is captured by-copy).
         let world_ptr = ctx.world_raw();
         let engine = ctx.engine;
-        let log_name = cstr_from_chars(&(*world_ptr).cvars.g_statLogFile.string).to_owned();
-        trap::FS_FOpenFile(
-            engine,
-            GFsFopenFileArgs::new(log_name, &mut weaponfile, FS_APPEND),
-        );
+        let log_name = cstr_to_str((*world_ptr).cvars.g_statLogFile.string.as_ptr());
+        trap::FS_FOpenFile(engine, &log_name, &mut weaponfile, FS_APPEND);
         if weaponfile == 0 {
             // failed to open file, let's not crash, shall we?
             return;
@@ -300,21 +286,12 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
 
         let write = |s: &str| {
             let b = s.as_bytes();
-            trap::FS_Write(
-                engine,
-                GFsWriteArgs::new(b.as_ptr(), b.len() as c_int, weaponfile),
-            );
+            trap::FS_Write(engine, b, weaponfile);
         };
 
         // Write out the level name.
-        let mut info: [c_char; 1024] = [0; 1024];
-        trap::GetServerinfo(engine, GGetServerinfoArgs::new(info.as_mut_ptr(), 1024));
-        let mapname_full = cstr_to_str(Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            info.as_ptr(),
-            cstr("mapname").as_ptr(),
-        ))
-        .to_string();
+        let info = trap::GetServerinfo(engine, 1024);
+        let mapname_full = Info_ValueForKey(&info, "mapname");
         // strncpy(mapname, ..., sizeof(mapname)-1) -> 127-byte cap.
         let mapname: String = mapname_full.chars().take(127).collect();
 
@@ -533,7 +510,7 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
         }
         write("\n\n\n");
 
-        trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(weaponfile));
+        trap::FS_FCloseFile(ctx.engine, weaponfile);
     }
 }
 

@@ -122,8 +122,6 @@ pub fn SP_info_notnull(self_: &mut gentity_t) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:86-132`
 pub fn misc_lightstyle_set(ctx: &mut GameContext, ent: EntityId) {
-    use mp_abi::game::syscalls::G_GET_CONFIGSTRING::GGetConfigstringArgs;
-    use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
     unsafe {
         let m_light_style = ctx.world.entity(ent).count;
         let m_light_switch_style = ctx.world.entity(ent).bounceCount;
@@ -132,73 +130,41 @@ pub fn misc_lightstyle_set(ctx: &mut GameContext, ent: EntityId) {
             // turn off
             if m_light_off_style != 0 {
                 for slot in 0..3 {
-                    let mut lightstyle: [c_char; 32] = [0; 32];
-                    trap::GetConfigstring(
+                    let s = trap::GetConfigstring(
                         ctx.engine,
-                        GGetConfigstringArgs::new(
-                            CS_LIGHT_STYLES + (m_light_off_style * 3) + slot,
-                            lightstyle.as_mut_ptr(),
-                            32,
-                        ),
+                        CS_LIGHT_STYLES + (m_light_off_style * 3) + slot,
+                        32,
                     );
-                    let s = cstr_to_str(lightstyle.as_ptr());
                     trap::SetConfigstring(
                         ctx.engine,
-                        GSetConfigstringArgs::new(
-                            CS_LIGHT_STYLES + (m_light_style * 3) + slot,
-                            cstr(&s),
-                        ),
+                        CS_LIGHT_STYLES + (m_light_style * 3) + slot,
+                        &s,
                     );
                 }
             } else {
-                trap::SetConfigstring(
-                    ctx.engine,
-                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 0, cstr("a")),
-                );
-                trap::SetConfigstring(
-                    ctx.engine,
-                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 1, cstr("a")),
-                );
-                trap::SetConfigstring(
-                    ctx.engine,
-                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 2, cstr("a")),
-                );
+                trap::SetConfigstring(ctx.engine, CS_LIGHT_STYLES + (m_light_style * 3) + 0, "a");
+                trap::SetConfigstring(ctx.engine, CS_LIGHT_STYLES + (m_light_style * 3) + 1, "a");
+                trap::SetConfigstring(ctx.engine, CS_LIGHT_STYLES + (m_light_style * 3) + 2, "a");
             }
         } else {
             // Turn myself on now
             if m_light_switch_style != 0 {
                 for slot in 0..3 {
-                    let mut lightstyle: [c_char; 32] = [0; 32];
-                    trap::GetConfigstring(
+                    let s = trap::GetConfigstring(
                         ctx.engine,
-                        GGetConfigstringArgs::new(
-                            CS_LIGHT_STYLES + (m_light_switch_style * 3) + slot,
-                            lightstyle.as_mut_ptr(),
-                            32,
-                        ),
+                        CS_LIGHT_STYLES + (m_light_switch_style * 3) + slot,
+                        32,
                     );
-                    let s = cstr_to_str(lightstyle.as_ptr());
                     trap::SetConfigstring(
                         ctx.engine,
-                        GSetConfigstringArgs::new(
-                            CS_LIGHT_STYLES + (m_light_style * 3) + slot,
-                            cstr(&s),
-                        ),
+                        CS_LIGHT_STYLES + (m_light_style * 3) + slot,
+                        &s,
                     );
                 }
             } else {
-                trap::SetConfigstring(
-                    ctx.engine,
-                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 0, cstr("z")),
-                );
-                trap::SetConfigstring(
-                    ctx.engine,
-                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 1, cstr("z")),
-                );
-                trap::SetConfigstring(
-                    ctx.engine,
-                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 2, cstr("z")),
-                );
+                trap::SetConfigstring(ctx.engine, CS_LIGHT_STYLES + (m_light_style * 3) + 0, "z");
+                trap::SetConfigstring(ctx.engine, CS_LIGHT_STYLES + (m_light_style * 3) + 1, "z");
+                trap::SetConfigstring(ctx.engine, CS_LIGHT_STYLES + (m_light_style * 3) + 2, "z");
             }
         }
     }
@@ -377,10 +343,7 @@ pub fn locateCamera(ctx: &mut GameContext, ent: EntityId) {
     let ent_target = ctx.world.entity(ent).target;
     let owner = G_PickTarget(ctx, ent_target);
     if owner.is_null() {
-        G_Printf(
-            ctx,
-            c"Couldn't find target for misc_partal_surface\n".as_ptr(),
-        );
+        G_Printf(ctx, "Couldn't find target for misc_partal_surface\n");
         G_FreeEntity(ctx, Some(ent));
         return;
     }
@@ -568,8 +531,6 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_misc.c:484-631`
 pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
     use mp_abi::game::syscalls::G_CM_REGISTER_TERRAIN::GCmRegisterTerrainArgs;
-    use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-    use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
     use mp_abi::game::syscalls::G_RMG_INIT::GRmgInitArgs;
     use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
     use mp_qshared::shared::MAX_QPATH;
@@ -577,7 +538,7 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
     // (`mp_qshared::shared::limits`).
     unsafe {
         // Force it to 1 when there is terrain on the level.
-        trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("RMG"), cstr("1")));
+        trap::Cvar_Set(ctx.engine, "RMG", "1");
         ctx.world.cvars.g_RMG.integer = 1;
 
         ctx.world.entity_mut(ent).s.angles = [0.0, 0.0, 0.0];
@@ -591,85 +552,63 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         // Get the shader from the top of the brush
         let shader_num: c_int = 0;
 
-        let mut seed: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        let mut mission_type: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        let mut seed: String = String::new();
+        let mut mission_type: String = String::new();
         if ctx.world.cvars.g_RMG.integer != 0 {
-            trap::Cvar_VariableStringBuffer(
-                ctx.engine,
-                GCvarVariableStringBufferArgs::new(
-                    cstr("RMG_seed"),
-                    seed.as_mut_ptr(),
-                    (MAX_QPATH) as i32,
-                ),
-            );
-            trap::Cvar_VariableStringBuffer(
-                ctx.engine,
-                GCvarVariableStringBufferArgs::new(
-                    cstr("RMG_mission"),
-                    mission_type.as_mut_ptr(),
-                    (MAX_QPATH) as i32,
-                ),
-            );
+            seed = trap::Cvar_VariableStringBuffer(ctx.engine, "RMG_seed", MAX_QPATH as usize);
+            mission_type =
+                trap::Cvar_VariableStringBuffer(ctx.engine, "RMG_mission", MAX_QPATH as usize);
         }
 
         // Get info required for the common init
-        let mut temp: [c_char; MAX_INFO_STRING] = [0; MAX_INFO_STRING];
-        temp[0] = 0;
+        let mut temp: String = String::new();
 
         let mut value: *mut c_char = core::ptr::null_mut();
         G_SpawnString(ctx, c"heightmap".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"heightMap".as_ptr(), value);
+        Info_SetValueForKey(&mut temp, "heightMap", &cstr_to_str(value));
 
         G_SpawnString(ctx, c"numpatches".as_ptr(), c"400".as_ptr(), &mut value);
-        Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"numPatches".as_ptr(),
-            cstr(&format!("{}", atoi(value))).as_ptr(),
-        );
+        Info_SetValueForKey(&mut temp, "numPatches", &format!("{}", atoi(value)));
 
         G_SpawnString(ctx, c"terxels".as_ptr(), c"4".as_ptr(), &mut value);
-        Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"terxels".as_ptr(),
-            cstr(&format!("{}", atoi(value))).as_ptr(),
-        );
+        Info_SetValueForKey(&mut temp, "terxels", &format!("{}", atoi(value)));
 
-        Info_SetValueForKey(temp.as_mut_ptr(), c"seed".as_ptr(), seed.as_ptr());
+        Info_SetValueForKey(&mut temp, "seed", &seed);
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"minx".as_ptr(),
-            cstr(&format!("{:.6}", ctx.world.entity(ent).r.mins[0])).as_ptr(),
+            &mut temp,
+            "minx",
+            &format!("{:.6}", ctx.world.entity(ent).r.mins[0]),
         );
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"miny".as_ptr(),
-            cstr(&format!("{:.6}", ctx.world.entity(ent).r.mins[1])).as_ptr(),
+            &mut temp,
+            "miny",
+            &format!("{:.6}", ctx.world.entity(ent).r.mins[1]),
         );
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"minz".as_ptr(),
-            cstr(&format!("{:.6}", ctx.world.entity(ent).r.mins[2])).as_ptr(),
+            &mut temp,
+            "minz",
+            &format!("{:.6}", ctx.world.entity(ent).r.mins[2]),
         );
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"maxx".as_ptr(),
-            cstr(&format!("{:.6}", ctx.world.entity(ent).r.maxs[0])).as_ptr(),
+            &mut temp,
+            "maxx",
+            &format!("{:.6}", ctx.world.entity(ent).r.maxs[0]),
         );
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"maxy".as_ptr(),
-            cstr(&format!("{:.6}", ctx.world.entity(ent).r.maxs[1])).as_ptr(),
+            &mut temp,
+            "maxy",
+            &format!("{:.6}", ctx.world.entity(ent).r.maxs[1]),
         );
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"maxz".as_ptr(),
-            cstr(&format!("{:.6}", ctx.world.entity(ent).r.maxs[2])).as_ptr(),
+            &mut temp,
+            "maxz",
+            &format!("{:.6}", ctx.world.entity(ent).r.maxs[2]),
         );
 
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"modelIndex".as_ptr(),
-            cstr(&format!("{}", ctx.world.entity(ent).s.modelindex)).as_ptr(),
+            &mut temp,
+            "modelIndex",
+            &format!("{}", ctx.world.entity(ent).s.modelindex),
         );
 
         G_SpawnString(
@@ -678,83 +617,53 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
             c"grassyhills".as_ptr(),
             &mut value,
         );
-        Info_SetValueForKey(temp.as_mut_ptr(), c"terrainDef".as_ptr(), value);
+        Info_SetValueForKey(&mut temp, "terrainDef", &cstr_to_str(value));
 
         G_SpawnString(ctx, c"instancedef".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"instanceDef".as_ptr(), value);
+        Info_SetValueForKey(&mut temp, "instanceDef", &cstr_to_str(value));
 
         G_SpawnString(ctx, c"miscentdef".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"miscentDef".as_ptr(), value);
+        Info_SetValueForKey(&mut temp, "miscentDef", &cstr_to_str(value));
 
-        Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"missionType".as_ptr(),
-            mission_type.as_ptr(),
-        );
+        Info_SetValueForKey(&mut temp, "missionType", &mission_type);
 
         // `#define MAX_INSTANCE_TYPES 16` at g_misc.c:483.
         const MAX_INSTANCE_TYPES: c_int = 16;
         let mut i: c_int = 0;
         while i < MAX_INSTANCE_TYPES {
-            let mut final_: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-            trap::Cvar_VariableStringBuffer(
+            let final_ = trap::Cvar_VariableStringBuffer(
                 ctx.engine,
-                GCvarVariableStringBufferArgs::new(
-                    cstr(&format!("RMG_instance{}", i)),
-                    final_.as_mut_ptr(),
-                    (MAX_QPATH) as i32,
-                ),
+                &format!("RMG_instance{}", i),
+                MAX_QPATH as usize,
             );
-            if *final_.as_ptr() != 0 {
-                Info_SetValueForKey(
-                    temp.as_mut_ptr(),
-                    cstr(&format!("inst{}", i)).as_ptr(),
-                    final_.as_ptr(),
-                );
+            if !final_.is_empty() {
+                Info_SetValueForKey(&mut temp, &format!("inst{}", i), &final_);
             }
             i += 1;
         }
 
         // Set additional data required on the client only
         G_SpawnString(ctx, c"densitymap".as_ptr(), c"".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"densityMap".as_ptr(), value);
+        Info_SetValueForKey(&mut temp, "densityMap", &cstr_to_str(value));
 
-        Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"shader".as_ptr(),
-            cstr(&format!("{}", shader_num)).as_ptr(),
-        );
+        Info_SetValueForKey(&mut temp, "shader", &format!("{}", shader_num));
         G_SpawnString(ctx, c"texturescale".as_ptr(), c"0.005".as_ptr(), &mut value);
         Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"texturescale".as_ptr(),
-            cstr(&format!(
-                "{:.6}",
-                atof_bytes(CStr::from_ptr(value).to_bytes())
-            ))
-            .as_ptr(),
+            &mut temp,
+            "texturescale",
+            &format!("{:.6}", atof_bytes(CStr::from_ptr(value).to_bytes())),
         );
 
         // Initialise the common aspects of the terrain
         let terrain_id = trap::CM_RegisterTerrain(
             ctx.engine,
-            GCmRegisterTerrainArgs::new(cstr(&cstr_to_str(temp.as_ptr()))),
+            GCmRegisterTerrainArgs::new(cstr(&temp)),
         );
 
-        Info_SetValueForKey(
-            temp.as_mut_ptr(),
-            c"terrainId".as_ptr(),
-            cstr(&format!("{}", terrain_id)).as_ptr(),
-        );
+        Info_SetValueForKey(&mut temp, "terrainId", &format!("{}", terrain_id));
 
         // Send all the data down to the client
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_TERRAINS + terrain_id,
-                cstr(&cstr_to_str(temp.as_ptr())),
-            ),
-        );
+        trap::SetConfigstring(ctx.engine, CS_TERRAINS + terrain_id, &temp);
 
         // Make sure the contents are properly set
         {
@@ -843,8 +752,6 @@ pub fn SP_misc_skyportal_orient(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:694-715`
 pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
-    use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
-
     let mut fov: *mut c_char = core::ptr::null_mut();
     G_SpawnString(ctx, c"fov".as_ptr(), c"80".as_ptr(), &mut fov);
     let fov_x = atof_bytes(unsafe { CStr::from_ptr(fov) }.to_bytes()) as f32;
@@ -867,10 +774,7 @@ pub fn SP_misc_skyportal(ctx: &mut GameContext, ent: EntityId) {
         "{:.2} {:.2} {:.2} {:.1} {} {:.2} {:.2} {:.2} {} {}",
         origin[0], origin[1], origin[2], fov_x, isfog, fogv[0], fogv[1], fogv[2], fogn, fogf
     );
-    trap::SetConfigstring(
-        ctx.engine,
-        GSetConfigstringArgs::new(CS_SKYBOXORG, cstr(&s)),
-    );
+    trap::SetConfigstring(ctx.engine, CS_SKYBOXORG, &s);
 
     let level_time = ctx.world.level.time;
     let e = ctx.world.entity_mut(ent);
@@ -1243,11 +1147,11 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            let msg = cstr(&format!(
+            let msg = format!(
                 "SP_misc_holocron: misc_holocron startsolid at {}\n",
                 cstr_to_str(vtos(ctx, origin))
-            ));
-            G_Printf(ctx, msg.as_ptr());
+            );
+            G_Printf(ctx, &msg);
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -1778,11 +1682,11 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            let msg = cstr(&format!(
+            let msg = format!(
                 "SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n",
                 cstr_to_str(vtos(ctx, origin))
-            ));
-            G_Printf(ctx, msg.as_ptr());
+            );
+            G_Printf(ctx, &msg);
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -1914,11 +1818,11 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            let msg = cstr(&format!(
+            let msg = format!(
                 "SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n",
                 cstr_to_str(vtos(ctx, origin))
-            ));
-            G_Printf(ctx, msg.as_ptr());
+            );
+            G_Printf(ctx, &msg);
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -2549,14 +2453,11 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
         if target.is_null() {
             // Bah, no good, dump a warning, but continue on and use the UP vector
             let targetname = ctx.world.entity(ent).target;
-            crate::g_main::Com_Printf(
-                cstr(&format!(
-                    "fx_runner_link: target specified but not found: {}\n",
-                    unsafe { cstr_to_str(targetname) }
-                ))
-                .as_ptr(),
-            );
-            crate::g_main::Com_Printf(c"  -assuming UP orientation.\n".as_ptr());
+            crate::g_main::Com_Printf(&format!(
+                "fx_runner_link: target specified but not found: {}\n",
+                unsafe { cstr_to_str(targetname) }
+            ));
+            crate::g_main::Com_Printf("  -assuming UP orientation.\n");
         } else {
             // Our target is valid so let's override the default UP vector
             let target_id = ctx.entity_id_of(target).unwrap();
@@ -2582,13 +2483,10 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
         if target.is_null() {
             // Target2 is bogus, but we can still continue
             let target2 = ctx.world.entity(ent).target2;
-            crate::g_main::Com_Printf(
-                cstr(&format!(
-                    "fx_runner_link: target2 was specified but is not valid: {}\n",
-                    unsafe { cstr_to_str(target2) }
-                ))
-                .as_ptr(),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "fx_runner_link: target2 was specified but is not valid: {}\n",
+                unsafe { cstr_to_str(target2) }
+            ));
         }
     }
 
@@ -2665,14 +2563,11 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
     if fx_file.is_null() || unsafe { *fx_file } == 0 {
         let targetname = ctx.world.entity(ent).targetname;
         let origin = ctx.world.entity(ent).s.origin;
-        crate::g_main::Com_Printf(
-            cstr(&format!(
-                "^1ERROR: fx_runner {} at {} has no fxFile specified\n",
-                unsafe { cstr_to_str(targetname) },
-                unsafe { cstr_to_str(vtos(ctx, origin)) }
-            ))
-            .as_ptr(),
-        );
+        crate::g_main::Com_Printf(&format!(
+            "^1ERROR: fx_runner {} at {} has no fxFile specified\n",
+            unsafe { cstr_to_str(targetname) },
+            unsafe { cstr_to_str(vtos(ctx, origin)) }
+        ));
         G_FreeEntity(ctx, Some(ent));
         return;
     }
@@ -3208,13 +3103,10 @@ pub fn FirstFreeTagOwner(ctx: &mut GameContext) -> *mut crate::level::tag_owner:
         i += 1;
     }
 
-    crate::g_main::Com_Printf(
-        cstr(&format!(
-            "WARNING: MAX_TAG_OWNERS ({}) REF TAG LIMIT HIT\n",
-            MAX_TAG_OWNERS
-        ))
-        .as_ptr(),
-    );
+    crate::g_main::Com_Printf(&format!(
+        "WARNING: MAX_TAG_OWNERS ({}) REF TAG LIMIT HIT\n",
+        MAX_TAG_OWNERS
+    ));
     core::ptr::null_mut()
 }
 
@@ -3237,13 +3129,7 @@ pub fn FirstFreeRefTag(
             i += 1;
         }
 
-        crate::g_main::Com_Printf(
-            cstr(&format!(
-                "WARNING: MAX_TAGS ({}) REF TAG LIMIT HIT\n",
-                MAX_TAGS
-            ))
-            .as_ptr(),
-        );
+        crate::g_main::Com_Printf(&format!("WARNING: MAX_TAGS ({}) REF TAG LIMIT HIT\n", MAX_TAGS));
         core::ptr::null_mut()
     }
 }
@@ -3362,9 +3248,10 @@ pub fn TAG_Add(
         let mut owner = owner;
         // Make sure this tag's name isn't already in use
         if !TAG_Find(ctx, owner, name).is_null() {
-            crate::g_main::Com_Printf(
-                cstr(&format!("^1Duplicate tag name \"{}\"\n", cstr_to_str(name))).as_ptr(),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "^1Duplicate tag name \"{}\"\n",
+                cstr_to_str(name)
+            ));
             return core::ptr::null_mut();
         }
 
@@ -3402,13 +3289,10 @@ pub fn TAG_Add(
         (*tag).flags = flags;
 
         if name.is_null() || *name == 0 {
-            crate::g_main::Com_Printf(
-                cstr(&format!(
-                    "^1ERROR: Nameless ref_tag found at ({} {} {})\n",
-                    origin[0] as c_int, origin[1] as c_int, origin[2] as c_int
-                ))
-                .as_ptr(),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "^1ERROR: Nameless ref_tag found at ({} {} {})\n",
+                origin[0] as c_int, origin[1] as c_int, origin[2] as c_int
+            ));
             return core::ptr::null_mut();
         }
 
@@ -3551,14 +3435,11 @@ pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
         } else {
             let targetname = ctx.world.entity(ent).targetname;
             let target = ctx.world.entity(ent).target;
-            crate::g_main::Com_Printf(
-                cstr(&format!(
-                    "^1ERROR: ref_tag ({}) has invalid target ({})",
-                    unsafe { cstr_to_str(targetname) },
-                    unsafe { cstr_to_str(target) }
-                ))
-                .as_ptr(),
-            );
+            crate::g_main::Com_Printf(&format!(
+                "^1ERROR: ref_tag ({}) has invalid target ({})",
+                unsafe { cstr_to_str(targetname) },
+                unsafe { cstr_to_str(target) }
+            ));
         }
     }
 

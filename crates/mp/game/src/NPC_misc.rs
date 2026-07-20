@@ -53,9 +53,8 @@ pub fn Debug_Printf(
         let msg: String = cstr_to_str(fmt);
 
         let output = format!("{}{:5}:{}", color, time, msg);
-        let output_cstr = cstr(&output);
 
-        Com_Printf(output_cstr.as_ptr());
+        Com_Printf(&output);
     }
 }
 
@@ -99,8 +98,7 @@ pub fn Debug_NPCPrintf(
 
         // Format: Q_COLOR_ESCAPE ('^') + color char + time + NPC name + message
         let output = format!("^{}{:5} ({}) {}", color, time, npc_targetname, msg);
-        let output_cstr = cstr(&output);
 
-        Com_Printf(output_cstr.as_ptr());
+        Com_Printf(&output);
     }
 }

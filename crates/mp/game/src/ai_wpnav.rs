@@ -36,18 +36,12 @@ use crate::trap;
 use core::mem::size_of;
 use mp_abi::game::syscalls::G_BOT_CALCULATEPATHS::GBotCalculatepathsArgs;
 use mp_abi::game::syscalls::G_BOT_UPDATEWAYPOINTS::GBotUpdatewaypointsArgs;
-use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
-use mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs;
-use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
-use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
-use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 use native_string::atof::atof_bytes;
-use std::ffi::CString;
+use native_string::atoi::atoi_bytes;
 
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
 /// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
@@ -392,7 +386,7 @@ pub fn BotWaypointRender(ctx: &mut GameContext) {
                     (*p).origin[1] as c_int,
                     (*p).origin[2] as c_int,
                 );
-                G_Printf(ctx, cstr(&s).as_ptr());
+                G_Printf(ctx, &s);
                 // GetFlagStr allocates 128 bytes for this, if it's changed then obviously this must be as well
                 B_TempFree(ctx, 128); // flagstr
 
@@ -421,7 +415,7 @@ pub fn TransferWPData(ctx: &mut GameContext, from: c_int, to: c_int) {
         if ctx.world.globals.gWPArray.0[to as usize].is_null() {
             G_Printf(
                 ctx,
-                c"^1FATAL ERROR: Could not allocated memory for waypoint\n".as_ptr(),
+                "^1FATAL ERROR: Could not allocated memory for waypoint\n",
             );
         }
 
@@ -448,7 +442,7 @@ pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
     unsafe {
         if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
             if ctx.world.cvars.g_RMG.integer == 0 {
-                G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
+                G_Printf(ctx, "^3Warning: Waypoint limit hit (%i)\n");
             }
             return;
         }
@@ -462,7 +456,7 @@ pub fn CreateNewWP(ctx: &mut GameContext, origin: vec3_t, flags: c_int) {
         if ctx.world.globals.gWPArray.0[n].is_null() {
             G_Printf(
                 ctx,
-                c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr(),
+                "^1ERROR: Could not allocated memory for waypoint\n",
             );
         }
 
@@ -500,7 +494,7 @@ pub fn CreateNewWP_FromObject(ctx: &mut GameContext, wp: *mut wpobject_t) {
         if ctx.world.globals.gWPArray.0[n].is_null() {
             G_Printf(
                 ctx,
-                c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr(),
+                "^1ERROR: Could not allocated memory for waypoint\n",
             );
         }
 
@@ -585,7 +579,7 @@ pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
         let mut i: c_int = 0;
 
         if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
-            G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
+            G_Printf(ctx, "^3Waypoint number %i does not exist\n");
             return;
         }
 
@@ -602,7 +596,7 @@ pub fn RemoveWP_InTrail(ctx: &mut GameContext, afterindex: c_int) {
         if foundanindex == 0 {
             G_Printf(
                 ctx,
-                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+                "^3Waypoint index %i should exist, but does not (?)\n",
             );
             return;
         }
@@ -644,13 +638,13 @@ pub fn CreateNewWP_InTrail(
 
         if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
             if ctx.world.cvars.g_RMG.integer == 0 {
-                G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
+                G_Printf(ctx, "^3Warning: Waypoint limit hit (%i)\n");
             }
             return 0;
         }
 
         if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
-            G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
+            G_Printf(ctx, "^3Waypoint number %i does not exist\n");
             return 0;
         }
 
@@ -667,7 +661,7 @@ pub fn CreateNewWP_InTrail(
         if foundanindex == 0 {
             G_Printf(
                 ctx,
-                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+                "^3Waypoint index %i should exist, but does not (?)\n",
             );
             return 0;
         }
@@ -725,13 +719,13 @@ pub fn CreateNewWP_InsertUnder(
 
         if ctx.world.globals.gWPNum >= MAX_WPARRAY_SIZE {
             if ctx.world.cvars.g_RMG.integer == 0 {
-                G_Printf(ctx, c"^3Warning: Waypoint limit hit (%i)\n".as_ptr());
+                G_Printf(ctx, "^3Warning: Waypoint limit hit (%i)\n");
             }
             return 0;
         }
 
         if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
-            G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
+            G_Printf(ctx, "^3Waypoint number %i does not exist\n");
             return 0;
         }
 
@@ -748,7 +742,7 @@ pub fn CreateNewWP_InsertUnder(
         if foundanindex == 0 {
             G_Printf(
                 ctx,
-                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+                "^3Waypoint index %i should exist, but does not (?)\n",
             );
             return 0;
         }
@@ -804,7 +798,7 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
         let mut i: c_int = 0;
 
         if afterindex < 0 || afterindex >= ctx.world.globals.gWPNum {
-            G_Printf(ctx, c"^3Waypoint number %i does not exist\n".as_ptr());
+            G_Printf(ctx, "^3Waypoint number %i does not exist\n");
             return;
         }
 
@@ -821,7 +815,7 @@ pub fn TeleportToWP(ctx: &mut GameContext, pl: Option<EntityId>, afterindex: c_i
         if foundanindex == 0 {
             G_Printf(
                 ctx,
-                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+                "^3Waypoint index %i should exist, but does not (?)\n",
             );
             return;
         }
@@ -847,7 +841,7 @@ pub fn WPFlagsModify(ctx: &mut GameContext, wpnum: c_int, flags: c_int) {
         if wpnum < 0 || wpnum >= ctx.world.globals.gWPNum || p.is_null() || (*p).inuse == 0 {
             G_Printf(
                 ctx,
-                c"^3WPFlagsModify: Waypoint %i does not exist\n".as_ptr(),
+                "^3WPFlagsModify: Waypoint %i does not exist\n",
             );
             return;
         }
@@ -1223,7 +1217,7 @@ pub fn ConnectTrail(
         if behindTheScenes == 0 {
             G_Printf(
                 ctx,
-                c"^3Point %i is not connected to %i - Repairing...\n".as_ptr(),
+                "^3Point %i is not connected to %i - Repairing...\n",
             );
         }
 
@@ -1332,7 +1326,7 @@ pub fn ConnectTrail(
             if behindTheScenes == 0 {
                 G_Printf(
                     ctx,
-                    c"^1Could not link %i to %i, unreachable by node branching.\n".as_ptr(),
+                    "^1Could not link %i to %i, unreachable by node branching.\n",
                 );
             }
             (*ctx.world.globals.gWPArray.0[startindex as usize]).flags |= WPFLAG_ONEWAY_FWD;
@@ -1340,7 +1334,7 @@ pub fn ConnectTrail(
             if behindTheScenes == 0 {
                 G_Printf(
                     ctx,
-                    c"^3Since points cannot be connected, point %i has been flagged as only-forward and point %i has been flagged as only-backward.\n".as_ptr(),
+                    "^3Since points cannot be connected, point %i has been flagged as only-forward and point %i has been flagged as only-backward.\n",
                 );
             }
 
@@ -1412,7 +1406,7 @@ pub fn ConnectTrail(
                     if behindTheScenes == 0 {
                         G_Printf(
                             ctx,
-                            c"^1Could not link %i to %i, waypoint limit hit.\n".as_ptr(),
+                            "^1Could not link %i to %i, waypoint limit hit.\n",
                         );
                     }
                     return 0;
@@ -1430,7 +1424,7 @@ pub fn ConnectTrail(
         }
 
         if behindTheScenes == 0 {
-            G_Printf(ctx, c"^3Finished connecting %i to %i.\n".as_ptr());
+            G_Printf(ctx, "^3Finished connecting %i to %i.\n");
         }
 
         1
@@ -1549,14 +1543,8 @@ pub fn RepairPaths(ctx: &mut GameContext, behindTheScenes: qboolean) -> c_int {
 
         let mut i: c_int = 0;
 
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_distconnect as *mut vmCvar_t),
-        );
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_visconnect as *mut vmCvar_t),
-        );
+        trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_wp_distconnect);
+        trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_wp_visconnect);
 
         while i < ctx.world.globals.gWPNum {
             let p = ctx.world.globals.gWPArray.0[i as usize];
@@ -1944,10 +1932,7 @@ pub fn GetNearestVisibleWPToItem(ctx: &mut GameContext, org: vec3_t, ignore: c_i
 pub fn CalculateWeightGoals(ctx: &mut GameContext) {
     // set waypoint weights depending on weapon and item placement
     unsafe {
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_clearweight as *mut vmCvar_t),
-        );
+        trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_wp_clearweight);
 
         let mut i: c_int = 0;
 
@@ -2115,29 +2100,30 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         let route_path_s = format!("botroutes/{}.wnt", filename_s);
 
         let mut f: fileHandle_t = 0;
-        let len = trap::FS_FOpenFile(
-            ctx.engine,
-            GFsFopenFileArgs::new(CString::new(route_path_s).unwrap(), &mut f, FS_READ),
-        );
+        let len = trap::FS_FOpenFile(ctx.engine, &route_path_s, &mut f, FS_READ);
 
         B_TempFree(ctx, 1024); // routePath
 
         if f == 0 {
             let s = format!("^3Bot route data not found for {}\n", filename_s);
-            G_Printf(ctx, cstr(&s).as_ptr());
+            G_Printf(ctx, &s);
             return 2;
         }
 
         if len >= 524288 {
             let s = "^1Route file exceeds maximum length\n";
-            G_Printf(ctx, cstr(s).as_ptr());
+            G_Printf(ctx, s);
             return 0;
         }
 
         let file_string = B_TempAlloc(ctx, 524288) as *mut c_char;
         let current_var = B_TempAlloc(ctx, 2048) as *mut c_char;
 
-        trap::FS_Read(ctx.engine, GFsReadArgs::new(file_string as *mut u8, len, f));
+        trap::FS_Read(
+            ctx.engine,
+            std::slice::from_raw_parts_mut(file_string as *mut u8, len as usize),
+            f,
+        );
 
         if *file_string.offset(i) == b'l' as c_char {
             // contains a "levelflags" entry..
@@ -2295,7 +2281,7 @@ pub fn LoadPathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         B_TempFree(ctx, 524288); // fileString
         B_TempFree(ctx, 2048); // currentVar
 
-        trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
+        trap::FS_FCloseFile(ctx.engine, f);
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             CalculateSiegeGoals(ctx);
@@ -2454,22 +2440,19 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         B_TempFree(ctx, 1024); // routePath
 
         let mut f: fileHandle_t = 0;
-        trap::FS_FOpenFile(
-            ctx.engine,
-            GFsFopenFileArgs::new(CString::new(route_path_s).unwrap(), &mut f, FS_WRITE),
-        );
+        trap::FS_FOpenFile(ctx.engine, &route_path_s, &mut f, FS_WRITE);
 
         if f == 0 {
             G_Printf(
                 ctx,
-                cstr("^1ERROR: Could not open file to write path data\n").as_ptr(),
+                "^1ERROR: Could not open file to write path data\n",
             );
             return 0;
         }
 
         if RepairPaths(ctx, qfalse) == 0 {
             // check if we can see all waypoints from the last. If not, try to branch over.
-            trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
+            trap::FS_FCloseFile(ctx.engine, f);
             return 0;
         }
 
@@ -2576,17 +2559,13 @@ pub fn SavePathData(ctx: &mut GameContext, filename: *const c_char) -> c_int {
         }
 
         let file_bytes = file_string.as_bytes();
-        trap::FS_Write(
-            ctx.engine,
-            GFsWriteArgs::new(file_bytes.as_ptr(), file_bytes.len() as c_int, f),
-        );
+        trap::FS_Write(ctx.engine, file_bytes, f);
 
-        trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
+        trap::FS_FCloseFile(ctx.engine, f);
 
         G_Printf(
             ctx,
-            cstr("Path data has been saved and updated. You may need to restart the level for some things to be properly calculated.\n")
-                .as_ptr(),
+            "Path data has been saved and updated. You may need to restart the level for some things to be properly calculated.\n",
         );
 
         1
@@ -2907,7 +2886,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
             || ctx.entity(terrain_id.unwrap()).inuse == 0
             || ctx.entity(terrain_id.unwrap()).s.eType != et_terrain
         {
-            G_Printf(ctx, cstr("Error: RMG with no terrain!\n").as_ptr());
+            G_Printf(ctx, "Error: RMG with no terrain!\n");
             return;
         }
         let terrain_id = terrain_id.unwrap();
@@ -3192,25 +3171,21 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
         let mut mapname: vmCvar_t = vmCvar_t::zeroed();
         trap::Cvar_Register(
             ctx.engine,
-            GCvarRegisterArgs::new(
-                &mut mapname as *mut vmCvar_t,
-                CString::new("mapname").unwrap(),
-                CString::new("").unwrap(),
-                CVAR_SERVERINFO | CVAR_ROM,
-            ),
+            Some(&mut mapname),
+            "mapname",
+            "",
+            CVAR_SERVERINFO | CVAR_ROM,
         );
 
         if ctx.world.cvars.g_RMG.integer != 0 {
             // If RMG, generate the path on-the-fly
             trap::Cvar_Register(
-                ctx.engine,
-                GCvarRegisterArgs::new(
-                    &mut ctx.world.cvars.bot_normgpath as *mut vmCvar_t,
-                    CString::new("bot_normgpath").unwrap(),
-                    CString::new("1").unwrap(),
-                    CVAR_CHEAT,
-                ),
-            );
+            ctx.engine,
+            Some(&mut ctx.world.cvars.bot_normgpath),
+            "bot_normgpath",
+            "1",
+            CVAR_CHEAT,
+        );
             // note: This is disabled for now as I'm using standard bot nav
             // on premade terrain levels.
 
@@ -3229,10 +3204,7 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
             }
         }
 
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_edit as *mut vmCvar_t),
-        );
+        trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_wp_edit);
 
         if ctx.world.cvars.bot_wp_edit.value != 0.0 {
             ctx.world.globals.gBotEdit = 1.0;
@@ -3363,8 +3335,8 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
         let mut optional_argument: c_int = 0;
         let mut i: c_int = 0;
         let mut flags_from_argument: c_int = 0;
-        let mut optional_s_argument: *mut c_char = core::ptr::null_mut();
-        let mut required_s_argument: *mut c_char = core::ptr::null_mut();
+        let mut optional_s_argument: String = String::new();
+        let mut required_s_argument: String = String::new();
 
         // if a waypoint editing related command is issued, bots will deactivate.
         // once bot_wp_save is issued and the trail is recalculated, bots will activate again.
@@ -3379,20 +3351,18 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
         if Q_stricmp(cmd, c"bot_wp_cmdlist".as_ptr()) == 0 {
             // lists all the bot waypoint commands.
-            G_Printf(ctx, cstr("^3bot_wp_add^7 - Add a waypoint (optional int parameter will insert the point after the specified waypoint index in a trail)\n\n").as_ptr());
-            G_Printf(ctx, cstr("^3bot_wp_rem^7 - Remove a waypoint (removes last unless waypoint index is specified as a parameter)\n\n").as_ptr());
-            G_Printf(ctx, cstr("^3bot_wp_addflagged^7 - Same as wp_add, but adds a flagged point (type bot_wp_addflagged for help)\n\n").as_ptr());
-            G_Printf(ctx, cstr("^3bot_wp_switchflags^7 - Switches flags on an existing waypoint (type bot_wp_switchflags for help)\n\n").as_ptr());
+            G_Printf(ctx, "^3bot_wp_add^7 - Add a waypoint (optional int parameter will insert the point after the specified waypoint index in a trail)\n\n");
+            G_Printf(ctx, "^3bot_wp_rem^7 - Remove a waypoint (removes last unless waypoint index is specified as a parameter)\n\n");
+            G_Printf(ctx, "^3bot_wp_addflagged^7 - Same as wp_add, but adds a flagged point (type bot_wp_addflagged for help)\n\n");
+            G_Printf(ctx, "^3bot_wp_switchflags^7 - Switches flags on an existing waypoint (type bot_wp_switchflags for help)\n\n");
             G_Printf(
                 ctx,
-                cstr("^3bot_wp_tele^7 - Teleport yourself to the specified waypoint's location\n")
-                    .as_ptr(),
+                "^3bot_wp_tele^7 - Teleport yourself to the specified waypoint's location\n",
             );
-            G_Printf(ctx, cstr("^3bot_wp_killoneways^7 - Removes oneway (backward and forward) flags on all waypoints in the level\n\n").as_ptr());
+            G_Printf(ctx, "^3bot_wp_killoneways^7 - Removes oneway (backward and forward) flags on all waypoints in the level\n\n");
             G_Printf(
                 ctx,
-                cstr("^3bot_wp_save^7 - Saves all waypoint data into a file for later use\n")
-                    .as_ptr(),
+                "^3bot_wp_save^7 - Saves all waypoint data into a file for later use\n",
             );
 
             return 1;
@@ -3402,14 +3372,14 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
-            if !optional_s_argument.is_null() {
-                optional_argument = atoi(optional_s_argument);
-            }
+            // Raven's `if (optional_sargument)` is always true (ConcatArgs
+            // never returns NULL) — empty assigns atoi("") == 0.
+            optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
             // §2b: player pool client; deref raw as Raven does.
             let cl = ctx.entity(pl).client;
             let origin = (*cl).ps.origin;
-            if !optional_s_argument.is_null() && *optional_s_argument != 0 {
+            if !optional_s_argument.is_empty() {
                 CreateNewWP_InTrail(ctx, origin, 0, optional_argument);
             } else {
                 CreateNewWP(ctx, origin, 0);
@@ -3422,11 +3392,11 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             optional_s_argument = ConcatArgs(ctx, 1);
 
-            if !optional_s_argument.is_null() {
-                optional_argument = atoi(optional_s_argument);
-            }
+            // Raven's `if (optional_sargument)` is always true (ConcatArgs
+            // never returns NULL) — empty assigns atoi("") == 0.
+            optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
-            if !optional_s_argument.is_null() && *optional_s_argument != 0 {
+            if !optional_s_argument.is_empty() {
                 RemoveWP_InTrail(ctx, optional_argument);
             } else {
                 RemoveWP(ctx);
@@ -3439,16 +3409,16 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
-            if !optional_s_argument.is_null() {
-                optional_argument = atoi(optional_s_argument);
-            }
+            // Raven's `if (optional_sargument)` is always true (ConcatArgs
+            // never returns NULL) — empty assigns atoi("") == 0.
+            optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
-            if !optional_s_argument.is_null() && *optional_s_argument != 0 {
+            if !optional_s_argument.is_empty() {
                 TeleportToWP(ctx, Some(pl), optional_argument);
             } else {
                 G_Printf(
                     ctx,
-                    cstr("^3You didn't specify an index. Assuming last.\n").as_ptr(),
+                    "^3You didn't specify an index. Assuming last.\n",
                 );
                 TeleportToWP(ctx, Some(pl), ctx.world.globals.gWPNum - 1);
             }
@@ -3480,13 +3450,14 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             required_s_argument = ConcatArgs(ctx, 1);
 
-            if required_s_argument.is_null() || *required_s_argument == 0 {
-                G_Printf(ctx, cstr("^3Flag string needed for bot_wp_addflagged\nj - Jump point\nd - Duck point\nc - Snipe or camp standing\nf - Wait for func\nm - Do not move to when func is under\ns - Snipe or camp\nx - Oneway, forward\ny - Oneway, back\ng - Mission goal\nn - No visibility\nExample (for a point the bot would jump at, and reverse on when traveling a trail backwards):\nbot_wp_addflagged jx\n").as_ptr());
+            if required_s_argument.is_empty() {
+                G_Printf(ctx, "^3Flag string needed for bot_wp_addflagged\nj - Jump point\nd - Duck point\nc - Snipe or camp standing\nf - Wait for func\nm - Do not move to when func is under\ns - Snipe or camp\nx - Oneway, forward\ny - Oneway, back\ng - Mission goal\nn - No visibility\nExample (for a point the bot would jump at, and reverse on when traveling a trail backwards):\nbot_wp_addflagged jx\n");
                 return 1;
             }
 
-            while *required_s_argument.offset(i as isize) != 0 {
-                let c = *required_s_argument.offset(i as isize);
+            let required_bytes = required_s_argument.as_bytes();
+            while (i as usize) < required_bytes.len() {
+                let c = required_bytes[i as usize] as c_char;
                 if c == b'j' as c_char {
                     flags_from_argument |= WPFLAG_JUMP;
                 } else if c == b'd' as c_char {
@@ -3514,14 +3485,14 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             optional_s_argument = ConcatArgs(ctx, 2);
 
-            if !optional_s_argument.is_null() {
-                optional_argument = atoi(optional_s_argument);
-            }
+            // Raven's `if (optional_sargument)` is always true (ConcatArgs
+            // never returns NULL) — empty assigns atoi("") == 0.
+            optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
             // §2b: player pool client; deref raw as Raven does.
             let cl = ctx.entity(pl).client;
             let origin = (*cl).ps.origin;
-            if !optional_s_argument.is_null() && *optional_s_argument != 0 {
+            if !optional_s_argument.is_empty() {
                 CreateNewWP_InTrail(ctx, origin, flags_from_argument, optional_argument);
             } else {
                 CreateNewWP(ctx, origin, flags_from_argument);
@@ -3534,13 +3505,14 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             required_s_argument = ConcatArgs(ctx, 1);
 
-            if required_s_argument.is_null() || *required_s_argument == 0 {
-                G_Printf(ctx, cstr("^3Flag string needed for bot_wp_switchflags\nType bot_wp_addflagged for a list of flags and their corresponding characters, or use 0 for no flags.\nSyntax: bot_wp_switchflags <flags> <n>\n").as_ptr());
+            if required_s_argument.is_empty() {
+                G_Printf(ctx, "^3Flag string needed for bot_wp_switchflags\nType bot_wp_addflagged for a list of flags and their corresponding characters, or use 0 for no flags.\nSyntax: bot_wp_switchflags <flags> <n>\n");
                 return 1;
             }
 
-            while *required_s_argument.offset(i as isize) != 0 {
-                let c = *required_s_argument.offset(i as isize);
+            let required_bytes = required_s_argument.as_bytes();
+            while (i as usize) < required_bytes.len() {
+                let c = required_bytes[i as usize] as c_char;
                 if c == b'j' as c_char {
                     flags_from_argument |= WPFLAG_JUMP;
                 } else if c == b'd' as c_char {
@@ -3568,14 +3540,14 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
 
             optional_s_argument = ConcatArgs(ctx, 2);
 
-            if !optional_s_argument.is_null() {
-                optional_argument = atoi(optional_s_argument);
-            }
+            // Raven's `if (optional_sargument)` is always true (ConcatArgs
+            // never returns NULL) — empty assigns atoi("") == 0.
+            optional_argument = atoi_bytes(optional_s_argument.as_bytes());
 
-            if !optional_s_argument.is_null() && *optional_s_argument != 0 {
+            if !optional_s_argument.is_empty() {
                 WPFlagsModify(ctx, optional_argument, flags_from_argument);
             } else {
-                G_Printf(ctx, cstr("^3Waypoint number (to modify) needed for bot_wp_switchflags\nSyntax: bot_wp_switchflags <flags> <n>\n").as_ptr());
+                G_Printf(ctx, "^3Waypoint number (to modify) needed for bot_wp_switchflags\nSyntax: bot_wp_switchflags <flags> <n>\n");
             }
             return 1;
         }
@@ -3604,14 +3576,12 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             ctx.world.globals.gDeactivated = 0.0;
             let mut mapname: vmCvar_t = vmCvar_t::zeroed();
             trap::Cvar_Register(
-                ctx.engine,
-                GCvarRegisterArgs::new(
-                    &mut mapname as *mut vmCvar_t,
-                    CString::new("mapname").unwrap(),
-                    CString::new("").unwrap(),
-                    CVAR_SERVERINFO | CVAR_ROM,
-                ),
-            );
+            ctx.engine,
+            Some(&mut mapname),
+            "mapname",
+            "",
+            CVAR_SERVERINFO | CVAR_ROM,
+        );
             SavePathData(ctx, mapname.string.as_ptr());
             return 1;
         }

@@ -2365,7 +2365,7 @@ unsafe fn player_die_log_kill(
         cstr_to_str((*cl).pers.netname.as_ptr()),
         obit
     );
-    crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+    crate::g_main::G_LogPrintf(ctx, &s);
 
     if ctx.world.cvars.g_austrian.integer != 0
         && ctx.world.cvars.g_gametype.integer == GT_DUEL
@@ -2398,15 +2398,15 @@ unsafe fn player_die_log_kill(
                 .add(ctx.world.level.sortedClients[1] as usize))
             .respawnTime
         };
-        crate::g_main::G_LogPrintf(ctx, cstr("Duel Kill Details:\n").as_ptr());
+        crate::g_main::G_LogPrintf(ctx, "Duel Kill Details:\n");
         let s = format!("Kill Time: {}\n", ctx.world.level.time - spawnTime);
-        crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+        crate::g_main::G_LogPrintf(ctx, &s);
         let s = format!(
             "victim: {}, hits on enemy {}\n",
             cstr_to_str((*cl).pers.netname.as_ptr()),
             (*cl).ps.persistant[persEnum_t::PERS_HITS as usize]
         );
-        crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+        crate::g_main::G_LogPrintf(ctx, &s);
         if !attacker.is_null() && !(*attacker).client.is_null() {
             let acl = (*attacker).client;
             let s = format!(
@@ -2415,7 +2415,7 @@ unsafe fn player_die_log_kill(
                 (*acl).ps.persistant[persEnum_t::PERS_HITS as usize],
                 (*attacker).health
             );
-            crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+            crate::g_main::G_LogPrintf(ctx, &s);
             // also - if MOD_SABER, list the animation and saber style
             if meansOfDeath == meansOfDeath_t::MOD_SABER as c_int {
                 let s = format!(
@@ -2423,7 +2423,7 @@ unsafe fn player_die_log_kill(
                     (*acl).ps.fd.saberAnimLevel,
                     cstr_to_str(animTable[(*acl).ps.torsoAnim as usize].name)
                 );
-                crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+                crate::g_main::G_LogPrintf(ctx, &s);
             }
         }
     }
@@ -4666,7 +4666,7 @@ pub fn G_CheckForDismemberment(
                     cstr_to_str((*client).pers.netname.as_ptr()),
                     cstr_to_str(hitLocName[hitLoc as usize].as_ptr())
                 );
-                crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
+                crate::g_main::G_LogPrintf(ctx, &s);
             }
         } else {
             G_GetDismemberLoc(ctx.entity(ent), &mut boltPoint, hitLocUse);
@@ -5636,7 +5636,7 @@ pub fn G_Damage(
                 take,
                 asave
             );
-            crate::g_main::G_Printf(ctx, cstr(&s).as_ptr());
+            crate::g_main::G_Printf(ctx, &s);
         }
 
         // add to the damage inflicted on a player this frame

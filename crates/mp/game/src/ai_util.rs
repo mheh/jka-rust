@@ -21,7 +21,6 @@ use mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerV
 use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFile;
 use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFile;
 use mp_abi::game::syscalls::G_FS_READ::GFsRead;
-use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
 use native_string::atof::atof_bytes;
 
 /// Raven `B_TempAlloc`.
@@ -286,12 +285,7 @@ pub fn BotDoChat(
         }
 
         // Early exit: non-English language selected
-        let lang_result = trap::Cvar_VariableIntegerValue(
-            ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(
-                std::ffi::CString::new("se_language").unwrap(),
-            )
-        );
+        let lang_result = trap::Cvar_VariableIntegerValue(ctx.engine, "se_language");
         if lang_result != 0 {
             return 0;
         }
@@ -604,7 +598,7 @@ pub fn ReadChatGroups(ctx: &mut GameContext, bs: *mut bot_state_t, buf: *mut c_c
         if strlen_result >= crate::game_globals::MAX_CHAT_BUFFER_SIZE {
             crate::g_main::G_Printf(
                 ctx,
-                "^1Error: Personality chat section exceeds max size\n\0".as_ptr() as *const c_char,
+                "^1Error: Personality chat section exceeds max size\n",
             );
             return 0;
         }
@@ -663,22 +657,17 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut f: fileHandle_t = 0;
         // Pass the raw filename bytes (no lossy UTF-8 round-trip) to FS_FOpenFile,
         // per the Cmd_TeamTask_f precedent (g_cmds.rs).
-        let path = cstr_from_chars(&bs_ref.settings.personalityfile).to_owned();
-        let len = trap::FS_FOpenFile(
-            ctx.engine,
-            mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs::new(
-                path,
-                &mut f as *mut fileHandle_t,
-                FS_READ,
-            ),
-        );
+        let path = cstr_from_chars(&bs_ref.settings.personalityfile)
+            .to_str()
+            .unwrap_or("");
+        let len = trap::FS_FOpenFile(ctx.engine, path, &mut f, FS_READ);
 
         let mut failed = 0 as c_int;
 
         if f == 0 {
             crate::g_main::G_Printf(
                 ctx,
-                "^1Error: Specified personality not found\n\0".as_ptr() as *const c_char,
+                "^1Error: Specified personality not found\n",
             );
             B_TempFree(ctx, 131072);
             return;
@@ -687,7 +676,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if len >= 131072 {
             crate::g_main::G_Printf(
                 ctx,
-                "^1Personality file exceeds maximum length\n\0".as_ptr() as *const c_char,
+                "^1Personality file exceeds maximum length\n",
             );
             B_TempFree(ctx, 131072);
             return;
@@ -696,7 +685,8 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         // Read the file
         trap::FS_Read(
             ctx.engine,
-            mp_abi::game::syscalls::G_FS_READ::GFsReadArgs::new(buf as *mut u8, len, f),
+            std::slice::from_raw_parts_mut(buf as *mut u8, len as usize),
+            f,
         );
 
         let mut rlen = len;
@@ -717,10 +707,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         if GetValueGroup(buf, "GeneralBotInfo\0".as_ptr() as *mut c_char, group) == 0 {
             trap::Printf(
                 ctx.engine,
-                GPrintArgs::new(
-                    std::ffi::CString::new("^1Personality file contains no GeneralBotInfo group\n")
-                        .unwrap(),
-                ),
+                "^1Personality file contains no GeneralBotInfo group\n",
             );
             failed = 1;
         }
@@ -955,10 +942,7 @@ pub fn BotUtilizePersonality(ctx: &mut GameContext, bs: *mut bot_state_t) {
         B_TempFree(ctx, 65536);
 
         // Close the file
-        trap::FS_FCloseFile(
-            ctx.engine,
-            mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs::new(f),
-        );
+        trap::FS_FCloseFile(ctx.engine, f);
     }
 }
 

@@ -331,13 +331,6 @@ static void dump_info_record(int idx, const char *s) {
 		printf("vfk "); emit_qstr(VKEYS[i]); printf(" "); emit_qstr(v); printf("\n");
 	}
 
-	{ const char *h = s; for (int i = 0; i < 12; i++) {
-		char key[1024], value[1024];
-		Info_NextPair(&h, key, value);
-		printf("np "); emit_qstr(key); printf(" "); emit_qstr(value); printf("\n");
-		if (*h == 0) break;
-	} }
-
 	for (unsigned i = 0; i < sizeof(RKEYS)/sizeof(RKEYS[0]); i++) {
 		char tmp[1100]; memset(tmp, 0, sizeof(tmp)); strcpy(tmp, s);
 		Info_RemoveKey(tmp, RKEYS[i]);
@@ -378,8 +371,8 @@ static void dump_info(const char *dir) {
 	free(buf);
 
 	// Big infostring: length in (MAX_INFO_STRING, BIG_INFO_STRING) — exercises
-	// Info_ValueForKey's BIG_INFO_STRING guard (only ValueForKey/Validate/
-	// NextPair, which lack the MAX_INFO_STRING guard, are safe here).
+	// Info_ValueForKey's BIG_INFO_STRING guard (only ValueForKey/Validate,
+	// which lack the MAX_INFO_STRING guard, are safe here).
 	char big[8192]; big[0] = 0; int i = 0;
 	while (strlen(big) < 1100) {
 		char pair[32]; snprintf(pair, sizeof(pair), "\\k%d\\v%d", i, i);
@@ -389,9 +382,6 @@ static void dump_info(const char *dir) {
 	printf("big val %d\n", Info_Validate(big));
 	{ char *v = Info_ValueForKey(big, "k50"); printf("big vfk k50 "); emit_qstr(v); printf("\n"); }
 	{ char *v = Info_ValueForKey(big, "missing"); printf("big vfk missing "); emit_qstr(v); printf("\n"); }
-	{ const char *h = big; char key[1024], value[1024];
-	  Info_NextPair(&h, key, value);
-	  printf("big np "); emit_qstr(key); printf(" "); emit_qstr(value); printf("\n"); }
 }
 
 int main(int argc, char **argv) {

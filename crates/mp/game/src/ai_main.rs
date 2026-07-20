@@ -71,7 +71,6 @@ use crate::ai_wpnav::{
     WPFLAG_ONEWAY_BACK, WPFLAG_ONEWAY_FWD, WPFLAG_RED_FLAG, WPFLAG_SNIPEORCAMP,
     WPFLAG_SNIPEORCAMPSTAND, WPFLAG_WAITFORFUNC,
 };
-use std::ffi::CString;
 
 // Pass-3 shard-1 body imports.
 use crate::ai_main_consts::{
@@ -111,8 +110,6 @@ use mp_abi::game::syscalls::BOTLIB_GET_CONSOLE_MESSAGE::BotlibGetConsoleMessageA
 use mp_abi::game::syscalls::BOTLIB_SETUP::BotlibSetupArgs;
 use mp_abi::game::syscalls::BOTLIB_SHUTDOWN::BotlibShutdownArgs;
 use mp_abi::game::syscalls::BOTLIB_USER_COMMAND::BotlibUserCommandArgs;
-use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
-use mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_bg::public::entity_event::entity_event_t::{
     EV_ALT_FIRE, EV_FIRE_WEAPON, EV_FOOTSTEP, EV_FOOTSTEP_METAL, EV_FOOTWADE, EV_GLOBAL_SOUND,
@@ -8078,33 +8075,16 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
         let base = ctx.world.g_entities.as_mut_ptr();
 
         if ctx.world.globals.gUpdateVars < ctx.world.level.time {
+            trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_pvstype);
+            trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_camp);
+            trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_attachments);
+            trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_forgimmick);
             trap::Cvar_Update(
                 ctx.engine,
-                GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_pvstype as *mut vmCvar_t),
-            );
-            trap::Cvar_Update(
-                ctx.engine,
-                GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_camp as *mut vmCvar_t),
-            );
-            trap::Cvar_Update(
-                ctx.engine,
-                GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_attachments as *mut vmCvar_t),
-            );
-            trap::Cvar_Update(
-                ctx.engine,
-                GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_forgimmick as *mut vmCvar_t),
-            );
-            trap::Cvar_Update(
-                ctx.engine,
-                GCvarUpdateArgs::new(
-                    &mut ctx.world.cvars.bot_honorableduelacceptance as *mut vmCvar_t,
-                ),
+                &mut ctx.world.cvars.bot_honorableduelacceptance,
             );
             // #ifndef FINAL_BUILD
-            trap::Cvar_Update(
-                ctx.engine,
-                GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_getinthecarrr as *mut vmCvar_t),
-            );
+            trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_getinthecarrr);
             ctx.world.globals.gUpdateVars = ctx.world.level.time + 1000;
         }
 
@@ -8112,10 +8092,7 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
 
         //rww - addl bot frame functions
         if ctx.world.globals.gBotEdit != 0.0 {
-            trap::Cvar_Update(
-                ctx.engine,
-                GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_wp_info as *mut vmCvar_t),
-            );
+            trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_wp_info);
             BotWaypointRender(ctx);
         }
 
@@ -8195,120 +8172,93 @@ pub fn BotAISetup(ctx: &mut GameContext, restart: c_int) -> c_int {
     //rww - new bot cvars..
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_forcepowers as *mut vmCvar_t,
-            CString::new("bot_forcepowers").unwrap(),
-            CString::new("1").unwrap(),
-            CVAR_CHEAT,
-        ),
+        Some(&mut ctx.world.cvars.bot_forcepowers),
+        "bot_forcepowers",
+        "1",
+        CVAR_CHEAT,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_forgimmick as *mut vmCvar_t,
-            CString::new("bot_forgimmick").unwrap(),
-            CString::new("0").unwrap(),
-            CVAR_CHEAT,
-        ),
+        Some(&mut ctx.world.cvars.bot_forgimmick),
+        "bot_forgimmick",
+        "0",
+        CVAR_CHEAT,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_honorableduelacceptance as *mut vmCvar_t,
-            CString::new("bot_honorableduelacceptance").unwrap(),
-            CString::new("0").unwrap(),
-            CVAR_CHEAT,
-        ),
+        Some(&mut ctx.world.cvars.bot_honorableduelacceptance),
+        "bot_honorableduelacceptance",
+        "0",
+        CVAR_CHEAT,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_pvstype as *mut vmCvar_t,
-            CString::new("bot_pvstype").unwrap(),
-            CString::new("1").unwrap(),
-            CVAR_CHEAT,
-        ),
+        Some(&mut ctx.world.cvars.bot_pvstype),
+        "bot_pvstype",
+        "1",
+        CVAR_CHEAT,
     );
     // #ifndef FINAL_BUILD
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_getinthecarrr as *mut vmCvar_t,
-            CString::new("bot_getinthecarrr").unwrap(),
-            CString::new("0").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_getinthecarrr),
+        "bot_getinthecarrr",
+        "0",
+        0,
     );
 
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_attachments as *mut vmCvar_t,
-            CString::new("bot_attachments").unwrap(),
-            CString::new("1").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_attachments),
+        "bot_attachments",
+        "1",
+        0,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_camp as *mut vmCvar_t,
-            CString::new("bot_camp").unwrap(),
-            CString::new("1").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_camp),
+        "bot_camp",
+        "1",
+        0,
     );
 
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_wp_info as *mut vmCvar_t,
-            CString::new("bot_wp_info").unwrap(),
-            CString::new("1").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_wp_info),
+        "bot_wp_info",
+        "1",
+        0,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_wp_edit as *mut vmCvar_t,
-            CString::new("bot_wp_edit").unwrap(),
-            CString::new("0").unwrap(),
-            CVAR_CHEAT,
-        ),
+        Some(&mut ctx.world.cvars.bot_wp_edit),
+        "bot_wp_edit",
+        "0",
+        CVAR_CHEAT,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_wp_clearweight as *mut vmCvar_t,
-            CString::new("bot_wp_clearweight").unwrap(),
-            CString::new("1").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_wp_clearweight),
+        "bot_wp_clearweight",
+        "1",
+        0,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_wp_distconnect as *mut vmCvar_t,
-            CString::new("bot_wp_distconnect").unwrap(),
-            CString::new("1").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_wp_distconnect),
+        "bot_wp_distconnect",
+        "1",
+        0,
     );
     trap::Cvar_Register(
         ctx.engine,
-        GCvarRegisterArgs::new(
-            &mut ctx.world.cvars.bot_wp_visconnect as *mut vmCvar_t,
-            CString::new("bot_wp_visconnect").unwrap(),
-            CString::new("1").unwrap(),
-            0,
-        ),
+        Some(&mut ctx.world.cvars.bot_wp_visconnect),
+        "bot_wp_visconnect",
+        "1",
+        0,
     );
 
-    trap::Cvar_Update(
-        ctx.engine,
-        GCvarUpdateArgs::new(&mut ctx.world.cvars.bot_forcepowers as *mut vmCvar_t),
-    );
+    trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.bot_forcepowers);
     //end rww
 
     //if the game is restarted for a tournament

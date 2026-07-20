@@ -46,8 +46,6 @@ use crate::g_misc::{TAG_GetAngles, TAG_GetOrigin, TAG_GetOrigin2, TAG_GetRadius}
 use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
 use crate::veh_dispatch::eject_all;
-use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
 use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
 use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
@@ -87,16 +85,13 @@ pub fn G_DebugPrint(
         let text = cstr_to_str(format);
 
         if level == WL_ERROR as c_int {
-            Com_Printf(cstr(&format!("{}ERROR: {}", S_COLOR_RED.to_string_lossy(), text)).as_ptr());
+            Com_Printf(&format!("{}ERROR: {}", S_COLOR_RED.to_string_lossy(), text));
         } else if level == WL_WARNING as c_int {
-            Com_Printf(
-                cstr(&format!(
-                    "{}WARNING: {}",
-                    S_COLOR_YELLOW.to_string_lossy(),
-                    text
-                ))
-                .as_ptr(),
-            );
+            Com_Printf(&format!(
+                "{}WARNING: {}",
+                S_COLOR_YELLOW.to_string_lossy(),
+                text
+            ));
         } else if level == WL_DEBUG as c_int {
             let mut ent_num: c_int = text
                 .split_whitespace()
@@ -115,26 +110,20 @@ pub fn G_DebugPrint(
             } else {
                 cstr_to_str(targ)
             };
-            Com_Printf(
-                cstr(&format!(
-                    "{}DEBUG: {}({}): {}\n",
-                    S_COLOR_BLUE.to_string_lossy(),
-                    targ_str,
-                    ent_num,
-                    buffer
-                ))
-                .as_ptr(),
-            );
+            Com_Printf(&format!(
+                "{}DEBUG: {}({}): {}\n",
+                S_COLOR_BLUE.to_string_lossy(),
+                targ_str,
+                ent_num,
+                buffer
+            ));
         } else {
             // default / WL_VERBOSE
-            Com_Printf(
-                cstr(&format!(
-                    "{}INFO: {}",
-                    S_COLOR_GREEN.to_string_lossy(),
-                    text
-                ))
-                .as_ptr(),
-            );
+            Com_Printf(&format!(
+                "{}INFO: {}",
+                S_COLOR_GREEN.to_string_lossy(),
+                text
+            ));
         }
     }
 }
@@ -262,16 +251,8 @@ pub fn Q3_PlaySound(
     }
 
     if type_voice != 0 {
-        let mut buf = [0 as c_char; 128];
-        trap::Cvar_VariableStringBuffer(
-            ctx.engine,
-            GCvarVariableStringBufferArgs::new(
-                CString::new("timescale").unwrap(),
-                buf.as_mut_ptr(),
-                buf.len() as c_int,
-            ),
-        );
-        let t_f_val = atof_bytes(unsafe { CStr::from_ptr(buf.as_ptr()) }.to_bytes()) as f32;
+        let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "timescale", 128);
+        let t_f_val = atof_bytes(buf.as_bytes()) as f32;
 
         if t_f_val > 1.0 {
             // Skip the damn sound!
@@ -2566,11 +2547,8 @@ pub fn Q3_SetWidth(ctx: &mut GameContext, entID: c_int, data: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2926-2929`
 pub fn Q3_SetTimeScale(ctx: &mut GameContext, entID: c_int, data: *const c_char) {
     unsafe {
-        let value = CString::new(std::ffi::CStr::from_ptr(data).to_bytes()).unwrap();
-        trap::Cvar_Set(
-            ctx.engine,
-            GCvarSetArgs::new(CString::new("timescale").unwrap(), value),
-        );
+        let value = cstr_to_str(data);
+        trap::Cvar_Set(ctx.engine, "timescale", &value);
     }
 }
 

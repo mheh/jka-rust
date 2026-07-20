@@ -10,9 +10,8 @@ use crate::client::spectator_state::spectatorState_t;
 use crate::client::spectator_state::spectatorState_t::*;
 use crate::g_main::{G_PowerDuelCount, G_Printf};
 use crate::prelude::*;
-use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_bg::public::duel_team::duelTeam_t::*;
+use native_string::atoi::atoi;
 
 /// Raven `G_WriteClientSessionData`.
 ///
@@ -90,7 +89,7 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
     };
 
     let var = format!("session{}", client);
-    trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr(&var), cstr(&s)));
+    trap::Cvar_Set(ctx.engine, &var, &s);
 }
 
 /// Raven `G_ReadSessionData`.
@@ -99,14 +98,8 @@ pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
 pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
     // `client - level.clients` recomputes to the client index `client`.
     let var = format!("session{}", client);
-    let mut s: [c_char; MAX_STRING_CHARS as usize] = [0; MAX_STRING_CHARS as usize];
+    let s_str = trap::Cvar_VariableStringBuffer(ctx.engine, &var, MAX_STRING_CHARS as usize);
 
-    trap::Cvar_VariableStringBuffer(
-        ctx.engine,
-        GCvarVariableStringBufferArgs::new(cstr(&var), s.as_mut_ptr(), MAX_STRING_CHARS as i32),
-    );
-
-    let s_str = unsafe { cstr_to_str(s.as_ptr()) };
     let parts: Vec<&str> = s_str.split_whitespace().collect();
 
     let mut idx = 0;
@@ -217,12 +210,7 @@ pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
 /// Raven `G_InitSessionData`.
 ///
 /// Source: `oracle/codemp/game/g_session.c:187-282`
-pub fn G_InitSessionData(
-    ctx: &mut GameContext,
-    client: usize,
-    userinfo: *mut c_char,
-    isBot: qboolean,
-) {
+pub fn G_InitSessionData(ctx: &mut GameContext, client: usize, userinfo: &str, isBot: qboolean) {
     // `client - level.clients` recomputes to the client index `client`.
     let client_id = EntityId(client as u32);
 
@@ -237,17 +225,11 @@ pub fn G_InitSessionData(
             if isBot == qfalse {
                 ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
             } else {
-                let value =
-                    Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo, cstr("team").as_ptr());
-                // `value` is the info-string return (seam), deref stays raw.
-                let value_char = if value.is_null() {
-                    0 as c_char
-                } else {
-                    unsafe { *value }
-                };
-                if value_char == b'r' as c_char || value_char == b'R' as c_char {
+                let value = Info_ValueForKey(userinfo, "team");
+                let value_char = value.chars().next().unwrap_or('\0');
+                if value_char == 'r' || value_char == 'R' {
                     ctx.world.client_mut(client).sess.sessionTeam = TEAM_RED;
-                } else if value_char == b'b' as c_char || value_char == b'B' as c_char {
+                } else if value_char == 'b' || value_char == 'B' {
                     ctx.world.client_mut(client).sess.sessionTeam = TEAM_BLUE;
                 } else {
                     let team = PickTeam(ctx, -1);
@@ -257,14 +239,9 @@ pub fn G_InitSessionData(
             }
         }
     } else {
-        let value = Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo, cstr("team").as_ptr());
-        // `value` is the info-string return (seam), deref stays raw.
-        let value_char = if value.is_null() {
-            0 as c_char
-        } else {
-            unsafe { *value }
-        };
-        if value_char == b's' as c_char {
+        let value = Info_ValueForKey(userinfo, "team");
+        let value_char = value.chars().next().unwrap_or('\0');
+        if value_char == 's' {
             ctx.world.client_mut(client).sess.sessionTeam = TEAM_SPECTATOR;
         } else {
             match ctx.world.cvars.g_gametype.integer {
@@ -318,25 +295,13 @@ pub fn G_InitSessionData(
 ///
 /// Source: `oracle/codemp/game/g_session.c:291-304`
 pub fn G_InitWorldSession(ctx: &mut GameContext) {
-    let mut s: [c_char; MAX_STRING_CHARS as usize] = [0; MAX_STRING_CHARS as usize];
+    let s = trap::Cvar_VariableStringBuffer(ctx.engine, "session", MAX_STRING_CHARS as usize);
 
-    trap::Cvar_VariableStringBuffer(
-        ctx.engine,
-        GCvarVariableStringBufferArgs::new(
-            cstr("session"),
-            s.as_mut_ptr(),
-            MAX_STRING_CHARS as c_int,
-        ),
-    );
-
-    let gt: c_int = atoi(s.as_ptr());
+    let gt: c_int = atoi(&s);
 
     if ctx.world.cvars.g_gametype.integer != gt {
         ctx.world.level.newSession = qtrue;
-        G_Printf(
-            ctx,
-            cstr("Gametype changed, clearing session data.\n").as_ptr(),
-        );
+        G_Printf(ctx, "Gametype changed, clearing session data.\n");
     }
 }
 
@@ -345,7 +310,7 @@ pub fn G_InitWorldSession(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/g_session.c:312-322`
 pub fn G_WriteSessionData(ctx: &mut GameContext) {
     let s = format!("{}", ctx.world.cvars.g_gametype.integer);
-    trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("session"), cstr(&s)));
+    trap::Cvar_Set(ctx.engine, "session", &s);
 
     for i in 0..ctx.world.level.maxclients {
         if ctx.world.client(i as usize).pers.connected == CON_CONNECTED {

@@ -15,10 +15,9 @@
 //! compile + golden suite.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use core::ffi::CStr;
 
 use crate::prelude::*;
-use native_string::atof::atof_bytes;
+use native_string::atof::atof;
 
 // Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
 // (voice/entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s —
@@ -286,19 +285,11 @@ pub fn WP_ResistForcePush(
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
         if noPenalty == qfalse {
-            let mut buf: [c_char; 128] = [0; 128];
             let tFVal: f32;
 
-            crate::trap::Cvar_VariableStringBuffer(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs::new(
-                    cstr("timescale"),
-                    buf.as_mut_ptr(),
-                    buf.len() as c_int,
-                ),
-            );
+            let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "timescale", 128);
 
-            tFVal = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32;
+            tFVal = atof(&buf) as f32;
 
             if runningResist == qfalse {
                 (*client).ps.velocity = [0.0, 0.0, 0.0];
@@ -1734,15 +1725,15 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>,
             let ty = cstr_to_str(ctx.world.entity(self_).NPC_type);
             if (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_1 {
                 crate::g_main::Com_Printf(
-                    cstr(&format!("^2{} Saber Attack Set: fast\n", ty)).as_ptr(),
+                    &format!("^2{} Saber Attack Set: fast\n", ty),
                 );
             } else if (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_2 {
                 crate::g_main::Com_Printf(
-                    cstr(&format!("^3{} Saber Attack Set: medium\n", ty)).as_ptr(),
+                    &format!("^3{} Saber Attack Set: medium\n", ty),
                 );
             } else if (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_3 {
                 crate::g_main::Com_Printf(
-                    cstr(&format!("^1{} Saber Attack Set: strong\n", ty)).as_ptr(),
+                    &format!("^1{} Saber Attack Set: strong\n", ty),
                 );
             }
         }
@@ -3185,14 +3176,13 @@ pub fn Jedi_SaberBlockGo(
         }
         if d_jedi {
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "({}) evading attack from height {:.2}, zdiff: {:.2}, rightdot: {:.2}\n",
                     ctx.world.level.time,
                     hitloc[2] - ctx.world.entity(self_).r.absmin[2],
                     zdiff,
                     rightdot
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
@@ -3245,7 +3235,7 @@ pub fn Jedi_SaberBlockGo(
                                 evasionType = evasionType_t::EVASION_DUCK_PARRY;
                                 evaded = qtrue;
                                 if d_jedi {
-                                    crate::g_main::Com_Printf(cstr("duck ").as_ptr());
+                                    crate::g_main::Com_Printf("duck ");
                                 }
                             } else {
                                 duckChance = 6;
@@ -3253,7 +3243,7 @@ pub fn Jedi_SaberBlockGo(
                         }
                     }
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("UR block\n").as_ptr());
+                        crate::g_main::Com_Printf("UR block\n");
                     }
                 } else if rightdot < -12.0
                     || (rightdot < -3.0 && zdiff < 5.0)
@@ -3302,7 +3292,7 @@ pub fn Jedi_SaberBlockGo(
                                 evasionType = evasionType_t::EVASION_DUCK_PARRY;
                                 evaded = qtrue;
                                 if d_jedi {
-                                    crate::g_main::Com_Printf(cstr("duck ").as_ptr());
+                                    crate::g_main::Com_Printf("duck ");
                                 }
                             } else {
                                 duckChance = 6;
@@ -3310,7 +3300,7 @@ pub fn Jedi_SaberBlockGo(
                         }
                     }
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("UL block\n").as_ptr());
+                        crate::g_main::Com_Printf("UL block\n");
                     }
                 } else {
                     (*client).ps.saberBlocked = BLOCKED_TOP as c_int;
@@ -3319,7 +3309,7 @@ pub fn Jedi_SaberBlockGo(
                         duckChance = 4;
                     }
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("TOP block\n").as_ptr());
+                        crate::g_main::Com_Printf("TOP block\n");
                     }
                 }
                 evaded = qtrue;
@@ -3330,7 +3320,7 @@ pub fn Jedi_SaberBlockGo(
                     evasionType = evasionType_t::EVASION_DUCK;
                     evaded = qtrue;
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("duck ").as_ptr());
+                        crate::g_main::Com_Printf("duck ");
                     }
                 }
             }
@@ -3342,7 +3332,7 @@ pub fn Jedi_SaberBlockGo(
                 evasionType = evasionType_t::EVASION_DUCK;
                 evaded = qtrue;
                 if d_jedi {
-                    crate::g_main::Com_Printf(cstr("duck ").as_ptr());
+                    crate::g_main::Com_Printf("duck ");
                 }
             }
             if incoming.is_some() || saberBusy == qfalse {
@@ -3371,7 +3361,7 @@ pub fn Jedi_SaberBlockGo(
                         }
                     }
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("mid-UR block\n").as_ptr());
+                        crate::g_main::Com_Printf("mid-UR block\n");
                     }
                 } else if rightdot < -8.0 || (rightdot < -3.0 && zdiff < -11.0) {
                     if doDodge != qfalse {
@@ -3398,7 +3388,7 @@ pub fn Jedi_SaberBlockGo(
                         }
                     }
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("mid-UL block\n").as_ptr());
+                        crate::g_main::Com_Printf("mid-UL block\n");
                     }
                 } else {
                     (*client).ps.saberBlocked = BLOCKED_TOP as c_int;
@@ -3408,7 +3398,7 @@ pub fn Jedi_SaberBlockGo(
                         evasionType = evasionType_t::EVASION_PARRY;
                     }
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("mid-TOP block\n").as_ptr());
+                        crate::g_main::Com_Printf("mid-TOP block\n");
                     }
                 }
                 evaded = qtrue;
@@ -3425,20 +3415,20 @@ pub fn Jedi_SaberBlockGo(
                 evasionType = evasionType_t::EVASION_DUCK;
                 evaded = qtrue;
                 if d_jedi {
-                    crate::g_main::Com_Printf(cstr("legs up\n").as_ptr());
+                    crate::g_main::Com_Printf("legs up\n");
                 }
                 if incoming.is_some() || saberBusy == qfalse {
                     if rightdot >= 0.0 {
                         (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT as c_int;
                         evasionType = evasionType_t::EVASION_DUCK_PARRY;
                         if d_jedi {
-                            crate::g_main::Com_Printf(cstr("LR block\n").as_ptr());
+                            crate::g_main::Com_Printf("LR block\n");
                         }
                     } else {
                         (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT as c_int;
                         evasionType = evasionType_t::EVASION_DUCK_PARRY;
                         if d_jedi {
-                            crate::g_main::Com_Printf(cstr("LL block\n").as_ptr());
+                            crate::g_main::Com_Printf("LL block\n");
                         }
                     }
                     evaded = qtrue;
@@ -3463,7 +3453,7 @@ pub fn Jedi_SaberBlockGo(
                         evasionType = evasionType_t::EVASION_FJUMP;
                         evaded = qtrue;
                         if d_jedi {
-                            crate::g_main::Com_Printf(cstr("force jump + ").as_ptr());
+                            crate::g_main::Com_Printf("force jump + ");
                         }
                     }
                 } else {
@@ -3518,7 +3508,7 @@ pub fn Jedi_SaberBlockGo(
                         evasionType = evasionType_t::EVASION_JUMP;
                         evaded = qtrue;
                         if d_jedi {
-                            crate::g_main::Com_Printf(cstr("jump + ").as_ptr());
+                            crate::g_main::Com_Printf("jump + ");
                         }
                     }
                     if (*client).NPC_class == CLASS_TAVION {
@@ -3599,7 +3589,7 @@ pub fn Jedi_SaberBlockGo(
                             evasionType = evasionType_t::EVASION_PARRY;
                         }
                         if d_jedi {
-                            crate::g_main::Com_Printf(cstr("LR block\n").as_ptr());
+                            crate::g_main::Com_Printf("LR block\n");
                         }
                     } else {
                         (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT as c_int;
@@ -3609,7 +3599,7 @@ pub fn Jedi_SaberBlockGo(
                             evasionType = evasionType_t::EVASION_PARRY;
                         }
                         if d_jedi {
-                            crate::g_main::Com_Printf(cstr("LL block\n").as_ptr());
+                            crate::g_main::Com_Printf("LL block\n");
                         }
                     }
                     evaded = qtrue;
@@ -3622,13 +3612,13 @@ pub fn Jedi_SaberBlockGo(
                     (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT as c_int;
                     evasionType = evasionType_t::EVASION_PARRY;
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("LR block\n").as_ptr());
+                        crate::g_main::Com_Printf("LR block\n");
                     }
                 } else {
                     (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT as c_int;
                     evasionType = evasionType_t::EVASION_PARRY;
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("LL block\n").as_ptr());
+                        crate::g_main::Com_Printf("LL block\n");
                     }
                 }
                 if incoming.is_some()
@@ -3652,7 +3642,7 @@ pub fn Jedi_SaberBlockGo(
                             (*client).ps.fd.forceJumpCharge = 320.0;
                             evasionType = evasionType_t::EVASION_FJUMP;
                             if d_jedi {
-                                crate::g_main::Com_Printf(cstr("force jump + ").as_ptr());
+                                crate::g_main::Com_Printf("force jump + ");
                             }
                         }
                     } else {
@@ -3669,7 +3659,7 @@ pub fn Jedi_SaberBlockGo(
                             }
                             evasionType = evasionType_t::EVASION_JUMP_PARRY;
                             if d_jedi {
-                                crate::g_main::Com_Printf(cstr("jump + ").as_ptr());
+                                crate::g_main::Com_Printf("jump + ");
                             }
                         }
                     }
@@ -3840,14 +3830,14 @@ pub fn Jedi_SaberBlock(ctx: &mut GameContext, saberNum: c_int, bladeNum: c_int) 
             //too far away to actually hit him
             if d_jedi {
                 crate::g_main::Com_Printf(
-                    cstr(&format!("^1enemy saber dist: {:.2}\n", dist)).as_ptr(),
+                    &format!("^1enemy saber dist: {:.2}\n", dist),
                 );
             }
             crate::g_timer::TIMER_Set(ctx, ctx.entity_id_of(npc), c"parryTime".as_ptr(), -1);
             return qfalse;
         }
         if d_jedi {
-            crate::g_main::Com_Printf(cstr(&format!("^2enemy saber dist: {:.2}\n", dist)).as_ptr());
+            crate::g_main::Com_Printf(&format!("^2enemy saber dist: {:.2}\n", dist));
         }
 
         crate::q_math::_VectorSubtract(
@@ -3948,11 +3938,10 @@ pub fn Jedi_SaberBlock(ctx: &mut GameContext, saberNum: c_int, bladeNum: c_int) 
             );
             if d_jedi {
                 crate::g_main::Com_Printf(
-                    cstr(&format!(
+                    &format!(
                         "Keep parry choice until: {}\n",
                         ctx.world.level.time + parryReCalcTime
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             }
 
@@ -4307,7 +4296,7 @@ pub fn Jedi_EvasionSaber(
                         } else {
                             //strafed
                             if d_jedi {
-                                crate::g_main::Com_Printf(cstr("def strafe\n").as_ptr());
+                                crate::g_main::Com_Printf("def strafe\n");
                             }
                             if ((*npc_info).scriptFlags & SCF_NO_ACROBATICS) == 0
                                 && (*client).ps.fd.forceRageRecoveryTime < ctx.world.level.time
@@ -4969,7 +4958,7 @@ pub fn Jedi_CombatTimersUpdate(ctx: &mut GameContext, enemy_dist: c_int) {
                 //start a strafe
                 if Jedi_Strafe(ctx, 1000, 3000, 0, 4000, qtrue) != qfalse {
                     if d_jedi {
-                        crate::g_main::Com_Printf(cstr("off strafe\n").as_ptr());
+                        crate::g_main::Com_Printf("off strafe\n");
                     }
                 }
             } else {
@@ -6402,13 +6391,12 @@ pub fn NPC_Jedi_Pain(
         }
         if d_jedi {
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "({}) PAIN: agg {}, no parry until {}\n",
                     ctx.world.level.time,
                     unsafe { (*snpc).stats.aggression },
                     ctx.world.level.time + 500
-                ))
-                .as_ptr(),
+                ),
             );
         }
         if d_jedi {
@@ -6428,14 +6416,13 @@ pub fn NPC_Jedi_Pain(
 
             let absmin_z = ctx.world.entity(self_).r.absmin[2];
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "({}) saber hit at height {:.2}, zdiff: {:.2}, rightdot: {:.2}\n",
                     ctx.world.level.time,
                     point[2] - absmin_z,
                     zdiff,
                     rightdot
-                ))
-                .as_ptr(),
+                ),
             );
         }
     } else {

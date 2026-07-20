@@ -22,9 +22,6 @@ use crate::g_main::G_Printf;
 use crate::q_shared::Q_strcat;
 use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
-use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
-use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
 
 /// Raven `EV_EVENT_BIT1`.
 ///
@@ -40,14 +37,10 @@ pub const EV_EVENT_BIT2: c_int = 0x00000200;
 ///
 /// Source: `oracle/codemp/game/bg_public.h:730`
 pub const EV_EVENT_BITS: c_int = EV_EVENT_BIT1 | EV_EVENT_BIT2;
-use mp_abi::game::syscalls::G_ERROR::GErrorArgs;
 use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
-use mp_abi::game::syscalls::G_GET_CONFIGSTRING::GGetConfigstringArgs;
 use mp_abi::game::syscalls::G_ICARUS_FREEENT::GIcarusFreeentArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_LOCATE_GAME_DATA::GLocateGameDataArgs;
-use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
-use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_bg::public::entity_event::{entity_event_t, entity_event_t::*};
@@ -174,16 +167,13 @@ pub fn G_FindConfigstringIndex(
 
         // `MAX_STRING_CHARS` resolves via the crate prelude glob.
         let mut i = 1;
-        let mut s = [0 as c_char; MAX_STRING_CHARS];
+        let mut s;
         while i < max {
-            trap::GetConfigstring(
-                ctx.engine,
-                GGetConfigstringArgs::new(start + i, s.as_mut_ptr(), MAX_STRING_CHARS as c_int),
-            );
-            if s[0] == 0 {
+            s = trap::GetConfigstring(ctx.engine, start + i, MAX_STRING_CHARS);
+            if s.is_empty() {
                 break;
             }
-            if Q_strcmp(s.as_ptr(), name) == 0 {
+            if Q_strcmp(cstr(&s).as_ptr(), name) == 0 {
                 return i;
             }
             i += 1;
@@ -194,16 +184,10 @@ pub fn G_FindConfigstringIndex(
         }
 
         if i == max {
-            trap::Error(
-                ctx.engine,
-                GErrorArgs::new(CString::new("G_FindConfigstringIndex: overflow").unwrap()),
-            );
+            trap::Error(ctx.engine, "G_FindConfigstringIndex: overflow");
         }
 
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(start + i, CStr::from_ptr(name).to_owned()),
-        );
+        trap::SetConfigstring(ctx.engine, start + i, &cstr_to_str(name));
 
         i
     }
@@ -302,10 +286,7 @@ pub fn G_TeamCommand(ctx: &mut GameContext, team: team_t, cmd: *mut c_char) {
         for i in 0..ctx.world.level.maxclients {
             let client = &ctx.world.clients[i as usize];
             if client.pers.connected == CON_CONNECTED && client.sess.sessionTeam == team {
-                trap::SendServerCommand(
-                    ctx.engine,
-                    GSendServerCommandArgs::new(i, CString::new(text.clone()).unwrap()),
-                );
+                trap::SendServerCommand(ctx.engine, i, &text);
             }
         }
     }
@@ -530,10 +511,7 @@ pub fn G_AllocateVehicleObject(ctx: &mut GameContext, pVeh: *mut *mut Vehicle_t)
             }
             i += 1;
         }
-        trap::Error(
-            ctx.engine,
-            GErrorArgs::new(CString::new("Ran out of vehicle pool slots.").unwrap()),
-        );
+        trap::Error(ctx.engine, "Ran out of vehicle pool slots.");
     }
 }
 
@@ -647,10 +625,7 @@ pub fn G_PickTarget(ctx: &mut GameContext, targetname: *mut c_char) -> *mut gent
 
     unsafe {
         if targetname.is_null() {
-            G_Printf(
-                ctx,
-                cstr("G_PickTarget called with NULL targetname\n").as_ptr(),
-            );
+            G_Printf(ctx, "G_PickTarget called with NULL targetname\n");
             return core::ptr::null_mut();
         }
 
@@ -677,7 +652,7 @@ pub fn G_PickTarget(ctx: &mut GameContext, targetname: *mut c_char) -> *mut gent
                 "G_PickTarget: target {} not found\n",
                 CStr::from_ptr(targetname).to_string_lossy()
             );
-            G_Printf(ctx, cstr(&msg).as_ptr());
+            G_Printf(ctx, &msg);
             return core::ptr::null_mut();
         }
 
@@ -752,10 +727,7 @@ pub fn G_UseTargets2(
         let f = (ctx.world.level.time as f64 * 0.001) as f32;
         AddRemap(ctx, tsn, tsnn, f);
         let config = BuildShaderStateConfig(ctx);
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_SHADERSTATE, unsafe { CStr::from_ptr(config) }.to_owned()),
-        );
+        trap::SetConfigstring(ctx.engine, CS_SHADERSTATE, unsafe { &cstr_to_str(config) });
     }
 
     if string.is_null() || unsafe { *string } == 0 {
@@ -776,16 +748,13 @@ pub fn G_UseTargets2(
         let t_id = ctx.entity_id_of(t);
 
         if t_id == Some(ent_id) {
-            G_Printf(ctx, cstr("WARNING: Entity used itself.\n").as_ptr());
+            G_Printf(ctx, "WARNING: Entity used itself.\n");
         } else if !ctx.world.entity(t_id.unwrap()).use_.is_none() {
             GlobalUse(ctx, t_id, Some(ent_id), activator);
         }
 
         if ctx.world.entity(ent_id).inuse == qfalse {
-            G_Printf(
-                ctx,
-                cstr("entity was removed while using targets\n").as_ptr(),
-            );
+            G_Printf(ctx, "entity was removed while using targets\n");
             return;
         }
     }
@@ -905,10 +874,7 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
         let mut numTempEntST = 0;
 
         let mut fh: fileHandle_t = 0;
-        trap::FS_FOpenFile(
-            ctx.engine,
-            GFsFopenFileArgs::new(CString::new("entspew.txt").unwrap(), &mut fh, FS_WRITE),
-        );
+        trap::FS_FOpenFile(ctx.engine, "entspew.txt", &mut fh, FS_WRITE);
 
         for i in 0..mp_qshared::shared::ENTITYNUM_MAX_NORMAL as usize {
             let ent = &ctx.world.g_entities[i];
@@ -928,13 +894,10 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
                         ent.s.number,
                         ent.s.eType - mp_bg::public::entity_type::entityType_t::ET_EVENTS as c_int
                     );
-                    Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(&s);
                     if fh != 0 {
                         let bytes = s.as_bytes();
-                        trap::FS_Write(
-                            ctx.engine,
-                            GFsWriteArgs::new(bytes.as_ptr(), bytes.len() as c_int, fh),
-                        );
+                        trap::FS_Write(ctx.engine, bytes, fh);
                     }
                 }
 
@@ -944,13 +907,10 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
                     "Unknown".to_string()
                 };
                 let s = format!("ENT {:4}: Classname {}\n", ent.s.number, className);
-                Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(&s);
                 if fh != 0 {
                     let bytes = s.as_bytes();
-                    trap::FS_Write(
-                        ctx.engine,
-                        GFsWriteArgs::new(bytes.as_ptr(), bytes.len() as c_int, fh),
-                    );
+                    trap::FS_Write(ctx.engine, bytes, fh);
                 }
             }
         }
@@ -959,14 +919,11 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
             "TempEnt count: {}\nTempEnt ST: {}\nNPC count: {}\nProjectile count: {}\n",
             numTempEnt, numTempEntST, numNPC, numProjectile
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         if fh != 0 {
             let bytes = s.as_bytes();
-            trap::FS_Write(
-                ctx.engine,
-                GFsWriteArgs::new(bytes.as_ptr(), bytes.len() as c_int, fh),
-            );
-            trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(fh));
+            trap::FS_Write(ctx.engine, bytes, fh);
+            trap::FS_FCloseFile(ctx.engine, fh);
         }
     }
 }
@@ -1007,10 +964,7 @@ pub fn G_Spawn(ctx: &mut GameContext) -> EntityId {
         }
         if i == mp_qshared::shared::ENTITYNUM_MAX_NORMAL {
             G_SpewEntList(ctx);
-            trap::Error(
-                ctx.engine,
-                GErrorArgs::new(CString::new("G_Spawn: no free entities").unwrap()),
-            );
+            trap::Error(ctx.engine, "G_Spawn: no free entities");
         }
 
         // open up a new slot
@@ -1069,10 +1023,7 @@ pub fn G_SendG2KillQueue(ctx: &mut GameContext) {
         i += 1;
     }
 
-    trap::SendServerCommand(
-        ctx.engine,
-        GSendServerCommandArgs::new(-1, CString::new(msg).unwrap()),
-    );
+    trap::SendServerCommand(ctx.engine, -1, &msg);
 
     // Clear the count because we just sent off the whole queue
     ctx.world.globals.gG2KillNum -= i;
@@ -1092,10 +1043,7 @@ pub fn G_KillG2Queue(ctx: &mut GameContext, entNum: c_int) {
         // This would be considered a Bad Thing. Since we're out of queue
         // slots, just send it now as a separate command (eats more
         // bandwidth, but we have no choice).
-        trap::SendServerCommand(
-            ctx.engine,
-            GSendServerCommandArgs::new(-1, CString::new(format!("kg2 {}", entNum)).unwrap()),
-        );
+        trap::SendServerCommand(ctx.engine, -1, &format!("kg2 {}", entNum));
         return;
     }
 
@@ -1225,13 +1173,7 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
 
         // make sure clientside loop sounds are killed on the tracker and client
         let trick = ctx.world.entity(ed_id).s.trickedentindex;
-        trap::SendServerCommand(
-            ctx.engine,
-            GSendServerCommandArgs::new(
-                -1,
-                CString::new(format!("kls {} {}", trick, ed_number)).unwrap(),
-            ),
-        );
+        trap::SendServerCommand(ctx.engine, -1, &format!("kls {} {}", trick, ed_number));
     }
 
     let ed_ptr = ctx.world.entity_mut(ed_id) as *mut gentity_t;
@@ -1445,7 +1387,7 @@ pub fn G_AddEvent(ent: &mut gentity_t, event: c_int, eventParm: c_int) {
             world: unsafe { &mut *crate::g_strap::strap_world() },
             engine: crate::g_strap::strap_engine(),
         };
-        G_Printf(&mut ctx, cstr(&msg).as_ptr());
+        G_Printf(&mut ctx, &msg);
         return;
     }
 

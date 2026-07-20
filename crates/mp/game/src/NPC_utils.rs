@@ -65,11 +65,9 @@ use crate::NPC_senses::{
     G_ClearLOS, G_ClearLOS2, G_ClearLOS3, G_ClearLOS4, G_ClearLOS5, InFOV, NPC_CheckAlertEvents,
 };
 use crate::NPC_sounds::G_AddVoiceEvent;
-use core::ffi::CStr;
 use mp_qshared::shared::force_powers::FP_SPEED;
-use native_string::atof::atof_bytes;
+use native_string::atof::atof;
 
-use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
 use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
@@ -352,16 +350,8 @@ pub fn NPC_UpdateAngles(ctx: &mut GameContext, doPitch: qboolean, doYaw: qboolea
         if ctx.world.entity(npc_id).s.weapon == WP_SABER
             && ((*npc_client).ps.fd.forcePowersActive & (1 << (FP_SPEED as c_int))) != 0
         {
-            let mut buf = [0 as c_char; 128];
-            trap::Cvar_VariableStringBuffer(
-                ctx.engine,
-                GCvarVariableStringBufferArgs::new(
-                    std::ffi::CString::new("timescale").unwrap(),
-                    buf.as_mut_ptr(),
-                    buf.len() as c_int,
-                ),
-            );
-            let t_f_val = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes());
+            let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "timescale", 128);
+            let t_f_val = atof(&buf);
             yaw_speed *= 1.0 / (t_f_val as f32);
         }
 
@@ -801,9 +791,7 @@ pub fn NPC_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_char
             // didn't find it, create it
             match first_free {
                 None => {
-                    let msg =
-                        std::ffi::CString::new("WARNING: NPC has no free bone indexes\n").unwrap();
-                    crate::g_main::Com_Printf(msg.as_ptr());
+                    crate::g_main::Com_Printf("WARNING: NPC has no free bone indexes\n");
                     return;
                 }
                 Some(s) => {
@@ -898,7 +886,7 @@ pub fn NPC_SetSurfaceOnOff(
             "WARNING: Tried to toggle NPC surface that isn't in toggleable surface list ({})\n",
             unsafe { cstr_to_str(surfaceName) }
         );
-        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+        crate::g_main::Com_Printf(&msg);
         return;
     }
 

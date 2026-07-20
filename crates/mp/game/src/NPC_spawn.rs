@@ -1104,11 +1104,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         if newent.is_null() {
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: NPC G_Spawn failed\n",
                     S_COLOR_RED.to_string_lossy()
-                ))
-                .as_ptr(),
+                ),
             );
             return core::ptr::null_mut();
         }
@@ -1118,11 +1117,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         (*newent).NPC = New_NPC_t(ctx, (*newent).s.number);
         if (*newent).NPC.is_null() {
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: NPC G_Alloc NPC failed\n",
                     S_COLOR_RED.to_string_lossy()
-                ))
-                .as_ptr(),
+                ),
             );
             // Raven: goto finish; (unreachable `return NULL;` right after — the
             // goto always wins). Preserve control-flow, not shape (§C10).
@@ -1156,11 +1154,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         if (*newent).client.is_null() {
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: NPC BG_Alloc client failed\n",
                     S_COLOR_RED.to_string_lossy()
-                ))
-                .as_ptr(),
+                ),
             );
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(&mut *(ent), save_org);
@@ -1258,12 +1255,11 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 }
                 _ => {
                     crate::g_main::Com_Printf(
-                        cstr(&format!(
+                        &format!(
                             "{} ERROR: Couldn't spawn NPC {}\n",
                             S_COLOR_RED.to_string_lossy(),
                             cstr_to_str((*ent).NPC_type as *const c_char)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
                     crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
@@ -1319,12 +1315,11 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         ) == qfalse
         {
             crate::g_main::Com_Printf(
-                cstr(&format!(
+                &format!(
                     "{} ERROR: Couldn't spawn NPC {}\n",
                     S_COLOR_RED.to_string_lossy(),
                     cstr_to_str((*ent).NPC_type as *const c_char)
-                ))
-                .as_ptr(),
+                ),
             );
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
@@ -2685,7 +2680,7 @@ pub fn NPC_SpawnType(
     let npc_spawner = ctx.entity_mut(npc_spawner_eid) as *mut gentity_t;
 
     if npc_spawner.is_null() {
-        Com_Printf(c"NPC_Spawn Error: Out of entities!\n".as_ptr() as *const c_char);
+        Com_Printf("NPC_Spawn Error: Out of entities!\n");
         return std::ptr::null_mut();
     }
 
@@ -2700,7 +2695,7 @@ pub fn NPC_SpawnType(
 
     unsafe {
         if (*npc_type) == b'\0' as c_char {
-            Com_Printf(c"Error, expected one of:\n NPC spawn [NPC type (from ext_data/NPCs)]\n NPC spawn vehicle [VEH type (from ext_data/vehicles)]\n".as_ptr() as *const c_char);
+            Com_Printf("Error, expected one of:\n NPC spawn [NPC type (from ext_data/NPCs)]\n NPC spawn vehicle [VEH type (from ext_data/vehicles)]\n");
             return std::ptr::null_mut();
         }
     }
@@ -2844,57 +2839,29 @@ pub fn NPC_SpawnType(
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4020-4039`
 pub fn NPC_Spawn_f(ctx: &mut GameContext, ent: EntityId) {
-    let mut npc_type: [u8; 1024] = [0; 1024];
-    let mut targetname: [u8; 1024] = [0; 1024];
+    let mut npc_type: [c_char; 1024] = [0; 1024];
+    let mut targetname: [c_char; 1024] = [0; 1024];
     let mut is_vehicle = 0u32;
 
-    trap::Argv(
-        ctx.engine,
-        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
-            2,
-            npc_type.as_mut_ptr() as *mut c_char,
-            1024,
-        ),
-    );
+    let arg2 = trap::Argv(ctx.engine, 2, 1024);
+    write_cstr_field(&mut npc_type, &arg2);
 
-    if Q_stricmp(
-        c"vehicle".as_ptr() as *const c_char,
-        npc_type.as_ptr() as *const c_char,
-    ) == 0
-    {
+    if Q_stricmp(c"vehicle".as_ptr() as *const c_char, npc_type.as_ptr()) == 0 {
         is_vehicle = 1;
-        trap::Argv(
-            ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
-                3,
-                npc_type.as_mut_ptr() as *mut c_char,
-                1024,
-            ),
-        );
-        trap::Argv(
-            ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
-                4,
-                targetname.as_mut_ptr() as *mut c_char,
-                1024,
-            ),
-        );
+        let arg3 = trap::Argv(ctx.engine, 3, 1024);
+        write_cstr_field(&mut npc_type, &arg3);
+        let arg4 = trap::Argv(ctx.engine, 4, 1024);
+        write_cstr_field(&mut targetname, &arg4);
     } else {
-        trap::Argv(
-            ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
-                3,
-                targetname.as_mut_ptr() as *mut c_char,
-                1024,
-            ),
-        );
+        let arg3 = trap::Argv(ctx.engine, 3, 1024);
+        write_cstr_field(&mut targetname, &arg3);
     }
 
     NPC_SpawnType(
         ctx,
         Some(ent),
-        npc_type.as_mut_ptr() as *mut c_char,
-        targetname.as_mut_ptr() as *mut c_char,
+        npc_type.as_mut_ptr(),
+        targetname.as_mut_ptr(),
         (is_vehicle) as i32,
     );
 }
@@ -2906,53 +2873,39 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
     // Raven `TeamNames[TEAM_NUM_TEAMS]` (NPC_stats.c:133), the NPC team_t names
     // (the many commented-out Trek-era entries collapse to these three).
     const TEAM_NAMES: [&str; TEAM_NUM_TEAMS as usize] = ["", "player", "enemy", "neutral"];
-    let mut name: [u8; 1024] = [0; 1024];
+    let mut name: [c_char; 1024] = [0; 1024];
     let mut kill_team: team_t = TEAM_FREE;
     let mut kill_non_sf = 0u32;
 
-    trap::Argv(
-        ctx.engine,
-        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, name.as_mut_ptr() as *mut c_char, 1024),
-    );
+    let arg2 = trap::Argv(ctx.engine, 2, 1024);
+    write_cstr_field(&mut name, &arg2);
 
-    if name[0] == b'\0' as u8 {
-        Com_Printf(c"Error, Expected:\n".as_ptr() as *const c_char);
+    if name[0] == 0 {
+        Com_Printf("Error, Expected:\n");
         Com_Printf(
-            c"NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n".as_ptr()
-                as *const c_char,
+            "NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n",
         );
-        Com_Printf(c"or\n".as_ptr() as *const c_char);
-        Com_Printf(c"NPC kill 'all' - kills all NPCs\n".as_ptr() as *const c_char);
-        Com_Printf(c"or\n".as_ptr() as *const c_char);
-        Com_Printf(c"NPC team '[teamname]' - kills all NPCs of a certain team ('nonally' is all but your allies)\n".as_ptr() as *const c_char);
+        Com_Printf("or\n");
+        Com_Printf("NPC kill 'all' - kills all NPCs\n");
+        Com_Printf("or\n");
+        Com_Printf("NPC team '[teamname]' - kills all NPCs of a certain team ('nonally' is all but your allies)\n");
         return;
     }
 
-    if Q_stricmp(
-        c"team".as_ptr() as *const c_char,
-        name.as_ptr() as *const c_char,
-    ) == 0
-    {
-        trap::Argv(
-            ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
-                3,
-                name.as_mut_ptr() as *mut c_char,
-                1024,
-            ),
-        );
+    if Q_stricmp(c"team".as_ptr() as *const c_char, name.as_ptr()) == 0 {
+        let arg3 = trap::Argv(ctx.engine, 3, 1024);
+        write_cstr_field(&mut name, &arg3);
 
-        if name[0] == b'\0' as u8 {
+        if name[0] == 0 {
             Com_Printf(
-                c"NPC_Kill Error: 'npc kill team' requires a team name!\n".as_ptr()
-                    as *const c_char,
+                "NPC_Kill Error: 'npc kill team' requires a team name!\n",
             );
-            Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
+            Com_Printf("Valid team names are:\n");
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                 // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
-                Com_Printf(cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr());
+                Com_Printf(&format!("{}\n", TEAM_NAMES[n as usize]));
             }
-            Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
+            Com_Printf("nonally - kills all but your teammates\n");
             return;
         }
 
@@ -2970,18 +2923,17 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
 
             if kill_team == TEAM_FREE {
                 Com_Printf(
-                    cstr(&format!(
+                    &format!(
                         "NPC_Kill Error: team '{}' not recognized\n",
                         unsafe { cstr_to_str(name.as_ptr() as *const c_char) }
-                    ))
-                    .as_ptr(),
+                    ),
                 );
-                Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
+                Com_Printf("Valid team names are:\n");
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                     // Raven `TeamNames[]` (NPC_stats.c:133) — the NPC team_t names.
-                    Com_Printf(cstr(&format!("{}\n", TEAM_NAMES[n as usize])).as_ptr());
+                    Com_Printf(&format!("{}\n", TEAM_NAMES[n as usize]));
                 }
-                Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
+                Com_Printf("nonally - kills all but your teammates\n");
                 return;
             }
         }
@@ -3002,12 +2954,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
             if !player.client.is_null() {
                 if unsafe { (*(player.client)).playerTeam } != NPCTEAM_PLAYER {
                     Com_Printf(
-                        cstr(&format!(
+                        &format!(
                             "Killing NPC {} named {}\n",
                             unsafe { cstr_to_str(player.NPC_type as *const c_char) },
                             unsafe { cstr_to_str(player.targetname as *const c_char) }
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     player.health = 0;
 
@@ -3034,12 +2985,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                             != 0
                     {
                         Com_Printf(
-                            cstr(&format!(
+                            &format!(
                                 "Removing NPC spawner {} with NPC named {}\n",
                                 cstr_to_str(player.NPC_type as *const c_char),
                                 cstr_to_str(player.NPC_targetname as *const c_char)
-                            ))
-                            .as_ptr(),
+                            ),
                         );
                         // STAGE-1: raw pointer cast ends the `player` borrow before
                         // re-entering `ctx` (Stage-2 debt).
@@ -3052,12 +3002,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
             if kill_team != TEAM_FREE {
                 if unsafe { (*(player.client)).playerTeam } == kill_team {
                     Com_Printf(
-                        cstr(&format!(
+                        &format!(
                             "Killing NPC {} named {}\n",
                             unsafe { cstr_to_str(player.NPC_type as *const c_char) },
                             unsafe { cstr_to_str(player.targetname as *const c_char) }
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     player.health = 0;
                     if let Some(die_fn) = player.die.get() {
@@ -3082,12 +3031,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                 ) == 0
             {
                 Com_Printf(
-                    cstr(&format!(
+                    &format!(
                         "Killing NPC {} named {}\n",
                         unsafe { cstr_to_str(player.NPC_type as *const c_char) },
                         unsafe { cstr_to_str(player.targetname as *const c_char) }
-                    ))
-                    .as_ptr(),
+                    ),
                 );
                 player.health = 0;
                 unsafe {
@@ -3111,12 +3059,11 @@ pub fn NPC_PrintScore(ctx: &mut GameContext, ent: EntityId) {
     let client = ctx.world.entity(ent).client;
     let score = unsafe { (*client).ps.persistant[PERS_SCORE as usize] };
     Com_Printf(
-        cstr(&format!(
+        &format!(
             "{}: {}\n",
             unsafe { cstr_to_str(targetname as *const c_char) },
             score
-        ))
-        .as_ptr(),
+        ),
     );
 }
 
@@ -3124,23 +3071,20 @@ pub fn NPC_PrintScore(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4183-4243`
 pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
-    let mut cmd: [u8; 1024] = [0; 1024];
+    let mut cmd: [c_char; 1024] = [0; 1024];
 
-    trap::Argv(
-        ctx.engine,
-        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, cmd.as_mut_ptr() as *mut c_char, 1024),
-    );
+    let arg1 = trap::Argv(ctx.engine, 1, 1024);
+    write_cstr_field(&mut cmd, &arg1);
 
-    if cmd[0] == b'\0' as u8 {
-        Com_Printf(c"Valid NPC commands are:\n".as_ptr() as *const c_char);
-        Com_Printf(c" spawn [NPC type (from NCPCs.cfg)]\n".as_ptr() as *const c_char);
+    if cmd[0] == 0 {
+        Com_Printf("Valid NPC commands are:\n");
+        Com_Printf(" spawn [NPC type (from NCPCs.cfg)]\n");
         Com_Printf(
-            c" kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n".as_ptr()
-                as *const c_char,
+            " kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n",
         );
-        Com_Printf(c" showbounds (draws exact bounding boxes of NPCs)\n".as_ptr() as *const c_char);
+        Com_Printf(" showbounds (draws exact bounding boxes of NPCs)\n");
         Com_Printf(
-            c" score [NPC targetname] (prints number of kills per NPC)\n".as_ptr() as *const c_char,
+            " score [NPC targetname] (prints number of kills per NPC)\n",
         );
     } else if Q_stricmp(
         c"spawn".as_ptr() as *const c_char,
@@ -3169,19 +3113,13 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
         cmd.as_ptr() as *const c_char,
     ) == 0
     {
-        let mut cmd2: [u8; 1024] = [0; 1024];
-        trap::Argv(
-            ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
-                2,
-                cmd2.as_mut_ptr() as *mut c_char,
-                1024,
-            ),
-        );
+        let mut cmd2: [c_char; 1024] = [0; 1024];
+        let arg2 = trap::Argv(ctx.engine, 2, 1024);
+        write_cstr_field(&mut cmd2, &arg2);
 
-        if cmd2[0] == b'\0' as u8 {
+        if cmd2[0] == 0 {
             // Show the score for all NPCs
-            Com_Printf(c"SCORE LIST:\n".as_ptr() as *const c_char);
+            Com_Printf("SCORE LIST:\n");
             for i in 0..ENTITYNUM_WORLD as usize {
                 let player = ctx.world.g_entities.get(i);
                 if player.is_none() || player.unwrap().client.is_null() {
@@ -3201,10 +3139,9 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
                 NPC_PrintScore(ctx, ctx.entity_id_of(found_ent).unwrap());
             } else {
                 Com_Printf(
-                    cstr(&format!("ERROR: NPC score - no such NPC {}\n", unsafe {
+                    &format!("ERROR: NPC score - no such NPC {}\n", unsafe {
                         cstr_to_str(cmd2.as_ptr() as *const c_char)
-                    }))
-                    .as_ptr(),
+                    }),
                 );
             }
         }

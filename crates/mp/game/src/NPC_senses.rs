@@ -1244,13 +1244,10 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
 pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
     if ctx.world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
         // ERROR: Too many interest points, limit is MAX_INTEREST_POINTS
-        Com_Printf(
-            cstr(&format!(
-                "ERROR:  Too many interest points, limit is {}\n",
-                MAX_INTEREST_POINTS as c_int
-            ))
-            .as_ptr(),
-        );
+        Com_Printf(&format!(
+            "ERROR:  Too many interest points, limit is {}\n",
+            MAX_INTEREST_POINTS as c_int
+        ));
         G_FreeEntity(ctx, Some(self_));
         return;
     }

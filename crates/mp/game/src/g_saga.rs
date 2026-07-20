@@ -41,7 +41,6 @@ use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
 use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
-use std::ffi::CString;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at call sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -101,13 +100,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(ctx: &mut GameContext, team: c_int) {
 ///
 /// Source: `oracle/codemp/game/g_saga.c:91-94`
 pub fn SiegeSetCompleteData(ctx: &mut GameContext, team: c_int) {
-    trap::SetConfigstring(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-            CS_SIEGE_WINTEAM,
-            cstr(&format!("{}", team)),
-        ),
-    );
+    trap::SetConfigstring(ctx.engine, CS_SIEGE_WINTEAM, &format!("{}", team));
 }
 
 /// Raven `InitSiegeMode`.
@@ -146,29 +139,15 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 if ctx.world.globals.g_siegePersistant.beatingTime != 0 {
                     trap::SetConfigstring(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_SIEGE_TIMEOVERRIDE,
-                            cstr(&format!("{}", ctx.world.globals.g_siegePersistant.lastTime)),
-                        ),
+                        CS_SIEGE_TIMEOVERRIDE,
+                        &format!("{}", ctx.world.globals.g_siegePersistant.lastTime),
                     );
                 } else {
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_SIEGE_TIMEOVERRIDE,
-                            cstr("0"),
-                        ),
-                    );
+                    trap::SetConfigstring(ctx.engine, CS_SIEGE_TIMEOVERRIDE, "0");
                 }
             } else {
                 // hmm, ok, nothing.
-                trap::SetConfigstring(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_SIEGE_TIMEOVERRIDE,
-                        cstr("0"),
-                    ),
-                );
+                trap::SetConfigstring(ctx.engine, CS_SIEGE_TIMEOVERRIDE, "0");
             }
 
             ctx.world.globals.imperial_goals_completed = 0;
@@ -176,12 +155,10 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
             trap::Cvar_Register(
                 ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
-                    &mut mapname as *mut vmCvar_t,
-                    CString::new("mapname").unwrap(),
-                    CString::new("").unwrap(),
-                    CVAR_SERVERINFO | CVAR_ROM,
-                ),
+                Some(&mut mapname),
+                "mapname",
+                "",
+                CVAR_SERVERINFO | CVAR_ROM,
             );
 
             let levelname_s = format!(
@@ -193,15 +170,8 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 break 'body;
             }
 
-            let levelname_c = CString::new(levelname_s.trim_end_matches('\0')).unwrap();
-            len = trap::FS_FOpenFile(
-                ctx.engine,
-                mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs::new(
-                    levelname_c,
-                    &mut f,
-                    FS_READ,
-                ),
-            );
+            let levelname_c = levelname_s.trim_end_matches('\0');
+            len = trap::FS_FOpenFile(ctx.engine, levelname_c, &mut f, FS_READ);
 
             if f == 0 || len >= MAX_SIEGE_INFO_SIZE {
                 break 'body;
@@ -209,17 +179,11 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
             trap::FS_Read(
                 ctx.engine,
-                mp_abi::game::syscalls::G_FS_READ::GFsReadArgs::new(
-                    ctx.world.bg_state.siege_info.as_mut_ptr() as *mut u8,
-                    len,
-                    f,
-                ),
+                &mut ctx.world.bg_state.siege_info[..len as usize],
+                f,
             );
 
-            trap::FS_FCloseFile(
-                ctx.engine,
-                mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs::new(f),
-            );
+            trap::FS_FCloseFile(ctx.engine, f);
 
             ctx.world.bg_state.siege_valid = 1;
 
@@ -279,7 +243,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                     );
                 }
             } else {
-                G_Error(ctx, cstr("Siege teams not defined").as_ptr());
+                G_Error(ctx, "Siege teams not defined");
             }
 
             if BG_SiegeGetValueGroup(
@@ -296,10 +260,8 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 {
                     trap::Cvar_Set(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                            CString::new("team2_icon").unwrap(),
-                            CString::new(cstr_from_chars(&teamIcon).to_bytes()).unwrap(),
-                        ),
+                        "team2_icon",
+                        &cstr_from_chars(&teamIcon).to_string_lossy(),
                     );
                 }
 
@@ -352,10 +314,8 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 {
                     trap::Cvar_Set(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                            CString::new("team1_icon").unwrap(),
-                            CString::new(cstr_from_chars(&teamIcon).to_bytes()).unwrap(),
-                        ),
+                        "team1_icon",
+                        &cstr_from_chars(&teamIcon).to_string_lossy(),
                     );
                 }
 
@@ -374,7 +334,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 ) != 0
                 {
                     if ctx.world.globals.rebel_time_limit != 0 {
-                        crate::g_main::Com_Printf(cstr("Tried to set imperial time limit, but there's already a rebel time limit!\nOnly one team can have a time limit.\n").as_ptr());
+                        crate::g_main::Com_Printf("Tried to set imperial time limit, but there's already a rebel time limit!\nOnly one team can have a time limit.\n");
                     } else {
                         ctx.world.globals.imperial_time_limit = atoi(goalreq.as_ptr()) * 1000;
                         if ctx.world.cvars.g_siegeTeamSwitch.integer != 0
@@ -406,10 +366,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             );
 
             if ctx.world.bg_state.bgNumSiegeClasses == 0 {
-                G_Error(
-                    ctx,
-                    cstr("Couldn't find any player classes for Siege").as_ptr(),
-                );
+                G_Error(ctx, "Couldn't find any player classes for Siege");
             }
 
             // Now load the teams since we have class data.
@@ -419,10 +376,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             );
 
             if ctx.world.bg_state.bgNumSiegeTeams == 0 {
-                G_Error(
-                    ctx,
-                    cstr("Couldn't find any player teams for Siege").as_ptr(),
-                );
+                G_Error(ctx, "Couldn't find any player teams for Siege");
             }
 
             // Get and set the team themes for each team.
@@ -505,13 +459,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             }
             write_cstr_field(&mut ctx.world.globals.gObjectiveCfgStr, &cfg);
 
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SIEGE_OBJECTIVES,
-                    cstr(&cfg),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_SIEGE_OBJECTIVES, &cfg);
 
             // precache saber data for classes that use sabers on both teams
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
@@ -610,10 +558,8 @@ pub fn G_SiegeSetObjectiveComplete(
         // Now re-update the configstring.
         trap::SetConfigstring(
             ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_SIEGE_OBJECTIVES,
-                cstr(&cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr).to_string_lossy()),
-            ),
+            CS_SIEGE_OBJECTIVES,
+            &cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr).to_string_lossy(),
         );
     }
 }
@@ -718,10 +664,7 @@ pub fn UseSiegeTarget(
         };
         if t == ent {
             // G_Printf("WARNING: Entity used itself.\n") — no format args.
-            crate::g_main::G_Printf(
-                ctx,
-                b"WARNING: Entity used itself.\n\0".as_ptr() as *const c_char,
-            );
+            crate::g_main::G_Printf(ctx, "WARNING: Entity used itself.\n");
         } else if !ctx.world.entity(t_id).use_.is_none() {
             GlobalUse(ctx, t, ent, ent);
         }
@@ -730,10 +673,7 @@ pub fn UseSiegeTarget(
         // the `Some` guard preserves the defined path (porting-rules §19).
         if let Some(ent_id) = ent {
             if ctx.world.entity(ent_id).inuse == 0 {
-                crate::g_main::G_Printf(
-                    ctx,
-                    b"entity was removed while using targets\n\0".as_ptr() as *const c_char,
-                );
+                crate::g_main::G_Printf(ctx, "entity was removed while using targets\n");
                 return;
             }
         }
@@ -963,10 +903,8 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
 
         trap::SetConfigstring(
             ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_SIEGE_STATE,
-                cstr(&format!("3|{}", ctx.world.level.time)),
-            ),
+            CS_SIEGE_STATE,
+            &format!("3|{}", ctx.world.level.time),
         ); // ended
         ctx.world.globals.gSiegeRoundBegun = qfalse;
         ctx.world.globals.gSiegeRoundEnded = qtrue;
@@ -1104,17 +1042,8 @@ pub fn G_ValidateSiegeClassForTeam(ctx: &mut GameContext, ent: EntityId, team: c
 /// Source: `oracle/codemp/game/g_saga.c:787-834`
 pub fn SetTeamQuick(ctx: &mut GameContext, ent: EntityId, team: c_int, doBegin: qboolean) {
     unsafe {
-        let mut userinfo: [c_char; MAX_INFO_STRING] = [0; MAX_INFO_STRING];
-
         let ent_num = ctx.world.entity(ent).s.number;
-        trap::GetUserinfo(
-            ctx.engine,
-            mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                ent_num,
-                userinfo.as_mut_ptr(),
-                userinfo.len() as c_int,
-            ),
-        );
+        let mut userinfo = trap::GetUserinfo(ctx.engine, ent_num, MAX_INFO_STRING);
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             G_ValidateSiegeClassForTeam(ctx, ent, team);
@@ -1127,39 +1056,19 @@ pub fn SetTeamQuick(ctx: &mut GameContext, ent: EntityId, team: c_int, doBegin: 
 
         if team == TEAM_SPECTATOR {
             (*cl).sess.spectatorState = spectatorState_t::SPECTATOR_FREE;
-            Info_SetValueForKey(
-                userinfo.as_mut_ptr(),
-                b"team\0".as_ptr() as *const c_char,
-                b"s\0".as_ptr() as *const c_char,
-            );
+            Info_SetValueForKey(&mut userinfo, "team", "s");
         } else {
             (*cl).sess.spectatorState = spectatorState_t::SPECTATOR_NOT;
             if team == TEAM_RED {
-                Info_SetValueForKey(
-                    userinfo.as_mut_ptr(),
-                    b"team\0".as_ptr() as *const c_char,
-                    b"r\0".as_ptr() as *const c_char,
-                );
+                Info_SetValueForKey(&mut userinfo, "team", "r");
             } else if team == TEAM_BLUE {
-                Info_SetValueForKey(
-                    userinfo.as_mut_ptr(),
-                    b"team\0".as_ptr() as *const c_char,
-                    b"b\0".as_ptr() as *const c_char,
-                );
+                Info_SetValueForKey(&mut userinfo, "team", "b");
             } else {
-                Info_SetValueForKey(
-                    userinfo.as_mut_ptr(),
-                    b"team\0".as_ptr() as *const c_char,
-                    b"?\0".as_ptr() as *const c_char,
-                );
+                Info_SetValueForKey(&mut userinfo, "team", "?");
             }
         }
 
-        let info_cstring = std::ffi::CString::new(cstr_from_chars(&userinfo).to_bytes()).unwrap();
-        trap::SetUserinfo(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(ent_num, info_cstring),
-        );
+        trap::SetUserinfo(ctx.engine, ent_num, &userinfo);
 
         (*cl).sess.spectatorClient = 0;
 
@@ -1261,10 +1170,8 @@ pub fn SiegeBeginRound(ctx: &mut GameContext, entNum: c_int) {
 
         trap::SetConfigstring(
             ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_SIEGE_STATE,
-                cstr(&format!("0|{}", ctx.world.level.time)),
-            ),
+            CS_SIEGE_STATE,
+            &format!("0|{}", ctx.world.level.time),
         ); // we're ready to g0g0g0
     }
 }
@@ -1364,13 +1271,7 @@ pub fn SiegeCheckTimers(ctx: &mut GameContext) {
             if numTeam1 == 0 || numTeam2 == 0 {
                 // don't have people on both teams yet.
                 ctx.world.globals.gSiegeBeginTime = ctx.world.level.time + SIEGE_ROUND_BEGIN_TIME;
-                trap::SetConfigstring(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_SIEGE_STATE,
-                        cstr("1"),
-                    ),
-                ); // "waiting for players on both teams"
+                trap::SetConfigstring(ctx.engine, CS_SIEGE_STATE, "1"); // "waiting for players on both teams"
             } else if ctx.world.globals.gSiegeBeginTime < ctx.world.level.time {
                 // mark the round as having begun
                 ctx.world.globals.gSiegeRoundBegun = qtrue;
@@ -1382,12 +1283,10 @@ pub fn SiegeCheckTimers(ctx: &mut GameContext) {
             } else {
                 trap::SetConfigstring(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_SIEGE_STATE,
-                        cstr(&format!(
-                            "2|{}",
-                            ctx.world.globals.gSiegeBeginTime - SIEGE_ROUND_BEGIN_TIME
-                        )),
+                    CS_SIEGE_STATE,
+                    &format!(
+                        "2|{}",
+                        ctx.world.globals.gSiegeBeginTime - SIEGE_ROUND_BEGIN_TIME
                     ),
                 ); // getting ready to begin
             }
@@ -1577,7 +1476,7 @@ pub fn SP_info_siege_objective(ctx: &mut GameContext, ent: EntityId) {
             crate::g_utils::G_FreeEntity(ctx, Some(ent));
             crate::g_main::G_Printf(
                 ctx,
-                cstr("ERROR: info_siege_objective without an objective or side value\n").as_ptr(),
+                "ERROR: info_siege_objective without an objective or side value\n",
             );
             return;
         }
@@ -1799,8 +1698,7 @@ pub fn SP_info_siege_decomplete(ctx: &mut GameContext, ent: EntityId) {
             crate::g_utils::G_FreeEntity(ctx, Some(ent));
             crate::g_main::G_Printf(
                 ctx,
-                cstr("ERROR: info_siege_objective_decomplete without an objective or side value\n")
-                    .as_ptr(),
+                "ERROR: info_siege_objective_decomplete without an objective or side value\n",
             );
             return;
         }
@@ -2275,10 +2173,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
 
         let model = ctx.world.entity(ent).model;
         if model.is_null() || *model == 0 {
-            G_Error(
-                ctx,
-                cstr("You must specify a model for misc_siege_item types.").as_ptr(),
-            );
+            G_Error(ctx, "You must specify a model for misc_siege_item types.");
         }
 
         // G_Spawn* out-params can't alias `ctx` across the `ctx`-taking call, so
@@ -2641,10 +2536,8 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
         let msgtarg_num = ctx.world.entity(msgTarg).s.number;
         trap::SendServerCommand(
             ctx.engine,
-            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                msgtarg_num,
-                cstr(&cstr_from_chars(&str_buf).to_string_lossy()),
-            ),
+            msgtarg_num,
+            &cstr_from_chars(&str_buf).to_string_lossy(),
         );
     }
 }

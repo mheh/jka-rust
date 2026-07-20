@@ -17,8 +17,8 @@ use core::ffi::CStr;
 
 use crate::c_format::{c_vsprintf, FmtArg};
 use crate::prelude::*;
-use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING};
 use native_string::atof::atof_bytes;
+use native_string::info::InfoSetResult;
 
 // S5-5: the `QSharedScratch` type and the `QSharedScratch`-threaded
 // `COM_Parse*` family are canonical in `mp_qshared` now (below the bg tier so
@@ -93,8 +93,7 @@ unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
 
 /// Prints a fixed (no-interpolation) message via `Com_Printf`.
 unsafe fn com_printf_lit(msg: &str) {
-    let c = std::ffi::CString::new(msg).unwrap();
-    crate::g_main::Com_Printf(c.as_ptr());
+    crate::g_main::Com_Printf(msg);
 }
 
 /// Raven `GetIDForString`.
@@ -321,8 +320,7 @@ pub fn COM_ParseError(qs: &QSharedScratch, format: *mut c_char) {
         let parsename_str = cstr_from_chars(&qs.com_parsename).to_string_lossy();
         let com_lines = qs.com_lines;
         let msg = format!("ERROR: {}, line {}: {}", parsename_str, com_lines, fmt_str);
-        let c_msg = std::ffi::CString::new(msg).unwrap();
-        crate::g_main::Com_Printf(c_msg.as_ptr());
+        crate::g_main::Com_Printf(&msg);
     }
 }
 
@@ -339,8 +337,7 @@ pub fn COM_ParseWarning(qs: &QSharedScratch, format: *mut c_char) {
             "WARNING: {}, line {}: {}",
             parsename_str, com_lines, fmt_str
         );
-        let c_msg = std::ffi::CString::new(msg).unwrap();
-        crate::g_main::Com_Printf(c_msg.as_ptr());
+        crate::g_main::Com_Printf(&msg);
     }
 }
 
@@ -969,7 +966,7 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[F
         }
         if len as c_int >= size {
             let msg = format!("Com_sprintf: overflow of {} in {}\n", len, size);
-            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+            crate::g_main::Com_Printf(&msg);
         }
         // Q_strncpyz needs a NUL-terminated source; `bigbuffer` has no interior
         // NUL (the formatter never emits one), so append the terminator here.
@@ -999,358 +996,40 @@ pub fn va(qs: &mut QSharedScratch, format: *const c_char, args: &[FmtArg]) -> *m
     }
 }
 
-/// Raven `Info_ValueForKey`.
+/// Raven `Info_SetValueForKey` — value logic in [`native_string::info`];
+/// this shim reproduces the `Com_Printf` a rejected set emits.
 ///
-/// Source: `oracle/codemp/game/q_shared.c:1051-1098`
-pub fn Info_ValueForKey(
-    qs: &mut QSharedScratch,
-    s: *const c_char,
-    key: *const c_char,
-) -> *mut c_char {
-    unsafe {
-        let mut pkey: [c_char; 8192] = [0; 8192]; // BIG_INFO_KEY
-        let mut o: *mut c_char;
-
-        if s.is_null() || key.is_null() {
-            return c"".as_ptr() as *mut c_char;
-        }
-
-        if c_strlen(s) >= BIG_INFO_STRING {
-            // Raven guards on `BIG_INFO_STRING` (8192), not `MAX_INFO_STRING`;
-            // the port previously hard-coded 1024 (a divergence caught by the
-            // oracle slice's big-infostring case). Com_Error(ERR_DROP, ...) -> panic.
-            panic!("Info_ValueForKey: oversize infostring");
-        }
-
-        qs.info_valueindex ^= 1;
-        let mut p = s;
-        if *p == b'\\' as c_char {
-            p = p.offset(1);
-        }
-
-        loop {
-            o = pkey.as_mut_ptr();
-            while *p != b'\\' as c_char {
-                if *p == 0 {
-                    return c"".as_ptr() as *mut c_char;
-                }
-                if o.offset_from(pkey.as_ptr()) < 8191 {
-                    *o = *p;
-                    o = o.offset(1);
-                }
-                p = p.offset(1);
-            }
-            *o = 0;
-            p = p.offset(1);
-
-            o = qs.info_value[qs.info_valueindex as usize].as_mut_ptr();
-
-            while *p != b'\\' as c_char && *p != 0 {
-                if o.offset_from(qs.info_value[qs.info_valueindex as usize].as_ptr()) < 8191 {
-                    *o = *p;
-                    o = o.offset(1);
-                }
-                p = p.offset(1);
-            }
-            *o = 0;
-
-            // Raven matches the key case-INSENSITIVELY (`!Q_stricmp(key,pkey)`);
-            // the port previously used case-sensitive strcmp (a divergence
-            // caught by the oracle slice's "Name" vs "name" probe).
-            if crate::q_shared::Q_stricmp(key, pkey.as_ptr() as *const c_char) == 0 {
-                return qs.info_value[qs.info_valueindex as usize].as_mut_ptr();
-            }
-
-            if *p == 0 {
-                break;
-            }
-            p = p.offset(1);
-        }
-
-        c"".as_ptr() as *mut c_char
-    }
-}
-
-/// Raven `Info_NextPair`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:1108-1139`
-pub fn Info_NextPair(head: *mut *const c_char, key: *mut c_char, value: *mut c_char) {
-    unsafe {
-        let mut s = *head;
-
-        if *s == b'\\' as c_char {
-            s = s.offset(1);
-        }
-        *key = 0;
-        *value = 0;
-
-        let mut o = key;
-        loop {
-            if *s == b'\\' as c_char {
-                break;
-            }
-            if *s == 0 {
-                *o = 0;
-                *head = s;
-                return;
-            }
-            *o = *s;
-            o = o.offset(1);
-            s = s.offset(1);
-        }
-        *o = 0;
-        s = s.offset(1);
-
-        let mut o = value;
-        while *s != b'\\' as c_char && *s != 0 {
-            *o = *s;
-            o = o.offset(1);
-            s = s.offset(1);
-        }
-        *o = 0;
-
-        *head = s;
-    }
-}
-
-/// Raven `Info_RemoveKey`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:1147-1195`
-pub fn Info_RemoveKey(mut s: *mut c_char, key: *const c_char) {
-    unsafe {
-        if c_strlen(s as *const c_char) >= MAX_INFO_STRING {
-            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-            panic!("Info_RemoveKey: oversize infostring");
-        }
-
-        if !c_strchr(key, b'\\' as c_char).is_null() {
-            return;
-        }
-
-        loop {
-            let start = s;
-            let mut p = start as *const c_char;
-            if *p == b'\\' as c_char {
-                p = p.offset(1);
-            }
-            let mut pkey: Vec<c_char> = Vec::new();
-            loop {
-                if *p == b'\\' as c_char {
-                    break;
-                }
-                if *p == 0 {
-                    return;
-                }
-                pkey.push(*p);
-                p = p.offset(1);
-            }
-            pkey.push(0);
-            p = p.offset(1);
-
-            let mut value: Vec<c_char> = Vec::new();
-            loop {
-                if *p == b'\\' as c_char || *p == 0 {
-                    break;
-                }
-                if *p == 0 {
-                    return;
-                }
-                value.push(*p);
-                p = p.offset(1);
-            }
-            value.push(0);
-
-            if c_strcmp(key, pkey.as_ptr()) == 0 {
-                c_strcpy(start, p); // remove this part
-                return;
-            }
-
-            if *p == 0 {
-                return;
-            }
-            // advance `s` to just past this pair for the next iteration.
-            s = p as *mut c_char;
-        }
-    }
-}
-
-/// Raven `Info_RemoveKey_Big`.
-///
-/// Same shape as `Info_RemoveKey`; distinct oracle function (`BIG_INFO_*`
-/// bounds), kept as its own body per porting-rules §20 (duplicate, don't
-/// unify).
-/// Source: `oracle/codemp/game/q_shared.c:1202-1250`
-pub fn Info_RemoveKey_Big(s: *mut c_char, key: *const c_char) {
-    unsafe {
-        if c_strlen(s as *const c_char) >= BIG_INFO_STRING {
-            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-            panic!("Info_RemoveKey_Big: oversize infostring");
-        }
-
-        if !c_strchr(key, b'\\' as c_char).is_null() {
-            return;
-        }
-
-        let mut s = s;
-        loop {
-            let start = s;
-            let mut p = start as *const c_char;
-            if *p == b'\\' as c_char {
-                p = p.offset(1);
-            }
-            let mut pkey: Vec<c_char> = Vec::new();
-            loop {
-                if *p == b'\\' as c_char {
-                    break;
-                }
-                if *p == 0 {
-                    return;
-                }
-                pkey.push(*p);
-                p = p.offset(1);
-            }
-            pkey.push(0);
-            p = p.offset(1);
-
-            let mut value: Vec<c_char> = Vec::new();
-            loop {
-                if *p == b'\\' as c_char || *p == 0 {
-                    break;
-                }
-                if *p == 0 {
-                    return;
-                }
-                value.push(*p);
-                p = p.offset(1);
-            }
-            value.push(0);
-
-            if c_strcmp(key, pkey.as_ptr()) == 0 {
-                c_strcpy(start, p);
-                return;
-            }
-
-            if *p == 0 {
-                return;
-            }
-            s = p as *mut c_char;
-        }
-    }
-}
-
-/// Raven `Info_Validate`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:1263-1271`
-pub fn Info_Validate(s: *const c_char) -> qboolean {
-    unsafe {
-        if !c_strchr(s, b'"' as c_char).is_null() {
-            return qfalse;
-        }
-        if !c_strchr(s, b';' as c_char).is_null() {
-            return qfalse;
-        }
-        qtrue
-    }
-}
-
-/// Raven `Info_SetValueForKey`.
-///
-/// The `Com_sprintf(newi, sizeof(newi), "\\%s\\%s", key, value)` call has a
-/// statically-known 2-arg format, so it's inlined directly (mechanical
-/// identity) rather than routed through the parked variadic `Com_sprintf`.
 /// Source: `oracle/codemp/game/q_shared.c:1280-1319`
-pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_char) {
-    unsafe {
-        if c_strlen(s as *const c_char) >= MAX_INFO_STRING {
-            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-            panic!("Info_SetValueForKey: oversize infostring");
-        }
-
-        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
-        {
-            com_printf_lit("Can't use keys or values with a \\\n");
-            return;
-        }
-
-        if !c_strchr(key, b';' as c_char).is_null() || !c_strchr(value, b';' as c_char).is_null() {
-            com_printf_lit("Can't use keys or values with a semicolon\n");
-            return;
-        }
-
-        if !c_strchr(key, b'"' as c_char).is_null() || !c_strchr(value, b'"' as c_char).is_null() {
-            com_printf_lit("Can't use keys or values with a \"\n");
-            return;
-        }
-
-        crate::q_shared::Info_RemoveKey(s, key);
-        if value.is_null() || c_strlen(value) == 0 {
-            return;
-        }
-
-        let key_s = std::ffi::CStr::from_ptr(key).to_string_lossy();
-        let value_s = std::ffi::CStr::from_ptr(value).to_string_lossy();
-        let newi = format!("\\{key_s}\\{value_s}");
-        let s_s = std::ffi::CStr::from_ptr(s).to_string_lossy();
-
-        if newi.len() + s_s.len() > MAX_INFO_STRING {
-            com_printf_lit("Info string length exceeded\n");
-            return;
-        }
-
-        // strcat(newi, s); strcpy(s, newi);
-        let full = format!("{newi}{s_s}");
-        let cstr = std::ffi::CString::new(full).unwrap();
-        c_strcpy(s, cstr.as_ptr());
-    }
+pub fn Info_SetValueForKey(s: &mut String, key: &str, value: &str) {
+    let result = native_string::info::Info_SetValueForKey(s, key, value);
+    print_info_set_result(result, "Info string length exceeded\n");
 }
 
-/// Raven `Info_SetValueForKey_Big`.
+/// Raven `Info_SetValueForKey_Big` — value logic in [`native_string::info`]
+/// (appends where the non-Big form prepends); `Com_Printf` shim as above.
 ///
-/// Same shape as `Info_SetValueForKey` against `Info_RemoveKey_Big`/
-/// `BIG_INFO_STRING`; kept as its own body per porting-rules §20.
 /// Source: `oracle/codemp/game/q_shared.c:1328-1366`
-pub fn Info_SetValueForKey_Big(s: *mut c_char, key: *const c_char, value: *const c_char) {
+pub fn Info_SetValueForKey_Big(s: &mut String, key: &str, value: &str) {
+    let result = native_string::info::Info_SetValueForKey_Big(s, key, value);
+    print_info_set_result(result, "BIG Info string length exceeded\n");
+}
+
+/// The `Com_Printf` messages Raven prints on a rejected `Info_SetValueForKey`;
+/// only the length-exceeded text differs between the Big/non-Big forms.
+fn print_info_set_result(result: InfoSetResult, exceeded_msg: &str) {
     unsafe {
-        if c_strlen(s as *const c_char) >= BIG_INFO_STRING {
-            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-            panic!("Info_SetValueForKey: oversize infostring");
+        match result {
+            InfoSetResult::Set => {}
+            InfoSetResult::ContainsBackslash => {
+                com_printf_lit("Can't use keys or values with a \\\n");
+            }
+            InfoSetResult::ContainsSemicolon => {
+                com_printf_lit("Can't use keys or values with a semicolon\n");
+            }
+            InfoSetResult::ContainsQuote => {
+                com_printf_lit("Can't use keys or values with a \"\n");
+            }
+            InfoSetResult::LengthExceeded => com_printf_lit(exceeded_msg),
         }
-
-        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
-        {
-            com_printf_lit("Can't use keys or values with a \\\n");
-            return;
-        }
-
-        if !c_strchr(key, b';' as c_char).is_null() || !c_strchr(value, b';' as c_char).is_null() {
-            com_printf_lit("Can't use keys or values with a semicolon\n");
-            return;
-        }
-
-        if !c_strchr(key, b'"' as c_char).is_null() || !c_strchr(value, b'"' as c_char).is_null() {
-            com_printf_lit("Can't use keys or values with a \"\n");
-            return;
-        }
-
-        crate::q_shared::Info_RemoveKey_Big(s, key);
-        if value.is_null() || c_strlen(value) == 0 {
-            return;
-        }
-
-        let key_s = std::ffi::CStr::from_ptr(key).to_string_lossy();
-        let value_s = std::ffi::CStr::from_ptr(value).to_string_lossy();
-        let newi = format!("\\{key_s}\\{value_s}");
-        let s_s = std::ffi::CStr::from_ptr(s).to_string_lossy();
-
-        if newi.len() + s_s.len() > BIG_INFO_STRING {
-            com_printf_lit("BIG Info string length exceeded\n");
-            return;
-        }
-
-        // strcat(s, newi) — appends newi onto the end of s (note: reversed
-        // order vs. Info_SetValueForKey's strcat(newi, s)/strcpy(s, newi)).
-        let full = format!("{s_s}{newi}");
-        let cstr = std::ffi::CString::new(full).unwrap();
-        c_strcpy(s, cstr.as_ptr());
     }
 }

@@ -101,31 +101,6 @@ pub struct botSpawnQueue_t {
     pub spawnTime: c_int,
 }
 
-/// `char *g_botInfos[MAX_BOTS]` — bot info strings (`g_bot.c:9`). Newtype because
-/// a 1024-element array has no library `Default` impl (only arrays up to 32 elements do).
-/// Source: `oracle/codemp/game/g_bot.c:9`
-pub struct BotInfos(pub [*mut c_char; MAX_BOTS]);
-
-impl Default for BotInfos {
-    fn default() -> Self {
-        BotInfos([core::ptr::null_mut(); MAX_BOTS])
-    }
-}
-
-// Transparent indexing (`globals.g_botInfos[i]`) so call sites written
-// against a plain `[*mut c_char; MAX_BOTS]` need no change.
-impl core::ops::Index<usize> for BotInfos {
-    type Output = *mut c_char;
-    fn index(&self, i: usize) -> &*mut c_char {
-        &self.0[i]
-    }
-}
-impl core::ops::IndexMut<usize> for BotInfos {
-    fn index_mut(&mut self, i: usize) -> &mut *mut c_char {
-        &mut self.0[i]
-    }
-}
-
 /// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state pointers
 /// (`ai_main.c` file-scope global). Newtype because a raw-pointer array has no
 /// library `Default` impl.
@@ -176,31 +151,6 @@ impl core::ops::Index<usize> for GNpcPtrs {
 }
 impl core::ops::IndexMut<usize> for GNpcPtrs {
     fn index_mut(&mut self, i: usize) -> &mut Self::Output {
-        &mut self.0[i]
-    }
-}
-
-/// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings (`g_bot.c:13`). Newtype because
-/// a 1024-element array has no library `Default` impl (only arrays up to 32 elements do).
-/// Source: `oracle/codemp/game/g_bot.c:13`
-pub struct ArenaInfos(pub [*mut c_char; MAX_ARENAS]);
-
-impl Default for ArenaInfos {
-    fn default() -> Self {
-        ArenaInfos([core::ptr::null_mut(); MAX_ARENAS])
-    }
-}
-
-// Transparent indexing (`globals.g_arenaInfos[i]`) so call sites written
-// against a plain `[*mut c_char; MAX_ARENAS]` need no change.
-impl core::ops::Index<usize> for ArenaInfos {
-    type Output = *mut c_char;
-    fn index(&self, i: usize) -> &*mut c_char {
-        &self.0[i]
-    }
-}
-impl core::ops::IndexMut<usize> for ArenaInfos {
-    fn index_mut(&mut self, i: usize) -> &mut *mut c_char {
         &mut self.0[i]
     }
 }
@@ -853,12 +803,12 @@ pub struct GameGlobals {
     /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]`.
     /// Source: `oracle/codemp/game/g_bot.c:27`
     pub botSpawnQueue: BotSpawnQueue,
-    /// `char *g_botInfos[MAX_BOTS]` — bot info strings.
+    /// `char *g_botInfos[MAX_BOTS]` — bot info strings, owned.
     /// Source: `oracle/codemp/game/g_bot.c:9`
-    pub g_botInfos: BotInfos,
-    /// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings.
+    pub g_botInfos: Vec<String>,
+    /// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings, owned.
     /// Source: `oracle/codemp/game/g_bot.c:13`
-    pub g_arenaInfos: ArenaInfos,
+    pub g_arenaInfos: Vec<String>,
     /// `g_numArenas`. Source: `oracle/codemp/game/g_bot.c:12`
     pub g_numArenas: c_int,
     /// `g_numBots`. Source: `oracle/codemp/game/g_bot.c:8`

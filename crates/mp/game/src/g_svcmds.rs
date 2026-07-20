@@ -9,14 +9,7 @@ use crate::g_main::G_Printf;
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameWorld;
-use mp_abi::game::syscalls::G_ARGC::GArgcArgs;
-use mp_abi::game::syscalls::G_ARGV::GArgvArgs;
-use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
-use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
-use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
-use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
+use native_string::q_string::Q_stricmp;
 
 // IP filter type: holds mask and compare value for IP filtering.
 // Source: oracle/codemp/game/g_svcmds.c:41-45
@@ -55,7 +48,7 @@ pub fn StringToFilter(ctx: &mut GameContext, s: *mut c_char, f: *mut ipFilter_t)
         if unsafe { *ptr } < b'0' as c_char || unsafe { *ptr } > b'9' as c_char {
             let s_str = unsafe { cstr_to_str(s) };
             let msg = format!("Bad filter address: {}\n", s_str);
-            G_Printf(ctx, cstr(&msg).as_ptr());
+            G_Printf(ctx, &msg);
             return qfalse;
         }
 
@@ -127,8 +120,7 @@ pub fn UpdateIPBans(ctx: &mut GameContext) {
         iplist.push_str(&format!("{}.{}.{}.{} ", b0, b1, b2, b3));
     }
 
-    let iplist_cstr = cstr(&iplist);
-    trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("g_banIPs"), iplist_cstr));
+    trap::Cvar_Set(ctx.engine, "g_banIPs", &iplist);
 }
 
 /// Raven `G_FilterPacket`.
@@ -208,7 +200,7 @@ pub fn AddIP(ctx: &mut GameContext, str: *mut c_char) {
 
         if i == ctx.world.globals.numIPFilters {
             if ctx.world.globals.numIPFilters as usize == MAX_IPFILTERS {
-                G_Printf(ctx, c"IP filter list is full\n".as_ptr());
+                G_Printf(ctx, "IP filter list is full\n");
                 return;
             }
             ctx.world.globals.numIPFilters += 1;
@@ -267,16 +259,16 @@ pub fn G_ProcessIPBans(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:226-239`
 pub fn Svcmd_AddIP_f(ctx: &mut GameContext) {
-    let argc = trap::Argc(ctx.engine, GArgcArgs::new());
+    let argc = trap::Argc(ctx.engine);
     if argc < 2 {
-        G_Printf(ctx, c"Usage:  addip <ip-mask>\n".as_ptr());
+        G_Printf(ctx, "Usage:  addip <ip-mask>\n");
         return;
     }
 
-    let mut str = [0 as c_char; 128];
-    trap::Argv(ctx.engine, GArgvArgs::new(1, str.as_mut_ptr(), 128));
+    let str = trap::Argv(ctx.engine, 1, 128);
+    let str_cstr = cstr(&str);
 
-    AddIP(ctx, str.as_mut_ptr());
+    AddIP(ctx, str_cstr.as_ptr() as *mut c_char);
 }
 
 /// Raven `Svcmd_RemoveIP_f`.
@@ -285,20 +277,20 @@ pub fn Svcmd_AddIP_f(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:246-274`
 pub fn Svcmd_RemoveIP_f(ctx: &mut GameContext) {
-    let argc = trap::Argc(ctx.engine, GArgcArgs::new());
+    let argc = trap::Argc(ctx.engine);
     if argc < 2 {
-        G_Printf(ctx, c"Usage:  sv removeip <ip-mask>\n".as_ptr());
+        G_Printf(ctx, "Usage:  sv removeip <ip-mask>\n");
         return;
     }
 
-    let mut str = [0 as c_char; 128];
-    trap::Argv(ctx.engine, GArgvArgs::new(1, str.as_mut_ptr(), 128));
+    let str = trap::Argv(ctx.engine, 1, 128);
+    let str_cstr = cstr(&str);
 
     let mut f = ipFilter_t {
         mask: 0,
         compare: 0,
     };
-    if StringToFilter(ctx, str.as_mut_ptr(), &mut f as *mut ipFilter_t) == qfalse {
+    if StringToFilter(ctx, str_cstr.as_ptr() as *mut c_char, &mut f as *mut ipFilter_t) == qfalse {
         return;
     }
 
@@ -307,22 +299,14 @@ pub fn Svcmd_RemoveIP_f(ctx: &mut GameContext) {
             && ctx.world.globals.ipFilters[i].compare == f.compare
         {
             ctx.world.globals.ipFilters[i].compare = 0xffffffffu32;
-            G_Printf(ctx, c"Removed.\n".as_ptr());
+            G_Printf(ctx, "Removed.\n");
 
             UpdateIPBans(ctx);
             return;
         }
     }
 
-    G_Printf(
-        ctx,
-        cstr(&format!("Didn't find {}.\n", unsafe {
-            {
-                cstr_to_str(str.as_ptr())
-            }
-        }))
-        .as_ptr(),
-    );
+    G_Printf(ctx, &format!("Didn't find {}.\n", str));
 }
 
 /// Raven `Svcmd_ListIPs_f`.
@@ -338,17 +322,13 @@ pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
     unsafe {
         G_Printf(
             ctx,
-            cstr(&format!(
-                "{} IP slots used.\n",
-                ctx.world.globals.numIPFilters
-            ))
-            .as_ptr(),
+            &format!("{} IP slots used.\n", ctx.world.globals.numIPFilters),
         );
 
         for i in 0..(ctx.world.globals.numIPFilters as usize) {
-            G_Printf(ctx, cstr(&format!("{}: ", i as c_int)).as_ptr());
+            G_Printf(ctx, &format!("{}: ", i as c_int));
             if (&ctx.world.globals.ipFilters)[i].compare == 0xffffffff {
-                G_Printf(ctx, c"unused\n".as_ptr());
+                G_Printf(ctx, "unused\n");
             } else {
                 // Oracle walks `compare` byte-by-byte via `(byte *)&ipFilters[i].compare`;
                 // `to_ne_bytes` yields the same 4 bytes in the same order.
@@ -359,8 +339,7 @@ pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
                 let b3 = bytes[3];
 
                 let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
-                let s_cstr = cstr(&s);
-                G_Printf(ctx, cstr(&format!("{}\n", s)).as_ptr());
+                G_Printf(ctx, &format!("{}\n", s));
             }
         }
     }
@@ -374,31 +353,20 @@ pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
 pub fn G_SaveBanIP(ctx: &mut GameContext) {
     let mut fh: i32 = 0;
 
-    let banip_cstr = cstr("banip.txt");
-    trap::FS_FOpenFile(ctx.engine, unsafe {
-        GFsFopenFileArgs::new(banip_cstr, &mut fh, FS_WRITE)
-    });
+    trap::FS_FOpenFile(ctx.engine, "banip.txt", &mut fh, FS_WRITE);
 
     if fh == 0 {
-        G_Printf(ctx, c"G_SaveBanIP - ERROR: can't open banip.txt\n".as_ptr());
+        G_Printf(ctx, "G_SaveBanIP - ERROR: can't open banip.txt\n");
         return;
     }
 
     let s = format!("{} \n", ctx.world.globals.numIPFilters);
-    let s_cstr = cstr(&s);
-    trap::FS_Write(
-        ctx.engine,
-        GFsWriteArgs::new(s_cstr.as_ptr() as *const u8, s.len() as c_int, fh),
-    );
+    trap::FS_Write(ctx.engine, s.as_bytes(), fh);
 
     for i in 0..(ctx.world.globals.numIPFilters as usize) {
         if ctx.world.globals.ipFilters[i].compare == 0xffffffff {
             let unused = "unused \n";
-            let unused_cstr = cstr(unused);
-            trap::FS_Write(
-                ctx.engine,
-                GFsWriteArgs::new(unused_cstr.as_ptr() as *const u8, unused.len() as c_int, fh),
-            );
+            trap::FS_Write(ctx.engine, unused.as_bytes(), fh);
         } else {
             // Oracle walks `compare` byte-by-byte via `(byte *)&ipFilters[i].compare`;
             // `to_ne_bytes` yields the same 4 bytes in the same order.
@@ -409,15 +377,11 @@ pub fn G_SaveBanIP(ctx: &mut GameContext) {
             let b3 = bytes[3];
 
             let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
-            let s_cstr = cstr(&s);
-            trap::FS_Write(
-                ctx.engine,
-                GFsWriteArgs::new(s_cstr.as_ptr() as *const u8, s.len() as c_int, fh),
-            );
+            trap::FS_Write(ctx.engine, s.as_bytes(), fh);
         }
     }
 
-    trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(fh));
+    trap::FS_FCloseFile(ctx.engine, fh);
 }
 
 /// Raven `G_LoadIPBans`.
@@ -430,26 +394,20 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     // `StringToFilter`/`G_Printf` calls below — mirrors the Stage-1
     // `ctx.world_raw()` idiom (see `g_object.rs`).
     let mut fh: i32 = 0;
-    let mut ban_ip_buffer = vec![0 as c_char; 32 * 1024]; // MAX_IPFILTERS * 32
+    let mut ban_ip_buffer = vec![0u8; 32 * 1024]; // MAX_IPFILTERS * 32
 
-    let banip_cstr = cstr("banip.txt");
-    let len = trap::FS_FOpenFile(ctx.engine, unsafe {
-        GFsFopenFileArgs::new(banip_cstr, &mut fh, FS_READ)
-    });
+    let len = trap::FS_FOpenFile(ctx.engine, "banip.txt", &mut fh, FS_READ);
 
     if fh == 0 {
-        G_Printf(ctx, c"G_LoadBanIP - ERROR: can't open banip.txt\n".as_ptr());
+        G_Printf(ctx, "G_LoadBanIP - ERROR: can't open banip.txt\n");
         return;
     }
 
-    trap::FS_Read(
-        ctx.engine,
-        GFsReadArgs::new(ban_ip_buffer.as_mut_ptr() as *mut u8, len, fh),
-    );
+    trap::FS_Read(ctx.engine, &mut ban_ip_buffer[..len as usize], fh);
     if (len as usize) < ban_ip_buffer.len() {
         ban_ip_buffer[len as usize] = 0;
     }
-    trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(fh));
+    trap::FS_FCloseFile(ctx.engine, fh);
 
     // §19 DIVERGENCE: oracle passes the uninitialized `char banIPFile[MAX_QPATH]`
     // to COM_BeginParseSession (UB); the name is only used in parse-error text, so
@@ -457,7 +415,7 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     let banIPFile = cstr("banip.txt");
     crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, banIPFile.as_ptr());
 
-    let mut p: *const c_char = ban_ip_buffer.as_ptr();
+    let mut p: *const c_char = ban_ip_buffer.as_ptr() as *const c_char;
     let token = crate::q_shared::COM_ParseExt(&mut ctx.world.bg_state.qs, &mut p, qtrue);
 
     if !token.is_null() {
@@ -499,7 +457,7 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
             continue;
         }
 
-        G_Printf(ctx, cstr(&format!("{:3}:", e as c_int)).as_ptr());
+        G_Printf(ctx, &format!("{:3}:", e as c_int));
 
         let eType = ctx.world.entity(id).s.eType;
         let type_str = match eType {
@@ -518,24 +476,21 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
             12 => "ET_INVISIBLE        ",
             13 => "ET_NPC              ",
             _ => {
-                G_Printf(
-                    ctx,
-                    cstr(&format!("{:3}                 ", eType as c_int)).as_ptr(),
-                );
+                G_Printf(ctx, &format!("{:3}                 ", eType as c_int));
                 ""
             }
         };
 
         if !type_str.is_empty() {
-            G_Printf(ctx, cstr(type_str).as_ptr());
+            G_Printf(ctx, type_str);
         }
 
         let classname = ctx.world.entity(id).classname;
         if !classname.is_null() {
-            G_Printf(ctx, classname);
+            G_Printf(ctx, &unsafe { cstr_to_str(classname) });
         }
 
-        G_Printf(ctx, c"\n".as_ptr());
+        G_Printf(ctx, "\n");
     }
 }
 
@@ -551,16 +506,13 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
         let idnum: c_int = atoi(s);
 
         if idnum < 0 || idnum >= ctx.world.level.maxclients {
-            crate::g_main::Com_Printf(cstr(&format!("Bad client slot: {}\n", idnum)).as_ptr());
+            crate::g_main::Com_Printf(&format!("Bad client slot: {}\n", idnum));
             return std::ptr::null_mut();
         }
 
         // Check connection status constant (CON_DISCONNECTED = 0)
         if ctx.world.client(idnum as usize).pers.connected == 0 {
-            G_Printf(
-                ctx,
-                cstr(&format!("Client {} is not connected\n", idnum)).as_ptr(),
-            );
+            G_Printf(ctx, &format!("Client {} is not connected\n", idnum));
             return std::ptr::null_mut();
         }
 
@@ -581,12 +533,7 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
 
     G_Printf(
         ctx,
-        cstr(&format!("User {} is not on the server\n", unsafe {
-            {
-                cstr_to_str(s)
-            }
-        }))
-        .as_ptr(),
+        &format!("User {} is not on the server\n", unsafe { cstr_to_str(s) }),
     );
     std::ptr::null_mut()
 }
@@ -597,24 +544,23 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:489-503`
 pub fn Svcmd_ForceTeam_f(ctx: &mut GameContext) {
-    let mut str = [0 as c_char; 128];
-
     // Get the player identifier
-    trap::Argv(ctx.engine, GArgvArgs::new(1, str.as_mut_ptr(), 128));
-    let cl = ClientForString(ctx, str.as_ptr());
+    let str = trap::Argv(ctx.engine, 1, 128);
+    let str_cstr = cstr(&str);
+    let cl = ClientForString(ctx, str_cstr.as_ptr());
     if cl.is_null() {
         return;
     }
 
     // Get the team string
-    trap::Argv(ctx.engine, GArgvArgs::new(2, str.as_mut_ptr(), 128));
+    let team = trap::Argv(ctx.engine, 2, 128);
 
     // Calculate the entity index from the client pointer (`cl - level.clients`);
     // the client slot is its entity number, so it doubles as the `EntityId`.
     let cl_idx =
         { (cl as usize - ctx.world.level.clients as usize) / std::mem::size_of::<gclient_t>() };
 
-    crate::g_cmds::SetTeam(ctx, EntityId(cl_idx as u32), str.as_mut_ptr());
+    crate::g_cmds::SetTeam(ctx, EntityId(cl_idx as u32), &team);
 }
 
 /// Raven `ConsoleCommand`.
@@ -623,68 +569,60 @@ pub fn Svcmd_ForceTeam_f(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/g_svcmds.c:513-575`
 pub fn ConsoleCommand(ctx: &mut GameContext) -> qboolean {
-    let mut cmd = [0 as c_char; 128];
+    let cmd = trap::Argv(ctx.engine, 0, 128);
 
-    trap::Argv(ctx.engine, GArgvArgs::new(0, cmd.as_mut_ptr(), 128));
-
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"entitylist".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "entitylist") == 0 {
         Svcmd_EntityList_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"forceteam".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "forceteam") == 0 {
         Svcmd_ForceTeam_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"game_memory".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "game_memory") == 0 {
         crate::g_mem::Svcmd_GameMem_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"addbot".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "addbot") == 0 {
         crate::g_bot::Svcmd_AddBot_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"botlist".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "botlist") == 0 {
         crate::g_bot::Svcmd_BotList_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"addip".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "addip") == 0 {
         Svcmd_AddIP_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"removeip".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "removeip") == 0 {
         Svcmd_RemoveIP_f(ctx);
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"listip".as_ptr()) == 0 {
+    if Q_stricmp(&cmd, "listip") == 0 {
         Svcmd_ListIPs_f(ctx);
         return qtrue;
     }
 
     if ctx.world.cvars.g_dedicated.integer != 0 {
-        if crate::q_shared::Q_stricmp(cmd.as_ptr(), c"say".as_ptr()) == 0 {
+        if Q_stricmp(&cmd, "say") == 0 {
             let msg = crate::g_cmds::ConcatArgs(ctx, 1);
-            let cmd_str = format!("print \"server: {}\n\"", unsafe {
-                std::ffi::CStr::from_ptr(msg).to_string_lossy()
-            });
-            let cmd_cstr = cstr(&cmd_str);
-            trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cmd_cstr));
+            let cmd_str = format!("print \"server: {}\n\"", msg);
+            trap::SendServerCommand(ctx.engine, -1, &cmd_str);
             return qtrue;
         }
 
         // Everything else will also be printed as a say command
         let msg = crate::g_cmds::ConcatArgs(ctx, 0);
-        let cmd_str = format!("print \"server: {}\n\"", unsafe {
-            std::ffi::CStr::from_ptr(msg).to_string_lossy()
-        });
-        let cmd_cstr = cstr(&cmd_str);
-        trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cmd_cstr));
+        let cmd_str = format!("print \"server: {}\n\"", msg);
+        trap::SendServerCommand(ctx.engine, -1, &cmd_str);
         return qtrue;
     }
 

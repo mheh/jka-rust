@@ -66,29 +66,26 @@ impl BgTraps for GameBgTraps<'_> {
     }
 
     fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
-        // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`). `Args::new` is `unsafe`
-        // (raw out-param `f`); the caller guarantees `f` is valid.
-        use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
-        let qpath = unsafe { std::ffi::CStr::from_ptr(qpath) }.to_owned();
-        crate::trap::FS_FOpenFile(self.engine, unsafe {
-            GFsFopenFileArgs::new(qpath, f, mode)
-        })
+        // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`). The caller guarantees
+        // `f` is valid.
+        let qpath = unsafe { std::ffi::CStr::from_ptr(qpath) }.to_string_lossy();
+        crate::trap::FS_FOpenFile(self.engine, &qpath, unsafe { &mut *f }, mode)
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
         // Mechanical delegation — matches the proven `pointcontents`
         // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
-        use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
-        crate::trap::FS_Read(self.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
+        let buf =
+            unsafe { core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize) };
+        crate::trap::FS_Read(self.engine, buf, f)
     }
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
         // Raven: `trap_FS_Write` (`G_FS_WRITE`).
-        use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
-        crate::trap::FS_Write(self.engine, GFsWriteArgs::new(buffer as *const u8, len, f))
+        let buf = unsafe { core::slice::from_raw_parts(buffer as *const u8, len as usize) };
+        crate::trap::FS_Write(self.engine, buf, f)
     }
     fn fs_fclose(&self, f: fileHandle_t) {
         // Raven: `trap_FS_FCloseFile` (`G_FS_FCLOSE_FILE`).
-        use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-        crate::trap::FS_FCloseFile(self.engine, GFsFcloseFileArgs::new(f as c_int))
+        crate::trap::FS_FCloseFile(self.engine, f)
     }
     fn fs_getfilelist(
         &self,
@@ -98,13 +95,11 @@ impl BgTraps for GameBgTraps<'_> {
         bufsize: c_int,
     ) -> c_int {
         // Raven: `trap_FS_GetFileList` (`G_FS_GETFILELIST`).
-        use mp_abi::game::syscalls::G_FS_GETFILELIST::GFsGetfilelistArgs;
-        let path = unsafe { std::ffi::CStr::from_ptr(path) }.to_owned();
-        let extension = unsafe { std::ffi::CStr::from_ptr(extension) }.to_owned();
-        crate::trap::FS_GetFileList(
-            self.engine,
-            GFsGetfilelistArgs::new(path, extension, listbuf as *mut u8, bufsize),
-        )
+        let path = unsafe { std::ffi::CStr::from_ptr(path) }.to_string_lossy();
+        let extension = unsafe { std::ffi::CStr::from_ptr(extension) }.to_string_lossy();
+        let list =
+            unsafe { core::slice::from_raw_parts_mut(listbuf as *mut u8, bufsize as usize) };
+        crate::trap::FS_GetFileList(self.engine, &path, &extension, list)
     }
 
     fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
@@ -430,31 +425,25 @@ impl BgTraps for GameBgTraps<'_> {
         value: *const c_char,
         flags: c_int,
     ) {
-        // Raven: `trap_Cvar_Register` (`G_CVAR_REGISTER`). `Args::new` wants owned
-        // `CString`s (`impl Into<CString>`); copy the borrowed C strings.
-        use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
-        let var_name = unsafe { std::ffi::CStr::from_ptr(var_name) }.to_owned();
-        let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_owned();
-        crate::trap::Cvar_Register(
-            self.engine,
-            GCvarRegisterArgs::new(cvar, var_name, value, flags),
-        )
+        // Raven: `trap_Cvar_Register` (`G_CVAR_REGISTER`).
+        let var_name = unsafe { std::ffi::CStr::from_ptr(var_name) }.to_string_lossy();
+        let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_string_lossy();
+        let cvar = unsafe { cvar.as_mut() };
+        crate::trap::Cvar_Register(self.engine, cvar, &var_name, &value, flags)
     }
 
     fn com_printf(&self, msg: *const c_char) {
         // Raven `Com_Printf` -> `trap_Print` (`G_PRINT`), the same route the
         // game-tier `Com_Printf` port takes. Source: `g_main.c:1219-1228`.
-        use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
-        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_owned();
-        crate::trap::Printf(self.engine, GPrintArgs::new(msg))
+        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_string_lossy();
+        crate::trap::Printf(self.engine, &msg)
     }
     fn com_error(&self, error_level: c_int, msg: *const c_char) {
         // Raven `Com_Error` -> `trap_Error` (`G_ERROR`); `error_level` is dropped
         // at the seam like the game-tier `Com_Error` port. Source: `g_main.c:1208-1217`.
-        use mp_abi::game::syscalls::G_ERROR::GErrorArgs;
         let _ = error_level;
-        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_owned();
-        crate::trap::Error(self.engine, GErrorArgs::new(msg))
+        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_string_lossy();
+        crate::trap::Error(self.engine, &msg)
     }
 }
 

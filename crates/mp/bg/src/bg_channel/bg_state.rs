@@ -142,14 +142,6 @@ pub struct BgState {
     /// Source: `oracle/codemp/game/bg_saga.h:113`
     pub siege_valid: c_int,
 
-    // --- `g_cmds.c` `ConcatArgs` returned-string scratch ---
-    /// Raven `ConcatArgs` builds the joined-argument string in a
-    /// `static char line[MAX_STRING_CHARS]` and returns a pointer to it;
-    /// `concat_args_line` is the owned home for that static, holding the
-    /// NUL-terminated bytes across the return.
-    /// Source: `oracle/codemp/game/g_cmds.c:127-140`
-    pub concat_args_line: Vec<u8>,
-
     // --- `bg_misc.c` string pool ---
     /// Raven `static char bg_pool[MAX_POOL_SIZE]` — the `BG_Alloc` bump pool.
     /// Source: `oracle/codemp/game/bg_misc.c:3324`
@@ -250,7 +242,6 @@ impl BgState {
             // (loaders index it directly rather than push/grow).
             siege_info: vec![0; 16384],
             siege_valid: 0,
-            concat_args_line: Vec::new(),
             // Sized like Raven's fixed `char bg_pool[MAX_POOL_SIZE]` zeroed static
             // (`BG_Alloc`/`BG_TempAlloc` write through `.as_mut_ptr()` to a fixed
             // extent, so an empty `Vec` gives a dangling pointer). `bg_poolTail`

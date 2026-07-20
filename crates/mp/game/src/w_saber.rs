@@ -349,7 +349,7 @@ pub fn G_SaberAttackPower(ctx: &mut GameContext, ent: Option<EntityId>, attackin
                     ctx.world.entity(ent).s.number,
                     baseLevel
                 );
-                Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(&s);
             }
         }
 
@@ -661,7 +661,7 @@ pub fn SetSaberBoxSize(ctx: &mut GameContext, saberent: Option<EntityId>) {
                         "Client {} in broken parry, saber box 0\n",
                         ctx.world.entity(owner_id).s.number
                     );
-                    Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(&s);
                 }
                 return;
             }
@@ -2584,7 +2584,7 @@ pub fn WP_GetSaberDeflectionAngle(
                                 .name
                         ),
                     );
-                    Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(&s);
                 }
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                 return false;
@@ -2641,7 +2641,7 @@ pub fn WP_GetSaberDeflectionAngle(
                                     .name
                             ),
                         );
-                        Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(&s);
                     }
                     (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                     return false;
@@ -2670,7 +2670,7 @@ pub fn WP_GetSaberDeflectionAngle(
                                     .name
                             ),
                         );
-                        Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(&s);
                     }
                     (*ac).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
                     return true;
@@ -5384,7 +5384,7 @@ pub fn CheckSaberDamage(
 
         if ctx.world.cvars.g_saberDebugPrint.integer > 2 && dmg > 1 {
             let s = format!("CL {} SABER DMG: {}\n", (*self_).s.number, dmg);
-            Com_Printf(cstr(&s).as_ptr());
+            Com_Printf(&s);
         }
 
         _VectorSubtract(*saberEnd, saberStart, &mut dir);
@@ -5904,7 +5904,7 @@ pub fn CheckSaberDamage(
                             (*self_).s.number,
                             (*otherOwner).s.number
                         );
-                        Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(&s);
                     }
                 }
             }
@@ -5959,7 +5959,7 @@ pub fn CheckSaberDamage(
                         (*otherOwner).s.number,
                         (*self_).s.number
                     );
-                    Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(&s);
                 }
 
                 didDefense = qtrue;
@@ -5994,7 +5994,7 @@ pub fn CheckSaberDamage(
                         (*self_).s.number,
                         (*otherOwner).s.number
                     );
-                    Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(&s);
                 }
 
                 (*ooc).ps.saberMove =
@@ -6022,7 +6022,7 @@ pub fn CheckSaberDamage(
                         (*self_).s.number,
                         (*otherOwner).s.number
                     );
-                    Com_Printf(cstr(&s).as_ptr());
+                    Com_Printf(&s);
                 }
 
                 if tryDeflectAgain == 0 {
@@ -6081,7 +6081,7 @@ pub fn CheckSaberDamage(
                             (*self_).s.number,
                             (*otherOwner).s.number
                         );
-                        Com_Printf(cstr(&s).as_ptr());
+                        Com_Printf(&s);
                     }
 
                     attackBonus = ctx
@@ -6204,7 +6204,7 @@ pub fn CheckSaberDamage(
                                 (*self_).s.number,
                                 (*otherOwner).s.number
                             );
-                            Com_Printf(cstr(&s).as_ptr());
+                            Com_Printf(&s);
                         }
                     } else {
                         //They are attacking, so are we
@@ -6240,7 +6240,7 @@ pub fn CheckSaberDamage(
                                     (*self_).s.number,
                                     (*otherOwner).s.number
                                 );
-                                Com_Printf(cstr(&s).as_ptr());
+                                Com_Printf(&s);
                             }
 
                             (*sc).ps.saberEventFlags |= SEF_DEFLECTED;
@@ -6270,7 +6270,7 @@ pub fn CheckSaberDamage(
                                     (*self_).s.number,
                                     (*otherOwner).s.number
                                 );
-                                Com_Printf(cstr(&s).as_ptr());
+                                Com_Printf(&s);
                             }
 
                             (*ooc).ps.saberEventFlags &= !SEF_BLOCKED;
@@ -6298,7 +6298,7 @@ pub fn CheckSaberDamage(
                                 (*self_).s.number,
                                 (*otherOwner).s.number
                             );
-                            Com_Printf(cstr(&s).as_ptr());
+                            Com_Printf(&s);
                         }
                     } else if PM_SaberInParry(G_GetParryForBlock((*ooc).ps.saberBlocked)) != 0
                         && didOffense == 0

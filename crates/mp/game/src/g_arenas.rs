@@ -161,11 +161,5 @@ pub fn UpdateTournamentInfo(ctx: &mut GameContext) {
     }
 
     let msg_str = cstr_from_chars(&msg).to_string_lossy().into_owned();
-    trap::SendConsoleCommand(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-            EXEC_APPEND as c_int,
-            cstr(&msg_str),
-        ),
-    );
+    trap::SendConsoleCommand(ctx.engine, EXEC_APPEND as c_int, &msg_str);
 }

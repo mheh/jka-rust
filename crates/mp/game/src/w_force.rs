@@ -102,11 +102,7 @@ use crate::q_math::vec3_origin;
 // Const/enum families transcribed by faithful Raven name (file header note).
 use crate::entity::hit_location::*;
 use crate::level::damage_flags::*;
-use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-use mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
-use mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs;
-use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::anim_number::animNumber_t::*;
 use mp_bg::public::effect_types::effectTypes_t::*;
@@ -161,13 +157,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             //ack, prevent user from being dumb
             maxRank = FORCE_MASTERY_JEDI_MASTER as c_int;
             let val = format!("{}", maxRank);
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    std::ffi::CString::new("g_maxForceRank").unwrap(),
-                    std::ffi::CString::new(val).unwrap(),
-                ),
-            );
+            trap::Cvar_Set(ctx.engine, "g_maxForceRank", &val);
         }
 
         // FLAG: gclient_t deref stays raw (`ent` can be an NPC carrying a pool
@@ -247,10 +237,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
             if (*cl).sess.setForce == 0 {
                 //bring up the class selection menu
-                trap::SendServerCommand(
-                    ctx.engine,
-                    GSendServerCommandArgs::new(ent_number, cstr("scl")),
-                );
+                trap::SendServerCommand(ctx.engine, ent_number, "scl");
             }
             (*cl).sess.setForce = qtrue;
             return;
@@ -267,24 +254,13 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             //rwwFIXMEFIXME: Temp
             write_cstr_field(&mut userinfo, "forcepowers\\7-1-333003000313003120");
         } else {
-            trap::GetUserinfo(
-                ctx.engine,
-                mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                    ent_number,
-                    userinfo.as_mut_ptr(),
-                    userinfo.len() as c_int,
-                ),
-            );
+            let userinfo_str = trap::GetUserinfo(ctx.engine, ent_number, userinfo.len());
+            write_cstr_field(&mut userinfo, &userinfo_str);
         }
 
         let userinfo_str = cstr_to_str(userinfo.as_ptr());
-        let key = cstr("forcepowers");
-        let val = Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            cstr(&userinfo_str).as_ptr(),
-            key.as_ptr(),
-        );
-        write_cstr_field(&mut forcePowers, &cstr_to_str(val));
+        let val = Info_ValueForKey(&userinfo_str, "forcepowers");
+        write_cstr_field(&mut forcePowers, &val);
 
         if ent_svflags & SVF_BOT != 0
             && !(&ctx.world.globals.botstates)[ent_number as usize].is_null()
@@ -486,10 +462,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             if (*cl).sess.setForce == 0 {
                 (*cl).sess.setForce = qtrue;
                 //bring up the class selection menu
-                trap::SendServerCommand(
-                    ctx.engine,
-                    GSendServerCommandArgs::new(ent_number, cstr("scl")),
-                );
+                trap::SendServerCommand(ctx.engine, ent_number, "scl");
             }
         } else {
             if warnClient != 0 || (*cl).sess.setForce == 0 {
@@ -505,20 +478,14 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                             (*cl).sess.spectatorClient = 0;
 
                             (*cl).pers.teamState.state = playerTeamStateState_t::TEAM_BEGIN;
-                            trap::SendServerCommand(
-                                ctx.engine,
-                                GSendServerCommandArgs::new(ent_number, cstr("spc")),
-                            ); // Fire up the profile menu
+                            trap::SendServerCommand(ctx.engine, ent_number, "spc"); // Fire up the profile menu
                         }
                     }
 
                     //Event isn't very reliable, I made it a string. This way I can send it to just one
                     //client also, as opposed to making a broadcast event.
                     let msg = format!("nfr {} {} {}", maxRank, 1, (*cl).sess.sessionTeam as c_int);
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        GSendServerCommandArgs::new(ent_number, cstr(&msg)),
-                    );
+                    trap::SendServerCommand(ctx.engine, ent_number, &msg);
                     //Arg1 is new max rank, arg2 is non-0 if force menu should be shown, arg3 is the current team
                 }
                 (*cl).sess.setForce = qtrue;
@@ -526,10 +493,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
 
             if didEvent == 0 {
                 let msg = format!("nfr {} {} {}", maxRank, 0, (*cl).sess.sessionTeam as c_int);
-                trap::SendServerCommand(
-                    ctx.engine,
-                    GSendServerCommandArgs::new(ent_number, cstr(&msg)),
-                );
+                trap::SendServerCommand(ctx.engine, ent_number, &msg);
             }
 
             if warnClientLimit != 0 {
@@ -5352,10 +5316,7 @@ pub fn HolocronUpdate(ctx: &mut GameContext, self_: EntityId) {
             noHRank = FORCE_LEVEL_3;
         }
 
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut ctx.world.cvars.g_MaxHolocronCarry as *mut vmCvar_t),
-        );
+        trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.g_MaxHolocronCarry);
 
         let mut i = 0;
         while i < NUM_FORCE_POWERS {
@@ -5428,10 +5389,7 @@ pub fn JediMasterUpdate(ctx: &mut GameContext, self_: EntityId) {
         // FLAG: gclient_t deref stays raw (pool clients on NPC entities, recipe 2b).
         let cl = ctx.entity(self_).client;
 
-        trap::Cvar_Update(
-            ctx.engine,
-            GCvarUpdateArgs::new(&mut ctx.world.cvars.g_MaxHolocronCarry as *mut vmCvar_t),
-        );
+        trap::Cvar_Update(ctx.engine, &mut ctx.world.cvars.g_MaxHolocronCarry);
 
         let mut i = 0;
         while i < NUM_FORCE_POWERS {

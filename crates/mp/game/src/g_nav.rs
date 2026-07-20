@@ -40,8 +40,8 @@ use crate::q_shared::Com_sprintf;
 use crate::trap;
 use crate::NPC_goal::G_BoundsOverlap;
 use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
+use native_string::q_string::Q_stricmp;
 
-use mp_abi::game::syscalls::G_ARGV::GArgvArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_NAV_ADDFAILEDEDGE::GNavAddfailededgeArgs;
@@ -1793,7 +1793,7 @@ pub fn SP_waypoint(ctx: &mut GameContext, ent: EntityId) {
                     unsafe { cstr_to_str(targetname) },
                     unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
                 );
-                Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(&s);
                 debug_assert!(false, "Waypoint in solid!");
                 G_FreeEntity(ctx, Some(ent));
                 return;
@@ -1848,7 +1848,7 @@ pub fn SP_waypoint_small(ctx: &mut GameContext, ent: EntityId) {
                     unsafe { cstr_to_str(targetname) },
                     unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
                 );
-                Com_Printf(cstr(&s).as_ptr());
+                Com_Printf(&s);
                 debug_assert!(false);
                 G_FreeEntity(ctx, Some(ent));
                 return;
@@ -1891,7 +1891,7 @@ pub fn SP_waypoint_navgoal(ctx: &mut GameContext, ent: EntityId) {
             unsafe { cstr_to_str(targetname) },
             unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         debug_assert!(false);
     }
     let targetname = ctx.entity(ent).targetname;
@@ -1926,7 +1926,7 @@ pub fn SP_waypoint_navgoal_8(ctx: &mut GameContext, ent: EntityId) {
             unsafe { cstr_to_str(targetname) },
             unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         debug_assert!(false);
     }
 
@@ -1962,7 +1962,7 @@ pub fn SP_waypoint_navgoal_4(ctx: &mut GameContext, ent: EntityId) {
             unsafe { cstr_to_str(targetname) },
             unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         debug_assert!(false);
     }
 
@@ -1998,7 +1998,7 @@ pub fn SP_waypoint_navgoal_2(ctx: &mut GameContext, ent: EntityId) {
             unsafe { cstr_to_str(targetname) },
             unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         debug_assert!(false);
     }
 
@@ -2034,7 +2034,7 @@ pub fn SP_waypoint_navgoal_1(ctx: &mut GameContext, ent: EntityId) {
             unsafe { cstr_to_str(targetname) },
             unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         debug_assert!(false);
     }
 
@@ -2059,13 +2059,12 @@ pub fn SP_waypoint_navgoal_1(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_nav.c:1518-1592`
 pub fn Svcmd_Nav_f(ctx: &mut GameContext) {
-    let mut cmd: [c_char; 1024] = [0; 1024];
-    trap::Argv(ctx.engine, GArgvArgs::new(1, cmd.as_mut_ptr(), 1024));
+    let cmd = trap::Argv(ctx.engine, 1, 1024);
 
-    if Q_stricmp(cmd.as_ptr(), c"show".as_ptr()) == 0 {
-        trap::Argv(ctx.engine, GArgvArgs::new(2, cmd.as_mut_ptr(), 1024));
+    if Q_stricmp(&cmd, "show") == 0 {
+        let cmd = trap::Argv(ctx.engine, 2, 1024);
 
-        if Q_stricmp(cmd.as_ptr(), c"all".as_ptr()) == 0 {
+        if Q_stricmp(&cmd, "all") == 0 {
             ctx.world.globals.NAVDEBUG_showNodes =
                 (ctx.world.globals.NAVDEBUG_showNodes == 0) as qboolean;
 
@@ -2077,35 +2076,35 @@ pub fn Svcmd_Nav_f(ctx: &mut GameContext) {
             ctx.world.globals.NAVDEBUG_showEnemyPath = v;
             ctx.world.globals.NAVDEBUG_showEdges = v;
             ctx.world.globals.NAVDEBUG_showRadius = v;
-        } else if Q_stricmp(cmd.as_ptr(), c"nodes".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "nodes") == 0 {
             ctx.world.globals.NAVDEBUG_showNodes =
                 (ctx.world.globals.NAVDEBUG_showNodes == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"radius".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "radius") == 0 {
             ctx.world.globals.NAVDEBUG_showRadius =
                 (ctx.world.globals.NAVDEBUG_showRadius == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"edges".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "edges") == 0 {
             ctx.world.globals.NAVDEBUG_showEdges =
                 (ctx.world.globals.NAVDEBUG_showEdges == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"testpath".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "testpath") == 0 {
             ctx.world.globals.NAVDEBUG_showTestPath =
                 (ctx.world.globals.NAVDEBUG_showTestPath == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"enemypath".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "enemypath") == 0 {
             ctx.world.globals.NAVDEBUG_showEnemyPath =
                 (ctx.world.globals.NAVDEBUG_showEnemyPath == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"combatpoints".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "combatpoints") == 0 {
             ctx.world.globals.NAVDEBUG_showCombatPoints =
                 (ctx.world.globals.NAVDEBUG_showCombatPoints == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"navgoals".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "navgoals") == 0 {
             ctx.world.globals.NAVDEBUG_showNavGoals =
                 (ctx.world.globals.NAVDEBUG_showNavGoals == 0) as qboolean;
-        } else if Q_stricmp(cmd.as_ptr(), c"collision".as_ptr()) == 0 {
+        } else if Q_stricmp(&cmd, "collision") == 0 {
             ctx.world.globals.NAVDEBUG_showCollision =
                 (ctx.world.globals.NAVDEBUG_showCollision == 0) as qboolean;
         }
-    } else if Q_stricmp(cmd.as_ptr(), c"set".as_ptr()) == 0 {
-        trap::Argv(ctx.engine, GArgvArgs::new(2, cmd.as_mut_ptr(), 1024));
+    } else if Q_stricmp(&cmd, "set") == 0 {
+        let cmd = trap::Argv(ctx.engine, 2, 1024);
 
-        if Q_stricmp(cmd.as_ptr(), c"testgoal".as_ptr()) == 0 {
+        if Q_stricmp(&cmd, "testgoal") == 0 {
             let waypoint = ctx.world.g_entities[0].waypoint;
             let ent0 = &mut ctx.world.g_entities[0] as *mut gentity_t;
             ctx.world.globals.NAVDEBUG_curGoal = trap::Nav_GetNearestNode(
@@ -2113,19 +2112,19 @@ pub fn Svcmd_Nav_f(ctx: &mut GameContext) {
                 GNavGetnearestnodeArgs::new(ent0.cast(), waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
             );
         }
-    } else if Q_stricmp(cmd.as_ptr(), c"totals".as_ptr()) == 0 {
-        Com_Printf(c"Navigation Totals:\n".as_ptr());
-        Com_Printf(c"------------------\n".as_ptr());
+    } else if Q_stricmp(&cmd, "totals") == 0 {
+        Com_Printf("Navigation Totals:\n");
+        Com_Printf("------------------\n");
         let n = trap::Nav_GetNumNodes(ctx.engine, GNavGetnumnodesArgs::new());
         let s = format!("Total Nodes:         {}\n", n);
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
         let s2 = format!("Total Combat Points: {}\n", ctx.world.level.numCombatPoints);
-        Com_Printf(cstr(&s2).as_ptr());
+        Com_Printf(&s2);
     } else {
         // Print the available commands
-        Com_Printf(c"nav - valid commands\n---\n".as_ptr());
-        Com_Printf(c"show\n - nodes\n - edges\n - testpath\n - enemypath\n - combatpoints\n - navgoals\n---\n".as_ptr());
-        Com_Printf(c"set\n - testgoal\n---\n".as_ptr());
+        Com_Printf("nav - valid commands\n---\n");
+        Com_Printf("show\n - nodes\n - edges\n - testpath\n - enemypath\n - combatpoints\n - navgoals\n---\n");
+        Com_Printf("set\n - testgoal\n---\n");
     }
 }
 
@@ -2273,7 +2272,7 @@ pub fn NAV_GetStoredWaypoint(ctx: &mut GameContext, targetname: *mut c_char) -> 
     }
     for i in 0..ctx.world.globals.numStoredWaypoints as usize {
         if ctx.world.globals.tempWaypointList[i].targetname[0] != 0
-            && Q_stricmp(
+            && crate::q_shared::Q_stricmp(
                 targetname,
                 ctx.world.globals.tempWaypointList[i].targetname.as_ptr(),
             ) == 0
@@ -2364,7 +2363,7 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
             unsafe { cstr_to_str(ctx.world.globals.fatalErrorString.0.as_ptr()) },
             ctx.world.globals.fatalErrors,
         );
-        Com_Printf(cstr(&s).as_ptr());
+        Com_Printf(&s);
     }
 }
 

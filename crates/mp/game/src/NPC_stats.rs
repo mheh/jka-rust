@@ -14,7 +14,6 @@
 
 use crate::bg_channel::GameBgTraps;
 use crate::prelude::*;
-use std::ffi::CString;
 
 // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
 // (`c_int`, cast here to match the `vec3_t` components they seed).
@@ -551,7 +550,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(ctx.world.entity(spawner).NPC_type)
                 );
-                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                crate::g_main::Com_Printf(&msg);
                 return;
             }
 
@@ -798,7 +797,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         if client_ptr.is_null() || (*client_ptr).NPC_class != CLASS_VEHICLE {
             if md3_model != 0 {
                 crate::g_main::Com_Printf(
-                    cstr("MD3 model using NPCs are not supported in MP\n").as_ptr(),
+                    "MD3 model using NPCs are not supported in MP\n",
                 );
             } else {
                 //if we have a model/skin then index them so they'll be registered immediately
@@ -933,7 +932,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), NPCName) == 0 {
             //Randomly assemble a starfleet guy
             //NPC_BuildRandom( NPC );
-            crate::g_main::Com_Printf(cstr("RANDOM NPC NOT SUPPORTED IN MP\n").as_ptr());
+            crate::g_main::Com_Printf("RANDOM NPC NOT SUPPORTED IN MP\n");
             return 0; // qfalse
         }
 
@@ -989,7 +988,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(NPCName)
                 );
-                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                crate::g_main::Com_Printf(&msg);
                 return 0;
             }
 
@@ -1223,7 +1222,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                 cstr_to_str(token),
                                 cstr_to_str(NPCName)
                             );
-                            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                            crate::g_main::Com_Printf(&msg);
                             continue 'parse;
                         }
                         (*ri).$field = n0;
@@ -1261,15 +1260,14 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         cstr_to_str(token),
                         cstr_to_str(NPCName)
                     );
-                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    crate::g_main::Com_Printf(&msg);
                     continue;
                 }
                 if n0 != 100 {
                     (*client_ptr).ps.iModelScale = n0; //so the client knows
                     if n0 >= 1024 {
                         crate::g_main::Com_Printf(
-                            cstr("WARNING: MP does not support scaling up to or over 1024%\n")
-                                .as_ptr(),
+                            "WARNING: MP does not support scaling up to or over 1024%\n",
                         );
                         n0 = 1023;
                     }
@@ -1303,12 +1301,12 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                 cstr_to_str(token),
                                 cstr_to_str(NPCName)
                             );
-                            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                            crate::g_main::Com_Printf(&msg);
                             continue 'parse;
                         }
                         if n0 != 100 {
                             crate::g_main::Com_Printf(
-                                cstr("MP doesn't support xyz scaling, use 'scale'.\n").as_ptr(),
+                                "MP doesn't support xyz scaling, use 'scale'.\n",
                             );
                         }
                         continue 'parse;
@@ -1345,7 +1343,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                     cstr_to_str(token),
                                     cstr_to_str(NPCName)
                                 );
-                                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                                crate::g_main::Com_Printf(&msg);
                                 continue 'parse;
                             }
                             if !npc_ptr.is_null() {
@@ -1378,7 +1376,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1408,7 +1406,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1440,7 +1438,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1469,7 +1467,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1498,7 +1496,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1527,7 +1525,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1576,7 +1574,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         cstr_to_str(token),
                         cstr_to_str(NPCName)
                     );
-                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    crate::g_main::Com_Printf(&msg);
                     continue;
                 }
                 if !npc_ptr.is_null() {
@@ -1681,7 +1679,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             "ERROR: Tried to spawn a vehicle NPC ({}) without using NPC_Vehicle or 'NPC spawn vehicle <vehiclename>'!!!  Bad, bad, bad!  Shame on you!\n",
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         return 0; // qfalse
                     }
                     md3Model = 0;
@@ -1714,7 +1712,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                 cstr_to_str(token),
                                 cstr_to_str(NPCName)
                             );
-                            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                            crate::g_main::Com_Printf(&msg);
                             continue 'parse;
                         }
                         //rwwFIXMEFIXME: support for this?
@@ -1851,7 +1849,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1883,7 +1881,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                     cstr_to_str(token),
                                     cstr_to_str(NPCName)
                                 );
-                                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                                crate::g_main::Com_Printf(&msg);
                                 continue 'parse;
                             }
                             if !npc_ptr.is_null() {
@@ -1915,7 +1913,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -1953,7 +1951,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             cstr_to_str(token),
                             cstr_to_str(NPCName)
                         );
-                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        crate::g_main::Com_Printf(&msg);
                         continue;
                     }
                     if !npc_ptr.is_null() {
@@ -2521,7 +2519,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     cstr_to_str(token),
                     cstr_to_str(NPCName)
                 );
-                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                crate::g_main::Com_Printf(&msg);
             }
             crate::q_shared::SkipRestOfLine(
                 &mut ctx.world.bg_state.qs,
@@ -2588,7 +2586,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 ctx.world.entity_mut(NPC).NPC_type = std::ptr::null_mut();
             }
         } else {
-            crate::g_main::Com_Printf(cstr("MD3 MODEL NPC'S ARE NOT SUPPORTED IN MP!\n").as_ptr());
+            crate::g_main::Com_Printf("MD3 MODEL NPC'S ARE NOT SUPPORTED IN MP!\n");
             return 0; // qfalse
         }
         /*
@@ -2612,11 +2610,6 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:3241-3302`
 pub fn NPC_LoadParms(ctx: &mut GameContext) {
-    use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-    use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
-    use mp_abi::game::syscalls::G_FS_GETFILELIST::GFsGetfilelistArgs;
-    use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
-
     unsafe {
         // The `_XBOX` malloc/free of `npcParseBuffer` is dead on this platform
         // and is dropped per porting-rules §20.
@@ -2633,11 +2626,11 @@ pub fn NPC_LoadParms(ctx: &mut GameContext) {
         let mut npc_extension_list_buf: [c_char; 2048] = [0; 2048];
         let file_cnt = trap::FS_GetFileList(
             ctx.engine,
-            GFsGetfilelistArgs::new(
-                CString::new("ext_data/NPCs").unwrap(),
-                CString::new(".npc").unwrap(),
+            "ext_data/NPCs",
+            ".npc",
+            std::slice::from_raw_parts_mut(
                 npc_extension_list_buf.as_mut_ptr() as *mut u8,
-                npc_extension_list_buf.len() as c_int,
+                npc_extension_list_buf.len(),
             ),
         );
 
@@ -2651,23 +2644,21 @@ pub fn NPC_LoadParms(ctx: &mut GameContext) {
 
             let path = format!("ext_data/NPCs/{}", cstr_to_str(hold_char));
             let mut f: fileHandle_t = 0;
-            let mut len = trap::FS_FOpenFile(
-                ctx.engine,
-                GFsFopenFileArgs::new(CString::new(path).unwrap(), &mut f, FS_READ),
-            );
+            let mut len = trap::FS_FOpenFile(ctx.engine, &path, &mut f, FS_READ);
 
             if len == -1 {
-                crate::g_main::Com_Printf(cstr("error reading file\n").as_ptr());
+                crate::g_main::Com_Printf("error reading file\n");
             } else {
                 if totallen + len >= MAX_NPC_DATA_SIZE {
                     crate::g_main::G_Error(
                         ctx,
-                        cstr("NPC extensions (*.npc) are too large").as_ptr(),
+                        "NPC extensions (*.npc) are too large",
                     );
                 }
                 trap::FS_Read(
                     ctx.engine,
-                    GFsReadArgs::new(npc_parse_buffer as *mut u8, len, f),
+                    std::slice::from_raw_parts_mut(npc_parse_buffer as *mut u8, len as usize),
+                    f,
                 );
                 *npc_parse_buffer.offset(len as isize) = 0;
 
@@ -2680,7 +2671,7 @@ pub fn NPC_LoadParms(ctx: &mut GameContext) {
                     cstr("\n").as_ptr(),
                 );
                 len += 1;
-                trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
+                trap::FS_FCloseFile(ctx.engine, f);
 
                 totallen += len;
                 marker = npc_parms.offset(totallen as isize);

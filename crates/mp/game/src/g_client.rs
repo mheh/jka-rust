@@ -44,6 +44,8 @@ use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_FREE, DUELTEAM_LONE, DUELTEA
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
+use native_string::atoi::atoi;
+use native_string::q_string::Q_stricmp;
 
 // `MAX_INFO_STRING` resolves via the crate prelude glob
 // (`mp_qshared::shared::limits`); the shadowing local copy was removed by the
@@ -55,13 +57,10 @@ use crate::level::level_locals::BODY_QUEUE_SIZE;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs;
-use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
-use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::gametype::GT_POWERDUEL;
 use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
-use std::ffi::CString;
 
 // Ghoul2 `BONE_ANIM_*`/`BONE_ANGLES_POSTMULT` flags (used by
 // `G_UpdateClientAnims`/`SetupGameGhoul2Model`) resolve via the canonical
@@ -351,10 +350,7 @@ pub fn ThrowSaberToAttacker(ctx: &mut GameContext, self_: EntityId, attacker: Op
             (*client).ps.saberIndex = (*ent).s.number;
         }
 
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_CLIENT_JEDIMASTER, CString::new("-1").unwrap()),
-        );
+        trap::SetConfigstring(ctx.engine, CS_CLIENT_JEDIMASTER, "-1");
 
         if !attacker.is_null()
             && !(*attacker).client.is_null()
@@ -532,10 +528,7 @@ pub fn JMSaberTouch(
 
     // Track the jedi master
     let cs = format!("{}", ctx.world.entity(other_id).s.number);
-    trap::SetConfigstring(
-        ctx.engine,
-        GSetConfigstringArgs::new(CS_CLIENT_JEDIMASTER, cstr(&cs)),
-    );
+    trap::SetConfigstring(ctx.engine, CS_CLIENT_JEDIMASTER, &cs);
 
     if ctx.world.cvars.g_spawnInvulnerability.integer != 0 {
         let invulnerable_at = ctx.world.level.time + ctx.world.cvars.g_spawnInvulnerability.integer;
@@ -546,14 +539,9 @@ pub fn JMSaberTouch(
     }
 
     let netname = unsafe { cstr_to_str((*other_client).pers.netname.as_ptr()) };
-    let becomejm = G_GetStringEdString(
-        ctx,
-        c"MP_SVGAME".as_ptr() as *mut c_char,
-        c"BECOMEJM".as_ptr() as *mut c_char,
-    );
-    let becomejm = unsafe { cstr_to_str(becomejm) };
+    let becomejm = G_GetStringEdString(ctx, "MP_SVGAME", "BECOMEJM");
     let msg = format!("cp \"{} {}\n\"", netname, becomejm);
-    trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cstr(&msg)));
+    trap::SendServerCommand(ctx.engine, -1, &msg);
 
     let self_number = ctx.world.entity(self_).s.number;
     unsafe {
@@ -1284,7 +1272,7 @@ pub fn CopyToBodyQue(ctx: &mut GameContext, ent: EntityId) -> qboolean {
             (*body).s.weapon,
             islight
         );
-        trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cstr(&cmd)));
+        trap::SendServerCommand(ctx.engine, -1, &cmd);
 
         (*body).r.svFlags = (*ent).r.svFlags | SVF_BROADCAST;
         crate::q_math::_VectorCopy((*ent).r.mins, &mut (*body).r.mins);
@@ -1359,7 +1347,7 @@ pub fn MaintainBodyQueue(ctx: &mut GameContext, ent: EntityId) {
         // bodyque func didn't manage to call ircg so call this to assure our limbs and
         // ragdoll states are proper on the client.
         let cmd = format!("rcg {}", ctx.world.entity(ent).s.clientNum);
-        trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cstr(&cmd)));
+        trap::SendServerCommand(ctx.engine, -1, &cmd);
     }
 }
 
@@ -1774,23 +1762,10 @@ pub fn ClientConnect(
     unsafe {
         let ent = ctx.world.g_entities.as_mut_ptr().add(clientNum as usize);
 
-        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
-        trap::GetUserinfo(
-            ctx.engine,
-            mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                clientNum,
-                userinfo_buf.as_mut_ptr(),
-                (MAX_INFO_STRING) as i32,
-            ),
-        );
-        let userinfo = cstr_to_str(userinfo_buf.as_ptr());
+        let userinfo = trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING as usize);
 
         // check to see if they are on the banned IP list
-        let value = cstr_to_str(Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            cstr(&userinfo).as_ptr(),
-            cstr("ip").as_ptr(),
-        ));
+        let value = Info_ValueForKey(&userinfo, "ip");
         let ip_string = value.clone();
 
         if crate::g_svcmds::G_FilterPacket(ctx, cstr(&value).as_ptr() as *mut c_char) != qfalse {
@@ -1802,11 +1777,7 @@ pub fn ClientConnect(
             && ctx.world.cvars.g_needpass.integer != 0
         {
             // check for a password
-            let value = cstr_to_str(Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                cstr(&userinfo).as_ptr(),
-                cstr("password").as_ptr(),
-            ));
+            let value = Info_ValueForKey(&userinfo, "password");
             let g_password = cstr_to_str(ctx.world.cvars.g_password.string.as_ptr());
             if !g_password.is_empty()
                 && !g_password.eq_ignore_ascii_case("none")
@@ -1814,11 +1785,7 @@ pub fn ClientConnect(
             {
                 // Raven returns a `static char sTemp[1024]` here; a leaked owned buffer
                 // is the defined-behavior stand-in. Source: oracle/codemp/game/g_client.c:2285
-                let s = cstr_to_str(G_GetStringEdString(
-                    ctx,
-                    c"MP_SVGAME".as_ptr() as *mut c_char,
-                    c"INVALID_ESCAPE_TO_MAIN".as_ptr() as *mut c_char,
-                ));
+                let s = G_GetStringEdString(ctx, "MP_SVGAME", "INVALID_ESCAPE_TO_MAIN");
                 return cstr(&s).into_raw();
             }
         }
@@ -1836,12 +1803,7 @@ pub fn ClientConnect(
 
         // read or initialize the session data
         if firstTime != qfalse || ctx.world.level.newSession != qfalse {
-            G_InitSessionData(
-                ctx,
-                clientNum as usize,
-                cstr(&userinfo).as_ptr() as *mut c_char,
-                isBot,
-            );
+            G_InitSessionData(ctx, clientNum as usize, &userinfo, isBot);
         }
         G_ReadSessionData(ctx, clientNum as usize);
 
@@ -1872,27 +1834,21 @@ pub fn ClientConnect(
         if isBot != qfalse {
             (*ent).r.svFlags |= SVF_BOT;
             (*ent).inuse = qtrue;
-            if crate::g_bot::G_BotConnect(ctx, clientNum, (firstTime == qfalse) as qboolean)
-                == qfalse
-            {
+            if !crate::g_bot::G_BotConnect(ctx, clientNum, firstTime == qfalse) {
                 return b"BotConnectfailed\0".as_ptr() as *mut c_char;
             }
         }
 
         // get and distribute relevant parameters
-        G_LogPrintf(
-            ctx,
-            cstr(&format!("ClientConnect: {}\n", clientNum)).as_ptr(),
-        );
+        G_LogPrintf(ctx, &format!("ClientConnect: {}\n", clientNum));
         ClientUserinfoChanged(ctx, clientNum);
         G_LogPrintf(
             ctx,
-            cstr(&format!(
+            &format!(
                 "{} connected with IP: {}\n",
                 cstr_to_str((*client).pers.netname.as_ptr()),
                 cstr_to_str((*client).sess.IPstring.as_ptr()),
-            ))
-            .as_ptr(),
+            ),
         );
 
         // don't do the "xxx connected" messages if they were carried over from previous level
@@ -1901,13 +1857,9 @@ pub fn ClientConnect(
                 "print \"{}{} {}\n\"",
                 cstr_to_str((*client).pers.netname.as_ptr()),
                 S_COLOR_WHITE,
-                cstr_to_str(G_GetStringEdString(
-                    ctx,
-                    c"MP_SVGAME".as_ptr() as *mut c_char,
-                    c"PLCONNECT".as_ptr() as *mut c_char,
-                )),
+                G_GetStringEdString(ctx, "MP_SVGAME", "PLCONNECT"),
             );
-            trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cstr(&m)));
+            trap::SendServerCommand(ctx.engine, -1, &m);
         }
 
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM
@@ -1940,15 +1892,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                 let mut team_str = "Red";
 
                 (*((*ent).client)).sess.sessionTeam = PickTeam(ctx, -1);
-                let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
-                trap::GetUserinfo(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                        clientNum,
-                        userinfo_buf.as_mut_ptr(),
-                        (MAX_INFO_STRING) as i32,
-                    ),
-                );
+                let mut userinfo = trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING as usize);
                 if (*((*ent).client)).sess.sessionTeam == TEAM_SPECTATOR {
                     (*((*ent).client)).sess.sessionTeam = TEAM_RED;
                 }
@@ -1959,19 +1903,9 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                     team_str = "Blue";
                 }
 
-                Info_SetValueForKey(
-                    userinfo_buf.as_mut_ptr(),
-                    c"team".as_ptr(),
-                    cstr(team_str).as_ptr(),
-                );
+                Info_SetValueForKey(&mut userinfo, "team", team_str);
 
-                trap::SetUserinfo(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
-                        clientNum,
-                        cstr(&cstr_to_str(userinfo_buf.as_ptr())),
-                    ),
-                );
+                trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
 
                 (*((*ent).client)).ps.persistant[PERS_TEAM as usize] =
                     (*((*ent).client)).sess.sessionTeam as c_int;
@@ -2046,25 +1980,12 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
         crate::w_saber::WP_SaberInitBladeData(ctx, ctx.entity_id_of(ent).unwrap());
 
         // First time model setup for that player.
-        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
-        trap::GetUserinfo(
-            ctx.engine,
-            mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                clientNum,
-                userinfo_buf.as_mut_ptr(),
-                (MAX_INFO_STRING) as i32,
-            ),
-        );
-        let userinfo = cstr_to_str(userinfo_buf.as_ptr());
-        let modelname = Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            cstr(&userinfo).as_ptr(),
-            cstr("model").as_ptr(),
-        );
+        let mut userinfo = trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING as usize);
+        let modelname = Info_ValueForKey(&userinfo, "model");
         SetupGameGhoul2Model(
             ctx,
             ctx.entity_id_of(ent).unwrap(),
-            modelname,
+            cstr(&modelname).as_ptr() as *mut c_char,
             core::ptr::null_mut(),
         );
 
@@ -2077,11 +1998,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
             && (*client).sess.duelTeam == DUELTEAM_FREE as c_int
         {
-            SetTeam(
-                ctx,
-                ctx.entity_id_of(ent).unwrap(),
-                c"s".as_ptr() as *mut c_char,
-            );
+            SetTeam(ctx, ctx.entity_id_of(ent).unwrap(), "s");
         } else {
             if ctx.world.cvars.g_gametype.integer == GT_SIEGE
                 && (ctx.world.globals.gSiegeRoundBegun == qfalse
@@ -2096,18 +2013,10 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             }
 
             if (*ent).r.svFlags & SVF_BOT != 0 && ctx.world.cvars.g_gametype.integer != GT_SIEGE {
-                let saber_val = Info_ValueForKey(
-                    &mut ctx.world.bg_state.qs,
-                    cstr(&userinfo).as_ptr(),
-                    cstr("saber1").as_ptr(),
-                );
-                let saber2_val = Info_ValueForKey(
-                    &mut ctx.world.bg_state.qs,
-                    cstr(&userinfo).as_ptr(),
-                    cstr("saber2").as_ptr(),
-                );
+                let saber_val = Info_ValueForKey(&userinfo, "saber1");
+                let saber2_val = Info_ValueForKey(&userinfo, "saber2");
 
-                if saber_val.is_null() || *saber_val == 0 {
+                if saber_val.is_empty() {
                     // blah, set em up with a random saber
                     let r = ctx.world.bg_state.rng.rand() % 50;
                     let (sab1, sab2);
@@ -2135,31 +2044,20 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                         cstr(sab2).as_ptr() as *mut c_char,
                         qfalse,
                     );
-                    Info_SetValueForKey(
-                        userinfo_buf.as_mut_ptr(),
-                        c"saber1".as_ptr(),
-                        cstr(sab1).as_ptr(),
-                    );
-                    Info_SetValueForKey(
-                        userinfo_buf.as_mut_ptr(),
-                        c"saber2".as_ptr(),
-                        cstr(sab2).as_ptr(),
-                    );
-                    trap::SetUserinfo(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
-                            clientNum,
-                            cstr(&cstr_to_str(userinfo_buf.as_ptr())),
-                        ),
-                    );
+                    Info_SetValueForKey(&mut userinfo, "saber1", sab1);
+                    Info_SetValueForKey(&mut userinfo, "saber2", sab2);
+                    trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
                 } else {
-                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, saber_val, qfalse);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        cstr(&saber_val).as_ptr() as *mut c_char,
+                        qfalse,
+                    );
                 }
 
-                if !saber_val.is_null()
-                    && *saber_val != 0
-                    && (saber2_val.is_null() || *saber2_val == 0)
-                {
+                if !saber_val.is_empty() && saber2_val.is_empty() {
                     G_SetSaber(
                         ctx,
                         ctx.entity_id_of(ent).unwrap(),
@@ -2167,20 +2065,16 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                         c"none".as_ptr() as *mut c_char,
                         qfalse,
                     );
-                    Info_SetValueForKey(
-                        userinfo_buf.as_mut_ptr(),
-                        c"saber2".as_ptr(),
-                        c"none".as_ptr(),
-                    );
-                    trap::SetUserinfo(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
-                            clientNum,
-                            cstr(&cstr_to_str(userinfo_buf.as_ptr())),
-                        ),
-                    );
+                    Info_SetValueForKey(&mut userinfo, "saber2", "none");
+                    trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
                 } else {
-                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, saber2_val, qfalse);
+                    G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        0,
+                        cstr(&saber2_val).as_ptr() as *mut c_char,
+                        qfalse,
+                    );
                 }
             }
 
@@ -2201,16 +2095,12 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                     "print \"{}{} {}\n\"",
                     cstr_to_str((*client).pers.netname.as_ptr()),
                     S_COLOR_WHITE,
-                    cstr_to_str(G_GetStringEdString(
-                        ctx,
-                        c"MP_SVGAME".as_ptr() as *mut c_char,
-                        c"PLENTER".as_ptr() as *mut c_char,
-                    )),
+                    G_GetStringEdString(ctx, "MP_SVGAME", "PLENTER"),
                 );
-                trap::SendServerCommand(ctx.engine, GSendServerCommandArgs::new(-1, cstr(&m)));
+                trap::SendServerCommand(ctx.engine, -1, &m);
             }
         }
-        G_LogPrintf(ctx, cstr(&format!("ClientBegin: {}\n", clientNum)).as_ptr());
+        G_LogPrintf(ctx, &format!("ClientBegin: {}\n", clientNum));
 
         // count current clients and rank for scoreboard
         CalculateRanks(ctx);
@@ -2568,16 +2458,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         let client = (*ent).client;
 
         // first we want the userinfo so we can see if we should update this client's saber
-        let mut userinfo_buf = [0 as c_char; MAX_INFO_STRING as usize];
-        trap::GetUserinfo(
-            ctx.engine,
-            mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                index,
-                userinfo_buf.as_mut_ptr(),
-                (MAX_INFO_STRING) as i32,
-            ),
-        );
-        let mut userinfo = cstr_to_str(userinfo_buf.as_ptr());
+        let mut userinfo = trap::GetUserinfo(ctx.engine, index, MAX_INFO_STRING as usize);
         let mut changed_saber = qfalse;
 
         let mut l: c_int = 0;
@@ -2589,30 +2470,25 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             };
 
             let key = format!("saber{}", l + 1);
-            let value = Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                cstr(&userinfo).as_ptr(),
-                cstr(&key).as_ptr(),
-            );
+            let value = Info_ValueForKey(&userinfo, &key);
+            // Raven's `value &&` is always true (Info_ValueForKey never
+            // returns NULL) — the empty string still enters here.
             if let Some(ref saber) = saber {
-                if !value.is_null() {
-                    let value_s = cstr_to_str(value);
-                    if !value_s.eq_ignore_ascii_case(saber)
-                        || saber.is_empty()
-                        || (*client).saber[0].model[0] == 0
+                if !value.eq_ignore_ascii_case(saber)
+                    || saber.is_empty()
+                    || (*client).saber[0].model[0] == 0
+                {
+                    if G_SetSaber(
+                        ctx,
+                        ctx.entity_id_of(ent).unwrap(),
+                        l,
+                        cstr(&value).as_ptr() as *mut c_char,
+                        qfalse,
+                    ) != qfalse
                     {
-                        if G_SetSaber(
-                            ctx,
-                            ctx.entity_id_of(ent).unwrap(),
-                            l,
-                            cstr(&value_s).as_ptr() as *mut c_char,
-                            qfalse,
-                        ) != qfalse
-                        {
-                            changed_saber = qtrue;
-                        } else if saber.is_empty() || (*client).saber[0].model[0] == 0 {
-                            changed_saber = qtrue;
-                        }
+                        changed_saber = qtrue;
+                    } else if saber.is_empty() || (*client).saber[0].model[0] == 0 {
+                        changed_saber = qtrue;
                     }
                 }
             }
@@ -2635,31 +2511,12 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     _ => None,
                 };
                 let key = format!("saber{}", l + 1);
-                let value = Info_ValueForKey(
-                    &mut ctx.world.bg_state.qs,
-                    userinfo_buf.as_ptr(),
-                    cstr(&key).as_ptr(),
-                );
-                let value_s = if !value.is_null() {
-                    cstr_to_str(value)
-                } else {
-                    String::new()
-                };
+                let value = Info_ValueForKey(&userinfo, &key);
 
                 if let Some(ref saber) = saber {
-                    if !value_s.eq_ignore_ascii_case(saber) {
-                        Info_SetValueForKey(
-                            userinfo_buf.as_mut_ptr(),
-                            cstr(&key).as_ptr(),
-                            cstr(saber).as_ptr(),
-                        );
-                        trap::SetUserinfo(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
-                                (*ent).s.number,
-                                cstr(&cstr_to_str(userinfo_buf.as_ptr())),
-                            ),
-                        );
+                    if !value.eq_ignore_ascii_case(saber) {
+                        Info_SetValueForKey(&mut userinfo, &key, saber);
+                        trap::SetUserinfo(ctx.engine, (*ent).s.number, &userinfo);
                     }
                 }
                 l += 1;
@@ -2870,24 +2727,14 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).bodyGrabIndex = ENTITYNUM_NONE;
 
         // Get the skin RGB based on his userinfo
-        let value = Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            cstr(&userinfo).as_ptr(),
-            cstr("char_color_red").as_ptr(),
-        );
-        (*client).ps.customRGBA[0] = if !value.is_null() { atoi(value) } else { 255 };
-        let value = Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            cstr(&userinfo).as_ptr(),
-            cstr("char_color_green").as_ptr(),
-        );
-        (*client).ps.customRGBA[1] = if !value.is_null() { atoi(value) } else { 255 };
-        let value = Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            cstr(&userinfo).as_ptr(),
-            cstr("char_color_blue").as_ptr(),
-        );
-        (*client).ps.customRGBA[2] = if !value.is_null() { atoi(value) } else { 255 };
+        let value = Info_ValueForKey(&userinfo, "char_color_red");
+        // Raven's `value ? atoi(value) : 255` never takes the 255 arm
+        // (Info_ValueForKey never returns NULL); empty -> atoi("") == 0.
+        (*client).ps.customRGBA[0] = atoi(&value);
+        let value = Info_ValueForKey(&userinfo, "char_color_green");
+        (*client).ps.customRGBA[1] = atoi(&value);
+        let value = Info_ValueForKey(&userinfo, "char_color_blue");
+        (*client).ps.customRGBA[2] = atoi(&value);
 
         if ((*client).ps.customRGBA[0] as c_int
             + (*client).ps.customRGBA[1] as c_int
@@ -3020,12 +2867,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     }
                     if WP_HasForcePowers(&(*client).ps) && (*client).sess.sessionTeam != force_team
                     {
-                        let team_name = TeamName(force_team as c_int);
-                        SetTeam(
-                            ctx,
-                            ctx.entity_id_of(ent).unwrap(),
-                            team_name as *mut c_char,
-                        );
+                        let team_name = cstr_to_str(TeamName(force_team as c_int));
+                        SetTeam(ctx, ctx.entity_id_of(ent).unwrap(), &team_name);
                         return;
                     }
                 }
@@ -3055,13 +2898,7 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             }
         } else {
             // jediVmerc is incompatible with this gametype, turn it off!
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_jediVmerc"),
-                    cstr("0"),
-                ),
-            );
+            trap::Cvar_Set(ctx.engine, "g_jediVmerc", "0");
             if ctx.world.cvars.g_gametype.integer == GT_HOLOCRON {
                 (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_SABER;
             } else if (*client).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] != 0 {
@@ -3476,18 +3313,14 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
             TossClientItems(ctx, ctx.entity_id_of(ent).unwrap());
         }
 
+        G_LogPrintf(ctx, &format!("ClientDisconnect: {}\n", clientNum));
         G_LogPrintf(
             ctx,
-            cstr(&format!("ClientDisconnect: {}\n", clientNum)).as_ptr(),
-        );
-        G_LogPrintf(
-            ctx,
-            cstr(&format!(
+            &format!(
                 "{} disconnected with IP: {}\n",
                 cstr_to_str((*((*ent).client)).pers.netname.as_ptr()),
                 cstr_to_str((*((*ent).client)).sess.IPstring.as_ptr()),
-            ))
-            .as_ptr(),
+            ),
         );
 
         // if we are playing in tourney mode, give a win to the other player and clear his
@@ -3550,10 +3383,7 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
         (*((*ent).client)).sess.sessionTeam = TEAM_FREE;
         (*ent).r.contents = 0;
 
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_PLAYERS + clientNum, cstr("")),
-        );
+        trap::SetConfigstring(ctx.engine, CS_PLAYERS + clientNum, "");
 
         CalculateRanks(ctx);
 
@@ -3937,9 +3767,7 @@ pub fn SetupGameGhoul2Model(
                 qtrue,
             ) == -1
             {
-                crate::g_main::Com_Printf(
-                    cstr("Failed to load humanoid animation file\n").as_ptr(),
-                );
+                crate::g_main::Com_Printf("Failed to load humanoid animation file\n");
                 return;
             }
         }
@@ -4248,7 +4076,6 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         let mut team: c_int = 0;
         let mut health: c_int = 0;
 
-        let mut s: *mut c_char = core::ptr::null_mut();
         let mut model: [c_char; 260] = [0; 260];
         let mut forcePowers: [c_char; 260] = [0; 260];
         let mut oldname: [c_char; 1024] = [0; 1024];
@@ -4256,45 +4083,28 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         // (and their color keys) are not truncated before parsing.
         let mut c1: [c_char; 1024] = [0; 1024];
         let mut c2: [c_char; 1024] = [0; 1024];
-        let mut userinfo: [c_char; 1024] = [0; 1024];
         let mut className: [c_char; 260] = [0; 260];
         let mut saberName: [c_char; 260] = [0; 260];
         let mut saber2Name: [c_char; 260] = [0; 260];
-        let mut value: *mut c_char = core::ptr::null_mut();
         let mut maxHealth: c_int = 0;
         let mut modelChanged: qboolean = qfalse;
 
-        trap::GetUserinfo(
-            ctx.engine,
-            mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
-                clientNum,
-                userinfo.as_mut_ptr(),
-                1024,
-            ),
-        );
+        let mut userinfo = trap::GetUserinfo(ctx.engine, clientNum, 1024);
 
         // check for malformed or illegal info strings
-        if crate::q_shared::Info_Validate(userinfo.as_ptr()) == qfalse {
-            write_cstr_field(&mut userinfo, "\\name\\badinfo");
+        if !Info_Validate(&userinfo) {
+            userinfo = "\\name\\badinfo".to_string();
         }
 
         // check for local client
-        s = crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"ip".as_ptr(),
-        );
-        if crate::q_shared::Q_strcmp(s, c"localhost".as_ptr()) == 0 {
+        let s = Info_ValueForKey(&userinfo, "ip");
+        if s == "localhost" {
             (*client).pers.localClient = qtrue;
         }
 
         // check the item prediction
-        s = crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"cg_predictItems".as_ptr(),
-        );
-        if atoi(s) == 0 {
+        let s = Info_ValueForKey(&userinfo, "cg_predictItems");
+        if atoi(&s) == 0 {
             (*client).pers.predictItemPickup = qfalse;
         } else {
             (*client).pers.predictItemPickup = qtrue;
@@ -4302,14 +4112,10 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         // set name
         crate::q_shared::Q_strncpyz(oldname.as_mut_ptr(), (*client).pers.netname.as_ptr(), 1024);
-        s = crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"name".as_ptr(),
-        );
+        let s = Info_ValueForKey(&userinfo, "name");
         ClientCleanName(
             ctx,
-            s,
+            cstr(&s).as_ptr(),
             (*client).pers.netname.as_mut_ptr(),
             (*client).pers.netname.len() as c_int,
         );
@@ -4331,61 +4137,30 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 if (*client).pers.netnameTime > ctx.world.level.time {
                     let msg = format!(
                         "print \"{}\n\"",
-                        cstr_to_str(G_GetStringEdString(
-                            ctx,
-                            cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                            cstr("NONAMECHANGE").as_ptr() as *mut c_char
-                        ))
+                        G_GetStringEdString(ctx, "MP_SVGAME", "NONAMECHANGE")
                     );
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        GSendServerCommandArgs::new(clientNum, cstr(&msg)),
-                    );
+                    trap::SendServerCommand(ctx.engine, clientNum, &msg);
 
-                    crate::q_shared::Info_SetValueForKey(
-                        userinfo.as_mut_ptr(),
-                        c"name".as_ptr(),
-                        oldname.as_ptr(),
-                    );
-                    trap::SetUserinfo(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
-                            clientNum,
-                            cstr(&cstr_to_str(userinfo.as_ptr())),
-                        ),
-                    );
+                    Info_SetValueForKey(&mut userinfo, "name", &cstr_to_str(oldname.as_ptr()));
+                    trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
                     write_cstr_field(&mut (*client).pers.netname, &cstr_to_str(oldname.as_ptr()));
                 } else {
                     let msg = format!(
                         "print \"{}{} {} {}\n\"",
                         cstr_to_str(oldname.as_ptr()),
                         S_COLOR_WHITE,
-                        cstr_to_str(G_GetStringEdString(
-                            ctx,
-                            cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                            cstr("PLRENAME").as_ptr() as *mut c_char
-                        )),
+                        G_GetStringEdString(ctx, "MP_SVGAME", "PLRENAME"),
                         cstr_to_str((*client).pers.netname.as_ptr())
                     );
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        GSendServerCommandArgs::new(-1, cstr(&msg)),
-                    );
+                    trap::SendServerCommand(ctx.engine, -1, &msg);
                     (*client).pers.netnameTime = ctx.world.level.time + 5000;
                 }
             }
         }
 
         // set model
-        crate::q_shared::Q_strncpyz(
-            model.as_mut_ptr(),
-            crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"model".as_ptr(),
-            ),
-            260,
-        );
+        let modelname_kv = Info_ValueForKey(&userinfo, "model");
+        crate::q_shared::Q_strncpyz(model.as_mut_ptr(), cstr(&modelname_kv).as_ptr(), 260);
 
         if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
             if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr()) != 0 {
@@ -4395,38 +4170,16 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // Get the skin RGB based on his userinfo
-        value = crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"char_color_red".as_ptr(),
-        );
-        if !value.is_null() {
-            (*client).ps.customRGBA[0] = atoi(value) as c_int;
-        } else {
-            (*client).ps.customRGBA[0] = 255;
-        }
+        // Raven's `if (value)` arms never take the 255 branch
+        // (Info_ValueForKey never returns NULL); empty -> atoi("") == 0.
+        let value = Info_ValueForKey(&userinfo, "char_color_red");
+        (*client).ps.customRGBA[0] = atoi(&value) as c_int;
 
-        value = crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"char_color_green".as_ptr(),
-        );
-        if !value.is_null() {
-            (*client).ps.customRGBA[1] = atoi(value) as c_int;
-        } else {
-            (*client).ps.customRGBA[1] = 255;
-        }
+        let value = Info_ValueForKey(&userinfo, "char_color_green");
+        (*client).ps.customRGBA[1] = atoi(&value) as c_int;
 
-        value = crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"char_color_blue".as_ptr(),
-        );
-        if !value.is_null() {
-            (*client).ps.customRGBA[2] = atoi(value) as c_int;
-        } else {
-            (*client).ps.customRGBA[2] = 255;
-        }
+        let value = Info_ValueForKey(&userinfo, "char_color_blue");
+        (*client).ps.customRGBA[2] = atoi(&value) as c_int;
 
         if ((*client).ps.customRGBA[0] + (*client).ps.customRGBA[1] + (*client).ps.customRGBA[2])
             < 100
@@ -4439,32 +4192,17 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         (*client).ps.customRGBA[3] = 255;
 
-        crate::q_shared::Q_strncpyz(
-            forcePowers.as_mut_ptr(),
-            crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"forcepowers".as_ptr(),
-            ),
-            260,
-        );
+        let forcepowers_kv = Info_ValueForKey(&userinfo, "forcepowers");
+        crate::q_shared::Q_strncpyz(forcePowers.as_mut_ptr(), cstr(&forcepowers_kv).as_ptr(), 260);
 
         // bots set their team a few frames later
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM
             && ctx.world.g_entities[clientNum as usize].r.svFlags & SVF_BOT != 0
         {
-            s = crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"team".as_ptr(),
-            );
-            if crate::q_shared::Q_stricmp(s, c"red".as_ptr()) == 0
-                || crate::q_shared::Q_stricmp(s, c"r".as_ptr()) == 0
-            {
+            let s = Info_ValueForKey(&userinfo, "team");
+            if Q_stricmp(&s, "red") == 0 || Q_stricmp(&s, "r") == 0 {
                 team = TEAM_RED;
-            } else if crate::q_shared::Q_stricmp(s, c"blue".as_ptr()) == 0
-                || crate::q_shared::Q_stricmp(s, c"b".as_ptr()) == 0
-            {
+            } else if Q_stricmp(&s, "blue") == 0 || Q_stricmp(&s, "b") == 0 {
                 team = TEAM_BLUE;
             } else {
                 // pick the team with the least number of players
@@ -4615,12 +4353,8 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             (*client).pers.teamInfo = qtrue;
         } else {
-            s = crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"teamoverlay".as_ptr(),
-            );
-            if *s == 0 || atoi(s) != 0 {
+            let s = Info_ValueForKey(&userinfo, "teamoverlay");
+            if s.is_empty() || atoi(&s) != 0 {
                 (*client).pers.teamInfo = qtrue;
             } else {
                 (*client).pers.teamInfo = qfalse;
@@ -4628,31 +4362,13 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // team task (0 = none, 1 = offence, 2 = defence)
-        teamTask = atoi(crate::q_shared::Info_ValueForKey(
-            &mut ctx.world.bg_state.qs,
-            userinfo.as_ptr(),
-            c"teamtask".as_ptr(),
-        )) as c_int;
+        teamTask = atoi(&Info_ValueForKey(&userinfo, "teamtask")) as c_int;
         // team Leader (1 = leader, 0 is normal player)
         teamLeader = (*client).sess.teamLeader as c_int;
 
         // colors
-        write_cstr_field(
-            &mut c1,
-            &cstr_to_str(crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"color1".as_ptr(),
-            )),
-        );
-        write_cstr_field(
-            &mut c2,
-            &cstr_to_str(crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"color2".as_ptr(),
-            )),
-        );
+        write_cstr_field(&mut c1, &Info_ValueForKey(&userinfo, "color1"));
+        write_cstr_field(&mut c2, &Info_ValueForKey(&userinfo, "color2"));
 
         // send over a subset of the userinfo keys so other clients can
         // print scoreboards, display models, and play custom sounds
@@ -4667,7 +4383,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 (*client).pers.maxHealth,
                 (*client).sess.wins,
                 (*client).sess.losses,
-                cstr_to_str(crate::q_shared::Info_ValueForKey(&mut ctx.world.bg_state.qs, userinfo.as_ptr(), c"skill".as_ptr())),
+                Info_ValueForKey(&userinfo, "skill"),
                 teamTask,
                 teamLeader,
                 cstr_to_str(className.as_ptr()),
@@ -4715,23 +4431,16 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
             )
         };
 
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_PLAYERS + clientNum, cstr(&configstring_s)),
-        );
+        trap::SetConfigstring(ctx.engine, CS_PLAYERS + clientNum, &configstring_s);
 
         if modelChanged != qfalse {
             // only going to be true for allowable server-side custom skeleton cases
             // update the server g2 instance if appropriate
-            let modelname_ptr = crate::q_shared::Info_ValueForKey(
-                &mut ctx.world.bg_state.qs,
-                userinfo.as_ptr(),
-                c"model".as_ptr(),
-            );
+            let modelname_kv2 = Info_ValueForKey(&userinfo, "model");
             SetupGameGhoul2Model(
                 ctx,
                 ctx.entity_id_of(ent).unwrap(),
-                modelname_ptr,
+                cstr(&modelname_kv2).as_ptr() as *mut c_char,
                 core::ptr::null_mut(),
             );
 
@@ -4749,12 +4458,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         if ctx.world.cvars.g_logClientInfo.integer != 0 {
             G_LogPrintf(
                 ctx,
-                cstr(&format!(
+                &format!(
                     "ClientUserinfoChanged: {} {}\n",
                     clientNum,
                     cstr_to_str(configstring_s.as_ptr() as *const c_char)
-                ))
-                .as_ptr(),
+                ),
             );
         }
     }

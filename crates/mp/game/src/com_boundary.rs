@@ -14,11 +14,9 @@
 use std::ffi::c_char;
 use std::sync::OnceLock;
 
-use mp_abi::game::syscalls::G_ERROR::GErrorArgs;
-use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
 use mp_engine_select::Engine;
 
-use crate::cstr_util::{cstr, cstr_to_str};
+use crate::cstr_util::cstr_to_str;
 use crate::trap;
 
 static COM_PRINT_SINK: OnceLock<fn(*const c_char)> = OnceLock::new();
@@ -51,7 +49,7 @@ pub(crate) fn com_error_sink() -> Option<fn(*const c_char)> {
 pub fn route_print(engine: &Engine, msg: *const c_char) {
     unsafe {
         let text = cstr_to_str(msg);
-        trap::Printf(engine, GPrintArgs::new(cstr(&text)));
+        trap::Printf(engine, &text);
     }
 }
 
@@ -62,6 +60,6 @@ pub fn route_print(engine: &Engine, msg: *const c_char) {
 pub fn route_error(engine: &Engine, msg: *const c_char) {
     unsafe {
         let text = cstr_to_str(msg);
-        trap::Error(engine, GErrorArgs::new(cstr(&text)));
+        trap::Error(engine, &text);
     }
 }

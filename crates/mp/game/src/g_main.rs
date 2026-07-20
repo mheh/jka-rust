@@ -16,7 +16,6 @@
 //! when unregistered (in-process tests).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use core::ffi::CStr;
 
 use crate::prelude::*;
 use native_string::atof::atof_bytes;
@@ -71,35 +70,15 @@ use native_sort::qsort::qsort;
 /// Raven `G_Printf`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:703-712`
-pub fn G_Printf(
-    ctx: &mut GameContext,
-    fmt: *const c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
-    unsafe {
-        let text = cstr_to_str(fmt);
-        trap::Printf(
-            ctx.engine,
-            mp_abi::game::syscalls::G_PRINT::GPrintArgs::new(cstr(&text)),
-        );
-    }
+pub fn G_Printf(ctx: &mut GameContext, msg: &str) {
+    trap::Printf(ctx.engine, msg);
 }
 
 /// Raven `G_Error`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:714-723`
-pub fn G_Error(
-    ctx: &mut GameContext,
-    fmt: *const c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
-    unsafe {
-        let text = cstr_to_str(fmt);
-        trap::Error(
-            ctx.engine,
-            mp_abi::game::syscalls::G_ERROR::GErrorArgs::new(cstr(&text)),
-        );
-    }
+pub fn G_Error(ctx: &mut GameContext, msg: &str) {
+    trap::Error(ctx.engine, msg);
 }
 
 /// Raven `G_FindTeams`.
@@ -354,18 +333,16 @@ pub fn G_RegisterCvars(ctx: &mut GameContext) {
     // `GameGlobals::gameCvarModCounts`, indexed the same as
     // `GAME_CVAR_TABLE` (Raven stores it inline on the row).
     for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
-        let cvar_ptr: *mut vmCvar_t = match entry.field {
-            Some(name) => ctx.world.cvars.field_mut(name) as *mut vmCvar_t,
-            None => std::ptr::null_mut(),
+        let cvar_opt: Option<&mut vmCvar_t> = match entry.field {
+            Some(name) => Some(ctx.world.cvars.field_mut(name)),
+            None => None,
         };
         trap::Cvar_Register(
             ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
-                cvar_ptr,
-                cstr(entry.name),
-                cstr(entry.default),
-                resolve_cvar_flags(entry.flags),
-            ),
+            cvar_opt,
+            entry.name,
+            entry.default,
+            resolve_cvar_flags(entry.flags),
         );
 
         if let Some(name) = entry.field {
@@ -389,29 +366,17 @@ pub fn G_RegisterCvars(ctx: &mut GameContext) {
     let gt = ctx.world.cvars.g_gametype.integer;
     if gt < 0 || gt >= GT_MAX_GAME_TYPE {
         let msg = format!("g_gametype {} is out of range, defaulting to 0\n", gt);
-        G_Printf(ctx, cstr(&msg).as_ptr());
-        trap::Cvar_Set(
-            ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
-        );
+        G_Printf(ctx, &msg);
+        trap::Cvar_Set(ctx.engine, "g_gametype", "0");
     } else if gt == GT_HOLOCRON {
-        G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
-        trap::Cvar_Set(
-            ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
-        );
+        G_Printf(ctx, "This gametype is not supported.\n");
+        trap::Cvar_Set(ctx.engine, "g_gametype", "0");
     } else if gt == GT_JEDIMASTER {
-        G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
-        trap::Cvar_Set(
-            ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
-        );
+        G_Printf(ctx, "This gametype is not supported.\n");
+        trap::Cvar_Set(ctx.engine, "g_gametype", "0");
     } else if gt == GT_CTY {
-        G_Printf(ctx, cstr("This gametype is not supported.\n").as_ptr());
-        trap::Cvar_Set(
-            ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("g_gametype"), cstr("0")),
-        );
+        G_Printf(ctx, "This gametype is not supported.\n");
+        trap::Cvar_Set(ctx.engine, "g_gametype", "0");
     }
 
     ctx.world.level.warmupModificationCount = ctx.world.cvars.g_warmup.modificationCount;
@@ -433,14 +398,10 @@ pub fn G_UpdateCvars(ctx: &mut GameContext) {
         // (cv->teamShader) remapped = qtrue; } } }` (g_main.c:857-872).
         for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
             if let Some(name) = entry.field {
-                // The raw `*mut vmCvar_t` still crosses the seam to `Cvar_Update`
+                // The `&mut vmCvar_t` still crosses the seam to `Cvar_Update`
                 // (the engine writes the fresh value in place); the readback then
                 // reads it through the safe `field_mut` accessor.
-                let cvar_ptr: *mut vmCvar_t = ctx.world.cvars.field_mut(name) as *mut vmCvar_t;
-                trap::Cvar_Update(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs::new(cvar_ptr),
-                );
+                trap::Cvar_Update(ctx.engine, ctx.world.cvars.field_mut(name));
 
                 let new_mod_count = ctx.world.cvars.field_mut(name).modificationCount;
                 if ctx.world.globals.gameCvarModCounts.0[i] != new_mod_count {
@@ -449,16 +410,10 @@ pub fn G_UpdateCvars(ctx: &mut GameContext) {
                     if entry.track_change {
                         let sptr = ctx.world.cvars.field_mut(name).string.as_ptr();
                         let value = cstr_to_str(sptr);
-                        trap::SendServerCommand(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                                -1,
-                                cstr(&format!(
+                        trap::SendServerCommand(ctx.engine, -1, &format!(
                                     "print \"Server: {} changed to {}\n\"",
                                     entry.name, value
-                                )),
-                            ),
-                        );
+                                ));
                     }
 
                     if entry.team_shader {
@@ -500,16 +455,14 @@ pub fn Com_Error(
 /// Raven `Com_Printf`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:1219-1228`
-pub fn Com_Printf(
-    msg: *const c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
+pub fn Com_Printf(msg: &str) {
     unsafe {
         if let Some(sink) = com_print_sink() {
-            sink(msg);
+            let c = cstr(msg);
+            sink(c.as_ptr());
             return;
         }
-        eprint!("{}", cstr_to_str(msg));
+        eprint!("{}", msg);
     }
 }
 
@@ -571,8 +524,7 @@ pub fn AddTournamentPlayer(ctx: &mut GameContext) {
     ctx.world.level.warmupTime = -1;
 
     // set them to free-for-all team
-    let s = CString::new("f").unwrap();
-    SetTeam(ctx, EntityId(idx as u32), s.as_ptr() as *mut c_char);
+        SetTeam(ctx, EntityId(idx as u32), "f");
 }
 
 /// Raven `RemoveTournamentLoser`.
@@ -590,8 +542,7 @@ pub fn RemoveTournamentLoser(ctx: &mut GameContext) {
     }
 
     // make them a spectator
-    let s = CString::new("s").unwrap();
-    SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
+        SetTeam(ctx, EntityId(clientNum as u32), "s");
 }
 
 /// Raven `G_PowerDuelCount`.
@@ -715,8 +666,7 @@ pub fn AddPowerDuelPlayers(ctx: &mut GameContext) {
     ctx.world.level.warmupTime = -1;
 
     // set them to free-for-all team
-    let s = CString::new("f").unwrap();
-    SetTeam(ctx, EntityId(idx as u32), s.as_ptr() as *mut c_char);
+        SetTeam(ctx, EntityId(idx as u32), "f");
 
     // Call recursively until everyone is in
     AddPowerDuelPlayers(ctx);
@@ -754,12 +704,7 @@ pub fn RemovePowerDuelLosers(ctx: &mut GameContext) {
     let mut j = 0;
     while j < remNum {
         // set them all to spectator
-        let s = CString::new("s").unwrap();
-        SetTeam(
-            ctx,
-            EntityId(remClients[j] as u32),
-            s.as_ptr() as *mut c_char,
-        );
+                SetTeam(ctx, EntityId(remClients[j] as u32), "s");
         j += 1;
     }
 
@@ -797,14 +742,13 @@ pub fn RemoveDuelDrawLoser(ctx: &mut GameContext) {
         cl_failure = 2;
     }
 
-    let s = CString::new("s").unwrap();
     if cl_failure != 2 {
         let clientNum = ctx.world.level.sortedClients[cl_failure as usize];
-        SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
+        SetTeam(ctx, EntityId(clientNum as u32), "s");
     } else {
         // we could be more elegant about this, but oh well.
         let clientNum = ctx.world.level.sortedClients[1];
-        SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
+        SetTeam(ctx, EntityId(clientNum as u32), "s");
     }
 }
 
@@ -823,8 +767,7 @@ pub fn RemoveTournamentWinner(ctx: &mut GameContext) {
     }
 
     // make them a spectator
-    let s = CString::new("s").unwrap();
-    SetTeam(ctx, EntityId(clientNum as u32), s.as_ptr() as *mut c_char);
+        SetTeam(ctx, EntityId(clientNum as u32), "s");
 }
 
 /// Raven `AdjustTournamentScores`.
@@ -859,13 +802,7 @@ pub fn AdjustTournamentScores(ctx: &mut GameContext) {
             let clientNum = ctx.world.level.sortedClients[cl_success as usize];
             ctx.world.clients[clientNum as usize].sess.wins += 1;
             ClientUserinfoChanged(ctx, clientNum);
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_CLIENT_DUELWINNER,
-                    cstr(&format!("{}", clientNum)),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, &format!("{}", clientNum));
 
             let clientNum = ctx.world.level.sortedClients[cl_failure as usize];
             ctx.world.clients[clientNum as usize].sess.losses += 1;
@@ -877,13 +814,7 @@ pub fn AdjustTournamentScores(ctx: &mut GameContext) {
             let clientNum = ctx.world.level.sortedClients[cl_success];
             ctx.world.clients[clientNum as usize].sess.wins += 1;
             ClientUserinfoChanged(ctx, clientNum);
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_CLIENT_DUELWINNER,
-                    cstr(&format!("{}", clientNum)),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, &format!("{}", clientNum));
 
             let clientNum = ctx.world.level.sortedClients[cl_failure];
             ctx.world.clients[clientNum as usize].sess.losses += 1;
@@ -894,13 +825,7 @@ pub fn AdjustTournamentScores(ctx: &mut GameContext) {
         if ctx.world.clients[clientNum as usize].pers.connected == CON_CONNECTED {
             ctx.world.clients[clientNum as usize].sess.wins += 1;
             ClientUserinfoChanged(ctx, clientNum);
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_CLIENT_DUELWINNER,
-                    cstr(&format!("{}", clientNum)),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, &format!("{}", clientNum));
         }
 
         let clientNum = ctx.world.level.sortedClients[1];
@@ -1211,108 +1136,48 @@ pub fn CalculateRanks(ctx: &mut GameContext) {
     }
 
     if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_SCORES1,
-                cstr(&format!(
+        trap::SetConfigstring(ctx.engine, CS_SCORES1, &format!(
                     "{}",
                     ctx.world.level.teamScores[TEAM_RED as usize]
-                )),
-            ),
-        );
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_SCORES2,
-                cstr(&format!(
+                ));
+        trap::SetConfigstring(ctx.engine, CS_SCORES2, &format!(
                     "{}",
                     ctx.world.level.teamScores[TEAM_BLUE as usize]
-                )),
-            ),
-        );
+                ));
     } else {
         if ctx.world.level.numConnectedClients == 0 {
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SCORES1,
-                    cstr(&format!("{}", SCORE_NOT_PRESENT)),
-                ),
-            );
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SCORES2,
-                    cstr(&format!("{}", SCORE_NOT_PRESENT)),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_SCORES1, &format!("{}", SCORE_NOT_PRESENT));
+            trap::SetConfigstring(ctx.engine, CS_SCORES2, &format!("{}", SCORE_NOT_PRESENT));
         } else if ctx.world.level.numConnectedClients == 1 {
             let c0 = ctx.world.level.sortedClients[0];
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SCORES1,
-                    cstr(&format!(
+            trap::SetConfigstring(ctx.engine, CS_SCORES1, &format!(
                         "{}",
                         ctx.world.clients[c0 as usize].ps.persistant
                             [persEnum_t::PERS_SCORE as usize]
-                    )),
-                ),
-            );
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SCORES2,
-                    cstr(&format!("{}", SCORE_NOT_PRESENT)),
-                ),
-            );
+                    ));
+            trap::SetConfigstring(ctx.engine, CS_SCORES2, &format!("{}", SCORE_NOT_PRESENT));
         } else {
             let c0 = ctx.world.level.sortedClients[0];
             let c1 = ctx.world.level.sortedClients[1];
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SCORES1,
-                    cstr(&format!(
+            trap::SetConfigstring(ctx.engine, CS_SCORES1, &format!(
                         "{}",
                         ctx.world.clients[c0 as usize].ps.persistant
                             [persEnum_t::PERS_SCORE as usize]
-                    )),
-                ),
-            );
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_SCORES2,
-                    cstr(&format!(
+                    ));
+            trap::SetConfigstring(ctx.engine, CS_SCORES2, &format!(
                         "{}",
                         ctx.world.clients[c1 as usize].ps.persistant
                             [persEnum_t::PERS_SCORE as usize]
-                    )),
-                ),
-            );
+                    ));
         }
 
         if ctx.world.cvars.g_gametype.integer != GT_DUEL
             || ctx.world.cvars.g_gametype.integer != GT_POWERDUEL
         {
             if ctx.world.level.numConnectedClients >= 1 {
-                trap::SetConfigstring(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_CLIENT_DUELWINNER,
-                        cstr(&format!("{}", ctx.world.level.sortedClients[0])),
-                    ),
-                );
+                trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, &format!("{}", ctx.world.level.sortedClients[0]));
             } else {
-                trap::SetConfigstring(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_CLIENT_DUELWINNER,
-                        cstr("-1"),
-                    ),
-                );
+                trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
             }
         }
     }
@@ -1479,13 +1344,7 @@ pub fn BeginIntermission(ctx: &mut GameContext) {
         if ctx.world.cvars.g_gametype.integer == GT_DUEL
             || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
         {
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_CLIENT_DUELWINNER,
-                    cstr("-1"),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
 
             if ctx.world.cvars.g_gametype.integer != GT_POWERDUEL {
                 AdjustTournamentScores(ctx);
@@ -1583,13 +1442,7 @@ pub fn ExitLevel(ctx: &mut GameContext) {
     {
         if DuelLimitHit(ctx) == qfalse {
             if ctx.world.level.restarted == qfalse {
-                trap::SendConsoleCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                        (EXEC_APPEND as c_int),
-                        cstr("map_restart 0\n"),
-                    ),
-                );
+                trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "map_restart 0\n");
                 ctx.world.level.restarted = qtrue;
                 ctx.world.level.changemap = std::ptr::null_mut();
                 ctx.world.level.intermissiontime = 0;
@@ -1605,21 +1458,9 @@ pub fn ExitLevel(ctx: &mut GameContext) {
         && ctx.world.globals.g_siegePersistant.beatingTime != qfalse
     {
         // restart same map...
-        trap::SendConsoleCommand(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                (EXEC_APPEND as c_int),
-                cstr("map_restart 0\n"),
-            ),
-        );
+        trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "map_restart 0\n");
     } else {
-        trap::SendConsoleCommand(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                (EXEC_APPEND as c_int),
-                cstr("vstr nextmap\n"),
-            ),
-        );
+        trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "vstr nextmap\n");
     }
     ctx.world.level.changemap = std::ptr::null_mut();
     ctx.world.level.intermissiontime = 0;
@@ -1659,39 +1500,23 @@ pub fn ExitLevel(ctx: &mut GameContext) {
 /// Raven `G_LogPrintf`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2213-2240`
-pub fn G_LogPrintf(
-    ctx: &mut GameContext,
-    fmt: *const c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
-    unsafe {
-        let msg = cstr_to_str(fmt);
+pub fn G_LogPrintf(ctx: &mut GameContext, msg: &str) {
+    let sec_total = ctx.world.level.time / 1000;
+    let min = sec_total / 60;
+    let sec = sec_total - min * 60;
+    let tens = sec / 10;
+    let sec = sec - tens * 10;
+    let full = format!("{:3}:{}{} {}", min, tens, sec, msg);
 
-        let sec_total = ctx.world.level.time / 1000;
-        let min = sec_total / 60;
-        let sec = sec_total - min * 60;
-        let tens = sec / 10;
-        let sec = sec - tens * 10;
-        let full = format!("{:3}:{}{} {}", min, tens, sec, msg);
-
-        if ctx.world.cvars.g_dedicated.integer != 0 {
-            G_Printf(ctx, cstr(&msg).as_ptr());
-        }
-
-        if ctx.world.level.logFile == 0 {
-            return;
-        }
-
-        let cs = cstr(&full);
-        trap::FS_Write(
-            ctx.engine,
-            mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs::new(
-                cs.as_bytes().as_ptr(),
-                full.len() as c_int,
-                ctx.world.level.logFile,
-            ),
-        );
+    if ctx.world.cvars.g_dedicated.integer != 0 {
+        G_Printf(ctx, msg);
     }
+
+    if ctx.world.level.logFile == 0 {
+        return;
+    }
+
+    trap::FS_Write(ctx.engine, full.as_bytes(), ctx.world.level.logFile);
 }
 
 /// Raven `LogExit`.
@@ -1701,17 +1526,11 @@ pub fn LogExit(ctx: &mut GameContext, string: *const c_char) {
     unsafe {
         let s = cstr_to_str(string);
 
-        G_LogPrintf(ctx, cstr(&format!("Exit: {}\n", s)).as_ptr());
+        G_LogPrintf(ctx, &format!("Exit: {}\n", s));
 
         ctx.world.level.intermissionQueued = ctx.world.level.time;
 
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_INTERMISSION,
-                cstr("1"),
-            ),
-        );
+        trap::SetConfigstring(ctx.engine, CS_INTERMISSION, "1");
 
         // don't send more than 32 scores (FIXME?)
         let mut num_sorted = ctx.world.level.numConnectedClients;
@@ -1720,15 +1539,11 @@ pub fn LogExit(ctx: &mut GameContext, string: *const c_char) {
         }
 
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
-            G_LogPrintf(
-                ctx,
-                cstr(&format!(
+            G_LogPrintf(ctx, &format!(
                     "red:{}  blue:{}\n",
                     ctx.world.level.teamScores[TEAM_RED as usize],
                     ctx.world.level.teamScores[TEAM_BLUE as usize]
-                ))
-                .as_ptr(),
-            );
+                ));
         }
 
         let mut i: c_int = 0;
@@ -1752,14 +1567,10 @@ pub fn LogExit(ctx: &mut GameContext, string: *const c_char) {
             let netname = cstr_to_str(ctx.world.clients[clientNum as usize].pers.netname.as_ptr());
             let score = ctx.world.clients[clientNum as usize].ps.persistant
                 [persEnum_t::PERS_SCORE as usize];
-            G_LogPrintf(
-                ctx,
-                cstr(&format!(
+            G_LogPrintf(ctx, &format!(
                     "score: {}  ping: {}  client: {} {}\n",
                     score, ping, clientNum, netname
-                ))
-                .as_ptr(),
-            );
+                ));
             i += 1;
         }
     }
@@ -1807,35 +1618,27 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
             if ctx.world.cvars.g_austrian.integer != 0
                 && ctx.world.cvars.g_gametype.integer != GT_POWERDUEL
             {
-                G_LogPrintf(ctx, cstr("Duel Results:\n").as_ptr());
+                G_LogPrintf(ctx, "Duel Results:\n");
                 let c0 = ctx.world.level.sortedClients[0];
                 let c1 = ctx.world.level.sortedClients[1];
                 let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
                 let n1 = cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
-                G_LogPrintf(
-                    ctx,
-                    cstr(&format!(
+                G_LogPrintf(ctx, &format!(
                         "winner: {}, score: {}, wins/losses: {}/{}\n",
                         n0,
                         ctx.world.clients[c0 as usize].ps.persistant
                             [persEnum_t::PERS_SCORE as usize],
                         ctx.world.clients[c0 as usize].sess.wins,
                         ctx.world.clients[c0 as usize].sess.losses
-                    ))
-                    .as_ptr(),
-                );
-                G_LogPrintf(
-                    ctx,
-                    cstr(&format!(
+                    ));
+                G_LogPrintf(ctx, &format!(
                         "loser: {}, score: {}, wins/losses: {}/{}\n",
                         n1,
                         ctx.world.clients[c1 as usize].ps.persistant
                             [persEnum_t::PERS_SCORE as usize],
                         ctx.world.clients[c1 as usize].sess.wins,
                         ctx.world.clients[c1 as usize].sess.losses
-                    ))
-                    .as_ptr(),
-                );
+                    ));
             }
 
             // if we are running a tournement map, kick the loser to spectator status,
@@ -1868,9 +1671,7 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                         let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
                         let n1 = cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
                         let n2 = cstr_to_str(ctx.world.clients[c2 as usize].pers.netname.as_ptr());
-                        G_LogPrintf(
-                            ctx,
-                            cstr(&format!(
+                        G_LogPrintf(ctx, &format!(
                                 "Power Duel Initiated: {} {}/{} vs {} {}/{} and {} {}/{}, kill limit: {}\n",
                                 n0,
                                 ctx.world.clients[c0 as usize].sess.wins,
@@ -1882,17 +1683,13 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                                 ctx.world.clients[c2 as usize].sess.wins,
                                 ctx.world.clients[c2 as usize].sess.losses,
                                 ctx.world.cvars.g_fraglimit.integer
-                            ))
-                            .as_ptr(),
-                        );
+                            ));
                     } else {
                         let c0 = ctx.world.level.sortedClients[0];
                         let c1 = ctx.world.level.sortedClients[1];
                         let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
                         let n1 = cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
-                        G_LogPrintf(
-                            ctx,
-                            cstr(&format!(
+                        G_LogPrintf(ctx, &format!(
                                 "Duel Initiated: {} {}/{} vs {} {}/{}, kill limit: {}\n",
                                 n0,
                                 ctx.world.clients[c0 as usize].sess.wins,
@@ -1901,9 +1698,7 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                                 ctx.world.clients[c1 as usize].sess.wins,
                                 ctx.world.clients[c1 as usize].sess.losses,
                                 ctx.world.cvars.g_fraglimit.integer
-                            ))
-                            .as_ptr(),
-                        );
+                            ));
                     }
                 }
 
@@ -1911,44 +1706,20 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                     if ctx.world.level.numPlayingClients >= 3
                         && ctx.world.level.numNonSpectatorClients >= 3
                     {
-                        trap::SetConfigstring(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                                CS_CLIENT_DUELISTS,
-                                cstr(&format!(
+                        trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                     "{}|{}|{}",
                                     ctx.world.level.sortedClients[0],
                                     ctx.world.level.sortedClients[1],
                                     ctx.world.level.sortedClients[2]
-                                )),
-                            ),
-                        );
-                        trap::SetConfigstring(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                                CS_CLIENT_DUELWINNER,
-                                cstr("-1"),
-                            ),
-                        );
+                                ));
+                        trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
                     }
                 } else if ctx.world.level.numPlayingClients >= 2 {
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELISTS,
-                            cstr(&format!(
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                 "{}|{}",
                                 ctx.world.level.sortedClients[0], ctx.world.level.sortedClients[1]
-                            )),
-                        ),
-                    );
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELWINNER,
-                            cstr("-1"),
-                        ),
-                    );
+                            ));
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
                 }
 
                 return;
@@ -1959,16 +1730,12 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
             {
                 let c0 = ctx.world.level.sortedClients[0];
                 let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
-                G_LogPrintf(
-                    ctx,
-                    cstr(&format!(
+                G_LogPrintf(ctx, &format!(
                         "Duel Tournament Winner: {} wins/losses: {}/{}\n",
                         n0,
                         ctx.world.clients[c0 as usize].sess.wins,
                         ctx.world.clients[c0 as usize].sess.losses
-                    ))
-                    .as_ptr(),
-                );
+                    ));
             }
 
             if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
@@ -1978,25 +1745,13 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                 if ctx.world.level.numPlayingClients >= 3
                     && ctx.world.level.numNonSpectatorClients >= 3
                 {
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELISTS,
-                            cstr(&format!(
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                 "{}|{}|{}",
                                 ctx.world.level.sortedClients[0],
                                 ctx.world.level.sortedClients[1],
                                 ctx.world.level.sortedClients[2]
-                            )),
-                        ),
-                    );
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELWINNER,
-                            cstr("-1"),
-                        ),
-                    );
+                            ));
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
                 }
             } else {
                 // this means we hit the duel limit so reset the wins/losses
@@ -2017,23 +1772,11 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                 AddTournamentPlayer(ctx);
 
                 if ctx.world.level.numPlayingClients >= 2 {
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELISTS,
-                            cstr(&format!(
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                 "{}|{}",
                                 ctx.world.level.sortedClients[0], ctx.world.level.sortedClients[1]
-                            )),
-                        ),
-                    );
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELWINNER,
-                            cstr("-1"),
-                        ),
-                    );
+                            ));
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
                 }
             }
         }
@@ -2213,22 +1956,12 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                 if ctx.world.level.time - ctx.world.level.startTime
                     >= ctx.world.cvars.g_timelimit.integer * 60000
                 {
-                    let sv_str = G_GetStringEdString(
-                        ctx,
-                        cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                        cstr("TIMELIMIT_HIT").as_ptr() as *mut c_char,
-                    );
-                    let hit_str = cstr_to_str(sv_str);
+                    let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "TIMELIMIT_HIT");
+                    let hit_str = sv_str;
                     let msg = format!("print \"{}.\n\"", hit_str);
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                            -1,
-                            cstr(&msg),
-                        ),
-                    );
+                    trap::SendServerCommand(ctx.engine, -1, &msg);
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
-                        Com_Printf(cstr("POWERDUEL WIN CONDITION: Timelimit hit (1)\n").as_ptr());
+                        Com_Printf("POWERDUEL WIN CONDITION: Timelimit hit (1)\n");
                     }
                     LogExit(ctx, cstr("Timelimit hit.").as_ptr());
                     return;
@@ -2269,21 +2002,11 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
         {
             if ctx.world.level.teamScores[TEAM_RED as usize] >= ctx.world.cvars.g_fraglimit.integer
             {
-                let sv_str = G_GetStringEdString(
-                    ctx,
-                    cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                    cstr("HIT_THE_KILL_LIMIT").as_ptr() as *mut c_char,
-                );
-                let hit_limit = cstr_to_str(sv_str);
-                trap::SendServerCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        -1,
-                        cstr(&format!("print \"Red {}\n\"", hit_limit)),
-                    ),
-                );
+                let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_THE_KILL_LIMIT");
+                let hit_limit = sv_str;
+                trap::SendServerCommand(ctx.engine, -1, &format!("print \"Red {}\n\"", hit_limit));
                 if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
-                    Com_Printf(cstr("POWERDUEL WIN CONDITION: Kill limit (1)\n").as_ptr());
+                    Com_Printf("POWERDUEL WIN CONDITION: Kill limit (1)\n");
                 }
                 LogExit(ctx, cstr(s_kill_limit).as_ptr());
                 return;
@@ -2291,21 +2014,11 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
 
             if ctx.world.level.teamScores[TEAM_BLUE as usize] >= ctx.world.cvars.g_fraglimit.integer
             {
-                let sv_str = G_GetStringEdString(
-                    ctx,
-                    cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                    cstr("HIT_THE_KILL_LIMIT").as_ptr() as *mut c_char,
-                );
-                let hit_limit = cstr_to_str(sv_str);
-                trap::SendServerCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        -1,
-                        cstr(&format!("print \"Blue {}\n\"", hit_limit)),
-                    ),
-                );
+                let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_THE_KILL_LIMIT");
+                let hit_limit = sv_str;
+                trap::SendServerCommand(ctx.engine, -1, &format!("print \"Blue {}\n\"", hit_limit));
                 if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
-                    Com_Printf(cstr("POWERDUEL WIN CONDITION: Kill limit (2)\n").as_ptr());
+                    Com_Printf("POWERDUEL WIN CONDITION: Kill limit (2)\n");
                 }
                 LogExit(ctx, cstr(s_kill_limit).as_ptr());
                 return;
@@ -2332,18 +2045,12 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                         >= ctx.world.cvars.g_duel_fraglimit.integer
                 {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
-                        Com_Printf(cstr("POWERDUEL WIN CONDITION: Duel limit hit (1)\n").as_ptr());
+                        Com_Printf("POWERDUEL WIN CONDITION: Duel limit hit (1)\n");
                     }
                     LogExit(ctx, cstr("Duel limit hit.").as_ptr());
                     ctx.world.globals.gDuelExit = qtrue;
                     let netname = cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                            -1,
-                            cstr(&format!("print \"{}^7 hit the win limit.\n\"", netname)),
-                        ),
-                    );
+                    trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}^7 hit the win limit.\n\"", netname));
                     return;
                 }
 
@@ -2351,25 +2058,15 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     >= ctx.world.cvars.g_fraglimit.integer
                 {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
-                        Com_Printf(cstr("POWERDUEL WIN CONDITION: Kill limit (3)\n").as_ptr());
+                        Com_Printf("POWERDUEL WIN CONDITION: Kill limit (3)\n");
                     }
                     LogExit(ctx, cstr(s_kill_limit).as_ptr());
                     ctx.world.globals.gDuelExit = qfalse;
                     if print_limit != qfalse {
                         let netname =
                             cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
-                        let hit_limit = cstr_to_str(G_GetStringEdString(
-                            ctx,
-                            cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                            cstr("HIT_THE_KILL_LIMIT").as_ptr() as *mut c_char,
-                        ));
-                        trap::SendServerCommand(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                                -1,
-                                cstr(&format!("print \"{}^7 {}.\n\"", netname, hit_limit)),
-                            ),
-                        );
+                        let hit_limit = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_THE_KILL_LIMIT");
+                        trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}^7 {}.\n\"", netname, hit_limit));
                     }
                     return;
                 }
@@ -2383,30 +2080,10 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
             if ctx.world.level.teamScores[TEAM_RED as usize]
                 >= ctx.world.cvars.g_capturelimit.integer
             {
-                let red = cstr_to_str(G_GetStringEdString(
-                    ctx,
-                    cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                    cstr("PRINTREDTEAM").as_ptr() as *mut c_char,
-                ));
-                let hit = cstr_to_str(G_GetStringEdString(
-                    ctx,
-                    cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                    cstr("HIT_CAPTURE_LIMIT").as_ptr() as *mut c_char,
-                ));
-                trap::SendServerCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        -1,
-                        cstr(&format!("print \"{} \"", red)),
-                    ),
-                );
-                trap::SendServerCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        -1,
-                        cstr(&format!("print \"{}.\n\"", hit)),
-                    ),
-                );
+                let red = G_GetStringEdString(ctx, "MP_SVGAME", "PRINTREDTEAM");
+                let hit = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_CAPTURE_LIMIT");
+                trap::SendServerCommand(ctx.engine, -1, &format!("print \"{} \"", red));
+                trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}.\n\"", hit));
                 LogExit(ctx, cstr("Capturelimit hit.").as_ptr());
                 return;
             }
@@ -2414,30 +2091,10 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
             if ctx.world.level.teamScores[TEAM_BLUE as usize]
                 >= ctx.world.cvars.g_capturelimit.integer
             {
-                let blue = cstr_to_str(G_GetStringEdString(
-                    ctx,
-                    cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                    cstr("PRINTBLUETEAM").as_ptr() as *mut c_char,
-                ));
-                let hit = cstr_to_str(G_GetStringEdString(
-                    ctx,
-                    cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                    cstr("HIT_CAPTURE_LIMIT").as_ptr() as *mut c_char,
-                ));
-                trap::SendServerCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        -1,
-                        cstr(&format!("print \"{} \"", blue)),
-                    ),
-                );
-                trap::SendServerCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        -1,
-                        cstr(&format!("print \"{}.\n\"", hit)),
-                    ),
-                );
+                let blue = G_GetStringEdString(ctx, "MP_SVGAME", "PRINTBLUETEAM");
+                let hit = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_CAPTURE_LIMIT");
+                trap::SendServerCommand(ctx.engine, -1, &format!("print \"{} \"", blue));
+                trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}.\n\"", hit));
                 LogExit(ctx, cstr("Capturelimit hit.").as_ptr());
                 return;
             }
@@ -2461,8 +2118,7 @@ pub fn G_RemoveDuelist(ctx: &mut GameContext, team: c_int) {
             && ctx.world.clients[i].sess.sessionTeam != TEAM_SPECTATOR
             && ctx.world.clients[i].sess.duelTeam == team
         {
-            let s = CString::new("s").unwrap();
-            SetTeam(ctx, EntityId(i as u32), s.as_ptr() as *mut c_char);
+                        SetTeam(ctx, EntityId(i as u32), "s");
         }
         i += 1;
     }
@@ -2476,30 +2132,18 @@ pub fn CheckTournament(ctx: &mut GameContext) {
         if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
             if ctx.world.level.numPlayingClients >= 3 && ctx.world.level.numNonSpectatorClients >= 3
             {
-                trap::SetConfigstring(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_CLIENT_DUELISTS,
-                        cstr(&format!(
+                trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                             "{}|{}|{}",
                             ctx.world.level.sortedClients[0],
                             ctx.world.level.sortedClients[1],
                             ctx.world.level.sortedClients[2]
-                        )),
-                    ),
-                );
+                        ));
             }
         } else if ctx.world.level.numPlayingClients >= 2 {
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_CLIENT_DUELISTS,
-                    cstr(&format!(
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                         "{}|{}",
                         ctx.world.level.sortedClients[0], ctx.world.level.sortedClients[1]
-                    )),
-                ),
-            );
+                    ));
         }
 
         if ctx.world.cvars.g_gametype.integer == GT_DUEL {
@@ -2511,16 +2155,10 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                 AddTournamentPlayer(ctx);
 
                 if ctx.world.level.numPlayingClients >= 2 {
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELISTS,
-                            cstr(&format!(
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                 "{}|{}",
                                 ctx.world.level.sortedClients[0], ctx.world.level.sortedClients[1]
-                            )),
-                        ),
-                    );
+                            ));
                 }
             }
 
@@ -2533,13 +2171,7 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                         ctx.world.clients[c0 as usize].ps.stats[statIndex_t::STAT_HEALTH as usize];
                     let h1 =
                         ctx.world.clients[c1 as usize].ps.stats[statIndex_t::STAT_HEALTH as usize];
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELHEALTHS,
-                            cstr(&format!("{}|{}|!", h0, h1)),
-                        ),
-                    );
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELHEALTHS, &format!("{}|{}|!", h0, h1));
                 }
             }
 
@@ -2593,18 +2225,12 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                     e.s.otherEntityNum2 = s1;
                     e.s.groundEntityNum = s2;
 
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_CLIENT_DUELISTS,
-                            cstr(&format!(
+                    trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                 "{}|{}|{}",
                                 ctx.world.level.sortedClients[0],
                                 ctx.world.level.sortedClients[1],
                                 ctx.world.level.sortedClients[2]
-                            )),
-                        ),
-                    );
+                            ));
                     G_ResetDuelists(ctx);
 
                     ctx.world.globals.g_dontFrickinCheck = qtrue;
@@ -2617,27 +2243,13 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                         let mut dbl: c_int = 0;
                         G_PowerDuelCount(ctx, &mut lone, &mut dbl, qtrue);
                         if lone < 1 {
-                            let sv_str = G_GetStringEdString(
-                                ctx,
-                                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                                cstr("DUELMORESINGLE").as_ptr() as *mut c_char,
-                            );
-                            let msg = cstr_to_str(sv_str);
-                            trap::SendServerCommand(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&format!("cp \"{}\n\"", msg))),
-                            );
+                            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "DUELMORESINGLE");
+                            let msg = sv_str;
+                            trap::SendServerCommand(ctx.engine, -1, &format!("cp \"{}\n\"", msg));
                         } else {
-                            let sv_str = G_GetStringEdString(
-                                ctx,
-                                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                                cstr("DUELMOREPAIRED").as_ptr() as *mut c_char,
-                            );
-                            let msg = cstr_to_str(sv_str);
-                            trap::SendServerCommand(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&format!("cp \"{}\n\"", msg))),
-                            );
+                            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "DUELMOREPAIRED");
+                            let msg = sv_str;
+                            trap::SendServerCommand(ctx.engine, -1, &format!("cp \"{}\n\"", msg));
                         }
                         ctx.world.globals.g_duelPrintTimer = ctx.world.level.time + 10000;
                     }
@@ -2658,18 +2270,12 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                         e.s.otherEntityNum2 = s1;
                         e.s.groundEntityNum = s2;
 
-                        trap::SetConfigstring(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                                CS_CLIENT_DUELISTS,
-                                cstr(&format!(
+                        trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, &format!(
                                     "{}|{}|{}",
                                     ctx.world.level.sortedClients[0],
                                     ctx.world.level.sortedClients[1],
                                     ctx.world.level.sortedClients[2]
-                                )),
-                            ),
-                        );
+                                ));
 
                         if ctx.world.cvars.g_austrian.integer != 0 {
                             let c0 = ctx.world.level.sortedClients[0];
@@ -2681,9 +2287,7 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                                 cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
                             let n2 =
                                 cstr_to_str(ctx.world.clients[c2 as usize].pers.netname.as_ptr());
-                            G_LogPrintf(
-                                ctx,
-                                cstr(&format!(
+                            G_LogPrintf(ctx, &format!(
                                     "Duel Initiated: {} {}/{} vs {} {}/{} and {} {}/{}, kill limit: {}\n",
                                     n0,
                                     ctx.world.clients[c0 as usize].sess.wins,
@@ -2695,9 +2299,7 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                                     ctx.world.clients[c2 as usize].sess.wins,
                                     ctx.world.clients[c2 as usize].sess.losses,
                                     ctx.world.cvars.g_fraglimit.integer
-                                ))
-                                .as_ptr(),
-                            );
+                                ));
                         }
                         // (map_restart-on-new-opponent left commented out in oracle.)
                     }
@@ -2727,14 +2329,8 @@ pub fn CheckTournament(ctx: &mut GameContext) {
             if not_enough != qfalse {
                 if ctx.world.level.warmupTime != -1 {
                     ctx.world.level.warmupTime = -1;
-                    trap::SetConfigstring(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                            CS_WARMUP,
-                            cstr(&format!("{}", ctx.world.level.warmupTime)),
-                        ),
-                    );
-                    G_LogPrintf(ctx, cstr("Warmup:\n").as_ptr());
+                    trap::SetConfigstring(ctx.engine, CS_WARMUP, &format!("{}", ctx.world.level.warmupTime));
+                    G_LogPrintf(ctx, "Warmup:\n");
                 }
                 return; // still waiting for team members
             }
@@ -2748,33 +2344,15 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                 // fudge by -1 to account for extra delays
                 ctx.world.level.warmupTime =
                     ctx.world.level.time + (ctx.world.cvars.g_warmup.integer - 1) * 1000;
-                trap::SetConfigstring(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                        CS_WARMUP,
-                        cstr(&format!("{}", ctx.world.level.warmupTime)),
-                    ),
-                );
+                trap::SetConfigstring(ctx.engine, CS_WARMUP, &format!("{}", ctx.world.level.warmupTime));
                 return;
             }
 
             // if the warmup time has counted down, restart
             if ctx.world.level.time > ctx.world.level.warmupTime {
                 ctx.world.level.warmupTime += 10000;
-                trap::Cvar_Set(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                        cstr("g_restarted"),
-                        cstr("1"),
-                    ),
-                );
-                trap::SendConsoleCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                        (EXEC_APPEND as c_int),
-                        cstr("map_restart 0\n"),
-                    ),
-                );
+                trap::Cvar_Set(ctx.engine, "g_restarted", "1");
+                trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "map_restart 0\n");
                 ctx.world.level.restarted = qtrue;
                 return;
             }
@@ -2802,13 +2380,7 @@ pub fn G_KickAllBots(ctx: &mut GameContext) {
             write_cstr_field(&mut netname, &cstr_to_str(cl.pers.netname.as_ptr()));
             crate::q_shared::Q_CleanStr(netname.as_mut_ptr());
             let cleaned = cstr_to_str(netname.as_ptr());
-            trap::SendConsoleCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                    (EXEC_INSERT as c_int),
-                    cstr(&format!("kick \"{}\"\n", cleaned)),
-                ),
-            );
+            trap::SendConsoleCommand(ctx.engine, (EXEC_INSERT as c_int), &format!("kick \"{}\"\n", cleaned));
             i += 1;
         }
     }
@@ -2824,31 +2396,18 @@ pub fn CheckVote(ctx: &mut GameContext) {
         {
             ctx.world.level.voteExecuteTime = 0;
             let vote_string = cstr_to_str(ctx.world.level.voteString.as_ptr());
-            trap::SendConsoleCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                    (EXEC_APPEND as c_int),
-                    cstr(&format!("{}\n", vote_string)),
-                ),
-            );
+            trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), &format!("{}\n", vote_string));
 
             if ctx.world.level.votingGametype != qfalse {
-                let cur = trap::Cvar_VariableIntegerValue(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("g_gametype")),
-                );
+                let cur = trap::Cvar_VariableIntegerValue(ctx.engine, "g_gametype");
                 if cur != ctx.world.level.votingGametypeTo {
                     // If we're voting to a different game type, be sure to refresh all the map stuff
-                    let next_map_ptr = crate::g_bot::G_RefreshNextMap(
+                    let next_map = crate::g_bot::G_RefreshNextMap(
                         ctx,
                         ctx.world.level.votingGametypeTo,
                         qtrue,
-                    );
-                    let next_map = if next_map_ptr.is_null() {
-                        String::new()
-                    } else {
-                        cstr_to_str(next_map_ptr)
-                    };
+                    )
+                    .unwrap_or_default();
 
                     if ctx.world.level.votingGametypeTo == GT_SIEGE {
                         // ok, kick all the bots, cause the aren't supported!
@@ -2856,10 +2415,7 @@ pub fn CheckVote(ctx: &mut GameContext) {
                     }
 
                     if !next_map.is_empty() {
-                        trap::SendConsoleCommand(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr(&format!("map {}\n", next_map))),
-                        );
+                        trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), &format!("map {}\n", next_map));
                     }
                 } else {
                     // otherwise, just leave the map until a restart
@@ -2868,18 +2424,9 @@ pub fn CheckVote(ctx: &mut GameContext) {
 
                 if ctx.world.cvars.g_fraglimitVoteCorrection.integer != 0 {
                     // This means to auto-correct fraglimit when voting to and from duel.
-                    let current_gt = trap::Cvar_VariableIntegerValue(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("g_gametype")),
-                    );
-                    let current_fl = trap::Cvar_VariableIntegerValue(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("fraglimit")),
-                    );
-                    let current_tl = trap::Cvar_VariableIntegerValue(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("timelimit")),
-                    );
+                    let current_gt = trap::Cvar_VariableIntegerValue(ctx.engine, "g_gametype");
+                    let current_fl = trap::Cvar_VariableIntegerValue(ctx.engine, "fraglimit");
+                    let current_tl = trap::Cvar_VariableIntegerValue(ctx.engine, "timelimit");
 
                     if (ctx.world.level.votingGametypeTo == GT_DUEL
                         || ctx.world.level.votingGametypeTo == GT_POWERDUEL)
@@ -2888,17 +2435,11 @@ pub fn CheckVote(ctx: &mut GameContext) {
                     {
                         if current_fl > 3 || current_fl == 0 {
                             // if voting to duel, and fraglimit is more than 3 (or unlimited), then set it down to 3
-                            trap::SendConsoleCommand(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("fraglimit 3\n")),
-                            );
+                            trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "fraglimit 3\n");
                         }
                         if current_tl != 0 {
                             // if voting to duel, and timelimit is set, make it unlimited
-                            trap::SendConsoleCommand(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("timelimit 0\n")),
-                            );
+                            trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "timelimit 0\n");
                         }
                     } else if (ctx.world.level.votingGametypeTo != GT_DUEL
                         && ctx.world.level.votingGametypeTo != GT_POWERDUEL)
@@ -2906,10 +2447,7 @@ pub fn CheckVote(ctx: &mut GameContext) {
                     {
                         if current_fl != 0 && current_fl < 20 {
                             // if voting from duel, an fraglimit is less than 20, then set it up to 20
-                            trap::SendConsoleCommand(
-                                ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("fraglimit 20\n")),
-                            );
+                            trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), "fraglimit 20\n");
                         }
                     }
                 }
@@ -2922,62 +2460,26 @@ pub fn CheckVote(ctx: &mut GameContext) {
             return;
         }
         if ctx.world.level.time - ctx.world.level.voteTime >= VOTE_TIME {
-            let sv_str = G_GetStringEdString(
-                ctx,
-                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                cstr("VOTEFAILED").as_ptr() as *mut c_char,
-            );
-            let msg = cstr_to_str(sv_str);
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    -1,
-                    cstr(&format!("print \"{}\n\"", msg)),
-                ),
-            );
+            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "VOTEFAILED");
+            let msg = sv_str;
+            trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
         } else if ctx.world.level.voteYes > ctx.world.level.numVotingClients / 2 {
-            let sv_str = G_GetStringEdString(
-                ctx,
-                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                cstr("VOTEPASSED").as_ptr() as *mut c_char,
-            );
+            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "VOTEPASSED");
             // execute the command, then remove the vote
-            let msg = cstr_to_str(sv_str);
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    -1,
-                    cstr(&format!("print \"{}\n\"", msg)),
-                ),
-            );
+            let msg = sv_str;
+            trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
             ctx.world.level.voteExecuteTime = ctx.world.level.time + 3000;
         } else if ctx.world.level.voteNo >= ctx.world.level.numVotingClients / 2 {
-            let sv_str = G_GetStringEdString(
-                ctx,
-                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                cstr("VOTEFAILED").as_ptr() as *mut c_char,
-            );
+            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "VOTEFAILED");
             // same behavior as a timeout
-            let msg = cstr_to_str(sv_str);
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    -1,
-                    cstr(&format!("print \"{}\n\"", msg)),
-                ),
-            );
+            let msg = sv_str;
+            trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
         } else {
             // still waiting for a majority
             return;
         }
         ctx.world.level.voteTime = 0;
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_VOTE_TIME,
-                cstr(""),
-            ),
-        );
+        trap::SetConfigstring(ctx.engine, CS_VOTE_TIME, "");
     }
 }
 
@@ -2993,13 +2495,7 @@ pub fn PrintTeam(ctx: &mut GameContext, team: c_int, message: *mut c_char) {
                 i += 1;
                 continue;
             }
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    i,
-                    cstr(&msg),
-                ),
-            );
+            trap::SendServerCommand(ctx.engine, i, &msg);
             i += 1;
         }
     }
@@ -3047,11 +2543,7 @@ pub fn SetLeader(ctx: &mut GameContext, team: c_int, client: c_int) {
         ctx.world.clients[client as usize].sess.teamLeader = qtrue;
         ClientUserinfoChanged(ctx, client);
         let netname = cstr_to_str(ctx.world.clients[client as usize].pers.netname.as_ptr());
-        let msg = cstr_to_str(G_GetStringEdString(
-            ctx,
-            cstr("MP_SVGAME").as_ptr() as *mut c_char,
-            cstr("NEWTEAMLEADER").as_ptr() as *mut c_char,
-        ));
+        let msg = G_GetStringEdString(ctx, "MP_SVGAME", "NEWTEAMLEADER");
         PrintTeam(
             ctx,
             team,
@@ -3118,79 +2610,37 @@ pub fn CheckTeamVote(ctx: &mut GameContext, team: c_int) {
             return;
         }
         if ctx.world.level.time - ctx.world.level.teamVoteTime[cs_offset] >= VOTE_TIME {
-            let sv_str = G_GetStringEdString(
-                ctx,
-                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                cstr("TEAMVOTEFAILED").as_ptr() as *mut c_char,
-            );
-            let msg = cstr_to_str(sv_str);
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    -1,
-                    cstr(&format!("print \"{}\n\"", msg)),
-                ),
-            );
+            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "TEAMVOTEFAILED");
+            let msg = sv_str;
+            trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
         } else if ctx.world.level.teamVoteYes[cs_offset]
             > ctx.world.level.numteamVotingClients[cs_offset] / 2
         {
-            let sv_str = G_GetStringEdString(
-                ctx,
-                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                cstr("TEAMVOTEPASSED").as_ptr() as *mut c_char,
-            );
+            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "TEAMVOTEPASSED");
             // execute the command, then remove the vote
-            let msg = cstr_to_str(sv_str);
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    -1,
-                    cstr(&format!("print \"{}\n\"", msg)),
-                ),
-            );
+            let msg = sv_str;
+            trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
 
             let vote_string = cstr_to_str(ctx.world.level.teamVoteString[cs_offset].as_ptr());
             if vote_string.starts_with("leader") {
                 // set the team leader — commented out in oracle
                 //SetLeader(team, atoi(level.teamVoteString[cs_offset] + 7));
             } else {
-                trap::SendConsoleCommand(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                        (EXEC_APPEND as c_int),
-                        cstr(&format!("{}\n", vote_string)),
-                    ),
-                );
+                trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), &format!("{}\n", vote_string));
             }
         } else if ctx.world.level.teamVoteNo[cs_offset]
             >= ctx.world.level.numteamVotingClients[cs_offset] / 2
         {
-            let sv_str = G_GetStringEdString(
-                ctx,
-                cstr("MP_SVGAME").as_ptr() as *mut c_char,
-                cstr("TEAMVOTEFAILED").as_ptr() as *mut c_char,
-            );
+            let sv_str = G_GetStringEdString(ctx, "MP_SVGAME", "TEAMVOTEFAILED");
             // same behavior as a timeout
-            let msg = cstr_to_str(sv_str);
-            trap::SendServerCommand(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                    -1,
-                    cstr(&format!("print \"{}\n\"", msg)),
-                ),
-            );
+            let msg = sv_str;
+            trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
         } else {
             // still waiting for a majority
             return;
         }
         ctx.world.level.teamVoteTime[cs_offset] = 0;
-        trap::SetConfigstring(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_TEAMVOTE_TIME + cs_offset as c_int,
-                cstr(""),
-            ),
-        );
+        trap::SetConfigstring(ctx.engine, CS_TEAMVOTE_TIME + cs_offset as c_int, "");
     }
 }
 
@@ -3207,31 +2657,13 @@ pub fn CheckCvars(ctx: &mut GameContext) {
 
             let mut password = cstr_to_str(ctx.world.cvars.g_password.string.as_ptr());
             password = password.replace('%', ".");
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_password"),
-                    cstr(&password),
-                ),
-            );
+            trap::Cvar_Set(ctx.engine, "g_password", &password);
 
             let pw = cstr_to_str(ctx.world.cvars.g_password.string.as_ptr());
             if !pw.is_empty() && Q_stricmp(cstr(&pw).as_ptr(), cstr("none").as_ptr()) != 0 {
-                trap::Cvar_Set(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                        cstr("g_needpass"),
-                        cstr("1"),
-                    ),
-                );
+                trap::Cvar_Set(ctx.engine, "g_needpass", "1");
             } else {
-                trap::Cvar_Set(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                        cstr("g_needpass"),
-                        cstr("0"),
-                    ),
-                );
+                trap::Cvar_Set(ctx.engine, "g_needpass", "0");
             }
         }
     }
@@ -3284,24 +2716,8 @@ pub fn NAV_CheckCalcPaths(ctx: &mut GameContext) {
             let mut mapname = vmCvar_t::zeroed();
             let mut ck_sum = vmCvar_t::zeroed();
 
-            trap::Cvar_Register(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
-                    &mut mapname as *mut vmCvar_t,
-                    CString::new("mapname").unwrap(),
-                    CString::new("").unwrap(),
-                    CVAR_SERVERINFO | CVAR_ROM,
-                ),
-            );
-            trap::Cvar_Register(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs::new(
-                    &mut ck_sum as *mut vmCvar_t,
-                    CString::new("sv_mapChecksum").unwrap(),
-                    CString::new("").unwrap(),
-                    CVAR_ROM,
-                ),
-            );
+            trap::Cvar_Register(ctx.engine, Some(&mut mapname), "mapname", "", CVAR_SERVERINFO | CVAR_ROM);
+            trap::Cvar_Register(ctx.engine, Some(&mut ck_sum), "sv_mapChecksum", "", CVAR_ROM);
 
             // clear all the failed edges
             trap::Nav_ClearAllFailedEdges(
@@ -3319,7 +2735,7 @@ pub fn NAV_CheckCalcPaths(ctx: &mut GameContext) {
             );
 
             if ctx.world.globals.fatalErrors != 0 {
-                Com_Printf(cstr("^1Not saving .nav file due to fatal nav errors\n").as_ptr());
+                Com_Printf("^1Not saving .nav file due to fatal nav errors\n");
             } else if trap::Nav_Save(
                 ctx.engine,
                 mp_abi::game::syscalls::G_NAV_SAVE::GNavSaveArgs::new(
@@ -3329,13 +2745,10 @@ pub fn NAV_CheckCalcPaths(ctx: &mut GameContext) {
             ) == qfalse
             {
                 let name = cstr_to_str(mapname.string.as_ptr());
-                Com_Printf(
-                    cstr(&format!(
+                Com_Printf(&format!(
                         "Unable to save navigations data for map \"{}\" (checksum:{})\n",
                         name, ck_sum.integer
-                    ))
-                    .as_ptr(),
-                );
+                    ));
             }
             ctx.world.globals.navCalcPathTime = 0;
         }
@@ -3393,23 +2806,9 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
 
         if ctx.world.globals.gDoSlowMoDuel != qfalse {
             if ctx.world.level.restarted != qfalse {
-                let mut buf: [c_char; 128] = [0; 128];
-                trap::Cvar_VariableStringBuffer(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs::new(
-                        cstr("timescale"),
-                        buf.as_mut_ptr(),
-                        buf.len() as c_int,
-                    ),
-                );
-                let t_fval = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32;
-                trap::Cvar_Set(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                        cstr("timescale"),
-                        cstr("1"),
-                    ),
-                );
+                let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "timescale", 128);
+                let t_fval = atof_bytes(buf.as_bytes()) as f32;
+                trap::Cvar_Set(ctx.engine, "timescale", "1");
                 if t_fval == 1.0f32 {
                     ctx.world.globals.gDoSlowMoDuel = qfalse;
                 }
@@ -3418,13 +2817,7 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                 let time_dif = (ctx.world.level.time - ctx.world.globals.gSlowMoDuelTime) as f32;
 
                 if time_dif < 150.0 {
-                    trap::Cvar_Set(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                            cstr("timescale"),
-                            cstr("0.1f"),
-                        ),
-                    );
+                    trap::Cvar_Set(ctx.engine, "timescale", "0.1f");
                 } else if time_dif < 1150.0 {
                     let mut use_dif = time_dif / 1000.0; // scale from 0.1 up to 1
                     if use_dif < 0.1 {
@@ -3433,32 +2826,12 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                     if use_dif > 1.0 {
                         use_dif = 1.0;
                     }
-                    trap::Cvar_Set(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                            cstr("timescale"),
-                            // `va("%f", useDif)` formats with 6 fixed decimals.
-                            cstr(&format!("{:.6}", use_dif)),
-                        ),
-                    );
+                    // `va("%f", useDif)` formats with 6 fixed decimals.
+                    trap::Cvar_Set(ctx.engine, "timescale", &format!("{:.6}", use_dif));
                 } else {
-                    let mut buf: [c_char; 128] = [0; 128];
-                    trap::Cvar_VariableStringBuffer(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs::new(
-                            cstr("timescale"),
-                            buf.as_mut_ptr(),
-                            buf.len() as c_int,
-                        ),
-                    );
-                    let t_fval = atof_bytes(CStr::from_ptr(buf.as_ptr()).to_bytes()) as f32;
-                    trap::Cvar_Set(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                            cstr("timescale"),
-                            cstr("1"),
-                        ),
-                    );
+                    let buf = trap::Cvar_VariableStringBuffer(ctx.engine, "timescale", 128);
+                    let t_fval = atof_bytes(buf.as_bytes()) as f32;
+                    trap::Cvar_Set(ctx.engine, "timescale", "1");
                     if time_dif > 1500.0 && t_fval == 1.0f32 {
                         ctx.world.globals.gDoSlowMoDuel = qfalse;
                     }
@@ -3883,16 +3256,10 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
                 } else {
                     cstr_to_str(classname)
                 };
-                G_Printf(ctx, cstr(&format!("{:4}: {}\n", i, name)).as_ptr());
+                G_Printf(ctx, &format!("{:4}: {}\n", i, name));
                 i += 1;
             }
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("g_listEntity"),
-                    cstr("0"),
-                ),
-            );
+            trap::Cvar_Set(ctx.engine, "g_listEntity", "0");
         }
 
         // At the end of the frame, send out the ghoul2 kill queue, if there is one
@@ -3914,23 +3281,11 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
 /// Raven `G_GetStringEdString`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:4104-4120`
-pub fn G_GetStringEdString(
-    ctx: &mut GameContext,
-    refSection: *mut c_char,
-    refName: *mut c_char,
-) -> *const c_char {
+pub fn G_GetStringEdString(_ctx: &mut GameContext, _refSection: &str, refName: &str) -> String {
     // Well, it would've been lovely doing it the above way, but it would mean
     // mixing languages for the client depending on what the server is. So
     // we'll mark this as a stringed reference with @@@ and send the refname
     // to the client, and when it goes to print it will get scanned for the
     // stringed reference indication and dealt with properly.
-    //
-    // Raven's `static char text[1024]` is a single reused rotating buffer;
-    // ported as an owned, leaked `'static` allocation per call instead.
-    unsafe {
-        let name = cstr_to_str(refName);
-        let text = format!("@@@{}", name);
-        let leaked: &'static CString = Box::leak(Box::new(cstr(&text)));
-        leaked.as_ptr()
-    }
+    format!("@@@{}", refName)
 }

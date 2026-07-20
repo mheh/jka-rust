@@ -1,9 +1,5 @@
 //! `g_shutdown_game` — Raven `G_ShutdownGame`.
 
-use std::ffi::CString;
-
-use mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs;
-use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
 use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
 use mp_abi::game::syscalls::G_G2_HAVEWEGHOULMODELS::GG2HaveweghoulmodelsArgs;
 use mp_abi::game::syscalls::G_ICARUS_SHUTDOWN::GIcarusShutdownArgs;
@@ -114,12 +110,12 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
     G_LogWeaponOutput(ctx);
 
     if ctx.world.level.logFile != 0 {
-        G_LogPrintf(ctx, cstr("ShutdownGame:\n").as_ptr());
+        G_LogPrintf(ctx, "ShutdownGame:\n");
         G_LogPrintf(
             ctx,
-            cstr("------------------------------------------------------------\n").as_ptr(),
+            "------------------------------------------------------------\n",
         );
-        trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(ctx.world.level.logFile));
+        trap::FS_FCloseFile(ctx.engine, ctx.world.level.logFile);
     }
 
     // write all the client session data so we can get it back
@@ -127,11 +123,7 @@ pub fn g_shutdown_game(ctx: &mut GameContext, args: GameShutdownArgs) {
 
     trap::ROFF_Clean(ctx.engine, GRoffCleanArgs::new());
 
-    if trap::Cvar_VariableIntegerValue(
-        ctx.engine,
-        GCvarVariableIntegerValueArgs::new(CString::new("bot_enable").unwrap()),
-    ) != 0
-    {
+    if trap::Cvar_VariableIntegerValue(ctx.engine, "bot_enable") != 0 {
         BotAIShutdown(ctx, restart);
     }
 

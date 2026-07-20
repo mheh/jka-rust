@@ -260,45 +260,34 @@ pub fn Use_Target_Print(
     }
 
     if ctx.entity(ent).genericValue15 > level_time {
-        Com_Printf(c"TARGET PRINT ERRORS:\n".as_ptr());
+        Com_Printf("TARGET PRINT ERRORS:\n");
         unsafe {
             if let Some(activator) = activator {
                 let classname = ctx.entity(activator).classname;
                 if !classname.is_null() && *classname != 0 {
-                    Com_Printf(
-                        cstr(&format!(
-                            "activator classname: {}\n",
-                            cstr_to_str(classname)
-                        ))
-                        .as_ptr(),
-                    );
+                    Com_Printf(&format!(
+                        "activator classname: {}\n",
+                        cstr_to_str(classname)
+                    ));
                 }
                 let target = ctx.entity(activator).target;
                 if !target.is_null() && *target != 0 {
-                    Com_Printf(
-                        cstr(&format!("activator target: {}\n", cstr_to_str(target))).as_ptr(),
-                    );
+                    Com_Printf(&format!("activator target: {}\n", cstr_to_str(target)));
                 }
                 let targetname = ctx.entity(activator).targetname;
                 if !targetname.is_null() && *targetname != 0 {
-                    Com_Printf(
-                        cstr(&format!(
-                            "activator targetname: {}\n",
-                            cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
-                    );
+                    Com_Printf(&format!(
+                        "activator targetname: {}\n",
+                        cstr_to_str(targetname)
+                    ));
                 }
             }
             let ent_targetname = ctx.entity(ent).targetname;
             if !ent_targetname.is_null() && *ent_targetname != 0 {
-                Com_Printf(
-                    cstr(&format!(
-                        "print targetname: {}\n",
-                        cstr_to_str(ent_targetname)
-                    ))
-                    .as_ptr(),
-                );
+                Com_Printf(&format!(
+                    "print targetname: {}\n",
+                    cstr_to_str(ent_targetname)
+                ));
             }
         }
         Com_Error(
@@ -329,21 +318,9 @@ pub fn Use_Target_Print(
                 let client_num = ctx.entity(activator).s.number;
                 unsafe {
                     if *message == b'@' as c_char && *message.add(1) != b'@' as c_char {
-                        trap::SendServerCommand(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                                client_num,
-                                crate::cstr_util::cstr(&format!("cps \"{}\"", msg)),
-                            ),
-                        );
+                        trap::SendServerCommand(ctx.engine, client_num, &format!("cps \"{}\"", msg));
                     } else {
-                        trap::SendServerCommand(
-                            ctx.engine,
-                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                                client_num,
-                                crate::cstr_util::cstr(&format!("cp \"{}\"", msg)),
-                            ),
-                        );
+                        trap::SendServerCommand(ctx.engine, client_num, &format!("cp \"{}\"", msg));
                     }
                 }
             }
@@ -389,21 +366,9 @@ pub fn Use_Target_Print(
     // Send to all players
     let msg = unsafe { crate::cstr_util::cstr_to_str(message) };
     if unsafe { *message == b'@' as c_char && *message.add(1) != b'@' as c_char } {
-        trap::SendServerCommand(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                -1,
-                crate::cstr_util::cstr(&format!("cps \"{}\"", msg)),
-            ),
-        );
+        trap::SendServerCommand(ctx.engine, -1, &format!("cps \"{}\"", msg));
     } else {
-        trap::SendServerCommand(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                -1,
-                crate::cstr_util::cstr(&format!("cp \"{}\"", msg)),
-            ),
-        );
+        trap::SendServerCommand(ctx.engine, -1, &format!("cp \"{}\"", msg));
     }
 }
 
@@ -914,13 +879,7 @@ pub fn target_location_linkup(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.level.locationLinked = qtrue;
     ctx.world.level.locationHead = core::ptr::null_mut();
 
-    trap::SetConfigstring(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-            mp_bg::public::configstring::CS_LOCATIONS,
-            cstr("unknown"),
-        ),
-    );
+    trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS, "unknown");
 
     let mut n = 1;
     let num_entities = ctx.world.level.num_entities as usize;
@@ -935,10 +894,8 @@ pub fn target_location_linkup(ctx: &mut GameContext, ent: EntityId) {
             let message = ctx.entity(id).message;
             trap::SetConfigstring(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    mp_bg::public::configstring::CS_LOCATIONS + n,
-                    cstr(&unsafe { cstr_to_str(message) }),
-                ),
+                mp_bg::public::configstring::CS_LOCATIONS + n,
+                &unsafe { cstr_to_str(message) },
             );
             n += 1;
             // `level.locationHead` is a raw `gentity_t*` seam field (§D5); the
@@ -1375,10 +1332,8 @@ pub fn target_level_change_use(
     let message = ctx.entity(self_).message;
     trap::SendConsoleCommand(
         ctx.engine,
-        mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-            cbufExec_t::EXEC_NOW as c_int,
-            cstr(&format!("map {}", unsafe { cstr_to_str(message) })),
-        ),
+        cbufExec_t::EXEC_NOW as c_int,
+        &format!("map {}", unsafe { cstr_to_str(message) }),
     );
 }
 
@@ -1423,10 +1378,8 @@ pub fn target_play_music_use(
     let message = ctx.entity(self_).message;
     trap::SetConfigstring(
         ctx.engine,
-        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-            mp_bg::public::configstring::CS_MUSIC,
-            unsafe { core::ffi::CStr::from_ptr(message) }.to_owned(),
-        ),
+        mp_bg::public::configstring::CS_MUSIC,
+        &unsafe { cstr_to_str(message) },
     );
 }
 

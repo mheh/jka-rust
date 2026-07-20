@@ -25,12 +25,12 @@ use std::path::PathBuf;
 use mp_game::prelude::{cstr, qfalse, qtrue};
 use mp_game::q_shared::{
     va, COM_BeginParseSession, COM_Compress, COM_DefaultExtension, COM_GetCurrentParseLine,
-    COM_ParseExt, COM_StripExtension, Com_Clamp, Com_Clampi, Com_sprintf, Info_NextPair,
-    Info_RemoveKey, Info_RemoveKey_Big, Info_SetValueForKey, Info_SetValueForKey_Big,
-    Info_Validate, Info_ValueForKey, QSharedScratch, Q_CleanStr, Q_PrintStrlen, Q_isalpha,
-    Q_islower, Q_isprint, Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp,
-    Q_strncpyz, Q_strrchr, Q_strupr, SkipBracedSection, SkipRestOfLine,
+    COM_ParseExt, COM_StripExtension, Com_Clamp, Com_Clampi, Com_sprintf, Info_SetValueForKey,
+    Info_SetValueForKey_Big, QSharedScratch, Q_CleanStr, Q_PrintStrlen, Q_isalpha, Q_islower,
+    Q_isprint, Q_isupper, Q_strcat, Q_stricmp, Q_stricmpn, Q_strlwr, Q_strncmp, Q_strncpyz,
+    Q_strrchr, Q_strupr, SkipBracedSection, SkipRestOfLine,
 };
+use native_string::info::{Info_RemoveKey, Info_RemoveKey_Big, Info_Validate, Info_ValueForKey};
 
 fn oracle_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
@@ -555,97 +555,62 @@ const SKV: &[(&str, &str)] = &[
     ("quote", "a\"b"),
 ];
 
-fn dump_info_record(qs: &mut QSharedScratch, o: &mut String, idx: usize, rec: &[u8]) {
-    let cb = cbuf_b(rec);
-    let s = cb.as_ptr();
+fn dump_info_record(o: &mut String, idx: usize, rec: &[u8]) {
+    // The fixture is pure ASCII, so the &str round trip is byte-lossless.
+    let s = String::from_utf8_lossy(rec).into_owned();
 
     let _ = write!(o, "rec {idx} ");
     qstr(o, rec);
     let _ = writeln!(o);
-    let _ = writeln!(o, "val {}", Info_Validate(s));
+    let _ = writeln!(o, "val {}", Info_Validate(&s) as c_int);
 
     for vk in VKEYS {
-        let k = cbuf(vk);
-        let v = Info_ValueForKey(qs, s, k.as_ptr());
+        let v = Info_ValueForKey(&s, vk);
         let _ = write!(o, "vfk ");
         qstr(o, vk.as_bytes());
         let _ = write!(o, " ");
-        qstr_p(o, v);
+        qstr(o, v.as_bytes());
         let _ = writeln!(o);
-    }
-
-    // Info_NextPair iteration.
-    let mut h: *const c_char = s;
-    for _ in 0..12 {
-        let mut key = vec![0 as c_char; 1024];
-        let mut value = vec![0 as c_char; 1024];
-        Info_NextPair(&mut h, key.as_mut_ptr(), value.as_mut_ptr());
-        let _ = write!(o, "np ");
-        qstr_p(o, key.as_ptr());
-        let _ = write!(o, " ");
-        qstr_p(o, value.as_ptr());
-        let _ = writeln!(o);
-        if unsafe { *h } == 0 {
-            break;
-        }
     }
 
     for rk in RKEYS {
-        let mut tmp = vec![0 as c_char; 1100];
-        for (i, &b) in rec.iter().enumerate() {
-            tmp[i] = b as c_char;
-        }
-        let k = cbuf(rk);
-        Info_RemoveKey(tmp.as_mut_ptr(), k.as_ptr());
+        let mut tmp = s.clone();
+        Info_RemoveKey(&mut tmp, rk);
         let _ = write!(o, "rk ");
         qstr(o, rk.as_bytes());
         let _ = write!(o, " ");
-        qstr_p(o, tmp.as_ptr());
+        qstr(o, tmp.as_bytes());
         let _ = writeln!(o);
     }
     for rk in RKEYS {
-        let mut tmp = vec![0 as c_char; 9000];
-        for (i, &b) in rec.iter().enumerate() {
-            tmp[i] = b as c_char;
-        }
-        let k = cbuf(rk);
-        Info_RemoveKey_Big(tmp.as_mut_ptr(), k.as_ptr());
+        let mut tmp = s.clone();
+        Info_RemoveKey_Big(&mut tmp, rk);
         let _ = write!(o, "rkb ");
         qstr(o, rk.as_bytes());
         let _ = write!(o, " ");
-        qstr_p(o, tmp.as_ptr());
+        qstr(o, tmp.as_bytes());
         let _ = writeln!(o);
     }
     for (k, v) in SKV {
-        let mut tmp = vec![0 as c_char; 1100];
-        for (i, &b) in rec.iter().enumerate() {
-            tmp[i] = b as c_char;
-        }
-        let ck = cbuf(k);
-        let cv = cbuf(v);
-        Info_SetValueForKey(tmp.as_mut_ptr(), ck.as_ptr(), cv.as_ptr());
+        let mut tmp = s.clone();
+        Info_SetValueForKey(&mut tmp, k, v);
         let _ = write!(o, "svk ");
         qstr(o, k.as_bytes());
         let _ = write!(o, " ");
         qstr(o, v.as_bytes());
         let _ = write!(o, " ");
-        qstr_p(o, tmp.as_ptr());
+        qstr(o, tmp.as_bytes());
         let _ = writeln!(o);
     }
     for (k, v) in SKV {
-        let mut tmp = vec![0 as c_char; 9000];
-        for (i, &b) in rec.iter().enumerate() {
-            tmp[i] = b as c_char;
-        }
-        let ck = cbuf(k);
-        let cv = cbuf(v);
-        Info_SetValueForKey_Big(tmp.as_mut_ptr(), ck.as_ptr(), cv.as_ptr());
+        let mut tmp = s.clone();
+        Info_SetValueForKey_Big(&mut tmp, k, v);
         let _ = write!(o, "svkb ");
         qstr(o, k.as_bytes());
         let _ = write!(o, " ");
         qstr(o, v.as_bytes());
         let _ = write!(o, " ");
-        qstr_p(o, tmp.as_ptr());
+        qstr(o, tmp.as_bytes());
         let _ = writeln!(o);
     }
     o.push_str("--\n");
@@ -653,10 +618,9 @@ fn dump_info_record(qs: &mut QSharedScratch, o: &mut String, idx: usize, rec: &[
 
 fn dump_info(o: &mut String) {
     o.push_str("== info ==\n");
-    let mut qs = QSharedScratch::zeroed();
     let data = read_fixture("infostrings.txt");
     for (idx, rec) in data.split(|&b| b == 0).enumerate() {
-        dump_info_record(&mut qs, o, idx, rec);
+        dump_info_record(o, idx, rec);
     }
 
     // Big infostring in (MAX_INFO_STRING, BIG_INFO_STRING); exercises the
@@ -667,26 +631,13 @@ fn dump_info(o: &mut String) {
         let _ = write!(big, "\\k{i}\\v{i}");
         i += 1;
     }
-    let bigc = cbuf(&big);
-    let s = bigc.as_ptr();
     let _ = writeln!(o, "big len {}", big.len());
-    let _ = writeln!(o, "big val {}", Info_Validate(s));
-    let k50 = cbuf("k50");
+    let _ = writeln!(o, "big val {}", Info_Validate(&big) as c_int);
     let _ = write!(o, "big vfk k50 ");
-    qstr_p(o, Info_ValueForKey(&mut qs, s, k50.as_ptr()));
+    qstr(o, Info_ValueForKey(&big, "k50").as_bytes());
     let _ = writeln!(o);
-    let miss = cbuf("missing");
     let _ = write!(o, "big vfk missing ");
-    qstr_p(o, Info_ValueForKey(&mut qs, s, miss.as_ptr()));
-    let _ = writeln!(o);
-    let mut h: *const c_char = s;
-    let mut key = vec![0 as c_char; 1024];
-    let mut value = vec![0 as c_char; 1024];
-    Info_NextPair(&mut h, key.as_mut_ptr(), value.as_mut_ptr());
-    let _ = write!(o, "big np ");
-    qstr_p(o, key.as_ptr());
-    let _ = write!(o, " ");
-    qstr_p(o, value.as_ptr());
+    qstr(o, Info_ValueForKey(&big, "missing").as_bytes());
     let _ = writeln!(o);
 }
 

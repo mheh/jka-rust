@@ -134,10 +134,8 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
     if !sound_set.is_null() && unsafe { *sound_set } != 0 {
         trap::SetConfigstring(
             ctx.engine,
-            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                CS_GLOBAL_AMBIENT_SET,
-                unsafe { std::ffi::CStr::from_ptr(sound_set).to_owned() },
-            ),
+            CS_GLOBAL_AMBIENT_SET,
+            &unsafe { cstr_to_str(sound_set) },
         );
     }
 
@@ -789,10 +787,7 @@ pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
     {
         let w = ctx.world.entity(ent_id).wait;
         ctx.world.entity_mut(ent_id).random = w - FRAMETIME as f32;
-        G_Printf(
-            ctx,
-            b"^3trigger_multiple has random >= wait\n\0".as_ptr() as *const c_char,
-        );
+        G_Printf(ctx, "^3trigger_multiple has random >= wait\n");
     }
 
     ctx.world.entity_mut(ent_id).delay *= 1000; // 1 = 1 msec, 1000 = 1 sec
@@ -1407,10 +1402,7 @@ pub fn trigger_teleporter_touch(
     let target = ctx.world.entity(self_).target;
     let dest = G_PickTarget(ctx, target);
     if dest.is_null() {
-        G_Printf(
-            ctx,
-            b"Couldn't find teleporter destination\n\0".as_ptr() as *const c_char,
-        );
+        G_Printf(ctx, "Couldn't find teleporter destination\n");
         return;
     }
     let dest_id = ctx.entity_id_of(dest).unwrap();
@@ -1834,10 +1826,7 @@ pub fn shipboundary_touch(
     let ent_id = ctx.entity_id_of(ent);
     if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
         // this is bad
-        G_Error(
-            ctx,
-            c"trigger_shipboundary has invalid target '%s'\n".as_ptr(),
-        );
+        G_Error(ctx, "trigger_shipboundary has invalid target '%s'\n");
         return;
     }
     let ent_id = ent_id.unwrap();
@@ -1940,14 +1929,14 @@ pub fn SP_trigger_shipboundary(ctx: &mut GameContext, self_id: EntityId) {
 
     let target = ctx.world.entity(self_id).target;
     if target.is_null() || unsafe { *target } == 0 {
-        G_Error(ctx, c"trigger_shipboundary without a target.".as_ptr());
+        G_Error(ctx, "trigger_shipboundary without a target.");
     }
     let mut gv1: c_int = 0;
     G_SpawnInt(ctx, c"traveltime".as_ptr(), c"0".as_ptr(), &mut gv1);
     ctx.world.entity_mut(self_id).genericValue1 = gv1;
 
     if ctx.world.entity(self_id).genericValue1 == 0 {
-        G_Error(ctx, c"trigger_shipboundary without traveltime.".as_ptr());
+        G_Error(ctx, "trigger_shipboundary without traveltime.");
     }
 
     ctx.world.entity_mut(self_id).think = Some(EntThink::shipboundary_think).into();
@@ -2010,10 +1999,7 @@ pub fn hyperspace_touch(
                 let ent_id = ctx.entity_id_of(ent);
                 if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
                     // this is bad
-                    G_Error(
-                        ctx,
-                        c"trigger_hyperspace has invalid target '%s'\n".as_ptr(),
-                    );
+                    G_Error(ctx, "trigger_hyperspace has invalid target '%s'\n");
                     return;
                 }
                 let ent_id = ent_id.unwrap();
@@ -2044,10 +2030,7 @@ pub fn hyperspace_touch(
                 let ent_id = ctx.entity_id_of(ent);
                 if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
                     // this is bad
-                    G_Error(
-                        ctx,
-                        c"trigger_hyperspace has invalid target2 '%s'\n".as_ptr(),
-                    );
+                    G_Error(ctx, "trigger_hyperspace has invalid target2 '%s'\n");
                     return;
                 }
                 let ent_id = ent_id.unwrap();
@@ -2113,10 +2096,7 @@ pub fn hyperspace_touch(
         let ent_id = ctx.entity_id_of(ent);
         if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
             // this is bad
-            G_Error(
-                ctx,
-                c"trigger_hyperspace has invalid target '%s'\n".as_ptr(),
-            );
+            G_Error(ctx, "trigger_hyperspace has invalid target '%s'\n");
             return;
         }
         let ent_id = ent_id.unwrap();
@@ -2168,11 +2148,11 @@ pub fn SP_trigger_hyperspace(ctx: &mut GameContext, self_id: EntityId) {
 
     let target = ctx.world.entity(self_id).target;
     if target.is_null() || unsafe { *target } == 0 {
-        G_Error(ctx, c"trigger_hyperspace without a target.".as_ptr());
+        G_Error(ctx, "trigger_hyperspace without a target.");
     }
     let target2 = ctx.world.entity(self_id).target2;
     if target2.is_null() || unsafe { *target2 } == 0 {
-        G_Error(ctx, c"trigger_hyperspace without a target2.".as_ptr());
+        G_Error(ctx, "trigger_hyperspace without a target2.");
     }
 
     let absmax = ctx.world.entity(self_id).r.absmax;
@@ -2250,10 +2230,7 @@ pub fn SP_func_timer(ctx: &mut GameContext, self_: EntityId) {
                                                       // G_Printf's seam is a fixed format string with no vararg
                                                       // substitution; vtos(self->s.origin) is dropped from the
                                                       // message, matching other G_Printf/G_Error sites in this file.
-        G_Printf(
-            ctx,
-            c"func_timer at (unresolved-vtos) has random >= wait\n".as_ptr(),
-        );
+        G_Printf(ctx, "func_timer at (unresolved-vtos) has random >= wait\n");
     }
 
     if ctx.world.entity(self_).spawnflags & 1 != 0 {

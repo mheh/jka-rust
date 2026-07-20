@@ -119,7 +119,7 @@ pub fn G2Tur_SetBoneAngles(
             }
             None => {
                 // no free bones.. can't do a thing then.
-                Com_Printf(c"WARNING: NPC has no free bone indexes\n".as_ptr());
+                Com_Printf("WARNING: NPC has no free bone indexes\n");
                 return;
             }
         },

@@ -46,18 +46,15 @@ use mp_bg::bg_misc::{BG_FindItem, BG_ParseField};
 use mp_bg::bg_panimate::BG_ParseAnimationFile;
 
 use crate::ent_fn_enums::EntThink;
-use mp_abi::game::syscalls::G_GET_ENTITY_TOKEN::GGetEntityTokenArgs;
 use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
 use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
 
 // Missing trap Args types - will be resolved by integration
-use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
 use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs;
 use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltInfoArgs;
 use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 use mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs as GR_RegisterSkinArgs;
-use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
 use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
 
 use mp_bg::public::fieldtype::fieldtype_t;
@@ -286,7 +283,7 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
 pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
     unsafe {
         if ctx.entity(id).classname.is_null() {
-            G_Printf(ctx, c"G_CallSpawn: NULL classname\n".as_ptr());
+            G_Printf(ctx, "G_CallSpawn: NULL classname\n");
             return qfalse;
         }
 
@@ -318,11 +315,7 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
         let classname_disp = CStr::from_ptr(ctx.entity(id).classname).to_string_lossy();
         G_Printf(
             ctx,
-            cstr(&format!(
-                "{} doesn't have a spawn function\n",
-                classname_disp
-            ))
-            .as_ptr(),
+            &format!("{} doesn't have a spawn function\n", classname_disp),
         );
         qfalse
     }
@@ -1068,58 +1061,43 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
 pub fn G_ParseSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) -> qboolean {
     // `MAX_TOKEN_CHARS` (value 1024) canonical in `mp_qshared::shared::limits`,
     // reaches this file via the crate prelude glob.
-    let mut keyname = [0 as c_char; MAX_TOKEN_CHARS];
-    let mut com_token = [0 as c_char; MAX_TOKEN_CHARS];
-
     ctx.world.level.numSpawnVars = 0;
     ctx.world.level.numSpawnVarChars = 0;
 
     // parse the opening brace
-    if trap::GetEntityToken(
-        ctx.engine,
-        GGetEntityTokenArgs::new(com_token.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
-    ) == qfalse
-    {
+    let Some(com_token) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
         // end of spawn string
         return qfalse;
-    }
-    if com_token[0] != b'{' as c_char {
+    };
+    if com_token.as_bytes().first() != Some(&b'{') {
         panic!("G_ParseSpawnVars: found {{ ... }} mismatch"); // G_Error -> panic (frozen Group A)
     }
 
     // go through all the key / value pairs
     loop {
         // parse key
-        if trap::GetEntityToken(
-            ctx.engine,
-            GGetEntityTokenArgs::new(keyname.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
-        ) == qfalse
-        {
+        let Some(keyname) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
             panic!("G_ParseSpawnVars: EOF without closing brace");
-        }
+        };
 
-        if keyname[0] == b'}' as c_char {
+        if keyname.as_bytes().first() == Some(&b'}') {
             break;
         }
 
         // parse value
-        if trap::GetEntityToken(
-            ctx.engine,
-            GGetEntityTokenArgs::new(com_token.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
-        ) == qfalse
-        {
+        let Some(com_token) = trap::GetEntityToken(ctx.engine, MAX_TOKEN_CHARS) else {
             panic!("G_ParseSpawnVars: EOF without closing brace");
-        }
+        };
 
-        if com_token[0] == b'}' as c_char {
+        if com_token.as_bytes().first() == Some(&b'}') {
             panic!("G_ParseSpawnVars: closing brace without data");
         }
         if ctx.world.level.numSpawnVars == mp_bg::MAX_SPAWN_VARS as c_int {
             panic!("G_ParseSpawnVars: MAX_SPAWN_VARS");
         }
         let n = ctx.world.level.numSpawnVars;
-        let key_tok = G_AddSpawnVarToken(ctx, keyname.as_ptr() as *const c_char);
-        let val_tok = G_AddSpawnVarToken(ctx, com_token.as_ptr() as *const c_char);
+        let key_tok = G_AddSpawnVarToken(ctx, cstr(&keyname).as_ptr());
+        let val_tok = G_AddSpawnVarToken(ctx, cstr(&com_token).as_ptr());
         ctx.world.level.spawnVars[n as usize][0] = key_tok;
         ctx.world.level.spawnVars[n as usize][1] = val_tok;
         ctx.world.level.numSpawnVars += 1;
@@ -1161,10 +1139,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
 
         G_SpawnString(ctx, c"classname".as_ptr(), c"".as_ptr(), &mut text);
         if Q_stricmp(text, c"worldspawn".as_ptr()) != 0 {
-            G_Error(
-                ctx,
-                c"SP_worldspawn: The first entity isn't 'worldspawn'".as_ptr(),
-            );
+            G_Error(ctx, "SP_worldspawn: The first entity isn't 'worldspawn'");
         }
 
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
@@ -1284,61 +1259,38 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         }
 
         // make some data visible to connecting client
-        trap::SetConfigstring(
-            ctx.engine,
-            // `#define GAME_VERSION "basejka-1"`.
-            GSetConfigstringArgs::new(CS_GAME_VERSION, c"basejka-1".to_owned()),
-        );
+        // `#define GAME_VERSION "basejka-1"`.
+        trap::SetConfigstring(ctx.engine, CS_GAME_VERSION, "basejka-1");
 
-        let level_start_time_str = format!("{}", ctx.world.level.startTime);
-        let level_start_time_c = CString::new(level_start_time_str).unwrap();
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_LEVEL_START_TIME, level_start_time_c),
+            CS_LEVEL_START_TIME,
+            &format!("{}", ctx.world.level.startTime),
         );
 
         G_SpawnString(ctx, c"music".as_ptr(), c"".as_ptr(), &mut text);
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_MUSIC, CStr::from_ptr(text).to_owned()),
-        );
+        trap::SetConfigstring(ctx.engine, CS_MUSIC, &cstr_to_str(text));
 
         G_SpawnString(ctx, c"message".as_ptr(), c"".as_ptr(), &mut text);
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_MESSAGE, CStr::from_ptr(text).to_owned()),
-        ); // map specific message
+        trap::SetConfigstring(ctx.engine, CS_MESSAGE, &cstr_to_str(text)); // map specific message
 
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(
-                CS_MOTD,
-                cstr_from_chars(&ctx.world.cvars.g_motd.string).to_owned(),
-            ),
+            CS_MOTD,
+            &cstr_from_chars(&ctx.world.cvars.g_motd.string).to_string_lossy(),
         ); // message of the day
 
         G_SpawnString(ctx, c"gravity".as_ptr(), c"800".as_ptr(), &mut text);
-        trap::Cvar_Set(
-            ctx.engine,
-            GCvarSetArgs::new(c"g_gravity".to_owned(), CStr::from_ptr(text).to_owned()),
-        );
+        trap::Cvar_Set(ctx.engine, "g_gravity", &cstr_to_str(text));
 
         G_SpawnString(ctx, c"enableBreath".as_ptr(), c"0".as_ptr(), &mut text);
-        trap::Cvar_Set(
-            ctx.engine,
-            GCvarSetArgs::new(
-                c"g_enableBreath".to_owned(),
-                CStr::from_ptr(text).to_owned(),
-            ),
-        );
+        trap::Cvar_Set(ctx.engine, "g_enableBreath", &cstr_to_str(text));
 
         G_SpawnString(ctx, c"soundSet".as_ptr(), c"default".as_ptr(), &mut text);
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(
-                mp_bg::public::configstring::CS_GLOBAL_AMBIENT_SET,
-                CStr::from_ptr(text).to_owned(),
-            ),
+            mp_bg::public::configstring::CS_GLOBAL_AMBIENT_SET,
+            &cstr_to_str(text),
         );
 
         ctx.world.g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
@@ -1346,38 +1298,26 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             c"worldspawn".as_ptr() as *mut c_char;
 
         // see if we want a warmup time
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_WARMUP, c"".to_owned()),
-        );
+        trap::SetConfigstring(ctx.engine, CS_WARMUP, "");
         if ctx.world.cvars.g_restarted.integer != 0 {
-            trap::Cvar_Set(
-                ctx.engine,
-                GCvarSetArgs::new(c"g_restarted".to_owned(), c"0".to_owned()),
-            );
+            trap::Cvar_Set(ctx.engine, "g_restarted", "0");
             ctx.world.level.warmupTime = 0;
         }
 
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(
-                CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3) as c_int,
-                CStr::from_ptr(defaultStyles[0][0]).to_owned(),
-            ),
+            CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3) as c_int,
+            &cstr_to_str(defaultStyles[0][0]),
         );
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(
-                CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3 + 1) as c_int,
-                CStr::from_ptr(defaultStyles[0][1]).to_owned(),
-            ),
+            CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3 + 1) as c_int,
+            &cstr_to_str(defaultStyles[0][1]),
         );
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(
-                CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3 + 2) as c_int,
-                CStr::from_ptr(defaultStyles[0][2]).to_owned(),
-            ),
+            CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3 + 2) as c_int,
+            &cstr_to_str(defaultStyles[0][2]),
         );
 
         for i in 1..LS_NUM_STYLES {
@@ -1392,10 +1332,8 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             lengthRed = (strlen(text)) as i32;
             trap::SetConfigstring(
                 ctx.engine,
-                GSetConfigstringArgs::new(
-                    CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3) as c_int,
-                    CStr::from_ptr(text).to_owned(),
-                ),
+                CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3) as c_int,
+                &cstr_to_str(text),
             );
 
             let green_key = format!("ls_{}g", i);
@@ -1409,10 +1347,8 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             lengthGreen = (strlen(text)) as i32;
             trap::SetConfigstring(
                 ctx.engine,
-                GSetConfigstringArgs::new(
-                    CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 1) as c_int,
-                    CStr::from_ptr(text).to_owned(),
-                ),
+                CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 1) as c_int,
+                &cstr_to_str(text),
             );
 
             let blue_key = format!("ls_{}b", i);
@@ -1426,10 +1362,8 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             lengthBlue = (strlen(text)) as i32;
             trap::SetConfigstring(
                 ctx.engine,
-                GSetConfigstringArgs::new(
-                    CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 2) as c_int,
-                    CStr::from_ptr(text).to_owned(),
-                ),
+                CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 2) as c_int,
+                &cstr_to_str(text),
             );
 
             if lengthRed != lengthGreen || lengthGreen != lengthBlue {
@@ -1487,7 +1421,7 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
         // has a "spawn" function to perform any global setup
         // needed by a level (setting configstrings or cvars, etc)
         if G_ParseSpawnVars(ctx, qfalse) == qfalse {
-            G_Error(ctx, c"SpawnEntities: no entities".as_ptr());
+            G_Error(ctx, "SpawnEntities: no entities");
         }
 
         if inSubBSP == qfalse {

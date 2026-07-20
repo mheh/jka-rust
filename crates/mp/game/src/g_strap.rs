@@ -14,7 +14,7 @@
 //! Source: `oracle/codemp/game/g_strap.c`
 #![allow(non_snake_case, unused, clippy::all)]
 
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::sync::OnceLock;
 
 use mp_engine_select::Engine;

@@ -26,7 +26,6 @@ use crate::NPC_move::NPC_MoveToGoal;
 use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
 use crate::NPC_utils::{NPC_SetBoneAngles, NPC_UpdateAngles};
-use std::ffi::CStr;
 
 /// Local state enums.
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:10-17`

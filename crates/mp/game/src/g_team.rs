@@ -369,13 +369,7 @@ pub fn Team_SetFlagStatus(ctx: &mut GameContext, team: c_int, status: flagStatus
                 st[2] = 0;
             }
 
-            trap::SetConfigstring(
-                ctx.engine,
-                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
-                    CS_FLAGSTATUS,
-                    cstr(&cstr_to_str(st.as_ptr())),
-                ),
-            );
+            trap::SetConfigstring(ctx.engine, CS_FLAGSTATUS, &unsafe { cstr_to_str(st.as_ptr()) });
         }
     }
 }
@@ -1445,13 +1439,7 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
             cnt,
             String::from_iter(string[0..stringlength].iter().map(|&c| c as u8 as char))
         );
-        trap::SendServerCommand(
-            ctx.engine,
-            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                ent_idx as c_int,
-                cstr(&cmd),
-            ),
-        );
+        trap::SendServerCommand(ctx.engine, ent_idx as c_int, &cmd);
     }
 }
 

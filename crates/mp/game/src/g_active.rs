@@ -1019,23 +1019,15 @@ pub fn ClientInactivityTimer(ctx: &mut GameContext, ent: EntityId) -> qboolean {
         } else if (*client).pers.localClient == 0 {
             let clientNum = client.offset_from(clients) as c_int;
             if level_time > (*client).inactivityTime {
-                trap::DropClient(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_DROP_CLIENT::GDropClientArgs::new(
-                        clientNum,
-                        cstr("Dropped due to inactivity"),
-                    ),
-                );
+                trap::DropClient(ctx.engine, clientNum, "Dropped due to inactivity");
                 return qfalse;
             }
             if level_time > (*client).inactivityTime - 10000 && (*client).inactivityWarning == 0 {
                 (*client).inactivityWarning = qtrue;
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                        clientNum,
-                        cstr("cp \"Ten seconds until inactivity drop!\n\""),
-                    ),
+                    clientNum,
+                    "cp \"Ten seconds until inactivity drop!\n\"",
                 );
             }
         }
@@ -2362,21 +2354,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if ctx.world.cvars.pmove_msec.integer < 8 {
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("pmove_msec"),
-                    cstr("8"),
-                ),
-            );
+            trap::Cvar_Set(ctx.engine, "pmove_msec", "8");
         } else if ctx.world.cvars.pmove_msec.integer > 33 {
-            trap::Cvar_Set(
-                ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
-                    cstr("pmove_msec"),
-                    cstr("33"),
-                ),
-            );
+            trap::Cvar_Set(ctx.engine, "pmove_msec", "33");
         }
 
         if ctx.world.cvars.pmove_fixed.integer != 0 || (*client).pers.pmoveFixed != qfalse {
@@ -2811,39 +2791,19 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
 
                 // Private duel announcements are now made globally because we only want one duel at a time.
                 if (*ent).health > 0 && (*client).ps.stats[STAT_HEALTH as usize] > 0 {
-                    let m = crate::g_main::G_GetStringEdString(
-                        ctx,
-                        c"MP_SVGAME".as_ptr() as *mut c_char,
-                        c"PLDUELWINNER".as_ptr() as *mut c_char,
-                    );
+                    let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLDUELWINNER");
                     let s = format!(
                         "cp \"{} {} {}!\n\"",
                         cstr_to_str((*client).pers.netname.as_ptr()),
-                        cstr_to_str(m),
+                        m,
                         cstr_to_str((*daClient).pers.netname.as_ptr())
                     );
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                            -1,
-                            cstr(&s),
-                        ),
-                    );
+                    trap::SendServerCommand(ctx.engine, -1, &s);
                 } else {
                     // it was a draw, because we both managed to die in the same frame
-                    let m = crate::g_main::G_GetStringEdString(
-                        ctx,
-                        c"MP_SVGAME".as_ptr() as *mut c_char,
-                        c"PLDUELTIE".as_ptr() as *mut c_char,
-                    );
-                    let s = format!("cp \"{}\n\"", cstr_to_str(m));
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                            -1,
-                            cstr(&s),
-                        ),
-                    );
+                    let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLDUELTIE");
+                    let s = format!("cp \"{}\n\"", m);
+                    trap::SendServerCommand(ctx.engine, -1, &s);
                 }
             } else {
                 let mut vSub: vec3_t = [0.0; 3];
@@ -2862,19 +2822,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                     G_AddEvent(&mut *(ent), EV_PRIVATE_DUEL as c_int, 0);
                     G_AddEvent(&mut *(duelAgainst), EV_PRIVATE_DUEL as c_int, 0);
 
-                    let m = crate::g_main::G_GetStringEdString(
-                        ctx,
-                        c"MP_SVGAME".as_ptr() as *mut c_char,
-                        c"PLDUELSTOP".as_ptr() as *mut c_char,
-                    );
-                    let s = format!("print \"{}\n\"", cstr_to_str(m));
-                    trap::SendServerCommand(
-                        ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
-                            -1,
-                            cstr(&s),
-                        ),
-                    );
+                    let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLDUELSTOP");
+                    let s = format!("print \"{}\n\"", m);
+                    trap::SendServerCommand(ctx.engine, -1, &s);
                 }
             }
         }
@@ -3957,8 +3907,7 @@ pub fn G_CheckClientTimeouts(ctx: &mut GameContext, ent: EntityId) {
         if ctx.world.level.time - (*cl).pers.cmd.serverTime
             > ctx.world.cvars.g_timeouttospec.integer * 1000
         {
-            let s = cstr("spectator");
-            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            SetTeam(ctx, ent, "spectator");
         }
     }
 }

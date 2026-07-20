@@ -3080,7 +3080,7 @@ pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
     // randomly select from teamed entities
     if !ctx.entity(ent).team.is_null() {
         if ctx.entity(ent).teammaster.is_none() {
-            G_Error(ctx, c"RespawnItem: bad teammaster".as_ptr());
+            G_Error(ctx, "RespawnItem: bad teammaster");
         }
         let master = ctx.entity(ent).teammaster;
 
@@ -3318,7 +3318,7 @@ pub fn Touch_Item(
 
     let other_number = ctx.entity(other).s.number;
     let logmsg = format!("Item: {} {}\n", other_number, it.classname);
-    G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
+    G_LogPrintf(ctx, &logmsg);
 
     let mut predict = unsafe { (*other_client).pers.predictItemPickup } != 0;
 
@@ -3757,7 +3757,7 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(ctx, c"FinishSpawningItem: %s startsolid at %s\n".as_ptr());
+            G_Printf(ctx, "FinishSpawningItem: %s startsolid at %s\n");
             G_FreeEntity(ctx, Some(ent));
             return;
         }
@@ -3800,13 +3800,13 @@ pub fn G_CheckTeamItems(ctx: &mut GameContext) {
         if item.is_none()
             || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
         {
-            G_Printf(ctx, c"WARNING: No team_CTF_redflag in map".as_ptr());
+            G_Printf(ctx, "WARNING: No team_CTF_redflag in map");
         }
         item = BG_FindItem("team_CTF_blueflag");
         if item.is_none()
             || ctx.world.globals.itemRegistered.0[item.unwrap().modelindex() as usize] == 0
         {
-            G_Printf(ctx, c"WARNING: No team_CTF_blueflag in map".as_ptr());
+            G_Printf(ctx, "WARNING: No team_CTF_blueflag in map");
         }
     }
 }
@@ -3855,24 +3855,16 @@ pub fn SaveRegisteredItems(ctx: &mut GameContext) {
     string[bg_numItems as usize] = 0;
 
     //	G_Printf( "%i items registered\n", count );
-    let s = cstr_from_chars(&string).to_owned();
-    trap::SetConfigstring(
-        ctx.engine,
-        mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s),
-    );
+    let s = cstr_from_chars(&string).to_string_lossy().into_owned();
+    trap::SetConfigstring(ctx.engine, CS_ITEMS, &s);
 }
 
 /// Raven `G_ItemDisabled`.
 ///
 /// Source: `oracle/codemp/game/g_items.c:3061-3067`
 pub fn G_ItemDisabled(ctx: &mut GameContext, item: ItemId) -> c_int {
-    let name = std::ffi::CString::new(format!("disable_{}", item.item().classname)).unwrap();
-    trap::Cvar_VariableIntegerValue(
-        ctx.engine,
-        mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(
-            name,
-        ),
-    )
+    let name = format!("disable_{}", item.item().classname);
+    trap::Cvar_VariableIntegerValue(ctx.engine, &name)
 }
 
 /// Raven `G_SpawnItem`.

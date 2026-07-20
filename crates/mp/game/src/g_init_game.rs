@@ -33,17 +33,11 @@ use mp_bg::public::configstring::CS_CLIENT_JEDIMASTER;
 
 use mp_abi::game::vmcalls::GAME_INIT::GameInitArgs;
 
-use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
-use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-use mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs;
-use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
 use mp_abi::game::syscalls::G_G2_CLEANENTATTACHMENTS::GG2CleanentattachmentsArgs;
-use mp_abi::game::syscalls::G_GET_SERVERINFO::GGetServerinfoArgs;
 use mp_abi::game::syscalls::G_ICARUS_INIT::GIcarusInitArgs;
 use mp_abi::game::syscalls::G_LOCATE_GAME_DATA::GLocateGameDataArgs;
 use mp_abi::game::syscalls::G_NAV_LOAD::GNavLoadArgs;
 use mp_abi::game::syscalls::G_NAV_SETPATHSCALCULATED::GNavSetpathscalculatedArgs;
-use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
 use mp_abi::game::syscalls::G_SET_SHARED_BUFFER::GSetSharedBufferArgs;
 
 // `MAX_INFO_STRING` resolves via the crate prelude glob
@@ -70,7 +64,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // (`q_math.rs`, `NPC_utils.rs`).
 
         // Init RMG to 0, it will be autoset to 1 if there is terrain on the level.
-        trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("RMG"), cstr("0")));
+        trap::Cvar_Set(ctx.engine, "RMG", "0");
         ctx.world.cvars.g_RMG.integer = 0;
 
         // Clean up any client-server ghoul2 instance attachments that may
@@ -102,17 +96,16 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // Load external vehicle data
         BG_VehicleLoadParms(&mut ctx.world.bg_state, &bg_traps);
 
-        G_Printf(ctx, c"------- Game Initialization -------\n".as_ptr());
-        G_Printf(ctx, c"gamename: basejka\n".as_ptr());
+        G_Printf(ctx, "------- Game Initialization -------\n");
+        G_Printf(ctx, "gamename: basejka\n");
         // Raven's `__DATE__` (compile-time C macro): `build.rs` emits it as
         // the `BUILD_DATE` env var (`__DATE__` format, computed at build time).
         G_Printf(
             ctx,
-            cstr(&format!(
+            &format!(
                 "gamedate: {}\n",
                 option_env!("BUILD_DATE").unwrap_or("")
-            ))
-            .as_ptr(),
+            ),
         );
 
         // Raven `srand( randomSeed )` — resolves to `bg_lib.c`'s own
@@ -151,42 +144,32 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             } else {
                 FS_APPEND
             };
-            let log_path = cstr_from_chars(&ctx.world.cvars.g_log.string).to_owned();
+            let log_path = cstr_to_str(ctx.world.cvars.g_log.string.as_ptr());
             let _ = trap::FS_FOpenFile(
                 ctx.engine,
-                GFsFopenFileArgs::new(
-                    log_path,
-                    &mut ctx.world.level.logFile as *mut fileHandle_t,
-                    mode,
-                ),
+                &log_path,
+                &mut ctx.world.level.logFile,
+                mode,
             );
             if ctx.world.level.logFile == 0 {
                 G_Printf(
                     ctx,
-                    cstr(&format!(
+                    &format!(
                         "WARNING: Couldn't open logfile: {}\n",
                         cstr_to_str(ctx.world.cvars.g_log.string.as_ptr())
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             } else {
-                let mut serverinfo: [c_char; MAX_INFO_STRING] = [0; MAX_INFO_STRING];
-                trap::GetServerinfo(
-                    ctx.engine,
-                    GGetServerinfoArgs::new(serverinfo.as_mut_ptr(), MAX_INFO_STRING as c_int),
-                );
+                let serverinfo = trap::GetServerinfo(ctx.engine, MAX_INFO_STRING);
 
                 G_LogPrintf(
                     ctx,
-                    cstr("------------------------------------------------------------\n").as_ptr(),
+                    "------------------------------------------------------------\n",
                 );
-                G_LogPrintf(
-                    ctx,
-                    cstr(&format!("InitGame: {}\n", cstr_to_str(serverinfo.as_ptr()))).as_ptr(),
-                );
+                G_LogPrintf(ctx, &format!("InitGame: {}\n", serverinfo));
             }
         } else {
-            G_Printf(ctx, c"Not logging to disk.\n".as_ptr());
+            G_Printf(ctx, "Not logging to disk.\n");
         }
 
         G_LogWeaponInit(ctx);
@@ -255,21 +238,17 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         let mut ck_sum = vmCvar_t::zeroed();
         trap::Cvar_Register(
             ctx.engine,
-            GCvarRegisterArgs::new(
-                &mut mapname as *mut vmCvar_t,
-                cstr("mapname"),
-                cstr(""),
-                CVAR_SERVERINFO | CVAR_ROM,
-            ),
+            Some(&mut mapname),
+            "mapname",
+            "",
+            CVAR_SERVERINFO | CVAR_ROM,
         );
         trap::Cvar_Register(
             ctx.engine,
-            GCvarRegisterArgs::new(
-                &mut ck_sum as *mut vmCvar_t,
-                cstr("sv_mapChecksum"),
-                cstr(""),
-                CVAR_ROM,
-            ),
+            Some(&mut ck_sum),
+            "sv_mapChecksum",
+            "",
+            CVAR_ROM,
         );
 
         let mapname_cstr = cstr_from_chars(&mapname.string).to_owned();
@@ -287,32 +266,17 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         if ctx.world.cvars.g_gametype.integer >= GT_TEAM {
             G_CheckTeamItems(ctx);
         } else if ctx.world.cvars.g_gametype.integer == GT_JEDIMASTER {
-            trap::SetConfigstring(
-                ctx.engine,
-                GSetConfigstringArgs::new(CS_CLIENT_JEDIMASTER, cstr("-1")),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_JEDIMASTER, "-1");
         }
 
         if ctx.world.cvars.g_gametype.integer == GT_POWERDUEL {
-            trap::SetConfigstring(
-                ctx.engine,
-                GSetConfigstringArgs::new(CS_CLIENT_DUELISTS, cstr("-1|-1|-1")),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, "-1|-1|-1");
         } else {
-            trap::SetConfigstring(
-                ctx.engine,
-                GSetConfigstringArgs::new(CS_CLIENT_DUELISTS, cstr("-1|-1")),
-            );
+            trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELISTS, "-1|-1");
         }
         // nmckenzie: DUEL_HEALTH: Default.
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_CLIENT_DUELHEALTHS, cstr("-1|-1|!")),
-        );
-        trap::SetConfigstring(
-            ctx.engine,
-            GSetConfigstringArgs::new(CS_CLIENT_DUELWINNER, cstr("-1")),
-        );
+        trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELHEALTHS, "-1|-1|!");
+        trap::SetConfigstring(ctx.engine, CS_CLIENT_DUELWINNER, "-1");
 
         SaveRegisteredItems(ctx);
 
@@ -320,21 +284,14 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // already commented out in the oracle.
 
         if ctx.world.cvars.g_gametype.integer == GT_SINGLE_PLAYER
-            || trap::Cvar_VariableIntegerValue(
-                ctx.engine,
-                GCvarVariableIntegerValueArgs::new(cstr("com_buildScript")),
-            ) != 0
+            || trap::Cvar_VariableIntegerValue(ctx.engine, "com_buildScript") != 0
         {
             G_ModelIndex(SP_PODIUM_MODEL.as_ptr());
             G_SoundIndex(c"sound/player/gurp1.wav".as_ptr());
             G_SoundIndex(c"sound/player/gurp2.wav".as_ptr());
         }
 
-        if trap::Cvar_VariableIntegerValue(
-            ctx.engine,
-            GCvarVariableIntegerValueArgs::new(cstr("bot_enable")),
-        ) != 0
-        {
+        if trap::Cvar_VariableIntegerValue(ctx.engine, "bot_enable") != 0 {
             BotAISetup(ctx, args.restart());
             BotAILoadMap(ctx, args.restart());
             G_InitBots(ctx, args.restart());
@@ -347,11 +304,10 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         {
             G_LogPrintf(
                 ctx,
-                cstr(&format!(
+                &format!(
                     "Duel Tournament Begun: kill limit {}, win limit: {}\n",
                     ctx.world.cvars.g_fraglimit.integer, ctx.world.cvars.g_duel_fraglimit.integer
-                ))
-                .as_ptr(),
+                ),
             );
         }
 

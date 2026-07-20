@@ -943,7 +943,7 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
             }
             G_UseTargets2(ctx, ent_eid, activator_eid, (*ent).closetarget);
         } else {
-            G_Error(ctx, c"Reached_BinaryMover: bad moverState".as_ptr());
+            G_Error(ctx, "Reached_BinaryMover: bad moverState");
         }
     }
 }
@@ -2268,7 +2268,7 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
             ),
         );
         if (*ent).nextTrain.is_none() {
-            Com_Printf(c"func_train at %s with an unfound target\n".as_ptr());
+            Com_Printf("func_train at %s with an unfound target\n");
             // Free me?`
             return;
         }
@@ -2341,7 +2341,7 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_mover.c:1873-1880`
 pub fn SP_path_corner(ctx: &mut GameContext, self_: EntityId) {
     if ctx.entity(self_).targetname.is_null() {
-        G_Printf(ctx, c"path_corner with no targetname at %s\n".as_ptr());
+        G_Printf(ctx, "path_corner with no targetname at %s\n");
         let origin = ctx.entity(self_).s.origin;
         let _ = vtos(ctx, origin);
         G_FreeEntity(ctx, Some(self_));
@@ -2374,7 +2374,7 @@ pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
     if ctx.entity(self_).target.is_null() {
         let absmin = ctx.entity(self_).r.absmin;
         let _ = vtos(ctx, absmin);
-        G_Printf(ctx, c"func_train without a target at %s\n".as_ptr());
+        G_Printf(ctx, "func_train without a target at %s\n");
         G_FreeEntity(ctx, Some(self_));
         return;
     }
@@ -3399,7 +3399,7 @@ pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
     }
     ctx.entity_mut(self_).team = core::ptr::null_mut();
     if ctx.entity(self_).model.is_null() {
-        G_Error(ctx, c"func_breakable with NULL model\n".as_ptr());
+        G_Error(ctx, "func_breakable with NULL model\n");
     }
     InitBBrush(ctx, self_);
 

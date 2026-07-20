@@ -325,9 +325,10 @@ pub use crate::q_math::{
     SHORT2ANGLE,
 };
 pub use crate::q_shared::{
-    va, COM_StripExtension, GetIDForString, Info_ValueForKey, Q_strchr, Q_strcmp, Q_stricmp,
-    Q_strncmp, Q_strncpyz, Q_strupr,
+    va, COM_StripExtension, GetIDForString, Q_strchr, Q_strcmp, Q_stricmp, Q_strncmp, Q_strncpyz,
+    Q_strupr,
 };
+pub use native_string::info::{Info_RemoveKey, Info_Validate, Info_ValueForKey};
 pub use crate::w_saber::WP_SaberCanBlock;
 pub use crate::FighterNPC::FighterIsLanded;
 pub use crate::NPC_AI_Atst::NPC_ATST_Precache;
