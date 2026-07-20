@@ -161,7 +161,7 @@ pub fn CM_BoxLeafnums_r(cm: &mut CollisionWorld, ll: *mut leafList_t, mut nodenu
 /// Source: `oracle/codemp/qcommon/cm_test.cpp:351-357`
 pub fn CM_ClusterPVS(cm: &mut CollisionWorld, cluster: c_int) -> *mut byte {
     unsafe {
-        if cluster < 0 || cluster >= cm.cmg.numClusters || cm.cmg.vised == qfalse {
+        if cluster < 0 || cluster >= cm.cmg.numClusters || !cm.cmg.vised {
             return cm.cmg.visibility;
         }
 

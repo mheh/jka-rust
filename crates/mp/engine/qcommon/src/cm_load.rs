@@ -104,7 +104,7 @@ use crate::cm_test::CM_FloodAreaConnections;
 use crate::md4_fns::Com_BlockChecksum;
 use crate::z_memman_pc::Hunk_Alloc;
 use mp_qshared::shared::ha_pref;
-use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
+use native_string::q_strncpyz::Q_strncpyzBytes;
 
 use crate::cm_patch_fns::{CM_ClearLevelPatches, CM_GeneratePatchCollide};
 use crate::common_fns::Com_DPrintf;
@@ -341,19 +341,11 @@ pub fn CM_ClearMap(cm: &mut CollisionWorld, rmg: &mut RmManager) {
             cm.land_scape = None;
         }
 
-        Com_Memset(
-            &mut cm.cmg as *mut clipMap_t as *mut (),
-            0,
-            core::mem::size_of::<clipMap_t>(),
-        );
+        cm.cmg = clipMap_t::default();
         CM_ClearLevelPatches(cm);
 
         for i in 0..cm.NumSubBSP {
-            Com_Memset(
-                &mut cm.SubBSP[i as usize] as *mut clipMap_t as *mut (),
-                0,
-                core::mem::size_of::<clipMap_t>(),
-            );
+            cm.SubBSP[i as usize] = clipMap_t::default();
         }
         cm.NumSubBSP = 0;
         cm.TotalSubModels = 0;
@@ -397,7 +389,7 @@ pub fn CM_DeleteCachedMap(
 
         // force map loader to ignore cached internal BSP structures for next
         // level CM_LoadMap() call...
-        cm.cmg.name[0] = 0;
+        cm.cmg.name.clear();
     }
 
     bActuallyFreedSomething
@@ -973,7 +965,7 @@ pub fn CMod_LoadVisibility(view: &mut EngineHostView, l: *mut lump_t, cmap: &mut
         }
         let buf = view.cm.cmod_base.offset((*l).fileofs as isize);
 
-        cmap.vised = mp_qshared::shared::qtrue;
+        cmap.vised = true;
         cmap.visibility = Hunk_Alloc(view, (len as usize) as c_int, ha_pref::h_high) as *mut u8;
         cmap.numClusters = i32::from_le(*(buf as *const c_int));
         cmap.clusterBytes = i32::from_le(*(buf.offset(4) as *const c_int));
@@ -1166,8 +1158,7 @@ pub fn CM_LoadMap_Actual(
             &format!("CM_LoadMap( {name}, {clientload} )\n"),
         );
 
-        let cmap_name = std::ffi::CStr::from_ptr(cmap.name.as_ptr());
-        if cmap_name.to_bytes() == name.as_bytes() && clientload != 0 {
+        if cmap.name == name && clientload != 0 {
             *checksum = view.cm.last_checksum as c_int;
             return;
         }
@@ -1182,11 +1173,7 @@ pub fn CM_LoadMap_Actual(
         }
 
         // free old stuff
-        Com_Memset(
-            cmap as *mut clipMap_t as *mut (),
-            0,
-            core::mem::size_of::<clipMap_t>(),
-        );
+        *cmap = clipMap_t::default();
 
         if name.is_empty() {
             cmap.numLeafs = 1;
@@ -1309,7 +1296,7 @@ pub fn CM_LoadMap_Actual(
 
         // allow this to be cached if it is loaded by the server
         if clientload == 0 {
-            Q_strncpyz(&mut cmap.name, &orig_name, MAX_QPATH);
+            cmap.name = orig_name;
         }
     }
 }
@@ -1340,9 +1327,8 @@ pub fn CM_LoadSubBSP(view: &mut EngineHostView, name: &str, clientload: qboolean
     unsafe {
         let mut count = view.cm.cmg.numSubModels;
         for i in 0..view.cm.NumSubBSP {
-            // Raven strcasecmp against the still-C SubBSP name array.
-            let sub_name = std::ffi::CStr::from_ptr(view.cm.SubBSP[i as usize].name.as_ptr());
-            if name.as_bytes().eq_ignore_ascii_case(sub_name.to_bytes()) {
+            // Raven strcasecmp.
+            if view.cm.SubBSP[i as usize].name.eq_ignore_ascii_case(name) {
                 return count;
             }
             count += view.cm.SubBSP[i as usize].numSubModels;

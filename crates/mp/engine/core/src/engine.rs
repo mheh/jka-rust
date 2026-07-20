@@ -184,6 +184,13 @@ impl Engine {
             addr_of_mut!((*p).common.cmd_argv).write(Vec::with_capacity(
                 mp_qshared::shared::limits::MAX_STRING_TOKENS,
             ));
+            // CollisionWorld clipmap names: owned Strings (string-data
+            // migration), not zero-valid; the rest of each clipMap_t stays
+            // under the alloc_zeroed mass (pointers/ints/bools zero-valid).
+            addr_of_mut!((*p).cm.cmg.name).write(String::new());
+            for slot in 0..(*p).cm.SubBSP.len() {
+                addr_of_mut!((*p).cm.SubBSP[slot].name).write(String::new());
+            }
             // Common.vmTable[].name: owned module names (string-data
             // migration), not zero-valid; the other vm_t fields stay under
             // the alloc_zeroed mass (pointers/ints/bools are zero-valid).

@@ -1,8 +1,7 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::{c_char, c_int, c_void};
-
-use mp_qshared::shared::{qboolean, MAX_QPATH};
+use core::ptr::null_mut;
 
 use super::c_area_t::cArea_t;
 use super::c_leaf_t::cLeaf_t;
@@ -17,10 +16,15 @@ use mp_qshared::shared::collision::cplane_t;
 /// Raven `clipMap_t` — the collision model: parsed BSP geometry (planes, nodes,
 /// leafs, brushes, patch surfaces) plus area/visibility data used for tracing.
 ///
+/// Engine-internal (never crosses the module ABI — modules reach collision only
+/// through trap calls), so §D12 internal-only shape applies: `name` owns a
+/// `String`, `vised` is `bool`, and the old `repr(C)` layout asserts went with
+/// the migration (2026-07-19). The geometry pointers stay raw exactly as
+/// transcribed — they index hunk allocations.
+///
 /// Type definition source: `oracle/codemp/qcommon/cm_local.h:161-211`
-#[repr(C)]
 pub struct clipMap_t {
-    pub name: [c_char; MAX_QPATH],
+    pub name: String,
 
     pub numShaders: c_int,
     pub shaders: *mut CCMShader,
@@ -53,7 +57,7 @@ pub struct clipMap_t {
     pub clusterBytes: c_int,
     pub visibility: *mut u8,
     /// if false, visibility is just a single cluster of ffs
-    pub vised: qboolean,
+    pub vised: bool,
 
     pub numEntityChars: c_int,
     pub entityString: *mut c_char,
@@ -76,71 +80,46 @@ pub struct clipMap_t {
     pub landScape: *mut c_void,
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<clipMap_t>() == 296);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, name) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numShaders) == 64);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, shaders) == 72);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numBrushSides) == 80);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, brushsides) == 88);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numPlanes) == 96);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, planes) == 104);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numNodes) == 112);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, nodes) == 120);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numLeafs) == 128);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, leafs) == 136);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numLeafBrushes) == 144);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, leafbrushes) == 152);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numLeafSurfaces) == 160);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, leafsurfaces) == 168);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numSubModels) == 176);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, cmodels) == 184);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numBrushes) == 192);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, brushes) == 200);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numClusters) == 208);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, clusterBytes) == 212);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, visibility) == 216);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, vised) == 224);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numEntityChars) == 228);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, entityString) == 232);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numAreas) == 240);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, areas) == 248);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, areaPortals) == 256);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, numSurfaces) == 264);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, surfaces) == 272);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, floodvalid) == 280);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, checkcount) == 284);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clipMap_t, landScape) == 288);
+/// The `Com_Memset(&cmg, 0, sizeof(cmg))` replacement: every field at its C
+/// zero value, the owned `name` empty. Assigning it drops the old `name`; the
+/// geometry pointers are hunk-managed and simply overwritten, as Raven's
+/// memset did.
+impl Default for clipMap_t {
+    fn default() -> Self {
+        clipMap_t {
+            name: String::new(),
+            numShaders: 0,
+            shaders: null_mut(),
+            numBrushSides: 0,
+            brushsides: null_mut(),
+            numPlanes: 0,
+            planes: null_mut(),
+            numNodes: 0,
+            nodes: null_mut(),
+            numLeafs: 0,
+            leafs: null_mut(),
+            numLeafBrushes: 0,
+            leafbrushes: null_mut(),
+            numLeafSurfaces: 0,
+            leafsurfaces: null_mut(),
+            numSubModels: 0,
+            cmodels: null_mut(),
+            numBrushes: 0,
+            brushes: null_mut(),
+            numClusters: 0,
+            clusterBytes: 0,
+            visibility: null_mut(),
+            vised: false,
+            numEntityChars: 0,
+            entityString: null_mut(),
+            numAreas: 0,
+            areas: null_mut(),
+            areaPortals: null_mut(),
+            numSurfaces: 0,
+            surfaces: null_mut(),
+            floodvalid: 0,
+            checkcount: 0,
+            landScape: null_mut(),
+        }
+    }
+}
