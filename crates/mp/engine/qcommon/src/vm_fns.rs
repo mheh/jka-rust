@@ -361,10 +361,12 @@ pub fn VM_Free(common: &mut Common, vm: *mut vm_t) {
     unsafe {
         if !(*vm).dllHandle.is_null() {
             Sys_UnloadDll((*vm).dllHandle);
-            *vm = core::mem::zeroed();
+            *vm = vm_t::default();
         }
 
-        *vm = core::mem::zeroed();
+        // Raven memsets again on the fall-through path; the double reset is
+        // faithful (vm.cpp:618,624).
+        *vm = vm_t::default();
     }
 
     common.currentVM = core::ptr::null_mut();
@@ -376,12 +378,10 @@ pub fn VM_Free(common: &mut Common, vm: *mut vm_t) {
 /// Source: `oracle/codemp/qcommon/vm.cpp:628-638`
 pub fn VM_Clear(common: &mut Common) {
     for i in 0..MAX_VM {
-        unsafe {
-            if !common.vmTable[i].dllHandle.is_null() {
-                Sys_UnloadDll(common.vmTable[i].dllHandle);
-            }
-            common.vmTable[i] = core::mem::zeroed();
+        if !common.vmTable[i].dllHandle.is_null() {
+            Sys_UnloadDll(common.vmTable[i].dllHandle);
         }
+        common.vmTable[i] = vm_t::default();
     }
     common.currentVM = core::ptr::null_mut();
     common.lastVM = core::ptr::null_mut();
@@ -503,16 +503,16 @@ pub fn VM_VmInfo_f(common: &mut Common) {
         crate::common::com_printf(common, "Registered virtual machines:\n");
         for i in 0..MAX_VM {
             let vm = &common.vmTable[i] as *const vm_t;
-            if (*vm).name[0] == 0 {
+            if (&(*vm).name).is_empty() {
                 break;
             }
-            let name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+            let name = (*vm).name.clone();
             crate::common::com_printf(common, &format!("{name} : "));
             if !(*vm).dllHandle.is_null() {
                 crate::common::com_printf(common, "native\n");
                 continue;
             }
-            if (*vm).compiled != qfalse {
+            if (*vm).compiled {
                 crate::common::com_printf(common, "compiled on load\n");
             } else {
                 crate::common::com_printf(common, "interpreted\n");
@@ -562,7 +562,9 @@ pub fn VM_Init(view: &mut EngineHostView) {
     Cmd_AddCommand(view, "vmprofile", Some(|view| VM_VmProfile_f(view)));
     Cmd_AddCommand(view, "vminfo", Some(|view| VM_VmInfo_f(view.common)));
 
-    view.common.vmTable = unsafe { core::mem::zeroed() };
+    for vm in view.common.vmTable.iter_mut() {
+        *vm = vm_t::default();
+    }
 }
 
 /// `VM_Alloc`.
@@ -587,7 +589,7 @@ pub fn VM_LoadSymbols(view: &mut EngineHostView, vm: *mut vm_t) {
 
     unsafe {
         let mut name = [0u8; MAX_QPATH as usize];
-        let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+        let vm_name = (*vm).name.clone();
         let stripped = COM_StripExtension(&vm_name);
         let n = stripped.len().min(name.len() - 1);
         name[..n].copy_from_slice(&stripped.as_bytes()[..n]);
@@ -689,9 +691,7 @@ pub fn VM_Create(
 
         // see if we already have the VM
         for i in 0..MAX_VM {
-            let name =
-                std::ffi::CStr::from_ptr(view.common.vmTable[i].name.as_ptr()).to_string_lossy();
-            if name.eq_ignore_ascii_case(module) {
+            if view.common.vmTable[i].name.eq_ignore_ascii_case(module) {
                 return &mut view.common.vmTable[i] as *mut vm_t;
             }
         }
@@ -699,7 +699,7 @@ pub fn VM_Create(
         // find a free vm
         let mut i = 0;
         while i < MAX_VM {
-            if view.common.vmTable[i].name[0] == 0 {
+            if view.common.vmTable[i].name.is_empty() {
                 break;
             }
             i += 1;
@@ -711,12 +711,9 @@ pub fn VM_Create(
 
         let vm = &mut view.common.vmTable[i] as *mut vm_t;
 
-        let name_bytes = module.as_bytes();
-        let n = name_bytes.len().min((*vm).name.len() - 1);
-        for (j, b) in name_bytes[..n].iter().enumerate() {
-            (*vm).name[j] = *b as c_char;
-        }
-        (*vm).name[n] = 0;
+        // Raven `Q_strncpyz(vm->name, module, sizeof vm->name)`; the MAX_QPATH
+        // cap is unreachable for the fixed engine module set.
+        (*vm).name = module.to_string();
         (*vm).systemCall = systemCalls;
 
         // never allow dll loading with a demo
@@ -728,7 +725,7 @@ pub fn VM_Create(
 
         if interpret == vmInterpret_t::VMI_NATIVE {
             // try to load as a system dll
-            let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+            let vm_name = (*vm).name.clone();
             view.print(&format!("Loading dll file {vm_name}.\n"));
             // SEAM-D11: `game_syscall_trampoline` is the C-variadic entry that
             // unpacks the va_list and dispatches to the armed engine slot; the
@@ -748,7 +745,7 @@ pub fn VM_Create(
         }
 
         // load the image
-        let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+        let vm_name = (*vm).name.clone();
         let filename = format!("vm/{vm_name}.qvm");
         view.print(&format!("Loading vm file {filename}.\n"));
         let file_bytes = view.fs_read_file(&filename);
@@ -821,10 +818,10 @@ pub fn VM_Create(
         (*vm).codeLength = (*header).codeLength;
 
         if interpret as c_int >= vmInterpret_t::VMI_COMPILED as c_int {
-            (*vm).compiled = qtrue;
+            (*vm).compiled = true;
             crate::vm_x86::VM_Compile(view, vm, header);
         } else {
-            (*vm).compiled = qfalse;
+            (*vm).compiled = false;
             crate::vm_interpreted::VM_PrepareInterpreter(view, vm, header);
         }
 
@@ -909,9 +906,7 @@ pub fn VM_Restart(view: &mut EngineHostView, vm: *mut vm_t) -> *mut vm_t {
         // DLL's can't be restarted in place
         if !(*vm).dllHandle.is_null() {
             let systemCall = (*vm).systemCall;
-            let name = std::ffi::CStr::from_ptr((*vm).name.as_ptr())
-                .to_string_lossy()
-                .into_owned();
+            let name = (*vm).name.clone();
 
             VM_Free(view.common, vm);
 
@@ -920,7 +915,7 @@ pub fn VM_Restart(view: &mut EngineHostView, vm: *mut vm_t) -> *mut vm_t {
 
         // load the image
         view.print("VM_Restart()\n");
-        let vm_name = std::ffi::CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+        let vm_name = (*vm).name.clone();
         let filename = format!("vm/{vm_name}.qvm");
         view.print(&format!("Loading vm file {filename}.\n"));
         let file_bytes = view.fs_read_file(&filename);

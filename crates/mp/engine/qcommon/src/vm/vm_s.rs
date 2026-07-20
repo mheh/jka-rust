@@ -1,23 +1,31 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use mp_qshared::shared::{qboolean, MAX_QPATH};
+use core::ffi::c_void;
+use core::ptr::null_mut;
+
+use native_platform::entrypoints::RawVmMain;
+
+use super::vm_symbol_s::vmSymbol_t;
 
 /// Raven `vm_t` — a running instance of a loaded/interpreted virtual machine module.
 ///
 /// Raven: DO NOT MOVE OR CHANGE THESE WITHOUT CHANGING THE VM_OFFSET_* DEFINES
-/// USED BY THE ASM CODE.
+/// USED BY THE ASM CODE. (That warning covers Raven's x86-asm interpreter;
+/// this port's transcriptions use the fields directly, and `vm_t` never
+/// crosses the module ABI — modules see only the syscall pointer and
+/// `vmMain` — so the type is engine-internal and holds an idiomatic `String`
+/// name (§D12 internal-only shape; the old `repr(C)` asserts went with it).)
 /// Type definition source: `oracle/codemp/qcommon/vm_local.h:111-146`
-#[repr(C)]
 pub struct vm_t {
     // the vm may be recursively entered
     pub programStack: i32,
     pub systemCall: Option<extern "C" fn(parms: *mut i32) -> i32>,
 
     //------------------------------------
-    pub name: [core::ffi::c_char; MAX_QPATH as usize],
+    pub name: String,
 
     // for dynamic linked modules
-    pub dllHandle: *mut core::ffi::c_void,
+    pub dllHandle: *mut c_void,
     // Raven's `int (QDECL *entryPoint)( int callNum, ... )` is the 32-bit
     // C-variadic shape; our module exports the fixed-arity widened dual
     // (`RawVmMain`: command + 12 AbiWord args — the vmMain pair ruling). The
@@ -25,12 +33,12 @@ pub struct vm_t {
     // stack while fixed-arity args are in registers, so calling the module
     // through a variadic type delivers garbage args (live boot bug,
     // 2026-07-12: frozen level.time / commandTime=200).
-    pub entryPoint: Option<native_platform::entrypoints::RawVmMain>,
+    pub entryPoint: Option<RawVmMain>,
 
     // for interpreted modules
-    pub currentlyInterpreting: qboolean,
+    pub currentlyInterpreting: bool,
 
-    pub compiled: qboolean,
+    pub compiled: bool,
     pub codeBase: *mut u8,
     pub codeLength: i32,
 
@@ -44,7 +52,7 @@ pub struct vm_t {
     pub stackBottom: i32,
 
     pub numSymbols: i32,
-    pub symbols: *mut super::vm_symbol_s::vmSymbol_t,
+    pub symbols: *mut vmSymbol_t,
 
     // for debug indenting
     pub callLevel: i32,
@@ -56,49 +64,30 @@ pub struct vm_t {
 /// Raven C tag `vm_s` for the same type.
 pub type vm_s = vm_t;
 
-const _: () = assert!(core::mem::offset_of!(vm_t, programStack) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<vm_t>() == 184);
-    assert!(core::mem::offset_of!(vm_t, systemCall) == 8);
-    assert!(core::mem::offset_of!(vm_t, name) == 16);
-    assert!(core::mem::offset_of!(vm_t, dllHandle) == 80);
-    assert!(core::mem::offset_of!(vm_t, entryPoint) == 88);
-    assert!(core::mem::offset_of!(vm_t, currentlyInterpreting) == 96);
-    assert!(core::mem::offset_of!(vm_t, compiled) == 100);
-    assert!(core::mem::offset_of!(vm_t, codeBase) == 104);
-    assert!(core::mem::offset_of!(vm_t, codeLength) == 112);
-    assert!(core::mem::offset_of!(vm_t, instructionPointers) == 120);
-    assert!(core::mem::offset_of!(vm_t, instructionPointersLength) == 128);
-    assert!(core::mem::offset_of!(vm_t, dataBase) == 136);
-    assert!(core::mem::offset_of!(vm_t, dataMask) == 144);
-    assert!(core::mem::offset_of!(vm_t, stackBottom) == 148);
-    assert!(core::mem::offset_of!(vm_t, numSymbols) == 152);
-    assert!(core::mem::offset_of!(vm_t, symbols) == 160);
-    assert!(core::mem::offset_of!(vm_t, callLevel) == 168);
-    assert!(core::mem::offset_of!(vm_t, breakFunction) == 172);
-    assert!(core::mem::offset_of!(vm_t, breakCount) == 176);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<vm_t>() == 136);
-    assert!(core::mem::offset_of!(vm_t, systemCall) == 4);
-    assert!(core::mem::offset_of!(vm_t, name) == 8);
-    assert!(core::mem::offset_of!(vm_t, dllHandle) == 72);
-    assert!(core::mem::offset_of!(vm_t, entryPoint) == 76);
-    assert!(core::mem::offset_of!(vm_t, currentlyInterpreting) == 80);
-    assert!(core::mem::offset_of!(vm_t, compiled) == 84);
-    assert!(core::mem::offset_of!(vm_t, codeBase) == 88);
-    assert!(core::mem::offset_of!(vm_t, codeLength) == 92);
-    assert!(core::mem::offset_of!(vm_t, instructionPointers) == 96);
-    assert!(core::mem::offset_of!(vm_t, instructionPointersLength) == 100);
-    assert!(core::mem::offset_of!(vm_t, dataBase) == 104);
-    assert!(core::mem::offset_of!(vm_t, dataMask) == 108);
-    assert!(core::mem::offset_of!(vm_t, stackBottom) == 112);
-    assert!(core::mem::offset_of!(vm_t, numSymbols) == 116);
-    assert!(core::mem::offset_of!(vm_t, symbols) == 120);
-    assert!(core::mem::offset_of!(vm_t, callLevel) == 124);
-    assert!(core::mem::offset_of!(vm_t, breakFunction) == 128);
-    assert!(core::mem::offset_of!(vm_t, breakCount) == 132);
-};
+/// The `Com_Memset(vm, 0, sizeof(vm_t))` replacement: every field at its C
+/// zero value, the owned `name` empty. Assigning it drops the old `name`.
+impl Default for vm_t {
+    fn default() -> Self {
+        vm_t {
+            programStack: 0,
+            systemCall: None,
+            name: String::new(),
+            dllHandle: null_mut(),
+            entryPoint: None,
+            currentlyInterpreting: false,
+            compiled: false,
+            codeBase: null_mut(),
+            codeLength: 0,
+            instructionPointers: null_mut(),
+            instructionPointersLength: 0,
+            dataBase: null_mut(),
+            dataMask: 0,
+            stackBottom: 0,
+            numSymbols: 0,
+            symbols: null_mut(),
+            callLevel: 0,
+            breakFunction: 0,
+            breakCount: 0,
+        }
+    }
+}

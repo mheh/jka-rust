@@ -184,6 +184,12 @@ impl Engine {
             addr_of_mut!((*p).common.cmd_argv).write(Vec::with_capacity(
                 mp_qshared::shared::limits::MAX_STRING_TOKENS,
             ));
+            // Common.vmTable[].name: owned module names (string-data
+            // migration), not zero-valid; the other vm_t fields stay under
+            // the alloc_zeroed mass (pointers/ints/bools are zero-valid).
+            for slot in 0..(*p).common.vmTable.len() {
+                addr_of_mut!((*p).common.vmTable[slot].name).write(String::new());
+            }
             // Common.hooks (ruling 2026-07-12): the qcommon->server/client/sound
             // upcall table. Option<fn> is null-niche zero-valid (all None under
             // the alloc_zeroed mass), but boot installs the null-build client/

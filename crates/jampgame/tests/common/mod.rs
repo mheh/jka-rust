@@ -309,7 +309,7 @@ impl RealWorld {
         // MUST come AFTER Phase A: `Com_InitHunkMemory` → `Hunk_Clear` →
         // `VM_Clear` (vm_fns.rs:382) nulls `currentVM`, so setting it earlier
         // would be wiped.
-        let mut vm: Box<vm_t> = Box::new(unsafe { core::mem::zeroed() });
+        let mut vm: Box<vm_t> = Box::new(vm_t::default());
         vm.entryPoint = Some(real_world_native_marker);
         vm.dataBase = core::ptr::null_mut();
         engine.common.currentVM = &mut *vm as *mut vm_t;

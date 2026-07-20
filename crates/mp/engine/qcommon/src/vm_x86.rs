@@ -9,7 +9,6 @@
 //! Source: `oracle/codemp/qcommon/vm_x86.cpp`
 
 use core::ffi::{c_char, c_int};
-use std::ffi::CStr;
 
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::ha_pref;
@@ -1171,7 +1170,7 @@ pub fn VM_Compile(view: &mut EngineHostView, vm: *mut vm_t, header: *mut vmHeade
         );
         Z_Free(view.common, view.common.buf as *mut ());
         Z_Free(view.common, view.common.jused as *mut ());
-        let vm_name = CStr::from_ptr((*vm).name.as_ptr()).to_string_lossy();
+        let vm_name = (*vm).name.clone();
         let msg = format!(
             "VM file {} compiled to {} bytes of code\n",
             vm_name, view.common.compiled_ofs
