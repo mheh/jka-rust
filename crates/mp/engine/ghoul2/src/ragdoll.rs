@@ -134,7 +134,8 @@ use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vectoangles, AngleNormZero,
-    AngleNormalize180, AngleVectors, Create_Matrix, DistanceSquared, VectorInverse,
+    AngleNormalize180, AngleVectors, Create_Matrix, DistanceSquared, Inverse_Matrix,
+    TransformPoint, VectorInverse,
 };
 use mp_qshared::shared::{
     mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID, CONTENTS_TERRAIN,
@@ -144,7 +145,7 @@ use mp_qshared::shared::{
 use crate::api_collision::{g2api_get_time, g2api_give_me_vector_from_matrix};
 use crate::bones::g2_find_bone;
 use crate::ghoul2_system::Ghoul2System;
-use crate::misc::{g2_generate_world_matrix, inverse_matrix, transform_point};
+use crate::misc::g2_generate_world_matrix;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::render::bone_transform::{multiply_3x4_matrix, uncompress_bone};
 use crate::render::skeleton::{
@@ -1680,17 +1681,20 @@ fn g2_rag_doll_solve_instances(
             continue;
         }
 
-        let n = inverse_matrix(&g2.rag.bones[i]);
+        let mut n = ZERO_BONE;
+        Inverse_Matrix(&g2.rag.bones[i], &mut n);
         let t_angles0 = instances[idx].blist[blist_idx].currentAngles;
         let mut cur_rot = ZERO_BONE;
         Create_Matrix(t_angles0, &mut cur_rot);
-        let cur_rot_inv = inverse_matrix(&cur_rot);
+        let mut cur_rot_inv = ZERO_BONE;
+        Inverse_Matrix(&cur_rot, &mut cur_rot_inv);
         let mut p = ZERO_BONE;
         multiply_3x4_matrix(&mut p, &g2.rag.bones[i], &cur_rot_inv);
 
         if rag_flags & RAG_PCJ_MODEL_ROOT != 0 {
             if g2.rag.have_desired_pelvis_offset {
-                let delta = transform_point(g2.rag.desired_pelvis_offset, &n);
+                let mut delta = [0.0; 3];
+                TransformPoint(g2.rag.desired_pelvis_offset, &mut delta, &n);
                 let bone = &mut instances[idx].blist[blist_idx];
                 for k in 0..3 {
                     let move_to = bone.velocityRoot[k] + delta[k] * 0.20;
@@ -1891,11 +1895,13 @@ fn g2_ik_solve_instances(
             continue;
         }
 
-        let n = inverse_matrix(&g2.rag.bones[i]);
+        let mut n = ZERO_BONE;
+        Inverse_Matrix(&g2.rag.bones[i], &mut n);
         let t_angles0 = instances[idx].blist[blist_idx].currentAngles;
         let mut cur_rot = ZERO_BONE;
         Create_Matrix(t_angles0, &mut cur_rot);
-        let cur_rot_inv = inverse_matrix(&cur_rot);
+        let mut cur_rot_inv = ZERO_BONE;
+        Inverse_Matrix(&cur_rot, &mut cur_rot_inv);
         let mut p = ZERO_BONE;
         multiply_3x4_matrix(&mut p, &g2.rag.bones[i], &cur_rot_inv);
 

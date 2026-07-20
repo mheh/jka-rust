@@ -160,8 +160,9 @@ use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::{
-    Create_Matrix, _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract,
-    CrossProduct, VectorLength, VectorLengthSquared, VectorNormalize,
+    Create_Matrix, Inverse_Matrix, TransformAndTranslatePoint, TransformPoint, _DotProduct,
+    _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, CrossProduct, VectorLength,
+    VectorLengthSquared, VectorNormalize,
 };
 use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRecord_t};
 
@@ -882,7 +883,7 @@ fn g2_trace_surfaces(
 /// triangle, [`g2_segment_triangle_test`]s the ray against it; on a hit,
 /// claims a free `TS.collRecMap` slot, forcing `TS.hitOne = true` and
 /// returning `true` if the map is full), fills in distance/flags/world-space
-/// position+normal ([`transform_and_translate_point`]/[`transform_point`]) and
+/// position+normal (`TransformAndTranslatePoint`/`TransformPoint`) and
 /// barycentric/UV via [`g2_build_hit_point_st`]. The commented-out
 /// hit-location/hit-material shader lookup (`:1151-1198`) is dead (module
 /// doc-comment note on `CTraceSurface`); `surfInfo` (the oracle's third
@@ -962,7 +963,8 @@ fn g2_trace_polys(
 
         let mut dist_vect = [0.0; 3];
         _VectorSubtract(hit_point, ts.ray_start, &mut dist_vect);
-        let mut world_normal = transform_point(normal, world_matrix);
+        let mut world_normal = [0.0; 3];
+        TransformPoint(normal, &mut world_normal, world_matrix);
         VectorNormalize(&mut world_normal);
 
         let new_col = &mut ts.coll_rec_map[i];
@@ -976,7 +978,7 @@ fn g2_trace_polys(
             G2_BACKFACE
         };
         new_col.mDistance = VectorLength(dist_vect);
-        new_col.mCollisionPosition = transform_and_translate_point(hit_point, world_matrix);
+        TransformAndTranslatePoint(hit_point, &mut new_col.mCollisionPosition, world_matrix);
         new_col.mCollisionNormal = world_normal;
         new_col.mMaterial = 0;
         new_col.mLocation = 0;
@@ -1122,7 +1124,8 @@ fn g2_radius_trace_polys(
         _VectorSubtract(b3, a3, &mut edge_ba);
         let mut normal = [0.0; 3];
         CrossProduct(edge_ba, edge_ac, &mut normal);
-        let mut world_normal = transform_point(normal, world_matrix);
+        let mut world_normal = [0.0; 3];
+        TransformPoint(normal, &mut world_normal, world_matrix);
         VectorNormalize(&mut world_normal);
 
         let mut dist_vect_dir = [0.0; 3];
@@ -1156,7 +1159,7 @@ fn g2_radius_trace_polys(
         new_col.mMaterial = 0;
         new_col.mLocation = 0;
         new_col.mDistance = VectorLength(dist_vect);
-        new_col.mCollisionPosition = transform_and_translate_point(hit_point, world_matrix);
+        TransformAndTranslatePoint(hit_point, &mut new_col.mCollisionPosition, world_matrix);
         new_col.mBarycentricI = 0.0;
         new_col.mBarycentricJ = 0.0;
 
@@ -1738,7 +1741,7 @@ pub fn g2_transform_model(
 
 /// Raven `void G2_GenerateWorldMatrix(const vec3_t angles, const vec3_t
 /// origin)` — builds the per-construct `worldMatrix`/`worldMatrixInv` pair
-/// (`tr_ghoul2.cpp:136-137`) via `Create_Matrix` + [`inverse_matrix`].
+/// (`tr_ghoul2.cpp:136-137`) via `Create_Matrix` + `Inverse_Matrix`.
 /// Per `## State ownership`, `worldMatrix`/`worldMatrixInv` are **not** a
 /// `Ghoul2System` field — they are per-construct scratch threaded through the
 /// skeleton build — so this returns the `(world_matrix, world_matrix_inv)`
@@ -1756,62 +1759,11 @@ pub fn g2_generate_world_matrix(angles: vec3_t, origin: vec3_t) -> (mdxaBone_t, 
     world_matrix.matrix[1][3] = origin[1];
     world_matrix.matrix[2][3] = origin[2];
 
-    let world_matrix_inv = inverse_matrix(&world_matrix);
-    (world_matrix, world_matrix_inv)
-}
-
-/// Raven `void TransformPoint(const vec3_t in, vec3_t out, mdxaBone_t *mat)`
-/// — rotate `in` by `mat` (no translation). Bare global name in the oracle
-/// (no `G2_` prefix); the out-param becomes a return per §C7.
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1613-1618`
-pub fn transform_point(input: vec3_t, mat: &mdxaBone_t) -> vec3_t {
-    let mut out = [0.0f32; 3];
-    for i in 0..3 {
-        out[i] =
-            input[0] * mat.matrix[i][0] + input[1] * mat.matrix[i][1] + input[2] * mat.matrix[i][2];
-    }
-    out
-}
-
-/// Raven `void TransformAndTranslatePoint (const vec3_t in, vec3_t out,
-/// mdxaBone_t *mat)` — rotate **and** translate `in` by `mat`. Bare global
-/// name in the oracle; the out-param becomes a return per §C7.
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1620-1626`
-pub fn transform_and_translate_point(input: vec3_t, mat: &mdxaBone_t) -> vec3_t {
-    let mut out = [0.0f32; 3];
-    for i in 0..3 {
-        out[i] = input[0] * mat.matrix[i][0]
-            + input[1] * mat.matrix[i][1]
-            + input[2] * mat.matrix[i][2]
-            + mat.matrix[i][3];
-    }
-    out
-}
-
-/// Raven `void Inverse_Matrix(mdxaBone_t *src, mdxaBone_t *dest)` —
-/// transpose the 3x3 rotation block, then solve the translation column so
-/// `dest` is `src`'s inverse (rigid transform: no scale/shear). Bare global
-/// name in the oracle; the out-param becomes a return per §C7.
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1656-1675`
-pub fn inverse_matrix(src: &mdxaBone_t) -> mdxaBone_t {
-    let mut dest = mdxaBone_t {
-        matrix: [[0.0f32; 4]; 3],
+    let mut world_matrix_inv = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
     };
-    for i in 0..3 {
-        for j in 0..3 {
-            dest.matrix[i][j] = src.matrix[j][i];
-        }
-    }
-    for i in 0..3 {
-        dest.matrix[i][3] = 0.0;
-        for j in 0..3 {
-            dest.matrix[i][3] -= dest.matrix[i][j] * src.matrix[j][3];
-        }
-    }
-    dest
+    Inverse_Matrix(&world_matrix, &mut world_matrix_inv);
+    (world_matrix, world_matrix_inv)
 }
 
 // ---------------------------------------------------------------------------
@@ -2101,7 +2053,10 @@ mod tests {
     #[test]
     fn inverse_matrix_of_identity_is_identity() {
         let id = identity_mdxa_bone();
-        let inv = inverse_matrix(&id);
+        let mut inv = mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        };
+        Inverse_Matrix(&id, &mut inv);
         for r in 0..3 {
             for c in 0..4 {
                 assert!((inv.matrix[r][c] - id.matrix[r][c]).abs() < 1e-6);
@@ -2125,7 +2080,8 @@ mod tests {
     #[test]
     fn transform_and_translate_point_applies_identity_unchanged() {
         let id = identity_mdxa_bone();
-        let p = transform_and_translate_point([1.0, 2.0, 3.0], &id);
+        let mut p = [0.0; 3];
+        TransformAndTranslatePoint([1.0, 2.0, 3.0], &mut p, &id);
         assert_eq!(p, [1.0, 2.0, 3.0]);
     }
 

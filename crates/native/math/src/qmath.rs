@@ -662,6 +662,49 @@ pub fn Create_Matrix(angle: vec3_t, matrix: &mut mdxaBone_t) {
     matrix.matrix[2][3] = 0.0;
 }
 
+/// Raven `TransformPoint` — rotate `in` by `mat` (no translation).
+///
+/// Source: `oracle/code/ghoul2/G2_misc.cpp:1644-1649`
+/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1613-1618`
+pub fn TransformPoint(r#in: vec3_t, out: &mut vec3_t, mat: &mdxaBone_t) {
+    for i in 0..3 {
+        out[i] =
+            r#in[0] * mat.matrix[i][0] + r#in[1] * mat.matrix[i][1] + r#in[2] * mat.matrix[i][2];
+    }
+}
+
+/// Raven `TransformAndTranslatePoint` — rotate **and** translate `in` by `mat`.
+///
+/// Source: `oracle/code/ghoul2/G2_misc.cpp:1651-1657`
+/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1620-1626`
+pub fn TransformAndTranslatePoint(r#in: vec3_t, out: &mut vec3_t, mat: &mdxaBone_t) {
+    for i in 0..3 {
+        out[i] = r#in[0] * mat.matrix[i][0]
+            + r#in[1] * mat.matrix[i][1]
+            + r#in[2] * mat.matrix[i][2]
+            + mat.matrix[i][3];
+    }
+}
+
+/// Raven `Inverse_Matrix`.
+///
+/// Raven: given a matrix, generate the inverse of that matrix.
+/// Source: `oracle/code/ghoul2/G2_misc.cpp:1687-1707`
+/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1656-1675`
+pub fn Inverse_Matrix(src: &mdxaBone_t, dest: &mut mdxaBone_t) {
+    for i in 0..3 {
+        for j in 0..3 {
+            dest.matrix[i][j] = src.matrix[j][i];
+        }
+    }
+    for i in 0..3 {
+        dest.matrix[i][3] = 0.0;
+        for j in 0..3 {
+            dest.matrix[i][3] -= dest.matrix[i][j] * src.matrix[j][3];
+        }
+    }
+}
+
 /// Raven `AxisClear`.
 ///
 /// Source: `oracle/codemp/game/q_math.c:538-548`

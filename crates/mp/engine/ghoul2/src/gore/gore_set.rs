@@ -61,7 +61,8 @@ use std::collections::BTreeMap;
 use core::ffi::c_void;
 
 use mp_qshared::shared::q_math::{
-    CrossProduct, VectorNormalize, _DotProduct, _VectorMA, _VectorScale, _VectorSubtract,
+    CrossProduct, Inverse_Matrix, TransformPoint, VectorNormalize, _DotProduct, _VectorMA,
+    _VectorScale, _VectorSubtract,
 };
 use mp_qshared::shared::{mdxaBone_t, vec3_t};
 
@@ -746,11 +747,15 @@ pub fn g2_gore_polys(
         mat.matrix[1][3] = -0.5;
         mat.matrix[2][3] = 0.0;
 
-        let shot_origin = crate::misc::transform_point(ts.ray_start, &mat);
+        let mut shot_origin = [0.0; 3];
+        TransformPoint(ts.ray_start, &mut shot_origin, &mat);
         mat.matrix[0][3] -= shot_origin[0];
         mat.matrix[1][3] -= shot_origin[1];
         mat.matrix[2][3] -= shot_origin[2];
-        let inv = crate::misc::inverse_matrix(&mat);
+        let mut inv = mdxaBone_t {
+            matrix: [[0.0f32; 4]; 3],
+        };
+        Inverse_Matrix(&mat, &mut inv);
 
         for r in 0..3 {
             for c in 0..4 {

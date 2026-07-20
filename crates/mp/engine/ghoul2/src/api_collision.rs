@@ -35,6 +35,7 @@
 
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::collision_record::MAX_G2_COLLISIONS;
+use mp_qshared::shared::q_math::TransformAndTranslatePoint;
 use mp_qshared::shared::{mdxaBone_t, vec3_t, CollisionRecord_t, Eorientations};
 
 use crate::ghoul2_system::{Ghoul2System, NUM_G2T_TIME};
@@ -198,8 +199,10 @@ pub fn g2api_collision_detect(
 
     // model is built. Lets check to see if any triangles are actually hit.
     // first up, translate the ray to model space
-    let trans_ray_start = crate::misc::transform_and_translate_point(ray_start, &world_matrix_inv);
-    let trans_ray_end = crate::misc::transform_and_translate_point(ray_end, &world_matrix_inv);
+    let mut trans_ray_start = [0.0; 3];
+    TransformAndTranslatePoint(ray_start, &mut trans_ray_start, &world_matrix_inv);
+    let mut trans_ray_end = [0.0; 3];
+    TransformAndTranslatePoint(ray_end, &mut trans_ray_end, &world_matrix_inv);
 
     // now walk each model and check the ray against each poly
     let mut coll_rec_map = [empty_collision_record(); MAX_G2_COLLISIONS];
@@ -311,8 +314,10 @@ pub fn g2api_collision_detect_cache(
 
     // model is built. Lets check to see if any triangles are actually hit.
     // first up, translate the ray to model space
-    let trans_ray_start = crate::misc::transform_and_translate_point(ray_start, &world_matrix_inv);
-    let trans_ray_end = crate::misc::transform_and_translate_point(ray_end, &world_matrix_inv);
+    let mut trans_ray_start = [0.0; 3];
+    TransformAndTranslatePoint(ray_start, &mut trans_ray_start, &world_matrix_inv);
+    let mut trans_ray_end = [0.0; 3];
+    TransformAndTranslatePoint(ray_end, &mut trans_ray_end, &world_matrix_inv);
 
     // now walk each model and check the ray against each poly
     let mut coll_rec_map = [empty_collision_record(); MAX_G2_COLLISIONS];
