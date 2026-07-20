@@ -41,23 +41,7 @@
 //!    `g2_set_bone_angles_matrix`'s empty-`fileName` `modelList[modelIndex]`
 //!    arm), the gap does not apply and the body resolves the model for real.
 //!
-//! **Three further findings reported upstream while filling this file's
-//! bodies:**
-//! 3. `misc::create_matrix` (Raven `Create_Matrix`, `G2_misc.cpp:1630-1653`)
-//!    is a private (non-`pub`) helper in `misc.rs`, whose own doc comment
-//!    claims "no cross-file caller" — but the oracle shows `Create_Matrix`
-//!    called directly from this file (`G2_bones.cpp:312,332,4059,4102,4248,
-//!    4336,4348,4444`) and from `G2_API.cpp:1873`, so that claim is incorrect
-//!    and the helper is unreachable from here as written. `create_matrix`/
-//!    `angles_to_axis` below are local, faithful duplicates (mechanical
-//!    transcription of `G2_misc.cpp:1630-1653` and
-//!    `oracle/codemp/game/q_math.c:530-536,1315-1348`, not invented behavior)
-//!    so `g2_generate_matrix` has a real body; `angles_to_axis` is doubly
-//!    unreachable as a *sibling call* — `AnglesToAxis` lives in the `mp_game`
-//!    crate, a tier `mp_engine_ghoul2` cannot depend on
-//!    (`docs/workspace-architecture.md`: engine sits below bg/game). Once
-//!    `misc::create_matrix` is made `pub(crate)` (and itself gains a working
-//!    `AnglesToAxis`), this duplicate should be removed in favor of calling it.
+//! **Further findings reported upstream while filling this file's bodies:**
 //! 4. `G2_TimingModel` (`oracle/codemp/renderer/tr_ghoul2.cpp:1167-1407`) has
 //!    no landed Rust home anywhere in this crate: `render/bone_transform.rs`'s
 //!    own module doc explicitly left it unstubbed pending `render/
@@ -80,7 +64,7 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::q_math::AnglesToAxis;
+use mp_qshared::shared::q_math::Create_Matrix;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations, MAX_QPATH};
 
 use crate::ghoul2_system::Ghoul2System;
@@ -220,40 +204,6 @@ unsafe fn mdxa_skel_base_pose_mat(header: *const c_void, bone_index: i32) -> mdx
 unsafe fn mdxa_skel_base_pose_mat_inv(header: *const c_void, bone_index: i32) -> mdxaBone_t {
     let skel = mdxa_skel_ptr(header, bone_index);
     core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *const mdxaBone_t)
-}
-
-// ---------------------------------------------------------------------------
-// Local duplicates of `Create_Matrix`/`AnglesToAxis` (module doc finding 3).
-// ---------------------------------------------------------------------------
-
-/// Raven `AnglesToAxis`/`AngleVectors`
-/// (`oracle/codemp/game/q_math.c:530-536,1315-1348`) — needed by
-/// [`create_matrix`] but unreachable as a sibling call from this crate
-/// (`mp_engine_ghoul2` depends on `mp_qshared`/`mp_host_interface` only; the
-/// real `AnglesToAxis` lives in the `mp_game` tier above engine in the crate
-/// graph, `docs/workspace-architecture.md`). Mirrors the f64-then-round-to-f32
-/// precision `mp_game::q_math::AngleVectors` already uses for the same Raven
-/// `M_PI` double literal.
-/// Raven `Create_Matrix` (module doc finding 3) — `AnglesToAxis` + pack into a
-/// rotation-only `mdxaBone_t` (translation column zeroed).
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1630-1653`
-fn create_matrix(angle: vec3_t) -> mdxaBone_t {
-    let mut axis = [[0.0f32; 3]; 3];
-    AnglesToAxis(angle, axis.as_mut_ptr());
-    let mut matrix = mdxaBone_t {
-        matrix: [[0.0; 4]; 3],
-    };
-    matrix.matrix[0][0] = axis[0][0];
-    matrix.matrix[1][0] = axis[0][1];
-    matrix.matrix[2][0] = axis[0][2];
-    matrix.matrix[0][1] = axis[1][0];
-    matrix.matrix[1][1] = axis[1][1];
-    matrix.matrix[2][1] = axis[1][2];
-    matrix.matrix[0][2] = axis[2][0];
-    matrix.matrix[1][2] = axis[2][1];
-    matrix.matrix[2][2] = axis[2][2];
-    matrix
 }
 
 // ---------------------------------------------------------------------------
@@ -575,7 +525,10 @@ pub fn g2_generate_matrix(
             Eorientations::ORIGIN => new_angles[2],
         };
 
-        let mut bone_override = create_matrix(new_angles);
+        let mut bone_override = mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        };
+        Create_Matrix(new_angles, &mut bone_override);
 
         let bone_number = blist[idx].boneNumber;
         // Safety: PREMULT/POSTMULT callers always pass a resolved
@@ -605,7 +558,10 @@ pub fn g2_generate_matrix(
         if matches!(left, Eorientations::POSITIVE_Y) {
             new_angles[0] += 180.0;
         }
-        let temp1 = create_matrix(new_angles);
+        let mut temp1 = mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        };
+        Create_Matrix(new_angles, &mut temp1);
 
         // Raven explicitly zeroes all 12 `permutation.matrix` cells before
         // the switches below; the zero-initialized literal here already

@@ -5,3 +5,6 @@ edition = "2021"
 
 [lib]
 name = "native_math"
+
+[dependencies]
+native_types = { path = "../types" }

@@ -10,6 +10,7 @@
 
 use crate::vector::{vec3_t, vec4_t, vec_t};
 use core::ffi::{c_int, c_schar, c_short, c_uint};
+use native_types::mdxaBone_t;
 
 pub type qboolean = c_int;
 type byte = u8;
@@ -633,6 +634,32 @@ pub fn AnglesToAxis(angles: vec3_t, axis: *mut vec3_t) {
         );
     }
     _VectorSubtract(VEC3_ORIGIN, right, &mut axis[1]);
+}
+
+/// Raven `Create_Matrix`.
+///
+/// Raven: create a matrix using a set of angles.
+/// Source: `oracle/code/ghoul2/G2_misc.cpp:1661-1684`
+/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1630-1653`
+pub fn Create_Matrix(angle: vec3_t, matrix: &mut mdxaBone_t) {
+    let mut axis = [[0.0f32; 3]; 3];
+    // convert angles to axis
+    AnglesToAxis(angle, axis.as_mut_ptr());
+    matrix.matrix[0][0] = axis[0][0];
+    matrix.matrix[1][0] = axis[0][1];
+    matrix.matrix[2][0] = axis[0][2];
+
+    matrix.matrix[0][1] = axis[1][0];
+    matrix.matrix[1][1] = axis[1][1];
+    matrix.matrix[2][1] = axis[1][2];
+
+    matrix.matrix[0][2] = axis[2][0];
+    matrix.matrix[1][2] = axis[2][1];
+    matrix.matrix[2][2] = axis[2][2];
+
+    matrix.matrix[0][3] = 0.0;
+    matrix.matrix[1][3] = 0.0;
+    matrix.matrix[2][3] = 0.0;
 }
 
 /// Raven `AxisClear`.

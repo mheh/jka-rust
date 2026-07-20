@@ -432,19 +432,12 @@ pub fn NumBots(ctx: &mut GameContext) -> c_int {
 ///
 /// Source: `oracle/codemp/game/ai_main.c:443-463`
 pub fn BotChangeViewAngle(angle: f32, ideal_angle: f32, speed: f32) -> f32 {
-    let angle = crate::q_math::AngleMod(angle);
-    let ideal_angle = crate::q_math::AngleMod(ideal_angle);
+    let angle = AngleMod(angle);
+    let ideal_angle = AngleMod(ideal_angle);
     if angle == ideal_angle {
         return angle;
     }
-    let mut mv = ideal_angle - angle;
-    if ideal_angle > angle {
-        if mv > 180.0 {
-            mv -= 360.0;
-        }
-    } else if mv < -180.0 {
-        mv += 360.0;
-    }
+    let mut mv = AngleDifference(ideal_angle, angle);
     if mv > 0.0 {
         if mv > speed {
             mv = speed;
@@ -452,7 +445,7 @@ pub fn BotChangeViewAngle(angle: f32, ideal_angle: f32, speed: f32) -> f32 {
     } else if mv < -speed {
         mv = -speed;
     }
-    crate::q_math::AngleMod(angle + mv)
+    AngleMod(angle + mv)
 }
 
 /// Raven `BotChangeViewAngles`.
@@ -494,8 +487,8 @@ pub fn BotChangeViewAngles(ctx: &mut GameContext, bs: *mut bot_state_t, thinktim
         let mut maxchange = bs.skills.maxturn;
         maxchange *= thinktime;
         for i in 0..2usize {
-            bs.viewangles[i] = crate::q_math::AngleMod(bs.viewangles[i]);
-            bs.ideal_viewangles[i] = crate::q_math::AngleMod(bs.ideal_viewangles[i]);
+            bs.viewangles[i] = AngleMod(bs.viewangles[i]);
+            bs.ideal_viewangles[i] = AngleMod(bs.ideal_viewangles[i]);
             let diff = AngleDifference(bs.viewangles[i], bs.ideal_viewangles[i]);
             let disired_speed = diff * factor;
             bs.viewanglespeed[i] += bs.viewanglespeed[i] - disired_speed;
@@ -513,7 +506,7 @@ pub fn BotChangeViewAngles(ctx: &mut GameContext, bs: *mut bot_state_t, thinktim
                 anglespeed = -maxchange;
             }
             bs.viewangles[i] += anglespeed;
-            bs.viewangles[i] = crate::q_math::AngleMod(bs.viewangles[i]);
+            bs.viewangles[i] = AngleMod(bs.viewangles[i]);
             bs.viewanglespeed[i] =
                 (bs.viewanglespeed[i] as f64 * (0.45 * (1.0 - factor) as f64)) as f32;
         }
@@ -652,7 +645,7 @@ pub fn BotUpdateInput(
 
         // add the delta angles to the bot's current view angles
         for j in 0..3usize {
-            (*bs).viewangles[j] = crate::q_math::AngleMod(
+            (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] + SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
             );
         }
@@ -684,7 +677,7 @@ pub fn BotUpdateInput(
         );
         // subtract the delta angles
         for j in 0..3usize {
-            (*bs).viewangles[j] = crate::q_math::AngleMod(
+            (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
             );
         }
@@ -775,7 +768,7 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
         }
         // add the delta angles to the bot's current view angles
         for j in 0..3usize {
-            (*bs).viewangles[j] = crate::q_math::AngleMod(
+            (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] + SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
             );
         }
@@ -792,7 +785,7 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
 
         // subtract the delta angles
         for j in 0..3usize {
-            (*bs).viewangles[j] = crate::q_math::AngleMod(
+            (*bs).viewangles[j] = AngleMod(
                 (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
             );
         }
@@ -2224,16 +2217,9 @@ pub fn UpdateEventTracker(ctx: &mut GameContext) {
 pub fn InFieldOfVision(viewangles: vec3_t, fov: f32, mut angles: vec3_t) -> c_int {
     // Raven: 1 if `angles` lies within `fov` of `viewangles` (yaw+pitch only).
     for i in 0..2usize {
-        let angle = crate::q_math::AngleMod(viewangles[i]);
-        angles[i] = crate::q_math::AngleMod(angles[i]);
-        let mut diff = angles[i] - angle;
-        if angles[i] > angle {
-            if diff > 180.0 {
-                diff -= 360.0;
-            }
-        } else if diff < -180.0 {
-            diff += 360.0;
-        }
+        let angle = AngleMod(viewangles[i]);
+        angles[i] = AngleMod(angles[i]);
+        let diff = AngleDifference(angles[i], angle);
         if diff > 0.0 {
             if diff > fov * 0.5 {
                 return 0;

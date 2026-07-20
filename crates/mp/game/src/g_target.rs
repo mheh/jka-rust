@@ -561,9 +561,7 @@ pub fn target_laser_think(ctx: &mut GameContext, self_: EntityId) {
         let s = ctx.entity(self_);
         (s.s.origin, s.movedir, s.s.number)
     };
-    end[0] = self_origin[0] + 2048.0 * self_movedir[0];
-    end[1] = self_origin[1] + 2048.0 * self_movedir[1];
-    end[2] = self_origin[2] + 2048.0 * self_movedir[2];
+    _VectorMA(self_origin, 2048.0, self_movedir, &mut end);
 
     trap::Trace(
         ctx.engine,

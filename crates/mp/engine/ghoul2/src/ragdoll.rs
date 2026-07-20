@@ -75,15 +75,7 @@
 //! **Problems reported upstream while transcribing this class (kept out of
 //! the doc's own text per house rules; see this porting task's `problems`
 //! output for the full list):**
-//! 1. `misc.rs::create_matrix` (`Create_Matrix`, `G2_misc.cpp:1630-1653`) is
-//!    a private `fn`, but `G2_bones.cpp` calls the *same* Raven global from
-//!    `G2_RagDollSolve`/`G2_IKSolve` (`:4059,4102,4248,4336,4348,4444`) — a
-//!    cross-file caller `misc.rs`'s own visibility doesn't allow. A local,
-//!    file-private `create_matrix` twin is transcribed below instead of
-//!    editing `misc.rs` (out of this porting task's file scope); `misc.rs`
-//!    should expose `pub(crate) fn create_matrix` so this duplicate can be
-//!    deleted.
-//! 2. `G2_GetBoneDependents`/`G2_WasBoneRendered`/`G2_RagGetAnimMatrix`
+//! 1. `G2_GetBoneDependents`/`G2_WasBoneRendered`/`G2_RagGetAnimMatrix`
 //!    (`tr_ghoul2.cpp:603,645,1417`) are, per this file's own module doc
 //!    above, owned by `render/skeleton.rs` — but that file (read in full
 //!    before writing this one) does not yet expose them. Ported here as
@@ -142,7 +134,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract, vectoangles, AngleNormZero,
-    AngleNormalize180, AngleVectors, AnglesToAxis, DistanceSquared, VectorInverse,
+    AngleNormalize180, AngleVectors, Create_Matrix, DistanceSquared, VectorInverse,
 };
 use mp_qshared::shared::{
     mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID, CONTENTS_TERRAIN,
@@ -347,34 +339,9 @@ impl Default for RagDollSolver {
     }
 }
 
-// ---------------------------------------------------------------------------
-// File-local vector/angle math primitives (oracle/codemp/game/q_math.c).
-// Not re-exported; see the module doc's "problems" note #1 for why these
-// aren't imported from a shared home (none of the tree's existing q_math
-// ports cover this set at time of writing).
-// ---------------------------------------------------------------------------
-
-/// Raven `void Create_Matrix(const float *angle, mdxaBone_t *matrix)` — file-
-/// local twin of `misc.rs`'s private (also-stubbed) `create_matrix`; see this
-/// file's module-doc "problems" note #1.
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1628-1651`
-fn create_matrix(angle: vec3_t) -> mdxaBone_t {
-    let mut axis = [[0.0f32; 3]; 3];
-    AnglesToAxis(angle, axis.as_mut_ptr());
-    let mut matrix = ZERO_BONE;
-    for row in 0..3 {
-        matrix.matrix[row][0] = axis[0][row];
-        matrix.matrix[row][1] = axis[1][row];
-        matrix.matrix[row][2] = axis[2][row];
-        matrix.matrix[row][3] = 0.0;
-    }
-    matrix
-}
-
 /// Materialize an independent `&mut boneInfo_t` out of `ghoul2.blist[index]`
 /// for a call site that also passes `ghoul2: &mut CGhoul2Info` itself — see
-/// this file's module-doc "problems" note #3 for why this `unsafe` stopgap
+/// this file's module-doc "problems" note #2 for why this `unsafe` stopgap
 /// exists and what it does NOT justify (only used where the callee provably
 /// never touches `ghoul2.blist` again while the returned `bone` is live).
 /// Takes a raw pointer (not `&mut CGhoul2Info`) so the borrow checker does
@@ -387,7 +354,7 @@ unsafe fn alias_bone_mut<'a>(ghoul2: *mut CGhoul2Info, index: usize) -> &'a mut 
 
 // ---------------------------------------------------------------------------
 // Private file-local `mdxaSkel_t`/`mdxaSkelOffsets_t` byte-layout walk — see
-// this file's module-doc "problems" note #2. Sizes only, transcribed from
+// this file's module-doc "problems" note #1. Sizes only, transcribed from
 // `oracle/codemp/renderer/mdx_format.h:350-397`; never an imported
 // `mp_renderer` type (`G2SV-D5`).
 // ---------------------------------------------------------------------------
@@ -432,7 +399,7 @@ unsafe fn mdxa_skel_name(skel: *const u8) -> String {
 
 /// Raven `int G2_GetBoneDependents(CGhoul2Info &ghoul2, int boneNum, int
 /// *tempDependents, int maxDep)` — private file-local stopgap (module-doc
-/// "problems" note #2); recurses the skeleton's `numChildren`/`children[]`
+/// "problems" note #1); recurses the skeleton's `numChildren`/`children[]`
 /// list, filling `out` breadth-first-then-recursive exactly as the oracle
 /// does, returning the count written.
 ///
@@ -484,7 +451,7 @@ fn g2_get_bone_dependents_recurse(header: *mut c_void, bone_num: i32, out: &mut 
 }
 
 /// Raven `bool G2_WasBoneRendered(CGhoul2Info &ghoul2, int boneNum)` —
-/// private file-local stopgap (module-doc "problems" note #2); forwards to
+/// private file-local stopgap (module-doc "problems" note #1); forwards to
 /// the already-landed `CBoneCache::was_rendered`.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:645-654`
@@ -497,7 +464,7 @@ fn g2_was_bone_rendered(g2: &Ghoul2System, ghoul2: &CGhoul2Info, bone_num: i32) 
 
 /// Raven `void G2_RagGetAnimMatrix(CGhoul2Info &ghoul2, const int boneNum,
 /// mdxaBone_t &matrix, const int frame)` — private file-local stopgap
-/// (module-doc "problems" note #2); recursively resolves bone `bone_num`'s
+/// (module-doc "problems" note #1); recursively resolves bone `bone_num`'s
 /// settle-frame animated matrix, memoized per-bone by `hasAnimFrameMatrix ==
 /// frame`, decompressing via `uncompress_bone` (`render/bone_transform.rs`,
 /// landed) and composing with the parent's (or the cache's `root_matrix` at
@@ -616,7 +583,7 @@ pub fn g2_rag_doll_setup(
     any_rendered: bool,
 ) -> bool {
     // `host` unused: `G2_WasBoneRendered`/`G2_GetBoneBasepose` read only the
-    // already-resolved `CBoneCache` (module-doc "problems" note #2), not a
+    // already-resolved `CBoneCache` (module-doc "problems" note #1), not a
     // fresh `EngineHost` lookup.
     g2.rag.rag.clear();
 
@@ -1218,7 +1185,7 @@ pub fn g2_generate_matrix_rag(blist: &mut Vec<boneInfo_t>, index: i32) {
 /// doc's prose elsewhere, reported upstream), not merely a debug convenience
 /// dropped by convention.
 ///
-/// **Reported gap** (module-doc note #5): the `broadsword_ragtobase > 1`
+/// **Reported gap** (module-doc note #4): the `broadsword_ragtobase > 1`
 /// pelvis-offset sub-branch (`:3496-3524,3625-3663`) needs
 /// `g2_rag_get_pelvis_lumbar_offsets`/`g2_rag_get_world_anim_matrix`'s
 /// `worldMatrix`, which this function's own frozen signature has no
@@ -1307,7 +1274,7 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
     let mut pelvis_pos = [0.0f32; 3];
     if broadsword_ragtobase > 1 {
         // See this fn's doc comment: blocked by a missing `worldMatrix`
-        // parameter (module-doc "problems" note #5); a no-op leaves the
+        // parameter (module-doc "problems" note #4); a no-op leaves the
         // four vectors at zero rather than inventing a substitute.
         g2_rag_get_pelvis_lumbar_offsets(
             g2,
@@ -1715,7 +1682,8 @@ fn g2_rag_doll_solve_instances(
 
         let n = inverse_matrix(&g2.rag.bones[i]);
         let t_angles0 = instances[idx].blist[blist_idx].currentAngles;
-        let cur_rot = create_matrix(t_angles0);
+        let mut cur_rot = ZERO_BONE;
+        Create_Matrix(t_angles0, &mut cur_rot);
         let cur_rot_inv = inverse_matrix(&cur_rot);
         let mut p = ZERO_BONE;
         multiply_3x4_matrix(&mut p, &g2.rag.bones[i], &cur_rot_inv);
@@ -1735,7 +1703,8 @@ fn g2_rag_doll_solve_instances(
             for k in 0..3 {
                 let mut t = t_angles0;
                 t[k] += 0.5;
-                let temp2 = create_matrix(t);
+                let mut temp2 = ZERO_BONE;
+                Create_Matrix(t, &mut temp2);
                 let mut temp1 = ZERO_BONE;
                 multiply_3x4_matrix(&mut temp1, &p, &temp2);
                 multiply_3x4_matrix(&mut gs[k], &temp1, &n);
@@ -1845,7 +1814,8 @@ fn g2_rag_doll_solve_instances(
                     // G2_BoneSnap is a compiled no-op server-side (see its own doc comment).
                     bone.snapped = is_snapped;
                 }
-                let temp1 = create_matrix(bone.currentAngles);
+                let mut temp1 = ZERO_BONE;
+                Create_Matrix(bone.currentAngles, &mut temp1);
                 let basepose_inv = if bone.baseposeInv.is_null() {
                     ZERO_BONE
                 } else {
@@ -1923,7 +1893,8 @@ fn g2_ik_solve_instances(
 
         let n = inverse_matrix(&g2.rag.bones[i]);
         let t_angles0 = instances[idx].blist[blist_idx].currentAngles;
-        let cur_rot = create_matrix(t_angles0);
+        let mut cur_rot = ZERO_BONE;
+        Create_Matrix(t_angles0, &mut cur_rot);
         let cur_rot_inv = inverse_matrix(&cur_rot);
         let mut p = ZERO_BONE;
         multiply_3x4_matrix(&mut p, &g2.rag.bones[i], &cur_rot_inv);
@@ -1932,7 +1903,8 @@ fn g2_ik_solve_instances(
         for k in 0..3 {
             let mut t = t_angles0;
             t[k] += 0.5;
-            let temp2 = create_matrix(t);
+            let mut temp2 = ZERO_BONE;
+            Create_Matrix(t, &mut temp2);
             let mut temp1 = ZERO_BONE;
             multiply_3x4_matrix(&mut temp1, &p, &temp2);
             multiply_3x4_matrix(&mut gs[k], &temp1, &n);
@@ -2026,7 +1998,8 @@ fn g2_ik_solve_instances(
                     }
                 }
             }
-            let temp1 = create_matrix(bone.currentAngles);
+            let mut temp1 = ZERO_BONE;
+            Create_Matrix(bone.currentAngles, &mut temp1);
             let basepose_inv = if bone.baseposeInv.is_null() {
                 ZERO_BONE
             } else {
@@ -2191,7 +2164,7 @@ pub fn g2_rag_set_state(
 }
 
 /// Raven `void Rag_Trace(...)`'s dependency `G2_RagGetPelvisLumbarOffsets`
-/// helper — see this file's module-doc "problems" note #5: blocked by a
+/// helper — see this file's module-doc "problems" note #4: blocked by a
 /// missing `world_matrix` parameter on this frozen signature (Raven's own
 /// body reads the file-scope `worldMatrix` directly, `G2_bones.cpp:3424`,
 /// which this port never reaches into as ambient state). A documented
@@ -2256,7 +2229,7 @@ pub fn g2_rag_get_world_anim_matrix(
 /// by two `flrand(-0.75, 0.75)` calls (`EngineHost::flrand`, `:2127-2129`
 /// numbering — actual call site `:4290`) and damps `velocityEffector`.
 ///
-/// **Reported gap** (module-doc "problems" note #4): this frozen signature
+/// **Reported gap** (module-doc "problems" note #3): this frozen signature
 /// has no `ghoul2`/blist parameter, but the body needs `boneInfo_t`'s own
 /// `ikPosition`/`velocityEffector`/`lastPosition` fields (`ragBoneData[i]->
 /// ...`, now blist-index-resolved per `G2SV-D13`(b)) — unreachable here. A

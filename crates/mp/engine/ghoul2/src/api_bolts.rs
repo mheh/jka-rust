@@ -71,13 +71,6 @@
 //! back to Raven's own "bolt has neither a bone nor a surface" identity-matrix
 //! arm (`tr_ghoul2.cpp:3328-3330`).
 //!
-//! **Fourth, minor gap (reported under `problems`).** `Create_Matrix`
-//! (`G2_misc.cpp:1630-1653`) is needed by `g2api_get_bolt_matrix` but exists
-//! only as `misc::create_matrix`, which is file-private (not `pub`) and so
-//! cannot be reused here; it is reimplemented locally below as a narrow
-//! stopgap (`create_matrix_from_angles`) rather than left uncallable. (The
-//! row-normalize it pairs with is the canonical q_math `VectorNormalizeRow`.)
-//!
 //! Bounds guards on a few direct `bltlist[index]` reads below (`
 //! g2api_attach_g2_model`/`g2api_attach_ent`) are a §19 divergence: Raven's own
 //! bounds checks there are `assert()`s only, which compile to nothing under
@@ -86,6 +79,7 @@
 //! /`None`) behavior instead of an out-of-bounds panic.
 
 use mp_host_interface::EngineHost;
+use mp_qshared::shared::q_math::Create_Matrix;
 use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, VectorNormalizeRow};
 
 use crate::api_collision;
@@ -353,7 +347,10 @@ pub fn g2api_get_bolt_matrix(
             if !g2.gbm_use_sp_method {
                 // "this is horribly stupid and I hate it. But lots of game code is
                 // written to assume this 90 degree offset thing." (`:1870`)
-                let rot_mat = create_matrix_from_angles([0.0, 270.0, 0.0]);
+                let mut rot_mat = mdxaBone_t {
+                    matrix: [[0.0; 4]; 3],
+                };
+                Create_Matrix([0.0, 270.0, 0.0], &mut rot_mat);
                 let mut temp_matrix = mdxaBone_t {
                     matrix: [[0.0; 4]; 3],
                 };
@@ -380,40 +377,6 @@ pub fn g2api_get_bolt_matrix(
 
     bone_transform::multiply_3x4_matrix(bolt_matrix, &world_matrix, &IDENTITY_MATRIX);
     false
-}
-
-/// Stopgap reimplementation of Raven `Create_Matrix` (`G2_misc.cpp:1630-1653`,
-/// via `AnglesToAxis`/`AngleVectors`, `q_math.c:530-536,1315-1348`) —
-/// `misc::create_matrix` already ports this but is file-private, so it cannot
-/// be reused here (module-doc gap #4, reported under `problems`); only the
-/// single fixed-angle call site in `g2api_get_bolt_matrix` (`newangles =
-/// {0,270,0}`, `G2_API.cpp:1872`) needs it.
-fn create_matrix_from_angles(angle: vec3_t) -> mdxaBone_t {
-    // q_math.c PITCH=0, YAW=1, ROLL=2 (`q_shared.h:374-376`).
-    let (sy, cy) = (angle[1].to_radians().sin(), angle[1].to_radians().cos());
-    let (sp, cp) = (angle[0].to_radians().sin(), angle[0].to_radians().cos());
-    let (sr, cr) = (angle[2].to_radians().sin(), angle[2].to_radians().cos());
-
-    let forward = [cp * cy, cp * sy, -sp];
-    let right = [
-        -1.0 * sr * sp * cy + -1.0 * cr * -sy,
-        -1.0 * sr * sp * sy + -1.0 * cr * cy,
-        -1.0 * sr * cp,
-    ];
-    let up = [cr * sp * cy + -sr * -sy, cr * sp * sy + -sr * cy, cr * cp];
-    // AnglesToAxis: axis[0]=forward, axis[1]=-right, axis[2]=up (q_math.c:530-536).
-    let axis = [forward, [-right[0], -right[1], -right[2]], up];
-
-    let mut matrix = mdxaBone_t {
-        matrix: [[0.0; 4]; 3],
-    };
-    for row in 0..3 {
-        for (col, axis_row) in axis.iter().enumerate() {
-            matrix.matrix[row][col] = axis_row[row];
-        }
-        matrix.matrix[row][3] = 0.0;
-    }
-    matrix
 }
 
 /// Raven `G2API_AttachG2Model` — encode `toModel`/`toBoltIndex` into

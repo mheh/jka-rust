@@ -331,6 +331,9 @@ version = "0.1.0"
 [[package]]
 name = "native_math"
 version = "0.1.0"
+dependencies = [
+ "native_types",
+]
 
 [[package]]
 name = "native_platform"

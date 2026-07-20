@@ -288,14 +288,14 @@ impl PmoveContext<'_> {
 
             AngleVectors(new_angles, Some(&mut nvf), None, None);
 
-            let mut r#mod = nvf[0] * ovr[0] + nvf[1] * ovr[1] + nvf[2] * ovr[2];
+            let mut r#mod = _DotProduct(nvf, ovr);
             if r#mod < 0.0 {
                 r#mod = -1.0;
             } else {
                 r#mod = 1.0;
             }
 
-            let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
+            let dot = _DotProduct(nvf, ovf);
 
             // storeAngles is always "present" (non-NULL &mut) for the live caller.
             storeAngles[PITCH] = dot * pitch;
@@ -410,7 +410,7 @@ impl PmoveContext<'_> {
                     _VectorCopy(*(*pVeh).m_vOrientation.cast::<vec3_t>(), &mut tempVAngles);
                     tempVAngles[ROLL] = 0.0;
                     AngleVectors(tempVAngles, None, Some(&mut rt), None);
-                    let dp = velocity[0] * rt[0] + velocity[1] * rt[1] + velocity[2] * rt[2];
+                    let dp = _DotProduct(velocity, rt);
                     let side = speed * dp;
                     vAngles[ROLL] -= side;
                 }
@@ -789,8 +789,7 @@ impl PmoveContext<'_> {
             }
             let oldInZ = r#in[2];
 
-            // backoff = DotProduct (in, normal);
-            let mut backoff = r#in[0] * normal[0] + r#in[1] * normal[1] + r#in[2] * normal[2];
+            let mut backoff = _DotProduct(r#in, normal);
 
             if backoff < 0.0 {
                 backoff *= overbounce;
@@ -5224,16 +5223,14 @@ pub fn PM_AnglesForSlope(yaw: f32, slope: vec3_t, angles: &mut [f32; 3]) {
 
     AngleVectors(new_angles, Some(&mut nvf), None, None);
 
-    // mod = DotProduct( nvf, ovr )
-    let mut r#mod = nvf[0] * ovr[0] + nvf[1] * ovr[1] + nvf[2] * ovr[2];
+    let mut r#mod = _DotProduct(nvf, ovr);
     if r#mod < 0.0 {
         r#mod = -1.0;
     } else {
         r#mod = 1.0;
     }
 
-    // dot = DotProduct( nvf, ovf )
-    let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
+    let dot = _DotProduct(nvf, ovf);
 
     angles[YAW] = 0.0;
     angles[PITCH] = dot * pitch;

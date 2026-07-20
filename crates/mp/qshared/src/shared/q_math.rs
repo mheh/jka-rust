@@ -22,8 +22,9 @@ pub use native_math::qmath::PerpendicularVectorMP as PerpendicularVector;
 pub use native_math::qmath::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
     vectoangles, vectoyaw, AngleDelta, AngleDifference, AngleMod, AngleNormZero, AngleNormalize180,
-    AngleNormalize360, AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, CrossProduct,
-    Distance, DistanceSquared, DotProductRow, MatrixMultiply, ProjectPointOnPlane, Q_fabs, Q_rand,
+    AngleNormalize360, AngleSubtract, AngleVectors, AnglesSubtract, AnglesToAxis, Create_Matrix,
+    CrossProduct, Distance, DistanceSquared, DotProductRow, MatrixMultiply, ProjectPointOnPlane,
+    Q_fabs, Q_rand,
     Q_random, RadiusFromBounds, VectorBetweenVectors, VectorClear, VectorCompare, VectorCompare2,
     VectorInverse, VectorLength, VectorLengthSquared, VectorNPos, VectorNormalize,
     VectorNormalize2, VectorNormalizeRow, VectorSet, ANGLE2SHORT, PITCH, ROLL, SHORT2ANGLE,

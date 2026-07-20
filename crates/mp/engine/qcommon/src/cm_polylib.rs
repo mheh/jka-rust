@@ -9,9 +9,8 @@ use core::ffi::c_int;
 
 use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::q_math::{
-    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
-    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    vec3_origin, CrossProduct, VectorLength, VectorNormalize2,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
+    CrossProduct, VectorLength, VectorNormalize2,
 };
 use mp_qshared::shared::{errorParm_t, vec3_t, vec_t};
 
@@ -65,11 +64,11 @@ pub fn WindingPlane(w: *mut winding_t, normal: &mut vec3_t, dist: *mut vec_t) {
         let mut v1: vec3_t = [0.0; 3];
         let mut v2: vec3_t = [0.0; 3];
 
-        VectorSubtract(*winding_p(w, 1), *winding_p(w, 0), &mut v1);
-        VectorSubtract(*winding_p(w, 2), *winding_p(w, 0), &mut v2);
+        _VectorSubtract(*winding_p(w, 1), *winding_p(w, 0), &mut v1);
+        _VectorSubtract(*winding_p(w, 2), *winding_p(w, 0), &mut v2);
         CrossProduct(v2, v1, normal);
         VectorNormalize2(*normal, normal);
-        *dist = DotProduct(*winding_p(w, 0), *normal);
+        *dist = _DotProduct(*winding_p(w, 0), *normal);
     }
 }
 
@@ -83,8 +82,8 @@ pub fn WindingArea(w: *mut winding_t) -> vec_t {
             let mut d1: vec3_t = [0.0; 3];
             let mut d2: vec3_t = [0.0; 3];
             let mut cross: vec3_t = [0.0; 3];
-            VectorSubtract(*winding_p(w, (i - 1) as usize), *winding_p(w, 0), &mut d1);
-            VectorSubtract(*winding_p(w, i as usize), *winding_p(w, 0), &mut d2);
+            _VectorSubtract(*winding_p(w, (i - 1) as usize), *winding_p(w, 0), &mut d1);
+            _VectorSubtract(*winding_p(w, i as usize), *winding_p(w, 0), &mut d2);
             CrossProduct(d1, d2, &mut cross);
             total += 0.5 * VectorLength(cross);
         }
@@ -122,14 +121,14 @@ pub fn WindingBounds(w: *mut winding_t, mins: &mut vec3_t, maxs: &mut vec3_t) {
 ///
 /// Source: `oracle/codemp/qcommon/cm_polylib.cpp:160-171`
 pub fn WindingCenter(_common: &mut Common, w: *mut winding_t, center: &mut vec3_t) {
-    VectorCopy(vec3_origin, center);
+    _VectorCopy(vec3_origin, center);
     unsafe {
         for i in 0..(*w).numpoints {
             let p = *winding_p(w, i as usize);
-            VectorAdd(p, *center, center);
+            _VectorAdd(p, *center, center);
         }
         let scale: vec_t = 1.0 / (*w).numpoints as vec_t;
-        VectorScale(*center, scale, center);
+        _VectorScale(*center, scale, center);
     }
 }
 
@@ -142,7 +141,7 @@ pub fn WindingOnPlaneSide(w: *mut winding_t, normal: vec3_t, dist: vec_t) -> c_i
 
     unsafe {
         for i in 0..(*w).numpoints {
-            let d = DotProduct(*winding_p(w, i as usize), normal) - dist;
+            let d = _DotProduct(*winding_p(w, i as usize), normal) - dist;
             if d < -ON_EPSILON {
                 if front {
                     return SIDE_CROSS;
@@ -187,20 +186,20 @@ pub fn RemoveColinearPoints(cm: &mut CollisionWorld, w: *mut winding_t) {
             let k = (i + numpoints - 1) % numpoints;
             let mut v1: vec3_t = [0.0; 3];
             let mut v2: vec3_t = [0.0; 3];
-            VectorSubtract(
+            _VectorSubtract(
                 *winding_p(w, j as usize),
                 *winding_p(w, i as usize),
                 &mut v1,
             );
-            VectorSubtract(
+            _VectorSubtract(
                 *winding_p(w, i as usize),
                 *winding_p(w, k as usize),
                 &mut v2,
             );
             VectorNormalize2(v1, &mut v1);
             VectorNormalize2(v2, &mut v2);
-            if DotProduct(v1, v2) < 0.999 {
-                VectorCopy(*winding_p(w, i as usize), &mut p[nump as usize]);
+            if _DotProduct(v1, v2) < 0.999 {
+                _VectorCopy(*winding_p(w, i as usize), &mut p[nump as usize]);
                 nump += 1;
             }
         }
@@ -310,7 +309,7 @@ pub fn CheckWinding(w: *mut winding_t) {
             let j = if i + 1 == (*w).numpoints { 0 } else { i + 1 };
 
             // check the point is on the face plane
-            let d = DotProduct(p1, facenormal) - facedist;
+            let d = _DotProduct(p1, facenormal) - facedist;
             if d < -ON_EPSILON || d > ON_EPSILON {
                 com_error(
                     errorParm_t::ERR_DROP,
@@ -321,7 +320,7 @@ pub fn CheckWinding(w: *mut winding_t) {
             // check the edge isnt degenerate
             let p2 = *winding_p(w, j as usize);
             let mut dir: vec3_t = [0.0; 3];
-            VectorSubtract(p2, p1, &mut dir);
+            _VectorSubtract(p2, p1, &mut dir);
 
             if VectorLength(dir) < ON_EPSILON {
                 com_error(
@@ -333,7 +332,7 @@ pub fn CheckWinding(w: *mut winding_t) {
             let mut edgenormal: vec3_t = [0.0; 3];
             CrossProduct(facenormal, dir, &mut edgenormal);
             VectorNormalize2(edgenormal, &mut edgenormal);
-            let mut edgedist = DotProduct(p1, edgenormal);
+            let mut edgedist = _DotProduct(p1, edgenormal);
             edgedist += ON_EPSILON;
 
             // all other points must be on front side
@@ -341,7 +340,7 @@ pub fn CheckWinding(w: *mut winding_t) {
                 if jj == i {
                     continue;
                 }
-                let d = DotProduct(*winding_p(w, jj as usize), edgenormal);
+                let d = _DotProduct(*winding_p(w, jj as usize), edgenormal);
                 if d > edgedist {
                     com_error(
                         errorParm_t::ERR_DROP,
@@ -380,45 +379,45 @@ pub fn BaseWindingForPlane(
     }
 
     let mut vup: vec3_t = [0.0; 3];
-    VectorCopy(vec3_origin, &mut vup);
+    _VectorCopy(vec3_origin, &mut vup);
     match x {
         0 | 1 => vup[2] = 1.0,
         2 => vup[0] = 1.0,
         _ => {}
     }
 
-    let v = DotProduct(vup, normal);
-    VectorMA(vup, -v, normal, &mut vup);
+    let v = _DotProduct(vup, normal);
+    _VectorMA(vup, -v, normal, &mut vup);
     VectorNormalize2(vup, &mut vup);
 
     let mut org: vec3_t = [0.0; 3];
-    VectorScale(normal, dist, &mut org);
+    _VectorScale(normal, dist, &mut org);
 
     let mut vright: vec3_t = [0.0; 3];
     CrossProduct(vup, normal, &mut vright);
 
-    VectorScale(vup, MAX_MAP_BOUNDS as vec_t, &mut vup);
-    VectorScale(vright, MAX_MAP_BOUNDS as vec_t, &mut vright);
+    _VectorScale(vup, MAX_MAP_BOUNDS as vec_t, &mut vup);
+    _VectorScale(vright, MAX_MAP_BOUNDS as vec_t, &mut vright);
 
     // project a really big axis aligned box onto the plane
     let w = AllocWinding(view, 4);
 
     unsafe {
-        VectorSubtract(org, vright, &mut *winding_p(w, 0));
+        _VectorSubtract(org, vright, &mut *winding_p(w, 0));
         let p0 = *winding_p(w, 0);
-        VectorAdd(p0, vup, &mut *winding_p(w, 0));
+        _VectorAdd(p0, vup, &mut *winding_p(w, 0));
 
-        VectorAdd(org, vright, &mut *winding_p(w, 1));
+        _VectorAdd(org, vright, &mut *winding_p(w, 1));
         let p1 = *winding_p(w, 1);
-        VectorAdd(p1, vup, &mut *winding_p(w, 1));
+        _VectorAdd(p1, vup, &mut *winding_p(w, 1));
 
-        VectorAdd(org, vright, &mut *winding_p(w, 2));
+        _VectorAdd(org, vright, &mut *winding_p(w, 2));
         let p2 = *winding_p(w, 2);
-        VectorSubtract(p2, vup, &mut *winding_p(w, 2));
+        _VectorSubtract(p2, vup, &mut *winding_p(w, 2));
 
-        VectorSubtract(org, vright, &mut *winding_p(w, 3));
+        _VectorSubtract(org, vright, &mut *winding_p(w, 3));
         let p3 = *winding_p(w, 3);
-        VectorSubtract(p3, vup, &mut *winding_p(w, 3));
+        _VectorSubtract(p3, vup, &mut *winding_p(w, 3));
 
         (*w).numpoints = 4;
     }
@@ -447,7 +446,7 @@ pub fn ReverseWinding(view: &mut EngineHostView, w: *mut winding_t) -> *mut wind
         let c = AllocWinding(view, (*w).numpoints);
         for i in 0..(*w).numpoints {
             let src = *winding_p(w, ((*w).numpoints - 1 - i) as usize);
-            VectorCopy(src, &mut *winding_p(c, i as usize));
+            _VectorCopy(src, &mut *winding_p(c, i as usize));
         }
         (*c).numpoints = (*w).numpoints;
         c
@@ -484,7 +483,7 @@ pub fn ChopWindingInPlace(
 
         // determine sides for each point
         for i in 0..(*in_).numpoints {
-            dot = DotProduct(*winding_p(in_, i as usize), normal);
+            dot = _DotProduct(*winding_p(in_, i as usize), normal);
             dot -= dist;
             dists[i as usize] = dot;
             if dot > epsilon {
@@ -518,14 +517,14 @@ pub fn ChopWindingInPlace(
 
             if sides[i as usize] == SIDE_ON {
                 let idx = (*f).numpoints as usize;
-                VectorCopy(p1, &mut *winding_p(f, (idx) as usize));
+                _VectorCopy(p1, &mut *winding_p(f, (idx) as usize));
                 (*f).numpoints += 1;
                 continue;
             }
 
             if sides[i as usize] == SIDE_FRONT {
                 let idx = (*f).numpoints as usize;
-                VectorCopy(p1, &mut *winding_p(f, (idx) as usize));
+                _VectorCopy(p1, &mut *winding_p(f, (idx) as usize));
                 (*f).numpoints += 1;
             }
 
@@ -550,7 +549,7 @@ pub fn ChopWindingInPlace(
             }
 
             let idx = (*f).numpoints as usize;
-            VectorCopy(mid, &mut *winding_p(f, (idx) as usize));
+            _VectorCopy(mid, &mut *winding_p(f, (idx) as usize));
             (*f).numpoints += 1;
         }
 
@@ -599,7 +598,7 @@ pub fn ClipWindingEpsilon(
 
         // determine sides for each point
         for i in 0..(*in_).numpoints {
-            dot = DotProduct(*winding_p(in_, i as usize), normal);
+            dot = _DotProduct(*winding_p(in_, i as usize), normal);
             dot -= dist;
             dists[i as usize] = dot;
             if dot > epsilon {
@@ -639,22 +638,22 @@ pub fn ClipWindingEpsilon(
 
             if sides[i as usize] == SIDE_ON {
                 let fi = (*f).numpoints as usize;
-                VectorCopy(p1, &mut *winding_p(f, (fi) as usize));
+                _VectorCopy(p1, &mut *winding_p(f, (fi) as usize));
                 (*f).numpoints += 1;
                 let bi = (*b).numpoints as usize;
-                VectorCopy(p1, &mut *winding_p(b, (bi) as usize));
+                _VectorCopy(p1, &mut *winding_p(b, (bi) as usize));
                 (*b).numpoints += 1;
                 continue;
             }
 
             if sides[i as usize] == SIDE_FRONT {
                 let fi = (*f).numpoints as usize;
-                VectorCopy(p1, &mut *winding_p(f, (fi) as usize));
+                _VectorCopy(p1, &mut *winding_p(f, (fi) as usize));
                 (*f).numpoints += 1;
             }
             if sides[i as usize] == SIDE_BACK {
                 let bi = (*b).numpoints as usize;
-                VectorCopy(p1, &mut *winding_p(b, (bi) as usize));
+                _VectorCopy(p1, &mut *winding_p(b, (bi) as usize));
                 (*b).numpoints += 1;
             }
 
@@ -679,10 +678,10 @@ pub fn ClipWindingEpsilon(
             }
 
             let fi = (*f).numpoints as usize;
-            VectorCopy(mid, &mut *winding_p(f, (fi) as usize));
+            _VectorCopy(mid, &mut *winding_p(f, (fi) as usize));
             (*f).numpoints += 1;
             let bi = (*b).numpoints as usize;
-            VectorCopy(mid, &mut *winding_p(b, (bi) as usize));
+            _VectorCopy(mid, &mut *winding_p(b, (bi) as usize));
             (*b).numpoints += 1;
         }
 
@@ -734,7 +733,7 @@ pub fn AddWindingToConvexHull(
             for j in 0..num_hull_points {
                 let k = (j + 1) % num_hull_points;
                 let mut dir: vec3_t = [0.0; 3];
-                VectorSubtract(hull_points[k], hull_points[j], &mut dir);
+                _VectorSubtract(hull_points[k], hull_points[j], &mut dir);
                 VectorNormalize2(dir, &mut dir);
                 CrossProduct(normal, dir, &mut hull_dirs[j]);
             }
@@ -743,8 +742,8 @@ pub fn AddWindingToConvexHull(
             let mut hull_side: [bool; MAX_HULL_POINTS as usize] = [false; MAX_HULL_POINTS as usize];
             for j in 0..num_hull_points {
                 let mut dir: vec3_t = [0.0; 3];
-                VectorSubtract(p, hull_points[j], &mut dir);
-                let d = DotProduct(dir, hull_dirs[j]);
+                _VectorSubtract(p, hull_points[j], &mut dir);
+                let d = _DotProduct(dir, hull_dirs[j]);
                 if d >= ON_EPSILON {
                     outside = true;
                 }
@@ -771,7 +770,7 @@ pub fn AddWindingToConvexHull(
             // insert the point here
             let mut new_hull_points: [vec3_t; MAX_HULL_POINTS as usize] =
                 [[0.0; 3]; MAX_HULL_POINTS as usize];
-            VectorCopy(p, &mut new_hull_points[0]);
+            _VectorCopy(p, &mut new_hull_points[0]);
             let mut num_new = 1usize;
 
             // copy over all points that aren't double fronts
@@ -782,7 +781,7 @@ pub fn AddWindingToConvexHull(
                     continue;
                 }
                 let copy = hull_points[(j + k + 1) % num_hull_points];
-                VectorCopy(copy, &mut new_hull_points[num_new]);
+                _VectorCopy(copy, &mut new_hull_points[num_new]);
                 num_new += 1;
             }
 

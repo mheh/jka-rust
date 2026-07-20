@@ -159,7 +159,10 @@
 use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::q_math::AnglesToAxis;
+use mp_qshared::shared::q_math::{
+    Create_Matrix, _DotProduct, _VectorAdd, _VectorMA, _VectorScale, _VectorSubtract,
+    CrossProduct, VectorLength, VectorLengthSquared, VectorNormalize,
+};
 use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRecord_t};
 
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
@@ -378,47 +381,6 @@ fn register_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
     )
 }
 
-// ---------------------------------------------------------------------------
-// Vector math (`q_math.c`) — no crate-wide home exists yet (`native_math`
-// only carries type aliases), so this file carries its own minimal set,
-// matching the values Raven's `DotProduct`/`CrossProduct`/... macros compute.
-// ---------------------------------------------------------------------------
-
-fn v_dot(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-fn v_cross(a: vec3_t, b: vec3_t) -> vec3_t {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
-fn v_sub(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-fn v_add(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-fn v_scale(a: vec3_t, s: f32) -> vec3_t {
-    [a[0] * s, a[1] * s, a[2] * s]
-}
-fn v_length_squared(a: vec3_t) -> f32 {
-    v_dot(a, a)
-}
-fn v_length(a: vec3_t) -> f32 {
-    v_length_squared(a).sqrt()
-}
-fn v_normalize(a: &mut vec3_t) -> f32 {
-    let len = v_length(*a);
-    if len != 0.0 {
-        let inv = 1.0 / len;
-        a[0] *= inv;
-        a[1] *= inv;
-        a[2] *= inv;
-    }
-    len
-}
 /// The first 3 elements of a `mdxaBone_t` matrix row (Raven's `DotProduct`
 /// macro only ever reads indices `[0][1][2]` regardless of the row's real
 /// declared width).
@@ -998,9 +960,10 @@ fn g2_trace_polys(
         );
         let _ = (s, t);
 
-        let dist_vect = v_sub(hit_point, ts.ray_start);
+        let mut dist_vect = [0.0; 3];
+        _VectorSubtract(hit_point, ts.ray_start, &mut dist_vect);
         let mut world_normal = transform_point(normal, world_matrix);
-        v_normalize(&mut world_normal);
+        VectorNormalize(&mut world_normal);
 
         let new_col = &mut ts.coll_rec_map[i];
         new_col.mPolyIndex = j;
@@ -1012,7 +975,7 @@ fn g2_trace_polys(
         } else {
             G2_BACKFACE
         };
-        new_col.mDistance = v_length(dist_vect);
+        new_col.mDistance = VectorLength(dist_vect);
         new_col.mCollisionPosition = transform_and_translate_point(hit_point, world_matrix);
         new_col.mCollisionNormal = world_normal;
         new_col.mMaterial = 0;
@@ -1041,30 +1004,31 @@ fn g2_radius_trace_polys(
     world_matrix: &mdxaBone_t,
 ) -> bool {
     let mut basis2: vec3_t = [0.0, 0.0, 1.0];
-    let v3_ray_dir_raw = v_sub(ts.ray_end, ts.ray_start);
-    let mut basis1 = v_cross(v3_ray_dir_raw, basis2);
+    let mut v3_ray_dir_raw = [0.0; 3];
+    _VectorSubtract(ts.ray_end, ts.ray_start, &mut v3_ray_dir_raw);
+    let mut basis1 = [0.0; 3];
+    CrossProduct(v3_ray_dir_raw, basis2, &mut basis1);
 
-    if v_dot(basis1, basis1) < 0.1 {
+    if _DotProduct(basis1, basis1) < 0.1 {
         basis2 = [0.0, 1.0, 0.0];
-        basis1 = v_cross(v3_ray_dir_raw, basis2);
+        CrossProduct(v3_ray_dir_raw, basis2, &mut basis1);
     }
-    let basis2 = v_cross(v3_ray_dir_raw, basis1);
+    let mut basis2 = [0.0; 3];
+    CrossProduct(v3_ray_dir_raw, basis1, &mut basis2);
 
-    v_normalize(&mut basis1);
-    let mut basis2 = basis2;
-    v_normalize(&mut basis2);
+    VectorNormalize(&mut basis1);
+    VectorNormalize(&mut basis2);
 
     let c = 0.0f32.cos();
     let s = 0.0f32.sin();
 
-    let taxis = v_add(
-        v_scale(basis1, 0.5 * c / ts.f_radius),
-        v_scale(basis2, 0.5 * s / ts.f_radius),
-    );
-    let saxis = v_add(
-        v_scale(basis1, -0.5 * s / ts.f_radius),
-        v_scale(basis2, 0.5 * c / ts.f_radius),
-    );
+    let mut taxis = [0.0; 3];
+    _VectorScale(basis1, 0.5 * c / ts.f_radius, &mut taxis);
+    _VectorMA(taxis, 0.5 * s / ts.f_radius, basis2, &mut taxis);
+
+    let mut saxis = [0.0; 3];
+    _VectorScale(basis1, -0.5 * s / ts.f_radius, &mut saxis);
+    _VectorMA(saxis, 0.5 * c / ts.f_radius, basis2, &mut saxis);
 
     let num_verts = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_VERTS) };
 
@@ -1073,7 +1037,7 @@ fn g2_radius_trace_polys(
     }
     let verts_ptr = ts.transformed_verts_array as *const i32;
 
-    let f = v_length_squared(v3_ray_dir_raw);
+    let f = VectorLengthSquared(v3_ray_dir_raw);
     let mut v3_ray_dir = v3_ray_dir_raw;
     if f != 0.0 {
         v3_ray_dir[0] /= f;
@@ -1086,10 +1050,11 @@ fn g2_radius_trace_polys(
     for j in 0..num_verts {
         // SAFETY: see `g2_trace_polys`'s identical-shape read.
         let vp = unsafe { read_flat_vert(verts_ptr, base, j as usize) };
-        let delta = v_sub([vp[0], vp[1], vp[2]], ts.ray_start);
-        let s_coord = v_dot(delta, saxis) + 0.5;
-        let t_coord = v_dot(delta, taxis) + 0.5;
-        let u_coord = v_dot(delta, v3_ray_dir);
+        let mut delta = [0.0; 3];
+        _VectorSubtract([vp[0], vp[1], vp[2]], ts.ray_start, &mut delta);
+        let s_coord = _DotProduct(delta, saxis) + 0.5;
+        let t_coord = _DotProduct(delta, taxis) + 0.5;
+        let u_coord = _DotProduct(delta, v3_ray_dir);
         let mut vflags = 0i32;
         if s_coord > 0.0 {
             vflags |= 1;
@@ -1151,18 +1116,22 @@ fn g2_radius_trace_polys(
         let b3 = [b[0], b[1], b[2]];
         let c3 = [c_vert[0], c_vert[1], c_vert[2]];
 
-        let edge_ac = v_sub(c3, a3);
-        let edge_ba = v_sub(b3, a3);
-        let normal = v_cross(edge_ba, edge_ac);
+        let mut edge_ac = [0.0; 3];
+        _VectorSubtract(c3, a3, &mut edge_ac);
+        let mut edge_ba = [0.0; 3];
+        _VectorSubtract(b3, a3, &mut edge_ba);
+        let mut normal = [0.0; 3];
+        CrossProduct(edge_ba, edge_ac, &mut normal);
         let mut world_normal = transform_point(normal, world_matrix);
-        v_normalize(&mut world_normal);
+        VectorNormalize(&mut world_normal);
 
-        let dist_vect_dir = v_sub(ts.ray_end, ts.ray_start);
+        let mut dist_vect_dir = [0.0; 3];
+        _VectorSubtract(ts.ray_end, ts.ray_start, &mut dist_vect_dir);
         let third = -(a3[0] * (b3[1] * c3[2] - c3[1] * b3[2])
             + b3[0] * (c3[1] * a3[2] - a3[1] * c3[2])
             + c3[0] * (a3[1] * b3[2] - b3[1] * a3[2]));
-        let side = v_dot(normal, ts.ray_start) + third;
-        let side2 = v_dot(normal, dist_vect_dir);
+        let side = _DotProduct(normal, ts.ray_start) + third;
+        let side2 = _DotProduct(normal, dist_vect_dir);
         let hit_point = if side2 != 0.0 {
             let dist = side / side2;
             let mut hp = ts.ray_start;
@@ -1174,7 +1143,8 @@ fn g2_radius_trace_polys(
             ts.ray_start
         };
 
-        let dist_vect = v_sub(hit_point, ts.ray_start);
+        let mut dist_vect = [0.0; 3];
+        _VectorSubtract(hit_point, ts.ray_start, &mut dist_vect);
 
         let new_col = &mut ts.coll_rec_map[i];
         new_col.mPolyIndex = j;
@@ -1185,7 +1155,7 @@ fn g2_radius_trace_polys(
         new_col.mCollisionNormal = world_normal;
         new_col.mMaterial = 0;
         new_col.mLocation = 0;
-        new_col.mDistance = v_length(dist_vect);
+        new_col.mDistance = VectorLength(dist_vect);
         new_col.mCollisionPosition = transform_and_translate_point(hit_point, world_matrix);
         new_col.mBarycentricI = 0.0;
         new_col.mBarycentricJ = 0.0;
@@ -1207,9 +1177,15 @@ fn g2_radius_trace_polys(
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:665-674`
 pub(crate) fn g2_area_of_tri(a: vec3_t, b: vec3_t, c: vec3_t) -> f32 {
-    let ab = v_sub(a, b);
-    let cb = v_sub(c, b);
-    v_length(v_cross(ab, cb))
+    let mut ab = [0.0; 3];
+    _VectorSubtract(a, b, &mut ab);
+    let mut cb = [0.0; 3];
+    _VectorSubtract(c, b, &mut cb);
+
+    let mut cross = [0.0; 3];
+    CrossProduct(ab, cb, &mut cross);
+
+    VectorLength(cross)
 }
 
 /// Raven `static void G2_BuildHitPointST(...)` — barycentric-interpolates the
@@ -1283,37 +1259,60 @@ pub(crate) fn g2_segment_triangle_test(
 ) -> Option<(vec3_t, vec3_t, f32)> {
     const TINY: f32 = 1e-10;
 
-    let edge_ac = v_sub(c, a);
-    let normal_t = v_sub(b, a);
-    let returned_normal = v_cross(normal_t, edge_ac);
+    let mut edge_ac = [0.0; 3];
+    _VectorSubtract(c, a, &mut edge_ac);
+    let mut returned_normal_t = [0.0; 3];
+    _VectorSubtract(b, a, &mut returned_normal_t);
 
-    let ray = v_sub(end, start);
-    let denom = v_dot(ray, returned_normal);
+    let mut returned_normal = [0.0; 3];
+    CrossProduct(returned_normal_t, edge_ac, &mut returned_normal);
+
+    let mut ray = [0.0; 3];
+    _VectorSubtract(end, start, &mut ray);
+
+    let denom = _DotProduct(ray, returned_normal);
 
     if denom.abs() < TINY || (!back_faces && denom > 0.0) || (!front_faces && denom < 0.0) {
         return None;
     }
 
-    let to_plane = v_sub(a, start);
-    let t = v_dot(to_plane, returned_normal) / denom;
+    let mut to_plane = [0.0; 3];
+    _VectorSubtract(a, start, &mut to_plane);
+
+    let t = _DotProduct(to_plane, returned_normal) / denom;
+
     if !(0.0..=1.0).contains(&t) {
         return None;
     }
 
-    let scaled_ray = v_scale(ray, t);
-    let returned_point = v_add(scaled_ray, start);
+    _VectorScale(ray, t, &mut ray);
 
-    let edge_pa = v_sub(a, returned_point);
-    let edge_pb = v_sub(b, returned_point);
-    let edge_pc = v_sub(c, returned_point);
+    let mut returned_point = [0.0; 3];
+    _VectorAdd(ray, start, &mut returned_point);
 
-    if v_dot(v_cross(edge_pa, edge_pb), returned_normal) < 0.0 {
+    let mut edge_pa = [0.0; 3];
+    _VectorSubtract(a, returned_point, &mut edge_pa);
+
+    let mut edge_pb = [0.0; 3];
+    _VectorSubtract(b, returned_point, &mut edge_pb);
+
+    let mut edge_pc = [0.0; 3];
+    _VectorSubtract(c, returned_point, &mut edge_pc);
+
+    let mut temp = [0.0; 3];
+
+    CrossProduct(edge_pa, edge_pb, &mut temp);
+    if _DotProduct(temp, returned_normal) < 0.0 {
         return None;
     }
-    if v_dot(v_cross(edge_pc, edge_pa), returned_normal) < 0.0 {
+
+    CrossProduct(edge_pc, edge_pa, &mut temp);
+    if _DotProduct(temp, returned_normal) < 0.0 {
         return None;
     }
-    if v_dot(v_cross(edge_pb, edge_pc), returned_normal) < 0.0 {
+
+    CrossProduct(edge_pb, edge_pc, &mut temp);
+    if _DotProduct(temp, returned_normal) < 0.0 {
         return None;
     }
 
@@ -1502,9 +1501,9 @@ fn r_transform_each_surface(
             let bone = eval_bone_cache(g2, bone_cache, bone_ref);
 
             for r in 0..3 {
-                temp_vert[r] +=
-                    bone_weight * (v_dot(row3(bone.matrix[r]), vert_coords) + bone.matrix[r][3]);
-                temp_normal[r] += bone_weight * v_dot(row3(bone.matrix[r]), normal);
+                temp_vert[r] += bone_weight
+                    * (_DotProduct(row3(bone.matrix[r]), vert_coords) + bone.matrix[r][3]);
+                temp_normal[r] += bone_weight * _DotProduct(row3(bone.matrix[r]), normal);
             }
         }
         let _ = temp_normal;
@@ -1737,38 +1736,9 @@ pub fn g2_transform_model(
 // world / inverse matrix math
 // ---------------------------------------------------------------------------
 
-/// Raven `void Create_Matrix(const float *angle, mdxaBone_t *matrix)` —
-/// `AnglesToAxis` + pack into a rotation-only `mdxaBone_t` (translation column
-/// zeroed). Private helper of [`g2_generate_world_matrix`]; no cross-file
-/// caller.
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1630-1653`
-fn create_matrix(angle: vec3_t) -> mdxaBone_t {
-    let mut axis = [[0.0f32; 3]; 3];
-    AnglesToAxis(angle, axis.as_mut_ptr());
-    let mut matrix = [[0.0f32; 4]; 3];
-    matrix[0][0] = axis[0][0];
-    matrix[1][0] = axis[0][1];
-    matrix[2][0] = axis[0][2];
-
-    matrix[0][1] = axis[1][0];
-    matrix[1][1] = axis[1][1];
-    matrix[2][1] = axis[1][2];
-
-    matrix[0][2] = axis[2][0];
-    matrix[1][2] = axis[2][1];
-    matrix[2][2] = axis[2][2];
-
-    matrix[0][3] = 0.0;
-    matrix[1][3] = 0.0;
-    matrix[2][3] = 0.0;
-
-    mdxaBone_t { matrix }
-}
-
 /// Raven `void G2_GenerateWorldMatrix(const vec3_t angles, const vec3_t
 /// origin)` — builds the per-construct `worldMatrix`/`worldMatrixInv` pair
-/// (`tr_ghoul2.cpp:136-137`) via [`create_matrix`] + [`inverse_matrix`].
+/// (`tr_ghoul2.cpp:136-137`) via `Create_Matrix` + [`inverse_matrix`].
 /// Per `## State ownership`, `worldMatrix`/`worldMatrixInv` are **not** a
 /// `Ghoul2System` field — they are per-construct scratch threaded through the
 /// skeleton build — so this returns the `(world_matrix, world_matrix_inv)`
@@ -1778,7 +1748,10 @@ fn create_matrix(angle: vec3_t) -> mdxaBone_t {
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1678-1686`
 pub fn g2_generate_world_matrix(angles: vec3_t, origin: vec3_t) -> (mdxaBone_t, mdxaBone_t) {
-    let mut world_matrix = create_matrix(angles);
+    let mut world_matrix = mdxaBone_t {
+        matrix: [[0.0; 4]; 3],
+    };
+    Create_Matrix(angles, &mut world_matrix);
     world_matrix.matrix[0][3] = origin[0];
     world_matrix.matrix[1][3] = origin[1];
     world_matrix.matrix[2][3] = origin[2];
@@ -2108,28 +2081,15 @@ mod tests {
     use super::*;
     use mp_host_interface::mock::MockHost;
 
-    // --- vector math ---------------------------------------------------------
-
-    #[test]
-    fn dot_and_cross_match_standard_formulas() {
-        assert_eq!(v_dot([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]), 32.0);
-        assert_eq!(v_cross([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]), [0.0, 0.0, 1.0]);
-    }
-
-    #[test]
-    fn normalize_scales_to_unit_length_and_reports_original_length() {
-        let mut v = [3.0f32, 4.0, 0.0];
-        let len = v_normalize(&mut v);
-        assert_eq!(len, 5.0);
-        assert!((v_length(v) - 1.0).abs() < 1e-6);
-    }
-
     // --- matrix math (Create_Matrix/Inverse_Matrix/G2_GenerateWorldMatrix) ---
     // Source: `oracle/codemp/ghoul2/G2_misc.cpp:1630-1686`
 
     #[test]
     fn create_matrix_at_zero_angles_is_identity_rotation() {
-        let m = create_matrix([0.0, 0.0, 0.0]);
+        let mut m = mdxaBone_t {
+            matrix: [[0.0; 4]; 3],
+        };
+        Create_Matrix([0.0, 0.0, 0.0], &mut m);
         let id = identity_mdxa_bone();
         for r in 0..3 {
             for c in 0..4 {

@@ -242,10 +242,7 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
     }
 
     let mut org = [0.0; 3];
-    // VectorMA(start, -START_DIS, dir, org) — org = start + (-15.0) * dir
-    org[0] = start[0] - START_DIS * dir[0];
-    org[1] = start[1] - START_DIS * dir[1];
-    org[2] = start[2] - START_DIS * dir[2];
+    _VectorMA(start, -START_DIS, dir, &mut org);
 
     let ent_gv13 = ctx.world.entity(ent).genericValue13;
     G_PlayEffectID(ent_gv13, org, dir);

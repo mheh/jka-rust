@@ -27,9 +27,8 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::errorParm_t;
 use mp_qshared::shared::ha_pref;
 use mp_qshared::shared::q_math::{
-    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorMA as VectorMA,
-    _VectorSubtract as VectorSubtract, CrossProduct, DotProductRow, VectorClear,
-    VectorLengthSquared, VectorNormalize,
+    _DotProduct, _VectorAdd, _VectorMA, _VectorSubtract, CrossProduct, DotProductRow,
+    VectorClear, VectorLengthSquared, VectorNormalize,
 };
 use mp_qshared::shared::{qboolean, qfalse, qtrue, vec3_t, vec4_t};
 
@@ -85,8 +84,8 @@ fn CM_SignbitsForNormal(normal: vec3_t) -> c_int {
 fn CM_PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> qboolean {
     let mut d1: vec3_t = [0.0; 3];
     let mut d2: vec3_t = [0.0; 3];
-    VectorSubtract(b, a, &mut d1);
-    VectorSubtract(c, a, &mut d2);
+    _VectorSubtract(b, a, &mut d1);
+    _VectorSubtract(c, a, &mut d2);
     let mut n: vec3_t = [0.0; 3];
     CrossProduct(d2, d1, &mut n);
     if VectorNormalize(&mut n) == 0.0 {
@@ -95,7 +94,7 @@ fn CM_PlaneFromPoints(plane: &mut vec4_t, a: vec3_t, b: vec3_t, c: vec3_t) -> qb
     plane[0] = n[0];
     plane[1] = n[1];
     plane[2] = n[2];
-    plane[3] = DotProduct(a, n);
+    plane[3] = _DotProduct(a, n);
     qtrue
 }
 
@@ -125,7 +124,7 @@ fn CM_NeedsSubdivision(a: vec3_t, b: vec3_t, c: vec3_t) -> qboolean {
 
     // see if the curve is far enough away from the linear mid
     let mut delta: vec3_t = [0.0; 3];
-    VectorSubtract(cmid, lmid, &mut delta);
+    _VectorSubtract(cmid, lmid, &mut delta);
     let dist = VectorLengthSquared(delta);
 
     (dist >= SUBDIVIDE_DISTANCE * SUBDIVIDE_DISTANCE) as qboolean
@@ -441,7 +440,7 @@ fn CM_FindPlane(cm: &mut CollisionWorld, p1: vec3_t, p2: vec3_t, p3: vec3_t) -> 
 
     // see if the points are close enough to an existing plane
     for i in 0..cm.numPlanes {
-        if DotProduct(
+        if _DotProduct(
             [plane[0], plane[1], plane[2]],
             [
                 cm.planes[i as usize].plane[0],
@@ -554,7 +553,7 @@ fn CM_EdgePlaneNum(
             let p2 = grid.points[(i + 1) as usize][j as usize];
             let p = CM_GridPlane(common, gridPlanes, i, j, 0);
             let pl = cm.planes[p as usize].plane;
-            VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
+            _VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
             CM_FindPlane(cm, p1, p2, up)
         }
         2 => {
@@ -563,7 +562,7 @@ fn CM_EdgePlaneNum(
             let p2 = grid.points[(i + 1) as usize][(j + 1) as usize];
             let p = CM_GridPlane(common, gridPlanes, i, j, 1);
             let pl = cm.planes[p as usize].plane;
-            VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
+            _VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
             CM_FindPlane(cm, p2, p1, up)
         }
         3 => {
@@ -572,7 +571,7 @@ fn CM_EdgePlaneNum(
             let p2 = grid.points[i as usize][(j + 1) as usize];
             let p = CM_GridPlane(common, gridPlanes, i, j, 1);
             let pl = cm.planes[p as usize].plane;
-            VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
+            _VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
             CM_FindPlane(cm, p2, p1, up)
         }
         1 => {
@@ -581,7 +580,7 @@ fn CM_EdgePlaneNum(
             let p2 = grid.points[(i + 1) as usize][(j + 1) as usize];
             let p = CM_GridPlane(common, gridPlanes, i, j, 0);
             let pl = cm.planes[p as usize].plane;
-            VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
+            _VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
             CM_FindPlane(cm, p1, p2, up)
         }
         4 => {
@@ -590,7 +589,7 @@ fn CM_EdgePlaneNum(
             let p2 = grid.points[i as usize][j as usize];
             let p = CM_GridPlane(common, gridPlanes, i, j, 0);
             let pl = cm.planes[p as usize].plane;
-            VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
+            _VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
             CM_FindPlane(cm, p1, p2, up)
         }
         5 => {
@@ -599,7 +598,7 @@ fn CM_EdgePlaneNum(
             let p2 = grid.points[(i + 1) as usize][(j + 1) as usize];
             let p = CM_GridPlane(common, gridPlanes, i, j, 1);
             let pl = cm.planes[p as usize].plane;
-            VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
+            _VectorMA(p1, 4.0, [pl[0], pl[1], pl[2]], &mut up);
             CM_FindPlane(cm, p1, p2, up)
         }
         _ => {
@@ -851,7 +850,7 @@ fn CM_AddFacetBevels(view: &mut EngineHostView, facet: *mut facet_t) {
         while j < (*w).numpoints {
             let k = (j + 1) % (*w).numpoints;
             let mut vec: vec3_t = [0.0; 3];
-            VectorSubtract(
+            _VectorSubtract(
                 *winding_p(w, j as usize),
                 *winding_p(w, k as usize),
                 &mut vec,
@@ -891,13 +890,13 @@ fn CM_AddFacetBevels(view: &mut EngineHostView, facet: *mut facet_t) {
                     eplane[0] = n[0];
                     eplane[1] = n[1];
                     eplane[2] = n[2];
-                    eplane[3] = DotProduct(*winding_p(w, j as usize), n);
+                    eplane[3] = _DotProduct(*winding_p(w, j as usize), n);
 
                     // if all the points of the facet winding are
                     // behind this plane, it is a proper edge bevel
                     let mut l = 0;
                     while l < (*w).numpoints {
-                        let d = DotProduct(*winding_p(w, l as usize), n) - eplane[3];
+                        let d = _DotProduct(*winding_p(w, l as usize), n) - eplane[3];
                         if d > 0.1 {
                             break; // point in front
                         }
@@ -1523,13 +1522,13 @@ pub fn CM_TraceThroughPatchCollide(
                 if t > 0.0 {
                     startp = [0.0; 3];
                     endp = [0.0; 3];
-                    VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
-                    VectorSubtract((*tw).end, (*tw).sphere.offset, &mut endp);
+                    _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
+                    _VectorSubtract((*tw).end, (*tw).sphere.offset, &mut endp);
                 } else {
                     startp = [0.0; 3];
                     endp = [0.0; 3];
-                    VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
-                    VectorAdd((*tw).end, (*tw).sphere.offset, &mut endp);
+                    _VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
+                    _VectorAdd((*tw).end, (*tw).sphere.offset, &mut endp);
                 }
             } else {
                 let offset = DotProductRow(&plane, (*tw).offsets[(*planes).signbits as usize]);
@@ -1585,13 +1584,13 @@ pub fn CM_TraceThroughPatchCollide(
                     if t > 0.0 {
                         startp = [0.0; 3];
                         endp = [0.0; 3];
-                        VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
-                        VectorSubtract((*tw).end, (*tw).sphere.offset, &mut endp);
+                        _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
+                        _VectorSubtract((*tw).end, (*tw).sphere.offset, &mut endp);
                     } else {
                         startp = [0.0; 3];
                         endp = [0.0; 3];
-                        VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
-                        VectorAdd((*tw).end, (*tw).sphere.offset, &mut endp);
+                        _VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
+                        _VectorAdd((*tw).end, (*tw).sphere.offset, &mut endp);
                     }
                 } else {
                     // NOTE: this works even though the plane might be flipped because the bbox is centered
@@ -1679,10 +1678,10 @@ pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchColli
                 let t = DotProductRow(&plane, (*tw).sphere.offset);
                 if t > 0.0 {
                     startp = [0.0; 3];
-                    VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
+                    _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
                 } else {
                     startp = [0.0; 3];
-                    VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
+                    _VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
                 }
             } else {
                 let offset = DotProductRow(&plane, (*tw).offsets[(*planes).signbits as usize]);
@@ -1721,10 +1720,10 @@ pub fn CM_PositionTestInPatchCollide(tw: *mut traceWork_t, pc: *const patchColli
                     let t = DotProductRow(&plane, (*tw).sphere.offset);
                     if t > 0.0 {
                         startp = [0.0; 3];
-                        VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
+                        _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
                     } else {
                         startp = [0.0; 3];
-                        VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
+                        _VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
                     }
                 } else {
                     // NOTE: this works even though the plane might be flipped because the bbox is centered

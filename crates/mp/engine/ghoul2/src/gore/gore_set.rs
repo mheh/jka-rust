@@ -60,6 +60,9 @@ use std::collections::BTreeMap;
 
 use core::ffi::c_void;
 
+use mp_qshared::shared::q_math::{
+    CrossProduct, VectorNormalize, _DotProduct, _VectorMA, _VectorScale, _VectorSubtract,
+};
 use mp_qshared::shared::{mdxaBone_t, vec3_t};
 
 use crate::api_collision::g2api_get_time;
@@ -402,58 +405,6 @@ unsafe fn read_vert3(verts: *const f32, vert_index: usize) -> vec3_t {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Minimal `vec3_t` math stopgaps. **Gap, reported under `problems`** (same
-// class of gap `api_bolts.rs`'s module doc already reports for
-// `VectorNormalize`): `mp_engine_ghoul2` depends only on `mp_qshared`/
-// `mp_host_interface` (`Cargo.toml`), and `mp_qshared` exports the `vec3_t`
-// *type* (`native/math/src/vector.rs:12`) but no `CrossProduct`/`DotProduct`/
-// `VectorNormalize`/`VectorScale`/`VectorMA`/`VectorSubtract` free functions
-// reachable from here. Reimplemented narrowly below rather than left
-// uncallable, matching `api_bolts.rs`'s `vector_normalize_row` precedent.
-// Source: `oracle/codemp/game/q_math.c` (`CrossProduct`/`DotProduct` are
-// `q_shared.h` inline macros; `VectorNormalize`/`VectorScale`/`VectorMA`/
-// `VectorSubtract` are `q_math.c` functions).
-// ---------------------------------------------------------------------------
-
-fn v3_cross(a: vec3_t, b: vec3_t) -> vec3_t {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
-
-fn v3_dot(a: vec3_t, b: vec3_t) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn v3_normalize(v: &mut vec3_t) {
-    let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if length != 0.0 {
-        let inv = 1.0 / length;
-        v[0] *= inv;
-        v[1] *= inv;
-        v[2] *= inv;
-    }
-}
-
-fn v3_scale(v: vec3_t, scale: f32) -> vec3_t {
-    [v[0] * scale, v[1] * scale, v[2] * scale]
-}
-
-fn v3_ma(v: vec3_t, scale: f32, add: vec3_t) -> vec3_t {
-    [
-        v[0] + add[0] * scale,
-        v[1] + add[1] * scale,
-        v[2] + add[2] * scale,
-    ]
-}
-
-fn v3_sub(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
 /// Raven `#define GORE_MARGIN (0.0f)` (`G2_misc.cpp:799`).
 const GORE_MARGIN: f32 = 0.0;
 
@@ -539,31 +490,28 @@ pub fn g2_gore_polys(
     // basis2=(0,0,1); basis1=CrossProduct(rayEnd,basis2); if too degenerate,
     // retry with basis2=(0,1,0). (G2_misc.cpp:807-820)
     let mut basis2: vec3_t = [0.0, 0.0, 1.0];
-    let mut basis1 = v3_cross(ts.ray_end, basis2);
-    if v3_dot(basis1, basis1) < 0.1 {
+    let mut basis1 = [0.0; 3];
+    CrossProduct(ts.ray_end, basis2, &mut basis1);
+    if _DotProduct(basis1, basis1) < 0.1 {
         basis2 = [0.0, 1.0, 0.0];
-        basis1 = v3_cross(ts.ray_end, basis2);
+        CrossProduct(ts.ray_end, basis2, &mut basis1);
     }
-    basis2 = v3_cross(ts.ray_end, basis1);
+    CrossProduct(ts.ray_end, basis1, &mut basis2);
     // Raven's two `assert(DotProduct(...)>.0001f)` (:822-823) are dropped —
     // `-DNDEBUG` reduces plain `assert()` to a no-op crate-wide (see this
     // crate's established convention, e.g. `api_models.rs`'s module doc).
-    v3_normalize(&mut basis1);
-    v3_normalize(&mut basis2);
+    VectorNormalize(&mut basis1);
+    VectorNormalize(&mut basis2);
 
     let c = ts.theta.cos();
     let s = ts.theta.sin();
 
-    let taxis = v3_ma(
-        v3_scale(basis1, 0.5 * c / ts.tsize),
-        0.5 * s / ts.tsize,
-        basis2,
-    );
-    let saxis = v3_ma(
-        v3_scale(basis1, -0.5 * s / ts.ssize),
-        0.5 * c / ts.ssize,
-        basis2,
-    );
+    let mut taxis = [0.0; 3];
+    _VectorScale(basis1, 0.5 * c / ts.tsize, &mut taxis);
+    _VectorMA(taxis, 0.5 * s / ts.tsize, basis2, &mut taxis);
+    let mut saxis = [0.0; 3];
+    _VectorScale(basis1, -0.5 * s / ts.ssize, &mut saxis);
+    _VectorMA(saxis, 0.5 * c / ts.ssize, basis2, &mut saxis);
 
     // G2_misc.cpp:841-874: per-vertex splotch-space flags/texcoords.
     let this_surface_index = unsafe { read_i32(surface, MDXM_SURF_OFS_THIS_SURFACE_INDEX) };
@@ -578,9 +526,10 @@ pub fn g2_gore_polys(
         // SAFETY: `verts_ptr` is the transformed-verts buffer for this
         // surface (resolved above); `j < numVerts` bounds the read.
         let v = unsafe { read_vert3(verts_ptr, j) };
-        let delta = v3_sub(v, ts.ray_start);
-        let s_coord = v3_dot(delta, saxis) + 0.5;
-        let t_coord = v3_dot(delta, taxis) + 0.5;
+        let mut delta = [0.0; 3];
+        _VectorSubtract(v, ts.ray_start, &mut delta);
+        let s_coord = _DotProduct(delta, saxis) + 0.5;
+        let t_coord = _DotProduct(delta, taxis) + 0.5;
         let mut vflags: i32 = 0;
         if s_coord > GORE_MARGIN {
             vflags |= 1;
@@ -642,10 +591,13 @@ pub fn g2_gore_polys(
             let p0 = unsafe { read_vert3(verts_ptr, indexes[0] as usize) };
             let p1 = unsafe { read_vert3(verts_ptr, indexes[1] as usize) };
             let p2 = unsafe { read_vert3(verts_ptr, indexes[2] as usize) };
-            let e1 = v3_sub(p1, p0);
-            let e2 = v3_sub(p2, p0);
-            let n = v3_cross(e1, e2);
-            if v3_dot(ts.ray_end, n) > 0.0 {
+            let mut e1 = [0.0; 3];
+            _VectorSubtract(p1, p0, &mut e1);
+            let mut e2 = [0.0; 3];
+            _VectorSubtract(p2, p0, &mut e2);
+            let mut n = [0.0; 3];
+            CrossProduct(e1, e2, &mut n);
+            if _DotProduct(ts.ray_end, n) > 0.0 {
                 if gore_data.frontFaces == 0 {
                     continue;
                 }
@@ -778,11 +730,11 @@ pub fn g2_gore_polys(
 
         // Build the entity-to-gore matrix + its inverse (G2_misc.cpp:1038-1069).
         let mut row0 = saxis;
-        v3_normalize(&mut row0);
+        VectorNormalize(&mut row0);
         let mut row1 = taxis;
-        v3_normalize(&mut row1);
+        VectorNormalize(&mut row1);
         let mut row2 = ts.ray_end;
-        v3_normalize(&mut row2);
+        VectorNormalize(&mut row2);
 
         let mut mat = mdxaBone_t {
             matrix: [[0.0f32; 4]; 3],

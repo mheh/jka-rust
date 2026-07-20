@@ -16,10 +16,9 @@ use mp_qshared::shared::{
 // `_`-prefixed / plain q_math fns (inputs by value, outputs `&mut`) per the
 // rosetta vec3 stanza.
 use mp_qshared::shared::q_math::{
-    _DotProduct as DotProduct, _VectorAdd as VectorAdd, _VectorCopy as VectorCopy,
-    _VectorMA as VectorMA, _VectorScale as VectorScale, _VectorSubtract as VectorSubtract,
-    vec3_origin, AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse,
-    VectorLengthSquared, VectorNormalize, VectorSet,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
+    AngleVectors, Square, VectorAdvance, VectorClear, VectorInverse, VectorLengthSquared,
+    VectorNormalize, VectorSet,
 };
 
 use crate::cm::c_leaf_t::cLeaf_t;
@@ -47,11 +46,11 @@ use crate::common_fns::Com_Memset;
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:43-50`
 pub fn RotatePoint(point: &mut vec3_t, matrix: *mut vec3_t) {
     let mut tvec: vec3_t = [0.0; 3];
-    VectorCopy(*point, &mut tvec);
+    _VectorCopy(*point, &mut tvec);
     unsafe {
-        point[0] = DotProduct(*matrix.add(0), tvec);
-        point[1] = DotProduct(*matrix.add(1), tvec);
-        point[2] = DotProduct(*matrix.add(2), tvec);
+        point[0] = _DotProduct(*matrix.add(0), tvec);
+        point[1] = _DotProduct(*matrix.add(1), tvec);
+        point[2] = _DotProduct(*matrix.add(2), tvec);
     }
 }
 
@@ -89,9 +88,9 @@ pub fn CreateRotationMatrix(angles: vec3_t, matrix: *mut vec3_t) {
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:81-88`
 pub fn CM_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vDir: vec3_t, mut vProj: vec3_t) {
     let mut pVec: vec3_t = [0.0; 3];
-    VectorSubtract(point, vStart, &mut pVec);
+    _VectorSubtract(point, vStart, &mut pVec);
     // project onto the directional vector for this segment
-    VectorMA(vStart, DotProduct(pVec, vDir), vDir, &mut vProj);
+    _VectorMA(vStart, _DotProduct(pVec, vDir), vDir, &mut vProj);
 }
 
 /// Raven `CM_VectorDistanceSquared`.
@@ -99,7 +98,7 @@ pub fn CM_ProjectPointOntoVector(point: vec3_t, vStart: vec3_t, vDir: vec3_t, mu
 /// Source: `oracle/codemp/qcommon/cm_trace.cpp:120-125`
 pub fn CM_VectorDistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
     let mut dir: vec3_t = [0.0; 3];
-    VectorSubtract(p2, p1, &mut dir);
+    _VectorSubtract(p2, p1, &mut dir);
     VectorLengthSquared(dir)
 }
 
@@ -148,14 +147,14 @@ pub fn CM_TestBoxInBrush(tw: *mut traceWork_t, trace: &mut trace_t, brush: *mut 
                 // adjust the plane distance apropriately for radius
                 let dist = (*plane).dist + (*tw).sphere.radius;
                 // find the closest point on the capsule to the plane
-                let t = DotProduct((*plane).normal, (*tw).sphere.offset);
+                let t = _DotProduct((*plane).normal, (*tw).sphere.offset);
                 let mut startp: vec3_t = [0.0; 3];
                 if t > 0.0 {
-                    VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
+                    _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startp);
                 } else {
-                    VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
+                    _VectorAdd((*tw).start, (*tw).sphere.offset, &mut startp);
                 }
-                let d1 = DotProduct(startp, (*plane).normal) - dist;
+                let d1 = _DotProduct(startp, (*plane).normal) - dist;
                 // if completely in front of face, no intersection
                 if d1 > 0.0 {
                     return;
@@ -170,9 +169,9 @@ pub fn CM_TestBoxInBrush(tw: *mut traceWork_t, trace: &mut trace_t, brush: *mut 
 
                 // adjust the plane distance apropriately for mins/maxs
                 let dist = (*plane).dist
-                    - DotProduct((*tw).offsets[(*plane).signbits as usize], (*plane).normal);
+                    - _DotProduct((*tw).offsets[(*plane).signbits as usize], (*plane).normal);
 
-                let d1 = DotProduct((*tw).start, (*plane).normal) - dist;
+                let d1 = _DotProduct((*tw).start, (*plane).normal) - dist;
 
                 // if completely in front of face, no intersection
                 if d1 > 0.0 {
@@ -198,10 +197,10 @@ pub fn CM_PlaneCollision(tw: *mut traceWork_t, side: *mut cbrushside_t) -> bool 
 
         // adjust the plane distance apropriately for mins/maxs
         let dist =
-            (*plane).dist - DotProduct((*tw).offsets[(*plane).signbits as usize], (*plane).normal);
+            (*plane).dist - _DotProduct((*tw).offsets[(*plane).signbits as usize], (*plane).normal);
 
-        let d1 = DotProduct((*tw).start, (*plane).normal) - dist;
-        let d2 = DotProduct((*tw).end, (*plane).normal) - dist;
+        let d1 = _DotProduct((*tw).start, (*plane).normal) - dist;
+        let d2 = _DotProduct((*tw).end, (*plane).normal) - dist;
 
         if d2 > 0.0 {
             // endpoint is not in solid
@@ -296,7 +295,7 @@ pub fn CM_CullBox(frustum: *const cplane_t, transformed: *const vec3_t) -> bool 
             let frust = frustum.offset(i);
             let mut j = 0;
             while j < 8 {
-                if DotProduct(*transformed.offset(j), (*frust).normal) > (*frust).dist {
+                if _DotProduct(*transformed.offset(j), (*frust).normal) > (*frust).dist {
                     // a point is in front
                     break;
                 }
@@ -329,13 +328,13 @@ pub fn CM_DistanceFromLineSquared(p: vec3_t, lp1: vec3_t, lp2: vec3_t, dir: vec3
     }
     if j < 3 {
         if (proj[j] - lp1[j]).abs() < (proj[j] - lp2[j]).abs() {
-            VectorSubtract(p, lp1, &mut t);
+            _VectorSubtract(p, lp1, &mut t);
         } else {
-            VectorSubtract(p, lp2, &mut t);
+            _VectorSubtract(p, lp2, &mut t);
         }
         return VectorLengthSquared(t);
     }
-    VectorSubtract(p, proj, &mut t);
+    _VectorSubtract(p, proj, &mut t);
     VectorLengthSquared(t)
 }
 
@@ -505,13 +504,13 @@ pub fn CM_TraceThroughSphere(
         let mut intersection: vec3_t = [0.0; 3];
 
         // if inside the sphere
-        VectorSubtract(start, origin, &mut dir);
+        _VectorSubtract(start, origin, &mut dir);
         let mut l1 = VectorLengthSquared(dir);
         if l1 < Square(radius) {
             trace.fraction = 0.0;
             trace.startsolid = qtrue as u8;
             // test for allsolid
-            VectorSubtract(end, origin, &mut dir);
+            _VectorSubtract(end, origin, &mut dir);
             l1 = VectorLengthSquared(dir);
             if l1 < Square(radius) {
                 trace.allsolid = qtrue as u8;
@@ -519,18 +518,18 @@ pub fn CM_TraceThroughSphere(
             return;
         }
         //
-        VectorSubtract(end, start, &mut dir);
+        _VectorSubtract(end, start, &mut dir);
         let length = VectorNormalize(&mut dir);
         //
         l1 = CM_DistanceFromLineSquared(origin, start, end, dir);
-        VectorSubtract(end, origin, &mut v1);
+        _VectorSubtract(end, origin, &mut v1);
         let l2 = VectorLengthSquared(v1);
         // if no intersection with the sphere and the end point is at least an epsilon away
         if l1 >= Square(radius) && l2 > Square(radius + SURFACE_CLIP_EPSILON) {
             return;
         }
         //
-        VectorSubtract(start, origin, &mut v1);
+        _VectorSubtract(start, origin, &mut v1);
         // dir is normalized so a = 1
         let b = 2.0 * (dir[0] * v1[0] + dir[1] * v1[1] + dir[2] * v1[2]);
         let c = v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]
@@ -548,14 +547,14 @@ pub fn CM_TraceThroughSphere(
             }
             if fraction < trace.fraction {
                 trace.fraction = fraction;
-                VectorSubtract(end, start, &mut dir);
-                VectorMA(start, fraction, dir, &mut intersection);
-                VectorSubtract(intersection, origin, &mut dir);
+                _VectorSubtract(end, start, &mut dir);
+                _VectorMA(start, fraction, dir, &mut intersection);
+                _VectorSubtract(intersection, origin, &mut dir);
                 let scale = 1.0 / (radius + RADIUS_EPSILON);
-                VectorScale(dir, scale, &mut dir);
-                VectorCopy(dir, &mut trace.plane.normal);
-                VectorAdd((*tw).modelOrigin, intersection, &mut intersection);
-                trace.plane.dist = DotProduct(trace.plane.normal, intersection);
+                _VectorScale(dir, scale, &mut dir);
+                _VectorCopy(dir, &mut trace.plane.normal);
+                _VectorAdd((*tw).modelOrigin, intersection, &mut intersection);
+                trace.plane.dist = _DotProduct(trace.plane.normal, intersection);
                 trace.contents = CONTENTS_BODY;
             }
         }
@@ -591,12 +590,12 @@ pub fn CM_TraceThroughVerticalCylinder(
         // if between lower and upper cylinder bounds
         if start[2] <= origin[2] + halfheight && start[2] >= origin[2] - halfheight {
             // if inside the cylinder
-            VectorSubtract(start2d, org2d, &mut dir);
+            _VectorSubtract(start2d, org2d, &mut dir);
             let mut l1 = VectorLengthSquared(dir);
             if l1 < Square(radius) {
                 trace.fraction = 0.0;
                 trace.startsolid = qtrue as u8;
-                VectorSubtract(end2d, org2d, &mut dir);
+                _VectorSubtract(end2d, org2d, &mut dir);
                 l1 = VectorLengthSquared(dir);
                 if l1 < Square(radius) {
                     trace.allsolid = qtrue as u8;
@@ -605,18 +604,18 @@ pub fn CM_TraceThroughVerticalCylinder(
             }
         }
         //
-        VectorSubtract(end2d, start2d, &mut dir);
+        _VectorSubtract(end2d, start2d, &mut dir);
         let length = VectorNormalize(&mut dir);
         //
         let l1 = CM_DistanceFromLineSquared(org2d, start2d, end2d, dir);
-        VectorSubtract(end2d, org2d, &mut v1);
+        _VectorSubtract(end2d, org2d, &mut v1);
         let l2 = VectorLengthSquared(v1);
         // if no intersection with the cylinder and the end point is at least an epsilon away
         if l1 >= Square(radius) && l2 > Square(radius + SURFACE_CLIP_EPSILON) {
             return;
         }
         //
-        VectorSubtract(start, origin, &mut v1);
+        _VectorSubtract(start, origin, &mut v1);
         // dir is normalized so we can use a = 1
         let b = 2.0 * (v1[0] * dir[0] + v1[1] * dir[1]);
         let c =
@@ -633,21 +632,21 @@ pub fn CM_TraceThroughVerticalCylinder(
                 fraction /= length;
             }
             if fraction < trace.fraction {
-                VectorSubtract(end, start, &mut dir);
-                VectorMA(start, fraction, dir, &mut intersection);
+                _VectorSubtract(end, start, &mut dir);
+                _VectorMA(start, fraction, dir, &mut intersection);
                 // if the intersection is between the cylinder lower and upper bound
                 if intersection[2] <= origin[2] + halfheight
                     && intersection[2] >= origin[2] - halfheight
                 {
                     //
                     trace.fraction = fraction;
-                    VectorSubtract(intersection, origin, &mut dir);
+                    _VectorSubtract(intersection, origin, &mut dir);
                     dir[2] = 0.0;
                     let scale = 1.0 / (radius + RADIUS_EPSILON);
-                    VectorScale(dir, scale, &mut dir);
-                    VectorCopy(dir, &mut trace.plane.normal);
-                    VectorAdd((*tw).modelOrigin, intersection, &mut intersection);
-                    trace.plane.dist = DotProduct(trace.plane.normal, intersection);
+                    _VectorScale(dir, scale, &mut dir);
+                    _VectorCopy(dir, &mut trace.plane.normal);
+                    _VectorAdd((*tw).modelOrigin, intersection, &mut intersection);
+                    trace.plane.dist = _DotProduct(trace.plane.normal, intersection);
                     trace.contents = CONTENTS_BODY;
                 }
             }
@@ -691,29 +690,29 @@ pub fn CM_TraceThroughTerrain(
         let mut tStep: vec3_t = [0.0; 3];
         VectorAdvance((*tw).start, (*tw).baseEnterFrac, (*tw).end, &mut tBegin);
         VectorAdvance((*tw).start, (*tw).baseLeaveFrac, (*tw).end, &mut tEnd);
-        VectorSubtract(tEnd, tBegin, &mut tDistance);
+        _VectorSubtract(tEnd, tBegin, &mut tDistance);
 
         // Calculate number of iterations to process
         let count = 1;
         let fraction = trace.fraction;
-        VectorScale(tDistance, 1.0 / count as f32, &mut tStep);
+        _VectorScale(tDistance, 1.0 / count as f32, &mut tStep);
 
         // Save the base start and end vectors
         let mut baseStart: vec3_t = [0.0; 3];
         let mut baseEnd: vec3_t = [0.0; 3];
-        VectorCopy((*tw).start, &mut baseStart);
-        VectorCopy((*tw).end, &mut baseEnd);
+        _VectorCopy((*tw).start, &mut baseStart);
+        _VectorCopy((*tw).end, &mut baseEnd);
 
         // Use the terrain vectors.  Start both at the beginning since the
         // step will be added to the end as the first step of the loop
-        VectorCopy(tBegin, &mut (*tw).start);
-        VectorCopy(tBegin, &mut (*tw).end);
+        _VectorCopy(tBegin, &mut (*tw).start);
+        _VectorCopy(tBegin, &mut (*tw).end);
 
         // Step thru terrain patches moving on about 1 patch at a time
         for i in 0..count {
             // Add the step to the end
             let mut end_copy = (*tw).end;
-            VectorAdd(end_copy, tStep, &mut end_copy);
+            _VectorAdd(end_copy, tStep, &mut end_copy);
             (*tw).end = end_copy;
 
             CM_CalcExtents(tBegin, (*tw).end, tw, (*tw).localBounds);
@@ -736,12 +735,12 @@ pub fn CM_TraceThroughTerrain(
 
             // Move the end to the start so the next trace starts
             // where this one left off
-            VectorCopy((*tw).end, &mut (*tw).start);
+            _VectorCopy((*tw).end, &mut (*tw).start);
         }
 
         // Put the original start and end back
-        VectorCopy(baseStart, &mut (*tw).start);
-        VectorCopy(baseEnd, &mut (*tw).end);
+        _VectorCopy(baseStart, &mut (*tw).start);
+        _VectorCopy(baseEnd, &mut (*tw).end);
 
         // Convert to global fraction only if something was hit along the way
         if trace.fraction != 1.0 {
@@ -853,8 +852,8 @@ pub fn CM_PositionTest(view: &mut EngineHostView, tw: *mut traceWork_t, trace: &
         let mut ll: leafList_t = core::mem::zeroed();
 
         // identify the leafs we are touching
-        VectorAdd((*tw).start, (*tw).size[0], &mut ll.bounds[0]);
-        VectorAdd((*tw).start, (*tw).size[1], &mut ll.bounds[1]);
+        _VectorAdd((*tw).start, (*tw).size[0], &mut ll.bounds[0]);
+        _VectorAdd((*tw).start, (*tw).size[1], &mut ll.bounds[1]);
 
         for i in 0..3 {
             ll.bounds[0][i] -= 1.0;
@@ -910,8 +909,8 @@ pub fn CM_TestCapsuleInCapsule(
 
         CM_ModelBounds(cm, model, &mut mins, &mut maxs);
 
-        VectorAdd((*tw).start, (*tw).sphere.offset, &mut top);
-        VectorSubtract((*tw).start, (*tw).sphere.offset, &mut bottom);
+        _VectorAdd((*tw).start, (*tw).sphere.offset, &mut top);
+        _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut bottom);
         for i in 0..3 {
             offset[i] = (mins[i] + maxs[i]) * 0.5;
             symetricSize[0][i] = mins[i] - offset[i];
@@ -928,29 +927,29 @@ pub fn CM_TestCapsuleInCapsule(
 
         let r = Square((*tw).sphere.radius + radius);
         // check if any of the spheres overlap
-        VectorCopy(offset, &mut p1);
+        _VectorCopy(offset, &mut p1);
         p1[2] += offs;
-        VectorSubtract(p1, top, &mut tmp);
+        _VectorSubtract(p1, top, &mut tmp);
         if VectorLengthSquared(tmp) < r {
             trace.startsolid = qtrue as u8;
             trace.allsolid = qtrue as u8;
             trace.fraction = 0.0;
         }
-        VectorSubtract(p1, bottom, &mut tmp);
+        _VectorSubtract(p1, bottom, &mut tmp);
         if VectorLengthSquared(tmp) < r {
             trace.startsolid = qtrue as u8;
             trace.allsolid = qtrue as u8;
             trace.fraction = 0.0;
         }
-        VectorCopy(offset, &mut p2);
+        _VectorCopy(offset, &mut p2);
         p2[2] -= offs;
-        VectorSubtract(p2, top, &mut tmp);
+        _VectorSubtract(p2, top, &mut tmp);
         if VectorLengthSquared(tmp) < r {
             trace.startsolid = qtrue as u8;
             trace.allsolid = qtrue as u8;
             trace.fraction = 0.0;
         }
-        VectorSubtract(p2, bottom, &mut tmp);
+        _VectorSubtract(p2, bottom, &mut tmp);
         if VectorLengthSquared(tmp) < r {
             trace.startsolid = qtrue as u8;
             trace.allsolid = qtrue as u8;
@@ -962,7 +961,7 @@ pub fn CM_TestCapsuleInCapsule(
             top[2] = 0.0;
             p1[2] = 0.0;
             // if the cylinders overlap
-            VectorSubtract(top, p1, &mut tmp);
+            _VectorSubtract(top, p1, &mut tmp);
             if VectorLengthSquared(tmp) < r {
                 trace.startsolid = qtrue as u8;
                 trace.allsolid = qtrue as u8;
@@ -1080,10 +1079,10 @@ pub fn CM_TraceCapsuleThroughCapsule(
             return;
         }
         // top origin and bottom origin of each sphere at start and end of trace
-        VectorAdd((*tw).start, (*tw).sphere.offset, &mut starttop);
-        VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startbottom);
-        VectorAdd((*tw).end, (*tw).sphere.offset, &mut endtop);
-        VectorSubtract((*tw).end, (*tw).sphere.offset, &mut endbottom);
+        _VectorAdd((*tw).start, (*tw).sphere.offset, &mut starttop);
+        _VectorSubtract((*tw).start, (*tw).sphere.offset, &mut startbottom);
+        _VectorAdd((*tw).end, (*tw).sphere.offset, &mut endtop);
+        _VectorSubtract((*tw).end, (*tw).sphere.offset, &mut endbottom);
 
         // calculate top and bottom of the capsule spheres to collide with
         for i in 0..3 {
@@ -1099,9 +1098,9 @@ pub fn CM_TraceCapsuleThroughCapsule(
             halfwidth
         };
         let offs = halfheight - radius;
-        VectorCopy(offset, &mut top);
+        _VectorCopy(offset, &mut top);
         top[2] += offs;
-        VectorCopy(offset, &mut bottom);
+        _VectorCopy(offset, &mut bottom);
         bottom[2] -= offs;
         // expand radius of spheres
         radius += (*tw).sphere.radius;
@@ -1377,8 +1376,8 @@ pub fn CM_TraceThroughTree(
             t2 = p2[(*plane).r#type as usize] - (*plane).dist;
             offset = (*tw).extents[(*plane).r#type as usize];
         } else {
-            t1 = DotProduct((*plane).normal, p1) - (*plane).dist;
-            t2 = DotProduct((*plane).normal, p2) - (*plane).dist;
+            t1 = _DotProduct((*plane).normal, p1) - (*plane).dist;
+            t2 = _DotProduct((*plane).normal, p2) - (*plane).dist;
             if (*tw).isPoint != 0 {
                 offset = 0.0;
             } else {
@@ -1525,7 +1524,7 @@ pub fn CM_Trace(
         );
         core::ptr::write_bytes(trace, 0, 1);
         (*trace).fraction = 1.0; // assume it goes the entire distance until shown otherwise
-        VectorCopy(origin, &mut tw.modelOrigin);
+        _VectorCopy(origin, &mut tw.modelOrigin);
 
         if (*local).numNodes == 0 {
             return; // map not loaded, shouldn't happen
@@ -1708,7 +1707,7 @@ pub fn CM_Trace(
 
         // generate endpos from the original, unmodified start/end
         if (*trace).fraction == 1.0 {
-            VectorCopy(end, &mut (*trace).endpos);
+            _VectorCopy(end, &mut (*trace).endpos);
         } else {
             for i in 0..3 {
                 (*trace).endpos[i] = start[i] + (*trace).fraction * (end[i] - start[i]);
@@ -1797,8 +1796,8 @@ pub fn CM_TransformedBoxTrace(
         }
 
         // subtract origin offset
-        VectorSubtract(start_l, origin, &mut start_l);
-        VectorSubtract(end_l, origin, &mut end_l);
+        _VectorSubtract(start_l, origin, &mut start_l);
+        _VectorSubtract(end_l, origin, &mut end_l);
 
         // rotate start and end into the models frame of reference
         let rotated = model != BOX_MODEL_HANDLE as c_int
