@@ -1,14 +1,19 @@
 //! MP `w_saber.h` free-standing `#define` constants and the anonymous
 //! force-jump-direction enum.
 //!
-//! This is the canonical (game-tier) home. The subset bg consumes
-//! (`SEF_LOCK_WON`, `SABER_RADIUS_STANDARD`, `SABERMINS_*`/`SABERMAXS_*`,
-//! `SABER_MIN_THROW_DIST`) is mirrored as bit-identical twins in
-//! `mp_bg::public::saber_consts` (keep values in sync).
+//! The geometry / event subset shared with the bg tier (`SEF_LOCK_WON`,
+//! `SABER_RADIUS_STANDARD`, `SABERMINS_*`/`SABERMAXS_*`, `SABER_MIN_THROW_DIST`)
+//! lives in `mp_qshared::common::mp::qcommon::saber::w_saber_consts` and is
+//! re-exported below; the game-only constants stay here.
 //!
 //! Source: `oracle/codemp/game/w_saber.h`
 
 use core::ffi::c_int;
+
+pub use mp_qshared::common::mp::qcommon::saber::w_saber_consts::{
+    SABERMAXS_X, SABERMAXS_Y, SABERMAXS_Z, SABERMINS_X, SABERMINS_Y, SABERMINS_Z,
+    SABER_MIN_THROW_DIST, SABER_RADIUS_STANDARD, SEF_LOCK_WON,
+};
 
 // saberEventFlags — `saberInfo_t`/entity saber-hit-this-frame bits.
 pub const SEF_HITENEMY: c_int = 0x1; // Hit the enemy
@@ -22,7 +27,6 @@ pub const SEF_EVENTS: c_int =
     SEF_HITENEMY | SEF_HITOBJECT | SEF_HITWALL | SEF_PARRIED | SEF_DEFLECTED | SEF_BLOCKED;
 pub const SEF_LOCKED: c_int = 0x40; // Sabers locked with someone else
 pub const SEF_INWATER: c_int = 0x80; // Saber is in water
-pub const SEF_LOCK_WON: c_int = 0x100; // Won a saberLock
 
 // saberEntityState — Raven note: hacky, only ever non-0/0 in practice.
 pub const SES_LEAVING: c_int = 1;
@@ -32,7 +36,6 @@ pub const SES_RETURNING: c_int = 1; // 3 in comment, redefined to 1
 /// Raven `JSF_AMBUSH` — ambusher Jedi.
 pub const JSF_AMBUSH: c_int = 16;
 
-pub const SABER_RADIUS_STANDARD: f32 = 3.0;
 pub const SABER_REFLECT_MISSILE_CONE: f32 = 0.2;
 
 // `FORCE_POWER_MAX` already lives in `mp_qshared::shared::force_powers` (glob
@@ -56,11 +59,3 @@ pub const FJ_BACKWARD: c_int = 1;
 pub const FJ_RIGHT: c_int = 2;
 pub const FJ_LEFT: c_int = 3;
 pub const FJ_UP: c_int = 4;
-
-pub const SABERMINS_X: f32 = -3.0;
-pub const SABERMINS_Y: f32 = -3.0;
-pub const SABERMINS_Z: f32 = -3.0;
-pub const SABERMAXS_X: f32 = 3.0;
-pub const SABERMAXS_Y: f32 = 3.0;
-pub const SABERMAXS_Z: f32 = 3.0;
-pub const SABER_MIN_THROW_DIST: f32 = 80.0;

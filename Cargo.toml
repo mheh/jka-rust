@@ -3,6 +3,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/native/build-date",
     "crates/native/math",
     "crates/native/sort",
     "crates/native/string",

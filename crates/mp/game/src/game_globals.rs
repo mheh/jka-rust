@@ -9,10 +9,117 @@
 //! intentionally excluded — not GameWorld state).
 #![allow(non_snake_case, non_camel_case_types, unused)]
 
+use core::ops::{Deref, DerefMut, Index, IndexMut};
+use core::ptr::null_mut;
+
+use native_platform::zeroed_box;
+
 use crate::botai::nodeobject_s::nodeobject_t;
 use crate::g_svcmds::ipFilter_t;
+use crate::g_timer::{gtimer_t, MAX_GTIMERS};
 use crate::game_cvars::GAME_CVAR_TABLE_LEN;
 use crate::prelude::*;
+use mp_qshared::shared::MAX_GENTITIES;
+
+/// Generates the array-wrapper newtypes `GameGlobals` needs for arrays larger
+/// than stable Rust's 32-element `Default` limit. Each arm emits the `pub`
+/// tuple struct (with the forwarded attributes/doc comments) plus a `Default`
+/// impl for one initialization strategy, and optionally `Index`/`IndexMut` or
+/// `Deref`/`DerefMut`. Modes: `null` (raw-pointer arrays), `zero` (integer/char
+/// arrays), `zero2d` (rectangular integer arrays), `elem` (element-`Default`
+/// arrays), `boxed` (heap-`zeroed_box` arrays).
+macro_rules! array_newtype {
+    // Raw-pointer array, null-initialized.
+    (null; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        $(#[$meta])*
+        $vis struct $name(pub [$elem; $n]);
+        impl Default for $name {
+            fn default() -> Self {
+                $name([null_mut(); $n])
+            }
+        }
+    };
+    (null, index; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        array_newtype!(null; $(#[$meta])* $vis $name, $elem, $n);
+        array_newtype!(@index $name, $elem);
+    };
+    // Integer/char array, zero-initialized.
+    (zero; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        $(#[$meta])*
+        $vis struct $name(pub [$elem; $n]);
+        impl Default for $name {
+            fn default() -> Self {
+                $name([0; $n])
+            }
+        }
+    };
+    (zero, deref; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        array_newtype!(zero; $(#[$meta])* $vis $name, $elem, $n);
+        impl Deref for $name {
+            type Target = [$elem];
+            fn deref(&self) -> &[$elem] {
+                &self.0
+            }
+        }
+        impl DerefMut for $name {
+            fn deref_mut(&mut self) -> &mut [$elem] {
+                &mut self.0
+            }
+        }
+    };
+    // Rectangular integer array, zero-initialized.
+    (zero2d; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $c:expr, $r:expr) => {
+        $(#[$meta])*
+        $vis struct $name(pub [[$elem; $c]; $r]);
+        impl Default for $name {
+            fn default() -> Self {
+                $name([[0; $c]; $r])
+            }
+        }
+    };
+    // Array of an element type that is itself `Copy + Default`.
+    (elem; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        $(#[$meta])*
+        $vis struct $name(pub [$elem; $n]);
+        impl Default for $name {
+            fn default() -> Self {
+                $name([<$elem>::default(); $n])
+            }
+        }
+    };
+    (elem, index; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        array_newtype!(elem; $(#[$meta])* $vis $name, $elem, $n);
+        array_newtype!(@index $name, $elem);
+    };
+    // Heap-allocated array, zero-initialized directly on the heap.
+    (boxed; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        $(#[$meta])*
+        $vis struct $name(pub Box<[$elem; $n]>);
+        impl Default for $name {
+            fn default() -> Self {
+                $name(zeroed_box())
+            }
+        }
+    };
+    (boxed, index; $(#[$meta:meta])* $vis:vis $name:ident, $elem:ty, $n:expr) => {
+        array_newtype!(boxed; $(#[$meta])* $vis $name, $elem, $n);
+        array_newtype!(@index $name, $elem);
+    };
+    // Shared `Index`/`IndexMut` over `self.0[i]`.
+    (@index $name:ident, $elem:ty) => {
+        impl Index<usize> for $name {
+            type Output = $elem;
+            fn index(&self, i: usize) -> &$elem {
+                &self.0[i]
+            }
+        }
+        impl IndexMut<usize> for $name {
+            fn index_mut(&mut self, i: usize) -> &mut $elem {
+                &mut self.0[i]
+            }
+        }
+    };
+}
 
 /// `ipFilter_t ipFilters[MAX_IPFILTERS]` (`g_svcmds.c:54`). Newtype because a
 /// 1024-element array has no library `Default` impl (only arrays up to 32
@@ -101,349 +208,143 @@ pub struct botSpawnQueue_t {
     pub spawnTime: c_int,
 }
 
-/// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state pointers
-/// (`ai_main.c` file-scope global). Newtype because a raw-pointer array has no
-/// library `Default` impl.
-/// Source: `oracle/codemp/game/ai_main.c:46`
-pub struct BotStates(
-    pub [*mut crate::botai::bot_state_s::bot_state_t; mp_qshared::shared::MAX_CLIENTS],
-);
+array_newtype!(null, index;
+    /// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state pointers
+    /// (`ai_main.c` file-scope global). Newtype because a raw-pointer array has no
+    /// library `Default` impl.
+    /// Source: `oracle/codemp/game/ai_main.c:46`
+    pub BotStates, *mut bot_state_t, MAX_CLIENTS);
 
-impl Default for BotStates {
-    fn default() -> Self {
-        BotStates([core::ptr::null_mut(); mp_qshared::shared::MAX_CLIENTS])
-    }
-}
-
-// Transparent indexing (`globals.botstates[i]`) so call sites written against
-// a plain `bot_state_t *[MAX_CLIENTS]` need no change.
-impl core::ops::Index<usize> for BotStates {
-    type Output = *mut crate::botai::bot_state_s::bot_state_t;
-    fn index(&self, i: usize) -> &Self::Output {
-        &self.0[i]
-    }
-}
-impl core::ops::IndexMut<usize> for BotStates {
-    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
-        &mut self.0[i]
-    }
-}
-
-/// `gNPC_t *gNPCPtrs[MAX_GENTITIES]` — per-entity NPC state pointers
-/// (`NPC_spawn.c` file-scope global). Newtype because a raw-pointer array has
-/// no library `Default` impl.
-/// Source: `oracle/codemp/game/NPC_spawn.c:1276`
-pub struct GNpcPtrs(pub [*mut crate::npc::g_npc_t::gNPC_t; mp_qshared::shared::MAX_GENTITIES]);
-
-impl Default for GNpcPtrs {
-    fn default() -> Self {
-        GNpcPtrs([core::ptr::null_mut(); mp_qshared::shared::MAX_GENTITIES])
-    }
-}
-
-// Transparent indexing (`globals.gNPCPtrs[i]`) so call sites written against
-// a plain `gNPC_t *[MAX_GENTITIES]` need no change.
-impl core::ops::Index<usize> for GNpcPtrs {
-    type Output = *mut crate::npc::g_npc_t::gNPC_t;
-    fn index(&self, i: usize) -> &Self::Output {
-        &self.0[i]
-    }
-}
-impl core::ops::IndexMut<usize> for GNpcPtrs {
-    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
-        &mut self.0[i]
-    }
-}
+array_newtype!(null, index;
+    /// `gNPC_t *gNPCPtrs[MAX_GENTITIES]` — per-entity NPC state pointers
+    /// (`NPC_spawn.c` file-scope global). Newtype because a raw-pointer array has
+    /// no library `Default` impl.
+    /// Source: `oracle/codemp/game/NPC_spawn.c:1276`
+    pub GNpcPtrs, *mut gNPC_t, MAX_GENTITIES);
 
 /// Raven `#define MAX_NPC_DATA_SIZE 0x20000` (`NPC_stats.c:236`).
 pub const MAX_NPC_DATA_SIZE: usize = 0x20000;
 
-/// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` / `char npcParseBuffer[MAX_NPC_DATA_SIZE]`
-/// (`NPC_stats.c:237-3238`) — a fixed 128 KB NPC-config parse buffer. Newtype so
-/// `GameGlobals` keeps a derive-shaped `Default` (arrays > 32 have no library `Default`);
-/// `#[repr(transparent)]` keeps the `&globals.NPCParms as *const _ as *const c_char`
-/// porter idiom valid — the wrapper's address is the buffer's first byte.
-/// Source: `oracle/codemp/game/NPC_stats.c:236-238`
-#[repr(transparent)]
-pub struct NpcDataBuffer(pub [c_char; MAX_NPC_DATA_SIZE]);
+array_newtype!(zero;
+    /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` / `char npcParseBuffer[MAX_NPC_DATA_SIZE]`
+    /// (`NPC_stats.c:237-3238`) — a fixed 128 KB NPC-config parse buffer. Newtype so
+    /// `GameGlobals` keeps a derive-shaped `Default` (arrays > 32 have no library `Default`);
+    /// `#[repr(transparent)]` keeps the `&globals.NPCParms as *const _ as *const c_char`
+    /// porter idiom valid — the wrapper's address is the buffer's first byte.
+    /// Source: `oracle/codemp/game/NPC_stats.c:236-238`
+    #[repr(transparent)]
+    pub NpcDataBuffer, c_char, MAX_NPC_DATA_SIZE);
 
-impl Default for NpcDataBuffer {
-    fn default() -> Self {
-        NpcDataBuffer([0; MAX_NPC_DATA_SIZE])
-    }
-}
+array_newtype!(elem, index;
+    /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]` — spawn queue array (`g_bot.c:27`).
+    /// Newtype for consistent interface with other large arrays.
+    /// Source: `oracle/codemp/game/g_bot.c:27`
+    #[derive(Clone, Copy)]
+    pub BotSpawnQueue, botSpawnQueue_t, BOT_SPAWN_QUEUE_DEPTH);
 
-/// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]` — spawn queue array (`g_bot.c:27`).
-/// Newtype for consistent interface with other large arrays.
-/// Source: `oracle/codemp/game/g_bot.c:27`
-#[derive(Clone, Copy)]
-pub struct BotSpawnQueue(pub [botSpawnQueue_t; BOT_SPAWN_QUEUE_DEPTH]);
+array_newtype!(zero;
+    /// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`). A thin wrapper because
+    /// `[qboolean; 256]` has no library `Default` impl (only arrays up to 32
+    /// elements do in stable Rust).
+    #[derive(Clone, Copy)]
+    pub ItemRegistered, qboolean, MAX_ITEMS);
 
-impl Default for BotSpawnQueue {
-    fn default() -> Self {
-        BotSpawnQueue([botSpawnQueue_t::default(); BOT_SPAWN_QUEUE_DEPTH])
-    }
-}
+array_newtype!(boxed;
+    /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot personality
+    /// chat message buffers, one per client. Boxed so the ~256 KB of bytes lives on
+    /// the heap (not the `GameGlobals` stack image, which the engine's
+    /// `vmMain(GAME_INIT)` builds on a constrained stack).
+    /// Source: `oracle/codemp/game/ai_util.c:12`
+    pub BotChatBuffer, [c_char; MAX_CHAT_BUFFER_SIZE], MAX_CLIENTS);
 
-// Transparent indexing (`globals.botSpawnQueue[i]`) so call sites written
-// against a plain `[botSpawnQueue_t; BOT_SPAWN_QUEUE_DEPTH]` need no change.
-impl core::ops::Index<usize> for BotSpawnQueue {
-    type Output = botSpawnQueue_t;
-    fn index(&self, i: usize) -> &botSpawnQueue_t {
-        &self.0[i]
-    }
-}
-impl core::ops::IndexMut<usize> for BotSpawnQueue {
-    fn index_mut(&mut self, i: usize) -> &mut botSpawnQueue_t {
-        &mut self.0[i]
-    }
-}
+array_newtype!(null;
+    /// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` — the waypoint arena, faithfully a
+    /// fixed array of raw pointers into the `B_Alloc` bump arena (individually
+    /// allocated, never freed). Newtype because a 4096-element array has no
+    /// library `Default` (>32) and the entries are raw pointers (null-init).
+    /// Source: `oracle/codemp/game/ai_main.h:398`
+    pub WpArray, *mut wpobject_t, MAX_WPARRAY_SIZE);
 
-/// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`). A thin wrapper because
-/// `[qboolean; 256]` has no library `Default` impl (only arrays up to 32
-/// elements do in stable Rust).
-#[derive(Clone, Copy)]
-pub struct ItemRegistered(pub [qboolean; MAX_ITEMS]);
+array_newtype!(null;
+    /// `gentity_t *gSpawnPoints[MAX_SPAWNPOINT_ARRAY]` (RMG autopath spawn set).
+    /// Source: `oracle/codemp/game/ai_wpnav.c:2507`
+    pub SpawnPointArray, *mut gentity_t, MAX_SPAWNPOINT_ARRAY);
 
-impl Default for ItemRegistered {
-    fn default() -> Self {
-        ItemRegistered([0; MAX_ITEMS])
-    }
-}
+array_newtype!(zero2d;
+    /// `int G_WeaponLogDamage[MAX_CLIENTS][MOD_MAX]` (`g_log.c:21`). Newtype
+    /// because the inner `[c_int; MOD_MAX]` (45 elements) has no library
+    /// `Default` impl (only arrays up to 32 elements do in stable Rust).
+    #[derive(Clone, Copy)]
+    pub WeaponLogDamage, c_int, meansOfDeath_t::MOD_MAX as usize, MAX_CLIENTS);
 
-/// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot personality
-/// chat message buffers, one per client. Boxed so the ~256 KB of bytes lives on
-/// the heap (not the `GameGlobals` stack image, which the engine's
-/// `vmMain(GAME_INIT)` builds on a constrained stack).
-/// Source: `oracle/codemp/game/ai_util.c:12`
-pub struct BotChatBuffer(
-    pub Box<[[c_char; MAX_CHAT_BUFFER_SIZE]; mp_qshared::shared::MAX_CLIENTS]>,
-);
+array_newtype!(zero2d;
+    /// `int G_WeaponLogKills[MAX_CLIENTS][MOD_MAX]` (`g_log.c:22`). Same
+    /// >32-inner-array `Default` gap as `WeaponLogDamage`.
+    #[derive(Clone, Copy)]
+    pub WeaponLogKills, c_int, meansOfDeath_t::MOD_MAX as usize, MAX_CLIENTS);
 
-impl Default for BotChatBuffer {
-    fn default() -> Self {
-        // `zeroed_box` builds the buffer directly on the heap (`c_char: ZeroValid`)
-        // — no stack transit.
-        BotChatBuffer(native_platform::zeroed_box())
-    }
-}
+array_newtype!(boxed;
+    /// `nodeobject_t nodetable[MAX_NODETABLE_SIZE]` — the 16384-entry node-graph
+    /// scratch table. Boxed so the ~458 KB of POD lives on the heap (not the
+    /// `GameWorld` stack image) and default-zeroed (`nodeobject_t` is `#[repr(C)]`
+    /// POD, so an all-zero image is valid).
+    /// Source: `oracle/codemp/game/ai_wpnav.c:19`
+    pub NodeTable, nodeobject_t, MAX_NODETABLE_SIZE);
 
-/// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` — the waypoint arena, faithfully a
-/// fixed array of raw pointers into the `B_Alloc` bump arena (individually
-/// allocated, never freed). Newtype because a 4096-element array has no
-/// library `Default` (>32) and the entries are raw pointers (null-init).
-/// Source: `oracle/codemp/game/ai_main.h:398`
-pub struct WpArray(pub [*mut wpobject_t; MAX_WPARRAY_SIZE]);
+array_newtype!(boxed, index;
+    /// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
+    /// Boxed so the ~162 KB of POD lives on the heap (not the `GameGlobals` stack
+    /// image, which the engine's `vmMain(GAME_INIT)` builds on a constrained
+    /// stack); `waypointData_t` is `#[repr(C)]` POD so an all-zero image is valid.
+    /// Source: `oracle/codemp/game/g_nav.c:1660`
+    pub TempWaypointList, waypointData_t, MAX_STORED_WAYPOINTS);
 
-impl Default for WpArray {
-    fn default() -> Self {
-        WpArray([core::ptr::null_mut(); MAX_WPARRAY_SIZE])
-    }
-}
+array_newtype!(zero;
+    /// `char fatalErrorString[4096]` — newtype because a 4096-byte array has no
+    /// library `Default` impl (only arrays up to 32 elements do in stable Rust),
+    /// same gap as `BotChatBuffer`.
+    /// Source: `oracle/codemp/game/g_nav.c:1617`
+    #[derive(Clone, Copy)]
+    pub FatalErrorString, c_char, 4096);
 
-/// `gentity_t *gSpawnPoints[MAX_SPAWNPOINT_ARRAY]` (RMG autopath spawn set).
-/// Source: `oracle/codemp/game/ai_wpnav.c:2507`
-pub struct SpawnPointArray(pub [*mut gentity_t; MAX_SPAWNPOINT_ARRAY]);
+array_newtype!(zero;
+    /// Raven `char NPCFile[MAX_QPATH]` (`NPC_stats.c:238`) — the currently-loading
+    /// NPC-config file name. `#[repr(transparent)]` keeps the porter idiom
+    /// `&globals.NPCFile as *const _ as *const c_char` valid (same treatment as
+    /// `NpcDataBuffer`); newtype so `GameGlobals` keeps a derive-shaped `Default`
+    /// (`MAX_QPATH` = 64 > 32 has no library `Default`).
+    /// Source: `oracle/codemp/game/NPC_stats.c:238`
+    #[repr(transparent)]
+    pub NpcFileBuffer, c_char, MAX_QPATH);
 
-impl Default for SpawnPointArray {
-    fn default() -> Self {
-        SpawnPointArray([core::ptr::null_mut(); MAX_SPAWNPOINT_ARRAY])
-    }
-}
+array_newtype!(zero, deref;
+    /// Raven `char gObjectiveCfgStr[1024]` (`g_saga.c:47`). Newtype (>32 array has
+    /// no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter
+    /// idioms `.as_ptr()`/`.as_mut_ptr()` and `write_cstr_field(&mut field, …)`
+    /// valid.
+    /// Source: `oracle/codemp/game/g_saga.c:47`
+    pub ObjectiveCfgStr, c_char, 1024);
 
-/// `int G_WeaponLogDamage[MAX_CLIENTS][MOD_MAX]` (`g_log.c:21`). Newtype
-/// because the inner `[c_int; MOD_MAX]` (45 elements) has no library
-/// `Default` impl (only arrays up to 32 elements do in stable Rust).
-#[derive(Clone, Copy)]
-pub struct WeaponLogDamage(pub [[c_int; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS]);
+array_newtype!(zero, deref;
+    /// Raven `char gParseObjectives[MAX_SIEGE_INFO_SIZE]` (`g_saga.c:46`). Newtype
+    /// (>32 array has no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep
+    /// the porter idiom `.as_mut_ptr()` valid.
+    /// Source: `oracle/codemp/game/g_saga.c:46`
+    pub ParseObjectivesBuffer, c_char, MAX_SIEGE_INFO_SIZE);
 
-impl Default for WeaponLogDamage {
-    fn default() -> Self {
-        WeaponLogDamage([[0; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS])
-    }
-}
+array_newtype!(zero, deref;
+    /// Raven `static char team1[512]` (`g_saga.c:17`). Newtype (>32 array has no
+    /// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
+    /// `.as_ptr()`/`.as_mut_ptr()` valid.
+    /// Source: `oracle/codemp/game/g_saga.c:17`
+    pub Team1Buf, c_char, 512);
 
-/// `int G_WeaponLogKills[MAX_CLIENTS][MOD_MAX]` (`g_log.c:22`). Same
-/// >32-inner-array `Default` gap as `WeaponLogDamage`.
-#[derive(Clone, Copy)]
-pub struct WeaponLogKills(pub [[c_int; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS]);
-
-impl Default for WeaponLogKills {
-    fn default() -> Self {
-        WeaponLogKills([[0; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS])
-    }
-}
-
-/// `nodeobject_t nodetable[MAX_NODETABLE_SIZE]` — the 16384-entry node-graph
-/// scratch table. Boxed so the ~458 KB of POD lives on the heap (not the
-/// `GameWorld` stack image) and default-zeroed (`nodeobject_t` is `#[repr(C)]`
-/// POD, so an all-zero image is valid).
-/// Source: `oracle/codemp/game/ai_wpnav.c:19`
-pub struct NodeTable(pub Box<[nodeobject_t; MAX_NODETABLE_SIZE]>);
-
-impl Default for NodeTable {
-    fn default() -> Self {
-        // `zeroed_box` builds the ~448 KB array directly on the heap
-        // (`nodeobject_t: ZeroValid`) so it never transits the stack — a naive
-        // `Box::new(zeroed())` materialized it on the stack (twice in debug) and
-        // overflowed the engine's `vmMain(GAME_INIT)` guard page.
-        NodeTable(native_platform::zeroed_box())
-    }
-}
-
-/// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
-/// Boxed so the ~162 KB of POD lives on the heap (not the `GameGlobals` stack
-/// image, which the engine's `vmMain(GAME_INIT)` builds on a constrained
-/// stack); `waypointData_t` is `#[repr(C)]` POD so an all-zero image is valid.
-/// Source: `oracle/codemp/game/g_nav.c:1660`
-pub struct TempWaypointList(pub Box<[waypointData_t; MAX_STORED_WAYPOINTS]>);
-
-impl Default for TempWaypointList {
-    fn default() -> Self {
-        // `zeroed_box` builds the array directly on the heap
-        // (`waypointData_t: ZeroValid`) — no stack transit.
-        TempWaypointList(native_platform::zeroed_box())
-    }
-}
-
-// Transparent indexing (`globals.tempWaypointList[i]`) so call sites written
-// against a plain `[waypointData_t; MAX_STORED_WAYPOINTS]` need no change.
-impl core::ops::Index<usize> for TempWaypointList {
-    type Output = waypointData_t;
-    fn index(&self, i: usize) -> &waypointData_t {
-        &self.0[i]
-    }
-}
-impl core::ops::IndexMut<usize> for TempWaypointList {
-    fn index_mut(&mut self, i: usize) -> &mut waypointData_t {
-        &mut self.0[i]
-    }
-}
-
-/// `char fatalErrorString[4096]` — newtype because a 4096-byte array has no
-/// library `Default` impl (only arrays up to 32 elements do in stable Rust),
-/// same gap as `BotChatBuffer`.
-/// Source: `oracle/codemp/game/g_nav.c:1617`
-#[derive(Clone, Copy)]
-pub struct FatalErrorString(pub [c_char; 4096]);
-
-impl Default for FatalErrorString {
-    fn default() -> Self {
-        FatalErrorString([0; 4096])
-    }
-}
-
-/// Raven `char NPCFile[MAX_QPATH]` (`NPC_stats.c:238`) — the currently-loading
-/// NPC-config file name. `#[repr(transparent)]` keeps the porter idiom
-/// `&globals.NPCFile as *const _ as *const c_char` valid (same treatment as
-/// `NpcDataBuffer`); newtype so `GameGlobals` keeps a derive-shaped `Default`
-/// (`MAX_QPATH` = 64 > 32 has no library `Default`).
-/// Source: `oracle/codemp/game/NPC_stats.c:238`
-#[repr(transparent)]
-pub struct NpcFileBuffer(pub [c_char; MAX_QPATH]);
-
-impl Default for NpcFileBuffer {
-    fn default() -> Self {
-        NpcFileBuffer([0; MAX_QPATH])
-    }
-}
-
-/// Raven `char gObjectiveCfgStr[1024]` (`g_saga.c:47`). Newtype (>32 array has
-/// no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter
-/// idioms `.as_ptr()`/`.as_mut_ptr()` and `write_cstr_field(&mut field, …)`
-/// valid.
-/// Source: `oracle/codemp/game/g_saga.c:47`
-pub struct ObjectiveCfgStr(pub [c_char; 1024]);
-
-impl Default for ObjectiveCfgStr {
-    fn default() -> Self {
-        ObjectiveCfgStr([0; 1024])
-    }
-}
-
-impl core::ops::Deref for ObjectiveCfgStr {
-    type Target = [c_char];
-    fn deref(&self) -> &[c_char] {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for ObjectiveCfgStr {
-    fn deref_mut(&mut self) -> &mut [c_char] {
-        &mut self.0
-    }
-}
-
-/// Raven `char gParseObjectives[MAX_SIEGE_INFO_SIZE]` (`g_saga.c:46`). Newtype
-/// (>32 array has no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep
-/// the porter idiom `.as_mut_ptr()` valid.
-/// Source: `oracle/codemp/game/g_saga.c:46`
-pub struct ParseObjectivesBuffer(pub [c_char; MAX_SIEGE_INFO_SIZE]);
-
-impl Default for ParseObjectivesBuffer {
-    fn default() -> Self {
-        ParseObjectivesBuffer([0; MAX_SIEGE_INFO_SIZE])
-    }
-}
-
-impl core::ops::Deref for ParseObjectivesBuffer {
-    type Target = [c_char];
-    fn deref(&self) -> &[c_char] {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for ParseObjectivesBuffer {
-    fn deref_mut(&mut self) -> &mut [c_char] {
-        &mut self.0
-    }
-}
-
-/// Raven `static char team1[512]` (`g_saga.c:17`). Newtype (>32 array has no
-/// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
-/// `.as_ptr()`/`.as_mut_ptr()` valid.
-/// Source: `oracle/codemp/game/g_saga.c:17`
-pub struct Team1Buf(pub [c_char; 512]);
-
-impl Default for Team1Buf {
-    fn default() -> Self {
-        Team1Buf([0; 512])
-    }
-}
-
-impl core::ops::Deref for Team1Buf {
-    type Target = [c_char];
-    fn deref(&self) -> &[c_char] {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for Team1Buf {
-    fn deref_mut(&mut self) -> &mut [c_char] {
-        &mut self.0
-    }
-}
-
-/// Raven `static char team2[512]` (`g_saga.c:18`). Newtype (>32 array has no
-/// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
-/// `.as_ptr()`/`.as_mut_ptr()` valid.
-/// Source: `oracle/codemp/game/g_saga.c:18`
-pub struct Team2Buf(pub [c_char; 512]);
-
-impl Default for Team2Buf {
-    fn default() -> Self {
-        Team2Buf([0; 512])
-    }
-}
-
-impl core::ops::Deref for Team2Buf {
-    type Target = [c_char];
-    fn deref(&self) -> &[c_char] {
-        &self.0
-    }
-}
-impl core::ops::DerefMut for Team2Buf {
-    fn deref_mut(&mut self) -> &mut [c_char] {
-        &mut self.0
-    }
-}
+array_newtype!(zero, deref;
+    /// Raven `static char team2[512]` (`g_saga.c:18`). Newtype (>32 array has no
+    /// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
+    /// `.as_ptr()`/`.as_mut_ptr()` valid.
+    /// Source: `oracle/codemp/game/g_saga.c:18`
+    pub Team2Buf, c_char, 512);
 
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
 /// char newShader[MAX_QPATH]; float timeOffset; }`.
@@ -465,85 +366,46 @@ impl Default for shaderRemap_t {
     }
 }
 
-/// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`).
-/// Newtype because a 128-element array of a non-`Copy`-array-friendly struct
-/// has no library `Default` (>32).
-pub struct RemappedShaders(pub [shaderRemap_t; MAX_SHADER_REMAPS]);
+array_newtype!(elem;
+    /// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`).
+    /// Newtype because a 128-element array of a non-`Copy`-array-friendly struct
+    /// has no library `Default` (>32).
+    pub RemappedShaders, shaderRemap_t, MAX_SHADER_REMAPS);
 
-impl Default for RemappedShaders {
-    fn default() -> Self {
-        RemappedShaders([shaderRemap_t::default(); MAX_SHADER_REMAPS])
-    }
-}
+array_newtype!(null;
+    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) — the dynamically
+    /// allocated NPC `gclient_t` backing store, indexed by entity number.
+    /// Source: `oracle/codemp/game/g_utils.c:428`
+    pub GClPtrs, *mut gclient_t, MAX_GENTITIES);
 
-/// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) — the dynamically
-/// allocated NPC `gclient_t` backing store, indexed by entity number.
-/// Source: `oracle/codemp/game/g_utils.c:428`
-pub struct GClPtrs(pub [*mut gclient_t; mp_qshared::shared::MAX_GENTITIES]);
+array_newtype!(zero;
+    /// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (`g_utils.c:877`).
+    pub GG2KillIndex, c_int, MAX_G2_KILL_QUEUE);
 
-impl Default for GClPtrs {
-    fn default() -> Self {
-        GClPtrs([core::ptr::null_mut(); mp_qshared::shared::MAX_GENTITIES])
-    }
-}
+array_newtype!(zero;
+    /// `qboolean g_vehiclePoolOccupied[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:386`).
+    pub VehiclePoolOccupied, qboolean, MAX_VEHICLES_AT_A_TIME);
 
-/// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (`g_utils.c:877`).
-pub struct GG2KillIndex(pub [c_int; MAX_G2_KILL_QUEUE]);
+array_newtype!(boxed;
+    /// `static Vehicle_t g_vehiclePool[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:385`) —
+    /// the fixed pool `G_AllocateVehicleObject` hands out slots from. Boxed so the
+    /// ~122 KB slab (`976 * 128`) lives on the heap, not in the `GameGlobals` stack
+    /// image the engine builds during `vmMain(GAME_INIT)`; the all-zero start
+    /// matches Raven's zero-initialized `static`.
+    pub VehiclePool, Vehicle_t, MAX_VEHICLES_AT_A_TIME);
 
-impl Default for GG2KillIndex {
-    fn default() -> Self {
-        GG2KillIndex([0; MAX_G2_KILL_QUEUE])
-    }
-}
+array_newtype!(boxed;
+    /// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) — the fixed timer pool,
+    /// intrusively linked into a free list. Boxed so the ~384 KB pool lives on the
+    /// heap (not the `GameGlobals` stack image, which the engine's
+    /// `vmMain(GAME_INIT)` builds on a constrained stack); the all-null/zero start
+    /// matches Raven's zero-initialized pool.
+    pub GTimerPool, gtimer_t, MAX_GTIMERS);
 
-/// `qboolean g_vehiclePoolOccupied[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:386`).
-pub struct VehiclePoolOccupied(pub [qboolean; MAX_VEHICLES_AT_A_TIME]);
-
-impl Default for VehiclePoolOccupied {
-    fn default() -> Self {
-        VehiclePoolOccupied([0; MAX_VEHICLES_AT_A_TIME])
-    }
-}
-
-/// `static Vehicle_t g_vehiclePool[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:385`) —
-/// the fixed pool `G_AllocateVehicleObject` hands out slots from. Boxed so the
-/// ~122 KB slab (`976 * 128`) lives on the heap, not in the `GameGlobals` stack
-/// image the engine builds during `vmMain(GAME_INIT)`; the all-zero start
-/// matches Raven's zero-initialized `static`.
-pub struct VehiclePool(pub Box<[Vehicle_t; MAX_VEHICLES_AT_A_TIME]>);
-
-impl Default for VehiclePool {
-    fn default() -> Self {
-        // `zeroed_box` builds the slab directly on the heap (`Vehicle_t: ZeroValid`
-        // — null pointers + POD) — no stack transit.
-        VehiclePool(native_platform::zeroed_box())
-    }
-}
-
-/// `gtimer_t g_timerPool[MAX_GTIMERS]` (`g_timer.c:17`) — the fixed timer pool,
-/// intrusively linked into a free list. Boxed so the ~384 KB pool lives on the
-/// heap (not the `GameGlobals` stack image, which the engine's
-/// `vmMain(GAME_INIT)` builds on a constrained stack); the all-null/zero start
-/// matches Raven's zero-initialized pool.
-pub struct GTimerPool(pub Box<[crate::g_timer::gtimer_t; crate::g_timer::MAX_GTIMERS]>);
-
-impl Default for GTimerPool {
-    fn default() -> Self {
-        // `zeroed_box` builds the pool directly on the heap
-        // (`gtimer_t: ZeroValid` — null pointers + 0) — no stack transit.
-        GTimerPool(native_platform::zeroed_box())
-    }
-}
-
-/// `gtimer_t *g_timers[MAX_GENTITIES]` (`g_timer.c:18`) — per-entity timer
-/// list heads, indexed by entity number.
-pub struct GTimers(pub [*mut crate::g_timer::gtimer_t; mp_qshared::shared::MAX_GENTITIES]);
-
-impl Default for GTimers {
-    fn default() -> Self {
-        GTimers([core::ptr::null_mut(); mp_qshared::shared::MAX_GENTITIES])
-    }
-}
+array_newtype!(null;
+    /// `gtimer_t *g_timers[MAX_GENTITIES]` (`g_timer.c:18`) — per-entity timer
+    /// list heads, indexed by entity number.
+    pub GTimers, *mut gtimer_t, MAX_GENTITIES);
 
 /// `navInfo_t frameNavInfo` (`NPC_move.c:14`) — per-frame NPC nav-move
 /// scratch state. Newtype because `navInfo_t` embeds `trace_t`/raw pointers
@@ -558,20 +420,12 @@ impl Default for FrameNavInfo {
     }
 }
 
-/// Per-row `cvarTable_t.modificationCount` cache (`g_main.c:22`). Raven
-/// stores this inline on each `gameCvarTable` row; this crate's
-/// `GAME_CVAR_TABLE` is a `const`, so the per-call-spanning cache lives here
-/// instead, indexed identically to `GAME_CVAR_TABLE`.
-pub struct GameCvarModCounts(pub [c_int; GAME_CVAR_TABLE_LEN]);
-
-impl Default for GameCvarModCounts {
-    fn default() -> Self {
-        // Matches the oracle's static zero-initialization of `gameCvarTable`
-        // rows (`modificationCount` is never explicitly initialized in the
-        // table literal, so it starts at 0 — g_main.c:230-475).
-        GameCvarModCounts([0; GAME_CVAR_TABLE_LEN])
-    }
-}
+array_newtype!(zero;
+    /// Per-row `cvarTable_t.modificationCount` cache (`g_main.c:22`). Raven
+    /// stores this inline on each `gameCvarTable` row; this crate's
+    /// `GAME_CVAR_TABLE` is a `const`, so the per-call-spanning cache lives here
+    /// instead, indexed identically to `GAME_CVAR_TABLE`.
+    pub GameCvarModCounts, c_int, GAME_CVAR_TABLE_LEN);
 
 /// `CheckCvars`' function-scope `static int lastMod = -1` (`g_main.c:3456`) —
 /// a genuine cross-frame static, homed here. Newtype so `GameGlobals` keeps

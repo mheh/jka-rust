@@ -33,6 +33,8 @@ use mp_qshared::shared::limits::MAX_GENTITIES;
 use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::wl_e::WL_e;
 
+use native_string::cstr::buf_to_string;
+
 use crate::blockstream::cblock::bytes_to_c_string;
 use crate::instance::icarus_instance::IcarusInstance;
 use crate::q3_interface::set_type_t::setType_t;
@@ -118,9 +120,7 @@ fn cstr_to_string(ptr: *const c_char) -> String {
     // SAFETY: caller-supplied pointer is a live entity field the seam owns
     // for the duration of this call (§D11 — dereferencing the seam pointer
     // is the confined ABI unsafe).
-    unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+    buf_to_string(unsafe { CStr::from_ptr(ptr) }.to_bytes())
 }
 
 /// Raven `strncpy( temp, str, 1023 ); temp[1023] = 0;` — the 1023-byte

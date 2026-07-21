@@ -7,6 +7,7 @@ pub mod saber_info;
 pub mod saber_styles;
 pub mod saber_trail;
 pub mod saber_type;
+pub mod w_saber_consts;
 
 pub use blade_info::{bladeInfo_t, MAX_BLADES};
 pub use saber_colors::{

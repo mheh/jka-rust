@@ -7,7 +7,7 @@
 //!
 //! Source: `oracle/codemp/qcommon/common.cpp`
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int, c_void, CStr};
 
 use mp_host_interface::engine_host::EngineHost;
 use mp_qshared::common::mp::qcommon::msg_t::msg_t;
@@ -19,6 +19,7 @@ use mp_qshared::shared::cvar::{
 };
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, CPUSTRING, FS_READ, Q3_VERSION};
+use native_string::cstr::buf_to_string;
 use native_string::q_string::{Q_strcmp, Q_stricmp, Q_stricmpn};
 
 use crate::collision_world::CollisionWorld;
@@ -1603,7 +1604,7 @@ unsafe fn c_str_to_string(p: *const c_char) -> String {
     if p.is_null() {
         return String::new();
     }
-    std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
+    buf_to_string(CStr::from_ptr(p).to_bytes())
 }
 
 /// `Q_random(&seed)` external (qshared LCG surface) — packet-cited external,

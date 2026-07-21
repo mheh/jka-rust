@@ -37,6 +37,7 @@ use mp_qshared::shared::cvar::{CVAR_INIT, CVAR_SYSTEMINFO};
 use mp_qshared::shared::limits::MAX_OSPATH;
 use mp_qshared::shared::swap::LittleLong;
 use native_string::atoi::atoi;
+use native_string::cstr::buf_to_string;
 use native_string::filter::Com_FilterPath;
 use native_string::q_string::{Q_stricmp, Q_stricmpn, Q_strlwr};
 use native_string::q_strncpyz::Q_strncpyz;
@@ -312,7 +313,7 @@ fn cstr(p: *const c_char) -> String {
     if p.is_null() {
         return String::new();
     }
-    unsafe { core::ffi::CStr::from_ptr(p).to_string_lossy().into_owned() }
+    unsafe { buf_to_string(CStr::from_ptr(p).to_bytes()) }
 }
 
 /// Raven `fs_scrambledProductId` — obfuscated retail product-id table.

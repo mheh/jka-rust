@@ -19,6 +19,9 @@ mp_engine_select = { path = "../engine-select" }
 # STATE-D9: zeroed_box/ZeroValid for GameWorld construction (doc-sanctioned edge).
 native_platform = { path = "../../native/platform" }
 
+[build-dependencies]
+native_build_date = { path = "../../native/build-date" }
+
 [dev-dependencies]
 # Saberload parity test (tests/jampgame_parity.rs): the inbound C-variadic
 # syscall trampoline + `arm_game_slot`, so the test's configstring-servicing

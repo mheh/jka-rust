@@ -3,7 +3,7 @@
 
 #![allow(non_snake_case, non_upper_case_globals, unused_variables)]
 
-use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void};
+use core::ffi::{c_char, c_int, c_long, c_uint, c_ulong, c_void, CStr};
 
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::fs_origin::fsOrigin_t;
@@ -47,6 +47,7 @@ use crate::files_common::{
 use crate::sys_engine::{Sys_StreamSeek, Sys_StreamedRead};
 use native_platform::{sys_fopen, sys_remove, sys_rename, Sys_BeginStreamedFile, Sys_ListFiles};
 use native_string::atoi::atoi;
+use native_string::cstr::buf_to_string;
 use native_string::q_strncpyz::Q_strncpyz;
 
 /// Raven `FS_PakIsPure`.
@@ -1283,7 +1284,7 @@ unsafe fn c_str_to_string(s: *const c_char) -> String {
     if s.is_null() {
         return String::new();
     }
-    std::ffi::CStr::from_ptr(s).to_string_lossy().into_owned()
+    buf_to_string(CStr::from_ptr(s).to_bytes())
 }
 
 fn append_cstr(dst: *mut c_char, size: c_int, s: &str) {

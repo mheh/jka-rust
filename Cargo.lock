@@ -219,6 +219,7 @@ dependencies = [
  "libc",
  "mp_host_interface",
  "mp_qshared",
+ "native_build_date",
  "native_math",
  "native_platform",
  "native_string",
@@ -272,6 +273,7 @@ dependencies = [
  "mp_engine_qcommon",
  "mp_engine_select",
  "mp_qshared",
+ "native_build_date",
  "native_math",
  "native_platform",
  "native_sort",
@@ -323,6 +325,10 @@ dependencies = [
  "mp_bg",
  "mp_qshared",
 ]
+
+[[package]]
+name = "native_build_date"
+version = "0.1.0"
 
 [[package]]
 name = "native_containers"
