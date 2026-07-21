@@ -50,6 +50,7 @@ use crate::sv_bot::{
     BotImport_DebugLineCreate, BotImport_DebugLineDelete, BotImport_DebugLineShow,
     BotImport_DebugPolygonCreate, BotImport_DebugPolygonDelete,
 };
+use crate::server::client_s::client_t;
 use crate::sv_client::SV_ExecuteClientCommand;
 use crate::sv_game::SV_inPVS;
 use crate::sv_world::SV_PointContents;
@@ -320,7 +321,7 @@ extern "C" fn bot_import_bot_client_command(client: c_int, command: *mut c_char)
     unsafe {
         let mut view = ctx_view(c);
         let sv = &mut *c.sv;
-        let cl = sv.svs.clients.offset(client as isize);
+        let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
         // botlib C-callback seam: one conversion at the head.
         let command = core::ffi::CStr::from_ptr(command).to_string_lossy();
         SV_ExecuteClientCommand(&mut view, sv, cl, &command, qtrue);

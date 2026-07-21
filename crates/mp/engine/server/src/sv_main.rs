@@ -227,7 +227,7 @@ pub fn SV_SendServerCommand(common: &mut Common, sv: &mut Server, cl: *mut clien
     unsafe {
         // send the data to all relevent clients
         for j in 0..common.cvar(common.sv_maxclients).integer {
-            let client = sv.svs.clients.offset(j as isize);
+            let client = &mut sv.svs.clients[j as usize] as *mut client_t;
             if ((*client).state as c_int) < clientState_t::CS_PRIMED as c_int {
                 continue;
             }
@@ -249,7 +249,7 @@ pub fn SV_CheckPaused(common: &mut Common, sv: &mut Server) -> qboolean {
     let mut count = 0;
     unsafe {
         for i in 0..common.cvar(common.sv_maxclients).integer {
-            let cl = sv.svs.clients.offset(i as isize);
+            let cl = &sv.svs.clients[i as usize] as *const client_t;
             if (*cl).state as c_int >= clientState_t::CS_CONNECTED as c_int
                 && (*cl).netchan.remoteAddress.r#type != netadrtype_t::NA_BOT
             {
@@ -448,7 +448,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         let mut status_length: usize = 0;
 
         for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-            let cl = sv.svs.clients.offset(i as isize);
+            let cl = &sv.svs.clients[i as usize] as *const client_t;
             if (*cl).state as c_int >= clientState_t::CS_CONNECTED as c_int {
                 let ps = SV_GameClientNum(sv, i);
                 Com_sprintf(
@@ -458,7 +458,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
                         "{} {} \"{}\"\n",
                         (*ps).persistant[PERS_SCORE as usize],
                         (*cl).ping,
-                        CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                        (*cl).name
                     ),
                 );
                 let player_length = strlen(player.as_ptr());
@@ -507,9 +507,7 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         for i in view.common.cvar(view.common.sv_privateClients).integer
             ..view.common.cvar(view.common.sv_maxclients).integer
         {
-            if (*sv.svs.clients.offset(i as isize)).state as c_int
-                >= clientState_t::CS_CONNECTED as c_int
-            {
+            if sv.svs.clients[i as usize].state as c_int >= clientState_t::CS_CONNECTED as c_int {
                 count += 1;
             }
         }
@@ -850,7 +848,7 @@ pub fn SV_PacketEvent(view: &mut EngineHostView, from: netadr_t, msg: *mut msg_t
 
         // find which client the message is from
         for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-            let cl = sv.svs.clients.offset(i as isize);
+            let cl = &mut sv.svs.clients[i as usize] as *mut client_t;
             if (*cl).state == clientState_t::CS_FREE {
                 continue;
             }
@@ -900,7 +898,7 @@ pub fn SV_PacketEvent(view: &mut EngineHostView, from: netadr_t, msg: *mut msg_t
 pub fn SV_CalcPings(common: &mut Common, sv: &mut Server) {
     unsafe {
         for i in 0..common.cvar(common.sv_maxclients).integer {
-            let cl = sv.svs.clients.offset(i as isize);
+            let cl = &mut sv.svs.clients[i as usize] as *mut client_t;
             if (*cl).state != clientState_t::CS_ACTIVE {
                 (*cl).ping = 999;
                 continue;
@@ -963,7 +961,7 @@ pub fn SV_CheckTimeouts(common: &mut Common, sv: &mut Server) {
 
     unsafe {
         for i in 0..common.cvar(common.sv_maxclients).integer {
-            let cl = sv.svs.clients.offset(i as isize);
+            let cl = &mut sv.svs.clients[i as usize] as *mut client_t;
             // message times may be wrong across a changelevel
             if (*cl).lastPacketTime > sv.svs.time {
                 (*cl).lastPacketTime = sv.svs.time;
@@ -974,7 +972,7 @@ pub fn SV_CheckTimeouts(common: &mut Common, sv: &mut Server) {
                     common,
                     &format!(
                         "Going from CS_ZOMBIE to CS_FREE for {}\n",
-                        CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                        (*cl).name
                     ),
                 );
                 (*cl).state = clientState_t::CS_FREE; // can now be reused

@@ -1,6 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 use core::ffi::c_char;
+use core::mem::zeroed;
+use core::ptr::null_mut;
 
 use mp_engine_qcommon::qcommon::net_limits::{
     MAX_DOWNLOAD_WINDOW, MAX_RELIABLE_COMMANDS, PACKET_BACKUP,
@@ -8,8 +10,7 @@ use mp_engine_qcommon::qcommon::net_limits::{
 use mp_engine_qcommon::qcommon::netchan_t::netchan_t;
 use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::usercmd::usercmd_t;
-use mp_qshared::shared::limits::MAX_NAME_LENGTH;
-use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_QPATH, MAX_STRING_CHARS};
+use mp_qshared::shared::{fileHandle_t, qboolean, MAX_INFO_STRING, MAX_STRING_CHARS};
 
 use super::client_snapshot_t::clientSnapshot_t;
 use super::client_state_t::clientState_t;
@@ -19,8 +20,13 @@ use super::client_state_t::clientState_t;
 
 /// Raven `client_t` — server-side per-client connection state.
 ///
+/// (§D12 internal-only shape: `client_t` never crosses the DLL seam — the game
+/// module sees `playerState`/`userinfo` only — so `name`/`downloadName` are
+/// owned `String`s and the old `#[repr(C)]` layout asserts are dropped. Index
+/// math over `svs.clients` still uses `size_of::<client_t>()` as the Vec's
+/// element stride, which is repr-independent.)
+///
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:124-182`
-#[repr(C)]
 pub struct client_t {
     pub state: clientState_t,
     /// name, etc
@@ -51,11 +57,11 @@ pub struct client_t {
     /// SV_GentityNum(clientnum)
     pub gentity: *mut sharedEntity_t,
     /// extracted from userinfo, high bits masked
-    pub name: [c_char; MAX_NAME_LENGTH],
+    pub name: String,
 
     // downloading
     /// if not empty string, we are downloading
-    pub downloadName: [c_char; MAX_QPATH],
+    pub downloadName: String,
     /// file being downloaded
     pub download: fileHandle_t,
     /// total bytes (can't use EOF because of paks)
@@ -110,95 +116,56 @@ pub struct client_t {
 /// to the typedef `client_t`.
 pub type client_s = client_t;
 
-const _: () = assert!(core::mem::offset_of!(client_t, state) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<client_t>() == 332960);
-    assert!(core::mem::offset_of!(client_t, userinfo) == 4);
-    assert!(core::mem::offset_of!(client_t, sentGamedir) == 1028);
-    assert!(core::mem::offset_of!(client_t, reliableCommands) == 1032);
-    assert!(core::mem::offset_of!(client_t, reliableSequence) == 132104);
-    assert!(core::mem::offset_of!(client_t, reliableAcknowledge) == 132108);
-    assert!(core::mem::offset_of!(client_t, reliableSent) == 132112);
-    assert!(core::mem::offset_of!(client_t, messageAcknowledge) == 132116);
-    assert!(core::mem::offset_of!(client_t, gamestateMessageNum) == 132120);
-    assert!(core::mem::offset_of!(client_t, challenge) == 132124);
-    assert!(core::mem::offset_of!(client_t, lastUsercmd) == 132128);
-    assert!(core::mem::offset_of!(client_t, lastMessageNum) == 132156);
-    assert!(core::mem::offset_of!(client_t, lastClientCommand) == 132160);
-    assert!(core::mem::offset_of!(client_t, lastClientCommandString) == 132164);
-    assert!(core::mem::offset_of!(client_t, gentity) == 133192);
-    assert!(core::mem::offset_of!(client_t, name) == 133200);
-    assert!(core::mem::offset_of!(client_t, downloadName) == 133232);
-    assert!(core::mem::offset_of!(client_t, download) == 133296);
-    assert!(core::mem::offset_of!(client_t, downloadSize) == 133300);
-    assert!(core::mem::offset_of!(client_t, downloadCount) == 133304);
-    assert!(core::mem::offset_of!(client_t, downloadClientBlock) == 133308);
-    assert!(core::mem::offset_of!(client_t, downloadCurrentBlock) == 133312);
-    assert!(core::mem::offset_of!(client_t, downloadXmitBlock) == 133316);
-    assert!(core::mem::offset_of!(client_t, downloadBlocks) == 133320);
-    assert!(core::mem::offset_of!(client_t, downloadBlockSize) == 133384);
-    assert!(core::mem::offset_of!(client_t, downloadEOF) == 133416);
-    assert!(core::mem::offset_of!(client_t, downloadSendTime) == 133420);
-    assert!(core::mem::offset_of!(client_t, deltaMessage) == 133424);
-    assert!(core::mem::offset_of!(client_t, nextReliableTime) == 133428);
-    assert!(core::mem::offset_of!(client_t, lastPacketTime) == 133432);
-    assert!(core::mem::offset_of!(client_t, lastConnectTime) == 133436);
-    assert!(core::mem::offset_of!(client_t, nextSnapshotTime) == 133440);
-    assert!(core::mem::offset_of!(client_t, rateDelayed) == 133444);
-    assert!(core::mem::offset_of!(client_t, timeoutCount) == 133448);
-    assert!(core::mem::offset_of!(client_t, frames) == 133452);
-    assert!(core::mem::offset_of!(client_t, ping) == 234572);
-    assert!(core::mem::offset_of!(client_t, rate) == 234576);
-    assert!(core::mem::offset_of!(client_t, snapshotMsec) == 234580);
-    assert!(core::mem::offset_of!(client_t, pureAuthentic) == 234584);
-    assert!(core::mem::offset_of!(client_t, netchan) == 234588);
-    assert!(core::mem::offset_of!(client_t, lastUserInfoChange) == 332952);
-    assert!(core::mem::offset_of!(client_t, lastUserInfoCount) == 332956);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<client_t>() == 332920);
-    assert!(core::mem::offset_of!(client_t, userinfo) == 4);
-    assert!(core::mem::offset_of!(client_t, sentGamedir) == 1028);
-    assert!(core::mem::offset_of!(client_t, reliableCommands) == 1032);
-    assert!(core::mem::offset_of!(client_t, reliableSequence) == 132104);
-    assert!(core::mem::offset_of!(client_t, reliableAcknowledge) == 132108);
-    assert!(core::mem::offset_of!(client_t, reliableSent) == 132112);
-    assert!(core::mem::offset_of!(client_t, messageAcknowledge) == 132116);
-    assert!(core::mem::offset_of!(client_t, gamestateMessageNum) == 132120);
-    assert!(core::mem::offset_of!(client_t, challenge) == 132124);
-    assert!(core::mem::offset_of!(client_t, lastUsercmd) == 132128);
-    assert!(core::mem::offset_of!(client_t, lastMessageNum) == 132156);
-    assert!(core::mem::offset_of!(client_t, lastClientCommand) == 132160);
-    assert!(core::mem::offset_of!(client_t, lastClientCommandString) == 132164);
-    assert!(core::mem::offset_of!(client_t, gentity) == 133188);
-    assert!(core::mem::offset_of!(client_t, name) == 133192);
-    assert!(core::mem::offset_of!(client_t, downloadName) == 133224);
-    assert!(core::mem::offset_of!(client_t, download) == 133288);
-    assert!(core::mem::offset_of!(client_t, downloadSize) == 133292);
-    assert!(core::mem::offset_of!(client_t, downloadCount) == 133296);
-    assert!(core::mem::offset_of!(client_t, downloadClientBlock) == 133300);
-    assert!(core::mem::offset_of!(client_t, downloadCurrentBlock) == 133304);
-    assert!(core::mem::offset_of!(client_t, downloadXmitBlock) == 133308);
-    assert!(core::mem::offset_of!(client_t, downloadBlocks) == 133312);
-    assert!(core::mem::offset_of!(client_t, downloadBlockSize) == 133344);
-    assert!(core::mem::offset_of!(client_t, downloadEOF) == 133376);
-    assert!(core::mem::offset_of!(client_t, downloadSendTime) == 133380);
-    assert!(core::mem::offset_of!(client_t, deltaMessage) == 133384);
-    assert!(core::mem::offset_of!(client_t, nextReliableTime) == 133388);
-    assert!(core::mem::offset_of!(client_t, lastPacketTime) == 133392);
-    assert!(core::mem::offset_of!(client_t, lastConnectTime) == 133396);
-    assert!(core::mem::offset_of!(client_t, nextSnapshotTime) == 133400);
-    assert!(core::mem::offset_of!(client_t, rateDelayed) == 133404);
-    assert!(core::mem::offset_of!(client_t, timeoutCount) == 133408);
-    assert!(core::mem::offset_of!(client_t, frames) == 133412);
-    assert!(core::mem::offset_of!(client_t, ping) == 234532);
-    assert!(core::mem::offset_of!(client_t, rate) == 234536);
-    assert!(core::mem::offset_of!(client_t, snapshotMsec) == 234540);
-    assert!(core::mem::offset_of!(client_t, pureAuthentic) == 234544);
-    assert!(core::mem::offset_of!(client_t, netchan) == 234548);
-    assert!(core::mem::offset_of!(client_t, lastUserInfoChange) == 332912);
-    assert!(core::mem::offset_of!(client_t, lastUserInfoCount) == 332916);
-};
+impl Default for client_t {
+    /// Raven zero-fills `client_t` wholesale (`Z_Malloc` TAG-zeroed /
+    /// `Com_Memset`). Every field but the two owned `String`s is POD (no
+    /// `Drop`); the all-POD aggregates (`usercmd_t`, `frames`, `netchan_t`) use
+    /// per-field `zeroed()`, verified free of `String`/`Vec`/`Drop`; the two
+    /// name fields default to empty (`downloadName` empty == "no download").
+    fn default() -> Self {
+        client_t {
+            state: clientState_t::CS_FREE,
+            userinfo: [0; MAX_INFO_STRING],
+            sentGamedir: 0,
+            reliableCommands: [[0; MAX_STRING_CHARS]; MAX_RELIABLE_COMMANDS],
+            reliableSequence: 0,
+            reliableAcknowledge: 0,
+            reliableSent: 0,
+            messageAcknowledge: 0,
+            gamestateMessageNum: 0,
+            challenge: 0,
+            lastUsercmd: unsafe { zeroed() },
+            lastMessageNum: 0,
+            lastClientCommand: 0,
+            lastClientCommandString: [0; MAX_STRING_CHARS],
+            gentity: null_mut(),
+            name: String::new(),
+            downloadName: String::new(),
+            download: 0,
+            downloadSize: 0,
+            downloadCount: 0,
+            downloadClientBlock: 0,
+            downloadCurrentBlock: 0,
+            downloadXmitBlock: 0,
+            downloadBlocks: [null_mut(); MAX_DOWNLOAD_WINDOW],
+            downloadBlockSize: [0; MAX_DOWNLOAD_WINDOW],
+            downloadEOF: 0,
+            downloadSendTime: 0,
+            deltaMessage: 0,
+            nextReliableTime: 0,
+            lastPacketTime: 0,
+            lastConnectTime: 0,
+            nextSnapshotTime: 0,
+            rateDelayed: 0,
+            timeoutCount: 0,
+            frames: unsafe { zeroed() },
+            ping: 0,
+            rate: 0,
+            snapshotMsec: 0,
+            pureAuthentic: 0,
+            netchan: unsafe { zeroed() },
+            lastUserInfoChange: 0,
+            lastUserInfoCount: 0,
+        }
+    }
+}

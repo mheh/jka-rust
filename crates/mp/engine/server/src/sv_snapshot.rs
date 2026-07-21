@@ -82,7 +82,7 @@ pub fn SV_SendClientMessages(view: &mut EngineHostView, sv: &mut Server) {
     // send a message to each connected client
     let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
     for i in 0..max_clients {
-        let c = unsafe { sv.svs.clients.offset(i as isize) };
+        let c = &mut sv.svs.clients[i as usize] as *mut client_t;
         unsafe {
             if (*c).state as i32 == 0 {
                 continue; // not connected
@@ -203,7 +203,7 @@ pub fn SV_SendMessageToClient(
 ) {
     unsafe {
         // A replay replica has no socket; suppress every transmit to it.
-        let slot = (client as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+        let slot = (client as *const u8).offset_from(sv.svs.clients.as_ptr() as *const u8) as isize
             / core::mem::size_of::<client_t>() as isize;
         if crate::sv_referee::ref_is_replica(sv, slot as c_int) {
             return;
@@ -218,7 +218,7 @@ pub fn SV_SendMessageToClient(
                 view.common,
                 &format!(
                     "[ISM]SV_SendClientGameState() [1] for {}, writing out old fragments\n",
-                    core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                    (*client).name
                 ),
             );
             SV_Netchan_TransmitNextFragment(view, &mut (*client).netchan);
@@ -265,7 +265,7 @@ pub fn SV_SendMessageToClient(
             // a gigantic connection message may have already put the
             // nextSnapshotTime more than a second away, so don't shorten it; do
             // shorten if client is downloading
-            if (*client).downloadName[0] == 0 && (*client).nextSnapshotTime < sv.svs.time + 1000 {
+            if (&(*client).downloadName).is_empty() && (*client).nextSnapshotTime < sv.svs.time + 1000 {
                 (*client).nextSnapshotTime = sv.svs.time + 1000;
             }
         }
@@ -278,7 +278,7 @@ pub fn SV_SendMessageToClient(
 pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client: *mut client_t) {
     unsafe {
         // A replay replica has no socket; suppress its snapshot send.
-        let slot = (client as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+        let slot = (client as *const u8).offset_from(sv.svs.clients.as_ptr() as *const u8) as isize
             / core::mem::size_of::<client_t>() as isize;
         if crate::sv_referee::ref_is_replica(sv, slot as c_int) {
             return;
@@ -323,7 +323,7 @@ pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client:
                     view.common,
                     &format!(
                         "[ISM]SV_SendClientGameState() [1] for {}, writing out old fragments\n",
-                        core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                        (*client).name
                     ),
                 );
                 SV_Netchan_TransmitNextFragment(view, &mut (*client).netchan);
@@ -377,7 +377,7 @@ pub fn SV_SendClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client:
                 view.common,
                 &format!(
                     "WARNING: msg overflowed for {}\n",
-                    core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                    (*client).name
                 ),
             );
             mp_engine_qcommon::msg::MSG_Clear(&mut msg);
@@ -502,7 +502,7 @@ pub fn SV_WriteSnapshotToClient(
                 common,
                 &format!(
                     "{}: Delta request from out of date packet.\n",
-                    core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                    (*client).name
                 ),
             );
             oldframe = core::ptr::null_mut();
@@ -517,7 +517,7 @@ pub fn SV_WriteSnapshotToClient(
                     common,
                     &format!(
                         "{}: Delta request from out of date entities.\n",
-                        core::ffi::CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                        (*client).name
                     ),
                 );
                 oldframe = core::ptr::null_mut();
@@ -847,7 +847,7 @@ pub fn SV_BuildClientSnapshot(view: &mut EngineHostView, sv: &mut Server, client
         }
 
         // grab the current playerState_t
-        let client_index = ((client as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_index = ((client as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         let ps = SV_GameClientNum(sv, client_index);
         (*frame).ps = *ps;

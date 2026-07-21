@@ -37,6 +37,7 @@ use mp_qshared::shared::{qfalse, qtrue};
 
 use crate::botlib_import::{arm_botlib_slot, botlib_import_table};
 use crate::server::bot_debugpoly_t::bot_debugpoly_t;
+use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::sv_game::SV_GentityNum;
 use crate::sv_world::SV_Trace;
@@ -243,7 +244,7 @@ pub fn SV_BotGetConsoleMessage(
     size: c_int,
 ) -> c_int {
     unsafe {
-        let cl = sv.svs.clients.offset(client as isize);
+        let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
         (*cl).lastPacketTime = sv.svs.time;
 
         if (*cl).reliableAcknowledge == (*cl).reliableSequence {
@@ -267,7 +268,7 @@ pub fn SV_BotGetConsoleMessage(
 /// Source: `oracle/codemp/server/sv_bot.cpp:786-796`
 pub fn SV_BotGetSnapshotEntity(sv: &mut Server, client: c_int, sequence: c_int) -> c_int {
     unsafe {
-        let cl = sv.svs.clients.offset(client as isize);
+        let cl = &sv.svs.clients[client as usize] as *const client_t;
         let frame = &(*cl).frames[(*cl).netchan.outgoingSequence as usize & PACKET_MASK];
         if sequence < 0 || sequence >= frame.num_entities {
             return -1;
@@ -497,7 +498,7 @@ pub fn SV_BotAllocateClient(common: &mut Common, sv: &mut Server) -> c_int {
     unsafe {
         // find a client slot
         let mut i: c_int = 0;
-        let mut cl = sv.svs.clients;
+        let mut cl = sv.svs.clients.as_mut_ptr();
         while i < common.cvar(common.sv_maxclients).integer {
             if (*cl).state == clientState_t::CS_FREE {
                 break;
@@ -536,9 +537,9 @@ pub fn SV_BotFreeClient(common: &mut Common, sv: &mut Server, clientNum: c_int) 
                 format!("SV_BotFreeClient: bad clientNum: {}", clientNum),
             );
         }
-        let cl = sv.svs.clients.offset(clientNum as isize);
+        let cl = &mut sv.svs.clients[clientNum as usize] as *mut client_t;
         (*cl).state = clientState_t::CS_FREE;
-        (*cl).name[0] = 0;
+        (*cl).name.clear();
         if !(*cl).gentity.is_null() {
             (*(*cl).gentity).r.svFlags &= !SVF_BOT;
         }

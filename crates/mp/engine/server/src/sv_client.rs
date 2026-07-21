@@ -30,8 +30,13 @@ use crate::server::server_static_t::MAX_CHALLENGES;
 use crate::Server;
 
 use native_string::atoi::atoi;
+use native_string::cstr::strncpyz_string;
 use native_string::q_string::{Q_strcmpBytes, Q_stricmp};
 use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
+
+use mp_engine_qcommon::cmd_common::Cmd_Argv;
+use mp_qshared::shared::limits::MAX_NAME_LENGTH;
+use mp_qshared::shared::MAX_QPATH;
 
 use mp_qshared::shared::q_string::{Com_sprintf, Info_SetValueForKey, Info_ValueForKey};
 
@@ -50,12 +55,9 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
     unsafe {
         let name = Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"name".as_ptr() as *mut c_char);
-        let name_len = (*cl).name.len();
-        Q_strncpyzBytes(
-            &mut (*cl).name,
-            core::ffi::CStr::from_ptr(name).to_bytes(),
-            name_len,
-        );
+        // Raven `Q_strncpyz(cl->name, ..., sizeof(cl->name))` — byte-truncate the
+        // extracted name to MAX_NAME_LENGTH into the String field.
+        (*cl).name = strncpyz_string(CStr::from_ptr(name).to_bytes(), MAX_NAME_LENGTH);
 
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
@@ -260,13 +262,13 @@ pub fn SV_ClientEnterWorld(
             common,
             &format!(
                 "Going from CS_PRIMED to CS_ACTIVE for {}\n",
-                CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                (*client).name
             ),
         );
         (*client).state = clientState_t::CS_ACTIVE;
 
         // set up the entity for the client
-        let client_num = ((client as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_num = ((client as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         let ent = crate::sv_game::SV_GentityNum(sv, client_num);
         (*ent).s.number = client_num;
@@ -294,15 +296,15 @@ pub fn SV_ClientEnterWorld(
 /// Source: `oracle/codemp/server/sv_client.cpp:1015-1020`
 pub fn SV_StopDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t) {
     unsafe {
-        if *(*cl).downloadName.as_ptr() != 0 {
-            let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        if !(&(*cl).downloadName).is_empty() {
+            let client_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
                 / core::mem::size_of::<client_t>() as isize) as c_int;
             mp_engine_qcommon::common::common::com_printf(
                 common,
                 &format!(
                     "clientDownload: {} : file \"{}\" aborted\n",
                     client_num,
-                    CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                    (*cl).downloadName
                 ),
             );
         }
@@ -317,7 +319,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
     unsafe {
         let block = atoi(mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1));
 
-        let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
 
         if block == (*cl).downloadClientBlock {
@@ -339,7 +341,7 @@ pub fn SV_NextDownload_f(common: &mut Common, sv: &mut Server, cl: *mut client_t
                     &format!(
                         "clientDownload: {} : file \"{}\" completed\n",
                         client_num,
-                        CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                        (*cl).downloadName
                     ),
                 );
                 crate::SV_CloseDownload(common, cl);
@@ -367,12 +369,9 @@ pub fn SV_BeginDownload_f(common: &mut Common, cl: *mut client_t) {
     // cl->downloadName is non-zero now, SV_WriteDownloadToClient will see this and open
     // the file itself
     unsafe {
-        let name_len = (*cl).downloadName.len();
-        Q_strncpyz(
-            &mut (*cl).downloadName,
-            mp_engine_qcommon::cmd_common::Cmd_Argv(common, 1),
-            name_len,
-        );
+        // Raven `Q_strncpyz(cl->downloadName, Cmd_Argv(1), sizeof(cl->downloadName))`
+        // — byte-truncate to MAX_QPATH into the String field.
+        (*cl).downloadName = strncpyz_string(Cmd_Argv(common, 1).as_bytes(), MAX_QPATH);
     }
 }
 
@@ -405,7 +404,7 @@ pub fn SV_UpdateUserinfo_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut 
 
         SV_UserinfoChanged(view, cl);
         // call prog code to allow overrides
-        let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         // Real `&mut Server` in scope — reach the game VM directly (`sv.gvm`)
         // rather than through the sv-touching `vm_call` view method (rule 7).
@@ -484,7 +483,7 @@ pub fn SV_ExecuteClientCommand(
         // pass unknown strings to the game
         if !matched && sv.sv.state == serverState_t::SS_GAME {
             let client_num = unsafe {
-                ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+                ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
                     / core::mem::size_of::<client_t>() as isize) as c_int
             };
             // Real `&mut Server` in scope — reach the game VM directly (rule 7).
@@ -518,7 +517,7 @@ pub fn SV_ClientThink(
             return;
         }
 
-        let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         mp_engine_qcommon::vm::VM_Call(
             common,
@@ -687,7 +686,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
         {
             let mut i: c_int = 0;
             while i < max_clients {
-                let cl = sv.svs.clients.offset(i as isize);
+                let cl = &mut sv.svs.clients[i as usize] as *mut client_t;
                 if mp_engine_qcommon::net_chan::NET_CompareBaseAdr(
                     view.common,
                     from,
@@ -824,7 +823,9 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             );
         }
 
-        let newcl: client_t = core::mem::zeroed();
+        // Raven's zero-initialized `client_t temp` template — `client_t::default()`
+        // now that the struct owns Strings (`mem::zeroed` would forge invalid ones).
+        let newcl: client_t = client_t::default();
         let mut reconnect = false;
         let cl_ptr: *mut client_t;
 
@@ -833,7 +834,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             let mut i: c_int = 0;
             let mut found = false;
             while i < max_clients {
-                let cl = sv.svs.clients.offset(i as isize);
+                let cl = &mut sv.svs.clients[i as usize] as *mut client_t;
                 if (*cl).state == clientState_t::CS_FREE {
                     i += 1;
                     continue;
@@ -859,7 +860,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                     // VVFIXME - both SOF2 and Wolf remove this call, claiming it blows away the user's info
                     // disconnect the client from the game first so any flags the
                     // player might have are dropped
-                    let cl_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+                    let cl_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
                         / core::mem::size_of::<client_t>() as isize)
                         as c_int;
                     // Real `&mut Server` in scope — reach the game VM directly (rule 7).
@@ -900,7 +901,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 {
                     let mut j = start_index;
                     while j < max_clients {
-                        let cl = sv.svs.clients.offset(j as isize);
+                        let cl = &mut sv.svs.clients[j as usize] as *mut client_t;
                         if (*cl).state == clientState_t::CS_FREE {
                             new_slot = cl;
                             break;
@@ -914,7 +915,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         let mut count = 0;
                         let mut j = start_index;
                         while j < max_clients {
-                            let cl = sv.svs.clients.offset(j as isize);
+                            let cl = &sv.svs.clients[j as usize] as *const client_t;
                             if (*cl).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
                                 count += 1;
                             }
@@ -922,9 +923,9 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                         }
                         // if they're all bots
                         if count >= max_clients - start_index {
-                            let last = sv.svs.clients.offset((max_clients - 1) as isize);
+                            let last = &mut sv.svs.clients[(max_clients - 1) as usize] as *mut client_t;
                             crate::SV_DropClient(view.common, sv, last, "only bots on server");
-                            new_slot = sv.svs.clients.offset((max_clients - 1) as isize);
+                            new_slot = &mut sv.svs.clients[(max_clients - 1) as usize] as *mut client_t;
                         } else {
                             mp_engine_qcommon::common::com_error(
                                 errorParm_t::ERR_FATAL,
@@ -960,7 +961,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
         // accept the new client
         // this is the only place a client_t is ever initialized
         *cl_ptr = newcl;
-        let client_num = ((cl_ptr as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_num = ((cl_ptr as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         // The slot may have last held a replay replica; it belongs to this
         // client now.
@@ -1037,7 +1038,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             view.common,
             &format!(
                 "Going from CS_FREE to CS_CONNECTED for {}\n",
-                CStr::from_ptr((*cl_ptr).name.as_ptr()).to_string_lossy()
+                (*cl_ptr).name
             ),
         );
 
@@ -1064,9 +1065,7 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
         let mut count = 0;
         let mut i: c_int = 0;
         while i < max_clients {
-            if (*sv.svs.clients.offset(i as isize)).state as c_int
-                >= clientState_t::CS_CONNECTED as c_int
-            {
+            if sv.svs.clients[i as usize].state as c_int >= clientState_t::CS_CONNECTED as c_int {
                 count += 1;
             }
             i += 1;
@@ -1088,7 +1087,7 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
         // A replay replica has no socket; the transmit primitive is skipped for
         // it (the trailing SV_SendMessageToClient is gated the same way), while
         // the CS_PRIMED state transition below still runs the human path.
-        let slot = ((client as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+        let slot = ((client as *const u8).offset_from(sv.svs.clients.as_ptr() as *const u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         let replica = crate::sv_referee::ref_is_replica(sv, slot);
 
@@ -1104,7 +1103,7 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
                 view.common,
                 &format!(
                     "[ISM]SV_SendClientGameState() [2] for {}, writing out old fragments\n",
-                    CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                    (*client).name
                 ),
             );
             mp_engine_qcommon::net_chan::Netchan_TransmitNextFragment(view, &mut (*client).netchan);
@@ -1114,14 +1113,14 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
             view.common,
             &format!(
                 "SV_SendClientGameState() for {}\n",
-                CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                (*client).name
             ),
         );
         mp_engine_qcommon::common::common::com_printf(
             view.common,
             &format!(
                 "Going from CS_CONNECTED to CS_PRIMED for {}\n",
-                CStr::from_ptr((*client).name.as_ptr()).to_string_lossy()
+                (*client).name
             ),
         );
         (*client).state = clientState_t::CS_PRIMED;
@@ -1198,7 +1197,7 @@ pub fn SV_SendClientGameState(view: &mut EngineHostView, sv: &mut Server, client
             mp_engine_qcommon::qcommon::svc_ops_e::svc_ops_e::svc_EOF as c_int,
         );
 
-        let client_num = ((client as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_num = ((client as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
         mp_engine_qcommon::msg::MSG_WriteLong(view.common, &mut msg, client_num);
 
@@ -1461,7 +1460,7 @@ pub fn SV_DoneDownload_f(view: &mut EngineHostView, sv: &mut Server, cl: *mut cl
             view.common,
             &format!(
                 "clientDownload: {} Done\n",
-                CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                (*cl).name
             ),
         );
     }
@@ -1495,7 +1494,7 @@ pub fn SV_ClientCommand(
             view.common,
             &format!(
                 "clientCommand: {} : {seq} : {s}\n",
-                CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy(),
+                (*cl).name,
             ),
         );
 
@@ -1505,7 +1504,7 @@ pub fn SV_ClientCommand(
                 view.common,
                 &format!(
                     "Client {} lost {} clientCommands\n",
-                    CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy(),
+                    (*cl).name,
                     seq - (*cl).lastClientCommand + 1
                 ),
             );
@@ -1531,7 +1530,7 @@ pub fn SV_ClientCommand(
                 view.common,
                 &format!(
                     "client text ignored for {}\n",
-                    CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                    (*cl).name
                 ),
             );
         }
@@ -1702,7 +1701,7 @@ pub fn SV_ExecuteClientMessage(
         // notice and send it a new game state
         //
         // _XBOX is not defined — the non-XBOX arm (download-aware) is live.
-        if server_id != sv.sv.serverId && *(*cl).downloadName.as_ptr() == 0 {
+        if server_id != sv.sv.serverId && (&(*cl).downloadName).is_empty() {
             if server_id == sv.sv.restartedServerId {
                 // they just haven't caught the map_restart yet
                 return;
@@ -1714,7 +1713,7 @@ pub fn SV_ExecuteClientMessage(
                     view.common,
                     &format!(
                         "{} : dropped gamestate, resending\n",
-                        CStr::from_ptr((*cl).name.as_ptr()).to_string_lossy()
+                        (*cl).name
                     ),
                 );
                 SV_SendClientGameState(view, sv, cl);
@@ -1746,7 +1745,7 @@ pub fn SV_ExecuteClientMessage(
         } else if c == mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_moveNoDelta as c_int {
             SV_UserMove(view.common, sv, cl, msg, qfalse);
         } else if c != mp_engine_qcommon::qcommon::clc_ops_e::clc_ops_e::clc_EOF as c_int {
-            let client_num = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+            let client_num = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
                 / core::mem::size_of::<client_t>() as isize) as c_int;
             mp_engine_qcommon::common::common::com_printf(
                 view.common,
@@ -1763,7 +1762,7 @@ pub fn SV_ExecuteClientMessage(
 /// Source: `oracle/codemp/server/sv_client.cpp:580-666`
 pub fn SV_DropClient(common: &mut Common, sv: &mut Server, drop: *mut client_t, reason: &str) {
     unsafe {
-        let drop_index = (drop as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let drop_index = (drop as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize;
 
         if (*drop).state == clientState_t::CS_ZOMBIE {
@@ -1793,7 +1792,7 @@ pub fn SV_DropClient(common: &mut Common, sv: &mut Server, drop: *mut client_t, 
         crate::SV_CloseDownload(common, drop);
 
         // tell everyone why they got dropped
-        let name = core::ffi::CStr::from_ptr((*drop).name.as_ptr()).to_string_lossy();
+        let name = (*drop).name.clone();
         crate::SV_SendServerCommand(
             common,
             sv,
@@ -1836,7 +1835,7 @@ pub fn SV_DropClient(common: &mut Common, sv: &mut Server, drop: *mut client_t, 
         // to the master so it is known the server is empty
         let mut i = 0;
         while i < common.cvar(common.sv_maxclients).integer {
-            if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
+            if sv.svs.clients[i as usize].state >= clientState_t::CS_CONNECTED {
                 break;
             }
             i += 1;
@@ -1857,7 +1856,7 @@ pub fn SV_CloseDownload(common: &mut Common, cl: *mut client_t) {
             mp_engine_qcommon::files_common::FS_FCloseFile(common, (*cl).download);
         }
         (*cl).download = 0;
-        (*cl).downloadName[0] = 0;
+        (*cl).downloadName.clear();
 
         // Free the temporary buffer space
         for i in 0..MAX_DOWNLOAD_WINDOW {
@@ -1881,19 +1880,17 @@ pub fn SV_WriteDownloadToClient(
     msg: *mut msg_t,
 ) {
     unsafe {
-        if (*cl).downloadName[0] == 0 {
+        if (&(*cl).downloadName).is_empty() {
             return; // Nothing being downloaded
         }
 
-        let client_index = ((cl as *mut u8).offset_from(sv.svs.clients as *mut u8) as isize
+        let client_index = ((cl as *mut u8).offset_from(sv.svs.clients.as_mut_ptr() as *mut u8) as isize
             / core::mem::size_of::<client_t>() as isize) as c_int;
 
         if (*cl).download == 0 {
             // We open the file here
             // (still-C client_t.downloadName: one conversion for the block)
-            let download_name = core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
-                .to_string_lossy()
-                .into_owned();
+            let download_name = (*cl).downloadName.clone();
             mp_engine_qcommon::common::common::com_printf(
                 view.common,
                 &format!("clientDownload: {client_index} : begining \"{download_name}\"\n"),
@@ -1926,8 +1923,7 @@ pub fn SV_WriteDownloadToClient(
                         &format!(
                             "clientDownload: {} : \"{}\" cannot download id pk3 files\n",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
-                                .to_string_lossy()
+                            (*cl).downloadName
                         ),
                     );
                     if missionPack {
@@ -1936,7 +1932,7 @@ pub fn SV_WriteDownloadToClient(
                             errorMessage.len() as c_int,
                             &format!(
                                 "Cannot autodownload Team Arena file \"{}\"\nThe Team Arena mission pack can be found in your local game store.",
-                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                                (*cl).downloadName
                             ),
                         );
                     } else {
@@ -1945,8 +1941,7 @@ pub fn SV_WriteDownloadToClient(
                             errorMessage.len() as c_int,
                             &format!(
                                 "Cannot autodownload id pk3 file \"{}\"",
-                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
-                                    .to_string_lossy()
+                                (*cl).downloadName
                             ),
                         );
                     }
@@ -1956,8 +1951,7 @@ pub fn SV_WriteDownloadToClient(
                         &format!(
                             "clientDownload: {} : \"{}\" download disabled",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
-                                .to_string_lossy()
+                            (*cl).downloadName
                         ),
                     );
                     if view.common.cvar(view.common.sv_pure).integer != 0 {
@@ -1966,7 +1960,7 @@ pub fn SV_WriteDownloadToClient(
                             errorMessage.len() as c_int,
                             &format!(
                                 "Could not download \"{}\" because autodownloading is disabled on the server.\n\nYou will need to get this file elsewhere before you can connect to this pure server.\n",
-                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                                (*cl).downloadName
                             ),
                         );
                     } else {
@@ -1975,7 +1969,7 @@ pub fn SV_WriteDownloadToClient(
                             errorMessage.len() as c_int,
                             &format!(
                                 "Could not download \"{}\" because autodownloading is disabled on the server.\n\nSet autodownload to No in your settings and you might be able to connect if you do have the file.\n",
-                                core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr()).to_string_lossy()
+                                (*cl).downloadName
                             ),
                         );
                     }
@@ -1985,8 +1979,7 @@ pub fn SV_WriteDownloadToClient(
                         &format!(
                             "clientDownload: {} : \"{}\" file not found on server\n",
                             client_index,
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
-                                .to_string_lossy()
+                            (*cl).downloadName
                         ),
                     );
                     Com_sprintf(
@@ -1994,8 +1987,7 @@ pub fn SV_WriteDownloadToClient(
                         errorMessage.len() as c_int,
                         &format!(
                             "File \"{}\" not found on server for autodownloading.\n",
-                            core::ffi::CStr::from_ptr((*cl).downloadName.as_ptr())
-                                .to_string_lossy()
+                            (*cl).downloadName
                         ),
                     );
                 }
@@ -2008,7 +2000,7 @@ pub fn SV_WriteDownloadToClient(
                 mp_engine_qcommon::msg::MSG_WriteLong(view.common, msg, -1); // illegal file size
                 mp_engine_qcommon::msg::MSG_WriteString(view.common, msg, errorMessage.as_ptr());
 
-                (*cl).downloadName[0] = 0;
+                (*cl).downloadName.clear();
                 return;
             }
 

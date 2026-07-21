@@ -71,16 +71,17 @@ pub fn SV_GetPlayerByFedName(common: &mut Common, sv: &mut Server, name: &str) -
     }
 
     // check for a name match
-    let n = sv.svs.clients;
+    let n = sv.svs.clients.as_mut_ptr();
     for i in 0..common.cvar(common.sv_maxclients).integer {
         let cl = unsafe { n.offset(i as isize) };
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
-        // still-C client_t name field: byte-exact compares at the site.
+        // client_t.name is a String now; byte-exact compares at the site (Q_CleanStr
+        // works on the local C-copy).
         unsafe {
             if Q_stricmpBytes(
-                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                (*cl).name.as_bytes(),
                 name.as_bytes(),
             ) == 0
             {
@@ -91,7 +92,7 @@ pub fn SV_GetPlayerByFedName(common: &mut Common, sv: &mut Server, name: &str) -
             let clean_len = cleanName.len();
             Q_strncpyzBytes(
                 &mut cleanName,
-                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                (*cl).name.as_bytes(),
                 clean_len,
             );
             Q_CleanStr(cleanName.as_mut_ptr());
@@ -142,16 +143,17 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
     let s = Cmd_Argv(common, 1).to_owned();
 
     // check for a name match
-    let n = sv.svs.clients;
+    let n = sv.svs.clients.as_mut_ptr();
     for i in 0..common.cvar(common.sv_maxclients).integer {
         let cl = unsafe { n.offset(i as isize) };
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
-        // still-C client_t name field: byte-exact compares at the site.
+        // client_t.name is a String now; byte-exact compares at the site (Q_CleanStr
+        // works on the local C-copy).
         unsafe {
             if Q_stricmpBytes(
-                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                (*cl).name.as_bytes(),
                 s.as_bytes(),
             ) == 0
             {
@@ -162,7 +164,7 @@ pub fn SV_GetPlayerByName(common: &mut Common, sv: &mut Server) -> *mut client_t
             let clean_len = cleanName.len();
             Q_strncpyzBytes(
                 &mut cleanName,
-                core::ffi::CStr::from_ptr((*cl).name.as_ptr()).to_bytes(),
+                (*cl).name.as_bytes(),
                 clean_len,
             );
             Q_CleanStr(cleanName.as_mut_ptr());
@@ -209,7 +211,7 @@ pub fn SV_GetPlayerByNum(common: &mut Common, sv: &mut Server) -> *mut client_t 
         return core::ptr::null_mut();
     }
 
-    let cl = unsafe { sv.svs.clients.offset(idnum as isize) };
+    let cl = &mut sv.svs.clients[idnum as usize] as *mut client_t;
     if unsafe { (*cl).state as i32 } == 0 {
         com_printf(common, &format!("Client {} is not active\n", idnum));
         return core::ptr::null_mut();
@@ -229,7 +231,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: &str) {
     let cl = SV_GetPlayerByFedName(common, sv, name);
     if cl.is_null() {
         if Q_stricmp(name, "all") == 0 {
-            let n = sv.svs.clients;
+            let n = sv.svs.clients.as_mut_ptr();
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
@@ -245,7 +247,7 @@ pub fn SV_KickByName(common: &mut Common, sv: &mut Server, name: &str) {
                 } // in case there is a funny zombie
             }
         } else if Q_stricmp(name, "allbots") == 0 {
-            let n = sv.svs.clients;
+            let n = sv.svs.clients.as_mut_ptr();
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
@@ -315,7 +317,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
         "--- ----- ---- --------------- ------- --------------------- ----- -----\n",
     );
     for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-        let cl = unsafe { sv.svs.clients.offset(i as isize) };
+        let cl = &sv.svs.clients[i as usize] as *const client_t;
         if unsafe { (*cl).state as i32 } == 0 {
             continue;
         }
@@ -340,7 +342,7 @@ pub fn SV_Status_f(view: &mut EngineHostView, sv: &mut Server) {
                 .into_owned()
         };
 
-        let name = unsafe { core::ffi::CStr::from_ptr((*cl).name.as_ptr()) }.to_string_lossy();
+        let name = unsafe { (*cl).name.clone() };
         if avoidTruncation == qfalse {
             com_printf(
                 view.common,
@@ -540,7 +542,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
     let cl = SV_GetPlayerByName(common, sv);
     if cl.is_null() {
         if Q_stricmp(Cmd_Argv(common, 1), "all") == 0 {
-            let n = sv.svs.clients;
+            let n = sv.svs.clients.as_mut_ptr();
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
@@ -556,7 +558,7 @@ pub fn SV_Kick_f(common: &mut Common, sv: &mut Server) {
                 } // in case there is a funny zombie
             }
         } else if Q_stricmp(Cmd_Argv(common, 1), "allbots") == 0 {
-            let n = sv.svs.clients;
+            let n = sv.svs.clients.as_mut_ptr();
             for i in 0..common.cvar(common.sv_maxclients).integer {
                 let cl = unsafe { n.offset(i as isize) };
                 if unsafe { (*cl).state as i32 } == 0 {
@@ -854,7 +856,7 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
 
     // connect and begin all the clients
     for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-        let client = unsafe { sv.svs.clients.offset(i as isize) };
+        let client = &mut sv.svs.clients[i as usize] as *mut client_t;
 
         // send the new gamestate to all connected clients
         if unsafe { (*client).state as i32 } < clientState_t::CS_CONNECTED as i32 {

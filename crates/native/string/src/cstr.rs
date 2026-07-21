@@ -16,6 +16,20 @@ pub fn cstr(s: &str) -> CString {
     CString::new(s).unwrap()
 }
 
+/// Byte-truncating `Q_strncpyz` into an owned `String` — the migrated-field
+/// twin of [`crate::q_strncpyz::Q_strncpyz`] for struct fields that became
+/// `String`. Takes `src` up to its first NUL, keeps at most `destsize - 1`
+/// bytes (Raven's `sizeof(dest)` bound), and lossy-decodes. A zero `destsize`
+/// yields the empty string (Raven's `destsize < 1` is a `Com_Error`).
+pub fn strncpyz_string(src: &[u8], destsize: usize) -> String {
+    if destsize == 0 {
+        return String::new();
+    }
+    let end = src.iter().position(|&b| b == 0).unwrap_or(src.len());
+    let n = end.min(destsize - 1);
+    String::from_utf8_lossy(&src[..n]).into_owned()
+}
+
 #[cfg(test)]
 mod cstr_tests {
     use super::{buf_to_string, cstr};

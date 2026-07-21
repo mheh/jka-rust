@@ -6,6 +6,7 @@
 //! Source: `oracle/codemp/server/sv_init.cpp`
 
 use core::ffi::{c_char, c_int, CStr};
+use core::ptr::addr_of_mut;
 
 use mp_qshared::common::mp::game::g_public::SVF_NOSERVERINFO;
 use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
@@ -13,7 +14,8 @@ use mp_qshared::common::mp::qcommon::tags::memtag_t;
 use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
-use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_STRING_CHARS};
+use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_NAME_LENGTH, MAX_STRING_CHARS};
+use native_string::cstr::strncpyz_string;
 use mp_qshared::shared::qboolean;
 
 use mp_engine_ghoul2::api_collision::g2api_set_time;
@@ -22,6 +24,7 @@ use mp_engine_qcommon::common::common::{com_printf, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_host_interface::engine_host::EngineHost;
 
+use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
 use crate::sv_bot::{SV_BotFrame, SV_BotInitBotLib, SV_BotInitCvars};
@@ -51,8 +54,7 @@ use mp_engine_qcommon::files_pc::{
 };
 use mp_engine_qcommon::vm_fns::VM_ExplicitArgPtr;
 use mp_engine_qcommon::z_memman_pc::{
-    CopyString, Hunk_AllocateTempMemory, Hunk_Clear, Hunk_FreeTempMemory, Hunk_SetMark, Z_Free,
-    Z_Malloc,
+    CopyString, Hunk_Clear, Hunk_SetMark, Z_Free, Z_Malloc,
 };
 use mp_qshared::shared::fileHandle_t;
 use mp_qshared::shared::q_string::{Info_ValueForKey, Q_stricmp, Q_strncpyz};
@@ -136,7 +138,7 @@ pub fn SV_SetConfigstring(
         // send the data to all relevant clients
         unsafe {
             for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-                let client = sv.svs.clients.offset(i as isize);
+                let client = &mut sv.svs.clients[i as usize] as *mut client_t;
                 if (*client).state < clientState_t::CS_PRIMED {
                     continue;
                 }
@@ -237,7 +239,7 @@ pub fn SV_GetUserinfo(
         panic!("SV_GetUserinfo: bad index {}\n", index);
     }
     unsafe {
-        let client = sv.svs.clients.offset(index as isize);
+        let client = &sv.svs.clients[index as usize] as *const client_t;
         Q_strncpyz(buffer, (*client).userinfo.as_ptr(), bufferSize);
     }
 }
@@ -258,17 +260,16 @@ pub fn SV_SetUserinfo(common: &mut Common, sv: &mut Server, index: c_int, mut va
             val = c"".as_ptr();
         }
 
-        let client = sv.svs.clients.offset(index as isize);
+        let client = &mut sv.svs.clients[index as usize] as *mut client_t;
         Q_strncpyz(
             (*client).userinfo.as_mut_ptr(),
             val,
             (*client).userinfo.len() as c_int,
         );
-        Q_strncpyz(
-            (*client).name.as_mut_ptr(),
-            Info_ValueForKey(val as *mut c_char, c"name".as_ptr() as *mut c_char),
-            (*client).name.len() as c_int,
-        );
+        // Raven `Q_strncpyz(cl->name, Info_ValueForKey(val,"name"), sizeof(cl->name))`
+        // — extract the name and byte-truncate to MAX_NAME_LENGTH into the String.
+        let name_src = Info_ValueForKey(val as *mut c_char, c"name".as_ptr() as *mut c_char);
+        (*client).name = strncpyz_string(CStr::from_ptr(name_src).to_bytes(), MAX_NAME_LENGTH);
     }
 }
 
@@ -381,14 +382,10 @@ pub fn SV_Startup(view: &mut EngineHostView, sv: &mut Server) {
     }
     SV_BoundMaxClients(view, sv, 1);
 
-    sv.svs.clients = Z_Malloc(
-        view,
-        (core::mem::size_of::<crate::server::client_s::client_t>()
-            * view.common.cvar(view.common.sv_maxclients).integer as usize) as c_int,
-        memtag_t::TAG_CLIENTS,
-        qboolean::from(1),
-        0,
-    ) as *mut _;
+    // Raven `Z_Malloc(sizeof(client_t)*maxclients, TAG_CLIENTS, zeroit)` — the
+    // owned `Vec<client_t>` filled with zero-equivalent Defaults.
+    let maxclients = view.common.cvar(view.common.sv_maxclients).integer as usize;
+    sv.svs.clients = (0..maxclients).map(|_| client_t::default()).collect();
     if view.common.cvar(view.common.com_dedicated).integer != 0 {
         sv.svs.numSnapshotEntities = view.common.cvar(view.common.sv_maxclients).integer
             * mp_engine_qcommon::qcommon::net_limits::PACKET_BACKUP as c_int
@@ -410,13 +407,9 @@ pub fn SV_Startup(view: &mut EngineHostView, sv: &mut Server) {
 pub fn SV_ChangeMaxClients(view: &mut EngineHostView, sv: &mut Server) {
     // get the highest client number in use
     let mut count: c_int = 0;
-    unsafe {
-        for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-            if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED
-                && i > count
-            {
-                count = i;
-            }
+    for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
+        if sv.svs.clients[i as usize].state >= clientState_t::CS_CONNECTED && i > count {
+            count = i;
         }
     }
     count += 1;
@@ -429,64 +422,22 @@ pub fn SV_ChangeMaxClients(view: &mut EngineHostView, sv: &mut Server) {
         return;
     }
 
-    let oldClients = Hunk_AllocateTempMemory(
-        view,
-        ((count as usize) * core::mem::size_of::<crate::server::client_s::client_t>()) as c_int,
-    ) as *mut crate::server::client_s::client_t;
-    unsafe {
-        // copy the clients to hunk memory
-        for i in 0..count {
-            if (*sv.svs.clients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
-                // `*oldClients[i] = clients[i]` — the raw `client_t` struct copy
-                // (POD, no `Drop`); Raven's plain struct assignment.
-                core::ptr::copy_nonoverlapping(
-                    sv.svs.clients.offset(i as isize),
-                    oldClients.offset(i as isize),
-                    1,
-                );
-            } else {
-                Com_Memset(
-                    oldClients.offset(i as isize) as *mut (),
-                    0,
-                    core::mem::size_of::<crate::server::client_s::client_t>(),
-                );
-            }
-        }
-
-        // free old clients arrays
-        Z_Free(view.common, sv.svs.clients as *mut _);
-
-        // allocate new clients
-        sv.svs.clients = Z_Malloc(
-            view,
-            ((view.common.cvar(view.common.sv_maxclients).integer as usize)
-                * core::mem::size_of::<crate::server::client_s::client_t>()) as c_int,
-            memtag_t::TAG_CLIENTS,
-            qboolean::from(1),
-            0,
-        ) as *mut _;
-        Com_Memset(
-            sv.svs.clients as *mut (),
-            0,
-            (view.common.cvar(view.common.sv_maxclients).integer as usize)
-                * core::mem::size_of::<crate::server::client_s::client_t>(),
-        );
-
-        // copy the clients over
-        for i in 0..count {
-            if (*oldClients.offset(i as isize)).state >= clientState_t::CS_CONNECTED {
-                // `clients[i] = oldClients[i]` — raw `client_t` struct copy.
-                core::ptr::copy_nonoverlapping(
-                    oldClients.offset(i as isize),
-                    sv.svs.clients.offset(i as isize),
-                    1,
-                );
-            }
+    // Raven copies the connected clients (Hunk temp round-trip) into a freshly
+    // zeroed `Z_Malloc` block of the new size. Rust shape: build the new
+    // `Vec<client_t>` of Defaults, MOVE each old connected slot across
+    // (`mem::take` transfers the owned Strings, no clone), then let the old Vec
+    // drop (disconnected slots' Strings free with it). `count <= oldMaxClients`
+    // and `count <= newMaxClients`, so every moved index is in bounds.
+    let new_max = view.common.cvar(view.common.sv_maxclients).integer as usize;
+    let mut new_clients: Vec<client_t> = (0..new_max).map(|_| client_t::default()).collect();
+    let mut old_clients = core::mem::take(&mut sv.svs.clients);
+    for i in 0..count as usize {
+        if old_clients[i].state >= clientState_t::CS_CONNECTED {
+            new_clients[i] = core::mem::take(&mut old_clients[i]);
         }
     }
-
-    // free the old clients on the hunk
-    Hunk_FreeTempMemory(view.common, oldClients as *mut _);
+    sv.svs.clients = new_clients;
+    drop(old_clients);
 
     // allocate new snapshot entities
     if view.common.cvar(view.common.com_dedicated).integer != 0 {
@@ -503,10 +454,10 @@ pub fn SV_ChangeMaxClients(view: &mut EngineHostView, sv: &mut Server) {
 ///
 /// Source: `oracle/codemp/server/sv_init.cpp:414-431`
 pub fn SV_SendMapChange(view: &mut EngineHostView, sv: &mut Server) {
-    if !sv.svs.clients.is_null() {
+    if !sv.svs.clients.is_empty() {
         unsafe {
             for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
-                let client = sv.svs.clients.offset(i as isize);
+                let client = &mut sv.svs.clients[i as usize] as *mut client_t;
                 if (*client).state >= clientState_t::CS_CONNECTED
                     && (*client).netchan.remoteAddress.r#type != netadrtype_t::NA_BOT
                 {
@@ -725,7 +676,7 @@ pub fn SV_SpawnServer(
     unsafe {
         for i in 0..view.common.cvar(view.common.sv_maxclients).integer {
             // send the new gamestate to all connected clients
-            let client = sv.svs.clients.offset(i as isize);
+            let client = &mut sv.svs.clients[i as usize] as *mut client_t;
             if (*client).state >= clientState_t::CS_CONNECTED {
                 if (*client).netchan.remoteAddress.r#type == netadrtype_t::NA_BOT {
                     if killBots != 0 {
@@ -1195,7 +1146,7 @@ pub fn SV_FinalMessage(view: &mut EngineHostView, sv: &mut Server, message: &str
     for _j in 0..2 {
         let maxclients = view.common.cvar(view.common.sv_maxclients).integer;
         for i in 0..maxclients {
-            let cl = unsafe { sv.svs.clients.offset(i as isize) };
+            let cl = &mut sv.svs.clients[i as usize] as *mut client_t;
             if unsafe { (*cl).state } >= clientState_t::CS_CONNECTED {
                 // don't send a disconnect to a local client
                 if unsafe { (*cl).netchan.remoteAddress.r#type } != netadrtype_t::NA_LOOPBACK {
@@ -1230,7 +1181,7 @@ pub fn SV_Shutdown(view: &mut EngineHostView, finalmsg: &str) {
     // RECORD tap: seal the tape with its `E` end record before teardown.
     crate::sv_referee::ref_tap_shutdown(sv);
 
-    if !sv.svs.clients.is_null() && !view.common.error.entered {
+    if !sv.svs.clients.is_empty() && !view.common.error.entered {
         SV_FinalMessage(view, sv, finalmsg);
     }
 
@@ -1251,12 +1202,17 @@ pub fn SV_Shutdown(view: &mut EngineHostView, finalmsg: &str) {
     // prevents crashing cmShaderTable on exit.
     CM_ClearMap(view.cm, &mut view.rmg);
 
-    // free server static data
-    if !sv.svs.clients.is_null() {
-        Z_Free(view.common, sv.svs.clients as *mut _);
-    }
+    // free server static data. Raven Z_Frees svs.clients then Com_Memsets all
+    // of serverStatic_t. The clients Vec owns its heap, so drop it here (the
+    // Z_Free — `mem::take` leaves an empty Vec), then zero the POD remainder.
+    // The memset also zeros the (empty) Vec header, so a fresh empty Vec is
+    // `ptr::write`n back over those bytes without dropping the invalid zeros.
+    drop(core::mem::take(&mut sv.svs.clients));
     let svs_size = core::mem::size_of_val(&sv.svs);
     Com_Memset(&mut sv.svs as *mut _ as *mut (), 0, svs_size);
+    unsafe {
+        core::ptr::write(addr_of_mut!(sv.svs.clients), Vec::new());
+    }
 
     Cvar_Set(view, "sv_running", "0");
     Cvar_Set(view, "ui_singlePlayerActive", "0");

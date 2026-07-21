@@ -32,6 +32,7 @@ use native_math::vector::vec3_t;
 use native_platform::Sys_CheckCD;
 use native_types::clipHandle_t;
 
+use crate::server::client_s::client_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
 use crate::server_host::sv_game_system_call;
@@ -377,7 +378,7 @@ pub fn SV_GameSendServerCommand(
         if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
             return;
         }
-        let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
+        let client = &mut sv.svs.clients[clientNum as usize] as *mut client_t;
         SV_SendServerCommand(common, sv, client, &msg);
     }
 }
@@ -389,7 +390,7 @@ pub fn SV_GameDropClient(common: &mut Common, sv: &mut Server, clientNum: c_int,
     if clientNum < 0 || clientNum >= common.cvar(common.sv_maxclients).integer {
         return;
     }
-    let client = unsafe { sv.svs.clients.offset(clientNum as isize) };
+    let client = &mut sv.svs.clients[clientNum as usize] as *mut client_t;
     SV_DropClient(common, sv, client, reason);
 }
 
@@ -472,7 +473,7 @@ pub fn SV_GetUsercmd(common: &mut Common, sv: &mut Server, clientNum: c_int, cmd
         // Com_Error(ERR_DROP, ...) — unported in this crate; see SV_GameError.
     }
     unsafe {
-        *cmd = (*sv.svs.clients.offset(clientNum as isize)).lastUsercmd;
+        *cmd = sv.svs.clients[clientNum as usize].lastUsercmd;
     }
 }
 
@@ -492,9 +493,7 @@ pub fn SV_InitGameVM(view: &mut EngineHostView, sv: &mut Server, restart: qboole
 
     let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
     for i in 0..max_clients {
-        unsafe {
-            (*sv.svs.clients.offset(i as isize)).gentity = core::ptr::null_mut();
-        }
+        sv.svs.clients[i as usize].gentity = core::ptr::null_mut();
     }
 }
 
@@ -1785,10 +1784,13 @@ pub fn SV_GameSystemCalls(
             let sv = &mut *(view.sv.as_raw() as *mut Server);
             // The clientNum trap word is ABI-typed `int`; a C module's variadic
             // slot leaves the high 32 bits garbage, so read only the low 32.
+            // Hoist the client pointer before the call — `sv` is also passed by
+            // &mut, so the Vec index must resolve to a raw pointer first.
+            let cl = &mut sv.svs.clients[*args.offset(1) as c_int as usize] as *mut client_t;
             crate::sv_client::SV_ClientThink(
                 view.common,
                 sv,
-                sv.svs.clients.offset(*args.offset(1) as c_int as isize),
+                cl,
                 vma(view.common, args, 2) as *mut usercmd_t,
             );
             return 0;

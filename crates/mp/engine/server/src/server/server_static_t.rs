@@ -21,8 +21,11 @@ pub const AUTHORIZE_TIMEOUT: i32 = 5000;
 
 /// Raven `serverStatic_t`.
 ///
+/// (§D12 internal-only shape: `serverStatic_t` never crosses the DLL seam, so
+/// `clients` is an owned `Vec<client_t>` and the old `#[repr(C)]` layout asserts
+/// are dropped — the array that C `Z_Malloc`'d now owns its heap.)
+///
 /// Type definition source: `oracle/codemp/qcommon/../server/server.h:208-228`
-#[repr(C)]
 pub struct serverStatic_t {
     /// sv_init has completed
     pub initialized: qboolean,
@@ -31,7 +34,7 @@ pub struct serverStatic_t {
     /// ^= SNAPFLAG_SERVERCOUNT every SV_SpawnServer()
     pub snapFlagServerBit: i32,
     /// [sv_maxclients->integer];
-    pub clients: *mut client_s,
+    pub clients: Vec<client_s>,
     /// sv_maxclients->integer*PACKET_BACKUP*MAX_PACKET_ENTITIES
     pub numSnapshotEntities: i32,
     /// next snapshotEntities to use
@@ -47,33 +50,3 @@ pub struct serverStatic_t {
     pub authorizeAddress: netadr_t,
 }
 
-const _: () = assert!(core::mem::offset_of!(serverStatic_t, initialized) == 0);
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<serverStatic_t>() == 41048);
-    assert!(core::mem::offset_of!(serverStatic_t, time) == 4);
-    assert!(core::mem::offset_of!(serverStatic_t, snapFlagServerBit) == 8);
-    assert!(core::mem::offset_of!(serverStatic_t, clients) == 16);
-    assert!(core::mem::offset_of!(serverStatic_t, numSnapshotEntities) == 24);
-    assert!(core::mem::offset_of!(serverStatic_t, nextSnapshotEntities) == 28);
-    assert!(core::mem::offset_of!(serverStatic_t, snapshotEntities) == 32);
-    assert!(core::mem::offset_of!(serverStatic_t, nextHeartbeatTime) == 40);
-    assert!(core::mem::offset_of!(serverStatic_t, challenges) == 44);
-    assert!(core::mem::offset_of!(serverStatic_t, redirectAddress) == 41004);
-    assert!(core::mem::offset_of!(serverStatic_t, authorizeAddress) == 41024);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<serverStatic_t>() == 41032);
-    assert!(core::mem::offset_of!(serverStatic_t, time) == 4);
-    assert!(core::mem::offset_of!(serverStatic_t, snapFlagServerBit) == 8);
-    assert!(core::mem::offset_of!(serverStatic_t, clients) == 12);
-    assert!(core::mem::offset_of!(serverStatic_t, numSnapshotEntities) == 16);
-    assert!(core::mem::offset_of!(serverStatic_t, nextSnapshotEntities) == 20);
-    assert!(core::mem::offset_of!(serverStatic_t, snapshotEntities) == 24);
-    assert!(core::mem::offset_of!(serverStatic_t, nextHeartbeatTime) == 28);
-    assert!(core::mem::offset_of!(serverStatic_t, challenges) == 32);
-    assert!(core::mem::offset_of!(serverStatic_t, redirectAddress) == 40992);
-    assert!(core::mem::offset_of!(serverStatic_t, authorizeAddress) == 41012);
-};

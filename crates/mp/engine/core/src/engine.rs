@@ -204,6 +204,10 @@ impl Engine {
             // installs them.
             addr_of_mut!((*p).common.hooks)
                 .write(mp_engine_qcommon::common::EngineHooks::null_dedicated());
+            // Server svs.clients: owned Vec<client_t> (was a Z_Malloc'd
+            // array) — not zero-valid — written empty here; SV_Startup fills it
+            // to sv_maxclients and SV_ChangeMaxClients/SV_Shutdown replace it.
+            addr_of_mut!((*p).sv.svs.clients).write(Vec::new());
             // Engine referee (sv_referee.rs) holds a Vec / Option<File> — not
             // zero-valid — so it is written in place through its Default
             // (RefMode::Off, empty buffers) before the Box is exposed.

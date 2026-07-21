@@ -295,7 +295,7 @@ unsafe fn usercmd_bytes(cmd: *const usercmd_t) -> Vec<u8> {
 
 /// The client index of `cl` within `svs.clients`.
 unsafe fn client_index(sv: &Server, cl: *const client_t) -> c_int {
-    ((cl as *const u8).offset_from(sv.svs.clients as *const u8) as isize
+    ((cl as *const u8).offset_from(sv.svs.clients.as_ptr() as *const u8) as isize
         / core::mem::size_of::<client_t>() as isize) as c_int
 }
 
@@ -343,11 +343,11 @@ pub fn ref_digest(sv: &Server, maxclients: c_int) -> StateDigest {
     }
 
     // Clients: playerState_t is the leading field of the game's gclient_s.
-    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_null() {
+    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_empty() {
         let base = sv.sv.gameClients as *const u8;
         let stride = sv.sv.gameClientSize as usize;
         for slot in 0..maxclients.max(0) as usize {
-            let cl = unsafe { &*sv.svs.clients.add(slot) };
+            let cl = &sv.svs.clients[slot];
             if (cl.state as c_int) >= (clientState_t::CS_CONNECTED as c_int) {
                 let p = unsafe { base.add(slot * stride) };
                 let ps = unsafe { core::slice::from_raw_parts(p, ps_size) };
@@ -381,11 +381,11 @@ pub fn ref_vstate(sv: &Server, maxclients: c_int) -> VState {
         }
     }
     let mut players = Vec::new();
-    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_null() {
+    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_empty() {
         let base = sv.sv.gameClients as *const u8;
         let stride = sv.sv.gameClientSize as usize;
         for slot in 0..maxclients.max(0) as usize {
-            let cl = unsafe { &*sv.svs.clients.add(slot) };
+            let cl = &sv.svs.clients[slot];
             if (cl.state as c_int) >= (clientState_t::CS_CONNECTED as c_int) {
                 let p = unsafe { base.add(slot * stride) };
                 let ps = unsafe { core::slice::from_raw_parts(p, ps_size) };
@@ -575,14 +575,14 @@ fn ref_resync(sv: &mut Server, tape: &VState, maxclients: c_int) {
             }
         }
     }
-    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_null() {
+    if !sv.sv.gameClients.is_null() && sv.sv.gameClientSize > 0 && !sv.svs.clients.is_empty() {
         let base = sv.sv.gameClients as *mut u8;
         let stride = sv.sv.gameClientSize as usize;
         for (slot, bytes) in &tape.players {
             if *slot < 0 || *slot >= maxclients {
                 continue;
             }
-            let cl = unsafe { &*sv.svs.clients.add(*slot as usize) };
+            let cl = &sv.svs.clients[*slot as usize];
             if (cl.state as c_int) < (clientState_t::CS_CONNECTED as c_int) {
                 continue;
             }
@@ -1211,7 +1211,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             if !ref_slot_injected(sv, view, client) {
                 return;
             }
-            let cl = unsafe { sv.svs.clients.add(client as usize) };
+            let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
             let mut ucmd: usercmd_t = unsafe { core::mem::zeroed() };
             let n = cmd.len().min(core::mem::size_of::<usercmd_t>());
             unsafe {
@@ -1231,7 +1231,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             if !ref_slot_injected(sv, view, client) {
                 return;
             }
-            let cl = unsafe { sv.svs.clients.add(client as usize) };
+            let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
             unsafe {
                 (*cl).lastPacketTime = sv.svs.time; // see Rec::Think
             }
@@ -1270,7 +1270,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
                 return;
             }
             sv.referee.injected_transition = true;
-            let cl = unsafe { sv.svs.clients.add(client as usize) };
+            let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
             let mut ucmd: usercmd_t = unsafe { core::mem::zeroed() };
             let n = cmd.len().min(core::mem::size_of::<usercmd_t>());
             unsafe {
@@ -1290,7 +1290,7 @@ fn ref_inject_one(view: &mut EngineHostView, sv: &mut Server, rec: Rec) {
             // `replica` stays set through the CS_ZOMBIE teardown so its final
             // frames remain I/O-suppressed; the next `C` on this slot resets it.
             sv.referee.injected_slots &= !(1u64 << (client as u32 & 63));
-            let cl = unsafe { sv.svs.clients.add(client as usize) };
+            let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
             crate::SV_DropClient(view.common, sv, cl, "replay drop");
         }
         Rec::Header { .. }
@@ -1325,7 +1325,7 @@ fn ref_inject_connect(view: &mut EngineHostView, sv: &mut Server, client: c_int,
     if !ref_client_in_range(view, client) {
         return;
     }
-    let cl = unsafe { sv.svs.clients.add(client as usize) };
+    let cl = &mut sv.svs.clients[client as usize] as *mut client_t;
     unsafe {
         // Mirror SV_DirectConnect exactly. It does NOT write ent->s.number
         // (digested memory — the slot keeps its stale value until the module
