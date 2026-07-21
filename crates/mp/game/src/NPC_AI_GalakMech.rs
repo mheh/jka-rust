@@ -84,35 +84,6 @@ const GENERATOR_HEALTH: c_int = 25; // Shield generator health threshold
                                     // Source: `oracle/codemp/game/w_saber.h:1`
 const ARMOR_EFFECT_TIME: c_int = 500;
 
-/// Inline helper from `oracle/codemp/game/bg_public.h:1524-1564`
-/// (same local-copy precedent as `NPC_AI_Mark2.rs`'s private helper of the
-/// same name — the call-surface table's "ported: NPC_AI_Mark2.rs" copy is
-/// `fn`-private to that file).
-#[inline]
-pub(crate) fn BG_GiveMeVectorFromMatrix(
-    boltMatrix: *const mdxaBone_t,
-    flags: c_int,
-    vec: &mut vec3_t,
-) {
-    pub const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
-    pub const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
-    unsafe {
-        match flags {
-            ORIGIN => {
-                vec[0] = (*boltMatrix).matrix[0][3];
-                vec[1] = (*boltMatrix).matrix[1][3];
-                vec[2] = (*boltMatrix).matrix[2][3];
-            }
-            NEGATIVE_Y => {
-                vec[0] = -(*boltMatrix).matrix[0][1];
-                vec[1] = -(*boltMatrix).matrix[1][1];
-                vec[2] = -(*boltMatrix).matrix[2][1];
-            }
-            _ => {}
-        }
-    }
-}
-
 /// Raven `NPC_GalakMech_Precache`.
 ///
 /// Source: `oracle/codemp/game/NPC_AI_GalakMech.c:42-57`

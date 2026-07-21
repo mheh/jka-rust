@@ -23,6 +23,16 @@ pub struct ipFilter_t {
 // Constants from the Raven source.
 pub const MAX_IPFILTERS: usize = 1024;
 
+/// Format an `ipFilter_t::compare` word as the oracle's dotted-quad plus a
+/// trailing space, walking the 4 bytes in native order (Raven's
+/// `((byte *)&compare)[0..3]`).
+///
+/// Source: `oracle/codemp/game/g_svcmds.c:119-122`
+fn format_ip(ip: c_uint) -> String {
+    let b = ip.to_ne_bytes();
+    format!("{}.{}.{}.{} ", b[0], b[1], b[2], b[3])
+}
+
 /// Raven `StringToFilter`.
 ///
 /// Parse an IP address string into mask and compare values for IP filtering.
@@ -109,15 +119,7 @@ pub fn UpdateIPBans(ctx: &mut GameContext) {
             continue;
         }
 
-        // Oracle walks `compare` byte-by-byte via `((byte *)&ipFilters[i].compare)[0..3]`;
-        // `to_ne_bytes` yields the same 4 bytes in the same order (g_svcmds.c:119-122).
-        let bytes = ctx.world.globals.ipFilters[i].compare.to_ne_bytes();
-        let b0 = bytes[0];
-        let b1 = bytes[1];
-        let b2 = bytes[2];
-        let b3 = bytes[3];
-
-        iplist.push_str(&format!("{}.{}.{}.{} ", b0, b1, b2, b3));
+        iplist.push_str(&format_ip(ctx.world.globals.ipFilters[i].compare));
     }
 
     trap::Cvar_Set(ctx.engine, "g_banIPs", &iplist);
@@ -330,15 +332,7 @@ pub fn Svcmd_ListIPs_f(ctx: &mut GameContext) {
             if (&ctx.world.globals.ipFilters)[i].compare == 0xffffffff {
                 G_Printf(ctx, "unused\n");
             } else {
-                // Oracle walks `compare` byte-by-byte via `(byte *)&ipFilters[i].compare`;
-                // `to_ne_bytes` yields the same 4 bytes in the same order.
-                let bytes = (&ctx.world.globals.ipFilters)[i].compare.to_ne_bytes();
-                let b0 = bytes[0];
-                let b1 = bytes[1];
-                let b2 = bytes[2];
-                let b3 = bytes[3];
-
-                let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
+                let s = format!("{}\n", format_ip((&ctx.world.globals.ipFilters)[i].compare));
                 G_Printf(ctx, &format!("{}\n", s));
             }
         }
@@ -368,15 +362,7 @@ pub fn G_SaveBanIP(ctx: &mut GameContext) {
             let unused = "unused \n";
             trap::FS_Write(ctx.engine, unused.as_bytes(), fh);
         } else {
-            // Oracle walks `compare` byte-by-byte via `(byte *)&ipFilters[i].compare`;
-            // `to_ne_bytes` yields the same 4 bytes in the same order.
-            let bytes = ctx.world.globals.ipFilters[i].compare.to_ne_bytes();
-            let b0 = bytes[0];
-            let b1 = bytes[1];
-            let b2 = bytes[2];
-            let b3 = bytes[3];
-
-            let s = format!("{}.{}.{}.{} \n", b0, b1, b2, b3);
+            let s = format!("{}\n", format_ip(ctx.world.globals.ipFilters[i].compare));
             trap::FS_Write(ctx.engine, s.as_bytes(), fh);
         }
     }

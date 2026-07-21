@@ -41,12 +41,7 @@ use mp_qshared::common::mp::gentity::MAT_METAL;
 use mp_qshared::shared::surface_flags::{CONTENTS_LIGHTSABER, MASK_SHOT};
 use mp_qshared::shared::trajectory::trType_t::{TR_LINEAR, TR_LINEAR_STOP, TR_STATIONARY};
 use std::ffi::c_char;
-
-/// Raven `q_shared.h:30` `VALIDSTRING(a)` macro.
-/// Source: `oracle/codemp/game/q_shared.h:30`
-unsafe fn VALIDSTRING(a: *const c_char) -> bool {
-    !a.is_null() && *a != 0
-}
+use crate::NPC_utils::VALIDSTRING;
 
 /// Raven `TurretPain`.
 ///

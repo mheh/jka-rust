@@ -15,13 +15,14 @@
 //! fn-top raw re-derives are gone. Entity-scan loops walk by `EntityId(i)`.
 //! Returns of `*mut gentity_t` and the raw `gentity_t*` globals (`eFlag*`,
 //! `gSpawnPoints`, `flag*`) stay raw: the pointer is produced at the boundary
-//! via `ent_ptr(ctx, id)` and consumed by callers via `ctx.entity_id_of(ptr)`.
+//! via `ent_id::resolve(base, id)` and consumed by callers via `ctx.entity_id_of(ptr)`.
 //! Player-client (`ent->client->ps`) derefs stay raw in tight `unsafe`
 //! blocks (§2b — pool clients have no accessor), as do the waypoint-arena
 //! (`wpobject_t`/`nodeobject_t`), `gitem_t`, and route-file byte-buffer
 //! pointers, which are not entities and have no owned home.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::ent_id;
 use crate::ai_main::{GetNearestVisibleWP, OrgVisible, OrgVisibleBox};
 use crate::ai_util::{B_Alloc, B_TempAlloc, B_TempFree};
 use crate::g_cmds::ConcatArgs;
@@ -42,16 +43,6 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
 use native_string::atof::atof_bytes;
 use native_string::atoi::atoi_bytes;
-
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 /// Raven `botGlobalNavWeaponWeights[WP_NUM_WEAPONS]` — per-weapon-index bot
 /// pickup weighting table used by nav item scoring. C's brace initializer is
@@ -142,23 +133,6 @@ unsafe fn wp_trace(
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:25-210`
 pub fn GetFlagStr(ctx: &mut GameContext, flags: c_int) -> *mut c_char {
-    // Raven flag bit values (`ai_main.h:22-38`); not yet ported anywhere else
-    // in the crate graph, so defined locally, verbatim.
-    const WPFLAG_JUMP: c_int = 0x00000010;
-    pub const WPFLAG_DUCK: c_int = 0x00000020;
-    pub const WPFLAG_NOVIS: c_int = 0x00000400;
-    pub const WPFLAG_SNIPEORCAMPSTAND: c_int = 0x00000800;
-    pub const WPFLAG_WAITFORFUNC: c_int = 0x00001000;
-    pub const WPFLAG_SNIPEORCAMP: c_int = 0x00002000;
-    const WPFLAG_ONEWAY_FWD: c_int = 0x00004000;
-    const WPFLAG_ONEWAY_BACK: c_int = 0x00008000;
-    pub const WPFLAG_GOALPOINT: c_int = 0x00010000;
-    const WPFLAG_RED_FLAG: c_int = 0x00020000;
-    const WPFLAG_BLUE_FLAG: c_int = 0x00040000;
-    pub const WPFLAG_SIEGE_REBELOBJ: c_int = 0x00080000;
-    pub const WPFLAG_SIEGE_IMPERIALOBJ: c_int = 0x00100000;
-    pub const WPFLAG_NOMOVEFUNC: c_int = 0x00200000;
-
     unsafe {
         let flagstr = B_TempAlloc(ctx, 128) as *mut c_char;
         let mut i: isize = 0;
@@ -2370,7 +2344,7 @@ pub fn FlagObjects(ctx: &mut GameContext) {
             ctx.world.globals.flagRed = p;
             ctx.world.globals.oFlagRed = ctx.world.globals.flagRed;
             // Store the raw entity pointer into the global at the boundary.
-            let fr_ptr = ent_ptr(ctx, Some(flag_red));
+            let fr_ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(flag_red));
             ctx.world.globals.eFlagRed = fr_ptr;
         }
 
@@ -2406,7 +2380,7 @@ pub fn FlagObjects(ctx: &mut GameContext) {
             ctx.world.globals.flagBlue = p;
             ctx.world.globals.oFlagBlue = ctx.world.globals.flagBlue;
             // Store the raw entity pointer into the global at the boundary.
-            let fb_ptr = ent_ptr(ctx, Some(flag_blue));
+            let fb_ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(flag_blue));
             ctx.world.globals.eFlagBlue = fb_ptr;
         }
     }
@@ -3100,7 +3074,7 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
             {
                 if ctx.entity(ent_id).s.origin[2] < 1280.0 {
                     // h4x
-                    let sp_ptr = ent_ptr(ctx, Some(ent_id));
+                    let sp_ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(ent_id));
                     let n = ctx.world.globals.gSpawnPointNum as usize;
                     ctx.world.globals.gSpawnPoints.0[n] = sp_ptr;
                     ctx.world.globals.gSpawnPointNum += 1;
@@ -3111,7 +3085,7 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
                 })
             {
                 // also make it path to flags in CTF.
-                let sp_ptr = ent_ptr(ctx, Some(ent_id));
+                let sp_ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(ent_id));
                 let n = ctx.world.globals.gSpawnPointNum as usize;
                 ctx.world.globals.gSpawnPoints.0[n] = sp_ptr;
                 ctx.world.globals.gSpawnPointNum += 1;
@@ -3220,12 +3194,12 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
             if ctx.entity(ent_id).inuse != 0 && !classname.is_null() {
                 if ctx.world.globals.eFlagRed.is_null() && c_str_eq(classname, b"team_CTF_redflag")
                 {
-                    let ptr = ent_ptr(ctx, Some(ent_id));
+                    let ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(ent_id));
                     ctx.world.globals.eFlagRed = ptr;
                 } else if ctx.world.globals.eFlagBlue.is_null()
                     && c_str_eq(classname, b"team_CTF_blueflag")
                 {
-                    let ptr = ent_ptr(ctx, Some(ent_id));
+                    let ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(ent_id));
                     ctx.world.globals.eFlagBlue = ptr;
                 }
 
@@ -3274,7 +3248,7 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         }
 
         // Produce the raw entity pointer at the return boundary.
-        ent_ptr(ctx, closest_index)
+        ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), closest_index)
     }
 }
 
@@ -3322,7 +3296,7 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
         }
 
         // Produce the raw entity pointer at the return boundary.
-        ent_ptr(ctx, next_index)
+        ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), next_index)
     }
 }
 

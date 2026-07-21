@@ -24,6 +24,7 @@ use crate::level::alert_event::{
 };
 use crate::level::interest_point::MAX_INTEREST_POINTS;
 use crate::npc::check_flags::{CHECK_360, CHECK_FOV, CHECK_PVS, CHECK_SHOOT, CHECK_VISRANGE};
+use crate::ent_id;
 use crate::npc::script_flags::SCF_DONT_FLEE;
 use crate::prelude::*;
 use crate::q_math::{
@@ -36,16 +37,6 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::shared::{
     CONTENTS_OPAQUE, ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_OPAQUE, MAX_GENTITIES,
 };
-
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 /// Raven `G_ClearLineOfSight`.
 ///
@@ -812,7 +803,8 @@ pub fn AddSoundEvent(
 ) {
     // `alertEvent_t.owner` is still a raw `*mut gentity_t` field, so the handle is
     // materialized back to a pointer for storage (id→pointer seam bridge).
-    let owner: *mut gentity_t = unsafe { ent_ptr(ctx, owner) };
+    let owner: *mut gentity_t =
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), owner) };
 
     // FIXME: Handle this in another manner?
     if ctx.world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
@@ -865,7 +857,8 @@ pub fn AddSightEvent(
 ) {
     // `alertEvent_t.owner` is still a raw `*mut gentity_t` field, so the handle is
     // materialized back to a pointer for storage (id→pointer seam bridge).
-    let owner: *mut gentity_t = unsafe { ent_ptr(ctx, owner) };
+    let owner: *mut gentity_t =
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), owner) };
 
     // FIXME: Handle this in another manner?
     if ctx.world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {

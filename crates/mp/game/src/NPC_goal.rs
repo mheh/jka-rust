@@ -13,17 +13,8 @@
 //! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::ent_id;
 use crate::prelude::*;
-
-/// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -34,7 +25,7 @@ unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t
 pub fn SetGoal(ctx: &mut GameContext, goal: Option<EntityId>, rating: f32) {
     // SAFETY: `NPCInfo` is Raven's ambient AI global (`gNPC_t *`); its raw deref is
     // the still-open ambient-globals seam (2c task #7), not an entity deref. The
-    // Stage-1 `ent_id_opt(base, ent_ptr(goal))` round-trip is the identity on
+    // Stage-1 `ent_id_opt(base, ent_id::resolve(base, goal))` round-trip is the identity on
     // `Option<EntityId>`, so the goal handle assigns directly.
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     let goal_time = ctx.world.level.time;
@@ -168,7 +159,8 @@ pub fn NPC_ReachedGoal(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_goal.c:136-231`
 pub fn ReachedGoal(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
     // STAGE-1: EntityId/Option params, raw body re-derived verbatim (Stage-2 debt).
-    let goal: *mut gentity_t = unsafe { ent_ptr(ctx, goal) };
+    let goal: *mut gentity_t =
+        unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), goal) };
     let npc_info: *mut gNPC_t = ctx.world.globals.NPCInfo;
     unsafe {
         if ((*npc_info).aiFlags & NPCAI_TOUCHED_GOAL) != 0 {

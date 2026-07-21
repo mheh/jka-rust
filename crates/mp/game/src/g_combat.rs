@@ -4153,7 +4153,7 @@ pub fn G_GetHitLocFromSurfName(
                             &ctx.entity(ent).modelScale as *const vec3_t,
                         ),
                     );
-                    crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                    BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
                         ORIGIN as c_int,
                         &mut tagOrg,
@@ -4178,7 +4178,7 @@ pub fn G_GetHitLocFromSurfName(
                                 &ctx.entity(ent).modelScale as *const vec3_t,
                             ),
                         );
-                        crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                        BG_GiveMeVectorFromMatrix(
                             &boltMatrix as *const mdxaBone_t,
                             ORIGIN as c_int,
                             &mut tagOrg,
@@ -4266,7 +4266,7 @@ pub fn G_GetHitLocFromSurfName(
                             &ctx.entity(ent).modelScale as *const vec3_t,
                         ),
                     );
-                    crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                    BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
                         ORIGIN as c_int,
                         &mut tagOrg,
@@ -4297,7 +4297,7 @@ pub fn G_GetHitLocFromSurfName(
                             &ctx.entity(ent).modelScale as *const vec3_t,
                         ),
                     );
-                    crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                    BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
                         ORIGIN as c_int,
                         &mut tagOrg,
@@ -4328,7 +4328,7 @@ pub fn G_GetHitLocFromSurfName(
                             &ctx.entity(ent).modelScale as *const vec3_t,
                         ),
                     );
-                    crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                    BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
                         ORIGIN as c_int,
                         &mut tagOrg,
@@ -4359,7 +4359,7 @@ pub fn G_GetHitLocFromSurfName(
                             &ctx.entity(ent).modelScale as *const vec3_t,
                         ),
                     );
-                    crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                    BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
                         ORIGIN as c_int,
                         &mut tagOrg,
@@ -4438,12 +4438,12 @@ pub fn G_GetHitLocFromSurfName(
                                     &ctx.entity(ent).modelScale as *const vec3_t,
                                 ),
                             );
-                            crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                            BG_GiveMeVectorFromMatrix(
                                 &boltMatrix as *const mdxaBone_t,
                                 ORIGIN as c_int,
                                 &mut tagOrg,
                             );
-                            crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                            BG_GiveMeVectorFromMatrix(
                                 &boltMatrix as *const mdxaBone_t,
                                 NEGATIVE_Y as c_int,
                                 &mut tagDir,

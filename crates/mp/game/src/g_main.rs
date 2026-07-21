@@ -2749,14 +2749,6 @@ pub fn NAV_CheckCalcPaths(ctx: &mut GameContext) {
     }
 }
 
-/// Raven `BG_GetTime` — "so shared code can get the local time depending on
-/// the side it's executed on."
-///
-/// Source: `oracle/codemp/game/g_main.c:3556-3562`
-pub fn BG_GetTime(ctx: &mut GameContext) -> c_int {
-    ctx.world.level.time
-}
-
 /// Raven `level.time` accessor (no standalone Raven symbol; mirrors the many
 /// `level.time` reads inlined at call sites).
 ///

@@ -113,7 +113,7 @@ const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
 
 /// Raven `q_shared.h:30` `VALIDSTRING(a)` macro.
 /// Source: `oracle/codemp/game/q_shared.h:30`
-unsafe fn VALIDSTRING(a: *const c_char) -> bool {
+pub(crate) unsafe fn VALIDSTRING(a: *const c_char) -> bool {
     !a.is_null() && *a as c_int != 0
 }
 

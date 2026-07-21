@@ -35,6 +35,7 @@ use crate::q_math::{
 };
 use crate::q_shared::Q_stricmp;
 use crate::NPC_combat::G_SetEnemy;
+use crate::NPC_utils::VALIDSTRING;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::bg_misc::snap_vector;
@@ -64,11 +65,6 @@ const START_DIS: f32 = 15.0;
 /// `material_t` is `c_int` (fork per type-port); `MAT_METAL = 0`
 /// (`q_shared.h:969`).
 const MAT_METAL: c_int = 0;
-
-/// Raven `q_shared.h:30` `VALIDSTRING(a)` macro.
-unsafe fn VALIDSTRING(a: *const c_char) -> bool {
-    !a.is_null() && *a != 0
-}
 
 /// Raven `G2Tur_SetBoneAngles`.
 ///

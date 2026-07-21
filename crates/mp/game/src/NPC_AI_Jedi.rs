@@ -16,6 +16,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 
+use crate::ent_id;
 use crate::prelude::*;
 use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
@@ -52,16 +53,6 @@ use crate::q_shared;
 // take `&gentity_t`. Non-leaf bodies re-derive the raw pointers verbatim at the
 // top (`// STAGE-1:` markers) — Stage-2 debt. Callers bridge at the boundary via
 // `ctx.entity_id_of(ptr)`.
-
-/// Resolve an `Option<EntityId>` param back to a `gentity_t*` (the
-/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
-#[inline]
-unsafe fn ent_ptr(ctx: &mut GameContext, id: Option<EntityId>) -> *mut gentity_t {
-    match id {
-        Some(i) => &mut ctx.world.g_entities[i.index()] as *mut gentity_t,
-        None => core::ptr::null_mut(),
-    }
-}
 
 /// Raven `G_StartMatrixEffect`.
 ///
@@ -4378,7 +4369,7 @@ pub fn Jedi_FindEnemyInCone(
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
 
     if self_client.is_null() {
-        return unsafe { ent_ptr(ctx, enemy) };
+        return unsafe { ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), enemy) };
     }
 
     unsafe {
@@ -4476,7 +4467,7 @@ pub fn Jedi_FindEnemyInCone(
             let _ = dist;
             e += 1;
         }
-        ent_ptr(ctx, enemy)
+        ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), enemy)
     }
 }
 

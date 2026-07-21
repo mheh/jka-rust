@@ -17,6 +17,7 @@ use crate::prelude::*;
 use crate::g_utils::G_ModelIndex;
 use crate::g_utils::G_SoundIndex;
 use native_string::q_string::Q_stricmp;
+use mp_bg::bg_saberLoad::qstricmp_eq;
 
 // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
 // (`c_int`, cast here to match the `vec3_t` components they seed).
@@ -389,13 +390,6 @@ pub fn TranslateRankName(name: *const c_char) -> rank_t {
         }
     }
     RANK_CIVILIAN
-}
-
-// Local helper: mirrors `!Q_stricmp(name, lit)` (Q_stricmp returns 0 on
-// case-insensitive equality). `Q_stricmp` itself is an out-of-file callee
-// (q_shared.c:900, staged skeleton at `crate::q_shared::Q_stricmp`).
-unsafe fn qstricmp_eq(name: *const c_char, lit: &std::ffi::CStr) -> bool {
-    !name.is_null() && Q_stricmp(lit.to_str().unwrap(), &cstr_to_str(name)) == 0
 }
 
 /// Raven `G_ParseAnimFileSet`.

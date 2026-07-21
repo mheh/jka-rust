@@ -9,6 +9,8 @@
 //! and the engine surface through `BgTraps`.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use std::ffi::CStr;
+
 use crate::prelude::*;
 // S5-5: canonical parse family + string helpers now live in `mp_qshared`.
 use mp_qshared::shared::com_parse::{
@@ -338,7 +340,7 @@ use mp_qshared::shared::limits::MAX_CLIENTS_I32;
 // Local helper: mirrors `!Q_stricmp(name, lit)` (Q_stricmp returns 0 on
 // case-insensitive equality). `Q_stricmp` itself is an out-of-file callee
 // (q_shared.c:900, staged skeleton at `Q_stricmp`).
-unsafe fn qstricmp_eq(name: *const c_char, lit: &std::ffi::CStr) -> bool {
+pub unsafe fn qstricmp_eq(name: *const c_char, lit: &CStr) -> bool {
     Q_stricmp(name, lit.as_ptr()) == 0
 }
 
