@@ -150,11 +150,11 @@
 //! `G2_GetAnimFileName`/`G2_SetupModelPointers` all call `RE_RegisterModel`/
 //! `RE_RegisterServerModel` (a filename → `qhandle_t` register), which has no
 //! `EngineHost` method (`## Seam definition`'s 15 methods only resolve an
-//! *already-registered* handle to its parsed block). This file duplicates
-//! `api_models.rs`'s `register_model`/`register_server_model`/
-//! `g2_should_register_server` divergence-via-`host.error` helpers (no shared
-//! home exists yet for them, same as that file's own `GHOUL2_ZONETRANSALLOC`/
-//! `MAX_G2_MODELS` duplication precedent) rather than inventing a fake handle.
+//! *already-registered* handle to its parsed block). The identical
+//! `g2_should_register_server`/`register_server_model` divergence-via-`host.error`
+//! helpers now live once in `api_models.rs` (imported below); this file keeps
+//! its own `register_model` because its `host.error` message cites this file's
+//! own call sites (`G2_API.cpp:282,312,359,2714`), not `api_models.rs`'s.
 
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::{
@@ -164,6 +164,7 @@ use mp_qshared::shared::q_math::{
 };
 use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRecord_t};
 
+use crate::api_models::{g2_should_register_server, register_server_model};
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
 use crate::gore::sskin_gore_data::SSkinGoreData;
 use crate::mdx::mdxa::MdxaView;
@@ -252,34 +253,11 @@ unsafe fn read_flat_vert(ptr: *const i32, base: usize, idx: usize) -> [f32; 5] {
 }
 
 // ---------------------------------------------------------------------------
-// `RE_RegisterModel`/`RE_RegisterServerModel`/`G2_ShouldRegisterServer` — no
-// `EngineHost` equivalent (module-doc gap note); duplicated from
-// `api_models.rs`'s identically-shaped helpers per that file's own
-// no-shared-home precedent.
+// `RE_RegisterModel` — no `EngineHost` equivalent (module-doc gap note). The
+// sibling `g2_should_register_server`/`register_server_model` helpers are
+// imported from `api_models.rs`; only `register_model` is kept local, its
+// `host.error` message citing this file's own call sites.
 // ---------------------------------------------------------------------------
-
-/// Raven `qboolean G2_ShouldRegisterServer(void)` gate, duplicated from
-/// `api_models.rs::g2_should_register_server` (see that file's module doc
-/// comment for the full gap analysis).
-/// Source: `oracle/codemp/ghoul2/G2_API.cpp:568-583`
-fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
-    if host.cvar_integer("cl_running") != 0 {
-        host.error(
-            errorParm_t::ERR_DROP,
-            "G2_ShouldRegisterServer: cl_running set in a DEDICATED build \u{2014} \
-             Com_TheHunkMarkHasBeenMade/ShaderHashTableExists have no EngineHost service",
-        );
-    }
-    true
-}
-
-/// Raven `RE_RegisterServerModel( fileName )` through the
-/// `EngineHost::model_register` seam (the former ghoul2-server.md gap, closed
-/// by user ruling 2026-07-12).
-/// Source: `oracle/codemp/renderer/tr_model.cpp:588`
-fn register_server_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
-    host.model_register(file_name)
-}
 
 /// `RE_RegisterModel`'s client-path twin of [`register_server_model`]; same
 /// gap, same divergence treatment.

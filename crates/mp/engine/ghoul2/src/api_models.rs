@@ -150,7 +150,7 @@ fn dup_cghoul2_info(src: &CGhoul2Info) -> CGhoul2Info {
 /// surprise this always returns `true`.
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:568-583`
-fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
+pub(crate) fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
     if host.cvar_integer("cl_running") != 0 {
         // `Com_TheHunkMarkHasBeenMade`/`ShaderHashTableExists` have no
         // `EngineHost` equivalent (module doc-comment gap note) and this arm
@@ -172,7 +172,7 @@ fn g2_should_register_server(host: &mut impl EngineHost) -> bool {
 /// `EngineHost::model_register` seam (the former ghoul2-server.md gap, closed
 /// by user ruling 2026-07-12).
 /// Source: `oracle/codemp/renderer/tr_model.cpp:588`
-fn register_server_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
+pub(crate) fn register_server_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
     host.model_register(file_name)
 }
 
@@ -443,6 +443,26 @@ pub fn g2api_has_ghoul2_model_on_index(
     true
 }
 
+/// Trim trailing `-1` (free) model slots off the back of `ghoul2` — the shared
+/// tail of [`g2api_remove_ghoul2_model`]/[`g2api_remove_ghoul2_models`].
+/// Source: `oracle/codemp/ghoul2/G2_API.cpp:795-875,877-958`
+fn trim_trailing_free_slots(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v) {
+    let size_now = ghoul2.size(g2);
+    let mut new_size = size_now;
+    let mut i = size_now - 1;
+    while i > -1 {
+        if ghoul2.get(g2, i).modelindex == -1 {
+            new_size = i;
+        } else {
+            break;
+        }
+        i -= 1;
+    }
+    if new_size != size_now {
+        ghoul2.resize(g2, new_size);
+    }
+}
+
 /// Raven `qboolean G2API_RemoveGhoul2Model(CGhoul2Info_v **ghlRemove, const
 /// int modelIndex)` — sanity-asserts the index names a live model, then frees
 /// its gore set (`DeleteGoreSet`, `_G2_GORE` on, `G2_misc.cpp:153`) and bone
@@ -485,20 +505,7 @@ pub fn g2api_remove_ghoul2_model(
     }
 
     // trim trailing -1 slots off the back.
-    let size_now = ghoul2.size(g2);
-    let mut new_size = size_now;
-    let mut i = size_now - 1;
-    while i > -1 {
-        if ghoul2.get(g2, i).modelindex == -1 {
-            new_size = i;
-        } else {
-            break;
-        }
-        i -= 1;
-    }
-    if new_size != size_now {
-        ghoul2.resize(g2, new_size);
-    }
+    trim_trailing_free_slots(g2, ghoul2);
 
     // if we are not using any space, just free the ghoul2 vector entirely.
     if ghoul2.size(g2) == 0 {
@@ -551,20 +558,7 @@ pub fn g2api_remove_ghoul2_models(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Inf
     }
 
     // trim trailing -1 slots off the back.
-    let size_now = ghoul2.size(g2);
-    let mut new_size = size_now;
-    let mut i = size_now - 1;
-    while i > -1 {
-        if ghoul2.get(g2, i).modelindex == -1 {
-            new_size = i;
-        } else {
-            break;
-        }
-        i -= 1;
-    }
-    if new_size != size_now {
-        ghoul2.resize(g2, new_size);
-    }
+    trim_trailing_free_slots(g2, ghoul2);
 
     if ghoul2.size(g2) == 0 {
         ghoul2.free(g2);

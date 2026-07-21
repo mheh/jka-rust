@@ -62,6 +62,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::qhandle_t;
 
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -201,15 +202,6 @@ pub fn g2api_get_anim_file_name_index(
     // `g2` is threaded per ruling 11 but never reached (module comment above).
     let _ = g2;
 
-    // `mdxmHeader_t` layout (see `api_surfaces.rs`'s `g2api_get_surface_name`
-    // for the full field list): `animName` is a NUL-terminated MAX_QPATH
-    // (64-byte) buffer at byte offset 72 (`mdx_format::mdxm_header_t.rs`'s
-    // frozen `offset_of!` assert). This crate never names the `mdxm*` types
-    // (`G2SV-D5`); this is the same raw byte arithmetic Raven itself does off
-    // the loader-owned block.
-    const ANIM_NAME_OFFSET: usize = 72;
-    const ANIM_NAME_LEN: usize = 64;
-
     let mdxm = host.model_mdxm(model_index);
     if mdxm.is_null() {
         // Divergence (§19, Raven UB site, per this fn's doc comment above):
@@ -217,14 +209,11 @@ pub fn g2api_get_anim_file_name_index(
         // `None` instead of dereferencing a null model.
         return None;
     }
-    let name_bytes = unsafe {
-        core::slice::from_raw_parts(mdxm.byte_add(ANIM_NAME_OFFSET) as *const u8, ANIM_NAME_LEN)
-    };
-    let end = name_bytes
-        .iter()
-        .position(|&b| b == 0)
-        .unwrap_or(ANIM_NAME_LEN);
-    Some(String::from_utf8_lossy(&name_bytes[..end]).into_owned())
+    // `mdxmHeader_t->animName` off the live loader block — `MdxmView` owns the
+    // byte offset (`G2SV-D5`, this crate never names the `mdxm*` types).
+    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
+    // contract.
+    Some(unsafe { MdxmView::from_block(mdxm) }.anim_name())
 }
 
 /// Raven `char *G2API_GetGLAName(CGhoul2Info_v &ghoul2, int modelIndex)` —
@@ -263,22 +252,11 @@ pub fn g2api_get_gla_name(
     // sole live statement past it.
     let info = ghoul2.get(g2, model_index);
 
-    // `mdxmHeader_t` layout (see `api_surfaces.rs`'s `g2api_get_surface_name`
-    // for the full field list): `animName` is a NUL-terminated MAX_QPATH
-    // (64-byte) buffer at byte offset 72. This crate never names the
-    // `mdxm*` types (`G2SV-D5`); `host` reaches the same
-    // `currentModel->mdxm` block through `ghlInfo->model`'s registered
-    // handle, matching this crate's `model_mdxm` convention throughout.
-    const ANIM_NAME_OFFSET: usize = 72;
-    const ANIM_NAME_LEN: usize = 64;
-
+    // `mdxmHeader_t->animName` off the `currentModel->mdxm` block reached
+    // through `ghlInfo->model`'s registered handle — `MdxmView` owns the byte
+    // offset (`G2SV-D5`). Raven's `assert(currentModel && mdxm)` was dropped
+    // above (NDEBUG); a null block is Raven UB (§19), so no guard is added here.
+    // SAFETY: the dropped assert guarantees a live, non-null block in practice.
     let mdxm = host.model_mdxm(info.model);
-    let name_bytes = unsafe {
-        core::slice::from_raw_parts(mdxm.byte_add(ANIM_NAME_OFFSET) as *const u8, ANIM_NAME_LEN)
-    };
-    let end = name_bytes
-        .iter()
-        .position(|&b| b == 0)
-        .unwrap_or(ANIM_NAME_LEN);
-    Some(String::from_utf8_lossy(&name_bytes[..end]).into_owned())
+    Some(unsafe { MdxmView::from_block(mdxm) }.anim_name())
 }
