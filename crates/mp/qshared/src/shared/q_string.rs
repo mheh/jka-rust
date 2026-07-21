@@ -317,20 +317,6 @@ pub fn Q_stricmp(s1: *const c_char, s2: *const c_char) -> c_int {
     }
 }
 
-/// Raven `Q_strlwr`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:905-914`
-pub fn Q_strlwr(s1: *mut c_char) -> *mut c_char {
-    unsafe {
-        let mut s = s1;
-        while *s != 0 {
-            *s = (*s as u8 as char).to_ascii_lowercase() as c_char;
-            s = s.offset(1);
-        }
-        s1
-    }
-}
-
 /// Raven `COM_Compress`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:353-419`

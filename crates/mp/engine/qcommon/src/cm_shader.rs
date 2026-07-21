@@ -38,10 +38,12 @@ use crate::files_common::{FS_FreeFile, FS_ListFiles, FS_ReadFile};
 use crate::z_memman_pc::Hunk_Alloc;
 use crate::z_memman_pc::{Z_Free, Z_Malloc};
 use mp_qshared::shared::ha_pref;
+use mp_qshared::shared::q_string;
 use mp_qshared::shared::q_string::{
     COM_ParseExt, SkipBracedSection, SkipRestOfLine, SkipWhitespace,
 };
-use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
+use mp_qshared::shared::q_string::Q_strncpyz;
+use native_string::q_string::Q_stricmp;
 
 /// Raven `SV_ParseSurfaceParm` — match the next token against `svInfoParms`,
 /// OR/AND-ing the shader's surface/content flags from the matching row.
@@ -57,7 +59,7 @@ pub fn SV_ParseSurfaceParm(
     let token = COM_ParseExt(text, qfalse);
     for i in 0..numsvInfoParms {
         let row = &cm.svInfoParms[i as usize];
-        if Q_stricmp(token, row.name) == 0 {
+        if q_string::Q_stricmp(token, row.name) == 0 {
             unsafe {
                 (*shader).surfaceFlags |= row.surfaceFlags;
                 (*shader).contentFlags |= row.contents;
@@ -255,7 +257,7 @@ pub fn SV_ParseMaterial(
         return;
     }
     for i in 0..MATERIAL_LAST {
-        if Q_stricmp(token, cm.svMaterialNames[i as usize]) == 0 {
+        if q_string::Q_stricmp(token, cm.svMaterialNames[i as usize]) == 0 {
             unsafe {
                 (*shader).surfaceFlags |= i;
             }
@@ -383,6 +385,7 @@ pub fn CM_ParseShader(
         }
 
         let c0 = unsafe { *token };
+        let token_str = unsafe { core::ffi::CStr::from_ptr(token).to_string_lossy() };
         // end of shader definition
         if c0 == b'}' as c_char {
             break;
@@ -394,15 +397,15 @@ pub fn CM_ParseShader(
         }
         // material deprecated as of 11 Jan 01
         // material undeprecated as of 7 May 01 - q3map_material deprecated
-        else if (Q_stricmp(token, c"material".as_ptr()) == 0)
-            || (Q_stricmp(token, c"q3map_material".as_ptr()) == 0)
+        else if (Q_stricmp(&token_str, "material") == 0)
+            || (Q_stricmp(&token_str, "q3map_material") == 0)
         {
             SV_ParseMaterial(common, cm, shader, text);
         }
         // sun parms
         // q3map_sun deprecated as of 11 Jan 01
-        else if (Q_stricmp(token, c"sun".as_ptr()) == 0)
-            || (Q_stricmp(token, c"q3map_sun".as_ptr()) == 0)
+        else if (Q_stricmp(&token_str, "sun") == 0)
+            || (Q_stricmp(&token_str, "q3map_sun") == 0)
         {
             //			float	a, b;
 
@@ -428,10 +431,10 @@ pub fn CM_ParseShader(
             //			shader->sunDirection[0] = cos( a ) * cos( b );
             //			shader->sunDirection[1] = sin( a ) * cos( b );
             //			shader->sunDirection[2] = sin( b );
-        } else if Q_stricmp(token, c"surfaceParm".as_ptr()) == 0 {
+        } else if Q_stricmp(&token_str, "surfaceParm") == 0 {
             SV_ParseSurfaceParm(cm, shader, text);
             continue;
-        } else if Q_stricmp(token, c"fogParms".as_ptr()) == 0 {
+        } else if Q_stricmp(&token_str, "fogParms") == 0 {
             let mut fogColor: vec3_t = vec3_t::default();
             if CM_ParseVector(common, shader, text, 3, fogColor.as_mut_ptr()) == 0 {
                 return;
