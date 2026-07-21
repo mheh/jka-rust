@@ -14,7 +14,7 @@ pub const DEMOGAME: &str = "demo";
 pub const DEMO_PAK_CHECKSUM: u32 = 437558517;
 
 /// Raven `MAX_ZPATH` — max path length inside a `.pk3`/zip.
-/// Source: `oracle/codemp/qcommon/files.cpp:203`
+/// Source: `oracle/codemp/qcommon/files.h:32`
 pub const MAX_ZPATH: usize = 256;
 
 /// Raven `MAX_SEARCH_PATHS` — max entries on the filesystem search-path chain.

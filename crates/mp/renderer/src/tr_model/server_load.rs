@@ -97,7 +97,7 @@ fn write_qpath(dest: &mut [c_char; MAX_QPATH], src: &str) {
 /// Reads a NUL-terminated `c_char` field back out as an owned `String`
 /// (`mdxm->animName`, `:867`). Model names are always ASCII paths, so the
 /// `c_char -> u8 -> char` widening is lossless here.
-fn read_qpath(bytes: &[c_char]) -> String {
+pub(crate) fn read_qpath(bytes: &[c_char]) -> String {
     bytes
         .iter()
         .take_while(|&&b| b != 0)

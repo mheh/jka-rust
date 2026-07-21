@@ -24,24 +24,14 @@ use mp_qshared::common::mp::qcommon::msg_t::msg_t;
 ///
 /// Source: `oracle/codemp/qcommon/huffman.cpp:12-19`
 pub unsafe fn Huff_putBit(bit: c_int, fout: *mut u8, offset: &mut c_int) {
-    let mut bloc = *offset;
-    if (bloc & 7) == 0 {
-        *fout.add((bloc >> 3) as usize) = 0;
-    }
-    *fout.add((bloc >> 3) as usize) |= (bit << (bloc & 7)) as u8;
-    bloc += 1;
-    *offset = bloc;
+    add_bit(bit as c_char, fout, offset);
 }
 
 /// Raven `Huff_getBit`.
 ///
 /// Source: `oracle/codemp/qcommon/huffman.cpp:22-29`
 pub unsafe fn Huff_getBit(fin: *mut u8, offset: &mut c_int) -> c_int {
-    let mut bloc = *offset;
-    let t = ((*fin.add((bloc >> 3) as usize) as c_int) >> (bloc & 7)) & 0x1;
-    bloc += 1;
-    *offset = bloc;
-    t
+    get_bit(fin, offset)
 }
 
 /// Raven `add_bit` — buffered bit append (uses the shared `bloc` cursor).

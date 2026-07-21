@@ -151,10 +151,10 @@
 //! `RE_RegisterServerModel` (a filename → `qhandle_t` register), which has no
 //! `EngineHost` method (`## Seam definition`'s 15 methods only resolve an
 //! *already-registered* handle to its parsed block). The identical
-//! `g2_should_register_server`/`register_server_model` divergence-via-`host.error`
-//! helpers now live once in `api_models.rs` (imported below); this file keeps
-//! its own `register_model` because its `host.error` message cites this file's
-//! own call sites (`G2_API.cpp:282,312,359,2714`), not `api_models.rs`'s.
+//! `g2_should_register_server`/`register_server_model`/`register_model`
+//! divergence-via-`host.error` helpers live once in `api_models.rs` (imported
+//! below); this file's call sites pass their own oracle citation
+//! (`G2_API.cpp:282,312,359,2714`) to `register_model`.
 
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::{
@@ -164,7 +164,7 @@ use mp_qshared::shared::q_math::{
 };
 use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRecord_t};
 
-use crate::api_models::{g2_should_register_server, register_server_model};
+use crate::api_models::{g2_should_register_server, register_model, register_server_model};
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
 use crate::gore::sskin_gore_data::SSkinGoreData;
 use crate::mdx::mdxa::MdxaView;
@@ -252,25 +252,6 @@ unsafe fn read_flat_vert(ptr: *const i32, base: usize, idx: usize) -> [f32; 5] {
     }
 }
 
-// ---------------------------------------------------------------------------
-// `RE_RegisterModel` — no `EngineHost` equivalent (module-doc gap note). The
-// sibling `g2_should_register_server`/`register_server_model` helpers are
-// imported from `api_models.rs`; only `register_model` is kept local, its
-// `host.error` message citing this file's own call sites.
-// ---------------------------------------------------------------------------
-
-/// `RE_RegisterModel`'s client-path twin of [`register_server_model`]; same
-/// gap, same divergence treatment.
-fn register_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
-    host.error(
-        errorParm_t::ERR_DROP,
-        &format!(
-            "G2_Misc internal: EngineHost has no RE_RegisterModel(\"{file_name}\") equivalent \
-             yet (docs/subsystems/ghoul2-server.md gap note, G2_API.cpp:282,312,359,2714)"
-        ),
-    )
-}
-
 /// The first 3 elements of a `mdxaBone_t` matrix row (Raven's `DotProduct`
 /// macro only ever reads indices `[0][1][2]` regardless of the row's real
 /// declared width).
@@ -308,7 +289,7 @@ fn identity_mdxa_bone() -> mdxaBone_t {
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:279-304`
 pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
-    let model = register_model(host, file_name);
+    let model = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
     let mdxm = host.model_mdxm(model);
     if mdxm.is_null() {
         return;
@@ -346,7 +327,7 @@ pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:307-342`
 pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i32) {
     let _ = frame;
-    let mod_m = register_model(host, file_name);
+    let mod_m = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
     let mdxm = host.model_mdxm(mod_m);
     if mdxm.is_null() {
         return;
@@ -394,7 +375,7 @@ pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:356-367`
 pub fn g2_get_anim_file_name(host: &mut impl EngineHost, file_name: &str) -> Option<String> {
-    let model = register_model(host, file_name);
+    let model = register_model(host, file_name, "G2_Misc internal", "G2_API.cpp:282,312,359,2714");
     let mdxm = host.model_mdxm(model);
     if mdxm.is_null() {
         return None;
@@ -434,7 +415,12 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
         ghl_info.model = if dedicated {
             register_server_model(host, &ghl_info.file_name)
         } else {
-            register_model(host, &ghl_info.file_name)
+            register_model(
+                host,
+                &ghl_info.file_name,
+                "G2_Misc internal",
+                "G2_API.cpp:282,312,359,2714",
+            )
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
@@ -1961,7 +1947,12 @@ mod tests {
     fn register_model_diverges_via_host_error() {
         let mut host = MockHost::new();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            register_model(&mut host, "models/x.glm")
+            register_model(
+                &mut host,
+                "models/x.glm",
+                "G2_Misc internal",
+                "G2_API.cpp:282,312,359,2714",
+            )
         }));
         assert!(result.is_err());
         assert_eq!(host.errors.len(), 1);

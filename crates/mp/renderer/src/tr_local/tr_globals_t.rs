@@ -27,7 +27,7 @@ const MAX_LIGHTMAPS: usize = 256;
 
 /// `MAX_MOD_KNOWN`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1138`
-const MAX_MOD_KNOWN: usize = 1024;
+pub(crate) const MAX_MOD_KNOWN: usize = 1024;
 
 /// `MAX_SUB_BSP` — rwwRMG - added. `usize`-typed dual of the canonical
 /// `mp_qshared::shared::limits::MAX_SUB_BSP` (`c_int`), for array sizing.
@@ -40,7 +40,7 @@ const MAX_SHADERS: usize = 16384;
 
 /// `MAX_SKINS`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1204`
-const MAX_SKINS: usize = 1024;
+pub(crate) const MAX_SKINS: usize = 1024;
 
 /// `FUNCTABLE_SIZE`.
 /// Source: `oracle/codemp/renderer/tr_local.h:1247`

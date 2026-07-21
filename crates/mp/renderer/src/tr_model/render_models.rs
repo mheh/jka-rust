@@ -19,15 +19,11 @@ use mp_qshared::shared::qhandle_t;
 
 use crate::tr_local::model_s::model_t;
 use crate::tr_local::modtype_t::modtype_t;
+use crate::tr_local::tr_globals_t::MAX_MOD_KNOWN;
 
 use super::cached_model_binary::CachedEndianedModelBinary;
+use super::server_load::read_qpath;
 use super::server_skin::ServerSkin;
-
-/// Raven `MAX_MOD_KNOWN` — the `tr.models[]` pool cap; `R_AllocModel` returns
-/// `None` (Raven `NULL`) at it.
-///
-/// Source: `oracle/codemp/renderer/tr_local.h:1138`
-const MAX_MOD_KNOWN: i32 = 1024;
 
 /// `ModelData` — the `tr.models[]` pool entry (ruling 40 reuse: the already-
 /// ported `model_t`, imported never re-declared; a thin wrapper vs the bare
@@ -243,7 +239,7 @@ impl RenderModels {
                 "{:8} : ({}) {}\n",
                 m.dataSize,
                 lods,
-                model_name(m)
+                read_qpath(&m.name)
             ));
             total += m.dataSize;
         }
@@ -260,7 +256,7 @@ impl RenderModels {
     ///
     /// Source: `oracle/codemp/renderer/tr_model.cpp:611-624`
     pub(super) fn r_alloc_model(&mut self) -> Option<qhandle_t> {
-        if self.num_models == MAX_MOD_KNOWN {
+        if self.num_models == MAX_MOD_KNOWN as i32 {
             return None;
         }
 
@@ -306,14 +302,6 @@ impl RenderModels {
     }
 }
 
-/// `mod->name` as an owned `String` for `R_Modellist_f`'s `%s` print: the
-/// fixed `[c_char; MAX_QPATH]` is a NUL-terminated C string.
-fn model_name(m: &ModelData) -> String {
-    let end = m.name.iter().position(|&c| c == 0).unwrap_or(m.name.len());
-    let bytes: Vec<u8> = m.name[..end].iter().map(|&c| c as u8).collect();
-    String::from_utf8_lossy(&bytes).into_owned()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,7 +319,7 @@ mod tests {
     #[test]
     fn alloc_model_caps_at_max_mod_known() {
         let mut rm = RenderModels::default();
-        rm.num_models = MAX_MOD_KNOWN;
+        rm.num_models = MAX_MOD_KNOWN as i32;
         assert_eq!(rm.r_alloc_model(), None);
     }
 

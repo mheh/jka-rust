@@ -26,6 +26,7 @@ use mp_host_interface::vm_slot::VmSlot;
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::game_export_t::gameExport_t;
 use mp_qshared::shared::q_math::{_VectorMA, _VectorScale, AngleVectors};
+use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::{qfalse, qtrue, trType_t, trajectory_t, vec3_t};
 
 use super::croff::MoveRotateEntry;
@@ -142,7 +143,7 @@ impl RoffSystem {
             let data = match host.fs_read_file(file) {
                 Some(d) if !d.is_empty() => d,
                 _ => {
-                    let other_path = com_strip_extension(file);
+                    let other_path = COM_StripExtension(file);
                     let fallback = format!("scripts/{other_path}.rof");
                     match host.fs_read_file(&fallback) {
                         Some(d) if !d.is_empty() => d,
@@ -889,17 +890,6 @@ impl RoffSystem {
 // through `q_math` macros/functions (inlined here: `mp_engine_qcommon` cannot
 // depend on `mp_game`, which owns `AngleVectors`/`VectorScale`/`VectorMA`).
 // -------------------------------------------------------------------------
-
-/// Raven `COM_StripExtension( in, out )` — forward-scans, copying up to the
-/// FIRST `.` (so `foo.bar.rof` → `foo`), used by `Cache`'s `scripts/%s.rof`
-/// fallback. Inlined here (`mp_game`'s copy is unreachable from qcommon).
-/// Source: `oracle/codemp/game/q_shared.c:99-104`
-fn com_strip_extension(input: &str) -> String {
-    match input.find('.') {
-        Some(idx) => input[..idx].to_string(),
-        None => input.to_string(),
-    }
-}
 
 /// Reads a little-endian `i32` at byte `off` (the fixed on-disk width, ROFF-D4).
 fn read_i32_le(data: &[u8], off: usize) -> i32 {

@@ -177,13 +177,19 @@ pub(crate) fn register_server_model(host: &mut impl EngineHost, file_name: &str)
 }
 
 /// `RE_RegisterModel`'s client-path twin of [`register_server_model`]; same
-/// gap, same divergence treatment.
-fn register_model(host: &mut impl EngineHost, file_name: &str) -> qhandle_t {
+/// gap, same divergence treatment. `context`/`cite` let each call site cite its
+/// own oracle location in the `host.error` message.
+pub(crate) fn register_model(
+    host: &mut impl EngineHost,
+    file_name: &str,
+    context: &str,
+    cite: &str,
+) -> qhandle_t {
     host.error(
         errorParm_t::ERR_DROP,
         &format!(
-            "G2API models: EngineHost has no RE_RegisterModel(\"{file_name}\") equivalent yet \
-             (docs/subsystems/ghoul2-server.md gap note, G2_API.cpp:593)"
+            "{context}: EngineHost has no RE_RegisterModel(\"{file_name}\") equivalent yet \
+             (docs/subsystems/ghoul2-server.md gap note, {cite})"
         ),
     )
 }
@@ -211,7 +217,7 @@ fn g2_test_model_pointers(ghl_info: &mut CGhoul2Info, host: &mut impl EngineHost
         ghl_info.model = if dedicated {
             register_server_model(host, &ghl_info.file_name)
         } else {
-            register_model(host, &ghl_info.file_name)
+            register_model(host, &ghl_info.file_name, "G2API models", "G2_API.cpp:593")
         };
 
         let mdxm = host.model_mdxm(ghl_info.model);
@@ -267,7 +273,7 @@ pub fn g2api_precache_ghoul2_model(host: &mut impl EngineHost, file_name: &str) 
     if g2_should_register_server(host) {
         register_server_model(host, file_name)
     } else {
-        register_model(host, file_name)
+        register_model(host, file_name, "G2API models", "G2_API.cpp:593")
     }
 }
 

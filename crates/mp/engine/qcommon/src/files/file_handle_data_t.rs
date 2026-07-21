@@ -3,11 +3,8 @@ use core::ffi::c_char;
 
 use mp_qshared::shared::qboolean;
 
+use super::files_consts::MAX_ZPATH;
 use super::qfile_us::qfile_ut;
-
-/// Raven's `MAX_ZPATH` — max length of a file path inside a pak/zip.
-/// Source: `oracle/codemp/qcommon/files.h:32`
-const MAX_ZPATH: usize = 256;
 
 /// Raven `fileHandleData_t` — per-handle state for an open engine file.
 ///

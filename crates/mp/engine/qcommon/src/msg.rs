@@ -1650,27 +1650,31 @@ fn psf_fields_mut(common: &mut Common, table: PsfTable) -> &mut [netField_t] {
     }
 }
 
+/// The delta-coder field tables are file-scope statics in Raven; here they live
+/// on `Common` and are populated lazily on first `MSG_Init`/`MSG_InitOOB` so the
+/// override check sees them filled.
+fn ensure_field_tables(common: &mut Common) {
+    if common.entity_state_fields.is_empty() {
+        common.entity_state_fields = build_entity_state_fields();
+    }
+    if common.player_state_fields.is_empty() {
+        common.player_state_fields = build_player_state_fields();
+    }
+    if common.pilot_player_state_fields.is_empty() {
+        common.pilot_player_state_fields = build_pilot_player_state_fields();
+    }
+    if common.veh_player_state_fields.is_empty() {
+        common.veh_player_state_fields = build_veh_player_state_fields();
+    }
+}
+
 /// Raven `MSG_Init` — one-time netf/psf override check, lazy Huffman init, then
 /// zero the `msg_t` and wire its buffer. (`_XBOX` is not defined, so the
 /// override-check block is live.)
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:46-68`
 pub fn MSG_Init(view: &mut EngineHostView, buf: *mut msg_t, data: *mut byte, length: c_int) {
-    // The delta-coder field tables are file-scope statics in Raven; here they
-    // live on `Common` and are populated lazily so the override check below sees
-    // them filled.
-    if view.common.entity_state_fields.is_empty() {
-        view.common.entity_state_fields = build_entity_state_fields();
-    }
-    if view.common.player_state_fields.is_empty() {
-        view.common.player_state_fields = build_player_state_fields();
-    }
-    if view.common.pilot_player_state_fields.is_empty() {
-        view.common.pilot_player_state_fields = build_pilot_player_state_fields();
-    }
-    if view.common.veh_player_state_fields.is_empty() {
-        view.common.veh_player_state_fields = build_veh_player_state_fields();
-    }
+    ensure_field_tables(view.common);
 
     if !view.common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
@@ -1698,18 +1702,7 @@ pub fn MSG_Init(view: &mut EngineHostView, buf: *mut msg_t, data: *mut byte, len
 ///
 /// Source: `oracle/codemp/qcommon/msg.cpp:70-92`
 pub fn MSG_InitOOB(view: &mut EngineHostView, buf: *mut msg_t, data: *mut byte, length: c_int) {
-    if view.common.entity_state_fields.is_empty() {
-        view.common.entity_state_fields = build_entity_state_fields();
-    }
-    if view.common.player_state_fields.is_empty() {
-        view.common.player_state_fields = build_player_state_fields();
-    }
-    if view.common.pilot_player_state_fields.is_empty() {
-        view.common.pilot_player_state_fields = build_pilot_player_state_fields();
-    }
-    if view.common.veh_player_state_fields.is_empty() {
-        view.common.veh_player_state_fields = build_veh_player_state_fields();
-    }
+    ensure_field_tables(view.common);
 
     if !view.common.g_nOverrideChecked {
         // Check for netf overrides, then for psf overrides.
