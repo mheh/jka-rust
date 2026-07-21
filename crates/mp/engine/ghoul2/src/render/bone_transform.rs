@@ -12,30 +12,19 @@
 //! (`render/bone_cache.rs`, `tr_ghoul2.cpp:236,1541`); `Multiply_3x4Matrix` and
 //! the quaternion helpers are the LERP chain it drives.
 //!
-//! **Finding reported upstream (see the porting task's `problems` output, kept
-//! out of the frozen doc per house rules):** `G2_TimingModel`
+//! **`G2_TimingModel` canonical home:** `G2_TimingModel`
 //! (`tr_ghoul2.cpp:1167-1407`) is a private helper called from
 //! `G2_TransformBone`'s body (`:1596`, this file's domain) **and** separately
 //! from `G2_bones.cpp:885` (`bones.rs`'s domain, non-ragdoll bone logic) — it
-//! is not named in either roster row's summary. `bones.rs` (landed) already
-//! attributes its home to `render/bone_cache.rs` in a comment
-//! (`g2_get_bone_anim_index`, citing `tr_ghoul2.cpp:1167`), not to this file;
-//! the skeleton left it unstubbed here to avoid a duplicate/conflicting
-//! *public* definition. But `g2_transform_bone`'s own body (`:1596`) reaches
-//! it directly and `render/bone_cache.rs` has no landed function for it
-//! either (still `todo!()`), so — mirroring the exact precedent `bones.rs`
-//! itself already set for this identical problem (its own module-doc finding
-//! 4) — [`g2_timing_model`] below is a third, file-local, faithful duplicate
-//! (mechanical transcription of `tr_ghoul2.cpp:1167-1407`, not invented
-//! behavior), `pub(self)` and used only by [`g2_transform_bone`]. Unlike
-//! `bones.rs`'s copy (forced to take `&boneInfo_t` by its own call site's
-//! pinned read-only `blist` signature — its module-doc finding 5), this
-//! file's `boneList` comes off `CBoneCache::root_bone_list` (a raw `*mut
-//! Vec<boneInfo_t>`), so this copy takes `&mut boneInfo_t` and performs
-//! Raven's one write (`bone.flags &= ~(BONE_ANIM_TOTAL)`) faithfully — no
-//! signature-forced divergence here. Whichever porter lands
-//! `render/bone_cache.rs`'s real home for `G2_TimingModel` should reconcile
-//! all three copies.
+//! is not named in either roster row's summary and had no landed home, so
+//! `bones.rs` and this file each carried a local duplicate. Those are
+//! reconciled: [`g2_timing_model`] below is the single `pub(crate)` canonical
+//! copy for this crate. It takes `&mut boneInfo_t` and performs Raven's one
+//! write (`bone.flags &= ~(BONE_ANIM_TOTAL)`) faithfully — `g2_transform_bone`
+//! here supplies its real bone (off `CBoneCache::root_bone_list`), while
+//! `bones.rs`'s `g2_get_bone_anim_index`, whose pinned read-only `blist` must
+//! not observe that write, hands it a scratch clone so the write lands on the
+//! throwaway copy (reproducing that call chain's original divergence).
 //!
 //! **Second finding reported upstream (same reason):** `UnCompressBone`
 //! (`tr_ghoul2.cpp:1158-1163`, `/*static inline*/`) and its private helper
@@ -164,16 +153,14 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
         if bone_override.flags & (BONE_ANIM_OVERRIDE_LOOP | BONE_ANIM_OVERRIDE) != 0 {
             // SAFETY: same as the function-level note above.
             let num_frames = unsafe { MdxaView::from_block(bc.header) }.num_frames();
-            let tb = &mut bc.bones[child_idx];
-            let (mut current_frame, mut new_frame, mut backlerp) =
-                (tb.current_frame, tb.new_frame, tb.backlerp);
-            g2_timing_model(
+            let tb = &bc.bones[child_idx];
+            let (current_frame, new_frame, backlerp) = g2_timing_model(
                 bone_override,
                 bc.incoming_time,
                 num_frames,
-                &mut current_frame,
-                &mut new_frame,
-                &mut backlerp,
+                tb.current_frame,
+                tb.new_frame,
+                tb.backlerp,
             );
             let tb = &mut bc.bones[child_idx];
             tb.current_frame = current_frame;
@@ -523,24 +510,36 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
 }
 
 /// Raven `void G2_TimingModel(boneInfo_t &bone,int currentTime,int
-/// numFramesInFile,int &currentFrame,int &newFrame,float &lerp)` — third
-/// file-local faithful duplicate; see the module doc's first finding. Unlike
-/// `bones.rs`'s copy, this one takes `&mut boneInfo_t` (this file's call site
-/// supplies one) and so transcribes Raven's one write
-/// (`bone.flags &= ~(BONE_ANIM_TOTAL)`, the "not override-loop, not
-/// override-freeze, ran off the end" arm) faithfully.
+/// numFramesInFile,int &currentFrame,int &newFrame,float &lerp)` — the
+/// per-bone frame/lerp evaluator; the single canonical copy for this crate,
+/// consumed by [`g2_transform_bone`] (this file, `tr_ghoul2.cpp:1596`) and by
+/// `bones.rs`'s `g2_get_bone_anim_index` (`G2_bones.cpp:885`). It takes
+/// `&mut boneInfo_t` and performs Raven's one write (`bone.flags &=
+/// ~(BONE_ANIM_TOTAL)`, the "not override-loop, not override-freeze, ran off
+/// the end" arm, `:1310`) faithfully. `g2_get_bone_anim_index`'s pinned
+/// read-only `blist` hands it a scratch clone so that write lands on the
+/// throwaway copy — reproducing that call chain's original no-observed-write
+/// divergence — while `g2_transform_bone` passes its real bone.
 ///
-/// Debug-only `assert` bounds checks are not transcribed as runtime effects.
+/// §C7: Raven's three `int&`/`float&` params are in-out references — every arm
+/// but the flags-clear arm assigns all three, and that one arm leaves the
+/// caller's incoming values untouched. Modelled as value-in
+/// (`current_frame`/`new_frame`/`lerp`) plus a `(currentFrame, newFrame,
+/// lerp)` return, so the flags-clear arm passes the incoming values straight
+/// back and each call site stays byte-identical.
+///
+/// Debug-only `assert` bounds checks (NDEBUG in the WinDed build) are not
+/// transcribed as runtime effects.
 ///
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:1167-1407`
-fn g2_timing_model(
+pub(crate) fn g2_timing_model(
     bone: &mut boneInfo_t,
     current_time: i32,
     num_frames_in_file: i32,
-    current_frame: &mut i32,
-    new_frame: &mut i32,
-    lerp: &mut f32,
-) {
+    mut current_frame: i32,
+    mut new_frame: i32,
+    mut lerp: f32,
+) -> (i32, i32, f32) {
     let anim_speed = bone.animSpeed;
     let mut time = if bone.pauseTime != 0 {
         (bone.pauseTime - bone.startTime) as f32 / 50.0
@@ -565,94 +564,95 @@ fn g2_timing_model(
             if bone.flags & BONE_ANIM_OVERRIDE_LOOP != 0 {
                 if anim_speed < 0.0 {
                     if new_frame_g < end_frame + 1.0 && new_frame_g >= end_frame {
-                        *lerp = (end_frame + 1.0) - new_frame_g;
-                        *current_frame = end_frame as i32;
-                        *new_frame = bone.startFrame;
+                        lerp = (end_frame + 1.0) - new_frame_g;
+                        current_frame = end_frame as i32;
+                        new_frame = bone.startFrame;
                     } else {
                         if new_frame_g <= end_frame + 1.0 {
                             new_frame_g = end_frame
                                 + (new_frame_g - end_frame) % (anim_size as f32)
                                 - anim_size as f32;
                         }
-                        *lerp = new_frame_g.ceil() - new_frame_g;
-                        *current_frame = new_frame_g.ceil() as i32;
-                        if *current_frame as f32 <= end_frame + 1.0 {
-                            *new_frame = bone.startFrame;
+                        lerp = new_frame_g.ceil() - new_frame_g;
+                        current_frame = new_frame_g.ceil() as i32;
+                        if current_frame as f32 <= end_frame + 1.0 {
+                            new_frame = bone.startFrame;
                         } else {
-                            *new_frame = *current_frame - 1;
+                            new_frame = current_frame - 1;
                         }
                     }
                 } else if new_frame_g > end_frame - 1.0 && new_frame_g < end_frame {
-                    *lerp = new_frame_g - (new_frame_g as i32) as f32;
-                    *current_frame = new_frame_g as i32;
-                    *new_frame = bone.startFrame;
+                    lerp = new_frame_g - (new_frame_g as i32) as f32;
+                    current_frame = new_frame_g as i32;
+                    new_frame = bone.startFrame;
                 } else {
                     if new_frame_g >= end_frame {
                         new_frame_g = end_frame + (new_frame_g - end_frame) % (anim_size as f32)
                             - anim_size as f32;
                     }
-                    *lerp = new_frame_g - (new_frame_g as i32) as f32;
-                    *current_frame = new_frame_g as i32;
+                    lerp = new_frame_g - (new_frame_g as i32) as f32;
+                    current_frame = new_frame_g as i32;
                     if new_frame_g >= end_frame - 1.0 {
-                        *new_frame = bone.startFrame;
+                        new_frame = bone.startFrame;
                     } else {
-                        *new_frame = *current_frame + 1;
+                        new_frame = current_frame + 1;
                     }
                 }
             } else if bone.flags & BONE_ANIM_OVERRIDE_FREEZE == BONE_ANIM_OVERRIDE_FREEZE {
                 if anim_speed > 0.0 {
-                    *current_frame = bone.endFrame - 1;
+                    current_frame = bone.endFrame - 1;
                 } else {
-                    *current_frame = bone.endFrame + 1;
+                    current_frame = bone.endFrame + 1;
                 }
-                *new_frame = *current_frame;
-                *lerp = 0.0;
+                new_frame = current_frame;
+                lerp = 0.0;
             } else {
                 // if we are supposed to reset the default anim, then do so
                 bone.flags &= !BONE_ANIM_TOTAL;
             }
         } else if anim_speed > 0.0 {
-            *current_frame = new_frame_g as i32;
-            *lerp = new_frame_g - *current_frame as f32;
-            *new_frame = *current_frame + 1;
-            if *new_frame >= end_frame as i32 {
+            current_frame = new_frame_g as i32;
+            lerp = new_frame_g - current_frame as f32;
+            new_frame = current_frame + 1;
+            if new_frame >= end_frame as i32 {
                 if bone.flags & BONE_ANIM_OVERRIDE_LOOP != 0 {
-                    *new_frame = bone.startFrame;
+                    new_frame = bone.startFrame;
                 } else {
-                    *new_frame = bone.endFrame - 1;
+                    new_frame = bone.endFrame - 1;
                 }
             }
         } else {
-            *lerp = new_frame_g.ceil() - new_frame_g;
-            *current_frame = new_frame_g.ceil() as i32;
-            if *current_frame > bone.startFrame {
-                *current_frame = bone.startFrame;
-                *new_frame = *current_frame;
-                *lerp = 0.0;
+            lerp = new_frame_g.ceil() - new_frame_g;
+            current_frame = new_frame_g.ceil() as i32;
+            if current_frame > bone.startFrame {
+                current_frame = bone.startFrame;
+                new_frame = current_frame;
+                lerp = 0.0;
             } else {
-                *new_frame = *current_frame - 1;
-                if (*new_frame as f32) < end_frame + 1.0 {
+                new_frame = current_frame - 1;
+                if (new_frame as f32) < end_frame + 1.0 {
                     if bone.flags & BONE_ANIM_OVERRIDE_LOOP != 0 {
-                        *new_frame = bone.startFrame;
+                        new_frame = bone.startFrame;
                     } else {
-                        *new_frame = bone.endFrame + 1;
+                        new_frame = bone.endFrame + 1;
                     }
                 }
             }
         }
     } else {
         if anim_speed < 0.0 {
-            *current_frame = bone.endFrame + 1;
+            current_frame = bone.endFrame + 1;
         } else {
-            *current_frame = bone.endFrame - 1;
+            current_frame = bone.endFrame - 1;
         }
-        if *current_frame < 0 {
-            *current_frame = 0;
+        if current_frame < 0 {
+            current_frame = 0;
         }
-        *new_frame = *current_frame;
-        *lerp = 0.0;
+        new_frame = current_frame;
+        lerp = 0.0;
     }
     let _ = num_frames_in_file; // only consulted by the debug-only asserts above
+    (current_frame, new_frame, lerp)
 }
 
 /// Raven `void Multiply_3x4Matrix(mdxaBone_t *out, mdxaBone_t *in2, mdxaBone_t
@@ -979,17 +979,7 @@ mod tests {
     #[test]
     fn g2_timing_model_steady_forward_playback() {
         let mut bone = make_bone(0, 10, 0, 1.0, 0);
-        let mut current_frame = 0;
-        let mut new_frame = 0;
-        let mut lerp = 0.0;
-        g2_timing_model(
-            &mut bone,
-            100,
-            100,
-            &mut current_frame,
-            &mut new_frame,
-            &mut lerp,
-        );
+        let (current_frame, new_frame, lerp) = g2_timing_model(&mut bone, 100, 100, 0, 0, 0.0);
         // time = 100/50 = 2.0, newFrame_g = 0 + 2.0*1.0 = 2.0
         assert_eq!(current_frame, 2);
         assert_eq!(new_frame, 3);
@@ -1001,18 +991,8 @@ mod tests {
         // Runs off the end with neither BONE_ANIM_OVERRIDE_LOOP nor
         // BONE_ANIM_OVERRIDE_FREEZE set: Raven clears BONE_ANIM_TOTAL bits.
         let mut bone = make_bone(0, 5, BONE_ANIM_OVERRIDE, 1.0, 0);
-        let mut current_frame = 0;
-        let mut new_frame = 0;
-        let mut lerp = 0.0;
         // time = 10000/50 = 200 -> way past endFrame(5)-1
-        g2_timing_model(
-            &mut bone,
-            10_000,
-            100,
-            &mut current_frame,
-            &mut new_frame,
-            &mut lerp,
-        );
+        let _ = g2_timing_model(&mut bone, 10_000, 100, 0, 0, 0.0);
         assert_eq!(bone.flags & BONE_ANIM_TOTAL, 0);
     }
 

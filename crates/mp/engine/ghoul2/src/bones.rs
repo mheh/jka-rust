@@ -42,24 +42,21 @@
 //!    arm), the gap does not apply and the body resolves the model for real.
 //!
 //! **Further findings reported upstream while filling this file's bodies:**
-//! 4. `G2_TimingModel` (`oracle/codemp/renderer/tr_ghoul2.cpp:1167-1407`) has
-//!    no landed Rust home anywhere in this crate: `render/bone_transform.rs`'s
-//!    own module doc explicitly left it unstubbed pending `render/
-//!    bone_cache.rs`, while `G2_bones.cpp:885` (this file's own
-//!    `g2_get_bone_anim_index`) is the *other* call site. `g2_timing_model`
-//!    below is a local, faithful duplicate (mechanical transcription, not
-//!    invented behavior) so that function has a real body; whichever porter
-//!    lands `render/bone_cache.rs` should reconcile the two copies.
-//! 5. `g2_get_bone_anim_index`'s frozen skeleton signature takes `blist: &[
-//!    boneInfo_t]` (read-only), but the oracle's `G2_TimingModel` call takes
-//!    `blist[index]` by mutable reference and, on one path (not
-//!    override-loop, not override-freeze, animation ran off the end), writes
-//!    `bone.flags &= ~(BONE_ANIM_TOTAL)` back into it (`tr_ghoul2.cpp:1310`).
-//!    That write is unreachable through the pinned read-only signature —
-//!    reported upstream as a genuinely-wrong-for-this-call-chain signature
-//!    (porting-rules §F: pinned signatures are LAW, not improvised around);
-//!    `g2_timing_model` below takes `&boneInfo_t` and simply does not perform
-//!    that one write, a documented divergence forced by the frozen signature.
+//! 4. `G2_TimingModel` (`oracle/codemp/renderer/tr_ghoul2.cpp:1167-1407`) is
+//!    called from two sites — `G2_TransformBone` (`render/bone_transform.rs`,
+//!    `:1596`) and `G2_bones.cpp:885` (this file's `g2_get_bone_anim_index`).
+//!    Its single canonical home is `render/bone_transform.rs`'s `pub(crate)`
+//!    [`g2_timing_model`](crate::render::bone_transform::g2_timing_model),
+//!    imported here (the earlier local duplicate is retired).
+//! 5. That canonical takes `&mut boneInfo_t` and performs Raven's one write
+//!    (`bone.flags &= ~(BONE_ANIM_TOTAL)`, the "not override-loop, not
+//!    override-freeze, ran off the end" arm, `tr_ghoul2.cpp:1310`). But
+//!    `g2_get_bone_anim_index`'s frozen skeleton signature takes
+//!    `blist: &[boneInfo_t]` (read-only, pinned — porting-rules §F: signatures
+//!    are LAW), so it cannot and must not observe that write. It passes the
+//!    canonical a scratch clone of the bone; the write lands on the throwaway
+//!    copy and the real `blist` entry is untouched — reproducing this call
+//!    chain's original no-observed-write behavior exactly.
 
 use core::ffi::c_void;
 
@@ -71,6 +68,7 @@ use crate::ghoul2_system::Ghoul2System;
 use crate::mdx::mdxa::MdxaView;
 use crate::mdx::mdxm::MdxmView;
 use crate::ragdoll_update_params::RagDollUpdateParams;
+use crate::render::bone_transform::g2_timing_model;
 use crate::shared::bone_info_t::boneInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
@@ -113,144 +111,6 @@ const BONE_NEED_TRANSFORM: i32 = 0x8000;
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:1200`
 const RAG_PCJ_IK_CONTROLLED: i32 = 0x08000;
-
-// ---------------------------------------------------------------------------
-// Local duplicate of `G2_TimingModel` (module doc findings 4/5).
-// ---------------------------------------------------------------------------
-
-/// Raven `void G2_TimingModel(boneInfo_t &bone, int currentTime, int
-/// numFramesInFile, int &currentFrame, int &newFrame, float &lerp)` — the
-/// per-bone frame/lerp evaluator [`g2_get_bone_anim_index`] needs (module doc
-/// finding 4). Debug-only `assert` bounds checks (NDEBUG in the WinDed build)
-/// are not transcribed as runtime effects, matching this crate's existing
-/// treatment of Raven `assert(...)` throughout.
-///
-/// Takes `bone: &boneInfo_t` (not `&mut`, unlike Raven's `boneInfo_t &bone`):
-/// the one write this function performs in Raven (`bone.flags &=
-/// ~(BONE_ANIM_TOTAL)`, the "not override-loop, not override-freeze, ran off
-/// the end" arm) is not reachable through [`g2_get_bone_anim_index`]'s pinned
-/// read-only `blist` — module doc finding 5, a documented divergence forced
-/// by the frozen signature, not performed here.
-///
-/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:1167-1407`
-fn g2_timing_model(
-    bone: &boneInfo_t,
-    current_time: i32,
-    current_frame: &mut i32,
-    new_frame: &mut i32,
-    lerp: &mut f32,
-) {
-    let anim_speed = bone.animSpeed;
-    let mut time = if bone.pauseTime != 0 {
-        (bone.pauseTime - bone.startTime) as f32 / 50.0
-    } else {
-        (current_time - bone.startTime) as f32 / 50.0
-    };
-    if time < 0.0 {
-        time = 0.0;
-    }
-    let mut new_frame_g = bone.startFrame as f32 + (time * anim_speed);
-
-    let anim_size = bone.endFrame - bone.startFrame;
-    // Raven shadows `endFrame` with this float twin (`(float)bone.endFrame`)
-    // for the rest of the function; every bare `endFrame` reference below is
-    // this local, not `bone.endFrame` directly.
-    let end_frame = bone.endFrame as f32;
-
-    if anim_size != 0 {
-        if (anim_speed > 0.0 && new_frame_g > end_frame - 1.0)
-            || (anim_speed < 0.0 && new_frame_g < end_frame + 1.0)
-        {
-            if bone.flags & BONE_ANIM_OVERRIDE_LOOP != 0 {
-                if anim_speed < 0.0 {
-                    if new_frame_g < end_frame + 1.0 && new_frame_g >= end_frame {
-                        *lerp = (end_frame + 1.0) - new_frame_g;
-                        *current_frame = end_frame as i32;
-                        *new_frame = bone.startFrame;
-                    } else {
-                        if new_frame_g <= end_frame + 1.0 {
-                            new_frame_g = end_frame
-                                + (new_frame_g - end_frame) % (anim_size as f32)
-                                - anim_size as f32;
-                        }
-                        *lerp = new_frame_g.ceil() - new_frame_g;
-                        *current_frame = new_frame_g.ceil() as i32;
-                        if *current_frame as f32 <= end_frame + 1.0 {
-                            *new_frame = bone.startFrame;
-                        } else {
-                            *new_frame = *current_frame - 1;
-                        }
-                    }
-                } else if new_frame_g > end_frame - 1.0 && new_frame_g < end_frame {
-                    *lerp = new_frame_g - (new_frame_g as i32) as f32;
-                    *current_frame = new_frame_g as i32;
-                    *new_frame = bone.startFrame;
-                } else {
-                    if new_frame_g >= end_frame {
-                        new_frame_g = end_frame + (new_frame_g - end_frame) % (anim_size as f32)
-                            - anim_size as f32;
-                    }
-                    *lerp = new_frame_g - (new_frame_g as i32) as f32;
-                    *current_frame = new_frame_g as i32;
-                    if new_frame_g >= end_frame - 1.0 {
-                        *new_frame = bone.startFrame;
-                    } else {
-                        *new_frame = *current_frame + 1;
-                    }
-                }
-            } else if bone.flags & BONE_ANIM_OVERRIDE_FREEZE == BONE_ANIM_OVERRIDE_FREEZE {
-                if anim_speed > 0.0 {
-                    *current_frame = bone.endFrame - 1;
-                } else {
-                    *current_frame = bone.endFrame + 1;
-                }
-                *new_frame = *current_frame;
-                *lerp = 0.0;
-            }
-            // else: Raven clears `bone.flags &= ~(BONE_ANIM_TOTAL)` here —
-            // unreachable through this fn's `&boneInfo_t` (module doc finding 5).
-        } else if anim_speed > 0.0 {
-            *current_frame = new_frame_g as i32;
-            *lerp = new_frame_g - *current_frame as f32;
-            *new_frame = *current_frame + 1;
-            if *new_frame >= end_frame as i32 {
-                if bone.flags & BONE_ANIM_OVERRIDE_LOOP != 0 {
-                    *new_frame = bone.startFrame;
-                } else {
-                    *new_frame = bone.endFrame - 1;
-                }
-            }
-        } else {
-            *lerp = new_frame_g.ceil() - new_frame_g;
-            *current_frame = new_frame_g.ceil() as i32;
-            if *current_frame > bone.startFrame {
-                *current_frame = bone.startFrame;
-                *new_frame = *current_frame;
-                *lerp = 0.0;
-            } else {
-                *new_frame = *current_frame - 1;
-                if (*new_frame as f32) < end_frame + 1.0 {
-                    if bone.flags & BONE_ANIM_OVERRIDE_LOOP != 0 {
-                        *new_frame = bone.startFrame;
-                    } else {
-                        *new_frame = bone.endFrame + 1;
-                    }
-                }
-            }
-        }
-    } else {
-        if anim_speed < 0.0 {
-            *current_frame = bone.endFrame + 1;
-        } else {
-            *current_frame = bone.endFrame - 1;
-        }
-        if *current_frame < 0 {
-            *current_frame = 0;
-        }
-        *new_frame = *current_frame;
-        *lerp = 0.0;
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Private helpers (file-scope in the oracle .cpp, not declared in
@@ -1280,8 +1140,8 @@ pub fn g2_set_bone_anim_index(
 /// const int currentTime, float *currentFrame, int *startFrame, *endFrame,
 /// *flags, float *retAnimSpeed, qhandle_t *modelList, int numFrames)` —
 /// bounds-checks `index`; if animating, calls the render-side `G2_TimingModel`
-/// (`render/bone_cache.rs`'s home, `tr_ghoul2.cpp:1167` — cross-file call, not
-/// defined in this file, duplicated locally per module doc finding 4) to
+/// (canonical `g2_timing_model` in `render/bone_transform.rs`, `tr_ghoul2.cpp:
+/// 1167` — cross-file call, module doc findings 4/5) to
 /// derive the lerped current frame and writes all out-params, else zeroes
 /// them and returns `qfalse`. `model_list` is present in the oracle signature
 /// but **never read** in the body (`G2_bones.cpp:872-901`) — kept for 1:1
@@ -1301,24 +1161,23 @@ pub fn g2_get_bone_anim_index(
     model_list: &[qhandle_t],
     num_frames: i32,
 ) -> bool {
-    // Raven's `numFrames` feeds `G2_TimingModel`'s `numFramesInFile` param,
-    // which only backs debug-only bounds `assert`s (skipped here, matching
-    // this crate's existing assert-skipping convention) — genuinely unused
-    // by the live logic.
-    let _ = (model_list, num_frames);
+    // `model_list` is never read in the body (kept for signature fidelity);
+    // `num_frames` feeds the canonical `g2_timing_model`'s `numFramesInFile`
+    // param, which only backs debug-only bounds `assert`s (skipped, matching
+    // this crate's assert-skipping convention).
+    let _ = model_list;
     if index >= 0 && (index as usize) < blist.len() && blist[index as usize].boneNumber != -1 {
         let bone = &blist[index as usize];
         if bone.flags & (BONE_ANIM_OVERRIDE_LOOP | BONE_ANIM_OVERRIDE) != 0 {
-            let mut local_current_frame = 0i32;
-            let mut local_new_frame = 0i32;
-            let mut local_lerp = 0.0f32;
-            g2_timing_model(
-                bone,
-                current_time,
-                &mut local_current_frame,
-                &mut local_new_frame,
-                &mut local_lerp,
-            );
+            // The canonical `g2_timing_model` takes `&mut boneInfo_t` to perform
+            // Raven's one flags-clear write; this call chain's pinned read-only
+            // `blist` must not observe it, so hand it a throwaway clone (module
+            // doc finding 5) and keep reading the untouched `blist` entry below.
+            // Raven seeds all three refs to 0 here, so the (unused) `new_frame`
+            // result and the flags-clear arm's pass-through match exactly.
+            let mut scratch = bone.clone();
+            let (local_current_frame, _local_new_frame, local_lerp) =
+                g2_timing_model(&mut scratch, current_time, num_frames, 0, 0, 0.0);
             *current_frame = local_current_frame as f32 + local_lerp;
             *start_frame = bone.startFrame;
             *end_frame = bone.endFrame;
