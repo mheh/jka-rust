@@ -15,6 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_SoundOnEnt;
 use crate::teams::class::class_t;
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 
@@ -1694,7 +1695,7 @@ pub fn G_DroidSounds(ctx: &mut GameContext, self_: EntityId) {
             };
 
             if let Some(sound_path) = sound_path {
-                crate::g_utils::G_SoundOnEnt(ctx, self_, CHAN_AUTO, cstr(&sound_path).as_ptr());
+                G_SoundOnEnt(ctx, self_, CHAN_AUTO, &sound_path);
             }
 
             let duration = ctx.world.bg_state.rng.Q_irand(2000, 4000);

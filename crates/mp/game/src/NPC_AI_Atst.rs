@@ -47,15 +47,15 @@ pub const RIGHT_ARM_HEALTH: c_int = 40;
 /// Source: `oracle/codemp/game/NPC_AI_Atst.c:20-34`
 pub fn NPC_ATST_Precache(ctx: &mut GameContext) {
     // SAFETY: G_SoundIndex, G_EffectIndex, RegisterItem accessed through game context.
-    G_SoundIndex(b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/atst/atst_damaged1");
+    G_SoundIndex("sound/chars/atst/atst_damaged2");
 
     RegisterItem(ctx, BG_FindItemForWeapon(WP_BOWCASTER));
     RegisterItem(ctx, BG_FindItemForWeapon(WP_ROCKET_LAUNCHER));
 
-    G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"explosions/droidexplosion1\0".as_ptr() as *const c_char);
+    G_EffectIndex("env/med_explode2");
+    G_EffectIndex("blaster/smoke_bolton");
+    G_EffectIndex("explosions/droidexplosion1");
 }
 
 /// Raven `G_ATSTCheckPain`.
@@ -73,15 +73,13 @@ pub fn G_ATSTCheckPain(
             ctx,
             self_,
             CHAN_LESS_ATTEN,
-            b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char,
-        );
+            "sound/chars/atst/atst_damaged1");
     } else {
         G_SoundOnEnt(
             ctx,
             self_,
             CHAN_LESS_ATTEN,
-            b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char,
-        );
+            "sound/chars/atst/atst_damaged2");
     }
 }
 

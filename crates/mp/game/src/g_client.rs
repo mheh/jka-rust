@@ -30,6 +30,7 @@ use crate::g_session::{G_InitSessionData, G_ReadSessionData, G_WriteClientSessio
 use crate::g_team::{SelectCTFSpawnPoint, SelectSiegeSpawnPoint, TeamName};
 use crate::g_utils::{G_EntitySound, G_MuteSound, G_PlayerHasCustomSkeleton};
 use crate::prelude::*;
+use crate::g_utils::G_ModelIndex;
 use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
 use crate::w_force::{WP_ForcePowerStop, WP_HasForcePowers, WP_InitForcePowers};
@@ -445,8 +446,7 @@ pub fn JMSaberThink(ctx: &mut GameContext, ent: EntityId) {
             e.s.pos.trBase = enemy_trbase;
             e.s.origin = enemy_trbase;
             e.r.currentOrigin = enemy_trbase;
-            e.s.modelindex = crate::g_utils::G_ModelIndex(
-                b"models/weapons2/saber/saber_w.glm\0".as_ptr() as *const c_char,
+            e.s.modelindex = G_ModelIndex("models/weapons2/saber/saber_w.glm",
             );
             e.s.eFlags &= !EF_NODRAW;
             e.s.modelGhoul2 = 1;
@@ -605,7 +605,7 @@ pub fn SP_info_jedimaster_start(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.entity_mut(ent).flags = FL_BOUNCE_HALF;
 
     ctx.world.entity_mut(ent).s.modelindex =
-        G_ModelIndex(b"models/weapons2/saber/saber_w.glm\0".as_ptr() as *const c_char);
+        G_ModelIndex("models/weapons2/saber/saber_w.glm");
     ctx.world.entity_mut(ent).s.modelGhoul2 = 1;
     ctx.world.entity_mut(ent).s.g2radius = 20;
     // (*ent).s.eType = ET_GENERAL;
@@ -2194,7 +2194,7 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
         ctx,
         ent,
         CHAN_VOICE,
-        G_SoundIndex(cstr("*pain25.wav").as_ptr()),
+        G_SoundIndex("*pain25.wav"),
     );
     // FIXME: A nice bone snapping sound instead if possible
     let n = ctx.world.bg_state.rng.Q_irand(1, 3);
@@ -2202,7 +2202,7 @@ pub fn G_BreakArm(ctx: &mut GameContext, ent: EntityId, arm: c_int) {
         ctx,
         Some(ent),
         CHAN_AUTO,
-        G_SoundIndex(cstr(&format!("sound/player/bodyfall_human{}.wav", n)).as_ptr()),
+        G_SoundIndex(&format!("sound/player/bodyfall_human{}.wav", n)),
     );
 }
 
@@ -3669,9 +3669,9 @@ pub fn SetupGameGhoul2Model(
                         if !(*ent).client.is_null() && (*((*ent).client)).NPC_class == CLASS_VEHICLE
                         {
                             // vehicles are tricky and send over their vehicle names as the model
-                            (*ent).s.modelindex = G_ModelIndex(vehicleName.as_ptr());
+                            (*ent).s.modelindex = G_ModelIndex(&cstr_to_str(vehicleName.as_ptr()));
                         } else {
-                            (*ent).s.modelindex = G_ModelIndex(modelFullPath.as_ptr());
+                            (*ent).s.modelindex = G_ModelIndex(&cstr_to_str(modelFullPath.as_ptr()));
                         }
                     }
                 }

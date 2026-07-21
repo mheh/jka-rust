@@ -43,6 +43,7 @@
 use crate::bg_channel::GameBgTraps;
 use crate::g_utils::G_SoundIndex;
 use crate::prelude::*;
+use crate::g_utils::G_EffectIndex;
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
     AngleSubtract, AngleVectors, VectorNormalize,
@@ -515,7 +516,7 @@ pub fn Board(ctx: &mut GameContext, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)
                         ctx,
                         Some(parent_id),
                         CHAN_AUTO,
-                        G_SoundIndex(c"sound/vehicles/common/release.wav".as_ptr()),
+                        G_SoundIndex("sound/vehicles/common/release.wav"),
                     );
                     let debounce = ctx.world.entity(parent_id).fly_sound_debounce_time;
                     if debounce != 0 {
@@ -888,7 +889,7 @@ pub fn StartDeathDelay(ctx: &mut GameContext, pVeh: *mut Vehicle_t, iDelayTimeOv
     }
 
     if unsafe { (*vi).flammable } != qfalse {
-        let snd = G_SoundIndex(c"sound/vehicles/common/fire_lp.wav".as_ptr());
+        let snd = G_SoundIndex("sound/vehicles/common/fire_lp.wav");
         let client = ctx.world.entity(parent_id).client;
         ctx.world.entity_mut(parent_id).s.loopSound = snd;
         // FLAG: pool client (recipe 2b) — deref stays raw.
@@ -2423,7 +2424,7 @@ pub fn G_FlyVehicleDestroySurface(
                 ctx,
                 pilot_id,
                 CHAN_VOICE,
-                G_SoundIndex(c"*falling1.wav".as_ptr()),
+                G_SoundIndex("*falling1.wav"),
             );
         }
     }
@@ -2963,7 +2964,7 @@ pub fn DeathUpdate(ctx: &mut GameContext, pVeh: *mut Vehicle_t) {
                         bottom[2] += 2.0;
                         fxAng = [-90.0, 0.0, 0.0];
                         crate::g_utils::G_PlayEffectID(
-                            crate::g_utils::G_EffectIndex(c"ships/ship_explosion_mark".as_ptr()),
+                            G_EffectIndex("ships/ship_explosion_mark"),
                             trace.endpos,
                             fxAng,
                         );

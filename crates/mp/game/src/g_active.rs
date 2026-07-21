@@ -253,21 +253,21 @@ pub fn P_WorldEffects(ctx: &mut GameContext, ent: EntityId) {
                             ctx,
                             Some(ent),
                             CHAN_VOICE as c_int,
-                            G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
+                            G_SoundIndex("sound/player/gurp1.wav"),
                         );
                     } else if ctx.world.bg_state.rng.rand() & 1 != 0 {
                         G_Sound(
                             ctx,
                             Some(ent),
                             CHAN_VOICE as c_int,
-                            G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
+                            G_SoundIndex("sound/player/gurp1.wav"),
                         );
                     } else {
                         G_Sound(
                             ctx,
                             Some(ent),
                             CHAN_VOICE as c_int,
-                            G_SoundIndex(cstr("sound/player/gurp2.wav").as_ptr()),
+                            G_SoundIndex("sound/player/gurp2.wav"),
                         );
                     }
 
@@ -1277,7 +1277,7 @@ pub fn ClientEvents(ctx: &mut GameContext, ent: EntityId, oldEventSequence: c_in
                             ctx,
                             Some(ent),
                             CHAN_AUTO as c_int,
-                            G_SoundIndex(cstr("sound/player/fallsplat.wav").as_ptr()),
+                            G_SoundIndex("sound/player/fallsplat.wav"),
                         );
                     }
                     break 'blk;
@@ -1855,23 +1855,23 @@ pub fn G_CheckMovingLoopingSounds(ctx: &mut GameContext, ent: EntityId, ucmd: *m
                 match (*cl).NPC_class {
                     CLASS_R2D2 => {
                         ctx.world.entity_mut(ent).s.loopSound =
-                            G_SoundIndex(cstr("sound/chars/r2d2/misc/r2_move_lp.wav").as_ptr());
+                            G_SoundIndex("sound/chars/r2d2/misc/r2_move_lp.wav");
                     }
                     CLASS_R5D2 => {
                         ctx.world.entity_mut(ent).s.loopSound =
-                            G_SoundIndex(cstr("sound/chars/r2d2/misc/r2_move_lp2.wav").as_ptr());
+                            G_SoundIndex("sound/chars/r2d2/misc/r2_move_lp2.wav");
                     }
                     CLASS_MARK2 => {
                         ctx.world.entity_mut(ent).s.loopSound =
-                            G_SoundIndex(cstr("sound/chars/mark2/misc/mark2_move_lp").as_ptr());
+                            G_SoundIndex("sound/chars/mark2/misc/mark2_move_lp");
                     }
                     CLASS_MOUSE => {
                         ctx.world.entity_mut(ent).s.loopSound =
-                            G_SoundIndex(cstr("sound/chars/mouse/misc/mouse_lp").as_ptr());
+                            G_SoundIndex("sound/chars/mouse/misc/mouse_lp");
                     }
                     CLASS_PROBE => {
                         ctx.world.entity_mut(ent).s.loopSound =
-                            G_SoundIndex(cstr("sound/chars/probe/misc/probedroidloop").as_ptr());
+                            G_SoundIndex("sound/chars/probe/misc/probedroidloop");
                     }
                     _ => {}
                 }
@@ -2498,7 +2498,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                         ctx,
                         ctx.entity_id_of(grabbed),
                         CHAN_AUTO as c_int,
-                        G_SoundIndex(cstr("sound/player/roll1.wav").as_ptr()),
+                        G_SoundIndex("sound/player/roll1.wav"),
                     );
                 }
             }
@@ -2925,7 +2925,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                         (*thClient).doingThrow = 0;
 
                         (*thClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
-                        G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain25.wav").as_ptr()));
+                        G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex("*pain25.wav"));
 
                         (*client).ps.forceDodgeAnim = 2;
                         (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
@@ -2951,8 +2951,8 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                         (*client).ps.velocity[1] = vDif[1] * vScale;
                         (*client).ps.velocity[2] = 400.0;
 
-                        G_EntitySound(ctx, ctx.entity_id_of(ent).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain100.wav").as_ptr()));
-                        G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*jump1.wav").as_ptr()));
+                        G_EntitySound(ctx, ctx.entity_id_of(ent).unwrap(), CHAN_VOICE as c_int, G_SoundIndex("*pain100.wav"));
+                        G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex("*jump1.wav"));
 
                         // Set the thrower as the "other killer", so if we die from
                         // fall/impact damage he is credited.
@@ -3015,7 +3015,7 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                             (*thClient).doingThrow = 0;
 
                             (*thClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
-                            G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex(cstr("*pain25.wav").as_ptr()));
+                            G_EntitySound(ctx, ctx.entity_id_of(thrower).unwrap(), CHAN_VOICE as c_int, G_SoundIndex("*pain25.wav"));
 
                             (*client).ps.forceDodgeAnim = 2;
                             (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
@@ -3757,13 +3757,10 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                     );
 
                     let face_kicked_eid = ctx.entity_id_of(faceKicked);
-                    let punch_sound = G_SoundIndex(
-                        cstr(&format!(
+                    let punch_sound = G_SoundIndex(&format!(
                             "sound/weapons/melee/punch{}",
                             ctx.world.bg_state.rng.Q_irand(1, 4)
-                        ))
-                        .as_ptr(),
-                    );
+                        ));
                     if (*fkClient).ps.weapon != WP_SABER
                         || (*fkClient).ps.fd.saberAnimLevel != FORCE_LEVEL_3
                         || (BG_SaberInAttack((*fkClient).ps.saberMove) == qfalse

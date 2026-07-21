@@ -12,6 +12,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_SoundIndex;
 
 // These define the working combat range for these suckers (`NPC_AI_Rancor.c:10-17`).
 const MIN_DISTANCE: c_int = 128;
@@ -55,14 +56,10 @@ pub fn Rancor_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
 /// Source: `oracle/codemp/game/NPC_AI_Rancor.c:36-45`
 pub fn NPC_Rancor_Precache(ctx: &mut GameContext) {
     for i in 1..3 {
-        crate::g_utils::G_SoundIndex(
-            std::ffi::CString::new(format!("sound/chars/rancor/snort_{}.wav", i))
-                .unwrap()
-                .as_ptr(),
-        );
+        G_SoundIndex(&format!("sound/chars/rancor/snort_{}.wav", i));
     }
-    crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr());
+    G_SoundIndex("sound/chars/rancor/swipehit.wav");
+    G_SoundIndex("sound/chars/rancor/chomp.wav");
 }
 
 /// Raven `Rancor_Idle`.
@@ -353,7 +350,7 @@ pub fn Rancor_Swing(ctx: &mut GameContext, tryGrab: qboolean) {
                         ctx,
                         Some(radiusEnt_id),
                         CHAN_AUTO,
-                        crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
+                        G_SoundIndex("sound/chars/rancor/swipehit.wav"),
                     );
                     //actually push the enemy
                     /*
@@ -451,7 +448,7 @@ pub fn Rancor_Smash(ctx: &mut GameContext) {
                     ctx,
                     Some(radiusEnt_id),
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
+                    G_SoundIndex("sound/chars/rancor/swipehit.wav"),
                 );
                 if distSq < halfRadSquared {
                     let damage = ctx.world.bg_state.rng.Q_irand(10, 25);
@@ -597,7 +594,7 @@ pub fn Rancor_Bite(ctx: &mut GameContext) {
                     ctx,
                     Some(radiusEnt_id),
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()),
+                    G_SoundIndex("sound/chars/rancor/chomp.wav"),
                 );
             }
         }
@@ -796,7 +793,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             ctx,
                             Some(activator_id),
                             CHAN_AUTO,
-                            crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()),
+                            G_SoundIndex("sound/chars/rancor/chomp.wav"),
                         );
                     }
                 }
@@ -868,8 +865,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             ctx,
                             Some(activator_id),
                             CHAN_AUTO,
-                            crate::g_utils::G_SoundIndex(
-                                c"sound/chars/rancor/swipehit.wav".as_ptr(),
+                            G_SoundIndex("sound/chars/rancor/swipehit.wav",
                             ),
                         );
                         let activator_health = ctx.world.entity(activator_id).health;
@@ -902,7 +898,7 @@ pub fn Rancor_Attack(ctx: &mut GameContext, distance: f32, doCharge: qboolean) {
                             ctx,
                             Some(activator_id),
                             CHAN_AUTO,
-                            crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()),
+                            G_SoundIndex("sound/chars/rancor/chomp.wav"),
                         );
                         //FIXME: sometimes end up with a live one in our mouths?
                         //just make sure they're dead
@@ -1408,13 +1404,10 @@ pub fn NPC_BSRancor_Default(ctx: &mut GameContext) {
         }
         */
         if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"angrynoise".as_ptr()) != 0 {
-            let sound_index = crate::g_utils::G_SoundIndex(
-                cstr(&format!(
+            let sound_index = G_SoundIndex(&format!(
                     "sound/chars/rancor/misc/anger{}.wav",
                     ctx.world.bg_state.rng.Q_irand(1, 3)
-                ))
-                .as_ptr(),
-            );
+                ));
             crate::g_utils::G_Sound(ctx, Some(npc_id), CHAN_AUTO, sound_index);
 
             let angrynoise = ctx.world.bg_state.rng.Q_irand(5000, 10000);
@@ -1500,13 +1493,10 @@ pub fn NPC_BSRancor_Default(ctx: &mut GameContext) {
         Rancor_Combat(ctx);
     } else {
         if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"idlenoise".as_ptr()) != 0 {
-            let sound_index = crate::g_utils::G_SoundIndex(
-                cstr(&format!(
+            let sound_index = G_SoundIndex(&format!(
                     "sound/chars/rancor/snort_{}.wav",
                     ctx.world.bg_state.rng.Q_irand(1, 2)
-                ))
-                .as_ptr(),
-            );
+                ));
             crate::g_utils::G_Sound(ctx, Some(npc_id), CHAN_AUTO, sound_index);
 
             let idlenoise = ctx.world.bg_state.rng.Q_irand(2000, 4000);

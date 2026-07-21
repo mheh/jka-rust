@@ -303,7 +303,7 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
             let healingsound = ctx.entity(id).healingsound;
             if !healingsound.is_null() && *healingsound != 0 {
                 //yeah...this can be used for anything, so.. precache it if it's there
-                G_SoundIndex(healingsound);
+                G_SoundIndex(&cstr_to_str(healingsound));
             }
             let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
             crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent_ptr);
@@ -1382,7 +1382,7 @@ pub fn G_PrecacheSoundsets(ctx: &mut GameContext) {
                     // Com_Error(ERR_DROP, ...) -> panic
                 }
 
-                let idx = G_SoundSetIndex(ctx, soundSet);
+                let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
                 ctx.world.g_entities[i].s.soundSetIndex = idx;
                 counted_sets += 1;
             }

@@ -1500,7 +1500,7 @@ pub fn SP_info_siege_objective(ctx: &mut GameContext, ent: EntityId) {
             // We have an icon, so index it now. We are reusing the
             // genericenemyindex variable rather than adding a new one to the
             // entity state.
-            let idx = G_IconIndex(ctx, s as *const c_char);
+            let idx = G_IconIndex(ctx, &cstr_to_str(s));
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
 
@@ -1573,7 +1573,7 @@ pub fn SP_info_siege_radaricon(ctx: &mut GameContext, ent: EntityId) {
 
         ctx.world.entity_mut(ent).use_ = Some(EntUse::SiegeIconUse).into();
 
-        let idx = G_IconIndex(ctx, s as *const c_char);
+        let idx = G_IconIndex(ctx, &cstr_to_str(s));
         ctx.world.entity_mut(ent).s.genericenemyindex = idx;
 
         trap::LinkEntity(
@@ -2273,7 +2273,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
 
         if !s.is_null() && *s != 0 {
             // We have a pickup sound, so index it now.
-            ctx.world.entity_mut(ent).noise_index = G_SoundIndex(s as *const c_char);
+            ctx.world.entity_mut(ent).noise_index = G_SoundIndex(&cstr_to_str(s));
         }
 
         G_SpawnString(
@@ -2285,7 +2285,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
 
         if !s.is_null() && *s != 0 {
             // We have a death effect, so index it now.
-            ctx.world.entity_mut(ent).genericValue3 = G_EffectIndex(s as *const c_char);
+            ctx.world.entity_mut(ent).genericValue3 = G_EffectIndex(&cstr_to_str(s));
         }
 
         G_SpawnString(
@@ -2297,7 +2297,7 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
 
         if !s.is_null() && *s != 0 {
             // We have a respawn effect, so index it now.
-            ctx.world.entity_mut(ent).genericValue10 = G_EffectIndex(s as *const c_char);
+            ctx.world.entity_mut(ent).genericValue10 = G_EffectIndex(&cstr_to_str(s));
         }
 
         G_SpawnString(
@@ -2311,12 +2311,12 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
             // We have an icon, so index it now. We are reusing the
             // genericenemyindex variable rather than adding a new one to the
             // entity state.
-            let idx = G_IconIndex(ctx, s as *const c_char);
+            let idx = G_IconIndex(ctx, &cstr_to_str(s));
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
 
         let model = ctx.world.entity(ent).model;
-        ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(model as *const c_char);
+        ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(&cstr_to_str(model));
 
         // Is the model a ghoul2 model?
         // Raven indexes `model[strlen(model) - 4]`, which underflows for names

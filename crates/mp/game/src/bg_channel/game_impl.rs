@@ -21,6 +21,9 @@ use core::ffi::{c_char, c_int, c_void};
 use mp_engine_select::Engine;
 
 use crate::prelude::*;
+use crate::g_utils::G_EffectIndex;
+use crate::g_utils::G_ModelIndex;
+use crate::g_utils::G_SoundIndex;
 
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
@@ -583,15 +586,15 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn sound_index(&mut self, name: *const c_char) -> c_int {
         // ctx-free configstring lookup. Source: `g_utils.c` (`G_SoundIndex`).
-        crate::g_utils::G_SoundIndex(name)
+        G_SoundIndex(&(unsafe { cstr_to_str(name as *const c_char) }))
     }
     fn model_index(&mut self, name: *const c_char) -> c_int {
         // ctx-free configstring lookup. Source: `g_utils.c` (`G_ModelIndex`).
-        crate::g_utils::G_ModelIndex(name)
+        G_ModelIndex(&(unsafe { cstr_to_str(name as *const c_char) }))
     }
     fn effect_index(&mut self, name: *const c_char) -> c_int {
         // ctx-free configstring lookup. Source: `g_utils.c` (`G_EffectIndex`).
-        crate::g_utils::G_EffectIndex(name)
+        G_EffectIndex(&(unsafe { cstr_to_str(name as *const c_char) }))
     }
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
         // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.

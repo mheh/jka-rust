@@ -66,17 +66,16 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 pub fn NPC_Probe_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let s = format!("sound/chars/probe/misc/probetalk{}", i);
-        let c_str = cstr(&s);
-        G_SoundIndex(c_str.as_ptr());
+        G_SoundIndex(&s);
     }
-    G_SoundIndex(c"sound/chars/probe/misc/probedroidloop".as_ptr());
-    G_SoundIndex(c"sound/chars/probe/misc/anger1".as_ptr());
-    G_SoundIndex(c"sound/chars/probe/misc/fire".as_ptr());
+    G_SoundIndex("sound/chars/probe/misc/probedroidloop");
+    G_SoundIndex("sound/chars/probe/misc/anger1");
+    G_SoundIndex("sound/chars/probe/misc/fire");
 
-    G_EffectIndex(c"chunks/probehead".as_ptr());
-    G_EffectIndex(c"env/med_explode2".as_ptr());
-    G_EffectIndex(c"explosions/probeexplosion1".as_ptr());
-    G_EffectIndex(c"bryar/muzzle_flash".as_ptr());
+    G_EffectIndex("chunks/probehead");
+    G_EffectIndex("env/med_explode2");
+    G_EffectIndex("explosions/probeexplosion1");
+    G_EffectIndex("bryar/muzzle_flash");
 
     RegisterItem(ctx, BG_FindItemForAmmo(AMMO_BLASTER));
     RegisterItem(ctx, BG_FindItemForWeapon(WP_BRYAR_PISTOL));
@@ -346,7 +345,7 @@ pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
     BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
 
     G_PlayEffectID(
-        G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+        G_EffectIndex("bryar/muzzle_flash"),
         muzzle1,
         [0.0; 3],
     );
@@ -355,7 +354,7 @@ pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
         ctx,
         Some(npc_id),
         CHAN_AUTO,
-        G_SoundIndex(c"sound/chars/probe/misc/fire".as_ptr()),
+        G_SoundIndex("sound/chars/probe/misc/fire"),
     );
 
     if ctx.world.entity(npc_id).health != 0 {
@@ -446,7 +445,7 @@ pub fn ImperialProbe_AttackDecision(ctx: &mut GameContext) {
         if TIMER_Done(ctx, Some(npc_id), c"angerNoise".as_ptr()) != 0 {
             let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
             let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-            G_SoundOnEnt(ctx, npc_id, CHAN_AUTO, cstr(&s).as_ptr());
+            G_SoundOnEnt(ctx, npc_id, CHAN_AUTO, &s);
 
             let patrol_delay = ctx.world.bg_state.rng.Q_irand(4000, 10000);
             TIMER_Set(ctx, Some(npc_id), c"patrolNoise".as_ptr(), patrol_delay);
@@ -636,7 +635,7 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
 
         if UpdateGoal(ctx) != core::ptr::null_mut() {
             // start loop sound once we move
-            let loop_sound = G_SoundIndex(c"sound/chars/probe/misc/probedroidloop".as_ptr());
+            let loop_sound = G_SoundIndex("sound/chars/probe/misc/probedroidloop");
             ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
             ctx.world.globals.ucmd.buttons |= BUTTON_WALKING;
             NPC_MoveToGoal(ctx, 1);
@@ -645,7 +644,7 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
         if TIMER_Done(ctx, Some(npc_id), c"patrolNoise".as_ptr()) != 0 {
             let sound_idx = ctx.world.bg_state.rng.Q_irand(1, 3);
             let s = format!("sound/chars/probe/misc/probetalk{}", sound_idx);
-            G_SoundOnEnt(ctx, npc_id, CHAN_AUTO, cstr(&s).as_ptr());
+            G_SoundOnEnt(ctx, npc_id, CHAN_AUTO, &s);
 
             let patrol_delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
             TIMER_Set(ctx, Some(npc_id), c"patrolNoise".as_ptr(), patrol_delay);
@@ -656,8 +655,7 @@ pub fn ImperialProbe_Patrol(ctx: &mut GameContext) {
             ctx,
             npc_id,
             CHAN_AUTO,
-            c"sound/chars/probe/misc/anger1".as_ptr(),
-        );
+            "sound/chars/probe/misc/anger1");
         let anger_delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
         TIMER_Set(ctx, Some(npc_id), c"angerNoise".as_ptr(), anger_delay);
     }

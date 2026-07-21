@@ -1085,7 +1085,7 @@ pub fn NPC_BSSniper_Attack(ctx: &mut GameContext) {
             if TIMER_Done(ctx, Some(npc_id), c"attackDelay".as_ptr()) != 0 {
                 WeaponThink(ctx, qtrue);
                 if (ctx.world.globals.ucmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK)) != 0 {
-                    G_SoundOnEnt(ctx, npc_id, CHAN_WEAPON, c"sound/null.wav".as_ptr());
+                    G_SoundOnEnt(ctx, npc_id, CHAN_WEAPON, "sound/null.wav");
                 }
 
                 // took a shot, now hide

@@ -752,7 +752,7 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
 ///
 /// Source: `oracle/codemp/game/NPC_utils.c:906-995`
 pub fn NPC_SetBoneAngles(ctx: &mut GameContext, ent: EntityId, bone: *mut c_char, angles: vec3_t) {
-    let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
+    let boneIndex = G_BoneIndex(ctx, &(unsafe { cstr_to_str(bone) }));
 
     // Walk the 4 fixed bone-index/bone-angle slot pairs looking for `boneIndex`
     // (or the first free slot if not already present). Raven walks raw pointers

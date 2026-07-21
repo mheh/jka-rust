@@ -14,6 +14,8 @@
 
 use crate::bg_channel::GameBgTraps;
 use crate::prelude::*;
+use crate::g_utils::G_ModelIndex;
+use crate::g_utils::G_SoundIndex;
 
 // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
 // (`c_int`, cast here to match the `vec3_t` components they seed).
@@ -688,7 +690,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Std =
-                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                        G_SoundIndex(&idx_s);
                 }
                 continue;
             }
@@ -710,7 +712,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Combat =
-                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                        G_SoundIndex(&idx_s);
                 }
                 continue;
             }
@@ -732,7 +734,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Extra =
-                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                        G_SoundIndex(&idx_s);
                 }
                 continue;
             }
@@ -754,7 +756,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
                     let idx_s = format!("*${}", trimmed);
                     ctx.world.entity_mut(spawner).s.csSounds_Jedi =
-                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                        G_SoundIndex(&idx_s);
                 }
                 continue;
             }
@@ -810,7 +812,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                     //append it after a *
                     model_name.push_str(&format!("*{}", cstr_to_str(custom_skin.as_ptr())));
                 }
-                crate::g_utils::G_ModelIndex(cstr(&model_name).as_ptr());
+                G_ModelIndex(&model_name);
             }
         }
 
@@ -2178,7 +2180,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     &mut callbacks,
                 );
                 let idx_s = format!("@{}", cstr_to_str(saber_name));
-                npcSaber1 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
+                npcSaber1 = G_ModelIndex(&idx_s);
 
                 mp_bg::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
                 continue;
@@ -2225,7 +2227,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     } else {
                         //NPC->client->ps.dualSabers = qtrue;
                         let idx_s = format!("@{}", cstr_to_str(saber_name));
-                        npcSaber2 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
+                        npcSaber2 = G_ModelIndex(&idx_s);
                     }
                     mp_bg::bg_misc::BG_TempFree(4096, &mut ctx.world.bg_state);
                 }
@@ -2535,7 +2537,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
 
             if npcSaber1 == 0 {
                 //use "kyle" for a default then
-                npcSaber1 = crate::g_utils::G_ModelIndex(cstr("@Kyle").as_ptr());
+                npcSaber1 = G_ModelIndex("@Kyle");
                 let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                     // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                     // field aliasing bg_state; a raw store is required (bg-seam re-entry).

@@ -7,6 +7,7 @@
 use core::ffi::CStr;
 
 use crate::prelude::*;
+use crate::g_utils::G_BSPIndex;
 use native_string::atof::atof_bytes;
 
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
@@ -478,7 +479,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         write_cstr_field(&mut temp, &format!("#{}", cstr_to_str(out)));
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
         trap::SetBrushModel(ctx.engine, ep.cast(), &cstr_to_str(temp.as_ptr())); // SV_SetBrushModel -- sets mins and maxs
-        crate::g_utils::G_BSPIndex(ctx, temp.as_ptr());
+        G_BSPIndex(ctx, &cstr_to_str(temp.as_ptr()));
 
         ctx.world.level.mNumBSPInstances += 1;
         write_cstr_field(&mut temp, &format!("{}-", ctx.world.level.mNumBSPInstances));
@@ -1427,7 +1428,7 @@ pub fn shield_power_converter_use(
         let sc = unsafe { (*other_cl).siegeClass };
         if ctx.world.bg_state.bgSiegeClasses[sc as usize].maxarmor == 0 {
             // can't use it!
-            let snd = G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr());
+            let snd = G_SoundIndex("sound/interface/shieldcon_empty");
             G_Sound(ctx, Some(self_), CHAN_AUTO as c_int, snd);
             return;
         }
@@ -1438,7 +1439,7 @@ pub fn shield_power_converter_use(
     if set_time < level_time {
         let max_armor: c_int;
         if ctx.world.entity(self_).s.loopSound == 0 {
-            let snd = G_SoundIndex(c"sound/interface/shieldcon_run".as_ptr());
+            let snd = G_SoundIndex("sound/interface/shieldcon_run");
             let e = ctx.world.entity_mut(self_);
             e.s.loopSound = snd;
             e.s.loopIsSoundset = qfalse;
@@ -1488,7 +1489,7 @@ pub fn shield_power_converter_use(
         let level_time = ctx.world.level.time;
         if loop_sound != 0 && set_time < level_time {
             if ctx.world.entity(self_).count <= 0 {
-                let snd = G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr());
+                let snd = G_SoundIndex("sound/interface/shieldcon_empty");
                 G_Sound(ctx, Some(self_), CHAN_AUTO as c_int, snd);
             } else {
                 let gv7 = ctx.world.entity(self_).genericValue7;
@@ -1543,7 +1544,7 @@ pub fn ammo_generic_power_converter_use(
 
         let mut i = AMMO_BLASTER as c_int;
         if ctx.world.entity(self_).s.loopSound == 0 {
-            let snd = G_SoundIndex(c"sound/interface/ammocon_run".as_ptr());
+            let snd = G_SoundIndex("sound/interface/ammocon_run");
             let e = ctx.world.entity_mut(self_);
             e.s.loopSound = snd;
             e.s.loopIsSoundset = qfalse;
@@ -1613,7 +1614,7 @@ pub fn ammo_generic_power_converter_use(
         let level_time = ctx.world.level.time;
         if loop_sound != 0 && set_time < level_time {
             if ctx.world.entity(self_).count <= 0 {
-                let snd = G_SoundIndex(c"sound/interface/ammocon_empty".as_ptr());
+                let snd = G_SoundIndex("sound/interface/ammocon_empty");
                 G_Sound(ctx, Some(self_), CHAN_AUTO as c_int, snd);
             } else {
                 let gv7 = ctx.world.entity(self_).genericValue7;
@@ -1698,7 +1699,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         }
 
         let model = ctx.world.entity(ent).model;
-        let mi = G_ModelIndex(model);
+        let mi = G_ModelIndex(&cstr_to_str(model));
         {
             let e = ctx.world.entity_mut(ent);
             e.s.modelindex = mi;
@@ -1744,10 +1745,10 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ep.cast()));
 
-        G_SoundIndex(c"sound/interface/ammocon_run".as_ptr());
-        let snd = G_SoundIndex(c"sound/interface/ammocon_done".as_ptr());
+        G_SoundIndex("sound/interface/ammocon_run");
+        let snd = G_SoundIndex("sound/interface/ammocon_done");
         ctx.world.entity_mut(ent).genericValue7 = snd;
-        G_SoundIndex(c"sound/interface/ammocon_empty".as_ptr());
+        G_SoundIndex("sound/interface/ammocon_empty");
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             // show on radar from everywhere
@@ -1756,7 +1757,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
                 e.r.svFlags |= SVF_BROADCAST;
                 e.s.eFlags |= EF_RADAROBJECT;
             }
-            let idx = G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/weapon_recharge".as_ptr());
+            let idx = G_IconIndex(ctx, "gfx/mp/siegeicons/desert/weapon_recharge");
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
     }
@@ -1837,7 +1838,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         }
 
         let model = ctx.world.entity(ent).model;
-        let mi = G_ModelIndex(model);
+        let mi = G_ModelIndex(&cstr_to_str(model));
         {
             let e = ctx.world.entity_mut(ent);
             e.s.modelindex = mi;
@@ -1883,10 +1884,10 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ep.cast()));
 
-        G_SoundIndex(c"sound/interface/shieldcon_run".as_ptr());
-        let snd = G_SoundIndex(c"sound/interface/shieldcon_done".as_ptr());
+        G_SoundIndex("sound/interface/shieldcon_run");
+        let snd = G_SoundIndex("sound/interface/shieldcon_done");
         ctx.world.entity_mut(ent).genericValue7 = snd;
-        G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr());
+        G_SoundIndex("sound/interface/shieldcon_empty");
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
             {
@@ -1894,7 +1895,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
                 e.r.svFlags |= SVF_BROADCAST;
                 e.s.eFlags |= EF_RADAROBJECT;
             }
-            let idx = G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/shield_recharge".as_ptr());
+            let idx = G_IconIndex(ctx, "gfx/mp/siegeicons/desert/shield_recharge");
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
     }
@@ -1917,7 +1918,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: &mut GameContext, ent: EntityId
     }
 
     let model = ctx.world.entity(ent).model;
-    let mi = G_ModelIndex(model);
+    let mi = G_ModelIndex(&(unsafe { cstr_to_str(model) }));
     {
         let e = ctx.world.entity_mut(ent);
         e.s.modelindex = mi;
@@ -1957,7 +1958,7 @@ pub fn SP_misc_model_shield_power_converter(ctx: &mut GameContext, ent: EntityId
 
     //G_SoundIndex("sound/movers/objects/useshieldstation.wav");
 
-    let mi2 = G_ModelIndex(c"/models/items/psd_big.md3".as_ptr());
+    let mi2 = G_ModelIndex("/models/items/psd_big.md3");
     ctx.world.entity_mut(ent).s.modelindex2 = mi2;
     // Precache model
 }
@@ -1999,7 +2000,7 @@ pub fn ammo_power_converter_use(
     let level_time = ctx.world.level.time;
     if set_time < level_time {
         if ctx.world.entity(self_).s.loopSound == 0 {
-            let snd = G_SoundIndex(c"sound/player/pickupshield.wav".as_ptr());
+            let snd = G_SoundIndex("sound/player/pickupshield.wav");
             ctx.world.entity_mut(self_).s.loopSound = snd;
         }
 
@@ -2062,7 +2063,7 @@ pub fn SP_misc_model_ammo_power_converter(ctx: &mut GameContext, ent: EntityId) 
     }
 
     let model = ctx.world.entity(ent).model;
-    let mi = G_ModelIndex(model);
+    let mi = G_ModelIndex(&(unsafe { cstr_to_str(model) }));
     {
         let e = ctx.world.entity_mut(ent);
         e.s.modelindex = mi;
@@ -2154,7 +2155,7 @@ pub fn health_power_converter_use(
     let level_time = ctx.world.level.time;
     if set_time < level_time {
         if ctx.world.entity(self_).s.loopSound == 0 {
-            let snd = G_SoundIndex(c"sound/player/pickuphealth.wav".as_ptr());
+            let snd = G_SoundIndex("sound/player/pickuphealth.wav");
             ctx.world.entity_mut(self_).s.loopSound = snd;
         }
         ctx.world.entity_mut(self_).setTime = level_time + 100;
@@ -2202,7 +2203,7 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
     }
 
     let model = ctx.world.entity(ent).model;
-    let mi = G_ModelIndex(model);
+    let mi = G_ModelIndex(&(unsafe { cstr_to_str(model) }));
     {
         let e = ctx.world.entity_mut(ent);
         e.s.modelindex = mi;
@@ -2240,8 +2241,8 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
     trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ep.cast()));
 
     //G_SoundIndex("sound/movers/objects/useshieldstation.wav");
-    G_SoundIndex(c"sound/player/pickuphealth.wav".as_ptr());
-    let snd = G_SoundIndex(c"sound/interface/shieldcon_done".as_ptr());
+    G_SoundIndex("sound/player/pickuphealth.wav");
+    let snd = G_SoundIndex("sound/interface/shieldcon_done");
     ctx.world.entity_mut(ent).genericValue7 = snd;
 
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
@@ -2251,7 +2252,7 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
             e.r.svFlags |= SVF_BROADCAST;
             e.s.eFlags |= EF_RADAROBJECT;
         }
-        let idx = G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/bacta".as_ptr());
+        let idx = G_IconIndex(ctx, "gfx/mp/siegeicons/desert/bacta");
         ctx.world.entity_mut(ent).s.genericenemyindex = idx;
     }
 }
@@ -2322,7 +2323,7 @@ pub fn fx_runner_think(ctx: &mut GameContext, ent: EntityId) {
         // NOT ONESHOT...this is an assy thing to do
         let sound_set = ctx.world.entity(ent).soundSet;
         if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-            let ssi = G_SoundSetIndex(ctx, sound_set);
+            let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
             let e = ctx.world.entity_mut(ent);
             e.s.soundSetIndex = ssi;
             e.s.loopIsSoundset = qtrue;
@@ -2367,7 +2368,7 @@ pub fn fx_runner_use(
 
         let sound_set = ctx.world.entity(self_).soundSet;
         if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-            let ssi = G_SoundSetIndex(ctx, sound_set);
+            let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
             ctx.world.entity_mut(self_).s.soundSetIndex = ssi;
             G_AddEvent(
                 ctx.world.entity_mut(self_),
@@ -2387,7 +2388,7 @@ pub fn fx_runner_use(
 
             let sound_set = ctx.world.entity(self_).soundSet;
             if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-                let ssi = G_SoundSetIndex(ctx, sound_set);
+                let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
                 ctx.world.entity_mut(self_).s.soundSetIndex = ssi;
                 G_AddEvent(
                     ctx.world.entity_mut(self_),
@@ -2407,7 +2408,7 @@ pub fn fx_runner_use(
 
             let sound_set = ctx.world.entity(self_).soundSet;
             if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-                let ssi = G_SoundSetIndex(ctx, sound_set);
+                let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
                 ctx.world.entity_mut(self_).s.soundSetIndex = ssi;
                 G_AddEvent(
                     ctx.world.entity_mut(self_),
@@ -2488,7 +2489,7 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
     } else {
         let sound_set = ctx.world.entity(ent).soundSet;
         if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-            let ssi = G_SoundSetIndex(ctx, sound_set);
+            let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
             let e = ctx.world.entity_mut(ent);
             e.s.soundSetIndex = ssi;
             e.s.loopSound = BMS_MID;
@@ -2562,7 +2563,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
 
     // Try and associate an effect file, unfortunately we won't know if this worked or not
     //	until the CGAME trys to register it...
-    let mi = G_EffectIndex(fx_file);
+    let mi = G_EffectIndex(&(unsafe { cstr_to_str(fx_file) }));
     let level_time = ctx.world.level.time;
     {
         let e = ctx.world.entity_mut(ent);
@@ -2596,7 +2597,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_misc.c:2509-2513`
 pub fn SP_CreateSpaceDust(ctx: &mut GameContext, ent: EntityId) {
     let count = ctx.world.entity(ent).count;
-    G_EffectIndex(cstr(&format!("*spacedust {}", count)).as_ptr());
+    G_EffectIndex(&format!("*spacedust {}", count));
     //G_EffectIndex("*constantwind ( 10 -10 0 )");
 }
 
@@ -2604,9 +2605,9 @@ pub fn SP_CreateSpaceDust(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2522-2527`
 pub fn SP_CreateSnow(ctx: &mut GameContext, ent: EntityId) {
-    G_EffectIndex(b"*snow\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"*fog\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"*constantwind (100 100 -100)\0".as_ptr() as *const c_char);
+    G_EffectIndex("*snow");
+    G_EffectIndex("*fog");
+    G_EffectIndex("*constantwind (100 100 -100)");
 }
 
 /// Raven `SP_CreateRain`.
@@ -2614,7 +2615,7 @@ pub fn SP_CreateSnow(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_misc.c:2535-2538`
 pub fn SP_CreateRain(ctx: &mut GameContext, ent: EntityId) {
     let count = ctx.world.entity(ent).count;
-    G_EffectIndex(cstr(&format!("*rain init {}", count)).as_ptr());
+    G_EffectIndex(&format!("*rain init {}", count));
 }
 
 /// Raven `Use_Target_Screenshake`.
@@ -2766,9 +2767,9 @@ pub fn SP_misc_maglock(ctx: &mut GameContext, self_: EntityId) {
     // NOTE: May have to make these only work on doors that are either untargeted
     //		or are targeted by a trigger, not doors fired off by scripts, counters
     //		or other such things?
-    let mi = G_ModelIndex(c"models/map_objects/imp_detention/door_lock.md3".as_ptr());
+    let mi = G_ModelIndex("models/map_objects/imp_detention/door_lock.md3");
     ctx.world.entity_mut(self_).s.modelindex = mi;
-    let ei = G_EffectIndex(c"maglock/explosion".as_ptr());
+    let ei = G_EffectIndex("maglock/explosion");
     ctx.world.entity_mut(self_).genericValue1 = ei;
 
     let origin = ctx.world.entity(self_).s.origin;
@@ -2902,11 +2903,11 @@ pub fn faller_touch(
         let r = ctx.world.bg_state.rng.Q_irand(1, 3);
 
         let snd = if r == 1 {
-            G_SoundIndex(c"sound/chars/stofficer1/misc/pain25".as_ptr())
+            G_SoundIndex("sound/chars/stofficer1/misc/pain25")
         } else if r == 2 {
-            G_SoundIndex(c"sound/chars/stofficer1/misc/pain50".as_ptr())
+            G_SoundIndex("sound/chars/stofficer1/misc/pain50")
         } else {
-            G_SoundIndex(c"sound/chars/stofficer1/misc/pain75".as_ptr())
+            G_SoundIndex("sound/chars/stofficer1/misc/pain75")
         };
         ctx.world.entity_mut(self_).genericValue11 = snd;
 
@@ -2977,9 +2978,9 @@ pub fn misc_faller_create(
 ) {
     let faller_id = G_Spawn(ctx);
 
-    let s10 = G_SoundIndex(c"sound/player/fallsplat".as_ptr());
+    let s10 = G_SoundIndex("sound/player/fallsplat");
     ctx.world.entity_mut(faller_id).genericValue10 = s10;
-    let s9 = G_SoundIndex(c"sound/chars/stofficer1/misc/falling1".as_ptr());
+    let s9 = G_SoundIndex("sound/chars/stofficer1/misc/falling1");
     {
         let f = ctx.world.entity_mut(faller_id);
         f.genericValue9 = s9;
@@ -2994,7 +2995,7 @@ pub fn misc_faller_create(
     G_SetOrigin(ctx.world.entity_mut(faller_id), origin);
 
     ctx.world.entity_mut(faller_id).s.modelGhoul2 = 1;
-    let mi = G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
+    let mi = G_ModelIndex("models/players/stormtrooper/model.glm");
     {
         let f = ctx.world.entity_mut(faller_id);
         f.s.modelindex = mi;
@@ -3051,12 +3052,12 @@ pub fn misc_faller_think(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:2844-2865`
 pub fn SP_misc_faller(ctx: &mut GameContext, ent: EntityId) {
-    G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
-    G_SoundIndex(c"sound/chars/stofficer1/misc/pain25".as_ptr());
-    G_SoundIndex(c"sound/chars/stofficer1/misc/pain50".as_ptr());
-    G_SoundIndex(c"sound/chars/stofficer1/misc/pain75".as_ptr());
-    G_SoundIndex(c"sound/chars/stofficer1/misc/falling1".as_ptr());
-    G_SoundIndex(c"sound/player/fallsplat".as_ptr());
+    G_ModelIndex("models/players/stormtrooper/model.glm");
+    G_SoundIndex("sound/chars/stofficer1/misc/pain25");
+    G_SoundIndex("sound/chars/stofficer1/misc/pain50");
+    G_SoundIndex("sound/chars/stofficer1/misc/pain75");
+    G_SoundIndex("sound/chars/stofficer1/misc/falling1");
+    G_SoundIndex("sound/player/fallsplat");
 
     let mut interval: c_int = 0;
     G_SpawnInt(ctx, c"interval".as_ptr(), c"500".as_ptr(), &mut interval);

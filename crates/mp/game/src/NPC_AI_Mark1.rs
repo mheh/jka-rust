@@ -12,6 +12,8 @@ use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
 use crate::npc::spot_t::spot_t;
 use crate::npc_c::NPC_SetAnim;
 use crate::prelude::*;
+use crate::g_utils::G_EffectIndex;
+use crate::g_utils::G_SoundIndex;
 use crate::trap;
 use mp_bg::public::anim_number::animNumber_t::*;
 
@@ -59,23 +61,23 @@ pub const LSTATE_FIRED4: c_int = 7;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Mark1.c:50-74`
 pub fn NPC_Mark1_Precache(ctx: &mut GameContext) {
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/shutdown".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/walk".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/run".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/death1".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/death2".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/anger".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_pain".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_explo".as_ptr());
+    G_SoundIndex("sound/chars/mark1/misc/mark1_wakeup");
+    G_SoundIndex("sound/chars/mark1/misc/shutdown");
+    G_SoundIndex("sound/chars/mark1/misc/walk");
+    G_SoundIndex("sound/chars/mark1/misc/run");
+    G_SoundIndex("sound/chars/mark1/misc/death1");
+    G_SoundIndex("sound/chars/mark1/misc/death2");
+    G_SoundIndex("sound/chars/mark1/misc/anger");
+    G_SoundIndex("sound/chars/mark1/misc/mark1_fire");
+    G_SoundIndex("sound/chars/mark1/misc/mark1_pain");
+    G_SoundIndex("sound/chars/mark1/misc/mark1_explo");
 
     //	G_EffectIndex( "small_chunks");
-    crate::g_utils::G_EffectIndex(c"env/med_explode2".as_ptr());
-    crate::g_utils::G_EffectIndex(c"explosions/probeexplosion1".as_ptr());
-    crate::g_utils::G_EffectIndex(c"blaster/smoke_bolton".as_ptr());
-    crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr());
-    crate::g_utils::G_EffectIndex(c"explosions/droidexplosion1".as_ptr());
+    G_EffectIndex("env/med_explode2");
+    G_EffectIndex("explosions/probeexplosion1");
+    G_EffectIndex("blaster/smoke_bolton");
+    G_EffectIndex("bryar/muzzle_flash");
+    G_EffectIndex("explosions/droidexplosion1");
 
     crate::g_items::RegisterItem(
         ctx,
@@ -129,13 +131,13 @@ pub fn NPC_Mark1_Part_Explode(ctx: &mut GameContext, self_: EntityId, bolt: c_in
         BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut dir);
 
         crate::g_utils::G_PlayEffectID(
-            crate::g_utils::G_EffectIndex(c"env/med_explode2".as_ptr()),
+            G_EffectIndex("env/med_explode2"),
             org,
             dir,
         );
 
         crate::g_utils::G_PlayEffectID(
-            crate::g_utils::G_EffectIndex(c"blaster/smoke_bolton".as_ptr()),
+            G_EffectIndex("blaster/smoke_bolton"),
             org,
             dir,
         );
@@ -200,7 +202,7 @@ pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
     BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
 
     crate::g_utils::G_PlayEffectID(
-        crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+        G_EffectIndex("bryar/muzzle_flash"),
         muzzle1,
         muzzle_dir,
     );
@@ -209,7 +211,7 @@ pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
         ctx,
         Some(npc_id),
         CHAN_AUTO,
-        crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
+        G_SoundIndex("sound/chars/mark1/misc/mark1_fire"),
     );
 
     let missile_id = CreateMissile(
@@ -282,7 +284,7 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
     BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
 
     crate::g_utils::G_PlayEffectID(
-        crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+        G_EffectIndex("bryar/muzzle_flash"),
         muzzle1,
         muzzle_dir,
     );
@@ -293,7 +295,7 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
         ctx,
         Some(npc_id),
         CHAN_AUTO,
-        crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
+        G_SoundIndex("sound/chars/mark1/misc/mark1_fire"),
     );
 
     ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
@@ -318,13 +320,10 @@ pub fn Mark1_die(
     dFlags: c_int,
     hitLoc: c_int,
 ) {
-    let sound_index = crate::g_utils::G_SoundIndex(
-        cstr(&format!(
+    let sound_index = G_SoundIndex(&format!(
             "sound/chars/mark1/misc/death{}.wav",
             ctx.world.bg_state.rng.Q_irand(1, 2),
-        ))
-        .as_ptr(),
-    );
+        ));
     let Some(self_id) = self_ else {
         return;
     };
@@ -441,7 +440,7 @@ pub fn NPC_Mark1_Pain(
         ctx,
         Some(self_id),
         CHAN_AUTO,
-        crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_pain".as_ptr()),
+        G_SoundIndex("sound/chars/mark1/misc/mark1_pain"),
     );
 
     // Hit in the CHEST???
@@ -659,7 +658,7 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
     }
 
     crate::g_utils::G_PlayEffectID(
-        crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+        G_EffectIndex("bryar/muzzle_flash"),
         muzzle1,
         forward,
     );
@@ -668,7 +667,7 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
         ctx,
         Some(npc_id),
         CHAN_AUTO,
-        crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
+        G_SoundIndex("sound/chars/mark1/misc/mark1_fire"),
     );
 
     let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
@@ -817,7 +816,7 @@ pub fn Mark1_FireRocket(ctx: &mut GameContext) {
         ctx,
         Some(npc_id),
         CHAN_AUTO,
-        crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()),
+        G_SoundIndex("sound/chars/mark1/misc/mark1_fire"),
     );
 
     let missile_id = CreateMissile(
@@ -986,7 +985,7 @@ pub fn Mark1_Patrol(ctx: &mut GameContext) {
             ctx,
             Some(npc_id),
             CHAN_AUTO,
-            crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr()),
+            G_SoundIndex("sound/chars/mark1/misc/mark1_wakeup"),
         );
         crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
         return;

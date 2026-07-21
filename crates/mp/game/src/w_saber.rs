@@ -856,7 +856,7 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
     }
 
     ctx.world.globals.saberSpinSound =
-        G_SoundIndex(cstr("sound/weapons/saber/saberspin.wav").as_ptr());
+        G_SoundIndex("sound/weapons/saber/saberspin.wav");
 }
 
 /// Raven `G_CheckLookTarget`.
@@ -4627,14 +4627,12 @@ pub fn WP_SaberBounceSound(
         } else {
             // `va("sound/weapons/saber/saberblock%d.wav", index)` — rendered as an
             // owned NUL-terminated string (appendix ruling: va -> owned String).
-            let path =
-                std::ffi::CString::new(format!("sound/weapons/saber/saberblock{}.wav", index))
-                    .unwrap();
+            let path = format!("sound/weapons/saber/saberblock{}.wav", index);
             G_Sound(
                 ctx,
                 Some(ent),
                 CHAN_AUTO as c_int,
-                G_SoundIndex(path.as_ptr()),
+                G_SoundIndex(&path),
             );
         }
     }
@@ -7747,7 +7745,7 @@ pub fn DownedSaberThink(ctx: &mut GameContext, saberent: EntityId) {
             ctx,
             Some(saberOwn_id),
             CHAN_BODY as c_int,
-            G_SoundIndex(cstr("sound/weapons/force/pull.wav").as_ptr()),
+            G_SoundIndex("sound/weapons/force/pull.wav"),
         );
         let son0 = unsafe { (*soc).saber[0].soundOn };
         if son0 != 0 {
@@ -7949,9 +7947,9 @@ pub fn WP_SaberAddG2Model(
 ) {
     WP_SaberRemoveG2Model(ctx, saberent);
     let modelindex = if !saberModel.is_null() && unsafe { *saberModel != 0 } {
-        G_ModelIndex(saberModel)
+        G_ModelIndex(&(unsafe { cstr_to_str(saberModel) }))
     } else {
-        G_ModelIndex(cstr("models/weapons2/saber/saber_w.glm").as_ptr())
+        G_ModelIndex("models/weapons2/saber/saber_w.glm")
     };
     ctx.world.entity_mut(saberent).s.modelindex = modelindex;
     // FIXME(Raven): use customSkin?
@@ -8482,7 +8480,7 @@ pub fn saberBackToOwner(ctx: &mut GameContext, saberent: EntityId) {
                     ctx,
                     ctx.entity_id_of(saberent),
                     CHAN_AUTO as c_int,
-                    G_SoundIndex(cstr("sound/weapons/saber/saber_catch.wav").as_ptr()),
+                    G_SoundIndex("sound/weapons/saber/saber_catch.wav"),
                 );
 
                 (*soc).ps.saberInFlight = qfalse;
@@ -9246,14 +9244,14 @@ pub fn G_KickTrace(
             //FIXME: regardless of what we hit, do kick hit sound and impact effect
             //G_PlayEffect( "misc/kickHit", trace.endpos, trace.plane.normal );
             if (*client).ps.torsoAnim == BOTH_A7_HILT as c_int {
-                let idx = G_SoundIndex(cstr("sound/movers/objects/saber_slam").as_ptr());
+                let idx = G_SoundIndex("sound/movers/objects/saber_slam");
                 G_Sound(ctx, ctx.entity_id_of(ent), CHAN_AUTO, idx);
             } else {
                 let s = format!(
                     "sound/weapons/melee/punch{}",
                     ctx.world.bg_state.rng.Q_irand(1, 4)
                 );
-                let idx = G_SoundIndex(cstr(&s).as_ptr());
+                let idx = G_SoundIndex(&s);
                 G_Sound(ctx, ctx.entity_id_of(ent), CHAN_AUTO, idx);
             }
             if (*hitEnt).inuse != 0 {
@@ -10267,7 +10265,7 @@ pub fn WP_SaberPositionUpdate(
                                         ctx,
                                         ctx.entity_id_of(grappler).unwrap(),
                                         CHAN_VOICE as c_int,
-                                        G_SoundIndex(cstr("*pain100.wav").as_ptr()),
+                                        G_SoundIndex("*pain100.wav"),
                                     );
                                     (*client).grappleState += 1;
                                 }

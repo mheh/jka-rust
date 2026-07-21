@@ -26,6 +26,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_ModelIndex;
 // Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
 // define it): the canonical home is g_public_consts, per house convention.
 use crate::ent_fn_enums::dispatch_die;
@@ -1632,9 +1633,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             return qfalse;
         }
 
-        crate::g_utils::G_ModelIndex(
-            cstr(&format!("${}", cstr_to_str(sp_npc_type as *const c_char))).as_ptr(),
-        );
+        G_ModelIndex(&format!("${}", cstr_to_str(sp_npc_type as *const c_char)));
 
         let p_veh_info = &(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize];
         if !p_veh_info.model.is_null() && *p_veh_info.model != 0 {

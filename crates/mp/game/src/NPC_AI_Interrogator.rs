@@ -73,12 +73,12 @@ const MIN_DISTANCE: c_int = 64;
 /// Source: `oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
 pub fn NPC_Interrogator_Precache(ctx: &mut GameContext, self_: Option<EntityId>) {
     // STAGE-1: EntityId param (unused by the body; caller may pass null/`None`).
-    G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr() as *const c_char);
-    G_SoundIndex(c"sound/chars/mark1/misc/anger.wav".as_ptr() as *const c_char);
-    G_SoundIndex(c"sound/chars/probe/misc/talk".as_ptr() as *const c_char);
-    G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_inject".as_ptr() as *const c_char);
-    G_SoundIndex(c"sound/chars/interrogator/misc/int_droid_explo".as_ptr() as *const c_char);
-    G_EffectIndex(c"explosions/droidexplosion1".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/interrogator/misc/torture_droid_lp");
+    G_SoundIndex("sound/chars/mark1/misc/anger.wav");
+    G_SoundIndex("sound/chars/probe/misc/talk");
+    G_SoundIndex("sound/chars/interrogator/misc/torture_droid_inject");
+    G_SoundIndex("sound/chars/interrogator/misc/int_droid_explo");
+    G_EffectIndex("explosions/droidexplosion1");
 }
 
 /// Raven `Interrogator_die`.
@@ -204,7 +204,7 @@ pub fn Interrogator_MaintainHeight(ctx: &mut GameContext) {
     let npc_id = ctx.entity_id_of(npc).unwrap();
     let npc_info = ctx.world.globals.NPCInfo;
 
-    let loop_sound = G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr());
+    let loop_sound = G_SoundIndex("sound/chars/interrogator/misc/torture_droid_lp");
     ctx.world.entity_mut(npc_id).s.loopSound = loop_sound;
 
     // Update our angles regardless
@@ -497,8 +497,7 @@ pub fn Interrogator_Melee(ctx: &mut GameContext, visible: qboolean, advance: qbo
                     ctx,
                     Some(npc_id),
                     CHAN_AUTO,
-                    G_SoundIndex(
-                        c"sound/chars/interrogator/misc/torture_droid_inject.mp3".as_ptr(),
+                    G_SoundIndex("sound/chars/interrogator/misc/torture_droid_inject.mp3",
                     ),
                 );
             }
@@ -535,8 +534,7 @@ pub fn Interrogator_Attack(ctx: &mut GameContext) {
                 ctx,
                 npc_id,
                 CHAN_AUTO,
-                c"sound/chars/probe/misc/talk.wav".as_ptr(),
-            );
+                "sound/chars/probe/misc/talk.wav");
 
             let delay = ctx.world.bg_state.rng.Q_irand(4000, 10000);
             TIMER_Set(ctx, Some(npc_id), c"patrolNoise".as_ptr(), delay);
@@ -595,8 +593,7 @@ pub fn Interrogator_Idle(ctx: &mut GameContext) {
             ctx,
             npc_id,
             CHAN_AUTO,
-            c"sound/chars/mark1/misc/anger.wav".as_ptr(),
-        );
+            "sound/chars/mark1/misc/anger.wav");
         NPC_UpdateAngles(ctx, 1, 1);
         return;
     }

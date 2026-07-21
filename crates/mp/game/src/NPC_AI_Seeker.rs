@@ -17,6 +17,8 @@
 use crate::g_missile::CreateMissile;
 use crate::npc::script_flags::SCF_CHASE_ENEMIES;
 use crate::prelude::*;
+use crate::g_utils::G_EffectIndex;
+use crate::g_utils::G_SoundIndex;
 use mp_qshared::shared::{CONTENTS_LIGHTSABER, MASK_SHOT};
 
 // Raven `#define VELOCITY_DECAY 0.7f32` (oracle/codemp/game/NPC_AI_Seeker.c:8).
@@ -59,9 +61,9 @@ const MOD_TELEFRAG: c_int = 37;
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Seeker.c:26-31`
 pub fn NPC_Seeker_Precache(ctx: &mut GameContext) {
-    crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/fire.wav".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss.wav".as_ptr());
-    crate::g_utils::G_EffectIndex(c"env/small_explode".as_ptr());
+    G_SoundIndex("sound/chars/seeker/misc/fire.wav");
+    G_SoundIndex("sound/chars/seeker/misc/hiss.wav");
+    G_EffectIndex("env/small_explode");
 }
 
 /// Raven `NPC_Seeker_Pain`.
@@ -281,7 +283,7 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
                     ctx,
                     Some(npc_id),
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss".as_ptr()),
+                    G_SoundIndex("sound/chars/seeker/misc/hiss"),
                 );
             } else {
                 vel *= 3.0f32;
@@ -376,7 +378,7 @@ pub fn Seeker_Strafe(ctx: &mut GameContext) {
                     ctx,
                     Some(npc_id),
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss".as_ptr()),
+                    G_SoundIndex("sound/chars/seeker/misc/hiss"),
                 );
             } else {
                 upPush *= 4.0f32;
@@ -497,7 +499,7 @@ pub fn Seeker_Fire(ctx: &mut GameContext) {
     let missile_id = CreateMissile(ctx, muzzle, dir, 1000.0f32, 10000, npc_id, false);
 
     crate::g_utils::G_PlayEffectID(
-        crate::g_utils::G_EffectIndex(c"blaster/muzzle_flash".as_ptr()),
+        G_EffectIndex("blaster/muzzle_flash"),
         npc_org,
         dir,
     );
@@ -764,7 +766,7 @@ pub fn Seeker_FollowOwner(ctx: &mut GameContext) {
                     ctx,
                     Some(npc_id),
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss".as_ptr()),
+                    G_SoundIndex("sound/chars/seeker/misc/hiss"),
                 );
             }
         }

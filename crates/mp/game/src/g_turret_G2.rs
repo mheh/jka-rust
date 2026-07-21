@@ -82,7 +82,7 @@ pub fn G2Tur_SetBoneAngles(
     bone: *mut c_char,
     angles: vec3_t,
 ) {
-    let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
+    let boneIndex = G_BoneIndex(ctx, &(unsafe { cstr_to_str(bone) }));
 
     // Walk the 4 fixed bone-index/bone-angle slot pairs looking for an
     // existing match, else the first free slot.
@@ -182,8 +182,8 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
 
     if dying != 0 {
         if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-            let mi = G_ModelIndex(NAME2.as_ptr());
-            let mi2 = G_ModelIndex(NAME.as_ptr());
+            let mi = G_ModelIndex(NAME2.to_str().unwrap());
+            let mi2 = G_ModelIndex(NAME.to_str().unwrap());
             let e = ctx.world.entity_mut(self_);
             e.s.modelindex = mi;
             e.s.modelindex2 = mi2;
@@ -201,8 +201,8 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
         ctx.world.entity_mut(self_).s.modelGhoul2 = 0;
     } else {
         if ctx.world.entity(self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-            let mi = G_ModelIndex(NAME.as_ptr());
-            let mi2 = G_ModelIndex(NAME2.as_ptr());
+            let mi = G_ModelIndex(NAME.to_str().unwrap());
+            let mi2 = G_ModelIndex(NAME2.to_str().unwrap());
             {
                 let e = ctx.world.entity_mut(self_);
                 e.s.modelindex = mi;
@@ -220,7 +220,7 @@ pub fn turretG2_set_models(ctx: &mut GameContext, self_: EntityId, dying: qboole
                 0,
             );
         } else {
-            let mi = G_ModelIndex(NAME3.as_ptr());
+            let mi = G_ModelIndex(NAME3.to_str().unwrap());
             ctx.world.entity_mut(self_).s.modelindex = mi;
             // set the new one
             trap::G2API_InitGhoul2Model(
@@ -515,7 +515,7 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
         }
     } else {
         // Regular blaster turret: fire standard missile
-        G_PlayEffectID(G_EffectIndex(c"blaster/muzzle_flash".as_ptr()), org, ang);
+        G_PlayEffectID(G_EffectIndex("blaster/muzzle_flash"), org, ang);
         let bolt_id = G_Spawn(ctx);
 
         let ent_number = ctx.world.entity(ent).s.number;
@@ -876,9 +876,9 @@ pub fn turretG2_aim(ctx: &mut GameContext, self_: EntityId) {
     if diffYaw != 0.0 || diffPitch != 0.0 {
         // FIXME: turbolaser sounds
         let loop_sound = if spawnflags & SPF_TURRETG2_TURBO != 0 {
-            G_SoundIndex(c"sound/vehicles/weapons/turbolaser/turn.wav".as_ptr())
+            G_SoundIndex("sound/vehicles/weapons/turbolaser/turn.wav")
         } else {
-            G_SoundIndex(c"sound/chars/turret/move.wav".as_ptr())
+            G_SoundIndex("sound/chars/turret/move.wav")
         };
         ctx.world.entity_mut(self_).s.loopSound = loop_sound;
     } else {
@@ -903,7 +903,7 @@ pub fn turretG2_turnoff(ctx: &mut GameContext, self_: EntityId) {
             ctx,
             Some(self_),
             CHAN_BODY as c_int,
-            G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
+            G_SoundIndex("sound/chars/turret/shutdown.wav"),
         );
     }
 
@@ -935,7 +935,7 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
                     ctx,
                     Some(self_),
                     CHAN_BODY as c_int,
-                    G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()),
+                    G_SoundIndex("sound/chars/turret/ping.wav"),
                 );
             }
             let t = ctx.world.level.time;
@@ -1070,7 +1070,7 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
                             ctx,
                             Some(self_),
                             CHAN_BODY as c_int,
-                            G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
+                            G_SoundIndex("sound/chars/turret/startup.wav"),
                         );
                     }
 
@@ -1309,7 +1309,7 @@ pub fn SP_misc_turretG2(ctx: &mut GameContext, base: EntityId) {
         // We have an icon, so index it now.  We are reusing the
         // genericenemyindex variable rather than adding a new one to the
         // entity state.
-        let icon = G_IconIndex(ctx, s as *const c_char);
+        let icon = G_IconIndex(ctx, &(unsafe { cstr_to_str(s) }));
         ctx.world.entity_mut(base).s.genericenemyindex = icon;
     }
 
@@ -1365,8 +1365,8 @@ pub fn finish_spawning_turretG2(ctx: &mut GameContext, base: EntityId) {
     ctx.world.entity_mut(base).team = core::ptr::null_mut();
 
     // Set up explosion effects
-    G_EffectIndex(c"turret/explode".as_ptr());
-    G_EffectIndex(c"sparks/spark_exp_nosnd".as_ptr());
+    G_EffectIndex("turret/explode");
+    G_EffectIndex("sparks/spark_exp_nosnd");
 
     // Set up callbacks
     {
@@ -1531,18 +1531,18 @@ pub fn finish_spawning_turretG2(ctx: &mut GameContext, base: EntityId) {
 
     // Precache special FX and moving sounds
     if ctx.world.entity(base).spawnflags & SPF_TURRETG2_TURBO != 0 {
-        let e1 = G_EffectIndex(c"turret/turb_muzzle_flash".as_ptr());
+        let e1 = G_EffectIndex("turret/turb_muzzle_flash");
         ctx.world.entity_mut(base).genericValue13 = e1;
-        let e2 = G_EffectIndex(c"turret/turb_shot".as_ptr());
+        let e2 = G_EffectIndex("turret/turb_shot");
         ctx.world.entity_mut(base).genericValue14 = e2;
-        let e3 = G_EffectIndex(c"turret/turb_impact".as_ptr());
+        let e3 = G_EffectIndex("turret/turb_impact");
         ctx.world.entity_mut(base).genericValue15 = e3;
-        G_SoundIndex(c"sound/vehicles/weapons/turbolaser/turn.wav".as_ptr());
+        G_SoundIndex("sound/vehicles/weapons/turbolaser/turn.wav");
     } else {
-        G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr());
-        G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr());
-        G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr());
-        G_SoundIndex(c"sound/chars/turret/move.wav".as_ptr());
+        G_SoundIndex("sound/chars/turret/startup.wav");
+        G_SoundIndex("sound/chars/turret/shutdown.wav");
+        G_SoundIndex("sound/chars/turret/ping.wav");
+        G_SoundIndex("sound/chars/turret/move.wav");
     }
 
     {

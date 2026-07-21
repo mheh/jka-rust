@@ -127,11 +127,11 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         ctx.world.level.time = args.level_time();
         ctx.world.level.startTime = args.level_time();
 
-        ctx.world.level.snd_fry = G_SoundIndex(c"sound/player/fry.wav".as_ptr()); // FIXME standing in lava / slime
+        ctx.world.level.snd_fry = G_SoundIndex("sound/player/fry.wav"); // FIXME standing in lava / slime
 
-        ctx.world.level.snd_hack = G_SoundIndex(c"sound/player/hacking.wav".as_ptr());
-        ctx.world.level.snd_medHealed = G_SoundIndex(c"sound/player/supp_healed.wav".as_ptr());
-        ctx.world.level.snd_medSupplied = G_SoundIndex(c"sound/player/supp_supplied.wav".as_ptr());
+        ctx.world.level.snd_hack = G_SoundIndex("sound/player/hacking.wav");
+        ctx.world.level.snd_medHealed = G_SoundIndex("sound/player/supp_healed.wav");
+        ctx.world.level.snd_medSupplied = G_SoundIndex("sound/player/supp_supplied.wav");
 
         // Raven: `//trap_SP_RegisterServer("mp_svgame");` — already commented
         // out in the oracle.
@@ -284,9 +284,9 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         if ctx.world.cvars.g_gametype.integer == GT_SINGLE_PLAYER
             || trap::Cvar_VariableIntegerValue(ctx.engine, "com_buildScript") != 0
         {
-            G_ModelIndex(SP_PODIUM_MODEL.as_ptr());
-            G_SoundIndex(c"sound/player/gurp1.wav".as_ptr());
-            G_SoundIndex(c"sound/player/gurp2.wav".as_ptr());
+            G_ModelIndex(SP_PODIUM_MODEL.to_str().unwrap());
+            G_SoundIndex("sound/player/gurp1.wav");
+            G_SoundIndex("sound/player/gurp2.wav");
         }
 
         if trap::Cvar_VariableIntegerValue(ctx.engine, "bot_enable") != 0 {
@@ -330,7 +330,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
             while i < names.len() {
                 match names[i] {
                     Some(name) => {
-                        G_SoundIndex(name.as_ptr());
+                        G_SoundIndex(name.to_str().unwrap());
                     }
                     None => break,
                 }

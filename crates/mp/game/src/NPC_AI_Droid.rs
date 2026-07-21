@@ -194,7 +194,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
             {
                 let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
                 let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
-                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
+                G_SoundOnEnt(ctx, npc_id, 0, &sound_path); // CHAN_AUTO = 0
                 let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
 
                 TIMER_Set(
@@ -214,7 +214,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
             {
                 let idx = ctx.world.bg_state.rng.Q_irand(1, 3);
                 let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
-                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr());
+                G_SoundOnEnt(ctx, npc_id, 0, &sound_path);
 
                 let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
                 TIMER_Set(
@@ -234,7 +234,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
             {
                 let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
                 let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
-                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr());
+                G_SoundOnEnt(ctx, npc_id, 0, &sound_path);
 
                 let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
                 TIMER_Set(
@@ -255,7 +255,7 @@ pub fn Droid_Patrol(ctx: &mut GameContext) {
             {
                 let idx = ctx.world.bg_state.rng.Q_irand(1, 2);
                 let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
-                G_SoundOnEnt(ctx, npc_id, 0, cstr(&sound_path).as_ptr());
+                G_SoundOnEnt(ctx, npc_id, 0, &sound_path);
 
                 let delay = ctx.world.bg_state.rng.Q_irand(2000, 4000);
                 TIMER_Set(
@@ -346,7 +346,7 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
                 TIMER_Set(ctx, Some(npc_id), b"smoke\0".as_ptr() as *const c_char, 100);
                 let origin = ctx.world.entity(npc_id).r.currentOrigin;
                 G_PlayEffectID(
-                    G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char),
+                    G_EffectIndex("volumetric/droid_smoke"),
                     origin,
                     dir,
                 );
@@ -362,7 +362,7 @@ pub fn Droid_Spin(ctx: &mut GameContext) {
                 );
                 let origin = ctx.world.entity(npc_id).r.currentOrigin;
                 G_PlayEffectID(
-                    G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char),
+                    G_EffectIndex("sparks/spark"),
                     origin,
                     dir,
                 );
@@ -472,19 +472,19 @@ pub fn NPC_Droid_Pain(
                             AngleVectors(current_angles, None, None, Some(&mut up));
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char),
+                                G_EffectIndex("chunks/r5d2head_veh"),
                                 origin,
                                 up,
                             );
                         } else {
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char),
+                                G_EffectIndex("small_chunks"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
                             G_PlayEffectID(
-                                G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char),
+                                G_EffectIndex("chunks/r5d2head"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
@@ -594,19 +594,19 @@ pub fn NPC_Droid_Pain(
                             AngleVectors(current_angles, None, None, Some(&mut up));
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char),
+                                G_EffectIndex("chunks/r2d2head_veh"),
                                 origin,
                                 up,
                             );
                         } else {
                             let origin = ctx.world.entity(self_).r.currentOrigin;
                             G_PlayEffectID(
-                                G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char),
+                                G_EffectIndex("small_chunks"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
                             G_PlayEffectID(
-                                G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char),
+                                G_EffectIndex("chunks/r2d2head"),
                                 origin,
                                 [0.0, 0.0, 0.0],
                             );
@@ -709,12 +709,12 @@ pub fn Droid_Pain(ctx: &mut GameContext) {
 pub fn NPC_Mouse_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", i);
-        G_SoundIndex(cstr(&sound_path).as_ptr());
+        G_SoundIndex(&sound_path);
     }
 
-    G_EffectIndex(b"env/small_explode\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/mouse/misc/death1\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/mouse/misc/mouse_lp\0".as_ptr() as *const c_char);
+    G_EffectIndex("env/small_explode");
+    G_SoundIndex("sound/chars/mouse/misc/death1");
+    G_SoundIndex("sound/chars/mouse/misc/mouse_lp");
 }
 
 /// Raven `NPC_R5D2_Precache`.
@@ -723,16 +723,16 @@ pub fn NPC_Mouse_Precache(ctx: &mut GameContext) {
 pub fn NPC_R5D2_Precache(ctx: &mut GameContext) {
     for i in 1..5 {
         let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", i);
-        G_SoundIndex(cstr(&sound_path).as_ptr());
+        G_SoundIndex(&sound_path);
     }
 
-    G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp2.wav\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
+    G_SoundIndex("sound/chars/r2d2/misc/r2_move_lp2.wav");
+    G_EffectIndex("env/med_explode");
+    G_EffectIndex("volumetric/droid_smoke");
+    G_EffectIndex("sparks/spark");
+    G_EffectIndex("chunks/r5d2head");
+    G_EffectIndex("chunks/r5d2head_veh");
 }
 
 /// Raven `NPC_R2D2_Precache`.
@@ -741,16 +741,16 @@ pub fn NPC_R5D2_Precache(ctx: &mut GameContext) {
 pub fn NPC_R2D2_Precache(ctx: &mut GameContext) {
     for i in 1..4 {
         let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", i);
-        G_SoundIndex(cstr(&sound_path).as_ptr());
+        G_SoundIndex(&sound_path);
     }
 
-    G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp.wav\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
+    G_SoundIndex("sound/chars/r2d2/misc/r2_move_lp.wav");
+    G_EffectIndex("env/med_explode");
+    G_EffectIndex("volumetric/droid_smoke");
+    G_EffectIndex("sparks/spark");
+    G_EffectIndex("chunks/r2d2head");
+    G_EffectIndex("chunks/r2d2head_veh");
 }
 
 /// Raven `NPC_Gonk_Precache`.
@@ -758,14 +758,14 @@ pub fn NPC_R2D2_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:520-530`
 pub fn NPC_Gonk_Precache(ctx: &mut GameContext) {
     // SAFETY: string literals valid.
-    G_SoundIndex(b"sound/chars/gonk/misc/gonktalk1.wav\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/gonk/misc/gonktalk2.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/gonk/misc/gonktalk1.wav");
+    G_SoundIndex("sound/chars/gonk/misc/gonktalk2.wav");
 
-    G_SoundIndex(b"sound/chars/gonk/misc/death1.wav\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/gonk/misc/death2.wav\0".as_ptr() as *const c_char);
-    G_SoundIndex(b"sound/chars/gonk/misc/death3.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/gonk/misc/death1.wav");
+    G_SoundIndex("sound/chars/gonk/misc/death2.wav");
+    G_SoundIndex("sound/chars/gonk/misc/death3.wav");
 
-    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
+    G_EffectIndex("env/med_explode");
 }
 
 /// Raven `NPC_Protocol_Precache`.
@@ -773,8 +773,8 @@ pub fn NPC_Gonk_Precache(ctx: &mut GameContext) {
 /// Source: `oracle/codemp/game/NPC_AI_Droid.c:537-541`
 pub fn NPC_Protocol_Precache(ctx: &mut GameContext) {
     // SAFETY: string literals valid.
-    G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
-    G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/mark2/misc/mark2_explo");
+    G_EffectIndex("env/med_explode");
 }
 
 /// Raven `NPC_BSDroid_Default`.

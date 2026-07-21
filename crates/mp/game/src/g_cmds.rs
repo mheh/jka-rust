@@ -14,6 +14,7 @@ use crate::client::client_connected::CON_CONNECTED;
 use crate::client::player_team_state::playerTeamStateState_t;
 use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
 use crate::prelude::*;
+use crate::g_utils::G_SoundIndex;
 use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
 use mp_bg::bg_misc::selected_holdable_tag;
@@ -1975,7 +1976,7 @@ pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
             crate::g_utils::G_TempEntity(ctx, [0.0f32, 0.0, 0.0], EV_VOICECMD_SOUND as c_int);
         ctx.world.entity_mut(te_id).s.groundEntityNum = ent.index() as c_int;
         ctx.world.entity_mut(te_id).s.eventParm =
-            crate::g_utils::G_SoundIndex(names[i].unwrap().as_ptr());
+            G_SoundIndex(names[i].unwrap().to_str().unwrap());
         ctx.world.entity_mut(te_id).r.svFlags |= SVF_BROADCAST;
     }
 }
@@ -4009,20 +4010,19 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                         ctx,
                         ctx.entity_id_of(other).unwrap(),
                         CHAN_VOICE as c_int,
-                        crate::g_utils::G_SoundIndex(c"*pain100.wav".as_ptr()),
+                        G_SoundIndex("*pain100.wav"),
                     );
                     crate::g_utils::G_EntitySound(
                         ctx,
                         ctx.entity_id_of(ent).unwrap(),
                         CHAN_VOICE as c_int,
-                        crate::g_utils::G_SoundIndex(c"*jump1.wav".as_ptr()),
+                        G_SoundIndex("*jump1.wav"),
                     );
                     crate::g_utils::G_Sound(
                         ctx,
                         ctx.entity_id_of(other),
                         CHAN_AUTO as c_int,
-                        crate::g_utils::G_SoundIndex(
-                            c"sound/movers/objects/objectHit.wav".as_ptr(),
+                        G_SoundIndex("sound/movers/objects/objectHit.wav",
                         ),
                     );
 
@@ -4088,7 +4088,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                             ctx,
                             ctx.entity_id_of(ent).unwrap(),
                             CHAN_VOICE as c_int,
-                            crate::g_utils::G_SoundIndex(c"*pain25.wav".as_ptr()),
+                            G_SoundIndex("*pain25.wav"),
                         );
 
                         (*otherClient).ps.forceHandExtend = HANDEXTEND_NONE as c_int;

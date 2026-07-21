@@ -103,7 +103,7 @@ pub fn G_PlayDoorLoopSound(ctx: &mut GameContext, ent: EntityId) {
         return;
     }
 
-    let idx = G_SoundSetIndex(ctx, soundSet);
+    let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
     let e = ctx.entity_mut(ent);
     e.s.soundSetIndex = idx;
     e.s.loopIsSoundset = qtrue;
@@ -120,7 +120,7 @@ pub fn G_PlayDoorSound(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
         return;
     }
 
-    let idx = G_SoundSetIndex(ctx, soundSet);
+    let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
     ctx.entity_mut(ent).s.soundSetIndex = idx;
 
     G_AddEvent(
@@ -1243,7 +1243,7 @@ pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
             // for now, not supported in MP.
             ctx.entity_mut(ent).s.modelindex2 = 0;
         } else {
-            ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(model2);
+            ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(&(unsafe { cstr_to_str(model2) }));
         }
     }
 
@@ -2489,7 +2489,7 @@ pub fn func_rotating_use(
         // play stop sound too?
         let soundSet = ctx.entity(self_).soundSet;
         if !soundSet.is_null() && unsafe { *soundSet } != 0 {
-            let idx = G_SoundSetIndex(ctx, soundSet);
+            let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
             ctx.entity_mut(self_).s.soundSetIndex = idx;
             G_AddEvent(
                 ctx.entity_mut(self_),
@@ -2500,7 +2500,7 @@ pub fn func_rotating_use(
     } else {
         let soundSet = ctx.entity(self_).soundSet;
         if !soundSet.is_null() && unsafe { *soundSet } != 0 {
-            let idx = G_SoundSetIndex(ctx, soundSet);
+            let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
             ctx.entity_mut(self_).s.soundSetIndex = idx;
             G_AddEvent(
                 ctx.entity_mut(self_),
@@ -2734,27 +2734,27 @@ pub fn SP_func_pendulum(ctx: &mut GameContext, ent: EntityId) {
 pub fn CacheChunkEffects(ctx: &mut GameContext, material: material_t) {
     match material {
         MAT_GLASS => {
-            G_EffectIndex(c"chunks/glassbreak".as_ptr());
+            G_EffectIndex("chunks/glassbreak");
         }
         MAT_GLASS_METAL => {
-            G_EffectIndex(c"chunks/glassbreak".as_ptr());
-            G_EffectIndex(c"chunks/metalexplode".as_ptr());
+            G_EffectIndex("chunks/glassbreak");
+            G_EffectIndex("chunks/metalexplode");
         }
         MAT_ELECTRICAL | MAT_ELEC_METAL => {
-            G_EffectIndex(c"chunks/sparkexplode".as_ptr());
+            G_EffectIndex("chunks/sparkexplode");
         }
         MAT_METAL | MAT_METAL2 | MAT_METAL3 | MAT_CRATE1 | MAT_CRATE2 => {
-            G_EffectIndex(c"chunks/metalexplode".as_ptr());
+            G_EffectIndex("chunks/metalexplode");
         }
         MAT_GRATE1 => {
-            G_EffectIndex(c"chunks/grateexplode".as_ptr());
+            G_EffectIndex("chunks/grateexplode");
         }
         MAT_DRK_STONE | MAT_LT_STONE | MAT_GREY_STONE | MAT_WHITE_METAL | MAT_SNOWY_ROCK => {
-            G_EffectIndex(c"chunks/rockbreaklg".as_ptr());
-            G_EffectIndex(c"chunks/rockbreakmed".as_ptr());
+            G_EffectIndex("chunks/rockbreaklg");
+            G_EffectIndex("chunks/rockbreakmed");
         }
         MAT_ROPE => {
-            G_EffectIndex(c"chunks/ropebreak".as_ptr());
+            G_EffectIndex("chunks/ropebreak");
         }
         _ => {}
     }
@@ -2960,7 +2960,7 @@ pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
 
             let te_eid = G_TempEntity(ctx, org, entity_event_t::EV_GENERAL_SOUND as c_int);
             let te = ctx.entity_mut(te_eid) as *mut gentity_t;
-            (*te).s.eventParm = G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr());
+            (*te).s.eventParm = G_SoundIndex("sound/weapons/explosions/cargoexplode.wav");
         }
 
         //FIXME: base numChunks off size?
@@ -3183,7 +3183,7 @@ pub fn InitBBrush(ctx: &mut GameContext, ent: EntityId) {
     // clip against the brushes
     let model2 = ctx.entity(ent).model2;
     if !model2.is_null() && unsafe { *model2 } != 0 {
-        ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(model2);
+        ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(&(unsafe { cstr_to_str(model2) }));
     }
 
     // if the "color" or "light" keys are set, setup constantLight
@@ -3256,7 +3256,7 @@ pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
     // Raw C-string deref of the engine-owned playfx name (seam).
     if !s.is_null() && unsafe { *s } != 0 {
         // should we play a special death effect?
-        ctx.entity_mut(self_).genericValue15 = G_EffectIndex(s);
+        ctx.entity_mut(self_).genericValue15 = G_EffectIndex(&(unsafe { cstr_to_str(s as *const c_char) }));
     } else {
         ctx.entity_mut(self_).genericValue15 = 0;
     }
@@ -3292,7 +3292,7 @@ pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
         ctx.entity_mut(self_).takedamage = qtrue;
     }
 
-    G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr()); // precaching
+    G_SoundIndex("sound/weapons/explosions/cargoexplode.wav"); // precaching
     let mut radius = 0.0f32;
     G_SpawnFloat(
         ctx,
@@ -3770,7 +3770,7 @@ pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
             // for now, not supported in MP.
             ctx.entity_mut(self_).s.modelindex2 = 0;
         } else {
-            ctx.entity_mut(self_).s.modelindex2 = G_ModelIndex(model2);
+            ctx.entity_mut(self_).s.modelindex2 = G_ModelIndex(&(unsafe { cstr_to_str(model2) }));
         }
     }
 

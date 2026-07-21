@@ -155,55 +155,55 @@ pub fn BuildShaderStateConfig(ctx: &mut GameContext) -> *const c_char {
 /// Source: `oracle/codemp/game/g_utils.c:66-95`
 pub fn G_FindConfigstringIndex(
     ctx: &mut GameContext,
-    name: *const c_char,
+    name: &str,
     start: c_int,
     max: c_int,
     create: qboolean,
 ) -> c_int {
-    unsafe {
-        if name.is_null() || *name == 0 {
-            return 0;
-        }
-
-        // `MAX_STRING_CHARS` resolves via the crate prelude glob.
-        let mut i = 1;
-        let mut s;
-        while i < max {
-            s = trap::GetConfigstring(ctx.engine, start + i, MAX_STRING_CHARS);
-            if s.is_empty() {
-                break;
-            }
-            if Q_strcmp(cstr(&s).as_ptr(), name) == 0 {
-                return i;
-            }
-            i += 1;
-        }
-
-        if create == qfalse {
-            return 0;
-        }
-
-        if i == max {
-            trap::Error(ctx.engine, "G_FindConfigstringIndex: overflow");
-        }
-
-        trap::SetConfigstring(ctx.engine, start + i, &cstr_to_str(name));
-
-        i
+    if name.is_empty() {
+        return 0;
     }
+
+    // `MAX_STRING_CHARS` resolves via the crate prelude glob.
+    let mut i = 1;
+    let mut s;
+    while i < max {
+        s = trap::GetConfigstring(ctx.engine, start + i, MAX_STRING_CHARS);
+        if s.is_empty() {
+            break;
+        }
+        // `Q_strcmp` is an exact byte compare; both sides are NUL-free Rust
+        // strings, so `==` is byte-identical.
+        if s == name {
+            return i;
+        }
+        i += 1;
+    }
+
+    if create == qfalse {
+        return 0;
+    }
+
+    if i == max {
+        trap::Error(ctx.engine, "G_FindConfigstringIndex: overflow");
+    }
+
+    trap::SetConfigstring(ctx.engine, start + i, name);
+
+    i
 }
 
 /// Raven `G_BoneIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:101-103`
-pub fn G_BoneIndex(ctx: &mut GameContext, name: *const c_char) -> c_int {
+pub fn G_BoneIndex(ctx: &mut GameContext, name: &str) -> c_int {
     G_FindConfigstringIndex(ctx, name, CS_G2BONES, MAX_G2BONES, qtrue)
 }
 
 /// Raven `G_ModelIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:108-130`
-pub fn G_ModelIndex(name: *const c_char) -> c_int {
+pub fn G_ModelIndex(name: &str) -> c_int {
     // Ctx-less bg-callable boundary fn (Raven reaches the engine through the
     // global syscall pointer); engine + world via the `g_strap` seam cells
     // (STAGE-2a: `GameContext::world` is a live `&mut GameWorld`, so it can no
@@ -220,17 +220,17 @@ pub fn G_ModelIndex(name: *const c_char) -> c_int {
 /// Raven `G_IconIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:132-136`
-pub fn G_IconIndex(ctx: &mut GameContext, name: *const c_char) -> c_int {
-    debug_assert!(!name.is_null() && unsafe { *name != 0 });
+pub fn G_IconIndex(ctx: &mut GameContext, name: &str) -> c_int {
+    debug_assert!(!name.is_empty());
     G_FindConfigstringIndex(ctx, name, CS_ICONS, MAX_ICONS, qtrue)
 }
 
 /// Raven `G_SoundIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:138-141`
-pub fn G_SoundIndex(name: *const c_char) -> c_int {
+pub fn G_SoundIndex(name: &str) -> c_int {
     // Ctx-less boundary fn; engine via the `g_strap` seam cell (see G_ModelIndex).
-    debug_assert!(!name.is_null() && unsafe { *name != 0 });
+    debug_assert!(!name.is_empty());
     let mut ctx = GameContext {
         world: unsafe { &mut *crate::g_strap::strap_world() },
         engine: crate::g_strap::strap_engine(),
@@ -241,14 +241,14 @@ pub fn G_SoundIndex(name: *const c_char) -> c_int {
 /// Raven `G_SoundSetIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:143-146`
-pub fn G_SoundSetIndex(ctx: &mut GameContext, name: *const c_char) -> c_int {
+pub fn G_SoundSetIndex(ctx: &mut GameContext, name: &str) -> c_int {
     G_FindConfigstringIndex(ctx, name, CS_AMBIENT_SET, MAX_AMBIENT_SETS, qtrue)
 }
 
 /// Raven `G_EffectIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:148-151`
-pub fn G_EffectIndex(name: *const c_char) -> c_int {
+pub fn G_EffectIndex(name: &str) -> c_int {
     // Ctx-less boundary fn; engine via the `g_strap` seam cell (see G_ModelIndex).
     let mut ctx = GameContext {
         world: unsafe { &mut *crate::g_strap::strap_world() },
@@ -260,7 +260,7 @@ pub fn G_EffectIndex(name: *const c_char) -> c_int {
 /// Raven `G_BSPIndex`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:153-156`
-pub fn G_BSPIndex(ctx: &mut GameContext, name: *const c_char) -> c_int {
+pub fn G_BSPIndex(ctx: &mut GameContext, name: &str) -> c_int {
     G_FindConfigstringIndex(ctx, name, CS_BSP_MODELS, MAX_SUB_BSP, qtrue)
 }
 
@@ -1608,7 +1608,7 @@ pub fn G_SoundOnEnt(
     ctx: &mut GameContext,
     ent: EntityId,
     channel: c_int,
-    soundPath: *const c_char,
+    soundPath: &str,
 ) {
     // Safe-state 2c: EntityId param; te + ent fields via the accessor.
     let origin = ctx.world.entity(ent).r.currentOrigin;
@@ -1835,7 +1835,7 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
         let healingsound = ctx.world.entity(target_id).healingsound;
         if !healingsound.is_null() && unsafe { *healingsound } != 0 {
             // play it
-            let sound = G_SoundIndex(healingsound);
+            let sound = G_SoundIndex(&(unsafe { cstr_to_str(healingsound) }));
             if ctx.world.entity(target_id).s.solid == SOLID_BMODEL {
                 // ok, well, just play it on the client then.
                 G_Sound(ctx, Some(ent_id), CHAN_AUTO as c_int, sound);

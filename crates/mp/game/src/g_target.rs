@@ -462,7 +462,7 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
     ) != 0
     {
         // this is a sound set
-        let soundset = G_SoundSetIndex(ctx, s);
+        let soundset = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(s as *const c_char) }));
         let e = ctx.entity_mut(ent);
         e.s.soundSetIndex = soundset;
         e.s.eFlags = mp_bg::public::entity_flags::EF_PERMANENT;
@@ -493,7 +493,7 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
     let mut buffer: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
     Q_strncpyz(buffer.as_mut_ptr(), s, MAX_QPATH as c_int);
 
-    let noise_index = G_SoundIndex(buffer.as_ptr());
+    let noise_index = G_SoundIndex(&(unsafe { cstr_to_str(buffer.as_ptr()) }));
     let e = ctx.entity_mut(ent);
     e.noise_index = noise_index;
 

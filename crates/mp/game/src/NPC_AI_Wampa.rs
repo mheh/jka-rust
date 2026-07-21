@@ -74,7 +74,7 @@ pub fn Wampa_SetBolts(ctx: &mut GameContext, self_: Option<EntityId>) {
 /// Source: `oracle/codemp/game/NPC_AI_Wampa.c:43-58`
 pub fn NPC_Wampa_Precache(ctx: &mut GameContext) {
     // Only the swipe sound is live; growl/snort loops are commented out
-    G_SoundIndex(b"sound/chars/rancor/swipehit.wav\0".as_ptr() as *const c_char);
+    G_SoundIndex("sound/chars/rancor/swipehit.wav");
 }
 
 /// Raven `Wampa_Idle`.
@@ -384,7 +384,7 @@ pub fn Wampa_Slash(ctx: &mut GameContext, boltIndex: c_int, backhand: qboolean) 
                 ctx,
                 Some(radius_id),
                 crate::prelude::CHAN_WEAPON,
-                crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()),
+                G_SoundIndex("sound/chars/rancor/swipehit.wav"),
             );
         }
     }
@@ -792,15 +792,15 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                 return;
             } else {
                 if crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"angrynoise".as_ptr()) != 0 {
-                    let angrynoise_snd = crate::cstr_util::cstr(&format!(
+                    let angrynoise_snd = format!(
                         "sound/chars/wampa/misc/anger{}.wav",
                         ctx.world.bg_state.rng.Q_irand(1, 2)
-                    ));
+                    );
                     crate::g_utils::G_Sound(
                         ctx,
                         Some(npc_id),
                         crate::prelude::CHAN_VOICE,
-                        crate::g_utils::G_SoundIndex(angrynoise_snd.as_ptr()),
+                        G_SoundIndex(&angrynoise_snd),
                     );
 
                     let angrynoise = ctx.world.bg_state.rng.Q_irand(5000, 10000);
@@ -913,7 +913,7 @@ pub fn NPC_BSWampa_Default(ctx: &mut GameContext) {
                     ctx,
                     Some(npc_id),
                     crate::prelude::CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(c"sound/chars/wampa/misc/anger3.wav".as_ptr()),
+                    G_SoundIndex("sound/chars/wampa/misc/anger3.wav"),
                 );
 
                 let idlenoise = ctx.world.bg_state.rng.Q_irand(2000, 4000);

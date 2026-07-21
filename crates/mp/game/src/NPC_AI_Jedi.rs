@@ -17,6 +17,9 @@
 
 
 use crate::prelude::*;
+use crate::g_utils::G_EffectIndex;
+use crate::g_utils::G_SoundIndex;
+use crate::g_utils::G_SoundOnEnt;
 use native_string::atof::atof;
 
 // Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
@@ -68,8 +71,8 @@ pub fn G_StartMatrixEffect(ent: &gentity_t) {
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:103-108`
 pub fn NPC_ShadowTrooper_Precache(ctx: &mut GameContext) {
     crate::g_items::RegisterItem(ctx, mp_bg::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
-    crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/cloak.wav".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/decloak.wav".as_ptr());
+    G_SoundIndex("sound/chars/shadowtrooper/cloak.wav");
+    G_SoundIndex("sound/chars/shadowtrooper/decloak.wav");
 }
 
 /// Raven `Jedi_ClearTimers`.
@@ -199,11 +202,11 @@ pub fn NPC_Jedi_PlayConfusionSound(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_AI_Jedi.c:182-189`
 pub fn Boba_Precache(ctx: &mut GameContext) {
-    crate::g_utils::G_SoundIndex(c"sound/boba/jeton.wav".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/boba/jethover.wav".as_ptr());
-    crate::g_utils::G_SoundIndex(c"sound/effects/combustfire.mp3".as_ptr());
-    crate::g_utils::G_EffectIndex(c"boba/jet".as_ptr());
-    crate::g_utils::G_EffectIndex(c"boba/fthrw".as_ptr());
+    G_SoundIndex("sound/boba/jeton.wav");
+    G_SoundIndex("sound/boba/jethover.wav");
+    G_SoundIndex("sound/effects/combustfire.mp3");
+    G_EffectIndex("boba/jet");
+    G_EffectIndex("boba/fthrw");
 }
 
 /// Raven `Boba_ChangeWeapon`.
@@ -216,7 +219,7 @@ pub fn Boba_ChangeWeapon(ctx: &mut GameContext, wp: c_int) {
         return;
     }
     crate::NPC_combat::NPC_ChangeWeapon(wp);
-    let snd = crate::g_utils::G_SoundIndex(c"sound/weapons/change.wav".as_ptr());
+    let snd = G_SoundIndex("sound/weapons/change.wav");
     crate::g_utils::G_AddEvent(
         ctx.world.entity_mut(npc_id),
         entity_event_t::EV_GENERAL_SOUND as c_int,
@@ -424,14 +427,13 @@ pub fn Boba_FlyStart(ctx: &mut GameContext, self_: EntityId) {
             (*client).jetPackTime = jet_pack_time;
         }
         //take-off sound
-        crate::g_utils::G_SoundOnEnt(
+        G_SoundOnEnt(
             ctx,
             self_,
             CHAN_ITEM as c_int,
-            c"sound/boba/jeton.wav".as_ptr(),
-        );
+            "sound/boba/jeton.wav");
         //jet loop sound
-        let loop_sound = crate::g_utils::G_SoundIndex(c"sound/boba/jethover.wav".as_ptr());
+        let loop_sound = G_SoundIndex("sound/boba/jethover.wav");
         ctx.world.entity_mut(self_).s.loopSound = loop_sound;
         if !ctx.world.entity(self_).NPC.is_null() {
             ctx.world.entity_mut(self_).count = Q3_INFINITE; // SEEKER shot ammo count
@@ -588,12 +590,11 @@ pub fn Boba_StartFlameThrower(ctx: &mut GameContext, self_: EntityId) {
         crate::g_timer::TIMER_Set(ctx, Some(self_), c"walking".as_ptr(), 0);
     }
     crate::g_timer::TIMER_Set(ctx, Some(self_), c"flameTime".as_ptr(), flameTime);
-    crate::g_utils::G_SoundOnEnt(
+    G_SoundOnEnt(
         ctx,
         self_,
         CHAN_WEAPON as c_int,
-        c"sound/effects/combustfire.mp3".as_ptr(),
-    );
+        "sound/effects/combustfire.mp3");
 
     // FLAG: NPC carries a BG_Alloc'd pool client (not level.clients); deref raw
     // via the safe entity borrow, per trap 2b.
@@ -623,7 +624,7 @@ pub fn Boba_StartFlameThrower(ctx: &mut GameContext, self_: EntityId) {
     BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
 
     crate::g_utils::G_PlayEffectID(
-        crate::g_utils::G_EffectIndex(c"boba/fthrw".as_ptr()),
+        G_EffectIndex("boba/fthrw"),
         org,
         dir,
     );
@@ -1033,7 +1034,7 @@ pub fn Jedi_Cloak(ctx: &mut GameContext, self_: Option<EntityId>) {
                 }
 
                 let snd =
-                    crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/cloak.wav".as_ptr());
+                    G_SoundIndex("sound/chars/shadowtrooper/cloak.wav");
                 crate::g_utils::G_Sound(ctx, Some(self_), CHAN_ITEM as c_int, snd);
             }
         }
@@ -1057,7 +1058,7 @@ pub fn Jedi_Decloak(ctx: &mut GameContext, self_: Option<EntityId>) {
                 }
 
                 let snd =
-                    crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/decloak.wav".as_ptr());
+                    G_SoundIndex("sound/chars/shadowtrooper/decloak.wav");
                 crate::g_utils::G_Sound(ctx, Some(self_), CHAN_ITEM as c_int, snd);
             }
         }
@@ -2708,12 +2709,11 @@ pub fn Jedi_CheckFlipEvasions(
                         0,
                     );
                 } else {
-                    crate::g_utils::G_SoundOnEnt(
+                    G_SoundOnEnt(
                         ctx,
                         self_,
                         CHAN_BODY as c_int,
-                        c"sound/weapons/force/jump.wav".as_ptr(),
-                    );
+                        "sound/weapons/force/jump.wav");
                 }
                 return evasionType_t::EVASION_CARTWHEEL;
             } else if (trace.contents & CONTENTS_BOTCLIP) == 0 {
@@ -2812,12 +2812,11 @@ pub fn Jedi_CheckFlipEvasions(
                                             0,
                                         );
                                     } else {
-                                        crate::g_utils::G_SoundOnEnt(
+                                        G_SoundOnEnt(
                                             ctx,
                                             self_,
                                             CHAN_BODY as c_int,
-                                            c"sound/weapons/force/jump.wav".as_ptr(),
-                                        );
+                                            "sound/weapons/force/jump.wav");
                                     }
                                     return evasionType_t::EVASION_OTHER;
                                 }
@@ -2906,12 +2905,11 @@ pub fn Jedi_CheckFlipEvasions(
                                     0,
                                 );
                             } else {
-                                crate::g_utils::G_SoundOnEnt(
+                                G_SoundOnEnt(
                                     ctx,
                                     self_,
                                     CHAN_BODY as c_int,
-                                    c"sound/weapons/force/jump.wav".as_ptr(),
-                                );
+                                    "sound/weapons/force/jump.wav");
                             }
                             return evasionType_t::EVASION_OTHER;
                         }
@@ -3557,8 +3555,7 @@ pub fn Jedi_SaberBlockGo(
                                         ctx,
                                         Some(self_),
                                         CHAN_BODY as c_int,
-                                        crate::g_utils::G_SoundIndex(
-                                            c"sound/weapons/force/jump.wav".as_ptr(),
+                                        G_SoundIndex("sound/weapons/force/jump.wav",
                                         ),
                                     );
                                 }
@@ -5635,21 +5632,19 @@ pub fn Jedi_TryJump(ctx: &mut GameContext, goal: Option<EntityId>) -> qboolean {
                                     (*client).ps.weaponTime = (*client).ps.torsoTimer;
                                     (*client).ps.fd.forcePowersActive |= 1 << FP_LEVITATION;
                                     if (*client).NPC_class == CLASS_BOBAFETT {
-                                        crate::g_utils::G_SoundOnEnt(
+                                        G_SoundOnEnt(
                                             ctx,
                                             npc_id,
                                             CHAN_ITEM as c_int,
-                                            c"sound/boba/jeton.wav".as_ptr(),
-                                        );
+                                            "sound/boba/jeton.wav");
                                         (*client).jetPackTime = ctx.world.level.time
                                             + ctx.world.bg_state.rng.Q_irand(1000, 3000);
                                     } else {
-                                        crate::g_utils::G_SoundOnEnt(
+                                        G_SoundOnEnt(
                                             ctx,
                                             npc_id,
                                             CHAN_BODY as c_int,
-                                            c"sound/weapons/force/jump.wav".as_ptr(),
-                                        );
+                                            "sound/weapons/force/jump.wav");
                                     }
 
                                     let force_jump_chasing_time =

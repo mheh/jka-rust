@@ -148,7 +148,7 @@ pub fn auto_turret_die(
     }
 
     G_PlayEffect(EFFECT_EXPLOSION_TURRET as c_int, pos, forward);
-    G_PlayEffectID(G_EffectIndex(c"turret/explode".as_ptr()), pos, forward);
+    G_PlayEffectID(G_EffectIndex("turret/explode"), pos, forward);
 
     let splashDamage = ctx.world.entity(self_).splashDamage;
     let splashRadius = ctx.world.entity(self_).splashRadius;
@@ -530,7 +530,7 @@ pub fn turret_aim(ctx: &mut GameContext, self_: EntityId) {
     top.s.apos.trDuration = FRAMETIME;
 
     if diffYaw != 0.0 || diffPitch != 0.0 {
-        top.s.loopSound = G_SoundIndex(c"sound/vehicles/weapons/hoth_turret/turn.wav".as_ptr());
+        top.s.loopSound = G_SoundIndex("sound/vehicles/weapons/hoth_turret/turn.wav");
     } else {
         top.s.loopSound = 0;
     }
@@ -874,15 +874,15 @@ pub fn turret_base_use(
 ///
 /// Source: `oracle/codemp/game/g_turret.c:663-703`
 pub fn SP_misc_turret(ctx: &mut GameContext, base: EntityId) {
-    let mi2 = G_ModelIndex(c"models/map_objects/hoth/turret_bottom.md3".as_ptr());
+    let mi2 = G_ModelIndex("models/map_objects/hoth/turret_bottom.md3");
     ctx.world.entity_mut(base).s.modelindex2 = mi2;
-    let mi = G_ModelIndex(c"models/map_objects/hoth/turret_base.md3".as_ptr());
+    let mi = G_ModelIndex("models/map_objects/hoth/turret_base.md3");
     ctx.world.entity_mut(base).s.modelindex = mi;
 
     let mut s: *mut c_char = std::ptr::null_mut();
     G_SpawnString(ctx, c"icon".as_ptr(), c"".as_ptr(), &mut s);
     if !s.is_null() && unsafe { *s != 0 } {
-        let icon = G_IconIndex(ctx, s);
+        let icon = G_IconIndex(ctx, &(unsafe { cstr_to_str(s as *const c_char) }));
         ctx.world.entity_mut(base).s.genericenemyindex = icon;
     }
 
@@ -932,9 +932,9 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
 
     let top_id = G_Spawn(ctx);
 
-    let mi = G_ModelIndex(c"models/map_objects/hoth/turret_top_new.md3".as_ptr());
+    let mi = G_ModelIndex("models/map_objects/hoth/turret_top_new.md3");
     ctx.world.entity_mut(top_id).s.modelindex = mi;
-    let mi2 = G_ModelIndex(c"models/map_objects/hoth/turret_top.md3".as_ptr());
+    let mi2 = G_ModelIndex("models/map_objects/hoth/turret_top.md3");
     ctx.world.entity_mut(top_id).s.modelindex2 = mi2;
 
     let base_angles = ctx.world.entity(base).s.angles;
@@ -967,9 +967,9 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
     ctx.world.entity_mut(base).s.eType = ET_GENERAL as c_int;
 
     // Set up explosion effects
-    G_EffectIndex(c"turret/explode".as_ptr());
-    G_EffectIndex(c"sparks/spark_exp_nosnd".as_ptr());
-    G_EffectIndex(c"turret/hoth_muzzle_flash".as_ptr());
+    G_EffectIndex("turret/explode");
+    G_EffectIndex("sparks/spark_exp_nosnd");
+    G_EffectIndex("turret/hoth_muzzle_flash");
 
     // Pitch angle (actually yaw, stored in speed field)
     ctx.world.entity_mut(top_id).speed = 0.0;
@@ -1081,12 +1081,12 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
         tp.r.mins[2] = 0.0;
     }
 
-    G_SoundIndex(c"sound/vehicles/weapons/hoth_turret/turn.wav".as_ptr());
-    let gv13 = G_EffectIndex(c"turret/hoth_muzzle_flash".as_ptr());
+    G_SoundIndex("sound/vehicles/weapons/hoth_turret/turn.wav");
+    let gv13 = G_EffectIndex("turret/hoth_muzzle_flash");
     ctx.world.entity_mut(top_id).genericValue13 = gv13;
-    let gv14 = G_EffectIndex(c"turret/hoth_shot".as_ptr());
+    let gv14 = G_EffectIndex("turret/hoth_shot");
     ctx.world.entity_mut(top_id).genericValue14 = gv14;
-    let gv15 = G_EffectIndex(c"turret/hoth_impact".as_ptr());
+    let gv15 = G_EffectIndex("turret/hoth_impact");
     ctx.world.entity_mut(top_id).genericValue15 = gv15;
 
     {

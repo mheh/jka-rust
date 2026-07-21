@@ -57,10 +57,10 @@ const LSTATE_WAITING: i32 = 1;
 /// Source: `oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
 pub fn NPC_MineMonster_Precache(ctx: &mut GameContext) {
     for i in 0..4 {
-        let bite_sound = cstr(&format!("sound/chars/mine/misc/bite{}.wav", i + 1));
-        G_SoundIndex(bite_sound.as_ptr());
-        let miss_sound = cstr(&format!("sound/chars/mine/misc/miss{}.wav", i + 1));
-        G_SoundIndex(miss_sound.as_ptr());
+        let bite_sound = format!("sound/chars/mine/misc/bite{}.wav", i + 1);
+        G_SoundIndex(&bite_sound);
+        let miss_sound = format!("sound/chars/mine/misc/miss{}.wav", i + 1);
+        G_SoundIndex(&miss_sound);
     }
 }
 
@@ -188,13 +188,13 @@ pub fn MineMonster_TryDamage(ctx: &mut GameContext, enemy: Option<EntityId>, dam
             MOD_MELEE as c_int,
         );
         let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
-        let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
-        let sound_idx = G_EffectIndex(bite_str.as_ptr());
+        let bite_str = format!("sound/chars/mine/misc/bite{}.wav", idx);
+        let sound_idx = G_EffectIndex(&bite_str);
         G_Sound(ctx, npc_opt, CHAN_AUTO, sound_idx);
     } else {
         let idx = ctx.world.bg_state.rng.Q_irand(1, 4);
-        let miss_str = cstr(&format!("sound/chars/mine/misc/miss{}.wav", idx));
-        let sound_idx = G_EffectIndex(miss_str.as_ptr());
+        let miss_str = format!("sound/chars/mine/misc/miss{}.wav", idx);
+        let sound_idx = G_EffectIndex(&miss_str);
         G_Sound(ctx, npc_opt, CHAN_AUTO, sound_idx);
     }
 }
