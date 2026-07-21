@@ -84,11 +84,8 @@ use mp_qshared::shared::{errorParm_t, qhandle_t};
 use crate::ghoul2_system::Ghoul2System;
 use crate::mdx::mdxa::MdxaView;
 use crate::mdx::mdxm::MdxmView;
-use crate::shared::bolt_info_t::boltInfo_t;
-use crate::shared::bone_info_t::boneInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
-use crate::shared::surface_info_t::surfaceInfo_t;
 
 /// Raven `#define GHOUL2_NEWORIGIN 0x008` (`ghoul2_shared.h:232`) — the
 /// `mFlags` bit `G2API_Set/GetGhoul2ModelFlags` preserve across a flags
@@ -97,32 +94,6 @@ use crate::shared::surface_info_t::surfaceInfo_t;
 /// same way between `ghoul2_system.rs` and `info_array.rs`, per their own
 /// doc comments) rather than invented as a new cross-file dependency.
 const GHOUL2_NEWORIGIN: i32 = 0x008;
-
-// ---------------------------------------------------------------------------
-// Manual POD duplicates. `boneInfo_t`/`boltInfo_t`/`surfaceInfo_t` (ABI-frozen
-// layout files in `shared/`, not this porter's to edit) carry no
-// `Clone`/`Copy` derive even though every field is individually `Copy` (ints/
-// floats/`mdxaBone_t`/`vec3_t`/raw pointers only, no `Drop`, no unique
-// ownership) — this mirrors C++'s implicit memberwise copy constructor,
-// exactly what `vector<T>`'s own copy (`CGhoul2Info_v::DeepCopy`,
-// `ghoul2_shared.h:387`, and `G2API_CopySpecificG2Model`'s plain struct
-// assignment, `G2_API.cpp:2315`) relies on.
-// ---------------------------------------------------------------------------
-
-fn dup_bone_info(src: &boneInfo_t) -> boneInfo_t {
-    // SAFETY: see module note above — POD, no Drop, no unique ownership.
-    unsafe { core::ptr::read(src) }
-}
-
-fn dup_bolt_info(src: &boltInfo_t) -> boltInfo_t {
-    // SAFETY: see module note above.
-    unsafe { core::ptr::read(src) }
-}
-
-fn dup_surface_info(src: &surfaceInfo_t) -> surfaceInfo_t {
-    // SAFETY: see module note above.
-    unsafe { core::ptr::read(src) }
-}
 
 /// Duplicate a whole `CGhoul2Info` instance (Raven's plain struct-assignment
 /// copy, `G2_API.cpp:2315`: `ghoul2To[modelTo] = ghoul2From[modelFrom]`).
@@ -133,9 +104,9 @@ fn dup_surface_info(src: &surfaceInfo_t) -> surfaceInfo_t {
 /// reproduces that aliasing faithfully rather than "fixing" it.
 fn dup_cghoul2_info(src: &CGhoul2Info) -> CGhoul2Info {
     CGhoul2Info {
-        slist: src.slist.iter().map(dup_surface_info).collect(),
-        bltlist: src.bltlist.iter().map(dup_bolt_info).collect(),
-        blist: src.blist.iter().map(dup_bone_info).collect(),
+        slist: src.slist.clone(),
+        bltlist: src.bltlist.clone(),
+        blist: src.blist.clone(),
         modelindex: src.modelindex,
         custom_shader: src.custom_shader,
         custom_skin: src.custom_skin,
@@ -835,6 +806,7 @@ pub fn g2api_ghoul2_size(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shared::bone_info_t::boneInfo_t;
     use mp_host_interface::mock::MockHost;
 
     #[test]
