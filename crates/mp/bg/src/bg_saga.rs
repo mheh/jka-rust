@@ -1095,7 +1095,7 @@ pub fn BG_SiegeParseClassFile(
         let mut class_info = [0 as c_char; 4096];
         let mut parse_buf = [0 as c_char; 4096];
 
-        len = traps.fs_fopen(filename, &mut f, FS_READ);
+        len = traps.fs_fopen(&cstr_to_str(filename), &mut f, FS_READ);
 
         if f == 0 || len >= 4096 {
             return;
@@ -1426,7 +1426,7 @@ pub fn BG_SiegeParseClassFile(
                         .as_ptr()
                 )
             );
-            traps.com_printf(cstr(&s).as_ptr());
+            traps.com_printf(&s);
         }
 
         if BG_SiegeGetPairedValue(
@@ -1610,8 +1610,8 @@ pub fn BG_SiegeLoadClasses(
         bg.bgNumSiegeClasses = 0;
 
         num_files = traps.fs_getfilelist(
-            c"ext_data/Siege/Classes".as_ptr(),
-            c".scl".as_ptr(),
+            "ext_data/Siege/Classes",
+            ".scl",
             filelist.as_mut_ptr(),
             4096,
         );
@@ -1666,7 +1666,7 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
         let mut i: isize = 1;
         let mut success: bool = true;
 
-        len = traps.fs_fopen(filename, &mut f, FS_READ);
+        len = traps.fs_fopen(&cstr_to_str(filename), &mut f, FS_READ);
 
         if f == 0 || len >= 2048 {
             return;
@@ -1759,8 +1759,8 @@ pub fn BG_SiegeLoadTeams(bg: &mut BgState, traps: &dyn BgTraps) {
         bg.bgNumSiegeTeams = 0;
 
         num_files = traps.fs_getfilelist(
-            c"ext_data/Siege/Teams".as_ptr(),
-            c".team".as_ptr(),
+            "ext_data/Siege/Teams",
+            ".team",
             filelist.as_mut_ptr(),
             4096,
         );

@@ -76,11 +76,10 @@ pub fn BG_ParseVehWeaponParm(
                         let n = sscanf_f32s(&value, &mut vec);
                         if n != 3 {
                             traps.com_printf(
-                                cstr(&format!(
+                                &format!(
                                     "{}BG_ParseVehWeaponParm: VEC3 sscanf() failed to read 3 floats ('angle' key bug?)\n",
                                     S_COLOR_YELLOW.to_str().unwrap()
-                                ))
-                                .as_ptr(),
+                                ),
                             );
                         }
                         let dst = b.add(field.ofs as usize) as *mut f32;
@@ -112,18 +111,18 @@ pub fn BG_ParseVehWeaponParm(
                     }
                     VF_MODEL | VF_MODEL_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.model_index(cstr(&value).as_ptr());
+                            callbacks.model_index(&value);
                     }
                     VF_EFFECT | VF_EFFECT_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.effect_index(cstr(&value).as_ptr());
+                            callbacks.effect_index(&value);
                     }
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: neither `WE_ARE_IN_THE_UI` nor `CGAME`; dead here.
                     }
                     VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.sound_index(cstr(&value).as_ptr());
+                            callbacks.sound_index(&value);
                     }
                     // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
                     // comments out the `G_SoundIndex` — the game module leaves the
@@ -196,12 +195,11 @@ pub fn VEH_LoadVehWeapon(
             if *token == 0 {
                 let name = cstr_to_str(vehWeaponName);
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: unexpected EOF while parsing Vehicle Weapon '{}'\n",
                         S_COLOR_RED.to_str().unwrap(),
                         name
-                    ))
-                    .as_ptr(),
+                    ),
                 );
                 return VEH_WEAPON_NONE;
             }
@@ -214,12 +212,11 @@ pub fn VEH_LoadVehWeapon(
             if value.is_null() || *value == 0 {
                 let pn = cstr_to_str(parmName.as_ptr());
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: Vehicle Weapon token '{}' has no value!\n",
                         S_COLOR_RED.to_str().unwrap(),
                         pn
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             } else if BG_ParseVehWeaponParm(
                 vehWeapon,
@@ -233,13 +230,12 @@ pub fn VEH_LoadVehWeapon(
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: Unknown Vehicle Weapon key/value pair '{}','{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
                         pn,
                         v
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             }
         }
@@ -268,11 +264,10 @@ pub fn VEH_VehWeaponIndexForName(
     unsafe {
         if vehWeaponName.is_null() || *vehWeaponName == 0 {
             traps.com_printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: Trying to read Vehicle Weapon with no name!\n",
                     S_COLOR_RED.to_str().unwrap()
-                ))
-                .as_ptr(),
+                ),
             );
             return VEH_WEAPON_NONE;
         }
@@ -287,12 +282,11 @@ pub fn VEH_VehWeaponIndexForName(
         if vw >= MAX_VEH_WEAPONS as c_int {
             let name = cstr_to_str(vehWeaponName);
             traps.com_printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: Too many Vehicle Weapons (max 16), aborting load on {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
                     name
-                ))
-                .as_ptr(),
+                ),
             );
             return VEH_WEAPON_NONE;
         }
@@ -300,12 +294,11 @@ pub fn VEH_VehWeaponIndexForName(
         if vw == VEH_WEAPON_NONE {
             let name = cstr_to_str(vehWeaponName);
             traps.com_printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: Could not find Vehicle Weapon {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
                     name
-                ))
-                .as_ptr(),
+                ),
             );
         }
         vw
@@ -415,11 +408,10 @@ pub fn BG_ParseVehicleParm(
                         let n = sscanf_f32s(&value, &mut vec);
                         if n != 3 {
                             traps.com_printf(
-                                cstr(&format!(
+                                &format!(
                                     "{}BG_ParseVehicleParm: VEC3 sscanf() failed to read 3 floats ('angle' key bug?)\n",
                                     S_COLOR_YELLOW.to_str().unwrap()
-                                ))
-                                .as_ptr(),
+                                ),
                             );
                         }
                         // Raven bug (bg_vehicleLoad.c:885-887): the store offset is
@@ -458,18 +450,18 @@ pub fn BG_ParseVehicleParm(
                     }
                     VF_MODEL | VF_MODEL_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.model_index(cstr(&value).as_ptr());
+                            callbacks.model_index(&value);
                     }
                     VF_EFFECT | VF_EFFECT_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.effect_index(cstr(&value).as_ptr());
+                            callbacks.effect_index(&value);
                     }
                     VF_SHADER | VF_SHADER_NOMIP => {
                         // QAGAME: dead (neither WE_ARE_IN_THE_UI nor CGAME).
                     }
                     VF_SOUND => {
                         *(b.add(field.ofs as usize) as *mut c_int) =
-                            callbacks.sound_index(cstr(&value).as_ptr());
+                            callbacks.sound_index(&value);
                     }
                     // `VF_SOUND_CLIENT` (MP cgame only): the `#elif QAGAME` branch
                     // comments out the `G_SoundIndex` — the game module leaves the
@@ -551,12 +543,11 @@ pub fn VEH_LoadVehicle(
             if *token == 0 {
                 let name = cstr_to_str(vehicleName);
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: unexpected EOF while parsing Vehicle '{}'\n",
                         S_COLOR_RED.to_str().unwrap(),
                         name
-                    ))
-                    .as_ptr(),
+                    ),
                 );
                 return VEHICLE_NONE;
             }
@@ -569,12 +560,11 @@ pub fn VEH_LoadVehicle(
             if value.is_null() || *value == 0 {
                 let pn = cstr_to_str(parmName.as_ptr());
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: Vehicle token '{}' has no value!\n",
                         S_COLOR_RED.to_str().unwrap(),
                         pn
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             } else if Q_stricmp(cstr("weap1").as_ptr(), parmName.as_ptr()) == 0 {
                 Q_strncpyz(weap1.as_mut_ptr(), value, 128);
@@ -599,13 +589,12 @@ pub fn VEH_LoadVehicle(
                 let pn = cstr_to_str(parmName.as_ptr());
                 let v = cstr_to_str(value);
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
                         pn,
                         v
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             }
         }
@@ -623,12 +612,11 @@ pub fn VEH_LoadVehicle(
             {
                 let w = cstr_to_str(weap1.as_ptr());
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: Unknown Vehicle key/value pair 'weap1', '{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
                         w
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             }
         }
@@ -644,12 +632,11 @@ pub fn VEH_LoadVehicle(
             {
                 let w = cstr_to_str(weap2.as_ptr());
                 traps.com_printf(
-                    cstr(&format!(
+                    &format!(
                         "{}ERROR: Unknown Vehicle key/value pair 'weap2', '{}'!\n",
                         S_COLOR_RED.to_str().unwrap(),
                         w
-                    ))
-                    .as_ptr(),
+                    ),
                 );
             }
         }
@@ -667,13 +654,12 @@ pub fn VEH_LoadVehicle(
                 {
                     let w = cstr_to_str(weap_muzzle[n - 1].as_ptr());
                     traps.com_printf(
-                        cstr(&format!(
+                        &format!(
                             "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
                             S_COLOR_RED.to_str().unwrap(),
                             key,
                             w
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                 }
             }
@@ -696,7 +682,7 @@ pub fn VEH_LoadVehicle(
         if !(*vehicle).model.is_null() {
             let model = cstr_to_str((*vehicle).model);
             (*vehicle).modelIndex = callbacks
-                .model_index(cstr(&format!("models/players/{}/model.glm", model)).as_ptr());
+                .model_index(&format!("models/players/{}/model.glm", model));
         }
 
         // SP-only skin-registration block (`#ifndef _JK2MP`) and the MP
@@ -707,18 +693,18 @@ pub fn VEH_LoadVehicle(
         BG_SetSharedVehicleFunctions(vehicle);
 
         if (*vehicle).explosionDamage != 0 {
-            callbacks.effect_index(cstr("ships/ship_explosion_mark").as_ptr());
+            callbacks.effect_index("ships/ship_explosion_mark");
         }
         if (*vehicle).flammable != 0 {
-            callbacks.sound_index(cstr("sound/vehicles/common/fire_lp.wav").as_ptr());
+            callbacks.sound_index("sound/vehicles/common/fire_lp.wav");
         }
         if (*vehicle).hoverHeight > 0.0 {
-            callbacks.effect_index(cstr("ships/swoop_dust").as_ptr());
+            callbacks.effect_index("ships/swoop_dust");
         }
 
-        callbacks.effect_index(cstr("volumetric/black_smoke").as_ptr());
-        callbacks.effect_index(cstr("ships/fire").as_ptr());
-        callbacks.sound_index(cstr("sound/vehicles/common/release.wav").as_ptr());
+        callbacks.effect_index("volumetric/black_smoke");
+        callbacks.effect_index("ships/fire");
+        callbacks.sound_index("sound/vehicles/common/release.wav");
         // QAGAME: the CGAME-only shader/fx/hideRider registrations (`#elif
         // CGAME`) are dead here; dropped per porting-rules §20.
 
@@ -741,11 +727,10 @@ pub fn VEH_VehicleIndexForName(
     unsafe {
         if vehicleName.is_null() || *vehicleName == 0 {
             traps.com_printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: Trying to read Vehicle with no name!\n",
                     S_COLOR_RED.to_str().unwrap()
-                ))
-                .as_ptr(),
+                ),
             );
             return VEHICLE_NONE;
         }
@@ -760,12 +745,11 @@ pub fn VEH_VehicleIndexForName(
         if v >= MAX_VEHICLES as c_int {
             let name = cstr_to_str(vehicleName);
             traps.com_printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
                     name
-                ))
-                .as_ptr(),
+                ),
             );
             return VEHICLE_NONE;
         }
@@ -773,12 +757,11 @@ pub fn VEH_VehicleIndexForName(
         if v == VEHICLE_NONE {
             let name = cstr_to_str(vehicleName);
             traps.com_printf(
-                cstr(&format!(
+                &format!(
                     "{}ERROR: Could not find Vehicle {}!\n",
                     S_COLOR_RED.to_str().unwrap(),
                     name
-                ))
-                .as_ptr(),
+                ),
             );
         }
         v
@@ -799,8 +782,8 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
         let mut list_buf: [c_char; 2048] = [0; 2048];
         let file_cnt = traps.fs_getfilelist(
-            cstr("ext_data/vehicles/weapons").as_ptr(),
-            cstr(".vwp").as_ptr(),
+            "ext_data/vehicles/weapons",
+            ".vwp",
             list_buf.as_mut_ptr(),
             2048,
         );
@@ -813,10 +796,10 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
             let mut f: fileHandle_t = 0;
             let path = format!("ext_data/vehicles/weapons/{}", cstr_to_str(hold_char));
-            let len = traps.fs_fopen(cstr(&path).as_ptr(), &mut f as *mut fileHandle_t, FS_READ);
+            let len = traps.fs_fopen(&path, &mut f as *mut fileHandle_t, FS_READ);
 
             if len == -1 {
-                traps.com_printf(cstr("error reading file\n").as_ptr());
+                traps.com_printf("error reading file\n");
             } else {
                 traps.fs_read(temp_read_buffer.as_mut_ptr() as *mut c_void, len, f);
                 temp_read_buffer[len as usize] = 0;
@@ -830,7 +813,7 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 if total_len + len as usize >= MAX_VEH_WEAPON_DATA_SIZE as usize {
                     traps.com_error(
                         ERR_DROP as c_int,
-                        cstr("Vehicle Weapon extensions (*.vwp) are too large").as_ptr(),
+                        "Vehicle Weapon extensions (*.vwp) are too large",
                     );
                 }
                 let appended = cstr_to_str(temp_read_buffer.as_ptr() as *const c_char);
@@ -860,8 +843,8 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
         let mut list_buf: [c_char; 2048] = [0; 2048];
         let file_cnt = traps.fs_getfilelist(
-            cstr("ext_data/vehicles").as_ptr(),
-            cstr(".veh").as_ptr(),
+            "ext_data/vehicles",
+            ".veh",
             list_buf.as_mut_ptr(),
             2048,
         );
@@ -874,10 +857,10 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
             let mut f: fileHandle_t = 0;
             let path = format!("ext_data/vehicles/{}", cstr_to_str(hold_char));
-            let len = traps.fs_fopen(cstr(&path).as_ptr(), &mut f as *mut fileHandle_t, FS_READ);
+            let len = traps.fs_fopen(&path, &mut f as *mut fileHandle_t, FS_READ);
 
             if len == -1 {
-                traps.com_printf(cstr("error reading file\n").as_ptr());
+                traps.com_printf("error reading file\n");
             } else {
                 traps.fs_read(temp_read_buffer.as_mut_ptr() as *mut c_void, len, f);
                 temp_read_buffer[len as usize] = 0;
@@ -890,7 +873,7 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 if total_len + len as usize >= MAX_VEHICLE_DATA_SIZE as usize {
                     traps.com_error(
                         ERR_DROP as c_int,
-                        cstr("Vehicle extensions (*.veh) are too large").as_ptr(),
+                        "Vehicle extensions (*.veh) are too large",
                     );
                 }
                 let appended = cstr_to_str(temp_read_buffer.as_ptr() as *const c_char);
@@ -952,11 +935,10 @@ pub fn BG_GetVehicleModelName(
             let name = cstr_to_str(veh_name);
             traps.com_error(
                 ERR_DROP as c_int,
-                cstr(&format!(
+                &format!(
                     "BG_GetVehicleModelName:  couldn't find vehicle {}",
                     name
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
@@ -988,11 +970,10 @@ pub fn BG_GetVehicleSkinName(
             let name = cstr_to_str(veh_name);
             traps.com_error(
                 ERR_DROP as c_int,
-                cstr(&format!(
+                &format!(
                     "BG_GetVehicleSkinName:  couldn't find vehicle {}",
                     name
-                ))
-                .as_ptr(),
+                ),
             );
         }
 
@@ -1025,7 +1006,7 @@ pub fn AttachRidersGeneric(
             let mut yawOnlyAngles: vec3_t = [0.0, 0.0, 0.0];
             let parent = (*pVeh).m_pParentEntity;
             let pilot = (*pVeh).m_pPilot;
-            let crotchBolt = traps.g2api_add_bolt((*parent).ghoul2, 0, cstr("*driver").as_ptr());
+            let crotchBolt = traps.g2api_add_bolt((*parent).ghoul2, 0, "*driver");
 
             debug_assert!(!(*parent).playerState.is_null());
 

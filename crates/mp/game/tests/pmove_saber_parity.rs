@@ -316,11 +316,9 @@ impl TestTraps {
 }
 
 impl BgTraps for TestTraps {
-    fn com_printf(&self, _msg: *const c_char) {}
-    fn com_error(&self, error_level: c_int, msg: *const c_char) {
-        panic!("com_error({}) in test: {:?}", error_level, unsafe {
-            std::ffi::CStr::from_ptr(msg)
-        });
+    fn com_printf(&self, _msg: &str) {}
+    fn com_error(&self, error_level: c_int, msg: &str) {
+        panic!("com_error({}) in test: {:?}", error_level, msg);
     }
     fn trace(
         &self,
@@ -352,7 +350,7 @@ impl BgTraps for TestTraps {
     }
 
     // --- FS: only the animation.cfg load path uses these ---
-    fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
+    fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
         // FS_READ == 0; only reads are served.
         if mode as c_int != 0 {
             unsafe {
@@ -364,8 +362,8 @@ impl BgTraps for TestTraps {
         }
         // Safety: `qpath` is the NUL-terminated vpath literal the animation.cfg
         // load path passes through `BG_ParseAnimationFile` / the `trap_FS_*` seam.
-        let vpath = unsafe { cstr_to_str(qpath) };
-        let base = vpath.rsplit('/').next().unwrap_or(&vpath);
+        let vpath = qpath;
+        let base = vpath.rsplit('/').next().unwrap_or(vpath);
         let real = self.fixdir.join(base);
         match std::fs::read(&real) {
             Ok(bytes) => {
@@ -420,8 +418,8 @@ impl BgTraps for TestTraps {
 
     fn fs_getfilelist(
         &self,
-        _path: *const c_char,
-        _extension: *const c_char,
+        _path: &str,
+        _extension: &str,
         _listbuf: *mut c_char,
         _bufsize: c_int,
     ) -> c_int {
@@ -429,13 +427,13 @@ impl BgTraps for TestTraps {
     }
 
     // --- everything below is off the basic saber path ---
-    fn r_register_skin(&self, _name: *const c_char) -> qhandle_t {
+    fn r_register_skin(&self, _name: &str) -> qhandle_t {
         unreachable!("r_register_skin off the basic pmove saber path")
     }
     fn g2api_init_ghoul2_model(
         &self,
         _a: *mut *mut c_void,
-        _b: *const c_char,
+        _b: &str,
         _c: c_int,
         _d: qhandle_t,
         _e: qhandle_t,
@@ -447,7 +445,7 @@ impl BgTraps for TestTraps {
     fn g2api_clean_ghoul2_models(&self, _a: *mut *mut c_void) {
         unreachable!()
     }
-    fn g2api_add_bolt(&self, _a: *mut c_void, _b: c_int, _c: *const c_char) -> c_int {
+    fn g2api_add_bolt(&self, _a: *mut c_void, _b: c_int, _c: &str) -> c_int {
         unreachable!()
     }
     fn g2api_get_bolt_matrix(
@@ -496,7 +494,7 @@ impl BgTraps for TestTraps {
         &self,
         _a: *mut c_void,
         _b: c_int,
-        _c: *const c_char,
+        _c: &str,
         _d: *const vec3_t,
         _e: c_int,
         _f: c_int,
@@ -512,7 +510,7 @@ impl BgTraps for TestTraps {
         &self,
         _a: *mut c_void,
         _b: c_int,
-        _c: *const c_char,
+        _c: &str,
         _d: c_int,
         _e: c_int,
         _f: c_int,
@@ -526,7 +524,7 @@ impl BgTraps for TestTraps {
     fn g2api_get_bone_anim(
         &self,
         _a: *mut c_void,
-        _b: *const c_char,
+        _b: &str,
         _c: c_int,
         _d: *mut f32,
         _e: *mut c_int,
@@ -553,7 +551,7 @@ impl BgTraps for TestTraps {
         &self,
         _a: *mut c_void,
         _b: c_int,
-        _c: *const c_char,
+        _c: Option<&str>,
         _d: c_int,
         _e: *mut sharedSetBoneIKStateParams_t,
     ) -> qboolean {
@@ -566,7 +564,7 @@ impl BgTraps for TestTraps {
         &self,
         _a: *mut c_void,
         _b: c_int,
-        _c: *const c_char,
+        _c: &str,
     ) -> c_int {
         unreachable!()
     }
@@ -580,7 +578,7 @@ impl BgTraps for TestTraps {
     ) {
         unreachable!()
     }
-    fn cvar_register(&self, _a: *mut vmCvar_t, _b: *const c_char, _c: *const c_char, _d: c_int) {
+    fn cvar_register(&self, _a: *mut vmCvar_t, _b: &str, _c: &str, _d: c_int) {
         unreachable!()
     }
 }
@@ -635,7 +633,7 @@ impl GameCallbacks for TestCallbacks {
     fn alloc(&mut self, _size: c_int) -> *mut c_void {
         unreachable!()
     }
-    fn new_string(&mut self, _s: *const c_char) -> *mut c_char {
+    fn new_string(&mut self, _s: &str) -> *mut c_char {
         unreachable!()
     }
     fn play_effect(&mut self, _f: c_int, _o: *const vec3_t, _a: *const vec3_t) {
@@ -644,13 +642,13 @@ impl GameCallbacks for TestCallbacks {
     fn play_effect_id(&mut self, _f: c_int, _o: *const vec3_t, _a: *const vec3_t) -> c_int {
         unreachable!()
     }
-    fn sound_index(&mut self, _n: *const c_char) -> c_int {
+    fn sound_index(&mut self, _n: &str) -> c_int {
         unreachable!()
     }
-    fn model_index(&mut self, _n: *const c_char) -> c_int {
+    fn model_index(&mut self, _n: &str) -> c_int {
         unreachable!()
     }
-    fn effect_index(&mut self, _n: *const c_char) -> c_int {
+    fn effect_index(&mut self, _n: &str) -> c_int {
         unreachable!()
     }
     fn cheap_weapon_fire(&mut self, _e: c_int, _w: c_int) {
@@ -688,7 +686,7 @@ impl GameCallbacks for TestCallbacks {
     fn try_grapple(&mut self, _e: c_int) -> qboolean {
         unreachable!()
     }
-    fn q3_set_parm(&mut self, _e: c_int, _p: c_int, _v: *const c_char) {
+    fn q3_set_parm(&mut self, _e: c_int, _p: c_int, _v: &str) {
         unreachable!()
     }
     fn board_vehicle(&mut self, _v: c_int, _e: c_int) -> qboolean {

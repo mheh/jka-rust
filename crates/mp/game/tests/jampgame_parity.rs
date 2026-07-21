@@ -766,26 +766,24 @@ mod saberload {
     }
 
     impl BgTraps for TestTraps {
-        fn com_printf(&self, _msg: *const c_char) {}
-        fn com_error(&self, error_level: c_int, msg: *const c_char) {
-            panic!("com_error({}) in test: {:?}", error_level, unsafe {
-                std::ffi::CStr::from_ptr(msg)
-            });
+        fn com_printf(&self, _msg: &str) {}
+        fn com_error(&self, error_level: c_int, msg: &str) {
+            panic!("com_error({}) in test: {:?}", error_level, msg);
         }
         fn fs_getfilelist(
             &self,
-            path: *const c_char,
-            extension: *const c_char,
+            path: &str,
+            extension: &str,
             listbuf: *mut c_char,
             bufsize: c_int,
         ) -> c_int {
-            let dir = self.mappath(&cstr_to_str_p(path));
-            let ext = cstr_to_str_p(extension);
+            let dir = self.mappath(path);
+            let ext = extension;
             let mut names: Vec<String> = match std::fs::read_dir(&dir) {
                 Ok(rd) => rd
                     .filter_map(|e| e.ok())
                     .map(|e| e.file_name().to_string_lossy().into_owned())
-                    .filter(|n| n.ends_with(&ext))
+                    .filter(|n| n.ends_with(ext))
                     .collect(),
                 Err(_) => return 0,
             };
@@ -806,9 +804,9 @@ mod saberload {
             n
         }
 
-        fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
+        fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
             let _ = mode;
-            let real = self.mappath(&cstr_to_str_p(qpath));
+            let real = self.mappath(qpath);
             match std::fs::read(&real) {
                 Ok(bytes) => {
                     let len = bytes.len() as c_int;
@@ -860,10 +858,10 @@ mod saberload {
             }
         }
 
-        fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
+        fn r_register_skin(&self, name: &str) -> qhandle_t {
             let id = self.skin_ctr.get() + 1;
             self.skin_ctr.set(id);
-            self.skin_log.borrow_mut().push((id, cstr_to_str_p(name)));
+            self.skin_log.borrow_mut().push((id, name.to_string()));
             id
         }
 
@@ -886,7 +884,7 @@ mod saberload {
         fn g2api_init_ghoul2_model(
             &self,
             _a: *mut *mut c_void,
-            _b: *const c_char,
+            _b: &str,
             _c: c_int,
             _d: qhandle_t,
             _e: qhandle_t,
@@ -898,7 +896,7 @@ mod saberload {
         fn g2api_clean_ghoul2_models(&self, _a: *mut *mut c_void) {
             unreachable!()
         }
-        fn g2api_add_bolt(&self, _a: *mut c_void, _b: c_int, _c: *const c_char) -> c_int {
+        fn g2api_add_bolt(&self, _a: *mut c_void, _b: c_int, _c: &str) -> c_int {
             unreachable!()
         }
         fn g2api_get_bolt_matrix(
@@ -947,7 +945,7 @@ mod saberload {
             &self,
             _a: *mut c_void,
             _b: c_int,
-            _c: *const c_char,
+            _c: &str,
             _d: *const vec3_t,
             _e: c_int,
             _f: c_int,
@@ -963,7 +961,7 @@ mod saberload {
             &self,
             _a: *mut c_void,
             _b: c_int,
-            _c: *const c_char,
+            _c: &str,
             _d: c_int,
             _e: c_int,
             _f: c_int,
@@ -977,7 +975,7 @@ mod saberload {
         fn g2api_get_bone_anim(
             &self,
             _a: *mut c_void,
-            _b: *const c_char,
+            _b: &str,
             _c: c_int,
             _d: *mut f32,
             _e: *mut c_int,
@@ -1004,7 +1002,7 @@ mod saberload {
             &self,
             _a: *mut c_void,
             _b: c_int,
-            _c: *const c_char,
+            _c: Option<&str>,
             _d: c_int,
             _e: *mut sharedSetBoneIKStateParams_t,
         ) -> qboolean {
@@ -1022,7 +1020,7 @@ mod saberload {
             &self,
             _a: *mut c_void,
             _b: c_int,
-            _c: *const c_char,
+            _c: &str,
         ) -> c_int {
             unreachable!()
         }
@@ -1042,16 +1040,12 @@ mod saberload {
         fn cvar_register(
             &self,
             _a: *mut vmCvar_t,
-            _b: *const c_char,
-            _c: *const c_char,
+            _b: &str,
+            _c: &str,
             _d: c_int,
         ) {
             unreachable!()
         }
-    }
-
-    fn cstr_to_str_p(p: *const c_char) -> String {
-        unsafe { std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned() }
     }
 
     // Read a fixed C-char array field as a displayable string (up to NUL).

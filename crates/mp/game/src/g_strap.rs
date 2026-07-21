@@ -308,10 +308,21 @@ pub fn strap_G2API_SetBoneIKState(
     ikState: c_int,
     params: *mut sharedSetBoneIKStateParams_t,
 ) -> qboolean {
-    // ctx-less bg-boundary wrapper; engine via the seam cell.
-    let bone = unsafe { CStr::from_ptr(boneName) }.to_string_lossy();
-    (crate::trap::G2API_SetBoneIKState(strap_engine(), ghoul2, time, &bone, ikState, params))
-        as qboolean
+    // ctx-less bg-boundary wrapper; engine via the seam cell. NULL boneName
+    // (Raven's init/reset-IK branch) rides through as None.
+    let bone = if boneName.is_null() {
+        None
+    } else {
+        Some(unsafe { CStr::from_ptr(boneName) }.to_string_lossy())
+    };
+    (crate::trap::G2API_SetBoneIKState(
+        strap_engine(),
+        ghoul2,
+        time,
+        bone.as_deref(),
+        ikState,
+        params,
+    )) as qboolean
 }
 
 /// Raven `strap_G2API_IKMove`.

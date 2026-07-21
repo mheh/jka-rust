@@ -236,7 +236,7 @@ pub fn BG_FileExists(fileName: *const c_char, bg: &BgState, traps: &dyn BgTraps)
         unsafe {
             if *fileName != 0 {
                 let mut fh = 0;
-                traps.fs_fopen(fileName, &mut fh, FS_READ);
+                traps.fs_fopen(&cstr_to_str(fileName), &mut fh, FS_READ);
                 if fh > 0 {
                     traps.fs_fclose(fh);
                     return qtrue;
@@ -272,7 +272,7 @@ pub fn BG_ParseField(
                 match (*f).r#type {
                     fieldtype_t::F_LSTRING => {
                         // QAGAME (jampgame) branch: G_NewString via the callbacks seam.
-                        let s = callbacks.new_string(value);
+                        let s = callbacks.new_string(&cstr_to_str(value));
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
                     fieldtype_t::F_VECTOR => {
@@ -324,7 +324,7 @@ pub fn BG_ParseField(
                         // Source: `oracle/codemp/game/bg_misc.c` (BG_ParseField F_PARM branch)
                         let g = ent as *mut bgEntity_t;
                         let parm_num = (*f).r#type as c_int - fieldtype_t::F_PARM1 as c_int;
-                        callbacks.q3_set_parm((*g).s.number, parm_num, value);
+                        callbacks.q3_set_parm((*g).s.number, parm_num, &cstr_to_str(value));
                     }
                     _ => {
                         // F_IGNORE and any other tag: no-op.
@@ -1766,11 +1766,19 @@ pub fn BG_ModelCache(
         let mut g2: *mut c_void = core::ptr::null_mut();
 
         if !skinName.is_null() && *skinName != 0 {
-            traps.r_register_skin(skinName);
+            traps.r_register_skin(&cstr_to_str(skinName));
         }
 
         // I could hook up a precache ghoul2 function, but oh well, this works
-        traps.g2api_init_ghoul2_model(&mut g2 as *mut *mut c_void, modelName, 0, 0, 0, 0, 0);
+        traps.g2api_init_ghoul2_model(
+            &mut g2 as *mut *mut c_void,
+            &cstr_to_str(modelName),
+            0,
+            0,
+            0,
+            0,
+            0,
+        );
         if !g2.is_null() {
             // now get rid of it
             traps.g2api_clean_ghoul2_models(&mut g2 as *mut *mut c_void);

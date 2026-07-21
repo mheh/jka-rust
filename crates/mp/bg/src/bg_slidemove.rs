@@ -1024,8 +1024,8 @@ impl PmoveContext<'_> {
             if trace.allsolid != 0 {
                 if (*self.pm).debugLevel != 0 {
                     // Com_Printf("%i:bend can't step\n", c_pmove);
-                    let msg = format!("{}:bend can't step\n", self.bg.c_pmove);
-                    self.traps.com_printf(msg.as_ptr() as *const c_char);
+                    self.traps
+                        .com_printf(&format!("{}:bend can't step\n", self.bg.c_pmove));
                 }
                 return; // can't step up
             }
@@ -1120,8 +1120,8 @@ impl PmoveContext<'_> {
             }
             if (*self.pm).debugLevel != 0 {
                 // Com_Printf("%i:stepped\n", c_pmove);
-                let msg = format!("{}:stepped\n", self.bg.c_pmove);
-                self.traps.com_printf(msg.as_ptr() as *const c_char);
+                self.traps
+                    .com_printf(&format!("{}:stepped\n", self.bg.c_pmove));
             }
         }
     }

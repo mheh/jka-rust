@@ -1848,7 +1848,7 @@ impl PmoveContext<'_> {
         }
         if anim < 0 {
             let s = format!("ERROR: anim {} < 0\n", anim);
-            self.traps.com_error(ERR_DROP as c_int, cstr(&s).as_ptr());
+            self.traps.com_error(ERR_DROP as c_int, &s);
         }
         unsafe {
             ((*(*self.pm).animations.offset(anim as isize)).numFrames as f32
@@ -1874,8 +1874,8 @@ impl PmoveContext<'_> {
             {
                 let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].name));
                 let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].name));
-                self.traps.com_printf(cstr(&old_str).as_ptr());
-                self.traps.com_printf(cstr(&new_str).as_ptr());
+                self.traps.com_printf(&old_str);
+                self.traps.com_printf(&new_str);
             }
         }
     }
@@ -2032,7 +2032,7 @@ impl PmoveContext<'_> {
         }
 
         if self.bg.BGPAFtextLoaded == 0 || isHumanoid == 0 {
-            len = self.traps.fs_fopen(filename, &mut f, FS_READ);
+            len = self.traps.fs_fopen(&(unsafe { cstr_to_str(filename) }), &mut f, FS_READ);
             if len <= 0 || len >= BGPAFtext.len() as c_int - 1 {
                 if dynAlloc != 0 {
                     BG_AnimsetFree(animset);
@@ -2042,7 +2042,7 @@ impl PmoveContext<'_> {
                         "{} exceeds the allowed game-side animation buffer!",
                         unsafe { cstr_to_str(filename) }
                     );
-                    self.traps.com_error(ERR_DROP as c_int, cstr(&s).as_ptr());
+                    self.traps.com_error(ERR_DROP as c_int, &s);
                 }
                 return -1;
             }

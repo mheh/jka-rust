@@ -68,11 +68,10 @@ impl BgTraps for GameBgTraps<'_> {
         crate::trap::PointContents(self.engine, GPointContentsArgs::new(point, passEntityNum))
     }
 
-    fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
+    fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
         // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`). The caller guarantees
         // `f` is valid.
-        let qpath = unsafe { std::ffi::CStr::from_ptr(qpath) }.to_string_lossy();
-        crate::trap::FS_FOpenFile(self.engine, &qpath, unsafe { &mut *f }, mode)
+        crate::trap::FS_FOpenFile(self.engine, qpath, unsafe { &mut *f }, mode)
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
         // Mechanical delegation — matches the proven `pointcontents`
@@ -92,29 +91,26 @@ impl BgTraps for GameBgTraps<'_> {
     }
     fn fs_getfilelist(
         &self,
-        path: *const c_char,
-        extension: *const c_char,
+        path: &str,
+        extension: &str,
         listbuf: *mut c_char,
         bufsize: c_int,
     ) -> c_int {
         // Raven: `trap_FS_GetFileList` (`G_FS_GETFILELIST`).
-        let path = unsafe { std::ffi::CStr::from_ptr(path) }.to_string_lossy();
-        let extension = unsafe { std::ffi::CStr::from_ptr(extension) }.to_string_lossy();
         let list =
             unsafe { core::slice::from_raw_parts_mut(listbuf as *mut u8, bufsize as usize) };
-        crate::trap::FS_GetFileList(self.engine, &path, &extension, list)
+        crate::trap::FS_GetFileList(self.engine, path, extension, list)
     }
 
-    fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
+    fn r_register_skin(&self, name: &str) -> qhandle_t {
         // Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
-        let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_string_lossy();
-        crate::trap::R_RegisterSkin(self.engine, &name)
+        crate::trap::R_RegisterSkin(self.engine, name)
     }
 
     fn g2api_init_ghoul2_model(
         &self,
         ghoul2Ptr: *mut *mut c_void,
-        fileName: *const c_char,
+        fileName: &str,
         modelIndex: c_int,
         customSkin: qhandle_t,
         customShader: qhandle_t,
@@ -123,11 +119,10 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> c_int {
         // Mechanical delegation. Raven: `trap_G2API_InitGhoul2Model`
         // (`G_G2_INITGHOUL2MODEL`).
-        let file_name = unsafe { std::ffi::CStr::from_ptr(fileName) }.to_string_lossy();
         crate::trap::G2API_InitGhoul2Model(
             self.engine,
             ghoul2Ptr,
-            &file_name,
+            fileName,
             modelIndex,
             customSkin,
             customShader,
@@ -143,17 +138,11 @@ impl BgTraps for GameBgTraps<'_> {
             mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(ghoul2Ptr),
         )
     }
-    fn g2api_add_bolt(
-        &self,
-        ghoul2: *mut c_void,
-        modelIndex: c_int,
-        boneName: *const c_char,
-    ) -> c_int {
+    fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: &str) -> c_int {
         // Real delegation to the already-wired `trap_G2API_AddBolt` seam
         // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)
         // only carry `&dyn BgTraps`, not `&Engine`.
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
-        crate::trap::G2API_AddBolt(self.engine, ghoul2, modelIndex, &bone_name)
+        crate::trap::G2API_AddBolt(self.engine, ghoul2, modelIndex, boneName)
     }
     fn g2api_get_bolt_matrix(
         &self,
@@ -232,7 +221,7 @@ impl BgTraps for GameBgTraps<'_> {
         &self,
         ghoul2: *mut c_void,
         modelIndex: c_int,
-        boneName: *const c_char,
+        boneName: &str,
         angles: *const vec3_t,
         flags: c_int,
         up: c_int,
@@ -243,12 +232,11 @@ impl BgTraps for GameBgTraps<'_> {
         currentTime: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneAngles` (`G_G2_ANGLEOVERRIDE`).
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
         (crate::trap::G2API_SetBoneAngles(
             self.engine,
             ghoul2,
             modelIndex,
-            &bone_name,
+            boneName,
             angles,
             flags,
             up,
@@ -263,7 +251,7 @@ impl BgTraps for GameBgTraps<'_> {
         &self,
         ghoul2: *mut c_void,
         modelIndex: c_int,
-        boneName: *const c_char,
+        boneName: &str,
         startFrame: c_int,
         endFrame: c_int,
         flags: c_int,
@@ -273,12 +261,11 @@ impl BgTraps for GameBgTraps<'_> {
         blendTime: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneAnim` (`G_G2_PLAYANIM`).
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
         (crate::trap::G2API_SetBoneAnim(
             self.engine,
             ghoul2,
             modelIndex,
-            &bone_name,
+            boneName,
             startFrame,
             endFrame,
             flags,
@@ -291,7 +278,7 @@ impl BgTraps for GameBgTraps<'_> {
     fn g2api_get_bone_anim(
         &self,
         ghoul2: *mut c_void,
-        boneName: *const c_char,
+        boneName: &str,
         currentTime: c_int,
         currentFrame: *mut f32,
         startFrame: *mut c_int,
@@ -302,11 +289,10 @@ impl BgTraps for GameBgTraps<'_> {
         modelIndex: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_GetBoneAnim` (`G_G2_GETBONEANIM`).
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
         (crate::trap::G2API_GetBoneAnim(
             self.engine,
             ghoul2,
-            &bone_name,
+            boneName,
             currentTime,
             currentFrame,
             startFrame,
@@ -339,13 +325,14 @@ impl BgTraps for GameBgTraps<'_> {
         &self,
         ghoul2: *mut c_void,
         time: c_int,
-        boneName: *const c_char,
+        boneName: Option<&str>,
         ikState: c_int,
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneIKState` (`G_G2_SETBONEIKSTATE`).
-        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_string_lossy();
-        (crate::trap::G2API_SetBoneIKState(self.engine, ghoul2, time, &bone_name, ikState, params))
+        // `None` rides through as a null boneName on the wire — the engine's
+        // init/reset-IK branch (`G2_bones.cpp:4674`).
+        (crate::trap::G2API_SetBoneIKState(self.engine, ghoul2, time, boneName, ikState, params))
             as qboolean
     }
     fn g2api_ik_move(
@@ -362,12 +349,11 @@ impl BgTraps for GameBgTraps<'_> {
         &self,
         ghoul2: *mut c_void,
         modelIndex: c_int,
-        surfaceName: *const c_char,
+        surfaceName: &str,
     ) -> c_int {
         // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus`
         // (G_G2_GETSURFACERENDERSTATUS).
-        let surface_name = unsafe { core::ffi::CStr::from_ptr(surfaceName) }.to_string_lossy();
-        crate::trap::G2API_GetSurfaceRenderStatus(self.engine, ghoul2, modelIndex, &surface_name)
+        crate::trap::G2API_GetSurfaceRenderStatus(self.engine, ghoul2, modelIndex, surfaceName)
     }
 
     fn fx_play_effect_id(
@@ -395,32 +381,22 @@ impl BgTraps for GameBgTraps<'_> {
         use mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs;
         crate::trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
     }
-    fn cvar_register(
-        &self,
-        cvar: *mut vmCvar_t,
-        var_name: *const c_char,
-        value: *const c_char,
-        flags: c_int,
-    ) {
+    fn cvar_register(&self, cvar: *mut vmCvar_t, var_name: &str, value: &str, flags: c_int) {
         // Raven: `trap_Cvar_Register` (`G_CVAR_REGISTER`).
-        let var_name = unsafe { std::ffi::CStr::from_ptr(var_name) }.to_string_lossy();
-        let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_string_lossy();
         let cvar = unsafe { cvar.as_mut() };
-        crate::trap::Cvar_Register(self.engine, cvar, &var_name, &value, flags)
+        crate::trap::Cvar_Register(self.engine, cvar, var_name, value, flags)
     }
 
-    fn com_printf(&self, msg: *const c_char) {
+    fn com_printf(&self, msg: &str) {
         // Raven `Com_Printf` -> `trap_Print` (`G_PRINT`), the same route the
         // game-tier `Com_Printf` port takes. Source: `g_main.c:1219-1228`.
-        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_string_lossy();
-        crate::trap::Printf(self.engine, &msg)
+        crate::trap::Printf(self.engine, msg)
     }
-    fn com_error(&self, error_level: c_int, msg: *const c_char) {
+    fn com_error(&self, error_level: c_int, msg: &str) {
         // Raven `Com_Error` -> `trap_Error` (`G_ERROR`); `error_level` is dropped
         // at the seam like the game-tier `Com_Error` port. Source: `g_main.c:1208-1217`.
         let _ = error_level;
-        let msg = unsafe { std::ffi::CStr::from_ptr(msg) }.to_string_lossy();
-        crate::trap::Error(self.engine, &msg)
+        crate::trap::Error(self.engine, msg)
     }
 }
 
@@ -552,8 +528,10 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         };
         crate::g_mem::G_Alloc(&mut ctx, size)
     }
-    fn new_string(&mut self, string: *const c_char) -> *mut c_char {
-        // `G_NewString` copies into the game pool via `ctx.world`.
+    fn new_string(&mut self, string: &str) -> *mut c_char {
+        // `G_NewString` copies into the game pool via `ctx.world`; it still takes
+        // a `*const c_char`, so re-encode the `&str` for the call (the temporary
+        // `CString` outlives the copy).
         // Source: `oracle/codemp/game/g_spawn.c` (`G_NewString`).
         // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
         // single-threaded module, no live sibling borrow across this call.
@@ -561,7 +539,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_spawn::G_NewString(&mut ctx, string)
+        crate::g_spawn::G_NewString(&mut ctx, cstr(string).as_ptr())
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
         // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned
@@ -584,17 +562,17 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             }
         }
     }
-    fn sound_index(&mut self, name: *const c_char) -> c_int {
+    fn sound_index(&mut self, name: &str) -> c_int {
         // ctx-free configstring lookup. Source: `g_utils.c` (`G_SoundIndex`).
-        G_SoundIndex(&(unsafe { cstr_to_str(name as *const c_char) }))
+        G_SoundIndex(name)
     }
-    fn model_index(&mut self, name: *const c_char) -> c_int {
+    fn model_index(&mut self, name: &str) -> c_int {
         // ctx-free configstring lookup. Source: `g_utils.c` (`G_ModelIndex`).
-        G_ModelIndex(&(unsafe { cstr_to_str(name as *const c_char) }))
+        G_ModelIndex(name)
     }
-    fn effect_index(&mut self, name: *const c_char) -> c_int {
+    fn effect_index(&mut self, name: &str) -> c_int {
         // ctx-free configstring lookup. Source: `g_utils.c` (`G_EffectIndex`).
-        G_EffectIndex(&(unsafe { cstr_to_str(name as *const c_char) }))
+        G_EffectIndex(name)
     }
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
         // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.
@@ -745,8 +723,9 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             crate::g_cmds::TryGrapple(&mut ctx, ent_id)
         }
     }
-    fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
-        // `Q3_SetParm` takes `entID` as a raw index and resolves it internally.
+    fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: &str) {
+        // `Q3_SetParm` takes `entID` as a raw index and resolves it internally; it
+        // still takes a `*const c_char`, so re-encode the `&str` for the call.
         // Source: `oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`).
         // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
         // single-threaded module, no live sibling borrow across this call.
@@ -754,7 +733,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_ICARUScb::Q3_SetParm(&mut ctx, entID, parmNum, parmValue);
+        crate::g_ICARUScb::Q3_SetParm(&mut ctx, entID, parmNum, cstr(parmValue).as_ptr());
     }
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
         // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against

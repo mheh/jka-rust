@@ -400,7 +400,7 @@ pub fn BG_SoundIndex(sound: *mut c_char, callbacks: &mut dyn GameCallbacks) -> c
             }
         }
     });
-    callbacks.sound_index(sound as *const c_char)
+    callbacks.sound_index(&(unsafe { cstr_to_str(sound as *const c_char) }))
 }
 
 /// Raven `BG_ParseLiteral`.
@@ -416,15 +416,13 @@ pub fn BG_ParseLiteral(
     unsafe {
         let token = COM_ParseExt(qs, data, qtrue);
         if *token == 0 {
-            let msg = std::ffi::CString::new("unexpected EOF\n").unwrap();
-            traps.com_printf(msg.as_ptr());
+            traps.com_printf("unexpected EOF\n");
             return qtrue;
         }
 
         if Q_stricmp(token as *const c_char, string) != 0 {
             let s = std::ffi::CStr::from_ptr(string).to_string_lossy();
-            let msg = std::ffi::CString::new(format!("required string '{}' missing\n", s)).unwrap();
-            traps.com_printf(msg.as_ptr());
+            traps.com_printf(&format!("required string '{}' missing\n", s));
             return qtrue;
         }
 
@@ -988,7 +986,7 @@ pub fn WP_SaberParseParms(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(useSaber.as_ptr())
                 );
-                traps.com_printf(cstr(&s).as_ptr());
+                traps.com_printf(&s);
                 return qfalse;
             }
 
@@ -1054,7 +1052,7 @@ pub fn WP_SaberParseParms(
 
             if qstricmp_eq(tok, c"customSkin") {
                 let value = parse_string_field!();
-                s.skin = traps.r_register_skin(value);
+                s.skin = traps.r_register_skin(&cstr_to_str(value));
                 continue;
             }
 
@@ -1088,7 +1086,7 @@ pub fn WP_SaberParseParms(
                         "WP_SaberParseParms: saber {} has illegal number of blades ({}) max: {}",
                         s_useSaber, n, MAX_BLADES
                     );
-                    traps.com_error(ERR_DROP as c_int, cstr(&msg).as_ptr());
+                    traps.com_error(ERR_DROP as c_int, &msg);
                     continue;
                 }
                 s.numBlades = n;
@@ -1109,7 +1107,7 @@ pub fn WP_SaberParseParms(
                             cstr_to_str(tok),
                             cstr_to_str(useSaber.as_ptr())
                         );
-                        traps.com_printf(cstr(&msg).as_ptr());
+                        traps.com_printf(&msg);
                         continue;
                     }
                 } else {
@@ -1118,7 +1116,7 @@ pub fn WP_SaberParseParms(
                         cstr_to_str(tok),
                         cstr_to_str(useSaber.as_ptr())
                     );
-                    traps.com_printf(cstr(&msg).as_ptr());
+                    traps.com_printf(&msg);
                     continue;
                 }
 
@@ -1150,7 +1148,7 @@ pub fn WP_SaberParseParms(
                             cstr_to_str(tok),
                             cstr_to_str(useSaber.as_ptr())
                         );
-                        traps.com_printf(cstr(&msg).as_ptr());
+                        traps.com_printf(&msg);
                         continue;
                     }
                     n = idx;
@@ -1160,7 +1158,7 @@ pub fn WP_SaberParseParms(
                         cstr_to_str(tok),
                         cstr_to_str(useSaber.as_ptr())
                     );
-                    traps.com_printf(cstr(&msg).as_ptr());
+                    traps.com_printf(&msg);
                     continue;
                 }
 
@@ -1194,7 +1192,7 @@ pub fn WP_SaberParseParms(
                             cstr_to_str(tok),
                             cstr_to_str(useSaber.as_ptr())
                         );
-                        traps.com_printf(cstr(&msg).as_ptr());
+                        traps.com_printf(&msg);
                         continue;
                     }
                     n = idx;
@@ -1204,7 +1202,7 @@ pub fn WP_SaberParseParms(
                         cstr_to_str(tok),
                         cstr_to_str(useSaber.as_ptr())
                     );
-                    traps.com_printf(cstr(&msg).as_ptr());
+                    traps.com_printf(&msg);
                     continue;
                 }
 
@@ -2134,7 +2132,7 @@ pub fn WP_SaberParseParms(
                     cstr_to_str(tok),
                     cstr_to_str(useSaber.as_ptr())
                 );
-                traps.com_printf(cstr(&msg).as_ptr());
+                traps.com_printf(&msg);
             }
             SkipRestOfLine(&mut bg.qs, &mut p);
         }
@@ -2204,7 +2202,7 @@ pub fn WP_SaberParseParm(
                     "ERROR: unexpected EOF while parsing '{}'\n",
                     cstr_to_str(saberName)
                 );
-                traps.com_printf(cstr(&s).as_ptr());
+                traps.com_printf(&s);
                 return qfalse;
             }
 
@@ -2391,11 +2389,9 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
         // now load in the extra .sab extensions
         let mut saberExtensionListBuf: [c_char; 2048] = [0; 2048];
-        let path = cstr("ext_data/sabers");
-        let ext = cstr(".sab");
         let fileCnt = traps.fs_getfilelist(
-            path.as_ptr(),
-            ext.as_ptr(),
+            "ext_data/sabers",
+            ".sab",
             saberExtensionListBuf.as_mut_ptr(),
             saberExtensionListBuf.len() as c_int,
         );
@@ -2407,18 +2403,14 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 
             let name = cstr_to_str(holdChar);
             let path_s = format!("ext_data/sabers/{}", name);
-            let path_c = cstr(&path_s);
             let mut f: fileHandle_t = 0;
-            len = traps.fs_fopen(path_c.as_ptr(), &mut f, FS_READ);
+            len = traps.fs_fopen(&path_s, &mut f, FS_READ);
 
             if len == -1 {
-                traps.com_printf(c"error reading file\n".as_ptr());
+                traps.com_printf("error reading file\n");
             } else {
                 if (totallen + len + 1/* for the endline */) >= MAX_SABER_DATA_SIZE as c_int {
-                    traps.com_error(
-                        ERR_DROP as c_int,
-                        c"Saber extensions (*.sab) are too large".as_ptr(),
-                    );
+                    traps.com_error(ERR_DROP as c_int, "Saber extensions (*.sab) are too large");
                 }
 
                 traps.fs_read(bg.bgSaberParseTBuffer.as_mut_ptr() as *mut c_void, len, f);

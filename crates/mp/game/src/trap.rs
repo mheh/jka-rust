@@ -1198,17 +1198,19 @@ pub fn G2API_SetBoneAnim(
 
 /// Raven `trap_G2API_SetBoneIKState` (`g_syscalls.c:1424-1427`) — `G_G2_SETBONEIKSTATE`.
 /// C: `qboolean trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params)`
+/// `boneName` is nullable in Raven: NULL selects the engine's init/reset-IK
+/// branch, so `None` here encodes a null pointer on the wire.
 pub fn G2API_SetBoneIKState(
     engine: &Engine,
     ghoul2: *mut c_void,
     time: c_int,
-    boneName: &str,
+    boneName: Option<&str>,
     ikState: c_int,
     params: *mut sharedSetBoneIKStateParams_t,
 ) -> bool {
     <Engine as Execute<GG2Setboneikstate>>::execute(
         engine,
-        GG2SetboneikstateArgs::new(ghoul2, time, cstr(boneName), ikState, params),
+        GG2SetboneikstateArgs::new(ghoul2, time, boneName.map(cstr), ikState, params),
     ) != 0
 }
 

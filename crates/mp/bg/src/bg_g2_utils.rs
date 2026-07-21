@@ -31,12 +31,10 @@ pub fn BG_AttachToRancor(
     // Getting the bolt here
     if inMouth != 0 {
         // in mouth
-        let bolt_name = cstr("jaw_bone");
-        boltIndex = traps.g2api_add_bolt(ghoul2, 0, bolt_name.as_ptr());
+        boltIndex = traps.g2api_add_bolt(ghoul2, 0, "jaw_bone");
     } else {
         // in right hand
-        let bolt_name = cstr("*r_hand");
-        boltIndex = traps.g2api_add_bolt(ghoul2, 0, bolt_name.as_ptr());
+        boltIndex = traps.g2api_add_bolt(ghoul2, 0, "*r_hand");
     }
 
     traps.g2api_get_bolt_matrix(
@@ -155,7 +153,9 @@ pub fn BG_GetRootSurfNameWithVariant(
     // Source: `oracle/codemp/game/bg_g2_utils.c:100`
     const MAX_VARIANTS: c_int = 8;
 
-    if ghoul2.is_null() || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse
+    if ghoul2.is_null()
+        || traps.g2api_get_surface_render_status(ghoul2, 0, &(unsafe { cstr_to_str(rootSurfName) }))
+            == qfalse
     {
         // see if the basic name without variants is on
         unsafe {
@@ -176,7 +176,9 @@ pub fn BG_GetRootSurfNameWithVariant(
             unsafe {
                 Q_strncpyz(returnSurfName, variant_cstr.as_ptr(), returnSize);
             }
-            if traps.g2api_get_surface_render_status(ghoul2, 0, returnSurfName) == qfalse {
+            if traps.g2api_get_surface_render_status(ghoul2, 0, &(unsafe { cstr_to_str(returnSurfName) }))
+                == qfalse
+            {
                 return qtrue;
             }
         }

@@ -19,8 +19,9 @@ pub struct GG2SetboneikstateArgs {
     pub ghoul2: *mut core::ffi::c_void,
     /// Current server time.
     pub time: c_int,
-    /// Bone name (NUL-terminated).
-    pub bone_name: CString,
+    /// Bone name (NUL-terminated). `None` encodes Raven's NULL — the
+    /// init/reset-IK-on-every-bone branch (`G2_bones.cpp:4674`).
+    pub bone_name: Option<CString>,
     /// IK state to set (e.g. `IKS_DYNAMIC`).
     pub ik_state: c_int,
     /// IK state params struct (may be null for IKS_NONE).
@@ -31,7 +32,7 @@ impl GG2SetboneikstateArgs {
     pub fn new(
         ghoul2: *mut core::ffi::c_void,
         time: c_int,
-        bone_name: CString,
+        bone_name: Option<CString>,
         ik_state: c_int,
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> Self {
@@ -50,8 +51,8 @@ impl GG2SetboneikstateArgs {
     pub fn time(&self) -> c_int {
         self.time
     }
-    pub fn bone_name(&self) -> &CString {
-        &self.bone_name
+    pub fn bone_name(&self) -> Option<&CString> {
+        self.bone_name.as_ref()
     }
     pub fn ik_state(&self) -> c_int {
         self.ik_state
@@ -79,7 +80,9 @@ impl EncodeSysCall for GG2Setboneikstate {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
             a.time as isize,
-            ptr_to_word(a.bone_name.as_ptr()),
+            a.bone_name
+                .as_ref()
+                .map_or(0, |name| ptr_to_word(name.as_ptr())),
             a.ik_state as isize,
             ptr_to_word(a.params as *const _),
         ])

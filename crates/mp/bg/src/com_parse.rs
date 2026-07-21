@@ -37,7 +37,7 @@ pub fn COM_ParseString(
         // non-zero here (COM_ParseExt never returns NULL), so the oracle's check
         // is dead in practice; preserved faithfully as a null-pointer check.
         if (*s).is_null() {
-            traps.com_printf(c"unexpected EOF\n".as_ptr());
+            traps.com_printf("unexpected EOF\n");
             return qtrue;
         }
         qfalse
@@ -55,7 +55,7 @@ pub fn COM_ParseInt(
     unsafe {
         let token = COM_ParseExt(qs, data, qfalse);
         if *token == 0 {
-            traps.com_printf(c"unexpected EOF\n".as_ptr());
+            traps.com_printf("unexpected EOF\n");
             return qtrue;
         }
         *i = atoi(token as *const c_char);
@@ -74,7 +74,7 @@ pub fn COM_ParseFloat(
     unsafe {
         let token = COM_ParseExt(qs, data, qfalse);
         if *token == 0 {
-            traps.com_printf(c"unexpected EOF\n".as_ptr());
+            traps.com_printf("unexpected EOF\n");
             return qtrue;
         }
         *f = atof_bytes(CStr::from_ptr(token).to_bytes()) as f32;

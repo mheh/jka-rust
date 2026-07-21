@@ -70,7 +70,7 @@ pub trait GameCallbacks {
 
     /// Raven `G_NewString(string)` — copies a string into game memory.
     /// Source: `oracle/codemp/game/g_local.h:942`
-    fn new_string(&mut self, string: *const c_char) -> *mut c_char;
+    fn new_string(&mut self, string: &str) -> *mut c_char;
 
     /// Raven `G_PlayEffect(fxID, org, ang)` — play a cached effect by index.
     /// Source: `oracle/codemp/game/g_local.h` (`G_PlayEffect`)
@@ -83,15 +83,15 @@ pub trait GameCallbacks {
 
     /// Raven `G_SoundIndex(name)` — register/lookup a sound, return its index.
     /// Source: `oracle/codemp/game/g_local.h:1002`
-    fn sound_index(&mut self, name: *const c_char) -> c_int;
+    fn sound_index(&mut self, name: &str) -> c_int;
 
     /// Raven `G_ModelIndex(name)`.
     /// Source: `oracle/codemp/game/g_local.h:1001`
-    fn model_index(&mut self, name: *const c_char) -> c_int;
+    fn model_index(&mut self, name: &str) -> c_int;
 
     /// Raven `G_EffectIndex(name)`.
     /// Source: `oracle/codemp/game/g_local.h:1004`
-    fn effect_index(&mut self, name: *const c_char) -> c_int;
+    fn effect_index(&mut self, name: &str) -> c_int;
 
     /// Raven cheap weapon-fire path fired from movement code (bg melee/impacts).
     /// Source: `oracle/codemp/game/g_weapon.c` (cheap-fire helper)
@@ -151,7 +151,7 @@ pub trait GameCallbacks {
 
     /// Raven `Q3_SetParm`-style ICARUS parameter set reachable from game logic.
     /// Source: `oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`)
-    fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char);
+    fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: &str);
 
     /// Vehicle boarding upcall. `bg_pmove`'s ground-check boards a
     /// vehicle NPC by calling `pVeh->m_pVehicleInfo->Board(pVeh, pEnt)` — a

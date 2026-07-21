@@ -41,7 +41,7 @@ pub trait BgTraps {
     // --- filesystem (trap_FS_*; bg saber/anim/vehicle loaders) ---
 
     /// Raven `trap_FS_FOpenFile`. Source: `oracle/codemp/game/g_syscalls.c`
-    fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int;
+    fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int;
     /// Raven `trap_FS_Read`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t);
     /// Raven `trap_FS_Write`. Source: `oracle/codemp/game/g_syscalls.c`
@@ -51,8 +51,8 @@ pub trait BgTraps {
     /// Raven `trap_FS_GetFileList`. Source: `oracle/codemp/game/g_syscalls.c`
     fn fs_getfilelist(
         &self,
-        path: *const c_char,
-        extension: *const c_char,
+        path: &str,
+        extension: &str,
         listbuf: *mut c_char,
         bufsize: c_int,
     ) -> c_int;
@@ -61,7 +61,7 @@ pub trait BgTraps {
     /// code (`WP_SaberParseParms`'s `customSkin` field) needs to register a
     /// skin without holding `&Engine`.
     /// Source: `oracle/codemp/game/g_syscalls.c:1179-1182`
-    fn r_register_skin(&self, name: *const c_char) -> qhandle_t;
+    fn r_register_skin(&self, name: &str) -> qhandle_t;
 
     /// Mirror of `trap_G2API_InitGhoul2Model` — the bg-visible surface
     /// `BG_ModelCache`'s QAGAME branch needs to precache a ghoul2 model
@@ -71,7 +71,7 @@ pub trait BgTraps {
     fn g2api_init_ghoul2_model(
         &self,
         ghoul2Ptr: *mut *mut c_void,
-        fileName: *const c_char,
+        fileName: &str,
         modelIndex: c_int,
         customSkin: qhandle_t,
         customShader: qhandle_t,
@@ -90,12 +90,7 @@ pub trait BgTraps {
     /// (`G_G2_ADDBOLT` syscall), needed by bg vehicle-loader code (`AttachRidersGeneric`)
     /// that only has `&dyn BgTraps`, not `&Engine`.
     /// Source: `oracle/codemp/game/g_syscalls.c:1239-1242`
-    fn g2api_add_bolt(
-        &self,
-        ghoul2: *mut c_void,
-        modelIndex: c_int,
-        boneName: *const c_char,
-    ) -> c_int;
+    fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: &str) -> c_int;
 
     /// Raven `strap_G2API_GetBoltMatrix`. Source: `oracle/codemp/game/g_strap.c:6-10`
     fn g2api_get_bolt_matrix(
@@ -141,7 +136,7 @@ pub trait BgTraps {
         &self,
         ghoul2: *mut c_void,
         modelIndex: c_int,
-        boneName: *const c_char,
+        boneName: &str,
         angles: *const vec3_t,
         flags: c_int,
         up: c_int,
@@ -156,7 +151,7 @@ pub trait BgTraps {
         &self,
         ghoul2: *mut c_void,
         modelIndex: c_int,
-        boneName: *const c_char,
+        boneName: &str,
         startFrame: c_int,
         endFrame: c_int,
         flags: c_int,
@@ -169,7 +164,7 @@ pub trait BgTraps {
     fn g2api_get_bone_anim(
         &self,
         ghoul2: *mut c_void,
-        boneName: *const c_char,
+        boneName: &str,
         currentTime: c_int,
         currentFrame: *mut f32,
         startFrame: *mut c_int,
@@ -189,11 +184,13 @@ pub trait BgTraps {
         params: *mut sharedRagDollUpdateParams_t,
     );
     /// Raven `strap_G2API_SetBoneIKState`. Source: `g_strap.c:53-56`
+    // `boneName` is genuinely nullable: bg passes NULL to init/reset the IK
+    // system on the instance (vs a named bone), so it crosses as `Option<&str>`.
     fn g2api_set_bone_ik_state(
         &self,
         ghoul2: *mut c_void,
         time: c_int,
-        boneName: *const c_char,
+        boneName: Option<&str>,
         ikState: c_int,
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> qboolean;
@@ -209,7 +206,7 @@ pub trait BgTraps {
         &self,
         ghoul2: *mut c_void,
         modelIndex: c_int,
-        surfaceName: *const c_char,
+        surfaceName: &str,
     ) -> c_int;
 
     // --- effects / misc ---
@@ -227,20 +224,14 @@ pub trait BgTraps {
     /// Source: `oracle/codemp/game/g_syscalls.c`
     fn snap_vector(&self, v: *mut f32);
     /// Raven `trap_Cvar_Register`. Source: `oracle/codemp/game/g_syscalls.c`
-    fn cvar_register(
-        &self,
-        cvar: *mut vmCvar_t,
-        var_name: *const c_char,
-        value: *const c_char,
-        flags: c_int,
-    );
+    fn cvar_register(&self, cvar: *mut vmCvar_t, var_name: &str, value: &str, flags: c_int);
 
     // --- console (Com_Printf/Com_Error map to trap_Print/trap_Error) ---
 
     /// Raven `Com_Printf`: bg code calls it, and in the module it maps to
     /// `trap_Print` (`G_PRINT`) — mirroring the game-tier `Com_Printf` port.
     /// Source: `oracle/codemp/game/g_main.c:1219-1228`.
-    fn com_printf(&self, msg: *const c_char);
+    fn com_printf(&self, msg: &str);
 
     /// Raven `Com_Error`: bg code calls it, and in the module it maps to
     /// `trap_Error` (`G_ERROR`). `error_level` is dropped at the seam, matching
@@ -248,5 +239,5 @@ pub trait BgTraps {
     /// forwards the level). Returns unit, as that port does — call-site control
     /// flow is unchanged.
     /// Source: `oracle/codemp/game/g_main.c:1208-1217`.
-    fn com_error(&self, error_level: c_int, msg: *const c_char);
+    fn com_error(&self, error_level: c_int, msg: &str);
 }
