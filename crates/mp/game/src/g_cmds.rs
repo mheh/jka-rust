@@ -2033,7 +2033,7 @@ pub fn Cmd_Where_f(ctx: &mut GameContext, ent: EntityId) {
     unsafe {
         let origin = ctx.world.entity(ent).s.origin;
         let v = crate::g_utils::vtos(ctx, origin);
-        let s = format!("print \"{}\n\"", cstr_to_str(v));
+        let s = format!("print \"{}\n\"", v);
         trap::SendServerCommand(ctx.engine, ent.index() as c_int, &s);
     }
 }
@@ -2206,7 +2206,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
 
         if ctx.world.level.voteExecuteTime != 0 {
             ctx.world.level.voteExecuteTime = 0;
-            let cc = format!("{}\n", cstr_to_str(ctx.world.level.voteString.as_ptr()));
+            let cc = format!("{}\n", ctx.world.level.voteString);
             trap::SendConsoleCommand(ctx.engine, EXEC_APPEND as c_int, &cc);
         }
 
@@ -2220,13 +2220,11 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.level.votingGametype = qtrue;
             ctx.world.level.votingGametypeTo = i;
 
-            write_cstr_field(
-                &mut ctx.world.level.voteString,
-                &format!("{} {}", arg1_s, i),
-            );
-            write_cstr_field(
-                &mut ctx.world.level.voteDisplayString,
-                &format!("{} {}", arg1_s, cstr_to_str(gameNames[i as usize].as_ptr())),
+            ctx.world.level.voteString =
+                strncpyz_string(format!("{} {}", arg1_s, i).as_bytes(), MAX_STRING_CHARS);
+            ctx.world.level.voteDisplayString = strncpyz_string(
+                format!("{} {}", arg1_s, cstr_to_str(gameNames[i as usize].as_ptr())).as_bytes(),
+                MAX_STRING_CHARS,
             );
         } else if arg1_s.eq_ignore_ascii_case("map") {
             let gametype = trap::Cvar_VariableIntegerValue(ctx.engine, "g_gametype");
@@ -2239,15 +2237,13 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
 
             let s_str = trap::Cvar_VariableStringBuffer(ctx.engine, "nextmap", MAX_STRING_CHARS);
             if !s_str.is_empty() {
-                write_cstr_field(
-                    &mut ctx.world.level.voteString,
-                    &format!("{} {}; set nextmap \"{}\"", arg1_s, arg2_s, s_str),
+                ctx.world.level.voteString = strncpyz_string(
+                    format!("{} {}; set nextmap \"{}\"", arg1_s, arg2_s, s_str).as_bytes(),
+                    MAX_STRING_CHARS,
                 );
             } else {
-                write_cstr_field(
-                    &mut ctx.world.level.voteString,
-                    &format!("{} {}", arg1_s, arg2_s),
-                );
+                ctx.world.level.voteString =
+                    strncpyz_string(format!("{} {}", arg1_s, arg2_s).as_bytes(), MAX_STRING_CHARS);
             }
 
             let arenaInfo = crate::g_bot::G_GetArenaInfoByMap(ctx, &arg2_s);
@@ -2259,10 +2255,8 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
                 None => "ERROR".to_string(),
             };
 
-            write_cstr_field(
-                &mut ctx.world.level.voteDisplayString,
-                &format!("map {}", mapName_str),
-            );
+            ctx.world.level.voteDisplayString =
+                strncpyz_string(format!("map {}", mapName_str).as_bytes(), MAX_STRING_CHARS);
         } else if arg1_s.eq_ignore_ascii_case("clientkick") {
             let n: c_int = atoi_bytes(arg2_s.as_bytes());
             if n < 0 || n >= MAX_CLIENTS as c_int {
@@ -2281,13 +2275,11 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
                 return;
             }
 
-            write_cstr_field(
-                &mut ctx.world.level.voteString,
-                &format!("{} {}", arg1_s, arg2_s),
-            );
-            write_cstr_field(
-                &mut ctx.world.level.voteDisplayString,
-                &format!("kick {}", (*nclient).pers.netname.clone()),
+            ctx.world.level.voteString =
+                strncpyz_string(format!("{} {}", arg1_s, arg2_s).as_bytes(), MAX_STRING_CHARS);
+            ctx.world.level.voteDisplayString = strncpyz_string(
+                format!("kick {}", (*nclient).pers.netname.clone()).as_bytes(),
+                MAX_STRING_CHARS,
             );
         } else if arg1_s.eq_ignore_ascii_case("kick") {
             let mut clientid = G_ClientNumberFromName(ctx, cstr(&arg2_s).as_ptr());
@@ -2303,14 +2295,12 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
                 }
             }
 
-            write_cstr_field(
-                &mut ctx.world.level.voteString,
-                &format!("clientkick {}", clientid),
-            );
+            ctx.world.level.voteString =
+                strncpyz_string(format!("clientkick {}", clientid).as_bytes(), MAX_STRING_CHARS);
             let ncl = ctx.world.g_entities[clientid as usize].client;
-            write_cstr_field(
-                &mut ctx.world.level.voteDisplayString,
-                &format!("kick {}", (*ncl).pers.netname.clone()),
+            ctx.world.level.voteDisplayString = strncpyz_string(
+                format!("kick {}", (*ncl).pers.netname.clone()).as_bytes(),
+                MAX_STRING_CHARS,
             );
         } else if arg1_s.eq_ignore_ascii_case("nextmap") {
             let s = trap::Cvar_VariableStringBuffer(ctx.engine, "nextmap", MAX_STRING_CHARS);
@@ -2319,16 +2309,16 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
                 return;
             }
             crate::g_saga::SiegeClearSwitchData(ctx);
-            write_cstr_field(&mut ctx.world.level.voteString, "vstr nextmap");
-            let vs = cstr_to_str(ctx.world.level.voteString.as_ptr());
-            write_cstr_field(&mut ctx.world.level.voteDisplayString, &vs);
+            ctx.world.level.voteString = strncpyz_string(b"vstr nextmap", MAX_STRING_CHARS);
+            let vs = ctx.world.level.voteString.clone();
+            ctx.world.level.voteDisplayString = strncpyz_string(vs.as_bytes(), MAX_STRING_CHARS);
         } else {
-            write_cstr_field(
-                &mut ctx.world.level.voteString,
-                &format!("{} \"{}\"", arg1_s, arg2_s),
+            ctx.world.level.voteString = strncpyz_string(
+                format!("{} \"{}\"", arg1_s, arg2_s).as_bytes(),
+                MAX_STRING_CHARS,
             );
-            let vs = cstr_to_str(ctx.world.level.voteString.as_ptr());
-            write_cstr_field(&mut ctx.world.level.voteDisplayString, &vs);
+            let vs = ctx.world.level.voteString.clone();
+            ctx.world.level.voteDisplayString = strncpyz_string(vs.as_bytes(), MAX_STRING_CHARS);
         }
 
         let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLCALLEDVOTE");
@@ -2349,7 +2339,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.client_mut(cidx).mGameFlags |= PSG_VOTED as u32;
 
         trap::SetConfigstring(ctx.engine, CS_VOTE_TIME, &format!("{}", ctx.world.level.voteTime));
-        trap::SetConfigstring(ctx.engine, CS_VOTE_STRING, &cstr_to_str(ctx.world.level.voteDisplayString.as_ptr()));
+        trap::SetConfigstring(ctx.engine, CS_VOTE_STRING, &ctx.world.level.voteDisplayString);
         trap::SetConfigstring(ctx.engine, CS_VOTE_YES, &format!("{}", ctx.world.level.voteYes));
         trap::SetConfigstring(ctx.engine, CS_VOTE_NO, &format!("{}", ctx.world.level.voteNo));
     }
@@ -2565,15 +2555,11 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if arg1_s.eq_ignore_ascii_case("kick") {
-            write_cstr_field(
-                &mut ctx.world.level.teamVoteString[cs_offset as usize],
-                &format!("clientkick {}", arg2_s),
-            );
+            ctx.world.level.teamVoteString[cs_offset as usize] =
+                strncpyz_string(format!("clientkick {}", arg2_s).as_bytes(), MAX_STRING_CHARS);
         } else {
-            write_cstr_field(
-                &mut ctx.world.level.teamVoteString[cs_offset as usize],
-                &format!("{} {}", arg1_s, arg2_s),
-            );
+            ctx.world.level.teamVoteString[cs_offset as usize] =
+                strncpyz_string(format!("{} {}", arg1_s, arg2_s).as_bytes(), MAX_STRING_CHARS);
         }
 
         for i in 0..ctx.world.level.maxclients {
@@ -2606,9 +2592,11 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
                     "{}",
                     ctx.world.level.teamVoteTime[cs_offset as usize]
                 ));
-        trap::SetConfigstring(ctx.engine, CS_TEAMVOTE_STRING + cs_offset, &cstr_to_str(
-                    ctx.world.level.teamVoteString[cs_offset as usize].as_ptr(),
-                ));
+        trap::SetConfigstring(
+            ctx.engine,
+            CS_TEAMVOTE_STRING + cs_offset,
+            &ctx.world.level.teamVoteString[cs_offset as usize],
+        );
         trap::SetConfigstring(ctx.engine, CS_TEAMVOTE_YES + cs_offset, &format!(
                     "{}",
                     ctx.world.level.teamVoteYes[cs_offset as usize]

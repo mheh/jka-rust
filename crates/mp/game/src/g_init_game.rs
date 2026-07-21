@@ -123,7 +123,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         G_InitMemory(ctx);
 
         // set some level globals
-        ctx.world.level = *native_platform::zeroed_box::<level_locals_t>();
+        ctx.world.level = level_locals_t::default();
         ctx.world.level.time = args.level_time();
         ctx.world.level.startTime = args.level_time();
 

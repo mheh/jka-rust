@@ -8,9 +8,7 @@ use core::ffi::{c_char, c_int};
 
 use crate::entity::gentity_t;
 use mp_bg::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS, TEAM_NUM_TEAMS};
-use mp_qshared::shared::{
-    fileHandle_t, qboolean, vec3_t, MAX_CLIENTS, MAX_QPATH, MAX_STRING_CHARS,
-};
+use mp_qshared::shared::{fileHandle_t, qboolean, vec3_t, MAX_CLIENTS};
 
 use crate::ai::{AIGroupInfo_t, MAX_FRAME_GROUPS};
 use crate::client::gclient_t;
@@ -23,11 +21,13 @@ use super::interest_point::{interestPoint_t, MAX_INTEREST_POINTS};
 pub const BODY_QUEUE_SIZE: usize = 8;
 
 /// Raven `level_locals_t` — game-internal world state; cleared as each map is
-/// entered. Pointer-bearing => arch-dependent; asserts pin the host-64-bit layout.
+/// entered. Game-internal only: nothing outside `mp_game` reads it by layout
+/// (the engine aliases `g_entities`/`clients` via `trap_LocateGameData`, not
+/// `level`), so it carries no ABI layout contract — hence no `#[repr(C)]` and no
+/// layout asserts. The owned `String` vote/filter fields make it non-`Copy` and
+/// not zero-valid; `Default` (below) supplies Raven's zero state.
 ///
 /// Type definition source: `oracle/codemp/game/g_local.h:819-930`
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub struct level_locals_t {
     pub clients: *mut gclient_t, // [maxclients]
 
@@ -71,8 +71,8 @@ pub struct level_locals_t {
     pub warmupModificationCount: c_int, // for detecting if g_warmup is changed
 
     // voting state
-    pub voteString: [c_char; MAX_STRING_CHARS],
-    pub voteDisplayString: [c_char; MAX_STRING_CHARS],
+    pub voteString: String,
+    pub voteDisplayString: String,
     pub voteTime: c_int,        // level.time vote was called
     pub voteExecuteTime: c_int, // time the vote is executed
     pub voteYes: c_int,
@@ -83,7 +83,7 @@ pub struct level_locals_t {
     pub votingGametypeTo: c_int,
 
     // team voting state
-    pub teamVoteString: [[c_char; MAX_STRING_CHARS]; 2],
+    pub teamVoteString: [String; 2],
     pub teamVoteTime: [c_int; 2], // level.time vote was called
     pub teamVoteYes: [c_int; 2],
     pub teamVoteNo: [c_int; 2],
@@ -132,20 +132,35 @@ pub struct level_locals_t {
     pub mRotationAdjust: f32,
     pub mTargetAdjust: *mut c_char,
 
-    pub mTeamFilter: [c_char; MAX_QPATH],
+    pub mTeamFilter: String,
 }
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<level_locals_t>() == 47176);
-const _: () = assert!(core::mem::offset_of!(level_locals_t, clients) == 0); // arch-independent anchor
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(level_locals_t, groups) == 11232);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(level_locals_t, combatPoints) == 32740);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(level_locals_t, mTeamFilter) == 47112);
 
-// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
-// all-zero bytes are a valid level_locals_t — the same property the layout asserts above
-// pin and Raven's memset/static zero-init relies on.
-// Source: oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven zero-inits `level`, g_main.c:9)
-unsafe impl native_platform::ZeroValid for level_locals_t {}
+impl Default for level_locals_t {
+    /// Raven zero-fills `level` wholesale (`memset(&level, 0, sizeof(level))` in
+    /// `G_InitGame`, `g_main.c`). Every field is all-zero-valid EXCEPT the owned
+    /// `String`s (`voteString`, `voteDisplayString`, `teamVoteString[2]`,
+    /// `mTeamFilter`), whose zeroed bytes would be invalid; we zero the whole
+    /// image and install a valid empty `String` into each of those slots before
+    /// the value is read, matching Raven's zero state (every scalar 0, every
+    /// pointer null, every vote/filter string "") exactly.
+    fn default() -> Self {
+        let mut u = core::mem::MaybeUninit::<level_locals_t>::uninit();
+        let p = u.as_mut_ptr();
+        // SAFETY: `p` is freshly-allocated, correctly-aligned storage for one
+        // `level_locals_t`. `write_bytes` zeroes every field (all-zero-valid save
+        // the owned `String`s); each `ptr::write` overwrites one non-zero-valid
+        // `String` slot with a valid empty `String` (its zeroed bytes never
+        // dropped), so `assume_init` observes a fully-valid value.
+        unsafe {
+            core::ptr::write_bytes(p, 0, 1);
+            core::ptr::write(core::ptr::addr_of_mut!((*p).voteString), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).voteDisplayString), String::new());
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*p).teamVoteString),
+                [String::new(), String::new()],
+            );
+            core::ptr::write(core::ptr::addr_of_mut!((*p).mTeamFilter), String::new());
+            u.assume_init()
+        }
+    }
+}

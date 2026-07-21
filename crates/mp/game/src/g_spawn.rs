@@ -232,11 +232,10 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
 
         // If a team filter is set then override any team settings for the spawns
         let mut team: c_int = -1;
-        let mTeamFilter = ctx.world.level.mTeamFilter.as_ptr();
-        if *mTeamFilter != 0 {
-            if Q_stricmp(&cstr_to_str(mTeamFilter), "red") == 0 {
+        if !ctx.world.level.mTeamFilter.is_empty() {
+            if ctx.world.level.mTeamFilter.eq_ignore_ascii_case("red") {
                 team = TEAM_RED;
-            } else if Q_stricmp(&cstr_to_str(mTeamFilter), "blue") == 0 {
+            } else if ctx.world.level.mTeamFilter.eq_ignore_ascii_case("blue") {
                 team = TEAM_BLUE;
             }
         }

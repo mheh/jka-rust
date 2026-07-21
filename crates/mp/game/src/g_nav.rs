@@ -1791,7 +1791,7 @@ pub fn SP_waypoint(ctx: &mut GameContext, ent: EntityId) {
                 let s = format!(
                     "ERROR: Waypoint {} at {} in solid!\n",
                     unsafe { cstr_to_str(targetname) },
-                    unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+                    vtos(ctx, ent_origin)
                 );
                 Com_Printf(&s);
                 debug_assert!(false, "Waypoint in solid!");
@@ -1846,7 +1846,7 @@ pub fn SP_waypoint_small(ctx: &mut GameContext, ent: EntityId) {
                 let s = format!(
                     "ERROR: Waypoint_small {} at {} in solid!\n",
                     unsafe { cstr_to_str(targetname) },
-                    unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+                    vtos(ctx, ent_origin)
                 );
                 Com_Printf(&s);
                 debug_assert!(false);
@@ -1889,7 +1889,7 @@ pub fn SP_waypoint_navgoal(ctx: &mut GameContext, ent: EntityId) {
         let s = format!(
             "ERROR: Waypoint_navgoal {} at {} in solid!\n",
             unsafe { cstr_to_str(targetname) },
-            unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+            vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
@@ -1924,7 +1924,7 @@ pub fn SP_waypoint_navgoal_8(ctx: &mut GameContext, ent: EntityId) {
         let s = format!(
             "ERROR: Waypoint_navgoal_8 {} at {} in solid!\n",
             unsafe { cstr_to_str(targetname) },
-            unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+            vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
@@ -1960,7 +1960,7 @@ pub fn SP_waypoint_navgoal_4(ctx: &mut GameContext, ent: EntityId) {
         let s = format!(
             "ERROR: Waypoint_navgoal_4 {} at {} in solid!\n",
             unsafe { cstr_to_str(targetname) },
-            unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+            vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
@@ -1996,7 +1996,7 @@ pub fn SP_waypoint_navgoal_2(ctx: &mut GameContext, ent: EntityId) {
         let s = format!(
             "ERROR: Waypoint_navgoal_2 {} at {} in solid!\n",
             unsafe { cstr_to_str(targetname) },
-            unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+            vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
@@ -2032,7 +2032,7 @@ pub fn SP_waypoint_navgoal_1(ctx: &mut GameContext, ent: EntityId) {
         let s = format!(
             "ERROR: Waypoint_navgoal_1 {} at {} in solid!\n",
             unsafe { cstr_to_str(targetname) },
-            unsafe { cstr_to_str(vtos(ctx, ent_origin)) }
+            vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
@@ -2142,20 +2142,20 @@ pub fn NAV_WaypointsTooFar(ctx: &mut GameContext, wp1: EntityId, wp2: EntityId) 
         let temp = if wp1_targetname.is_null() && wp2_targetname.is_null() {
             format!(
                 "Waypoint conn {}->{} > 1024\n",
-                unsafe { cstr_to_str(vtos(ctx, wp1_origin)) },
-                unsafe { cstr_to_str(vtos(ctx, wp2_origin)) }
+                vtos(ctx, wp1_origin),
+                vtos(ctx, wp2_origin)
             )
         } else if wp1_targetname.is_null() {
             format!(
                 "Waypoint conn {}->{} > 1024\n",
-                unsafe { cstr_to_str(vtos(ctx, wp1_origin)) },
+                vtos(ctx, wp1_origin),
                 unsafe { cstr_to_str(wp2_targetname) }
             )
         } else if wp2_targetname.is_null() {
             format!(
                 "Waypoint conn {}->{} > 1024\n",
                 unsafe { cstr_to_str(wp1_targetname) },
-                unsafe { cstr_to_str(vtos(ctx, wp2_origin)) }
+                vtos(ctx, wp2_origin)
             )
         } else {
             // they both have valid targetnames

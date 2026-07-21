@@ -166,7 +166,7 @@ impl GameWorld {
         // None by construction (zero == None, std-guaranteed via
         // Option<NonZeroU8>) — no post-zero fixup needed.
         let clients = zeroed_clients();
-        let level = *native_platform::zeroed_box::<level_locals_t>();
+        let level = level_locals_t::default();
         let memoryPool = native_platform::zeroed_box::<[u8; 262144]>();
         let refTagOwnerMap = native_platform::zeroed_box::<
             [crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS],
@@ -223,7 +223,7 @@ impl GameWorld {
         // field exactly once before `assume_init`.
         unsafe {
             use core::ptr::addr_of_mut;
-            addr_of_mut!((*p).level).write(*native_platform::zeroed_box::<level_locals_t>());
+            addr_of_mut!((*p).level).write(level_locals_t::default());
             addr_of_mut!((*p).g_entities).write(native_platform::zeroed_box());
             // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
             // None by construction (zero == None, std-guaranteed via

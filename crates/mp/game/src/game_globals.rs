@@ -347,30 +347,28 @@ array_newtype!(zero, deref;
     pub Team2Buf, c_char, 512);
 
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
-/// char newShader[MAX_QPATH]; float timeOffset; }`.
+/// char newShader[MAX_QPATH]; float timeOffset; }`. `oldShader`/`newShader` are
+/// owned `String`s (the `MAX_QPATH` byte bound is applied at the write sites in
+/// `AddRemap`); the struct is game-internal, so layout is free.
 /// Source: `oracle/codemp/game/g_utils.c:8-13`
-#[derive(Clone, Copy)]
+#[derive(Clone, Default)]
 pub struct shaderRemap_t {
-    pub oldShader: [c_char; MAX_QPATH],
-    pub newShader: [c_char; MAX_QPATH],
+    pub oldShader: String,
+    pub newShader: String,
     pub timeOffset: f32,
 }
 
-impl Default for shaderRemap_t {
+/// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`). Newtype
+/// because a 128-element array has no library `Default` (>32); the non-`Copy`
+/// element (owns `String`s) rules out the `[x; N]` repeat form, so it is built
+/// element-by-element via `core::array::from_fn`.
+pub struct RemappedShaders(pub [shaderRemap_t; MAX_SHADER_REMAPS]);
+
+impl Default for RemappedShaders {
     fn default() -> Self {
-        shaderRemap_t {
-            oldShader: [0; MAX_QPATH],
-            newShader: [0; MAX_QPATH],
-            timeOffset: 0.0,
-        }
+        RemappedShaders(core::array::from_fn(|_| shaderRemap_t::default()))
     }
 }
-
-array_newtype!(elem;
-    /// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`).
-    /// Newtype because a 128-element array of a non-`Copy`-array-friendly struct
-    /// has no library `Default` (>32).
-    pub RemappedShaders, shaderRemap_t, MAX_SHADER_REMAPS);
 
 array_newtype!(null;
     /// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) — the dynamically

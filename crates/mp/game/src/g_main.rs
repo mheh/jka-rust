@@ -2391,7 +2391,7 @@ pub fn CheckVote(ctx: &mut GameContext) {
             && ctx.world.level.voteExecuteTime < ctx.world.level.time
         {
             ctx.world.level.voteExecuteTime = 0;
-            let vote_string = cstr_to_str(ctx.world.level.voteString.as_ptr());
+            let vote_string = ctx.world.level.voteString.clone();
             trap::SendConsoleCommand(ctx.engine, (EXEC_APPEND as c_int), &format!("{}\n", vote_string));
 
             if ctx.world.level.votingGametype != qfalse {
@@ -2617,7 +2617,7 @@ pub fn CheckTeamVote(ctx: &mut GameContext, team: c_int) {
             let msg = sv_str;
             trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}\n\"", msg));
 
-            let vote_string = cstr_to_str(ctx.world.level.teamVoteString[cs_offset].as_ptr());
+            let vote_string = ctx.world.level.teamVoteString[cs_offset].clone();
             if vote_string.starts_with("leader") {
                 // set the team leader — commented out in oracle
                 //SetLeader(team, atoi(level.teamVoteString[cs_offset] + 7));

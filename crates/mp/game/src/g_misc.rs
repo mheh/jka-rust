@@ -30,6 +30,7 @@ use crate::q_math::vec3_origin;
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
 use crate::q_shared::{Info_SetValueForKey, Q_strlwr};
 use native_string::q_string::Q_stricmp;
+use native_string::strncpyz_string;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
@@ -503,10 +504,8 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
             c"".as_ptr(),
             &mut teamfilter_out,
         );
-        write_cstr_field(
-            &mut ctx.world.level.mTeamFilter,
-            &cstr_to_str(teamfilter_out),
-        );
+        ctx.world.level.mTeamFilter =
+            strncpyz_string(cstr_to_str(teamfilter_out).as_bytes(), MAX_QPATH as usize);
 
         {
             let e = ctx.world.entity_mut(ent);
@@ -526,7 +525,7 @@ pub fn SP_misc_bsp(ctx: &mut GameContext, ent: EntityId) {
         trap::SetActiveSubBSP(ctx.engine, GSetActiveSubbspArgs::new(-1));
 
         ctx.world.level.mBSPInstanceDepth -= 1;
-        ctx.world.level.mTeamFilter[0] = 0;
+        ctx.world.level.mTeamFilter.clear();
     }
 }
 
@@ -1145,7 +1144,7 @@ pub fn SP_misc_holocron(ctx: &mut GameContext, ent: EntityId) {
         if tr.startsolid != 0 {
             let msg = format!(
                 "SP_misc_holocron: misc_holocron startsolid at {}\n",
-                cstr_to_str(vtos(ctx, origin))
+                vtos(ctx, origin)
             );
             G_Printf(ctx, &msg);
             G_FreeEntity(ctx, Some(ent));
@@ -1680,7 +1679,7 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         if tr.startsolid != 0 {
             let msg = format!(
                 "SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n",
-                cstr_to_str(vtos(ctx, origin))
+                vtos(ctx, origin)
             );
             G_Printf(ctx, &msg);
             G_FreeEntity(ctx, Some(ent));
@@ -1816,7 +1815,7 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
         if tr.startsolid != 0 {
             let msg = format!(
                 "SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n",
-                cstr_to_str(vtos(ctx, origin))
+                vtos(ctx, origin)
             );
             G_Printf(ctx, &msg);
             G_FreeEntity(ctx, Some(ent));
@@ -2562,7 +2561,7 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
         crate::g_main::Com_Printf(&format!(
             "^1ERROR: fx_runner {} at {} has no fxFile specified\n",
             unsafe { cstr_to_str(targetname) },
-            unsafe { cstr_to_str(vtos(ctx, origin)) }
+            vtos(ctx, origin)
         ));
         G_FreeEntity(ctx, Some(ent));
         return;
@@ -2829,7 +2828,7 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
         crate::g_main::Com_Error(
             ERR_DROP as c_int,
             cstr(&format!("misc_maglock at {} in solid\n", unsafe {
-                cstr_to_str(vtos(ctx, origin))
+                vtos(ctx, origin)
             }))
             .as_ptr(),
         );

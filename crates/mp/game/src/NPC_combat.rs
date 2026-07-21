@@ -1414,11 +1414,8 @@ pub fn NPC_PickEnemy(
                                     //I'm not looking in the right dir toward them to see them
                                     failed = true;
                                 } else {
-                                    let vtos_str =
-                                        vtos(ctx, (*newenemy_client).hiddenDir) as *const c_char;
-                                    let name_str = cstr_to_str(vtos_str);
-                                    let vtos_str_2 = vtos(ctx, normDiff) as *const c_char;
-                                    let name_str_2 = cstr_to_str(vtos_str_2);
+                                    let name_str = vtos(ctx, (*newenemy_client).hiddenDir);
+                                    let name_str_2 = vtos(ctx, normDiff);
                                     let npc_targetname = ctx.world.entity(npc_id).targetname;
                                     let newenemy_targetname =
                                         ctx.world.entity(newenemy_id).targetname;
@@ -1594,10 +1591,8 @@ pub fn NPC_PickEnemy(
                         if dot > 0.5 {
                             continue;
                         } else {
-                            let vtos_str = vtos(ctx, (*newenemy_client).hiddenDir) as *const c_char;
-                            let name_str = cstr_to_str(vtos_str);
-                            let vtos_str_2 = vtos(ctx, normDiff) as *const c_char;
-                            let name_str_2 = cstr_to_str(vtos_str_2);
+                            let name_str = vtos(ctx, (*newenemy_client).hiddenDir);
+                            let name_str_2 = vtos(ctx, normDiff);
                             let npc_targetname = ctx.world.entity(npc_id).targetname;
                             let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
                             let s = format!(
@@ -2439,7 +2434,7 @@ pub fn SP_point_combat(ctx: &mut GameContext, self_: EntityId) {
             let s = format!(
                 "{}ERROR: combat point at {} in solid!\n",
                 S_COLOR_RED.to_str().unwrap(),
-                cstr_to_str(vtos(ctx, currentOrigin))
+                vtos(ctx, currentOrigin)
             );
             Com_Printf(&s);
         }
@@ -2469,8 +2464,7 @@ pub fn CP_FindCombatPointWaypoints(ctx: &mut GameContext) {
 
             if ctx.world.level.combatPoints[i].waypoint == WAYPOINT_NONE {
                 let cp_origin = ctx.world.level.combatPoints[i].origin;
-                let vtos_str = vtos(ctx, cp_origin);
-                let name_str = cstr_to_str(vtos_str);
+                let name_str = vtos(ctx, cp_origin);
                 let s = format!(
                     "{}ERROR: Combat Point at {} has no waypoint!\n",
                     S_COLOR_RED.to_str().unwrap(),

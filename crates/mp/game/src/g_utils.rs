@@ -16,10 +16,10 @@
 
 use crate::prelude::*;
 use crate::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
+use native_string::strncpyz_string;
 
 use crate::client::gclient_t;
 use crate::g_main::G_Printf;
-use crate::q_shared::Q_strcat;
 use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 
@@ -62,24 +62,6 @@ use std::ffi::{CStr, CString};
 use crate::game_globals::MAX_SHADER_REMAPS;
 use mp_bg::bg_misc::snap_vector;
 
-/// Raven `strcpy(dest, src)` into a fixed-size `[c_char; N]` field — copies
-/// bytes up to (and including) the NUL or the buffer capacity, whichever is
-/// first (Raven's `strcpy` itself has no bound, but every call site here
-/// copies a caller string into a `MAX_QPATH`-sized field, so this stays
-/// faithful without reproducing the C overrun).
-unsafe fn strcpy_buf<const N: usize>(dest: &mut [c_char; N], src: *const c_char) {
-    let mut i = 0usize;
-    while i < N - 1 {
-        let c = *src.add(i);
-        dest[i] = c;
-        if c == 0 {
-            return;
-        }
-        i += 1;
-    }
-    dest[N - 1] = 0;
-}
-
 /// Raven `AddRemap`. `remapCount`/`remappedShaders` reached via
 /// `ctx.world.globals` (backfilled from the `()` placeholder —
 /// see `RemappedShaders` in `game_globals.rs`).
@@ -91,63 +73,51 @@ pub fn AddRemap(
     newShader: *const c_char,
     timeOffset: f32,
 ) {
-    unsafe {
-        for i in 0..ctx.world.globals.remapCount as usize {
-            let existing = ctx.world.globals.remappedShaders.0[i].oldShader.as_ptr();
-            if Q_stricmp(oldShader, existing) == 0 {
-                strcpy_buf(
-                    &mut ctx.world.globals.remappedShaders.0[i].newShader,
-                    newShader,
-                );
-                ctx.world.globals.remappedShaders.0[i].timeOffset = timeOffset;
-                return;
-            }
-        }
-        if (ctx.world.globals.remapCount as usize) < MAX_SHADER_REMAPS {
-            let i = ctx.world.globals.remapCount as usize;
-            strcpy_buf(
-                &mut ctx.world.globals.remappedShaders.0[i].newShader,
-                newShader,
-            );
-            strcpy_buf(
-                &mut ctx.world.globals.remappedShaders.0[i].oldShader,
-                oldShader,
-            );
+    // `oldShader`/`newShader` remain seam pointers (entity `targetShaderName*`
+    // fields); read them once into owned strings. Raven's `strcpy` into the
+    // `MAX_QPATH` fields is bounded here (its C overrun is UB); the compare is
+    // `Q_stricmp == 0` (ASCII case-fold).
+    let old_shader = unsafe { cstr_to_str(oldShader) };
+    let new_shader = unsafe { cstr_to_str(newShader) };
+    for i in 0..ctx.world.globals.remapCount as usize {
+        if old_shader.eq_ignore_ascii_case(&ctx.world.globals.remappedShaders.0[i].oldShader) {
+            ctx.world.globals.remappedShaders.0[i].newShader =
+                strncpyz_string(new_shader.as_bytes(), MAX_QPATH as usize);
             ctx.world.globals.remappedShaders.0[i].timeOffset = timeOffset;
-            ctx.world.globals.remapCount += 1;
+            return;
         }
+    }
+    if (ctx.world.globals.remapCount as usize) < MAX_SHADER_REMAPS {
+        let i = ctx.world.globals.remapCount as usize;
+        ctx.world.globals.remappedShaders.0[i].newShader =
+            strncpyz_string(new_shader.as_bytes(), MAX_QPATH as usize);
+        ctx.world.globals.remappedShaders.0[i].oldShader =
+            strncpyz_string(old_shader.as_bytes(), MAX_QPATH as usize);
+        ctx.world.globals.remappedShaders.0[i].timeOffset = timeOffset;
+        ctx.world.globals.remapCount += 1;
     }
 }
 
 /// Raven `BuildShaderStateConfig`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:39-50`
-pub fn BuildShaderStateConfig(ctx: &mut GameContext) -> *const c_char {
-    unsafe {
-        // `MAX_STRING_CHARS` resolves via the crate prelude glob
-        // (`mp_qshared::shared::limits`). Raven's `static char buff[...]` now
-        // lives on `GameWorld.scratch` (safe-state Stage 3).
-        let buff: *mut c_char = (&raw mut *ctx.world.scratch.shader_state_buff).cast::<c_char>();
+pub fn BuildShaderStateConfig(ctx: &GameContext) -> String {
+    // Raven accumulates into a `static char buff[MAX_STRING_CHARS*4]` via
+    // `Q_strcat` and returns it by pointer; the owned `String` return makes the
+    // scratch buffer unnecessary. The `Q_strcat` total bound
+    // (`MAX_STRING_CHARS*4 - 1` bytes) is preserved by truncating the
+    // concatenation once at the end (once full, `Q_strcat` is a no-op — so a
+    // final truncation is byte-identical to the per-append bound).
+    // `MAX_STRING_CHARS` resolves via the crate prelude glob.
+    let mut buff = String::new();
+    for i in 0..ctx.world.globals.remapCount as usize {
+        let old_shader_str = &ctx.world.globals.remappedShaders.0[i].oldShader;
+        let new_shader_str = &ctx.world.globals.remappedShaders.0[i].newShader;
+        let time_offset = ctx.world.globals.remappedShaders.0[i].timeOffset;
 
-        // Zero out the buffer at the start
-        for i in 0..MAX_STRING_CHARS * 4 {
-            *buff.add(i) = 0;
-        }
-
-        for i in 0..ctx.world.globals.remapCount as usize {
-            let old_shader_str = cstr_from_chars(&ctx.world.globals.remappedShaders.0[i].oldShader)
-                .to_string_lossy();
-            let new_shader_str = cstr_from_chars(&ctx.world.globals.remappedShaders.0[i].newShader)
-                .to_string_lossy();
-            let time_offset = ctx.world.globals.remappedShaders.0[i].timeOffset;
-
-            let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
-            let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
-            Q_strcat(buff, (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
-        }
-
-        buff as *const c_char
+        buff.push_str(&format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset));
     }
+    strncpyz_string(buff.as_bytes(), MAX_STRING_CHARS * 4)
 }
 
 /// Raven `G_FindConfigstringIndex`.
@@ -727,7 +697,7 @@ pub fn G_UseTargets2(
         let f = (ctx.world.level.time as f64 * 0.001) as f32;
         AddRemap(ctx, tsn, tsnn, f);
         let config = BuildShaderStateConfig(ctx);
-        trap::SetConfigstring(ctx.engine, CS_SHADERSTATE, unsafe { &cstr_to_str(config) });
+        trap::SetConfigstring(ctx.engine, CS_SHADERSTATE, &config);
     }
 
     if string.is_null() || unsafe { *string } == 0 {
@@ -797,26 +767,15 @@ pub fn tv(ctx: &mut GameContext, x: f32, y: f32, z: f32) -> *mut f32 {
 /// Raven `vtos`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:653-665`
-pub fn vtos(ctx: &mut GameContext, v: vec3_t) -> *mut c_char {
-    unsafe {
-        // Raven's function-local `static int index` / `static char str[8][32]`
-        // now live on `GameWorld.scratch` (safe-state Stage 3); the 8-slot ring
-        // rotation is preserved exactly.
-        let idx = ctx.world.scratch.vtos_index as usize;
-        ctx.world.scratch.vtos_index = (ctx.world.scratch.vtos_index + 1) & 7;
-
-        let s = &mut ctx.world.scratch.vtos_str[idx];
-
-        let formatted = format!("({} {} {})", v[0] as c_int, v[1] as c_int, v[2] as c_int);
-        let bytes = formatted.as_bytes();
-        let copy_len = (bytes.len() + 1).min(32);
-        for i in 0..bytes.len().min(31) {
-            s[i] = bytes[i] as c_char;
-        }
-        s[copy_len - 1] = 0; // NUL-terminate
-
-        s.as_mut_ptr()
-    }
+pub fn vtos(ctx: &mut GameContext, v: vec3_t) -> String {
+    // Raven returns one of 8 rotating `static char str[8][32]` buffers so that
+    // several `vtos` results survive in one `printf`; an owned `String` per call
+    // makes the ring unnecessary. The `Com_sprintf(s, 32, ...)` bound (31 bytes)
+    // is preserved. `ctx` is unused now (the ring is gone) but kept so the ~13
+    // call sites are untouched.
+    let _ = ctx;
+    let formatted = format!("({} {} {})", v[0] as c_int, v[1] as c_int, v[2] as c_int);
+    strncpyz_string(formatted.as_bytes(), 32)
 }
 
 /// Raven `G_SetMovedir`. Reshape: both `angles`/`movedir` are written
