@@ -20,10 +20,10 @@ use crate::g_mem::G_Alloc;
 use crate::g_session::G_ReadSessionData;
 use crate::g_team::{S_COLOR_RED, S_COLOR_YELLOW};
 use crate::level::bot_settings::bot_settings_t;
-use crate::q_shared::{COM_Parse, COM_ParseExt, Info_SetValueForKey, Q_CleanStr};
-use native_string::cstr::buf_to_string;
+use crate::q_shared::{COM_Parse, COM_ParseExt, Info_SetValueForKey};
+use native_string::{buf_to_string, strncpyz_string};
 use native_string::info::Info_ValueForKey;
-use native_string::q_string::Q_stricmp;
+use native_string::{Q_CleanStr, Q_stricmp};
 use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
 
 use mp_abi::game::syscalls::G_BOT_ALLOCATE_CLIENT::GBotAllocateClientArgs;
@@ -418,16 +418,10 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
                     } else {
                         ""
                     };
-                    let mut netname: [c_char; 36] = [0; 36];
-                    write_cstr_field(&mut netname, &value);
-                    Q_CleanStr(netname.as_mut_ptr());
-                    let cmd = format!(
-                        "addbot \"{}\" {} {} {}\n",
-                        cstr_to_str(netname.as_ptr()),
-                        skill,
-                        teamstr,
-                        0
-                    );
+                    // Raven truncates `value` to sizeof(netname)-1 (35 bytes)
+                    // before cleaning, so keep that bound.
+                    let netname = Q_CleanStr(&strncpyz_string(value.as_bytes(), 36));
+                    let cmd = format!("addbot \"{}\" {} {} {}\n", netname, skill, teamstr, 0);
                     trap::SendConsoleCommand(ctx.engine, cbufExec_t::EXEC_INSERT as c_int, &cmd);
                     return;
                 }
@@ -457,10 +451,10 @@ pub fn G_RemoveRandomBot(ctx: &mut GameContext, team: c_int) -> bool {
                 continue;
             }
 
-            let mut netname: [c_char; 36] = [0; 36];
-            write_cstr_field(&mut netname, &cl.pers.netname);
-            Q_CleanStr(netname.as_mut_ptr());
-            let cmd = format!("kick \"{}\"\n", cstr_to_str(netname.as_ptr()));
+            // `pers.netname` is already <= 35 bytes (MAX_NETNAME), so cleaning
+            // it directly matches Raven's `strcpy(netname, ...)` + Q_CleanStr.
+            let netname = Q_CleanStr(&cl.pers.netname);
+            let cmd = format!("kick \"{}\"\n", netname);
             trap::SendConsoleCommand(ctx.engine, cbufExec_t::EXEC_INSERT as c_int, &cmd);
             return true;
         }

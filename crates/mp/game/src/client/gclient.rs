@@ -9,7 +9,7 @@ use core::ffi::{c_char, c_int, c_uint, c_void};
 use crate::entity::gentity_t;
 use mp_qshared::common::mp::entity_id::EntityId;
 use mp_qshared::common::mp::qcommon::{playerState_t, saberInfo_t, MAX_SABERS};
-use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
+use mp_qshared::shared::{qboolean, vec3_t};
 
 use crate::teams::{class_t, npcteam_t};
 
@@ -156,7 +156,9 @@ pub struct gclient_s {
 
     pub forcePowerSoundDebounce: c_int, // if > level.time, don't repeat certain sound events
 
-    pub modelname: [c_char; MAX_QPATH],
+    // Owned `String` (§13); the field is game-private (past `ps`/`pers`) so no
+    // layout contract binds it. Byte-width write bound stays `MAX_QPATH - 1`.
+    pub modelname: String,
 
     pub fjDidJump: qboolean,
 
@@ -251,22 +253,28 @@ const _: () = assert!(core::mem::offset_of!(gclient_t, pers) == 1552);
 impl Default for gclient_t {
     /// Raven zero-fills `gclient_t` wholesale (`memset(client, 0, ...)` in
     /// `ClientConnect`/`ClientSpawn`, `memset(g_clients, 0, ...)` in
-    /// `G_InitGame`). Every field is all-zero-valid EXCEPT `pers.netname`
-    /// (a `String`, whose zeroed bytes would be an invalid value); we write the
+    /// `G_InitGame`). Every field is all-zero-valid EXCEPT the owned `String`s
+    /// (`pers.netname`, `sess.{siegeClass,saberType,saber2Type,IPstring}`,
+    /// `modelname`), whose zeroed bytes would be invalid values; we write the
     /// zeroed image into heap storage and then install a valid empty `String`
-    /// into that one slot before the value is ever read, so the result matches
-    /// Raven's zero state (`netname == ""`) exactly.
+    /// into each of those slots before the value is ever read, so the result
+    /// matches Raven's zero state (every scalar 0, every name "") exactly.
     fn default() -> Self {
         let mut u = core::mem::MaybeUninit::<gclient_t>::uninit();
         let p = u.as_mut_ptr();
         // SAFETY: `p` is freshly-allocated, correctly-aligned storage for one
-        // `gclient_t`. `write_bytes` zeroes every field (all-zero-valid save
-        // `pers.netname`); the `ptr::write` then overwrites the only
-        // non-zero-valid field with a valid empty `String` (its invalid zeroed
-        // bytes are never dropped), so `assume_init` observes a fully-valid value.
+        // `gclient_t`. `write_bytes` zeroes every field (all-zero-valid save the
+        // owned `String`s); each `ptr::write` then overwrites one non-zero-valid
+        // `String` slot with a valid empty `String` (its invalid zeroed bytes
+        // never dropped), so `assume_init` observes a fully-valid value.
         unsafe {
             core::ptr::write_bytes(p, 0, 1);
             core::ptr::write(core::ptr::addr_of_mut!((*p).pers.netname), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).sess.siegeClass), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).sess.saberType), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).sess.saber2Type), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).sess.IPstring), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*p).modelname), String::new());
             u.assume_init()
         }
     }

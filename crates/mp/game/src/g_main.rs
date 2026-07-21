@@ -40,7 +40,7 @@ use crate::g_utils::{
 use crate::game_cvars::{GameCvars, GAME_CVAR_TABLE};
 use crate::npc_c::ClearNPCGlobals;
 use crate::q_math::VectorLength;
-use native_string::q_string::Q_stricmp;
+use native_string::{Q_CleanStr, Q_stricmp};
 use crate::w_force::WP_ForcePowersUpdate;
 use crate::w_saber::{WP_SaberPositionUpdate, WP_SaberStartMissileBlockCheck};
 use crate::world::GameWorld;
@@ -2373,10 +2373,9 @@ pub fn G_KickAllBots(ctx: &mut GameContext) {
                 i += 1;
                 continue;
             }
-            let mut netname: [c_char; 36] = [0; 36];
-            write_cstr_field(&mut netname, &cl.pers.netname);
-            crate::q_shared::Q_CleanStr(netname.as_mut_ptr());
-            let cleaned = cstr_to_str(netname.as_ptr());
+            // `pers.netname` is already <= 35 bytes (MAX_NETNAME); cleaning it
+            // directly matches Raven's `strncpy(netname, ...)` + Q_CleanStr.
+            let cleaned = Q_CleanStr(&cl.pers.netname);
             trap::SendConsoleCommand(ctx.engine, (EXEC_INSERT as c_int), &format!("kick \"{}\"\n", cleaned));
             i += 1;
         }

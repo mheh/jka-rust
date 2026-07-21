@@ -46,8 +46,8 @@ use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
 use native_string::atoi::atoi;
-use native_string::cstr::strncpyz_string;
-use native_string::q_string::Q_stricmp;
+use native_string::strncpyz_string;
+use native_string::Q_stricmp;
 
 use crate::client::client_persistant::MAX_NETNAME;
 
@@ -1798,7 +1798,7 @@ pub fn ClientConnect(
         }
         G_ReadSessionData(ctx, clientNum as usize);
 
-        write_cstr_field(&mut (*client).sess.IPstring, &ip_string);
+        (*client).sess.IPstring = strncpyz_string(ip_string.as_bytes(), 32);
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (firstTime != qfalse || ctx.world.level.newSession != qfalse)
@@ -1838,7 +1838,7 @@ pub fn ClientConnect(
             &format!(
                 "{} connected with IP: {}\n",
                 (*client).pers.netname.clone(),
-                cstr_to_str((*client).sess.IPstring.as_ptr()),
+                (*client).sess.IPstring.clone(),
             ),
         );
 
@@ -2441,8 +2441,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         let mut l: c_int = 0;
         while l < (MAX_SABERS) as i32 {
             let saber = match l {
-                0 => Some(cstr_to_str((*client).sess.saberType.as_ptr())),
-                1 => Some(cstr_to_str((*client).sess.saber2Type.as_ptr())),
+                0 => Some((*client).sess.saberType.clone()),
+                1 => Some((*client).sess.saber2Type.clone()),
                 _ => None,
             };
 
@@ -2483,8 +2483,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
             l = 0;
             while l < (MAX_SABERS) as i32 {
                 let saber = match l {
-                    0 => Some(cstr_to_str((*client).sess.saberType.as_ptr())),
-                    1 => Some(cstr_to_str((*client).sess.saber2Type.as_ptr())),
+                    0 => Some((*client).sess.saberType.clone()),
+                    1 => Some((*client).sess.saber2Type.clone()),
                     _ => None,
                 };
                 let key = format!("saber{}", l + 1);
@@ -2672,11 +2672,16 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         let game_flags = (*client).mGameFlags & (PSG_VOTED | PSG_TEAMVOTED) as u32;
 
         // clear everything but the persistant data
-        // `pers` owns a `String` (`netname`), so move it out with `ptr::read`
-        // (the source slot is left bit-stale; the `write_bytes` below zeroes it
-        // harmlessly and the `ptr::write` restore avoids dropping that garbage).
+        // `pers` and `sess` own `String`s (netname; siege/saber/IP), so move
+        // them out with `ptr::read` (the source slots are left bit-stale; the
+        // `write_bytes` below zeroes them harmlessly and the `ptr::write`
+        // restores avoid dropping that garbage).
         let saved = core::ptr::read(core::ptr::addr_of!((*client).pers));
-        let saved_sess = (*client).sess;
+        let saved_sess = core::ptr::read(core::ptr::addr_of!((*client).sess));
+        // `modelname` is NOT in Raven's preserve set (the `memset` clears it to
+        // ""); drop the old `String` here so the wholesale `write_bytes` below
+        // doesn't leak it, then a valid empty `String` is installed after.
+        drop(core::ptr::read(core::ptr::addr_of!((*client).modelname)));
         let saved_ping = (*client).ps.ping;
         let accuracy_hits = (*client).accuracy_hits;
         let accuracy_shots = (*client).accuracy_shots;
@@ -2743,10 +2748,12 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.jetpackFuel = 100;
         (*client).ps.cloakFuel = 100;
 
-        // restore pers with `ptr::write` — the current slot holds the zeroed
-        // (invalid) `String` from `write_bytes`, which must not be dropped.
+        // restore pers/sess with `ptr::write` — the current slots hold the
+        // zeroed (invalid) `String`s from `write_bytes`, which must not be
+        // dropped; `modelname` gets a fresh valid empty `String` (Raven's "").
         core::ptr::write(core::ptr::addr_of_mut!((*client).pers), saved);
-        (*client).sess = saved_sess;
+        core::ptr::write(core::ptr::addr_of_mut!((*client).sess), saved_sess);
+        core::ptr::write(core::ptr::addr_of_mut!((*client).modelname), String::new());
         (*client).ps.ping = saved_ping;
         (*client).accuracy_hits = accuracy_hits;
         (*client).accuracy_shots = accuracy_shots;
@@ -3301,7 +3308,7 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
             &format!(
                 "{} disconnected with IP: {}\n",
                 (*((*ent).client)).pers.netname.clone(),
-                cstr_to_str((*((*ent).client)).sess.IPstring.as_ptr()),
+                (*((*ent).client)).sess.IPstring.clone(),
             ),
         );
 
@@ -4059,8 +4066,12 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         crate::q_shared::Q_strncpyz(model.as_mut_ptr(), cstr(&modelname_kv).as_ptr(), 260);
 
         if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
-            if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr()) != 0 {
-                write_cstr_field(&mut (*client).modelname, &cstr_to_str(model.as_ptr()));
+            // `modelname` is a `String`; `model` stays a C buffer (feeds pointer
+            // sinks), so compare via the &str `Q_stricmp` (ASCII case-fold) and
+            // keep the field's `MAX_QPATH - 1` byte write bound.
+            let model_str = cstr_to_str(model.as_ptr());
+            if Q_stricmp(&model_str, &(*client).modelname) != 0 {
+                (*client).modelname = strncpyz_string(model_str.as_bytes(), MAX_QPATH);
                 modelChanged = qtrue;
             }
         }
@@ -4110,10 +4121,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         // Set the siege class
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-            write_cstr_field(
-                &mut className,
-                &cstr_to_str((*client).sess.siegeClass.as_ptr()),
-            );
+            write_cstr_field(&mut className, &(*client).sess.siegeClass);
 
             // This function will see if the given class is legal for the given team.
             // If not className will be filled in with the first legal class for this team.
@@ -4123,19 +4131,16 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
             if (*client).siegeClass == -1 {
                 // ok, get the first valid class for the team you're on then, I guess.
                 BG_SiegeCheckClassLegality(team, className.as_mut_ptr(), &ctx.world.bg_state);
-                write_cstr_field(
-                    &mut (*client).sess.siegeClass,
-                    &cstr_to_str(className.as_ptr()),
+                (*client).sess.siegeClass = strncpyz_string(
+                    core::slice::from_raw_parts(className.as_ptr() as *const u8, className.len()),
+                    64,
                 );
                 (*client).siegeClass =
                     BG_SiegeFindClassIndexByName(className.as_ptr(), &ctx.world.bg_state);
             } else {
                 // otherwise, make sure the class we are using is legal.
                 G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);
-                write_cstr_field(
-                    &mut className,
-                    &cstr_to_str((*client).sess.siegeClass.as_ptr()),
-                );
+                write_cstr_field(&mut className, &(*client).sess.siegeClass);
             }
 
             // Set the sabers if the class dictates
@@ -4190,13 +4195,9 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                     // be sure to override the model we actually use
                     write_cstr_field(&mut model, &cstr_to_str(scl.forcedModel.as_ptr()));
                     if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
-                        if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr())
-                            != 0
-                        {
-                            write_cstr_field(
-                                &mut (*client).modelname,
-                                &cstr_to_str(model.as_ptr()),
-                            );
+                        let model_str = cstr_to_str(model.as_ptr());
+                        if Q_stricmp(&model_str, &(*client).modelname) != 0 {
+                            (*client).modelname = strncpyz_string(model_str.as_bytes(), MAX_QPATH);
                             modelChanged = qtrue;
                         }
                     }
@@ -4204,10 +4205,11 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
                 // force them to use their class model on the server, if the class dictates
                 if G_PlayerHasCustomSkeleton(&*(ent)) != qfalse {
-                    if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr()) != 0
+                    let model_str = cstr_to_str(model.as_ptr());
+                    if Q_stricmp(&model_str, &(*client).modelname) != 0
                         || (*ent).localAnimIndex == 0
                     {
-                        write_cstr_field(&mut (*client).modelname, &cstr_to_str(model.as_ptr()));
+                        (*client).modelname = strncpyz_string(model_str.as_bytes(), MAX_QPATH);
                         modelChanged = qtrue;
                     }
                 }
@@ -4217,14 +4219,8 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // Set the saber name
-        write_cstr_field(
-            &mut saberName,
-            &cstr_to_str((*client).sess.saberType.as_ptr()),
-        );
-        write_cstr_field(
-            &mut saber2Name,
-            &cstr_to_str((*client).sess.saber2Type.as_ptr()),
-        );
+        write_cstr_field(&mut saberName, &(*client).sess.saberType);
+        write_cstr_field(&mut saber2Name, &(*client).sess.saber2Type);
 
         // set max health
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {

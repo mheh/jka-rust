@@ -20,7 +20,8 @@ use crate::trap;
 use mp_bg::bg_misc::selected_holdable_tag;
 use native_string::atof::atof_bytes;
 use native_string::atoi::{atoi, atoi_bytes};
-use native_string::q_string::Q_stricmp;
+use native_string::strncpyz_string;
+use native_string::{Q_CleanStr, Q_stricmp};
 
 /// Raven `SAY_ALL`/`SAY_TEAM`/`SAY_TELL` chat-mode `#define`s.
 ///
@@ -227,30 +228,28 @@ pub fn ConcatArgs(ctx: &mut GameContext, start: c_int) -> String {
 /// Remove case and control characters.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:161-175`
-pub fn SanitizeString(r#in: *mut c_char, out: *mut c_char) {
-    unsafe {
-        let mut i = r#in;
-        let mut o = out;
-        loop {
-            let c = *i as u8;
-            if c == 0 {
-                break;
-            }
-            if c == 27 {
-                // skip color code
-                i = i.add(2);
-                continue;
-            }
-            if (c as i8) < 32 {
-                i = i.add(1);
-                continue;
-            }
-            *o = (c as char).to_ascii_lowercase() as c_char;
-            o = o.add(1);
-            i = i.add(1);
+pub fn SanitizeString(r#in: &str) -> String {
+    let bytes = r#in.as_bytes();
+    let mut out: Vec<u8> = Vec::new();
+    let mut i = 0;
+    // Byte-positional per Raven's pointer walk: ESC(27) skips a 2-byte color
+    // code, control bytes (< 32) drop, others lowercase via `tolower` (ASCII
+    // fold, high bytes unchanged). §19: a lone trailing ESC would step Raven's
+    // pointer past the NUL; the length bound stops here instead.
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == 27 {
+            i += 2;
+            continue;
         }
-        *o = 0;
+        if (c as i8) < 32 {
+            i += 1;
+            continue;
+        }
+        out.push(c.to_ascii_lowercase());
+        i += 1;
     }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Raven `ClientNumberFromString`.
@@ -282,19 +281,13 @@ pub fn ClientNumberFromString(ctx: &mut GameContext, to: EntityId, s: *mut c_cha
         }
 
         // check for a name match
-        let mut s2 = [0 as c_char; MAX_STRING_CHARS];
-        SanitizeString(s, s2.as_mut_ptr());
+        let s2 = SanitizeString(&ss);
         for idnum in 0..ctx.world.level.maxclients {
             if ctx.world.client(idnum as usize).pers.connected != CON_CONNECTED {
                 continue;
             }
-            let mut n2 = [0 as c_char; MAX_STRING_CHARS];
-            // `netname` is a `String`; `SanitizeString` still takes `char*`, so
-            // stage the name in a mutable C buffer (convention 7).
-            let mut nbuf = [0 as c_char; MAX_STRING_CHARS];
-            write_cstr_field(&mut nbuf, &ctx.world.client(idnum as usize).pers.netname);
-            SanitizeString(nbuf.as_mut_ptr(), n2.as_mut_ptr());
-            if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
+            let n2 = SanitizeString(&ctx.world.client(idnum as usize).pers.netname);
+            if n2 == s2 {
                 return idnum;
             }
         }
@@ -612,8 +605,11 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
                 // Oracle guards with `if ( ent->client->sess.IPstring )`, but
                 // IPstring is a `char[32]` array whose address is never null, so
                 // this ban runs unconditionally. Preserve the always-true quirk.
-                let ipstr = ctx.world.client_mut(cidx).sess.IPstring.as_mut_ptr();
-                crate::g_svcmds::AddIP(ctx, ipstr);
+                // `IPstring` is a `String`; `AddIP` still takes `char*`, so stage
+                // it in a C buffer (convention 7).
+                let mut ipbuf = [0 as c_char; 32];
+                write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
+                crate::g_svcmds::AddIP(ctx, ipbuf.as_mut_ptr());
 
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "TKBAN");
                 let s = format!(
@@ -691,8 +687,11 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
                 // Oracle guards with `if ( ent->client->sess.IPstring )`, but
                 // IPstring is a `char[32]` array whose address is never null, so
                 // this ban runs unconditionally. Preserve the always-true quirk.
-                let ipstr = ctx.world.client_mut(cidx).sess.IPstring.as_mut_ptr();
-                crate::g_svcmds::AddIP(ctx, ipstr);
+                // `IPstring` is a `String`; `AddIP` still takes `char*`, so stage
+                // it in a C buffer (convention 7).
+                let mut ipbuf = [0 as c_char; 32];
+                write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
+                crate::g_svcmds::AddIP(ctx, ipbuf.as_mut_ptr());
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "SUICIDEBAN");
                 let s = format!(
                     "print \"{} {}\n\"",
@@ -1352,7 +1351,7 @@ pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
         );
 
         let cn = cstr_to_str(classname_buf.as_ptr());
-        write_cstr_field(&mut ctx.world.client_mut(cidx).sess.siegeClass, &cn);
+        ctx.world.client_mut(cidx).sess.siegeClass = strncpyz_string(cn.as_bytes(), 64);
 
         crate::g_client::ClientUserinfoChanged(ctx, ent.index() as c_int);
 
@@ -1487,20 +1486,26 @@ pub fn G_SetSaber(
 
         if (*client).saber[0].model[0] == 0 {
             debug_assert!(false, "should never happen!"); // Raven `assert(0)`
-            write_cstr_field(&mut (*client).sess.saberType, "none");
+            (*client).sess.saberType = strncpyz_string(b"none", 64);
         } else {
-            write_cstr_field(
-                &mut (*client).sess.saberType,
-                &cstr_to_str((*client).saber[0].name.as_ptr()),
+            (*client).sess.saberType = strncpyz_string(
+                core::slice::from_raw_parts(
+                    (*client).saber[0].name.as_ptr() as *const u8,
+                    (*client).saber[0].name.len(),
+                ),
+                64,
             );
         }
 
         if (*client).saber[1].model[0] == 0 {
-            write_cstr_field(&mut (*client).sess.saber2Type, "none");
+            (*client).sess.saber2Type = strncpyz_string(b"none", 64);
         } else {
-            write_cstr_field(
-                &mut (*client).sess.saber2Type,
-                &cstr_to_str((*client).saber[1].name.as_ptr()),
+            (*client).sess.saber2Type = strncpyz_string(
+                core::slice::from_raw_parts(
+                    (*client).saber[1].name.as_ptr() as *const u8,
+                    (*client).saber[1].name.len(),
+                ),
+                64,
             );
         }
 
@@ -2040,18 +2045,13 @@ pub fn Cmd_Where_f(ctx: &mut GameContext, ent: EntityId) {
 /// Source: `oracle/codemp/game/g_cmds.c:1871-1890`
 pub fn G_ClientNumberFromName(ctx: &mut GameContext, name: *const c_char) -> c_int {
     unsafe {
-        let mut s2 = [0 as c_char; MAX_STRING_CHARS];
-        let mut n2 = [0 as c_char; MAX_STRING_CHARS];
+        let name_str = cstr_to_str(name);
 
         // check for a name match
-        SanitizeString(name as *mut c_char, s2.as_mut_ptr());
+        let s2 = SanitizeString(&name_str);
         for i in 0..ctx.world.level.numConnectedClients {
-            // `netname` is a `String`; stage it in a mutable C buffer for the
-            // pointer-taking `SanitizeString` (convention 7).
-            let mut nbuf = [0 as c_char; MAX_STRING_CHARS];
-            write_cstr_field(&mut nbuf, &ctx.world.client(i as usize).pers.netname);
-            SanitizeString(nbuf.as_mut_ptr(), n2.as_mut_ptr());
-            if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
+            let n2 = SanitizeString(&ctx.world.client(i as usize).pers.netname);
+            if n2 == s2 {
                 return i;
             }
         }
@@ -2065,46 +2065,45 @@ pub fn G_ClientNumberFromName(ctx: &mut GameContext, name: *const c_char) -> c_i
 /// Rich's revised version of `SanitizeString`.
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:1899-1937`
-pub fn SanitizeString2(r#in: *mut c_char, out: *mut c_char) {
-    unsafe {
-        let mut i: isize = 0;
-        let mut r: isize = 0;
+pub fn SanitizeString2(r#in: &str) -> String {
+    let bytes = r#in.as_bytes();
+    let mut out: Vec<u8> = Vec::new();
+    let mut i = 0;
+    // Rich's variant: no lowercasing, `^`+digit('0'..='9') skips a 2-byte color
+    // code (a bare `^` skips 1), the name truncates at MAX_NAME_LENGTH-1 bytes,
+    // control bytes (< 32) drop. A `^` at the last byte reads 0 for its
+    // follower (Raven reads the NUL), so it takes the bare-`^` arm.
+    while i < bytes.len() {
+        if i >= MAX_NAME_LENGTH - 1 {
+            // the ui truncates the name here..
+            break;
+        }
 
-        loop {
-            let c = *r#in.offset(i) as u8;
-            if c == 0 {
-                break;
-            }
-            if i as usize >= MAX_NAME_LENGTH - 1 {
-                // the ui truncates the name here..
-                break;
-            }
+        let c = bytes[i];
 
-            if c == b'^' {
-                let next = *r#in.offset(i + 1) as u8;
-                if next >= b'0' && next <= b'9' {
-                    // only skip it if there's a number after it for the color
-                    i += 2;
-                    continue;
-                } else {
-                    // just skip the ^
-                    i += 1;
-                    continue;
-                }
-            }
-
-            if (c as i8) < 32 {
+        if c == b'^' {
+            let next = if i + 1 < bytes.len() { bytes[i + 1] } else { 0 };
+            if next >= b'0' && next <= b'9' {
+                // only skip it if there's a number after it for the color
+                i += 2;
+                continue;
+            } else {
+                // just skip the ^
                 i += 1;
                 continue;
             }
-
-            *out.offset(r) = c as c_char;
-            r += 1;
-            i += 1;
         }
 
-        *out.offset(r) = 0;
+        if (c as i8) < 32 {
+            i += 1;
+            continue;
+        }
+
+        out.push(c);
+        i += 1;
     }
+
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Raven `G_ClientNumberFromStrippedName`.
@@ -2115,18 +2114,13 @@ pub fn SanitizeString2(r#in: *mut c_char, out: *mut c_char) {
 /// Source: `oracle/codemp/game/g_cmds.c:1946-1965`
 pub fn G_ClientNumberFromStrippedName(ctx: &mut GameContext, name: *const c_char) -> c_int {
     unsafe {
-        let mut s2 = [0 as c_char; MAX_STRING_CHARS];
-        let mut n2 = [0 as c_char; MAX_STRING_CHARS];
+        let name_str = cstr_to_str(name);
 
         // check for a name match
-        SanitizeString2(name as *mut c_char, s2.as_mut_ptr());
+        let s2 = SanitizeString2(&name_str);
         for i in 0..ctx.world.level.numConnectedClients {
-            // `netname` is a `String`; stage it in a mutable C buffer for the
-            // pointer-taking `SanitizeString2` (convention 7).
-            let mut nbuf = [0 as c_char; MAX_STRING_CHARS];
-            write_cstr_field(&mut nbuf, &ctx.world.client(i as usize).pers.netname);
-            SanitizeString2(nbuf.as_mut_ptr(), n2.as_mut_ptr());
-            if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
+            let n2 = SanitizeString2(&ctx.world.client(i as usize).pers.netname);
+            if n2 == s2 {
                 return i;
             }
         }
@@ -2518,11 +2512,7 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
                         return;
                     }
                 } else {
-                    let mut target = arg2_s.clone();
-                    let mut tbuf: Vec<c_char> = target.bytes().map(|b| b as c_char).collect();
-                    tbuf.push(0);
-                    crate::q_shared::Q_CleanStr(tbuf.as_mut_ptr());
-                    target = cstr_to_str(tbuf.as_ptr());
+                    let target = Q_CleanStr(&arg2_s);
 
                     targetClientNum = ctx.world.level.maxclients;
                     for i in 0..ctx.world.level.maxclients {
@@ -2534,14 +2524,7 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
                         if ctx.world.client(i as usize).sess.sessionTeam != team {
                             continue;
                         }
-                        let mut nbuf: Vec<c_char> =
-                            ctx.world.client(i as usize).pers.netname.clone()
-                                .bytes()
-                                .map(|b| b as c_char)
-                                .collect();
-                        nbuf.push(0);
-                        crate::q_shared::Q_CleanStr(nbuf.as_mut_ptr());
-                        let netname = cstr_to_str(nbuf.as_ptr());
+                        let netname = Q_CleanStr(&ctx.world.client(i as usize).pers.netname);
                         if netname.eq_ignore_ascii_case(&target) {
                             targetClientNum = i;
                             break;

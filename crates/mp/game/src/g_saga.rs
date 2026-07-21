@@ -31,7 +31,8 @@ use crate::g_utils::{
 };
 use crate::q_shared::Info_SetValueForKey;
 use crate::q_shared::Q_strcat;
-use native_string::q_string::Q_stricmp;
+use native_string::strncpyz_string;
+use native_string::Q_stricmp;
 use mp_bg::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
     BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
@@ -1027,12 +1028,12 @@ pub fn G_ValidateSiegeClassForTeam(ctx: &mut GameContext, ent: EntityId, team: c
                     (*(*stm).classes[newClassIndex as usize]).name.as_ptr(),
                     &ctx.world.bg_state,
                 );
-                write_cstr_field(
-                    &mut (*cl).sess.siegeClass,
-                    &core::ffi::CStr::from_ptr(
-                        (*(*stm).classes[newClassIndex as usize]).name.as_ptr(),
-                    )
-                    .to_string_lossy(),
+                (*cl).sess.siegeClass = strncpyz_string(
+                    core::slice::from_raw_parts(
+                        (*(*stm).classes[newClassIndex as usize]).name.as_ptr() as *const u8,
+                        (*(*stm).classes[newClassIndex as usize]).name.len(),
+                    ),
+                    64,
                 );
             }
         }

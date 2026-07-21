@@ -4,7 +4,7 @@
 
 #![allow(non_camel_case_types)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 
 use mp_bg::team_t;
 use mp_qshared::shared::qboolean;
@@ -22,8 +22,14 @@ pub const FOLLOW_ACTIVE2: c_int = -2;
 /// reading them back at connection time; anything added MUST be handled in
 /// `G_InitSessionData()` / `G_ReadSessionData()` / `G_WriteSessionData()`.
 /// Source: `oracle/codemp/game/g_local.h:408`
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+///
+/// `siegeClass`/`saberType`/`saber2Type`/`IPstring` are owned `String`s (§13
+/// string-endgame): the struct never crosses the DLL seam by layout — it sits
+/// in `gclient_t`'s private tail past `pers`, and the engine only learns the
+/// full stride at runtime — so `#[repr(C)]` and the `size_of` assert are dropped.
+/// Not `Copy` (owns `String`s); the byte-width write bounds (63/63/63/31) are
+/// preserved at every write site instead.
+#[derive(Clone, Debug, PartialEq)]
 pub struct clientSession_t {
     pub sessionTeam: team_t,
     pub spectatorTime: c_int, // for determining next-in-line to play
@@ -36,13 +42,12 @@ pub struct clientSession_t {
     pub setForce: qboolean, // set to true once player is given the chance to set force powers
     pub updateUITime: c_int, // only update userinfo for FP/SL if < level.time
     pub teamLeader: qboolean, // true when this client is a team leader
-    pub siegeClass: [c_char; 64],
-    pub saberType: [c_char; 64],
-    pub saber2Type: [c_char; 64],
+    pub siegeClass: String,
+    pub saberType: String,
+    pub saber2Type: String,
     pub duelTeam: c_int,
     pub siegeDesiredTeam: c_int,
     pub killCount: c_int,
     pub TKCount: c_int,
-    pub IPstring: [c_char; 32], // yeah, I know, could be 16, but, just in case...
+    pub IPstring: String, // yeah, I know, could be 16, but, just in case...
 }
-const _: () = assert!(core::mem::size_of::<clientSession_t>() == 284);

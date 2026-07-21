@@ -91,15 +91,16 @@ pub struct GameWorld {
 
 /// Zeroed `g_clients` array, built directly on the heap (never on the stack —
 /// the by-value array is ~230 KB and the engine calls `vmMain` from a deep
-/// stack). `gclient_t` stopped being `ZeroValid` when `pers.netname` became a
-/// `String`, so this mirrors `native_platform::zeroed_box` and then installs a
-/// valid empty `String` into each client's `netname` slot before the array is
-/// ever read (Raven's `memset(g_clients, 0, ...)` == every scalar 0, name "").
+/// stack). `gclient_t` stopped being `ZeroValid` when its `String` fields
+/// landed, so this mirrors `native_platform::zeroed_box` and then installs a
+/// valid empty `String` into each client's owned-`String` slots before the
+/// array is ever read (Raven's `memset(g_clients, 0, ...)` == every scalar 0,
+/// every name "").
 fn zeroed_clients() -> Box<[gclient_t; MAX_CLIENTS]> {
     let layout = Layout::new::<[gclient_t; MAX_CLIENTS]>();
     // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every
-    // `gclient_t` field save `pers.netname`; each `ptr::write` overwrites that
-    // one slot with a valid empty `String` (its zeroed bytes never dropped)
+    // `gclient_t` field save the owned `String`s; each `ptr::write` overwrites
+    // one such slot with a valid empty `String` (its zeroed bytes never dropped)
     // before ownership passes to the `Box`, so the whole array is initialized.
     unsafe {
         let base = alloc_zeroed(layout) as *mut gclient_t;
@@ -107,10 +108,13 @@ fn zeroed_clients() -> Box<[gclient_t; MAX_CLIENTS]> {
             handle_alloc_error(layout);
         }
         for i in 0..MAX_CLIENTS {
-            core::ptr::write(
-                core::ptr::addr_of_mut!((*base.add(i)).pers.netname),
-                String::new(),
-            );
+            let c = base.add(i);
+            core::ptr::write(core::ptr::addr_of_mut!((*c).pers.netname), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*c).sess.siegeClass), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*c).sess.saberType), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*c).sess.saber2Type), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*c).sess.IPstring), String::new());
+            core::ptr::write(core::ptr::addr_of_mut!((*c).modelname), String::new());
         }
         Box::from_raw(base as *mut [gclient_t; MAX_CLIENTS])
     }

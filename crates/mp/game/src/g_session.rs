@@ -12,57 +12,55 @@ use crate::g_main::{G_PowerDuelCount, G_Printf};
 use crate::prelude::*;
 use mp_bg::public::duel_team::duelTeam_t::*;
 use native_string::atoi::atoi;
+use native_string::strncpyz_string;
 
 /// Raven `G_WriteClientSessionData`.
 ///
 /// Source: `oracle/codemp/game/g_session.c:23-96`
 pub fn G_WriteClientSessionData(ctx: &mut GameContext, client: usize) {
-    let mut siege_class: [c_char; 64] = [0; 64];
-    let mut saber_type: [c_char; 64] = [0; 64];
-    let mut saber2_type: [c_char; 64] = [0; 64];
-
-    {
+    // Raven copies each session string into a scratch buffer and converts its
+    // spaces to char(1) — siege class names contain spaces, but the session
+    // cvar is space-separated. The `String` fields have no interior NUL (they
+    // are filled from NUL-terminated sources), so iterating all bytes matches
+    // Raven's `while (buf[i])` walk exactly.
+    let (mut siege_class, mut saber_type, mut saber2_type) = {
         let c = ctx.world.client(client);
-        siege_class.copy_from_slice(&c.sess.siegeClass);
-        saber_type.copy_from_slice(&c.sess.saberType);
-        saber2_type.copy_from_slice(&c.sess.saber2Type);
-    }
+        (
+            c.sess.siegeClass.clone().into_bytes(),
+            c.sess.saberType.clone().into_bytes(),
+            c.sess.saber2Type.clone().into_bytes(),
+        )
+    };
 
-    let mut i = 0;
-    while i < 64 && siege_class[i] != 0 {
-        if siege_class[i] == b' ' as c_char {
-            siege_class[i] = 1;
+    for b in siege_class.iter_mut() {
+        if *b == b' ' {
+            *b = 1;
         }
-        i += 1;
     }
 
-    if siege_class[0] == 0 {
-        siege_class[0] = b'n' as c_char;
-        siege_class[1] = b'o' as c_char;
-        siege_class[2] = b'n' as c_char;
-        siege_class[3] = b'e' as c_char;
-        siege_class[4] = 0;
+    if siege_class.is_empty() {
+        // make sure there's at least something
+        siege_class = b"none".to_vec();
     }
 
-    i = 0;
-    while i < 64 && saber_type[i] != 0 {
-        if saber_type[i] == b' ' as c_char {
-            saber_type[i] = 1;
+    for b in saber_type.iter_mut() {
+        if *b == b' ' {
+            *b = 1;
         }
-        i += 1;
     }
 
-    i = 0;
-    while i < 64 && saber2_type[i] != 0 {
-        if saber2_type[i] == b' ' as c_char {
-            saber2_type[i] = 1;
+    for b in saber2_type.iter_mut() {
+        if *b == b' ' {
+            *b = 1;
         }
-        i += 1;
     }
 
-    let siege_class_str = unsafe { cstr_to_str(siege_class.as_ptr()) };
-    let saber_type_str = unsafe { cstr_to_str(saber_type.as_ptr()) };
-    let saber2_type_str = unsafe { cstr_to_str(saber2_type.as_ptr()) };
+    // Only ' '(0x20) -> 0x01 was substituted, so the bytes stay valid UTF-8;
+    // the lossy decode is an identity round-trip that keeps the cvar bytes
+    // byte-identical to Raven's `%s`.
+    let siege_class_str = String::from_utf8_lossy(&siege_class);
+    let saber_type_str = String::from_utf8_lossy(&saber_type);
+    let saber2_type_str = String::from_utf8_lossy(&saber2_type);
 
     // `client - level.clients` recomputes to the client index `client` (both
     // alias `world.clients`), so the session cvar name uses it directly.
@@ -161,40 +159,23 @@ pub fn G_ReadSessionData(ctx: &mut GameContext, client: usize) {
         idx += 1;
     }
     if idx < parts.len() {
-        write_cstr_field(&mut c.sess.siegeClass, parts[idx]);
+        c.sess.siegeClass = strncpyz_string(parts[idx].as_bytes(), 64);
         idx += 1;
     }
     if idx < parts.len() {
-        write_cstr_field(&mut c.sess.saberType, parts[idx]);
+        c.sess.saberType = strncpyz_string(parts[idx].as_bytes(), 64);
         idx += 1;
     }
     if idx < parts.len() {
-        write_cstr_field(&mut c.sess.saber2Type, parts[idx]);
+        c.sess.saber2Type = strncpyz_string(parts[idx].as_bytes(), 64);
     }
 
-    let mut i = 0;
-    while i < c.sess.siegeClass.len() && c.sess.siegeClass[i] != 0 {
-        if c.sess.siegeClass[i] == 1 {
-            c.sess.siegeClass[i] = b' ' as c_char;
-        }
-        i += 1;
-    }
-
-    i = 0;
-    while i < c.sess.saberType.len() && c.sess.saberType[i] != 0 {
-        if c.sess.saberType[i] == 1 {
-            c.sess.saberType[i] = b' ' as c_char;
-        }
-        i += 1;
-    }
-
-    i = 0;
-    while i < c.sess.saber2Type.len() && c.sess.saber2Type[i] != 0 {
-        if c.sess.saber2Type[i] == 1 {
-            c.sess.saber2Type[i] = b' ' as c_char;
-        }
-        i += 1;
-    }
+    // Convert the char(1) placeholders back to spaces, as the session data was
+    // written that way (0x01 and ' ' are single ASCII bytes, so `replace` on
+    // the char is byte-identical to Raven's in-place `buf[i] == 1 -> ' '`).
+    c.sess.siegeClass = c.sess.siegeClass.replace('\u{1}', " ");
+    c.sess.saberType = c.sess.saberType.replace('\u{1}', " ");
+    c.sess.saber2Type = c.sess.saber2Type.replace('\u{1}', " ");
 
     c.sess.sessionTeam = session_team as team_t;
     // spectatorState_t is `#[repr(i32)]`; the sscanf'd int transmutes to it.
@@ -282,10 +263,12 @@ pub fn G_InitSessionData(ctx: &mut GameContext, client: usize, userinfo: &str, i
     ctx.world.client_mut(client).sess.spectatorTime = time;
 
     {
+        // Raven clears each with `sess.X[0] = 0` (empty C string); `.clear()`
+        // is the byte-equivalent empty-`String`.
         let c = ctx.world.client_mut(client);
-        c.sess.siegeClass[0] = 0;
-        c.sess.saberType[0] = 0;
-        c.sess.saber2Type[0] = 0;
+        c.sess.siegeClass.clear();
+        c.sess.saberType.clear();
+        c.sess.saber2Type.clear();
     }
 
     G_WriteClientSessionData(ctx, client);

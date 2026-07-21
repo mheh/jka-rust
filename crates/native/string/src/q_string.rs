@@ -64,6 +64,35 @@ pub fn Q_stricmp(s1: &str, s2: &str) -> c_int {
     Q_stricmpBytes(s1.as_bytes(), s2.as_bytes())
 }
 
+/// Raven `Q_CleanStr` — strip color codes and non-printable bytes, returning
+/// an owned `String` (the migrated-field twin of the pointer `Q_CleanStr`, for
+/// callers whose source became a `String`).
+///
+/// `Q_IsColorString(s)` = `^` followed by a byte in `'0'..='7'` that is not a
+/// second `^`; both the `^` and the digit are dropped. A `^` with no valid
+/// digit is kept (it is itself printable). Bytes outside `0x20..=0x7E` drop.
+/// Byte-positional, so the output matches Raven's in-place compaction exactly.
+///
+/// Source: `oracle/codemp/game/q_shared.c:963-982`
+pub fn Q_CleanStr(string: &str) -> String {
+    let bytes = string.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        let n = if i + 1 < bytes.len() { bytes[i + 1] } else { 0 };
+        if c == b'^' && n != 0 && n != b'^' && (b'0'..=b'7').contains(&n) {
+            // Q_IsColorString(s): skip the `^` here (Raven's inner `s++`); the
+            // digit is skipped by the trailing `i += 1` on this same pass.
+            i += 1;
+        } else if (0x20..=0x7E).contains(&c) {
+            out.push(c);
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// Raven `Q_strncmp` over raw bytes.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:881-898`
@@ -172,6 +201,19 @@ mod q_string_tests {
         // 0x80 widens negative, so it sorts below 'A' exactly as C's signed
         // char comparison does.
         assert_eq!(Q_strcmpBytes(&[0x80, 0], &[b'A', 0]), -1);
+    }
+
+    #[test]
+    fn cleanstr_strips_color_codes_and_control_bytes() {
+        // `^`+digit('0'..='7') drops both bytes; a printable char survives.
+        assert_eq!(Q_CleanStr("^1red^7white"), "redwhite");
+        // A `^` with no valid digit is itself printable and is kept; `^8`/`^^`
+        // are not color codes (matches Q_PrintStrlen's guard).
+        assert_eq!(Q_CleanStr("a^b^8c^^d"), "a^b^8c^^d");
+        // Bytes outside 0x20..=0x7E drop (here a control byte and a high byte).
+        assert_eq!(Q_CleanStr("a\u{1}b\u{7f}"), "ab");
+        // A trailing lone `^` is kept (no follower digit).
+        assert_eq!(Q_CleanStr("hi^"), "hi^");
     }
 
     #[test]
