@@ -21,6 +21,9 @@ use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
 use crate::g_utils::G_SoundOnEnt;
 use native_string::atof::atof;
+// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
+// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+use native_string::q_string::Q_stricmp;
 
 // Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
 // (voice/entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s —
@@ -42,6 +45,7 @@ use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
 // Dedupe MASK_SHOT glob ambiguity (surface_flags::* / mp_qshared::shared::* both
 // re-export it): canonical home is surface_flags per house convention.
 use mp_qshared::shared::surface_flags::MASK_SHOT;
+use crate::q_shared;
 
 // Safe-state migration **Stage 1**: entity-pointer params are `EntityId` /
 // `Option<EntityId>` handles (§B5), not raw `gentity_t*`; ctx-free leaf helpers
@@ -257,8 +261,10 @@ pub fn WP_ResistForcePush(
     unsafe {
         if (ctx.world.entity(self_id).s.number == 0
             || (*client).NPC_class == CLASS_DESANN
-            || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), ctx.world.entity(self_id).NPC_type)
-                == 0
+            || {
+                let p = ctx.world.entity(self_id).NPC_type;
+                !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+            }
             || (*client).NPC_class == CLASS_LUKE)
             && (crate::q_math::VectorLengthSquared((*client).ps.velocity) > 10000.0
                 || (*client).ps.fd.forcePowerLevel[FP_PUSH as usize] >= FORCE_LEVEL_3
@@ -1930,8 +1936,10 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
             }
         } else if enemy_dist <= 64
             && (((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0
-                || (crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*npc).NPC_type) == 0
-                    && ctx.world.bg_state.rng.Q_irand(0, 10) == 0))
+                || ({
+                    let p = (*npc).NPC_type;
+                    !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                } && ctx.world.bg_state.rng.Q_irand(0, 10) == 0))
         {
             //can't use saber and they're in striking range
             if ctx.world.bg_state.rng.Q_irand(0, 5) == 0
@@ -2172,7 +2180,10 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                     }
                 }
                 if (*client).NPC_class == CLASS_DESANN
-                    || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*npc).NPC_type) == 0
+                    || {
+                        let p = (*npc).NPC_type;
+                        !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                    }
                 {
                     chanceScale = 1;
                 } else if (*npc_info).rank as c_int == RANK_ENSIGN as c_int {
@@ -2185,8 +2196,10 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                 if chanceScale != 0
                     && (enemy_dist > ctx.world.bg_state.rng.Q_irand(100, 200)
                         || ((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0
-                        || (crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*npc).NPC_type) == 0
-                            && ctx.world.bg_state.rng.Q_irand(0, 3) == 0))
+                        || ({
+                            let p = (*npc).NPC_type;
+                            !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                        } && ctx.world.bg_state.rng.Q_irand(0, 3) == 0))
                     && enemy_dist < 500
                     && (ctx.world.bg_state.rng.Q_irand(0, chanceScale * 10) < 5
                         || (!enemy.is_null()
@@ -5208,7 +5221,10 @@ pub fn Jedi_AttackDecide(ctx: &mut GameContext, enemy_dist: c_int) -> qboolean {
             let chance: c_int;
             if (*client).NPC_class == CLASS_DESANN
                 || (*client).NPC_class == CLASS_LUKE
-                || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*npc).NPC_type) == 0
+                || {
+                    let p = (*npc).NPC_type;
+                    !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                }
             {
                 chance = 20;
             } else if (*client).NPC_class == CLASS_TAVION {
@@ -5732,7 +5748,10 @@ pub fn Jedi_CheckEnemyMovement(ctx: &mut GameContext, enemy_dist: f32) {
         if (*client).NPC_class != CLASS_TAVION
             && (*client).NPC_class != CLASS_DESANN
             && (*client).NPC_class != CLASS_LUKE
-            && crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*npc).NPC_type) != 0
+            && {
+                let p = (*npc).NPC_type;
+                p.is_null() || Q_stricmp("Yoda", &cstr_to_str(p)) != 0
+            }
         {
             let npc_id = ent_id(ge, npc);
             if (*enemy).enemy.is_some() && (*enemy).enemy == Some(npc_id) {
@@ -6358,7 +6377,10 @@ pub fn NPC_Jedi_Pain(
         //back off
         crate::g_timer::TIMER_Set(ctx, Some(self_), c"parryTime".as_ptr(), -1);
         if unsafe { (*client).NPC_class } == CLASS_DESANN
-            || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), ctx.world.entity(self_).NPC_type) == 0
+            || {
+                let p = ctx.world.entity(self_).NPC_type;
+                !p.is_null() && Q_stricmp("Yoda", &(unsafe { cstr_to_str(p) })) == 0
+            }
         {
             //less for Desann
             unsafe {
@@ -6963,7 +6985,10 @@ pub fn Jedi_CanPullBackSaber(ctx: &mut GameContext, self_: EntityId) -> qboolean
         || unsafe { (*client).NPC_class } == CLASS_TAVION
         || unsafe { (*client).NPC_class } == CLASS_LUKE
         || unsafe { (*client).NPC_class } == CLASS_DESANN
-        || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), ctx.world.entity(self_).NPC_type) == 0
+        || {
+            let p = ctx.world.entity(self_).NPC_type;
+            !p.is_null() && Q_stricmp("Yoda", &(unsafe { cstr_to_str(p) })) == 0
+        }
     {
         return qtrue;
     }
@@ -7114,7 +7139,10 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
             } else {
                 let chance: f32;
                 if (*client).NPC_class == CLASS_DESANN
-                    || crate::q_shared::Q_stricmp(c"Yoda".as_ptr(), (*npc).NPC_type) == 0
+                    || {
+                        let p = (*npc).NPC_type;
+                        !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                    }
                 {
                     if ctx.world.cvars.g_spskill.integer != 0 {
                         chance = 4.0f32;
@@ -7334,7 +7362,10 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
             };
             if !enemy.is_null()
                 && (*enemy).s.weapon == WP_TURRET as c_int
-                && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy).classname) == 0
+                && {
+                    let p = (*enemy).classname;
+                    !p.is_null() && Q_stricmp("PAS", &cstr_to_str(p)) == 0
+                }
             {
                 if (*enemy).count <= 0 {
                     //it's out of ammo

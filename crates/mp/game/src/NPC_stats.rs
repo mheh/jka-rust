@@ -395,7 +395,7 @@ pub fn TranslateRankName(name: *const c_char) -> rank_t {
 // case-insensitive equality). `Q_stricmp` itself is an out-of-file callee
 // (q_shared.c:900, staged skeleton at `crate::q_shared::Q_stricmp`).
 unsafe fn qstricmp_eq(name: *const c_char, lit: &std::ffi::CStr) -> bool {
-    crate::q_shared::Q_stricmp(name, lit.as_ptr()) == 0
+    !name.is_null() && Q_stricmp(lit.to_str().unwrap(), &cstr_to_str(name)) == 0
 }
 
 /// Raven `G_ParseAnimFileSet`.

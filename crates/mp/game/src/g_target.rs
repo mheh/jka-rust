@@ -31,6 +31,7 @@ use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED};
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
+use native_string::q_string::Q_stricmp;
 
 /// Raven `#define Q3_SCRIPT_DIR "scripts"`.
 /// Source: `oracle/codemp/game/q_shared.h:10`
@@ -884,7 +885,7 @@ pub fn target_location_linkup(ctx: &mut GameContext, ent: EntityId) {
         let id = EntityId(i as u32);
         let classname = ctx.entity(id).classname;
         if !classname.is_null()
-            && Q_stricmp(classname, b"target_location\0".as_ptr() as *const c_char) == 0
+            && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "target_location") == 0
         {
             // lets overload some variables!
             ctx.entity_mut(id).health = n; // use for location marking

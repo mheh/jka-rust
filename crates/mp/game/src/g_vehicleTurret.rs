@@ -20,7 +20,7 @@ use crate::q_math::{
     _VectorCopy, _VectorMA, _VectorSubtract, vectoangles, AngleNormalize180, AnglesSubtract,
     VectorLengthSquared, VectorNormalize,
 };
-use crate::q_shared::{Q_stricmp, Q_strncmp};
+use native_string::q_string::{Q_stricmp, Q_strncmp};
 use crate::trap;
 use crate::NPC_utils::NPC_SetBoneAngles;
 use mp_bg::public::team::TEAM_SPECTATOR;
@@ -28,6 +28,7 @@ use mp_bg::weapons::weapon_t::WP_TURRET;
 use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
 use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
 use mp_qshared::shared::surface_flags::MASK_SHOT;
+use crate::q_shared;
 
 // `PITCH`/`YAW` resolve via the crate prelude glob (`crate::q_math`); the
 // shadowing local copies were removed by the placeholder-const sweep.
@@ -341,16 +342,19 @@ pub fn VEH_TurretFindEnemies(
                     // is a bbrush, but invincible
                     || (!ctx.world.entity(target_id).NPC_targetname.is_null()
                         && !ctx.world.entity(parent).targetname.is_null()
-                        && Q_stricmp(
+                        && q_shared::Q_stricmp(
                             ctx.world.entity(target_id).NPC_targetname,
                             ctx.world.entity(parent).targetname,
                         ) != 0)
                 {
                     // not in invicible bbrush, but can only be broken by an NPC that is not me
-                    let s = cstr("misc_turret");
                     if ctx.world.entity(target_id).s.weapon == WP_TURRET
                         && !ctx.world.entity(target_id).classname.is_null()
-                        && Q_strncmp(ctx.world.entity(target_id).classname, s.as_ptr(), 11) == 0
+                        && Q_strncmp(
+                            "misc_turret",
+                            &cstr_to_str(ctx.world.entity(target_id).classname),
+                            11,
+                        ) == 0
                     {
                         // these guys we want to shoot at
                     } else {

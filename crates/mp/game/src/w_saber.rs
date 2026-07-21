@@ -22,6 +22,9 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
+// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+use native_string::q_string::Q_stricmp;
 
 // Constants used by the ported (non-parked) bodies below. Raven `#define`/enum
 // constants live in the already-ported qshared/bg type modules; the prelude
@@ -134,6 +137,7 @@ use crate::npc::look_mode::lookMode_t;
 use crate::saber::saber_flags::SFL_NOT_LOCKABLE;
 use mp_qshared::common::mp::qcommon::collision_record::{G2Trace_t, MAX_G2_COLLISIONS};
 use mp_qshared::shared::saber_block_type::saberBlockType_t;
+use crate::q_shared;
 
 // w_saber.c file-local `#define`s used by this shard (matching the file's
 // existing file-local const scoping, e.g. `SABER_NONATTACK_DAMAGE` above).
@@ -791,7 +795,7 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
             && ce.r.ownerNum == ent_number
             && !ce.classname.is_null()
             && unsafe { *ce.classname != 0 }
-            && unsafe { Q_stricmp(ce.classname, c"lightsaber".as_ptr()) == 0 };
+            && unsafe { Q_stricmp(&cstr_to_str(ce.classname), "lightsaber") == 0 };
 
         if matches {
             if saberent.is_some() {

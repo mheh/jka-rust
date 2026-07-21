@@ -14,6 +14,7 @@ use crate::g_utils::{G_BoxInBounds, G_RadiusList};
 use crate::prelude::*;
 use crate::w_force::Jedi_DodgeEvasion;
 use mp_bg::public::entity_type::entityType_t;
+use native_string::q_string::Q_stricmp;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::probe;
@@ -3796,10 +3797,10 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                 if render_impact {
                     if (tr.entityNum < ENTITYNUM_WORLD as i16
                         && ctx.world.entity(traceEnt_id).takedamage != 0)
-                        || Q_stricmp(
-                            ctx.world.entity(traceEnt_id).classname,
-                            c"misc_model_breakable".as_ptr(),
-                        ) == 0
+                        || {
+                            let cn = ctx.world.entity(traceEnt_id).classname;
+                            !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "misc_model_breakable") == 0
+                        }
                         || ctx.world.entity(traceEnt_id).s.eType == (ET_MOVER) as i32
                     {
                         // Create a simple impact type mark that doesn't last long in the world

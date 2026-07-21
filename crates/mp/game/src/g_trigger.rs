@@ -37,14 +37,15 @@ use crate::g_utils::{
     G_UseTargets,
 };
 use crate::q_math::vec3_origin;
-use crate::q_shared::Q_stricmp;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
+use native_string::q_string::Q_stricmp;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
+use crate::q_shared;
 
 // Pass-2: a handful of cross-file resolved signatures still
 // take a `vec3_t` by value where Raven passed `NULL` (e.g. `G_Damage`'s
@@ -213,7 +214,7 @@ pub fn G_NameInTriggerClassList(list: *mut c_char, str: *mut c_char) -> qboolean
             }
             cmp[j as usize] = 0;
 
-            if Q_stricmp(str, cmp.as_ptr()) == 0 {
+            if q_shared::Q_stricmp(str, cmp.as_ptr()) == 0 {
                 // found it
                 return qtrue;
             }
@@ -304,7 +305,7 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                 let goaltarget = ctx.world.entity(obj_item).goaltarget;
                 if !goaltarget.is_null()
                     && unsafe { *goaltarget } != 0
-                    && Q_stricmp(targetname, goaltarget) == 0
+                    && q_shared::Q_stricmp(targetname, goaltarget) == 0
                 {
                     let sess_team = unsafe { (*ac).sess.sessionTeam };
                     if ctx.world.entity(obj_item).genericValue7 != sess_team {
@@ -551,7 +552,7 @@ pub fn Touch_Multi(
         if !npc_targetname.is_null() && unsafe { *npc_targetname } != 0 {
             let script_targetname = ctx.world.entity(other).script_targetname;
             if !script_targetname.is_null() && unsafe { *script_targetname } != 0 {
-                if Q_stricmp(npc_targetname, script_targetname) != 0 {
+                if q_shared::Q_stricmp(npc_targetname, script_targetname) != 0 {
                     // not the right guy to fire me off
                     return;
                 }
@@ -1196,7 +1197,9 @@ pub fn AimAtTarget(ctx: &mut GameContext, self_: EntityId) {
     let ent_id = ctx.entity_id_of(ent).unwrap();
 
     let classname = ctx.world.entity(self_).classname;
-    if !classname.is_null() && Q_stricmp(c"trigger_push".as_ptr(), classname) == 0 {
+    if !classname.is_null()
+        && Q_stricmp("trigger_push", &(unsafe { cstr_to_str(classname) })) == 0
+    {
         if ctx.world.entity(self_).spawnflags & PUSH_RELATIVE != 0 {
             // relative, not an arc or linear
             let co = ctx.world.entity(ent_id).r.currentOrigin;
@@ -1213,7 +1216,9 @@ pub fn AimAtTarget(ctx: &mut GameContext, self_: EntityId) {
     }
 
     let classname = ctx.world.entity(self_).classname;
-    if !classname.is_null() && Q_stricmp(c"target_push".as_ptr(), classname) == 0 {
+    if !classname.is_null()
+        && Q_stricmp("target_push", &(unsafe { cstr_to_str(classname) })) == 0
+    {
         if ctx.world.entity(self_).spawnflags & PUSH_CONSTANT != 0 {
             let eo = ctx.world.entity(ent_id).s.origin;
             let so = ctx.world.entity(self_).s.origin;

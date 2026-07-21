@@ -29,6 +29,7 @@ use crate::level::tag_owner::{MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME, TAG_GE
 use crate::q_math::vec3_origin;
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
 use crate::q_shared::{Info_SetValueForKey, Q_strlwr};
+use native_string::q_string::Q_stricmp;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
@@ -42,6 +43,7 @@ use mp_bg::public::fx_state::{
 use mp_bg::public::means_of_death::meansOfDeath_t::MOD_UNKNOWN;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
+use crate::q_shared;
 
 /// Raven `HOLOCRON_RESPAWN_TIME`.
 ///
@@ -2839,7 +2841,7 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
     let trace_ent = EntityId(trace.entityNum as u32);
     let is_bad = trace.entityNum >= (ENTITYNUM_WORLD as c_int) as i16 || {
         let classname = ctx.world.entity(trace_ent).classname;
-        Q_stricmp(c"func_door".as_ptr(), classname) != 0
+        classname.is_null() || Q_stricmp("func_door", &(unsafe { cstr_to_str(classname) })) != 0
     };
     if is_bad {
         let level_time = ctx.world.level.time;
@@ -3151,7 +3153,7 @@ pub fn TAG_FindOwner(
     let mut i: c_int = 0;
     while i < MAX_TAG_OWNERS as c_int {
         if ctx.world.refTagOwnerMap[i as usize].inuse != 0
-            && Q_stricmp(ctx.world.refTagOwnerMap[i as usize].name.as_ptr(), owner) == 0
+            && q_shared::Q_stricmp(ctx.world.refTagOwnerMap[i as usize].name.as_ptr(), owner) == 0
         {
             return &mut ctx.world.refTagOwnerMap[i as usize] as *mut _;
         }
@@ -3192,7 +3194,7 @@ pub fn TAG_Find(
         let owner_ptr = tag_owner as *mut crate::level::tag_owner::tagOwner_t;
         while i < MAX_TAGS as c_int {
             if (*owner_ptr).tags[i as usize].inuse != 0
-                && Q_stricmp((*owner_ptr).tags[i as usize].name.as_ptr(), name) == 0
+                && q_shared::Q_stricmp((*owner_ptr).tags[i as usize].name.as_ptr(), name) == 0
             {
                 return &mut (*owner_ptr).tags[i as usize] as *mut reference_tag_t;
             }
@@ -3210,7 +3212,7 @@ pub fn TAG_Find(
         i = 0;
         while i < MAX_TAGS as c_int {
             if (*generic_ptr).tags[i as usize].inuse != 0
-                && Q_stricmp((*generic_ptr).tags[i as usize].name.as_ptr(), name) == 0
+                && q_shared::Q_stricmp((*generic_ptr).tags[i as usize].name.as_ptr(), name) == 0
             {
                 return &mut (*generic_ptr).tags[i as usize] as *mut reference_tag_t;
             }

@@ -23,7 +23,7 @@ use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleVectors,
     DirToByte, DistanceSquared, VectorCompare, VectorLengthSquared, VectorNormalize,
 };
-use crate::q_shared::Q_stricmp;
+use native_string::q_string::{Q_stricmp, Q_strncmp};
 use crate::teams::class::class_t;
 use crate::trap;
 use crate::w_saber::UpdateClientRenderBolts;
@@ -1830,11 +1830,8 @@ pub fn G_BroadcastObit(
             ctx.entity_mut(ent).s.otherEntityNum2 = killer;
         }
         if let Some(inflictor) = inflictor {
-            if Q_stricmp(
-                c"vehicle_proj".as_ptr(),
-                ctx.entity(inflictor).classname as *const c_char,
-            ) == 0
-            {
+            let cn = ctx.entity(inflictor).classname;
+            if !cn.is_null() && Q_stricmp("vehicle_proj", &(unsafe { cstr_to_str(cn) })) == 0 {
                 // a vehicle missile
                 ctx.entity_mut(ent).s.eventParm = meansOfDeath_t::MOD_VEHICLE as c_int;
                 // store index into g_vehWeaponInfo
@@ -1855,12 +1852,10 @@ pub fn G_BroadcastObit(
             {
                 let v = ctx.entity(attacker).s.m_iVehicleNum;
                 ctx.entity_mut(ent).s.brokenLimbs = v;
-            } else if ctx.entity(ent).s.lookTarget != 0
-                && Q_stricmp(
-                    c"func_rotating".as_ptr(),
-                    ctx.entity(attacker).classname as *const c_char,
-                ) == 0
-            {
+            } else if ctx.entity(ent).s.lookTarget != 0 && {
+                let cn = ctx.entity(attacker).classname;
+                !cn.is_null() && Q_stricmp("func_rotating", &(unsafe { cstr_to_str(cn) })) == 0
+            } {
                 // my vehicle was killed by a func_rotating, probably an asteroid
                 ctx.entity_mut(ent).s.saberInFlight = qtrue;
             }
@@ -4078,51 +4073,53 @@ pub fn G_GetHitLocFromSurfName(
             footRBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*r_leg_foot");
         }
 
-        let stricmp = |lit: &CStr| crate::q_shared::Q_stricmp(lit.as_ptr(), surfName) == 0;
+        // surfName is proven non-null and non-empty by the early guard above.
+        let surf_name_s = cstr_to_str(surfName);
+        let stricmp = |lit: &str| Q_stricmp(lit, &surf_name_s) == 0;
 
         if !ctx.entity(ent).client.is_null() && (*client).NPC_class == class_t::CLASS_ATST {
-            if stricmp(c"head_light_blaster_cann") {
+            if stricmp("head_light_blaster_cann") {
                 *hitLoc = HL_ARM_LT;
-            } else if stricmp(c"head_concussion_charger") {
+            } else if stricmp("head_concussion_charger") {
                 *hitLoc = HL_ARM_RT;
             }
             return qfalse;
         } else if !ctx.entity(ent).client.is_null() && (*client).NPC_class == class_t::CLASS_MARK1 {
-            if stricmp(c"l_arm") {
+            if stricmp("l_arm") {
                 *hitLoc = HL_ARM_LT;
-            } else if stricmp(c"r_arm") {
+            } else if stricmp("r_arm") {
                 *hitLoc = HL_ARM_RT;
-            } else if stricmp(c"torso_front") {
+            } else if stricmp("torso_front") {
                 *hitLoc = HL_CHEST;
-            } else if stricmp(c"torso_tube1") {
+            } else if stricmp("torso_tube1") {
                 *hitLoc = HL_GENERIC1;
-            } else if stricmp(c"torso_tube2") {
+            } else if stricmp("torso_tube2") {
                 *hitLoc = HL_GENERIC2;
-            } else if stricmp(c"torso_tube3") {
+            } else if stricmp("torso_tube3") {
                 *hitLoc = HL_GENERIC3;
-            } else if stricmp(c"torso_tube4") {
+            } else if stricmp("torso_tube4") {
                 *hitLoc = HL_GENERIC4;
-            } else if stricmp(c"torso_tube5") {
+            } else if stricmp("torso_tube5") {
                 *hitLoc = HL_GENERIC5;
-            } else if stricmp(c"torso_tube6") {
+            } else if stricmp("torso_tube6") {
                 *hitLoc = HL_GENERIC6;
             }
             return qfalse;
         } else if !ctx.entity(ent).client.is_null() && (*client).NPC_class == class_t::CLASS_MARK2 {
-            if stricmp(c"torso_canister1") {
+            if stricmp("torso_canister1") {
                 *hitLoc = HL_GENERIC1;
-            } else if stricmp(c"torso_canister2") {
+            } else if stricmp("torso_canister2") {
                 *hitLoc = HL_GENERIC2;
-            } else if stricmp(c"torso_canister3") {
+            } else if stricmp("torso_canister3") {
                 *hitLoc = HL_GENERIC3;
             }
             return qfalse;
         } else if !ctx.entity(ent).client.is_null()
             && (*client).NPC_class == class_t::CLASS_GALAKMECH
         {
-            if stricmp(c"torso_antenna") || stricmp(c"torso_antenna_base") {
+            if stricmp("torso_antenna") || stricmp("torso_antenna_base") {
                 *hitLoc = HL_GENERIC1;
-            } else if stricmp(c"torso_shield") {
+            } else if stricmp("torso_shield") {
                 *hitLoc = HL_GENERIC2;
             } else {
                 *hitLoc = HL_CHEST;
@@ -4130,11 +4127,10 @@ pub fn G_GetHitLocFromSurfName(
             return qfalse;
         }
 
-        let strncmp =
-            |lit: &CStr, n: c_int| crate::q_shared::Q_strncmp(lit.as_ptr(), surfName, n) == 0;
+        let strncmp = |lit: &str, n: usize| Q_strncmp(lit, &surf_name_s, n) == 0;
 
         let actualTime = ctx.world.level.time;
-        if strncmp(c"hips", 4) {
+        if strncmp("hips", 4) {
             // FIXME: test properly for legs
             *hitLoc = HL_WAIST;
             if !ctx.entity(ent).client.is_null() && !ctx.entity(ent).ghoul2.is_null() {
@@ -4193,7 +4189,7 @@ pub fn G_GetHitLocFromSurfName(
                     }
                 }
             }
-        } else if strncmp(c"torso", 5) {
+        } else if strncmp("torso", 5) {
             if ctx.entity(ent).client.is_null() {
                 *hitLoc = HL_CHEST;
             } else {
@@ -4247,9 +4243,9 @@ pub fn G_GetHitLocFromSurfName(
                     }
                 }
             }
-        } else if strncmp(c"head", 4) {
+        } else if strncmp("head", 4) {
             *hitLoc = HL_HEAD;
-        } else if strncmp(c"r_arm", 5) {
+        } else if strncmp("r_arm", 5) {
             *hitLoc = HL_ARM_RT;
             if !ctx.entity(ent).client.is_null() && !ctx.entity(ent).ghoul2.is_null() {
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -4280,7 +4276,7 @@ pub fn G_GetHitLocFromSurfName(
                     }
                 }
             }
-        } else if strncmp(c"l_arm", 5) {
+        } else if strncmp("l_arm", 5) {
             *hitLoc = HL_ARM_LT;
             if !ctx.entity(ent).client.is_null() && !ctx.entity(ent).ghoul2.is_null() {
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -4311,7 +4307,7 @@ pub fn G_GetHitLocFromSurfName(
                     }
                 }
             }
-        } else if strncmp(c"r_leg", 5) {
+        } else if strncmp("r_leg", 5) {
             *hitLoc = HL_LEG_RT;
             if !ctx.entity(ent).client.is_null() && !ctx.entity(ent).ghoul2.is_null() {
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -4342,7 +4338,7 @@ pub fn G_GetHitLocFromSurfName(
                     }
                 }
             }
-        } else if strncmp(c"l_leg", 5) {
+        } else if strncmp("l_leg", 5) {
             *hitLoc = HL_LEG_LT;
             if !ctx.entity(ent).client.is_null() && !ctx.entity(ent).ghoul2.is_null() {
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -4373,10 +4369,10 @@ pub fn G_GetHitLocFromSurfName(
                     }
                 }
             }
-        } else if strncmp(c"r_hand", 6) || strncmp(c"w_", 2) {
+        } else if strncmp("r_hand", 6) || strncmp("w_", 2) {
             // right hand or weapon
             *hitLoc = HL_HAND_RT;
-        } else if strncmp(c"l_hand", 6) {
+        } else if strncmp("l_hand", 6) {
             *hitLoc = HL_HAND_LT;
         }
 
@@ -4783,7 +4779,8 @@ pub fn G_ApplyVehicleOtherKiller(
         (*targClient).ps.otherKillerDebounceTime = ctx.world.level.time + 25000;
         (*targClient).otherKillerMOD = r#mod;
         if inflictor.is_some_and(|inf| {
-            crate::q_shared::Q_stricmp(c"vehicle_proj".as_ptr(), ctx.entity(inf).classname) == 0
+            let cn = ctx.entity(inf).classname;
+            !cn.is_null() && Q_stricmp("vehicle_proj", &cstr_to_str(cn)) == 0
         }) {
             let inf = inflictor.unwrap();
             (*targClient).otherKillerVehWeapon = ctx.entity(inf).s.otherEntityNum2 + 1;

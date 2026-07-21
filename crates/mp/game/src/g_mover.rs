@@ -40,6 +40,7 @@ use crate::g_utils::{
 };
 use crate::q_math::AngleVectors;
 use crate::NPC_utils::G_ActivateBehavior;
+use native_string::q_string::Q_stricmp;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
@@ -49,6 +50,7 @@ use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+use crate::entity::flags;
 
 /// Raven `pushed_t` (`g_mover.c:19-24`) — one saved position/angle/deltayaw
 /// snapshot per moved entity, so a blocked mover push can roll everything
@@ -266,7 +268,8 @@ pub fn G_TryPushingEntity(
         // comment — the EF_MOVER_STOP branch is `#if 0`'d out, g_mover.c:164-172).
         if (*pusher).s.apos.trType != trType_t::TR_STATIONARY
             && ((*pusher).spawnflags & 16) != 0
-            && crate::q_shared::Q_stricmp((*pusher).classname, c"func_rotating".as_ptr()) == 0
+            && !(*pusher).classname.is_null()
+            && Q_stricmp(&cstr_to_str((*pusher).classname), "func_rotating") == 0
         {
             // just blow the fuck out of them
             G_Damage(
@@ -718,7 +721,7 @@ pub fn G_MoverTeam(ctx: &mut GameContext, ent: EntityId) {
 pub fn G_RunMover(ctx: &mut GameContext, ent: EntityId) {
     // if not a team captain, don't do anything, because the captain
     // will handle everything
-    if ctx.entity(ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+    if ctx.entity(ent).flags & flags::FL_TEAMSLAVE != 0 {
         return;
     }
 
@@ -1166,7 +1169,7 @@ pub fn Use_BinaryMover(
         }
 
         // only the master should be used
-        if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+        if (*ent).flags & flags::FL_TEAMSLAVE != 0 {
             Use_BinaryMover(
                 ctx,
                 (*ent).teammaster.unwrap(),
@@ -1176,7 +1179,7 @@ pub fn Use_BinaryMover(
             return;
         }
 
-        if (*ent).flags & crate::entity::flags::FL_INACTIVE != 0 {
+        if (*ent).flags & flags::FL_INACTIVE != 0 {
             return;
         }
 
@@ -1289,7 +1292,7 @@ pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.svFlags = SVF_USE_CURRENT_ORIGIN;
     if ctx.entity(ent).spawnflags & MOVER_INACTIVE != 0 {
         // Make it inactive
-        ctx.entity_mut(ent).flags |= crate::entity::flags::FL_INACTIVE;
+        ctx.entity_mut(ent).flags |= flags::FL_INACTIVE;
     }
     if ctx.entity(ent).spawnflags & MOVER_PLAYER_USE != 0 {
         // Can be used by the player's BUTTON_USE
@@ -1468,7 +1471,7 @@ pub fn Touch_DoorTrigger(
             }
         }
 
-        if (*ent).flags & crate::entity::flags::FL_INACTIVE != 0 {
+        if (*ent).flags & flags::FL_INACTIVE != 0 {
             return;
         }
 
@@ -1482,7 +1485,7 @@ pub fn Touch_DoorTrigger(
             } else {
                 // temporarily unlock us while we call Use_BinaryMover (so it
                 // doesn't unlock all the doors in this team)
-                if (*parent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                if (*parent).flags & flags::FL_TEAMSLAVE != 0 {
                     relock_ent = match (*parent).teammaster {
                         Some(id) => &mut ctx.world.g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
@@ -1596,7 +1599,7 @@ pub fn G_EntIsDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
     }
 
     let classname = ctx.world.g_entities[entityNum as usize].classname;
-    if crate::q_shared::Q_stricmp(classname, c"func_door".as_ptr()) == 0 {
+    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "func_door") == 0 {
         // blocked by a door
         return qtrue;
     }
@@ -1612,10 +1615,10 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
     unsafe {
         let mut owner: *mut gentity_t = core::ptr::null_mut();
         let mut door = ent;
-        if (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+        if (*door).flags & flags::FL_TEAMSLAVE != 0 {
             // not the master door, get the master door
             while !(*door).teammaster.is_none()
-                && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0
+                && (*door).flags & flags::FL_TEAMSLAVE != 0
             {
                 door =
                     crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*door).teammaster);
@@ -1686,10 +1689,10 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
         if G_EntIsDoor(ctx, entityNum) != 0 {
             let mut ent = &mut ctx.world.g_entities[entityNum as usize] as *mut gentity_t;
             let mut owner: *mut gentity_t;
-            if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+            if (*ent).flags & flags::FL_TEAMSLAVE != 0 {
                 // not the master door, get the master door
                 while !(*ent).teammaster.is_none()
-                    && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0
+                    && (*ent).flags & flags::FL_TEAMSLAVE != 0
                 {
                     ent = crate::ent_id::resolve(
                         ctx.world.g_entities.as_mut_ptr(),
@@ -1710,9 +1713,10 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                     if owner.is_null() {
                         break;
                     }
-                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr())
-                        == 0
-                        && (*owner).flags & crate::entity::flags::FL_INACTIVE == 0
+                    if {
+                        let cn = (*owner).classname;
+                        !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "trigger_multiple") == 0
+                    } && (*owner).flags & flags::FL_INACTIVE == 0
                     {
                         return qtrue;
                     }
@@ -1728,9 +1732,10 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                     if owner.is_null() {
                         break;
                     }
-                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr())
-                        == 0
-                        && (*owner).flags & crate::entity::flags::FL_INACTIVE == 0
+                    if {
+                        let cn = (*owner).classname;
+                        !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "trigger_multiple") == 0
+                    } && (*owner).flags & flags::FL_INACTIVE == 0
                     {
                         return qtrue;
                     }
@@ -1739,12 +1744,12 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
             } else {
                 // check the door's auto-created trigger instead
                 owner = G_FindDoorTrigger(ctx, ctx.entity_id_of(ent).unwrap());
-                if !owner.is_null() && (*owner).flags & crate::entity::flags::FL_INACTIVE != 0 {
+                if !owner.is_null() && (*owner).flags & flags::FL_INACTIVE != 0 {
                     // owning auto-created trigger is inactive
                     return qfalse;
                 }
             }
-            if (*ent).flags & crate::entity::flags::FL_INACTIVE == 0
+            if (*ent).flags & flags::FL_INACTIVE == 0
                 && (*ent).health == 0
                 && (*ent).spawnflags & MOVER_PLAYER_USE == 0
                 && (*ent).spawnflags & MOVER_FORCE_ACTIVATE == 0
@@ -1856,7 +1861,7 @@ pub fn SP_func_door(ctx: &mut GameContext, ent: EntityId) {
     let level_time = ctx.world.level.time;
     ctx.entity_mut(ent).nextthink = level_time + FRAMETIME;
 
-    if ctx.entity(ent).flags & crate::entity::flags::FL_TEAMSLAVE == 0 {
+    if ctx.entity(ent).flags & flags::FL_TEAMSLAVE == 0 {
         let mut health = 0;
         G_SpawnInt(
             ctx,
@@ -2292,7 +2297,10 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
                 // ported binding in this crate; `Q_stricmp` is the closest
                 // available equivalent (case-insensitive) and is a no-op
                 // difference for the literal "path_corner" classname.
-                if crate::q_shared::Q_stricmp((*next).classname, c"path_corner".as_ptr()) == 0 {
+                if {
+                    let cn = (*next).classname;
+                    !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "path_corner") == 0
+                } {
                     break;
                 }
             }
@@ -3177,7 +3185,7 @@ pub fn InitBBrush(ctx: &mut GameContext, ent: EntityId) {
     trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
 
     ctx.entity_mut(ent).die = Some(EntDie::funcBBrushDie).into();
-    ctx.entity_mut(ent).flags |= crate::entity::flags::FL_BBRUSH;
+    ctx.entity_mut(ent).flags |= flags::FL_BBRUSH;
 
     // if the "model2" key is set, use a separate model for drawing, but
     // clip against the brushes
@@ -3282,10 +3290,10 @@ pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
 
     if ctx.entity(self_).spawnflags & 16 != 0 {
         // saber only
-        ctx.entity_mut(self_).flags |= crate::entity::flags::FL_DMG_BY_SABER_ONLY;
+        ctx.entity_mut(self_).flags |= flags::FL_DMG_BY_SABER_ONLY;
     } else if ctx.entity(self_).spawnflags & 32 != 0 {
         // heavy weap
-        ctx.entity_mut(self_).flags |= crate::entity::flags::FL_DMG_BY_HEAVY_WEAP_ONLY;
+        ctx.entity_mut(self_).flags |= flags::FL_DMG_BY_HEAVY_WEAP_ONLY;
     }
 
     if ctx.entity(self_).health != 0 {
@@ -3375,14 +3383,16 @@ pub fn G_EntIsBreakable(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(classname, c"func_breakable".as_ptr()) == 0 {
+    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "func_breakable") == 0 {
         return qtrue;
     }
 
-    if crate::q_shared::Q_stricmp(classname, c"misc_model_breakable".as_ptr()) == 0 {
+    if !classname.is_null()
+        && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "misc_model_breakable") == 0
+    {
         return qtrue;
     }
-    if crate::q_shared::Q_stricmp(classname, c"misc_maglock".as_ptr()) == 0 {
+    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "misc_maglock") == 0 {
         return qtrue;
     }
 
@@ -3632,7 +3642,7 @@ pub fn G_EntIsRemovableUsable(ctx: &mut GameContext, entNum: c_int) -> qboolean 
     let eFlags = ent.s.eFlags;
     let spawnflags = ent.spawnflags;
     let targetname = ent.targetname;
-    if !classname.is_null() && crate::q_shared::Q_stricmp(classname, c"func_usable".as_ptr()) == 0 {
+    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "func_usable") == 0 {
         if (eFlags & EF_SHADER_ANIM) == 0 && (spawnflags & 8) == 0 && !targetname.is_null() {
             // not just a shader-animator and not ALWAYS_ON, so it must be removable somehow
             return qtrue;

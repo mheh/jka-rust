@@ -48,7 +48,7 @@ use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
     AngleSubtract, AngleVectors, VectorNormalize,
 };
-use crate::q_shared::Q_strncmp;
+use native_string::q_string::Q_strncmp;
 use crate::trap;
 use crate::NPC_spawn::NPC_Spawn_Do;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
@@ -2138,24 +2138,25 @@ pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
     if surfaceName.is_null() {
         return -1;
     }
-    if Q_strncmp(c"nose".as_ptr(), surfaceName, 4) == 0
-        || Q_strncmp(c"f_gear".as_ptr(), surfaceName, 6) == 0
-        || Q_strncmp(c"glass".as_ptr(), surfaceName, 5) == 0
+    let surfaceName = unsafe { cstr_to_str(surfaceName) };
+    if Q_strncmp("nose", &surfaceName, 4) == 0
+        || Q_strncmp("f_gear", &surfaceName, 6) == 0
+        || Q_strncmp("glass", &surfaceName, 5) == 0
     {
         return SHIPSURF_FRONT;
     }
-    if Q_strncmp(c"body".as_ptr(), surfaceName, 4) == 0 {
+    if Q_strncmp("body", &surfaceName, 4) == 0 {
         return SHIPSURF_BACK;
     }
-    if Q_strncmp(c"r_wing1".as_ptr(), surfaceName, 7) == 0
-        || Q_strncmp(c"r_wing2".as_ptr(), surfaceName, 7) == 0
-        || Q_strncmp(c"r_gear".as_ptr(), surfaceName, 6) == 0
+    if Q_strncmp("r_wing1", &surfaceName, 7) == 0
+        || Q_strncmp("r_wing2", &surfaceName, 7) == 0
+        || Q_strncmp("r_gear", &surfaceName, 6) == 0
     {
         return SHIPSURF_RIGHT;
     }
-    if Q_strncmp(c"l_wing1".as_ptr(), surfaceName, 7) == 0
-        || Q_strncmp(c"l_wing2".as_ptr(), surfaceName, 7) == 0
-        || Q_strncmp(c"l_gear".as_ptr(), surfaceName, 6) == 0
+    if Q_strncmp("l_wing1", &surfaceName, 7) == 0
+        || Q_strncmp("l_wing2", &surfaceName, 7) == 0
+        || Q_strncmp("l_gear", &surfaceName, 6) == 0
     {
         return SHIPSURF_LEFT;
     }

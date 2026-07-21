@@ -31,7 +31,7 @@ use core::ffi::CStr;
 use crate::g_utils::{G_Find, G_TempEntity};
 use crate::prelude::*;
 use crate::q_math::VectorLength;
-use crate::q_shared::Q_stricmp;
+use native_string::q_string::Q_stricmp;
 use crate::trap;
 use core::mem::size_of;
 use mp_abi::game::syscalls::G_BOT_CALCULATEPATHS::GBotCalculatepathsArgs;
@@ -3096,7 +3096,7 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
             if inuse != 0
                 && !classname.is_null()
                 && *classname != 0
-                && Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0
+                && Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0
             {
                 if ctx.entity(ent_id).s.origin[2] < 1280.0 {
                     // h4x
@@ -3255,8 +3255,9 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             let spawn_id = EntityId(i as u32);
             let classname = ctx.entity(spawn_id).classname;
             if ctx.entity(spawn_id).inuse != 0
-                && (Q_stricmp(classname, c"info_player_start".as_ptr()) == 0
-                    || Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0)
+                && !classname.is_null()
+                && (Q_stricmp(&cstr_to_str(classname), "info_player_start") == 0
+                    || Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0)
             {
                 // §2b: player pool client; deref raw as Raven does.
                 let cl = ctx.entity(ent).client;
@@ -3292,8 +3293,9 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
             let spawn_id = EntityId(i as u32);
             let classname = ctx.entity(spawn_id).classname;
             if ctx.entity(spawn_id).inuse != 0
-                && (Q_stricmp(classname, c"info_player_start".as_ptr()) == 0
-                    || Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0)
+                && !classname.is_null()
+                && (Q_stricmp(&cstr_to_str(classname), "info_player_start") == 0
+                    || Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0)
             {
                 next_index = Some(spawn_id);
                 break;
@@ -3308,8 +3310,9 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
                 let spawn_id = EntityId(i as u32);
                 let classname = ctx.entity(spawn_id).classname;
                 if ctx.entity(spawn_id).inuse != 0
-                    && (Q_stricmp(classname, c"info_player_start".as_ptr()) == 0
-                        || Q_stricmp(classname, c"info_player_deathmatch".as_ptr()) == 0)
+                    && !classname.is_null()
+                    && (Q_stricmp(&cstr_to_str(classname), "info_player_start") == 0
+                        || Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0)
                 {
                     next_index = Some(spawn_id);
                     break;
@@ -3349,7 +3352,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 0;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_cmdlist".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_cmdlist") == 0 {
             // lists all the bot waypoint commands.
             G_Printf(ctx, "^3bot_wp_add^7 - Add a waypoint (optional int parameter will insert the point after the specified waypoint index in a trail)\n\n");
             G_Printf(ctx, "^3bot_wp_rem^7 - Remove a waypoint (removes last unless waypoint index is specified as a parameter)\n\n");
@@ -3368,7 +3371,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_add".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_add") == 0 {
             ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
@@ -3387,7 +3390,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_rem".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_rem") == 0 {
             ctx.world.globals.gDeactivated = 1.0;
 
             optional_s_argument = ConcatArgs(ctx, 1);
@@ -3405,7 +3408,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_tele".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_tele") == 0 {
             ctx.world.globals.gDeactivated = 1.0;
             optional_s_argument = ConcatArgs(ctx, 1);
 
@@ -3425,7 +3428,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_spawntele".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_spawntele") == 0 {
             let closest_spawn = GetClosestSpawn(ctx, pl);
 
             if closest_spawn.is_null() {
@@ -3445,7 +3448,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_addflagged".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_addflagged") == 0 {
             ctx.world.globals.gDeactivated = 1.0;
 
             required_s_argument = ConcatArgs(ctx, 1);
@@ -3500,7 +3503,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_switchflags".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_switchflags") == 0 {
             ctx.world.globals.gDeactivated = 1.0;
 
             required_s_argument = ConcatArgs(ctx, 1);
@@ -3552,7 +3555,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_killoneways".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_killoneways") == 0 {
             i = 0;
 
             while i < ctx.world.globals.gWPNum {
@@ -3572,7 +3575,7 @@ pub fn AcceptBotCommand(ctx: &mut GameContext, cmd: *mut c_char, pl: Option<Enti
             return 1;
         }
 
-        if Q_stricmp(cmd, c"bot_wp_save".as_ptr()) == 0 {
+        if !cmd.is_null() && Q_stricmp(&cstr_to_str(cmd), "bot_wp_save") == 0 {
             ctx.world.globals.gDeactivated = 0.0;
             let mut mapname: vmCvar_t = vmCvar_t::zeroed();
             trap::Cvar_Register(

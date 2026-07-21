@@ -31,6 +31,7 @@ use crate::g_utils::{
 };
 use crate::q_shared::Info_SetValueForKey;
 use crate::q_shared::Q_strcat;
+use native_string::q_string::Q_stricmp;
 use mp_bg::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
     BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
@@ -41,6 +42,7 @@ use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
 use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
+use crate::q_shared;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at call sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -207,8 +209,8 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             {
                 if ctx.world.cvars.g_siegeTeam1.string[0] != 0
                     && Q_stricmp(
-                        ctx.world.cvars.g_siegeTeam1.string.as_ptr(),
-                        b"none\0".as_ptr() as *const c_char,
+                        &cstr_to_str(ctx.world.cvars.g_siegeTeam1.string.as_ptr()),
+                        "none",
                     ) != 0
                 {
                     // check for override
@@ -227,8 +229,8 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
                 if ctx.world.cvars.g_siegeTeam2.string[0] != 0
                     && Q_stricmp(
-                        ctx.world.cvars.g_siegeTeam2.string.as_ptr(),
-                        b"none\0".as_ptr() as *const c_char,
+                        &cstr_to_str(ctx.world.cvars.g_siegeTeam2.string.as_ptr()),
+                        "none",
                     ) != 0
                 {
                     write_cstr_field(
@@ -1002,7 +1004,7 @@ pub fn G_ValidateSiegeClassForTeam(ctx: &mut GameContext, ent: EntityId, team: c
                 // go through the team and see its valid classes, can we find
                 // one that matches our current player class?
                 if !(*stm).classes[i as usize].is_null() {
-                    if Q_stricmp(
+                    if q_shared::Q_stricmp(
                         (*scl).name.as_ptr(),
                         (*(*stm).classes[i as usize]).name.as_ptr(),
                     ) == 0
@@ -2325,8 +2327,8 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
         let model_str = core::ffi::CStr::from_ptr(model).to_bytes();
         if model_str.len() >= 4
             && Q_stricmp(
-                model_str[model_str.len() - 4..].as_ptr() as *const c_char,
-                b".glm\0".as_ptr() as *const c_char,
+                &cstr_to_str(model_str[model_str.len() - 4..].as_ptr() as *const c_char),
+                ".glm",
             ) == 0
         {
             // apparently so.

@@ -40,8 +40,8 @@ use crate::g_main::{G_Error, G_Printf};
 use crate::g_mem::G_Alloc;
 use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};
-use crate::q_shared::{Q_stricmp, Q_strncmp};
 use crate::NPC_utils::G_ActivateBehavior;
+use native_string::q_string::{Q_stricmp, Q_strncmp};
 use mp_bg::bg_misc::{BG_FindItem, BG_ParseField};
 use mp_bg::bg_panimate::BG_ParseAnimationFile;
 
@@ -55,6 +55,7 @@ use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
 use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
 
 use mp_bg::public::fieldtype::fieldtype_t;
+use crate::q_shared;
 
 // `TEAM_RED`/`TEAM_BLUE` (`bg_public.h`) — local consts, same convention as
 // `g_team.rs`, resolved at integration.
@@ -113,7 +114,7 @@ pub fn G_SpawnString(
         }
 
         for i in 0..level.numSpawnVars {
-            if Q_stricmp(key, level.spawnVars[i as usize][0]) == 0 {
+            if q_shared::Q_stricmp(key, level.spawnVars[i as usize][0]) == 0 {
                 *out = level.spawnVars[i as usize][1];
                 return qtrue;
             }
@@ -233,9 +234,9 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
         let mut team: c_int = -1;
         let mTeamFilter = ctx.world.level.mTeamFilter.as_ptr();
         if *mTeamFilter != 0 {
-            if Q_stricmp(mTeamFilter, c"red".as_ptr()) == 0 {
+            if Q_stricmp(&cstr_to_str(mTeamFilter), "red") == 0 {
                 team = TEAM_RED;
-            } else if Q_stricmp(mTeamFilter, c"blue".as_ptr()) == 0 {
+            } else if Q_stricmp(&cstr_to_str(mTeamFilter), "blue") == 0 {
                 team = TEAM_BLUE;
             }
         }
@@ -854,7 +855,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
 
             let classname = ctx.entity(id).classname;
             if !classname.is_null() && *classname != 0 {
-                if Q_strncmp(c"NPC_".as_ptr(), classname, 4) != 0 {
+                if Q_strncmp("NPC_", &cstr_to_str(classname), 4) != 0 {
                     // Not an NPC_spawner (rww - probably don't even care for MP, but whatever)
                     G_ActivateBehavior(ctx, Some(id), BSET_SPAWN);
                 }
@@ -898,7 +899,7 @@ pub fn G_AddSpawnVarToken(ctx: &mut GameContext, string: *const c_char) -> *mut 
 pub fn AddSpawnField(ctx: &mut GameContext, field: *mut c_char, value: *mut c_char) {
     let num_spawn_vars = ctx.world.level.numSpawnVars;
     for i in 0..num_spawn_vars {
-        if Q_stricmp(ctx.world.level.spawnVars[i as usize][0], field) == 0 {
+        if q_shared::Q_stricmp(ctx.world.level.spawnVars[i as usize][0], field) == 0 {
             let token = G_AddSpawnVarToken(ctx, value);
             ctx.world.level.spawnVars[i as usize][1] = token;
             return;
@@ -929,7 +930,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         // component `sscanf_3f` fails to match is left at that seed rather
         // than picking up C's stack garbage (porting-rules §19).
         let mut origin: vec3_t = [0.0, 0.0, 0.0];
-        if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+        if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
             sscanf_3f(value, &mut origin);
         }
 
@@ -967,7 +968,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         );
 
         G_SpawnString(ctx, c"angles".as_ptr(), NOVALUE.as_ptr(), &mut value);
-        if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+        if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
             let mut angles: vec3_t = [0.0, 0.0, 0.0];
             sscanf_3f(value, &mut angles);
 
@@ -985,7 +986,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         } else {
             G_SpawnString(ctx, c"angle".as_ptr(), NOVALUE.as_ptr(), &mut value);
             let mut angle1: f32 = 0.0;
-            if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+            if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
                 sscanf_1f(value, &mut angle1);
             }
             angle1 = ((angle1 + ctx.world.level.mRotationAdjust) as f64 % 360.0) as f32;
@@ -1002,7 +1003,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
         // brushes, though direction is rarely ever used.
         G_SpawnString(ctx, c"direction".as_ptr(), NOVALUE.as_ptr(), &mut value);
         let mut direction: vec3_t = [0.0, 0.0, 0.0];
-        if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+        if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
             sscanf_3f(value, &mut direction);
         }
         direction[1] = ((direction[1] + ctx.world.level.mRotationAdjust) as f64 % 360.0) as f32;
@@ -1036,7 +1037,7 @@ fn HandleEntityAdjustment(ctx: &mut GameContext) {
             (c"ICARUSname", c"ICARUSname"),
         ] {
             G_SpawnString(ctx, key.as_ptr(), NOVALUE.as_ptr(), &mut value);
-            if Q_stricmp(value, NOVALUE.as_ptr()) != 0 {
+            if value.is_null() || Q_stricmp(&cstr_to_str(value), "novalue") != 0 {
                 let value_str = CStr::from_ptr(value).to_string_lossy();
                 let temp = format!("{}{}", target_adjust_str, value_str);
                 let temp_c = CString::new(temp).unwrap();
@@ -1135,7 +1136,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         );
 
         G_SpawnString(ctx, c"classname".as_ptr(), c"".as_ptr(), &mut text);
-        if Q_stricmp(text, c"worldspawn".as_ptr()) != 0 {
+        if text.is_null() || Q_stricmp(&cstr_to_str(text), "worldspawn") != 0 {
             G_Error(ctx, "SP_worldspawn: The first entity isn't 'worldspawn'");
         }
 
@@ -1146,11 +1147,10 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
             engine: ctx.engine,
         };
         for i in 0..ctx.world.level.numSpawnVars {
-            if Q_stricmp(
-                c"spawnscript".as_ptr(),
-                ctx.world.level.spawnVars[i as usize][0],
-            ) == 0
-            {
+            if {
+                let sv = ctx.world.level.spawnVars[i as usize][0];
+                !sv.is_null() && Q_stricmp("spawnscript", &cstr_to_str(sv)) == 0
+            } {
                 let field_key = ctx.world.level.spawnVars[i as usize][0];
                 let field_value = ctx.world.level.spawnVars[i as usize][1];
                 let ent_base = ctx.world.g_entities.as_mut_ptr() as *mut byte;

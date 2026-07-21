@@ -39,7 +39,9 @@ use crate::q_math::{
     _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract, vec3_origin, vectoangles, AngleVectors,
     DistanceHorizontalSquared, VectorLength, VectorLengthSquared, VectorNormalize, PITCH, YAW,
 };
-use crate::q_shared::Q_stricmp;
+// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
+// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+use native_string::q_string::Q_stricmp;
 use crate::teams::class::*;
 use crate::teams::npcteam::{NPCTEAM_ENEMY, NPCTEAM_FREE, NPCTEAM_NEUTRAL, NPCTEAM_PLAYER};
 use crate::NPC_AI_Default::NPC_LostEnemyDecideChase;
@@ -64,6 +66,7 @@ use mp_bg::public::weaponstate::weaponstate_t::{
 use mp_bg::weapons::weapon_t::*;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::MASK_SHOT;
+use crate::q_shared;
 
 // Raven `DEBUG_LEVEL_INFO` (`b_local.h:23`) — not yet ported as a central
 // const; inlined here from the header value.
@@ -566,8 +569,8 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
 
             //Alert anyone else in the area
             let npc_type = ctx.world.entity(self_).NPC_type;
-            if Q_stricmp(c"desperado".as_ptr(), npc_type as *const c_char) != 0
-                && Q_stricmp(c"paladin".as_ptr(), npc_type as *const c_char) != 0
+            if (npc_type.is_null() || Q_stricmp("desperado", &cstr_to_str(npc_type)) != 0)
+                && (npc_type.is_null() || Q_stricmp("paladin", &cstr_to_str(npc_type)) != 0)
             {
                 //special holodeck enemies exception
                 if (*client).ps.fd.forceGripBeingGripped < level_time as f32 {
@@ -953,7 +956,7 @@ pub fn HaveWeapon(ctx: &mut GameContext, weapon: c_int) -> qboolean {
 /// Source: `oracle/codemp/game/NPC_combat.c:1114-1124`
 pub fn EntIsGlass(check: &gentity_t) -> qboolean {
     if !check.classname.is_null()
-        && Q_stricmp(c"func_breakable".as_ptr(), check.classname as *const c_char) == 0
+        && Q_stricmp("func_breakable", &(unsafe { cstr_to_str(check.classname) })) == 0
         && check.count == 1
         && check.health <= 100
     {

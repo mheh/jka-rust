@@ -1462,8 +1462,8 @@ pub fn G_SetSaber(
         truncSaberName[i] = 0;
 
         if saberNum == 0
-            && (crate::q_shared::Q_stricmp(c"none".as_ptr(), truncSaberName.as_ptr()) == 0
-                || crate::q_shared::Q_stricmp(c"remove".as_ptr(), truncSaberName.as_ptr()) == 0)
+            && (Q_stricmp("none", &cstr_to_str(truncSaberName.as_ptr())) == 0
+                || Q_stricmp("remove", &cstr_to_str(truncSaberName.as_ptr())) == 0)
         {
             write_cstr_field(&mut truncSaberName, "Kyle");
         }

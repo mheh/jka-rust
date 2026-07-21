@@ -13,6 +13,9 @@
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_TempEntity};
 use crate::prelude::*;
 use crate::trap;
+// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
+// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+use native_string::q_string::Q_stricmp;
 
 use crate::g_weapon::SnapVectorTowards;
 use crate::q_math::{
@@ -23,6 +26,7 @@ use crate::w_saber::{RandFloat, WP_SaberBlockNonRandom};
 use mp_bg::bg_misc::snap_vector;
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
+use crate::q_shared;
 
 /// Raven `G_ReflectMissile`.
 ///
@@ -849,9 +853,9 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                     && (unsafe { (*(*other_vehicle).m_pVehicleInfo).r#type } == VH_SPEEDER
                         || (unsafe { (*(*other_vehicle).m_pVehicleInfo).r#type } == VH_FIGHTER
                             && !ctx.entity(ent).classname.is_null()
-                            && crate::q_shared::Q_stricmp(
-                                ctx.entity(ent).classname,
-                                c"vehicle_proj".as_ptr() as *const c_char,
+                            && Q_stricmp(
+                                &(unsafe { cstr_to_str(ctx.entity(ent).classname) }),
+                                "vehicle_proj",
                             ) == 0))
                     && unsafe {
                         FighterIsLanded(other_vehicle, &mut (*ctx.entity(other).client).ps)

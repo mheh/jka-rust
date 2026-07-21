@@ -36,6 +36,10 @@ use crate::g_public_consts::SVF_NOCLIENT;
 use crate::q_shared::FOFS_targetname;
 use crate::NPC_stats::TeamTable;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
+use native_string::q_string::Q_stricmp;
+use native_string::q_string::Q_strncmp;
+use crate::q_shared;
+use crate::g_spawn::G_NewString;
 
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC
@@ -154,8 +158,10 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
             let ghoul2 = ctx.world.entity(ent).ghoul2;
             trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, "head_hatchcover", 0);
         }
-        let wampa = cstr("wampa");
-        if crate::q_shared::Q_stricmp(wampa.as_ptr(), ctx.world.entity(ent).NPC_type) == 0 {
+        if {
+            let p = ctx.world.entity(ent).NPC_type;
+            !p.is_null() && Q_stricmp("wampa", &cstr_to_str(p)) == 0
+        } {
             crate::NPC_AI_Wampa::Wampa_SetBolts(ctx, Some(ent));
             ctx.world.entity_mut(ent).s.g2radius = 80;
             ctx.world.entity_mut(ent).mass = 300.0;
@@ -172,12 +178,16 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                 Some(crate::ent_fn_enums::EntPain::NPC_Rancor_Pain).into();
             ctx.world.entity_mut(ent).health *= 4;
         }
-        let yoda = cstr("Yoda");
-        if crate::q_shared::Q_stricmp(yoda.as_ptr(), ctx.world.entity(ent).NPC_type) == 0 {
+        if {
+            let p = ctx.world.entity(ent).NPC_type;
+            !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+        } {
             (*npc).scriptFlags |= SCF_NO_FORCE;
         }
-        let emperor = cstr("emperor");
-        if crate::q_shared::Q_stricmp(emperor.as_ptr(), ctx.world.entity(ent).NPC_type) == 0 {
+        if {
+            let p = ctx.world.entity(ent).NPC_type;
+            !p.is_null() && Q_stricmp("emperor", &cstr_to_str(p)) == 0
+        } {
             (*npc).scriptFlags |= SCF_DONT_FIRE;
         }
         if (*client).ps.weapon == WP_SABER {
@@ -223,8 +233,10 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                 }
             }
             NPCTEAM_NEUTRAL => {
-                let gonk = cstr("gonk");
-                if crate::q_shared::Q_stricmp(ctx.world.entity(ent).NPC_type, gonk.as_ptr()) == 0 {
+                if {
+                    let p = ctx.world.entity(ent).NPC_type;
+                    !p.is_null() && Q_stricmp(&cstr_to_str(p), "gonk") == 0
+                } {
                     ctx.world.entity_mut(ent).r.svFlags |= SVF_PLAYER_USABLE;
                 }
             }
@@ -263,12 +275,10 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                             crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
                         }
                     }
-                    let galak_mech = cstr("galak_mech");
-                    if crate::q_shared::Q_stricmp(
-                        ctx.world.entity(ent).NPC_type,
-                        galak_mech.as_ptr(),
-                    ) == 0
-                    {
+                    if {
+                        let p = ctx.world.entity(ent).NPC_type;
+                        !p.is_null() && Q_stricmp(&cstr_to_str(p), "galak_mech") == 0
+                    } {
                         crate::NPC_AI_GalakMech::NPC_GalakMech_Init(ctx, ent);
                     }
                 }
@@ -676,8 +686,10 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
             (*client).ps.stats[STAT_MAX_HEALTH as usize] = 100;
         }
 
-        let rodian = cstr("rodian");
-        if crate::q_shared::Q_stricmp(rodian.as_ptr(), ctx.world.entity(ent).NPC_type) == 0 {
+        if {
+            let p = ctx.world.entity(ent).NPC_type;
+            !p.is_null() && Q_stricmp("rodian", &cstr_to_str(p)) == 0
+        } {
             match ctx.world.cvars.g_spskill.integer {
                 0 => (*npc).stats.aim = (1.0) as i32,
                 1 => (*npc).stats.aim = (ctx.world.bg_state.rng.Q_irand(2, 3) as f32) as i32,
@@ -685,11 +697,13 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                 _ => {}
             }
         } else {
-            let rodian2 = cstr("rodian2");
             if (*client).NPC_class == CLASS_STORMTROOPER
                 || (*client).NPC_class == CLASS_SWAMPTROOPER
                 || (*client).NPC_class == CLASS_IMPWORKER
-                || crate::q_shared::Q_stricmp(rodian2.as_ptr(), ctx.world.entity(ent).NPC_type) == 0
+                || {
+                    let p = ctx.world.entity(ent).NPC_type;
+                    !p.is_null() && Q_stricmp("rodian2", &cstr_to_str(p)) == 0
+                }
             {
                 match ctx.world.cvars.g_spskill.integer {
                     0 => {
@@ -924,16 +938,9 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                 }
 
                 if !droid_npc_type.is_null() {
-                    let random_s = cstr("random");
-                    let default_s = cstr("default");
-                    if crate::q_shared::Q_stricmp(
-                        random_s.as_ptr(),
-                        droid_npc_type as *const c_char,
-                    ) == 0
-                        || crate::q_shared::Q_stricmp(
-                            default_s.as_ptr(),
-                            droid_npc_type as *const c_char,
-                        ) == 0
+                    if Q_stricmp("random", &cstr_to_str(droid_npc_type as *const c_char)) == 0
+                        || Q_stricmp("default", &cstr_to_str(droid_npc_type as *const c_char))
+                            == 0
                     {
                         droid_npc_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
                             cstr("r2d2").into_raw()
@@ -1172,7 +1179,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         if (*ent).NPC_type.is_null() {
             (*ent).NPC_type = c"random".as_ptr() as *mut c_char;
         } else {
-            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString(
+            (*ent).NPC_type = q_shared::Q_strlwr(G_NewString(
                 ctx,
                 (*ent).NPC_type as *const c_char,
             ));
@@ -1193,9 +1200,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             (*newent).flags |= FL_NO_KNOCKBACK;
         }
 
-        let npc_vehicle = cstr("NPC_Vehicle");
-        if crate::q_shared::Q_stricmp((*ent).classname as *const c_char, npc_vehicle.as_ptr()) == 0
-        {
+        if {
+            let p = (*ent).classname as *const c_char;
+            !p.is_null() && Q_stricmp(&cstr_to_str(p), "NPC_Vehicle") == 0
+        } {
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                 // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                 // field aliasing bg_state; a raw store is required (bg-seam re-entry).
@@ -1318,13 +1326,9 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         }
 
         if !(*ent).NPC_type.is_null() {
-            let kyle = cstr("kyle");
-            let test = cstr("test");
-            if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, kyle.as_ptr()) == 0 {
+            if Q_stricmp(&cstr_to_str((*ent).NPC_type as *const c_char), "kyle") == 0 {
                 (*((*newent).NPC)).aiFlags |= NPCAI_MATCHPLAYERWEAPON;
-            } else if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, test.as_ptr())
-                == 0
-            {
+            } else if Q_stricmp(&cstr_to_str((*ent).NPC_type as *const c_char), "test") == 0 {
                 let base = ctx.world.g_entities.as_mut_ptr();
                 for n in 0..1 {
                     let e = base.add(n as usize);
@@ -1705,10 +1709,8 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
         }
 
         if !droid_npc_type.is_null() {
-            let random_s = cstr("random");
-            let default_s = cstr("default");
-            if crate::q_shared::Q_stricmp(random_s.as_ptr(), droid_npc_type) == 0
-                || crate::q_shared::Q_stricmp(default_s.as_ptr(), droid_npc_type) == 0
+            if Q_stricmp("random", &cstr_to_str(droid_npc_type)) == 0
+                || Q_stricmp("default", &cstr_to_str(droid_npc_type)) == 0
             {
                 NPC_PrecacheType(ctx, cstr("r2d2").into_raw());
                 NPC_PrecacheType(ctx, cstr("r5d2").into_raw());
@@ -2766,41 +2768,41 @@ pub fn NPC_SpawnType(
         }
     };
 
-    if Q_stricmp(c"gonk".as_ptr() as *const c_char, npc_type) == 0 {
+    if Q_stricmp("gonk", npc_type_str) == 0 {
         NPC_Gonk_Precache(ctx);
-    } else if Q_stricmp(c"mouse".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("mouse", npc_type_str) == 0 {
         NPC_Mouse_Precache(ctx);
-    } else if Q_strncmp(c"r2d2".as_ptr() as *const c_char, npc_type, 4) == 0 {
+    } else if Q_strncmp("r2d2", npc_type_str, 4) == 0 {
         NPC_R2D2_Precache(ctx);
-    } else if Q_stricmp(c"atst".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("atst", npc_type_str) == 0 {
         NPC_ATST_Precache(ctx);
-    } else if Q_strncmp(c"r5d2".as_ptr() as *const c_char, npc_type, 4) == 0 {
+    } else if Q_strncmp("r5d2", npc_type_str, 4) == 0 {
         NPC_R5D2_Precache(ctx);
-    } else if Q_stricmp(c"mark1".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("mark1", npc_type_str) == 0 {
         NPC_Mark1_Precache(ctx);
-    } else if Q_stricmp(c"mark2".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("mark2", npc_type_str) == 0 {
         NPC_Mark2_Precache(ctx);
-    } else if Q_stricmp(c"interrogator".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("interrogator", npc_type_str) == 0 {
         NPC_Interrogator_Precache(ctx, None);
-    } else if Q_stricmp(c"probe".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("probe", npc_type_str) == 0 {
         NPC_Probe_Precache(ctx);
-    } else if Q_stricmp(c"seeker".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("seeker", npc_type_str) == 0 {
         NPC_Seeker_Precache(ctx);
-    } else if Q_stricmp(c"remote".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("remote", npc_type_str) == 0 {
         NPC_Remote_Precache(ctx);
-    } else if Q_strncmp(c"shadowtrooper".as_ptr() as *const c_char, npc_type, 13) == 0 {
+    } else if Q_strncmp("shadowtrooper", npc_type_str, 13) == 0 {
         NPC_ShadowTrooper_Precache(ctx);
-    } else if Q_stricmp(c"minemonster".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("minemonster", npc_type_str) == 0 {
         NPC_MineMonster_Precache(ctx);
-    } else if Q_stricmp(c"howler".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("howler", npc_type_str) == 0 {
         NPC_Howler_Precache();
-    } else if Q_stricmp(c"sentry".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("sentry", npc_type_str) == 0 {
         NPC_Sentry_Precache(ctx);
-    } else if Q_stricmp(c"protocol".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("protocol", npc_type_str) == 0 {
         NPC_Protocol_Precache(ctx);
-    } else if Q_stricmp(c"galak_mech".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("galak_mech", npc_type_str) == 0 {
         NPC_GalakMech_Precache(ctx);
-    } else if Q_stricmp(c"wampa".as_ptr() as *const c_char, npc_type) == 0 {
+    } else if Q_stricmp("wampa", npc_type_str) == 0 {
         NPC_Wampa_Precache(ctx);
     }
 
@@ -2818,7 +2820,7 @@ pub fn NPC_Spawn_f(ctx: &mut GameContext, ent: EntityId) {
     let arg2 = trap::Argv(ctx.engine, 2, 1024);
     write_cstr_field(&mut npc_type, &arg2);
 
-    if Q_stricmp(c"vehicle".as_ptr() as *const c_char, npc_type.as_ptr()) == 0 {
+    if Q_stricmp("vehicle", &(unsafe { cstr_to_str(npc_type.as_ptr()) })) == 0 {
         is_vehicle = 1;
         let arg3 = trap::Argv(ctx.engine, 3, 1024);
         write_cstr_field(&mut npc_type, &arg3);
@@ -2864,7 +2866,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
         return;
     }
 
-    if Q_stricmp(c"team".as_ptr() as *const c_char, name.as_ptr()) == 0 {
+    if Q_stricmp("team", &(unsafe { cstr_to_str(name.as_ptr()) })) == 0 {
         let arg3 = trap::Argv(ctx.engine, 3, 1024);
         write_cstr_field(&mut name, &arg3);
 
@@ -2881,11 +2883,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
             return;
         }
 
-        if Q_stricmp(
-            c"nonally".as_ptr() as *const c_char,
-            name.as_ptr() as *const c_char,
-        ) == 0
-        {
+        if Q_stricmp("nonally", &(unsafe { cstr_to_str(name.as_ptr()) })) == 0 {
             kill_non_sf = 1;
         } else {
             kill_team = GetIDForString(
@@ -2953,8 +2951,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
             } else if !player.NPC_type.is_null() && !player.classname.is_null() {
                 unsafe {
                     if (*player.classname) != b'\0' as c_char
-                        && Q_stricmp(c"NPC_starfleet".as_ptr() as *const c_char, player.classname)
-                            != 0
+                        && Q_stricmp("NPC_starfleet", &cstr_to_str(player.classname)) != 0
                     {
                         Com_Printf(
                             &format!(
@@ -2996,11 +2993,9 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                     }
                 }
             } else if (!player.targetname.is_null()
-                && Q_stricmp(name.as_ptr() as *const c_char, player.targetname) == 0)
-                || Q_stricmp(
-                    c"all".as_ptr() as *const c_char,
-                    name.as_ptr() as *const c_char,
-                ) == 0
+                && q_shared::Q_stricmp(name.as_ptr() as *const c_char, player.targetname)
+                    == 0)
+                || Q_stricmp("all", &(unsafe { cstr_to_str(name.as_ptr() as *const c_char) })) == 0
             {
                 Com_Printf(
                     &format!(
@@ -3058,21 +3053,13 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
         Com_Printf(
             " score [NPC targetname] (prints number of kills per NPC)\n",
         );
-    } else if Q_stricmp(
-        c"spawn".as_ptr() as *const c_char,
-        cmd.as_ptr() as *const c_char,
-    ) == 0
-    {
+    } else if Q_stricmp("spawn", &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) })) == 0 {
         NPC_Spawn_f(ctx, ent);
-    } else if Q_stricmp(
-        c"kill".as_ptr() as *const c_char,
-        cmd.as_ptr() as *const c_char,
-    ) == 0
-    {
+    } else if Q_stricmp("kill", &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) })) == 0 {
         NPC_Kill_f(ctx);
     } else if Q_stricmp(
-        c"showbounds".as_ptr() as *const c_char,
-        cmd.as_ptr() as *const c_char,
+        "showbounds",
+        &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) }),
     ) == 0
     {
         ctx.world.globals.showBBoxes = if ctx.world.globals.showBBoxes != 0 {
@@ -3080,11 +3067,7 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
         } else {
             1
         };
-    } else if Q_stricmp(
-        c"score".as_ptr() as *const c_char,
-        cmd.as_ptr() as *const c_char,
-    ) == 0
-    {
+    } else if Q_stricmp("score", &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) })) == 0 {
         let mut cmd2: [c_char; 1024] = [0; 1024];
         let arg2 = trap::Argv(ctx.engine, 2, 1024);
         write_cstr_field(&mut cmd2, &arg2);

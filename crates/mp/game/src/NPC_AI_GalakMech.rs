@@ -22,6 +22,9 @@ use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
 use crate::g_utils::G_SoundOnEnt;
 use crate::trap;
+// Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
+// genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
+use native_string::q_string::Q_stricmp;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
@@ -43,6 +46,7 @@ const BS_CINEMATIC: bState_t = bState_t::BS_CINEMATIC;
 // spelling; not glob-imported by the prelude).
 // Source: `oracle/codemp/game/g_local.h`
 use crate::entity::hit_location::HL_GENERIC1;
+use crate::q_shared;
 
 // Raven `gNPC_t::scriptFlags` bits (`SCF_*`, b_public.h:26-52) resolve to the
 // canonical `crate::npc::script_flags` consts through the prelude glob. The
@@ -1045,7 +1049,8 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                 NPC_GM_StartLaser(ctx);
             } else if ctx.world.globals.enemyDist4 < MIN_LOB_DIST_SQUARED
                 && (enemy_weapon != WP_TURRET as c_int
-                    || crate::q_shared::Q_stricmp(c"PAS".as_ptr(), enemy_classname) != 0)
+                    || enemy_classname.is_null()
+                    || Q_stricmp("PAS", &cstr_to_str(enemy_classname)) != 0)
                 && crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"noRapid".as_ptr()) != 0
             {
                 // enemy within 256
@@ -1059,7 +1064,8 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                 }
             } else if (ctx.world.globals.enemyDist4 > MAX_LOB_DIST_SQUARED
                 || (enemy_weapon == WP_TURRET as c_int
-                    && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), enemy_classname) == 0))
+                    && !enemy_classname.is_null()
+                    && Q_stricmp("PAS", &cstr_to_str(enemy_classname)) == 0))
                 && crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"noLob".as_ptr()) != 0
             {
                 // enemy more than 448 away and we are ready to try lob fire again
@@ -1381,8 +1387,10 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
 
         // also:
         if ctx.world.entity(enemy_id).s.weapon == WP_TURRET as c_int
-            && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), ctx.world.entity(enemy_id).classname)
-                == 0
+            && {
+                let p = ctx.world.entity(enemy_id).classname;
+                !p.is_null() && Q_stricmp("PAS", &cstr_to_str(p)) == 0
+            }
         {
             // crush turrets
             if crate::NPC_goal::G_BoundsOverlap(
