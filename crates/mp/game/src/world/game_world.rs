@@ -1,6 +1,7 @@
 //! `GameWorld` — the one owned module-island instance (STATE-D1/D9, FROZEN).
 
 use core::ffi::c_int;
+use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
 
 use crate::entity::gentity_t;
 use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
@@ -88,6 +89,33 @@ pub struct GameWorld {
     pub scratch: crate::world::game_scratch::GameScratch,
 }
 
+/// Zeroed `g_clients` array, built directly on the heap (never on the stack —
+/// the by-value array is ~230 KB and the engine calls `vmMain` from a deep
+/// stack). `gclient_t` stopped being `ZeroValid` when `pers.netname` became a
+/// `String`, so this mirrors `native_platform::zeroed_box` and then installs a
+/// valid empty `String` into each client's `netname` slot before the array is
+/// ever read (Raven's `memset(g_clients, 0, ...)` == every scalar 0, name "").
+fn zeroed_clients() -> Box<[gclient_t; MAX_CLIENTS]> {
+    let layout = Layout::new::<[gclient_t; MAX_CLIENTS]>();
+    // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every
+    // `gclient_t` field save `pers.netname`; each `ptr::write` overwrites that
+    // one slot with a valid empty `String` (its zeroed bytes never dropped)
+    // before ownership passes to the `Box`, so the whole array is initialized.
+    unsafe {
+        let base = alloc_zeroed(layout) as *mut gclient_t;
+        if base.is_null() {
+            handle_alloc_error(layout);
+        }
+        for i in 0..MAX_CLIENTS {
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*base.add(i)).pers.netname),
+                String::new(),
+            );
+        }
+        Box::from_raw(base as *mut [gclient_t; MAX_CLIENTS])
+    }
+}
+
 impl GameWorld {
     /// Borrow entity `id` out of the owned `g_entities` arena (§B5). Safe: the
     /// world owns the arena, so this is a plain checked index, not pointer math.
@@ -133,7 +161,7 @@ impl GameWorld {
         // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
         // None by construction (zero == None, std-guaranteed via
         // Option<NonZeroU8>) — no post-zero fixup needed.
-        let clients = native_platform::zeroed_box::<[gclient_t; MAX_CLIENTS]>();
+        let clients = zeroed_clients();
         let level = *native_platform::zeroed_box::<level_locals_t>();
         let memoryPool = native_platform::zeroed_box::<[u8; 262144]>();
         let refTagOwnerMap = native_platform::zeroed_box::<
@@ -196,7 +224,7 @@ impl GameWorld {
             // The zeroed bytes leave each entity's FnId<EntXxx> handler fields as
             // None by construction (zero == None, std-guaranteed via
             // Option<NonZeroU8>) — no post-zero fixup needed.
-            addr_of_mut!((*p).clients).write(native_platform::zeroed_box());
+            addr_of_mut!((*p).clients).write(zeroed_clients());
             addr_of_mut!((*p).cvars).write(GameCvars::default());
             addr_of_mut!((*p).globals).write(crate::game_globals::GameGlobals::default());
             addr_of_mut!((*p).speedLoopSound).write(0);

@@ -22,8 +22,14 @@ use super::render_info::renderInfo_t;
 /// `ps` MUST be first (the server expects it); the rest is private to game.
 /// Pointer-bearing => arch-dependent; asserts pin the host-64-bit layout.
 /// Type definition source: `oracle/codemp/game/g_local.h:536-748`
+///
+/// Not `Copy`: `pers.netname` is an owned `String` (§13). The struct keeps
+/// `#[repr(C)]` and `ps` at offset 0 — the engine reads the `playerState`
+/// prefix at a runtime-queried stride (`trap_LocateGameData`) — but every
+/// `offset_of` assert at/after `pers` (whose byte size shrank when `netname`
+/// stopped being a fixed array) is dropped.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct gclient_s {
     // ps MUST be the first element, because the server expects it
     pub ps: playerState_t,
@@ -235,19 +241,33 @@ pub type gclient_t = gclient_s;
 const _: () = assert!(core::mem::offset_of!(gclient_t, ps) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gclient_t, pers) == 1552);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gclient_t, sess) == 1708);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gclient_t, saber) == 1992);
-// This struct's stored `gentity_t*` fields are ported as `Option<EntityId>`
-// (align 4 vs a pointer's align 8), so the private tail's byte offsets shift. This struct is
-// game-internal / not ABI-fixed beyond its prefix — the engine learns the full
-// stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
-// `offset_of` assert at/after the first flipped field are therefore dropped;
-// only the fixed-prefix asserts above (declared before the first flip) remain.
+// `ps` (offset 0) and `pers` (offset 1552 == `size_of::<playerState_t>()`) are
+// unaffected by `pers`'s internal `String` field. The `size_of` assert and every
+// `offset_of` assert at/after `pers` (whose byte size shrank when `netname`
+// became a `String`) are dropped — this struct is game-internal / not ABI-fixed
+// beyond its prefix; the engine learns the full stride at runtime via
+// `trap_LocateGameData`.
 
-// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
-// all-zero bytes are a valid gclient_t — the same property the layout asserts above
-// pin and Raven's memset/static zero-init relies on.
-// Source: oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven memsets g_clients, g_main.c:983)
-unsafe impl native_platform::ZeroValid for gclient_t {}
+impl Default for gclient_t {
+    /// Raven zero-fills `gclient_t` wholesale (`memset(client, 0, ...)` in
+    /// `ClientConnect`/`ClientSpawn`, `memset(g_clients, 0, ...)` in
+    /// `G_InitGame`). Every field is all-zero-valid EXCEPT `pers.netname`
+    /// (a `String`, whose zeroed bytes would be an invalid value); we write the
+    /// zeroed image into heap storage and then install a valid empty `String`
+    /// into that one slot before the value is ever read, so the result matches
+    /// Raven's zero state (`netname == ""`) exactly.
+    fn default() -> Self {
+        let mut u = core::mem::MaybeUninit::<gclient_t>::uninit();
+        let p = u.as_mut_ptr();
+        // SAFETY: `p` is freshly-allocated, correctly-aligned storage for one
+        // `gclient_t`. `write_bytes` zeroes every field (all-zero-valid save
+        // `pers.netname`); the `ptr::write` then overwrites the only
+        // non-zero-valid field with a valid empty `String` (its invalid zeroed
+        // bytes are never dropped), so `assume_init` observes a fully-valid value.
+        unsafe {
+            core::ptr::write_bytes(p, 0, 1);
+            core::ptr::write(core::ptr::addr_of_mut!((*p).pers.netname), String::new());
+            u.assume_init()
+        }
+    }
+}

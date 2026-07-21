@@ -368,7 +368,7 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
                     i += 1;
                     continue;
                 }
-                if Q_stricmp(&value, &cstr_to_str(cl.pers.netname.as_ptr())) == 0 {
+                if Q_stricmp(&value, &cl.pers.netname) == 0 {
                     break;
                 }
                 i += 1;
@@ -402,7 +402,7 @@ pub fn G_AddRandomBot(ctx: &mut GameContext, team: c_int) {
                     i += 1;
                     continue;
                 }
-                if Q_stricmp(&value, &cstr_to_str(cl.pers.netname.as_ptr())) == 0 {
+                if Q_stricmp(&value, &cl.pers.netname) == 0 {
                     break;
                 }
                 i += 1;
@@ -458,7 +458,7 @@ pub fn G_RemoveRandomBot(ctx: &mut GameContext, team: c_int) -> bool {
             }
 
             let mut netname: [c_char; 36] = [0; 36];
-            write_cstr_field(&mut netname, &cstr_to_str(cl.pers.netname.as_ptr()));
+            write_cstr_field(&mut netname, &cl.pers.netname);
             Q_CleanStr(netname.as_mut_ptr());
             let cmd = format!("kick \"{}\"\n", cstr_to_str(netname.as_ptr()));
             trap::SendConsoleCommand(ctx.engine, cbufExec_t::EXEC_INSERT as c_int, &cmd);

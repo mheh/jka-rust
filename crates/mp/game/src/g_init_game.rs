@@ -184,7 +184,12 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         // initialize all clients for this game
         ctx.world.level.maxclients = ctx.world.cvars.g_maxclients.integer;
-        core::ptr::write_bytes(ctx.world.clients.as_mut_ptr(), 0, MAX_CLIENTS);
+        // Raven `memset(g_clients, 0, sizeof(g_clients))` (g_main.c). `netname` is
+        // a `String`, so reset each slot to its zero image (dropping any prior
+        // occupant's name) rather than byte-zeroing over live `String`s.
+        for i in 0..MAX_CLIENTS {
+            ctx.world.clients[i] = gclient_t::default();
+        }
         ctx.world.level.clients = ctx.world.clients.as_mut_ptr();
 
         // set client fields on player ents

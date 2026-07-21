@@ -512,7 +512,7 @@ pub fn ClientForString(ctx: &mut GameContext, s: *const c_char) -> *mut gclient_
             continue;
         }
 
-        if crate::q_shared::Q_stricmp(cl.pers.netname.as_ptr(), s) == 0 {
+        if Q_stricmp(&cl.pers.netname, &unsafe { cstr_to_str(s) }) == 0 {
             return unsafe { ctx.world.level.clients.add(i) as *mut gclient_t };
         }
     }

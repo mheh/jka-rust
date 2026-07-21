@@ -4,7 +4,7 @@
 
 #![allow(non_camel_case_types)]
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::shared::qboolean;
@@ -25,8 +25,13 @@ pub const MAX_VOTE_COUNT: c_int = 3;
 /// on each level/team change at `ClientBegin()`.
 ///
 /// Type definition source: `oracle/codemp/game/g_local.h:443-458`
-#[repr(C)]
-#[derive(Clone, Copy)]
+///
+/// `netname` is an owned `String` (§13 string-endgame): the field never crosses
+/// the DLL seam by layout — the engine only sees `playerState`/`userinfo` — so
+/// the old `#[repr(C)]` and `offset_of`/`size_of` asserts are dropped. `Default`
+/// is Raven's zero image (all scalars 0, `netname` empty), matching the
+/// `memset(client, 0, ...)` clears in `ClientConnect`/`ClientSpawn`.
+#[derive(Clone, Default)]
 pub struct clientPersistant_t {
     pub connected: clientConnected_t,
     pub cmd: usercmd_t,              // we would lose angles if not persistant
@@ -34,7 +39,7 @@ pub struct clientPersistant_t {
     pub initialSpawn: qboolean,      // the first spawn should be at a cool location
     pub predictItemPickup: qboolean, // based on cg_predictItems userinfo
     pub pmoveFixed: qboolean,
-    pub netname: [c_char; MAX_NETNAME],
+    pub netname: String,
     pub netnameTime: c_int,           // Last time the name was changed
     pub maxHealth: c_int,             // for handicapping
     pub enterTime: c_int,             // level.time the client entered the game
@@ -43,9 +48,3 @@ pub struct clientPersistant_t {
     pub teamVoteCount: c_int,         // to prevent people from constantly calling votes
     pub teamInfo: qboolean,           // send team overlay updates?
 }
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<clientPersistant_t>() == 156);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientPersistant_t, netname) == 48);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(clientPersistant_t, teamState) == 96);

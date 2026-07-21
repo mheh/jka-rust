@@ -79,7 +79,7 @@ fn sec_hitloc(o: &mut String, ctx: &mut GameContext) {
         // target lives in the world arena (slot 0); its `client` points at a
         // stack `gclient_t` as before.
         let id = EntityId::from_num(0).unwrap();
-        let mut client: gclient_t = unsafe { core::mem::zeroed() };
+        let mut client: gclient_t = gclient_t::default();
         {
             let ent = ctx.entity_mut(id);
             *ent = unsafe { core::mem::zeroed() };
@@ -116,7 +116,7 @@ fn sec_armor(o: &mut String, ctx: &mut GameContext) {
         // lives in the world arena (slot 0); its `client` points at a stack
         // `gclient_t` as before.
         let id = EntityId::from_num(0).unwrap();
-        let mut client: gclient_t = unsafe { core::mem::zeroed() };
+        let mut client: gclient_t = gclient_t::default();
         client.ps.stats[STAT_ARMOR as usize] = pi(tok[1]);
         client.NPC_class = if pi(tok[2]) != 0 {
             class_t::CLASS_VEHICLE

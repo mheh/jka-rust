@@ -432,11 +432,13 @@ pub fn BotDoChat(
                 if let Some(id) = cobject_id {
                     let client = ctx.world.entity(id).client;
                     if !client.is_null() {
-                        let netname = unsafe { (*client).pers.netname };
-                        let mut inc_n = 0isize;
+                        // `netname` is a `String`; copy its bytes (no trailing
+                        // NUL — a C `netname[]` had none in its content either).
+                        let nbytes = unsafe { (*client).pers.netname.as_bytes() };
+                        let mut inc_n = 0usize;
 
-                        while netname[inc_n as usize] != 0 {
-                            *currentChat_b.offset(inc_2) = netname[inc_n as usize] as u8;
+                        while inc_n < nbytes.len() {
+                            *currentChat_b.offset(inc_2) = nbytes[inc_n];
                             inc_2 += 1;
                             inc_n += 1;
                         }

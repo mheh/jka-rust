@@ -301,7 +301,7 @@ pub fn G_LogWeaponOutput(ctx: &mut GameContext) {
         let player_name = |i: usize| -> String {
             let pc = (*world_ptr).g_entities[i].client;
             if !pc.is_null() {
-                cstr_to_str((*pc).pers.netname.as_ptr()).to_string()
+                (*pc).pers.netname.clone().to_string()
             } else {
                 "<Unknown>".to_string()
             }

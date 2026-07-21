@@ -1561,7 +1561,7 @@ pub fn LogExit(ctx: &mut GameContext, string: &str) {
             let raw_ping = ctx.world.clients[clientNum as usize].ps.ping;
             let ping = if raw_ping < 999 { raw_ping } else { 999 };
 
-            let netname = cstr_to_str(ctx.world.clients[clientNum as usize].pers.netname.as_ptr());
+            let netname = ctx.world.clients[clientNum as usize].pers.netname.clone();
             let score = ctx.world.clients[clientNum as usize].ps.persistant
                 [persEnum_t::PERS_SCORE as usize];
             G_LogPrintf(ctx, &format!(
@@ -1618,8 +1618,8 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                 G_LogPrintf(ctx, "Duel Results:\n");
                 let c0 = ctx.world.level.sortedClients[0];
                 let c1 = ctx.world.level.sortedClients[1];
-                let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
-                let n1 = cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
+                let n0 = ctx.world.clients[c0 as usize].pers.netname.clone();
+                let n1 = ctx.world.clients[c1 as usize].pers.netname.clone();
                 G_LogPrintf(ctx, &format!(
                         "winner: {}, score: {}, wins/losses: {}/{}\n",
                         n0,
@@ -1665,9 +1665,9 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                         let c0 = ctx.world.level.sortedClients[0];
                         let c1 = ctx.world.level.sortedClients[1];
                         let c2 = ctx.world.level.sortedClients[2];
-                        let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
-                        let n1 = cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
-                        let n2 = cstr_to_str(ctx.world.clients[c2 as usize].pers.netname.as_ptr());
+                        let n0 = ctx.world.clients[c0 as usize].pers.netname.clone();
+                        let n1 = ctx.world.clients[c1 as usize].pers.netname.clone();
+                        let n2 = ctx.world.clients[c2 as usize].pers.netname.clone();
                         G_LogPrintf(ctx, &format!(
                                 "Power Duel Initiated: {} {}/{} vs {} {}/{} and {} {}/{}, kill limit: {}\n",
                                 n0,
@@ -1684,8 +1684,8 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                     } else {
                         let c0 = ctx.world.level.sortedClients[0];
                         let c1 = ctx.world.level.sortedClients[1];
-                        let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
-                        let n1 = cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
+                        let n0 = ctx.world.clients[c0 as usize].pers.netname.clone();
+                        let n1 = ctx.world.clients[c1 as usize].pers.netname.clone();
                         G_LogPrintf(ctx, &format!(
                                 "Duel Initiated: {} {}/{} vs {} {}/{}, kill limit: {}\n",
                                 n0,
@@ -1726,7 +1726,7 @@ pub fn CheckIntermissionExit(ctx: &mut GameContext) {
                 && ctx.world.cvars.g_gametype.integer != GT_POWERDUEL
             {
                 let c0 = ctx.world.level.sortedClients[0];
-                let n0 = cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
+                let n0 = ctx.world.clients[c0 as usize].pers.netname.clone();
                 G_LogPrintf(ctx, &format!(
                         "Duel Tournament Winner: {} wins/losses: {}/{}\n",
                         n0,
@@ -2046,7 +2046,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     }
                     LogExit(ctx, "Duel limit hit.");
                     ctx.world.globals.gDuelExit = qtrue;
-                    let netname = cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
+                    let netname = ctx.world.clients[i as usize].pers.netname.clone();
                     trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}^7 hit the win limit.\n\"", netname));
                     return;
                 }
@@ -2061,7 +2061,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     ctx.world.globals.gDuelExit = qfalse;
                     if print_limit != qfalse {
                         let netname =
-                            cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
+                            ctx.world.clients[i as usize].pers.netname.clone();
                         let hit_limit = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_THE_KILL_LIMIT");
                         trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}^7 {}.\n\"", netname, hit_limit));
                     }
@@ -2279,11 +2279,11 @@ pub fn CheckTournament(ctx: &mut GameContext) {
                             let c1 = ctx.world.level.sortedClients[1];
                             let c2 = ctx.world.level.sortedClients[2];
                             let n0 =
-                                cstr_to_str(ctx.world.clients[c0 as usize].pers.netname.as_ptr());
+                                ctx.world.clients[c0 as usize].pers.netname.clone();
                             let n1 =
-                                cstr_to_str(ctx.world.clients[c1 as usize].pers.netname.as_ptr());
+                                ctx.world.clients[c1 as usize].pers.netname.clone();
                             let n2 =
-                                cstr_to_str(ctx.world.clients[c2 as usize].pers.netname.as_ptr());
+                                ctx.world.clients[c2 as usize].pers.netname.clone();
                             G_LogPrintf(ctx, &format!(
                                     "Duel Initiated: {} {}/{} vs {} {}/{} and {} {}/{}, kill limit: {}\n",
                                     n0,
@@ -2374,7 +2374,7 @@ pub fn G_KickAllBots(ctx: &mut GameContext) {
                 continue;
             }
             let mut netname: [c_char; 36] = [0; 36];
-            write_cstr_field(&mut netname, &cstr_to_str(cl.pers.netname.as_ptr()));
+            write_cstr_field(&mut netname, &cl.pers.netname);
             crate::q_shared::Q_CleanStr(netname.as_mut_ptr());
             let cleaned = cstr_to_str(netname.as_ptr());
             trap::SendConsoleCommand(ctx.engine, (EXEC_INSERT as c_int), &format!("kick \"{}\"\n", cleaned));
@@ -2504,7 +2504,7 @@ pub fn PrintTeam(ctx: &mut GameContext, team: c_int, message: *mut c_char) {
 pub fn SetLeader(ctx: &mut GameContext, team: c_int, client: c_int) {
     unsafe {
         if ctx.world.clients[client as usize].pers.connected == CON_DISCONNECTED {
-            let netname = cstr_to_str(ctx.world.clients[client as usize].pers.netname.as_ptr());
+            let netname = ctx.world.clients[client as usize].pers.netname.clone();
             PrintTeam(
                 ctx,
                 team,
@@ -2513,7 +2513,7 @@ pub fn SetLeader(ctx: &mut GameContext, team: c_int, client: c_int) {
             return;
         }
         if ctx.world.clients[client as usize].sess.sessionTeam as c_int != team {
-            let netname = cstr_to_str(ctx.world.clients[client as usize].pers.netname.as_ptr());
+            let netname = ctx.world.clients[client as usize].pers.netname.clone();
             PrintTeam(
                 ctx,
                 team,
@@ -2539,7 +2539,7 @@ pub fn SetLeader(ctx: &mut GameContext, team: c_int, client: c_int) {
         }
         ctx.world.clients[client as usize].sess.teamLeader = qtrue;
         ClientUserinfoChanged(ctx, client);
-        let netname = cstr_to_str(ctx.world.clients[client as usize].pers.netname.as_ptr());
+        let netname = ctx.world.clients[client as usize].pers.netname.clone();
         let msg = G_GetStringEdString(ctx, "MP_SVGAME", "NEWTEAMLEADER");
         PrintTeam(
             ctx,

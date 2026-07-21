@@ -73,7 +73,9 @@ pub const MAX_SHOOTERS: c_int = 16;
 /// Raven `shooterClient_t`.
 ///
 /// Type definition source: `oracle/codemp/game/g_misc.c:3346-3350`
-#[derive(Clone, Copy)]
+///
+/// Not `Copy`: `cl.pers.netname` is an owned `String` (§13).
+#[derive(Clone)]
 pub struct shooterClient_t {
     pub cl: gclient_t,
     pub inuse: qboolean,
@@ -81,9 +83,12 @@ pub struct shooterClient_t {
 
 impl Default for shooterClient_t {
     fn default() -> Self {
-        // `gclient_t` has no library `Default`; zeroed matches Raven's
-        // `memset(g_shooterClients, 0, ...)` init.
-        unsafe { core::mem::zeroed() }
+        // Raven's `memset(g_shooterClients, 0, ...)` init: `gclient_t::default()`
+        // is that zero image (its `pers.netname` `String` empty, all else 0).
+        Self {
+            cl: gclient_t::default(),
+            inuse: qfalse,
+        }
     }
 }
 
@@ -3471,7 +3476,10 @@ pub fn G_ClientForShooter(ctx: &mut GameContext) -> *mut gclient_t {
         if ctx.world.globals.g_shooterClientInit == qfalse {
             // in theory it should be initialized to 0 on the stack, but just in case.
             for slot in ctx.world.globals.g_shooterClients.iter_mut() {
-                *slot = core::mem::zeroed();
+                // `shooterClient_t::default()` is the memset-0 image (its
+                // `cl.pers.netname` `String` is not zero-valid, so reset the
+                // whole slot rather than byte-zeroing over it).
+                *slot = shooterClient_t::default();
             }
             ctx.world.globals.g_shooterClientInit = qtrue;
         }

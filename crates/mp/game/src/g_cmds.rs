@@ -289,10 +289,11 @@ pub fn ClientNumberFromString(ctx: &mut GameContext, to: EntityId, s: *mut c_cha
                 continue;
             }
             let mut n2 = [0 as c_char; MAX_STRING_CHARS];
-            SanitizeString(
-                ctx.world.client(idnum as usize).pers.netname.as_ptr() as *mut c_char,
-                n2.as_mut_ptr(),
-            );
+            // `netname` is a `String`; `SanitizeString` still takes `char*`, so
+            // stage the name in a mutable C buffer (convention 7).
+            let mut nbuf = [0 as c_char; MAX_STRING_CHARS];
+            write_cstr_field(&mut nbuf, &ctx.world.client(idnum as usize).pers.netname);
+            SanitizeString(nbuf.as_mut_ptr(), n2.as_mut_ptr());
             if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
                 return idnum;
             }
@@ -617,7 +618,7 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "TKBAN");
                 let s = format!(
                     "print \"{} {}\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                    ctx.world.client(cidx).pers.netname.clone(),
                     m
                 );
                 trap::SendServerCommand(ctx.engine, -1, &s);
@@ -629,7 +630,7 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "TKKICK");
                 let s = format!(
                     "print \"{} {}\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                    ctx.world.client(cidx).pers.netname.clone(),
                     m
                 );
                 trap::SendServerCommand(ctx.engine, -1, &s);
@@ -695,7 +696,7 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "SUICIDEBAN");
                 let s = format!(
                     "print \"{} {}\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                    ctx.world.client(cidx).pers.netname.clone(),
                     m
                 );
                 trap::SendServerCommand(ctx.engine, -1, &s);
@@ -707,7 +708,7 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "SUICIDEKICK");
                 let s = format!(
                     "print \"{} {}\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                    ctx.world.client(cidx).pers.netname.clone(),
                     m
                 );
                 trap::SendServerCommand(ctx.engine, -1, &s);
@@ -775,7 +776,7 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
             let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "JOINEDTHEREDTEAM");
             let s = format!(
                 "cp \"{}{}{} {}\n\"",
-                cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                ctx.world.client(cidx).pers.netname.clone(),
                 "^7",
                 "",
                 m
@@ -785,7 +786,7 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
             let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "JOINEDTHEBLUETEAM");
             let s = format!(
                 "cp \"{}{} {}\n\"",
-                cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                ctx.world.client(cidx).pers.netname.clone(),
                 "^7",
                 m
             );
@@ -796,7 +797,7 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
             let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "JOINEDTHESPECTATORS");
             let s = format!(
                 "cp \"{}{} {}\n\"",
-                cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                ctx.world.client(cidx).pers.netname.clone(),
                 "^7",
                 m
             );
@@ -812,7 +813,7 @@ pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int)
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "JOINEDTHEBATTLE");
                 let s = format!(
                     "cp \"{}{} {}\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                    ctx.world.client(cidx).pers.netname.clone(),
                     "^7",
                     m
                 );
@@ -1727,7 +1728,7 @@ pub fn G_Say(
             mode = SAY_ALL;
         }
 
-        let netname = cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr());
+        let netname = ctx.world.client(cidx).pers.netname.clone();
         let chat = cstr_to_str(chatText);
         let mut locMsg: Option<String> = None;
         let name: String;
@@ -1893,9 +1894,9 @@ pub fn Cmd_Tell_f(ctx: &mut GameContext, ent: EntityId) {
 
         let p = ConcatArgs(ctx, 2);
 
-        let netname_ent = cstr_to_str(ctx.world.client(ent.index()).pers.netname.as_ptr());
+        let netname_ent = ctx.world.client(ent.index()).pers.netname.clone();
         let netname_target =
-            cstr_to_str(ctx.world.client(targetNum as usize).pers.netname.as_ptr());
+            ctx.world.client(targetNum as usize).pers.netname.clone();
         let logmsg = format!(
             "tell: {} to {}: {}\n",
             netname_ent,
@@ -2045,10 +2046,11 @@ pub fn G_ClientNumberFromName(ctx: &mut GameContext, name: *const c_char) -> c_i
         // check for a name match
         SanitizeString(name as *mut c_char, s2.as_mut_ptr());
         for i in 0..ctx.world.level.numConnectedClients {
-            SanitizeString(
-                ctx.world.client(i as usize).pers.netname.as_ptr() as *mut c_char,
-                n2.as_mut_ptr(),
-            );
+            // `netname` is a `String`; stage it in a mutable C buffer for the
+            // pointer-taking `SanitizeString` (convention 7).
+            let mut nbuf = [0 as c_char; MAX_STRING_CHARS];
+            write_cstr_field(&mut nbuf, &ctx.world.client(i as usize).pers.netname);
+            SanitizeString(nbuf.as_mut_ptr(), n2.as_mut_ptr());
             if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
                 return i;
             }
@@ -2119,10 +2121,11 @@ pub fn G_ClientNumberFromStrippedName(ctx: &mut GameContext, name: *const c_char
         // check for a name match
         SanitizeString2(name as *mut c_char, s2.as_mut_ptr());
         for i in 0..ctx.world.level.numConnectedClients {
-            SanitizeString2(
-                ctx.world.client(i as usize).pers.netname.as_ptr() as *mut c_char,
-                n2.as_mut_ptr(),
-            );
+            // `netname` is a `String`; stage it in a mutable C buffer for the
+            // pointer-taking `SanitizeString2` (convention 7).
+            let mut nbuf = [0 as c_char; MAX_STRING_CHARS];
+            write_cstr_field(&mut nbuf, &ctx.world.client(i as usize).pers.netname);
+            SanitizeString2(nbuf.as_mut_ptr(), n2.as_mut_ptr());
             if cstr_eq(n2.as_ptr(), s2.as_ptr()) {
                 return i;
             }
@@ -2290,7 +2293,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
             );
             write_cstr_field(
                 &mut ctx.world.level.voteDisplayString,
-                &format!("kick {}", cstr_to_str((*nclient).pers.netname.as_ptr())),
+                &format!("kick {}", (*nclient).pers.netname.clone()),
             );
         } else if arg1_s.eq_ignore_ascii_case("kick") {
             let mut clientid = G_ClientNumberFromName(ctx, cstr(&arg2_s).as_ptr());
@@ -2313,7 +2316,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
             let ncl = ctx.world.g_entities[clientid as usize].client;
             write_cstr_field(
                 &mut ctx.world.level.voteDisplayString,
-                &format!("kick {}", cstr_to_str((*ncl).pers.netname.as_ptr())),
+                &format!("kick {}", (*ncl).pers.netname.clone()),
             );
         } else if arg1_s.eq_ignore_ascii_case("nextmap") {
             let s = trap::Cvar_VariableStringBuffer(ctx.engine, "nextmap", MAX_STRING_CHARS);
@@ -2337,7 +2340,7 @@ pub fn Cmd_CallVote_f(ctx: &mut GameContext, ent: EntityId) {
         let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLCALLEDVOTE");
         let s = format!(
             "print \"{}^7 {}\n\"",
-            cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+            ctx.world.client(cidx).pers.netname.clone(),
             m
         );
         trap::SendServerCommand(ctx.engine, -1, &s);
@@ -2532,7 +2535,7 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
                             continue;
                         }
                         let mut nbuf: Vec<c_char> =
-                            cstr_to_str(ctx.world.client(i as usize).pers.netname.as_ptr())
+                            ctx.world.client(i as usize).pers.netname.clone()
                                 .bytes()
                                 .map(|b| b as c_char)
                                 .collect();
@@ -2562,13 +2565,11 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
             {
                 let msg = format!(
                     "print \"Cannot call a team vote on someone not on your team ({}).\n\"",
-                    cstr_to_str(
-                        ctx.world
-                            .client(targetClientNum as usize)
-                            .pers
-                            .netname
-                            .as_ptr()
-                    )
+                    ctx.world
+                        .client(targetClientNum as usize)
+                        .pers
+                        .netname
+                        .clone()
                 );
                 trap::SendServerCommand(ctx.engine, ent.index() as c_int, &msg);
                 return;
@@ -2601,7 +2602,7 @@ pub fn Cmd_CallTeamVote_f(ctx: &mut GameContext, ent: EntityId) {
             if ctx.world.client(i as usize).sess.sessionTeam == team {
                 let msg = format!(
                     "print \"{} called a team vote.\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr())
+                    ctx.world.client(cidx).pers.netname.clone()
                 );
                 trap::SendServerCommand(ctx.engine, i, &msg);
             }
@@ -3283,9 +3284,9 @@ pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLDUELACCEPT");
                 let s = format!(
                     "print \"{} {} {}!\n\"",
-                    cstr_to_str(ctx.world.client(chidx).pers.netname.as_ptr()),
+                    ctx.world.client(chidx).pers.netname.clone(),
                     m,
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr())
+                    ctx.world.client(cidx).pers.netname.clone()
                 );
                 trap::SendServerCommand(ctx.engine, -1, &s);
 
@@ -3330,7 +3331,7 @@ pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
                 let m1 = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLDUELCHALLENGE");
                 let s1 = format!(
                     "cp \"{} {}\n\"",
-                    cstr_to_str(ctx.world.client(cidx).pers.netname.as_ptr()),
+                    ctx.world.client(cidx).pers.netname.clone(),
                     m1
                 );
                 trap::SendServerCommand(ctx.engine, challenged.index() as c_int, &s1);
@@ -3339,7 +3340,7 @@ pub fn Cmd_EngageDuel_f(ctx: &mut GameContext, ent: EntityId) {
                 let s2 = format!(
                     "cp \"{} {}\n\"",
                     m2,
-                    cstr_to_str(ctx.world.client(chidx).pers.netname.as_ptr())
+                    ctx.world.client(chidx).pers.netname.clone()
                 );
                 trap::SendServerCommand(ctx.engine, ent.index() as c_int, &s2);
             }
@@ -3462,7 +3463,7 @@ pub fn G_ClientNumFromNetname(ctx: &mut GameContext, name: *mut c_char) -> c_int
 
             if ctx.world.entity(id).inuse != qfalse
                 && !ctx.world.entity(id).client.is_null()
-                && crate::q_shared::Q_stricmp(ctx.world.client(i).pers.netname.as_ptr(), name) == 0
+                && Q_stricmp(&ctx.world.client(i).pers.netname, &cstr_to_str(name)) == 0
             {
                 return ctx.world.entity(id).s.number;
             }

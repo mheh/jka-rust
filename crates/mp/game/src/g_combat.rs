@@ -2327,7 +2327,7 @@ unsafe fn player_die_log_kill(
     if !attacker.is_null() {
         killer = (*attacker).s.number;
         if !(*attacker).client.is_null() {
-            killer_name = cstr_to_str((*((*attacker).client)).pers.netname.as_ptr());
+            killer_name = (*((*attacker).client)).pers.netname.clone();
         } else {
             killer_name = "<non-client>".to_string();
         }
@@ -2358,7 +2358,7 @@ unsafe fn player_die_log_kill(
         (*self_).s.number,
         meansOfDeath,
         killer_name,
-        cstr_to_str((*cl).pers.netname.as_ptr()),
+        (*cl).pers.netname.clone(),
         obit
     );
     crate::g_main::G_LogPrintf(ctx, &s);
@@ -2399,7 +2399,7 @@ unsafe fn player_die_log_kill(
         crate::g_main::G_LogPrintf(ctx, &s);
         let s = format!(
             "victim: {}, hits on enemy {}\n",
-            cstr_to_str((*cl).pers.netname.as_ptr()),
+            (*cl).pers.netname.clone(),
             (*cl).ps.persistant[persEnum_t::PERS_HITS as usize]
         );
         crate::g_main::G_LogPrintf(ctx, &s);
@@ -2407,7 +2407,7 @@ unsafe fn player_die_log_kill(
             let acl = (*attacker).client;
             let s = format!(
                 "killer: {}, hits on enemy {}, health: {}\n",
-                cstr_to_str((*acl).pers.netname.as_ptr()),
+                (*acl).pers.netname.clone(),
                 (*acl).ps.persistant[persEnum_t::PERS_HITS as usize],
                 (*attacker).health
             );
@@ -4585,7 +4585,7 @@ pub fn G_CheckForDismemberment(
             {
                 let s = format!(
                     "Duel Dismemberment: {} dismembered at {}\n",
-                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    (*client).pers.netname.clone(),
                     cstr_to_str(hitLocName[hitLoc as usize].as_ptr())
                 );
                 crate::g_main::G_LogPrintf(ctx, &s);

@@ -46,7 +46,10 @@ use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
 use native_string::atoi::atoi;
+use native_string::cstr::strncpyz_string;
 use native_string::q_string::Q_stricmp;
+
+use crate::client::client_persistant::MAX_NETNAME;
 
 // `MAX_INFO_STRING` resolves via the crate prelude glob
 // (`mp_qshared::shared::limits`); the shadowing local copy was removed by the
@@ -538,7 +541,7 @@ pub fn JMSaberTouch(
         }
     }
 
-    let netname = unsafe { cstr_to_str((*other_client).pers.netname.as_ptr()) };
+    let netname = unsafe { (*other_client).pers.netname.clone() };
     let becomejm = G_GetStringEdString(ctx, "MP_SVGAME", "BECOMEJM");
     let msg = format!("cp \"{} {}\n\"", netname, becomejm);
     trap::SendServerCommand(ctx.engine, -1, &msg);
@@ -1519,96 +1522,88 @@ pub fn PickTeam(ctx: &mut GameContext, ignoreClientNum: c_int) -> team_t {
 /// Raven `ClientCleanName` — sanitize a player name (colors, spaces, length).
 ///
 /// Source: `oracle/codemp/game/g_client.c:1335-1410`
-pub fn ClientCleanName(
-    ctx: &mut GameContext,
-    r#in: *const c_char,
-    out: *mut c_char,
-    outSize: c_int,
-) {
-    // Q_COLOR_ESCAPE == '^'; ColorIndex(c) == ((c - '0') & 0x07).
-    const Q_COLOR_ESCAPE: c_char = b'^' as c_char;
+pub fn ClientCleanName(ctx: &mut GameContext, r#in: &str, outSize: c_int) -> String {
+    let _ = ctx;
+    // Q_COLOR_ESCAPE == '^'; ColorIndex(c) == ((c - '0') & 0x07). All logic is
+    // byte-positional (Raven counts bytes and the length bounds are byte
+    // bounds): iterate the input bytes, build a `Vec<u8>`, lossy-decode once at
+    // the end so byte positions match Raven exactly (§13 convention 6).
+    const Q_COLOR_ESCAPE: u8 = b'^';
     #[inline]
-    fn ColorIndex(c: c_char) -> c_int {
+    fn ColorIndex(c: u8) -> c_int {
         (c as c_int - '0' as c_int) & 0x07
     }
-    unsafe {
-        // save room for trailing null byte
-        let outSize = outSize - 1;
 
-        let mut len: c_int = 0;
-        let mut colorlessLen: c_int = 0;
-        let p = out; // start of dest
-        *p = 0;
-        let mut spaces: c_int = 0;
+    // save room for trailing null byte
+    let outSize = outSize - 1;
 
-        let mut inp = r#in;
-        let mut outp = out;
+    let in_bytes = r#in.as_bytes();
+    let mut out: Vec<u8> = Vec::new(); // `*p == 0` <=> `out.is_empty()` (only non-NUL bytes are ever written)
+    let mut len: c_int = 0;
+    let mut colorlessLen: c_int = 0;
+    let mut spaces: c_int = 0;
 
-        loop {
-            let ch = *inp;
-            inp = inp.add(1);
-            if ch == 0 {
+    let mut i = 0usize;
+    while i < in_bytes.len() {
+        let ch = in_bytes[i];
+        i += 1;
+
+        // don't allow leading spaces
+        if out.is_empty() && ch == b' ' {
+            continue;
+        }
+
+        // check colors
+        if ch == Q_COLOR_ESCAPE {
+            // solo trailing carat is not a color prefix (Raven: `*inp == 0`)
+            if i >= in_bytes.len() {
                 break;
             }
 
-            // don't allow leading spaces
-            if *p == 0 && ch == b' ' as c_char {
+            // don't allow black in a name, period
+            if ColorIndex(in_bytes[i]) == 0 {
+                i += 1;
                 continue;
             }
 
-            // check colors
-            if ch == Q_COLOR_ESCAPE {
-                // solo trailing carat is not a color prefix
-                if *inp == 0 {
-                    break;
-                }
-
-                // don't allow black in a name, period
-                if ColorIndex(*inp) == 0 {
-                    inp = inp.add(1);
-                    continue;
-                }
-
-                // make sure room in dest for both chars
-                if len > outSize - 2 {
-                    break;
-                }
-
-                *outp = ch;
-                outp = outp.add(1);
-                *outp = *inp;
-                outp = outp.add(1);
-                inp = inp.add(1);
-                len += 2;
-                continue;
-            }
-
-            // don't allow too many consecutive spaces
-            if ch == b' ' as c_char {
-                spaces += 1;
-                if spaces > 3 {
-                    continue;
-                }
-            } else {
-                spaces = 0;
-            }
-
-            if len > outSize - 1 {
+            // make sure room in dest for both chars
+            if len > outSize - 2 {
                 break;
             }
 
-            *outp = ch;
-            outp = outp.add(1);
-            colorlessLen += 1;
-            len += 1;
+            out.push(ch);
+            out.push(in_bytes[i]);
+            i += 1;
+            len += 2;
+            continue;
         }
-        *outp = 0;
 
-        // don't allow empty names
-        if *p == 0 || colorlessLen == 0 {
-            crate::q_shared::Q_strncpyz(p, b"Padawan\0".as_ptr() as *const c_char, outSize);
+        // don't allow too many consecutive spaces
+        if ch == b' ' {
+            spaces += 1;
+            if spaces > 3 {
+                continue;
+            }
+        } else {
+            spaces = 0;
         }
+
+        if len > outSize - 1 {
+            break;
+        }
+
+        out.push(ch);
+        colorlessLen += 1;
+        len += 1;
     }
+
+    // don't allow empty names
+    if out.is_empty() || colorlessLen == 0 {
+        // Raven `Q_strncpyz(p, "Padawan", outSize)` with the already-decremented
+        // `outSize` as the buffer bound.
+        return strncpyz_string(b"Padawan", outSize.max(0) as usize);
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Raven `G_SaberModelSetup`.
@@ -1789,7 +1784,11 @@ pub fn ClientConnect(
         // assign the pointer for bg entity access
         (*ent).playerState = &mut (*client).ps;
 
-        core::ptr::write_bytes(client, 0, 1);
+        // Raven `memset(client, 0, sizeof(*client))`: reset the whole gclient to
+        // its zero image. `pers.netname` is a `String` (not zero-valid), so the
+        // assignment drops the prior occupant's name and installs the empty
+        // default rather than byte-zeroing over a live `String`.
+        *client = gclient_t::default();
 
         (*client).pers.connected = CON_CONNECTING as _;
 
@@ -1838,7 +1837,7 @@ pub fn ClientConnect(
             ctx,
             &format!(
                 "{} connected with IP: {}\n",
-                cstr_to_str((*client).pers.netname.as_ptr()),
+                (*client).pers.netname.clone(),
                 cstr_to_str((*client).sess.IPstring.as_ptr()),
             ),
         );
@@ -1847,7 +1846,7 @@ pub fn ClientConnect(
         if firstTime != qfalse {
             let m = format!(
                 "print \"{}{} {}\n\"",
-                cstr_to_str((*client).pers.netname.as_ptr()),
+                (*client).pers.netname.clone(),
                 S_COLOR_WHITE,
                 G_GetStringEdString(ctx, "MP_SVGAME", "PLCONNECT"),
             );
@@ -2085,7 +2084,7 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
             {
                 let m = format!(
                     "print \"{}{} {}\n\"",
-                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    (*client).pers.netname.clone(),
                     S_COLOR_WHITE,
                     G_GetStringEdString(ctx, "MP_SVGAME", "PLENTER"),
                 );
@@ -2673,7 +2672,10 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         let game_flags = (*client).mGameFlags & (PSG_VOTED | PSG_TEAMVOTED) as u32;
 
         // clear everything but the persistant data
-        let saved = (*client).pers;
+        // `pers` owns a `String` (`netname`), so move it out with `ptr::read`
+        // (the source slot is left bit-stale; the `write_bytes` below zeroes it
+        // harmlessly and the `ptr::write` restore avoids dropping that garbage).
+        let saved = core::ptr::read(core::ptr::addr_of!((*client).pers));
         let saved_sess = (*client).sess;
         let saved_ping = (*client).ps.ping;
         let accuracy_hits = (*client).accuracy_hits;
@@ -2741,7 +2743,9 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*client).ps.jetpackFuel = 100;
         (*client).ps.cloakFuel = 100;
 
-        (*client).pers = saved;
+        // restore pers with `ptr::write` — the current slot holds the zeroed
+        // (invalid) `String` from `write_bytes`, which must not be dropped.
+        core::ptr::write(core::ptr::addr_of_mut!((*client).pers), saved);
         (*client).sess = saved_sess;
         (*client).ps.ping = saved_ping;
         (*client).accuracy_hits = accuracy_hits;
@@ -3296,7 +3300,7 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
             ctx,
             &format!(
                 "{} disconnected with IP: {}\n",
-                cstr_to_str((*((*ent).client)).pers.netname.as_ptr()),
+                (*((*ent).client)).pers.netname.clone(),
                 cstr_to_str((*((*ent).client)).sess.IPstring.as_ptr()),
             ),
         );
@@ -3976,7 +3980,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         let mut model: [c_char; 260] = [0; 260];
         let mut forcePowers: [c_char; 260] = [0; 260];
-        let mut oldname: [c_char; 1024] = [0; 1024];
+        let oldname: String;
         // `MAX_INFO_STRING` is 1024; these must match so long userinfo strings
         // (and their color keys) are not truncated before parsing.
         let mut c1: [c_char; 1024] = [0; 1024];
@@ -4009,29 +4013,23 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         }
 
         // set name
-        crate::q_shared::Q_strncpyz(oldname.as_mut_ptr(), (*client).pers.netname.as_ptr(), 1024);
+        // Raven `Q_strncpyz(oldname, netname, sizeof(oldname))` (1024): `netname`
+        // is ≤ MAX_NETNAME bytes, so a clone is byte-identical to the truncation.
+        oldname = (*client).pers.netname.clone();
         let s = Info_ValueForKey(&userinfo, "name");
-        ClientCleanName(
-            ctx,
-            cstr(&s).as_ptr(),
-            (*client).pers.netname.as_mut_ptr(),
-            (*client).pers.netname.len() as c_int,
-        );
+        (*client).pers.netname = ClientCleanName(ctx, &s, MAX_NETNAME as c_int);
 
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
             if (*client).sess.spectatorState
                 == crate::client::spectator_state::spectatorState_t::SPECTATOR_SCOREBOARD
             {
-                crate::q_shared::Q_strncpyz(
-                    (*client).pers.netname.as_mut_ptr(),
-                    c"scoreboard".as_ptr(),
-                    (*client).pers.netname.len() as c_int,
-                );
+                (*client).pers.netname = strncpyz_string(b"scoreboard", MAX_NETNAME);
             }
         }
 
         if (*client).pers.connected == CON_CONNECTED {
-            if crate::q_shared::Q_strcmp(oldname.as_ptr(), (*client).pers.netname.as_ptr()) != 0 {
+            // Raven `strcmp(oldname, netname)` — case-sensitive byte compare.
+            if oldname != (*client).pers.netname {
                 if (*client).pers.netnameTime > ctx.world.level.time {
                     let msg = format!(
                         "print \"{}\n\"",
@@ -4039,16 +4037,16 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                     );
                     trap::SendServerCommand(ctx.engine, clientNum, &msg);
 
-                    Info_SetValueForKey(&mut userinfo, "name", &cstr_to_str(oldname.as_ptr()));
+                    Info_SetValueForKey(&mut userinfo, "name", &oldname);
                     trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
-                    write_cstr_field(&mut (*client).pers.netname, &cstr_to_str(oldname.as_ptr()));
+                    (*client).pers.netname = strncpyz_string(oldname.as_bytes(), MAX_NETNAME);
                 } else {
                     let msg = format!(
                         "print \"{}{} {} {}\n\"",
-                        cstr_to_str(oldname.as_ptr()),
+                        oldname,
                         S_COLOR_WHITE,
                         G_GetStringEdString(ctx, "MP_SVGAME", "PLRENAME"),
-                        cstr_to_str((*client).pers.netname.as_ptr())
+                        (*client).pers.netname
                     );
                     trap::SendServerCommand(ctx.engine, -1, &msg);
                     (*client).pers.netnameTime = ctx.world.level.time + 5000;
@@ -4273,7 +4271,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         let configstring_s = if (*ent).r.svFlags & SVF_BOT != 0 {
             format!(
                 "n\\{}\\t\\{}\\model\\{}\\c1\\{}\\c2\\{}\\hc\\{}\\w\\{}\\l\\{}\\skill\\{}\\tt\\{}\\tl\\{}\\siegeclass\\{}\\st\\{}\\st2\\{}\\dt\\{}\\sdt\\{}",
-                cstr_to_str((*client).pers.netname.as_ptr()),
+                (*client).pers.netname.clone(),
                 team,
                 cstr_to_str(model.as_ptr()),
                 cstr_to_str(c1.as_ptr()),
@@ -4294,7 +4292,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
             // more crap to send
             format!(
                 "n\\{}\\t\\{}\\model\\{}\\c1\\{}\\c2\\{}\\hc\\{}\\w\\{}\\l\\{}\\tt\\{}\\tl\\{}\\siegeclass\\{}\\st\\{}\\st2\\{}\\dt\\{}\\sdt\\{}",
-                cstr_to_str((*client).pers.netname.as_ptr()),
+                (*client).pers.netname.clone(),
                 (*client).sess.sessionTeam,
                 cstr_to_str(model.as_ptr()),
                 cstr_to_str(c1.as_ptr()),
@@ -4313,7 +4311,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         } else {
             format!(
                 "n\\{}\\t\\{}\\model\\{}\\c1\\{}\\c2\\{}\\hc\\{}\\w\\{}\\l\\{}\\tt\\{}\\tl\\{}\\st\\{}\\st2\\{}\\dt\\{}",
-                cstr_to_str((*client).pers.netname.as_ptr()),
+                (*client).pers.netname.clone(),
                 (*client).sess.sessionTeam,
                 cstr_to_str(model.as_ptr()),
                 cstr_to_str(c1.as_ptr()),

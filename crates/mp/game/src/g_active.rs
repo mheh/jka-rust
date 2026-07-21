@@ -2794,9 +2794,9 @@ pub fn ClientThink_real(ctx: &mut GameContext, ent: EntityId) {
                     let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME", "PLDUELWINNER");
                     let s = format!(
                         "cp \"{} {} {}!\n\"",
-                        cstr_to_str((*client).pers.netname.as_ptr()),
+                        (*client).pers.netname.clone(),
                         m,
-                        cstr_to_str((*daClient).pers.netname.as_ptr())
+                        (*daClient).pers.netname.clone()
                     );
                     trap::SendServerCommand(ctx.engine, -1, &s);
                 } else {

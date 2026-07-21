@@ -2271,12 +2271,11 @@ pub fn PassLovedOneCheck(
         let loved = (&ctx.world.globals.botstates)[ent_num as usize];
 
         while i < (*bs).lovednum {
-            let netname = (*clients.add((*loved).client as usize))
-                .pers
-                .netname
-                .as_ptr();
-            let lovedname = (*bs).loved[i as usize].name.as_ptr() as *const c_char;
-            if core::ffi::CStr::from_ptr(netname) == core::ffi::CStr::from_ptr(lovedname) {
+            // `netname` is a `String`; compare against the remembered loved name
+            // (byte-exact strcmp equivalent, matching `GetLoveLevel`).
+            if (*clients.add((*loved).client as usize)).pers.netname
+                == cstr_to_str((*bs).loved[i as usize].name.as_ptr() as *const c_char)
+            {
                 if IsTeamplay(ctx) == 0 && (*bs).loved[i as usize].level < 2 {
                     // if FFA and level of love is not greater than 1, just don't care
                     return 1;
@@ -5614,7 +5613,6 @@ pub fn GetLoveLevel(ctx: &mut GameContext, bs: *mut bot_state_t, love: *mut bot_
     unsafe {
         let base = ctx.world.g_entities.as_mut_ptr();
         let mut i: c_int = 0;
-        let lname: *const c_char;
 
         if ctx.world.cvars.g_gametype.integer == GT_DUEL
             || ctx.world.cvars.g_gametype.integer == GT_POWERDUEL
@@ -5635,16 +5633,12 @@ pub fn GetLoveLevel(ctx: &mut GameContext, bs: *mut bot_state_t, love: *mut bot_
             return 1;
         }
 
-        lname = (*((*base.add((*love).client as usize)).client))
+        // Raven's `lname = netname[]` (array, never NULL) makes its `!lname`
+        // guard dead; read the name directly.
+        let lname_s = (*((*base.add((*love).client as usize)).client))
             .pers
             .netname
-            .as_ptr();
-
-        if lname.is_null() {
-            return 0;
-        }
-
-        let lname_s = cstr_to_str(lname);
+            .clone();
 
         while i < (*bs).lovednum {
             if cstr_to_str((*bs).loved[i as usize].name.as_ptr() as *const c_char) == lname_s {
@@ -5767,7 +5761,7 @@ pub fn BotDeathNotify(ctx: &mut GameContext, bs: *mut bot_state_t) {
                 let mut ltest: c_int = 0;
                 while ltest < (*bi).lovednum {
                     let mine =
-                        cstr_to_str((*clients.add((*bs).client as usize)).pers.netname.as_ptr());
+                        (*clients.add((*bs).client as usize)).pers.netname.clone();
                     let theirs =
                         cstr_to_str((*bi).loved[ltest as usize].name.as_ptr() as *const c_char);
                     if mine == theirs {
