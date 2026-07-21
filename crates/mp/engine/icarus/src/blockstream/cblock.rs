@@ -179,6 +179,57 @@ impl Block {
     }
 }
 
+// Small block-member read helpers (native-endian, §19-guarded on short data).
+// Shared by the sequencer/task-manager dispatch paths and the game interface.
+
+/// Read a member's raw data as a native-endian `f32` (`*(float *)GetMemberData`),
+/// **without** advancing. Short/absent data reads `0.0` (§19 guard).
+pub(crate) fn peek_member_float(block: &Block, member_num: i32) -> f32 {
+    let data = block.get_member_data(member_num).unwrap_or(&[]);
+    let mut buf = [0u8; 4];
+    let n = data.len().min(4);
+    buf[..n].copy_from_slice(&data[..n]);
+    f32::from_ne_bytes(buf)
+}
+
+/// Read a member's raw data as a native-endian `f32`, advancing `member_num`.
+pub(crate) fn member_float(block: &Block, member_num: &mut i32) -> f32 {
+    let v = peek_member_float(block, *member_num);
+    *member_num += 1;
+    v
+}
+
+/// Read a member's raw data as a native-endian `i32` (`*(int *)GetMemberData`),
+/// advancing `member_num`. Short/absent data reads `0` (§19 guard).
+pub(crate) fn member_int(block: &Block, member_num: &mut i32) -> i32 {
+    let data = block.get_member_data(*member_num).unwrap_or(&[]);
+    *member_num += 1;
+    let mut buf = [0u8; 4];
+    let n = data.len().min(4);
+    buf[..n].copy_from_slice(&data[..n]);
+    i32::from_ne_bytes(buf)
+}
+
+/// A raw byte field (`(char *)GetMemberData`) read as a C string: bytes up to
+/// the first NUL, lossy UTF-8.
+pub(crate) fn bytes_to_c_string(data: &[u8]) -> String {
+    let len = data.iter().position(|&b| b == 0).unwrap_or(data.len());
+    String::from_utf8_lossy(&data[..len]).into_owned()
+}
+
+/// Read a member's data as a C string **without** advancing.
+pub(crate) fn peek_member_c_string(block: &Block, member_num: i32) -> String {
+    let data = block.get_member_data(member_num).unwrap_or(&[]);
+    bytes_to_c_string(data)
+}
+
+/// Read a member's data as a C string, advancing `member_num`.
+pub(crate) fn member_c_string(block: &Block, member_num: &mut i32) -> String {
+    let s = peek_member_c_string(block, *member_num);
+    *member_num += 1;
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

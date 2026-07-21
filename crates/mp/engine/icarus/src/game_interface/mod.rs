@@ -30,8 +30,10 @@ use mp_qshared::common::mp::qcommon::shared_entity_t::sharedEntity_t;
 use mp_qshared::common::mp::qcommon::t_g_icarus_getsetidforstring::T_G_ICARUS_GETSETIDFORSTRING;
 use mp_qshared::common::mp::qcommon::t_g_icarus_soundindex::T_G_ICARUS_SOUNDINDEX;
 use mp_qshared::shared::limits::MAX_GENTITIES;
+use mp_qshared::shared::q_string::COM_StripExtension;
 use mp_qshared::shared::wl_e::WL_e;
 
+use crate::blockstream::cblock::bytes_to_c_string;
 use crate::instance::icarus_instance::IcarusInstance;
 use crate::q3_interface::set_type_t::setType_t;
 use crate::taskmanager::ctask_manager::TaskManager;
@@ -131,13 +133,6 @@ fn truncate_1023(mut s: String) -> String {
     s
 }
 
-/// Raw byte blob (a `BlockMember::m_data`, NUL-terminated by `SetData`) →
-/// owned UTF-8 `String`, trimmed at the first NUL.
-fn bytes_to_string(data: &[u8]) -> String {
-    let end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
-    String::from_utf8_lossy(&data[..end]).into_owned()
-}
-
 /// Bounded copy into a fixed `[c_char; N]` shared-memory field. Raven's raw
 /// `strcpy` here is unbounded; truncating to fit is the defined choice for an
 /// over-long name (§19, same treatment as the OOB-entnum guards elsewhere in
@@ -160,16 +155,6 @@ fn get_id_for_string(table: &[(&str, i32)], name: &str) -> i32 {
         .find(|(entry_name, _)| entry_name.eq_ignore_ascii_case(name))
         .map(|(_, id)| *id)
         .unwrap_or(-1)
-}
-
-/// Raven `COM_StripExtension` — forward-scans to the FIRST `.` (distinct from
-/// `CBlockStream::StripExtension`'s backward scan to the LAST `.`).
-/// Source: `oracle/codemp/game/q_shared.c:99-104`
-fn com_strip_extension(input: &str) -> String {
-    match input.find('.') {
-        Some(idx) => input[..idx].to_string(),
-        None => input.to_string(),
-    }
 }
 
 // ===========================================================================
@@ -659,20 +644,20 @@ pub fn icarus_interrogate_script(icarus: &mut Icarus, host: &mut dyn EngineHost,
             }
             ID_PLAY => {
                 if let Some(data0) = block.get_member_data(0) {
-                    if bytes_to_string(data0).eq_ignore_ascii_case("PLAY_ROFF") {
+                    if bytes_to_c_string(data0).eq_ignore_ascii_case("PLAY_ROFF") {
                         // theROFFSystem.Cache(...) elided — see fn doc.
                     }
                 }
             }
             ID_RUN => {
                 if let Some(data0) = block.get_member_data(0) {
-                    let run_name = com_strip_extension(&bytes_to_string(data0));
+                    let run_name = COM_StripExtension(&bytes_to_c_string(data0));
                     icarus_interrogate_script(icarus, host, &run_name);
                 }
             }
             ID_SOUND => {
                 if let Some(data1) = block.get_member_data(1) {
-                    let sound_name = bytes_to_string(data1);
+                    let sound_name = bytes_to_c_string(data1);
                     icarus_sound_precache(icarus, host, &sound_name);
                 }
             }
@@ -681,11 +666,11 @@ pub fn icarus_interrogate_script(icarus: &mut Icarus, host: &mut dyn EngineHost,
                 if member0_is_string {
                     let s_val1 = block
                         .get_member_data(0)
-                        .map(bytes_to_string)
+                        .map(bytes_to_c_string)
                         .unwrap_or_default();
                     let s_val2 = block
                         .get_member_data(1)
-                        .map(bytes_to_string)
+                        .map(bytes_to_c_string)
                         .unwrap_or_default();
                     let set_id = icarus_get_id_for_string(icarus, host, &s_val1);
 

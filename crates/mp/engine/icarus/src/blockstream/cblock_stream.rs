@@ -193,9 +193,13 @@ impl BlockStream {
         data
     }
 
-    /// Raven `CBlockStream::StripExtension`.
+    /// Raven `CBlockStream::StripExtension` — backward-scans to the LAST `.`
+    /// (distinct from `COM_StripExtension`'s forward scan to the first `.`).
+    /// Shared as the one icarus-crate backward-scan copy (`CSequencer::Run`
+    /// routes here); it reads none of `CBlockStream`'s state, so it is an
+    /// associated fn rather than a method.
     /// Source: `oracle/codemp/icarus/BlockStream.cpp` (`blockstream.h:190`)
-    pub fn strip_extension(&self, input: &str) -> String {
+    pub(crate) fn strip_extension(input: &str) -> String {
         // Raven scans backward from `strlen(in)` (whose first read is the
         // implicit NUL, never '.') for the last '.'; scanning from
         // `len - 1` is equivalent and skips that redundant first step.
@@ -278,9 +282,8 @@ mod tests {
 
     #[test]
     fn strip_extension_finds_last_dot() {
-        let stream = BlockStream::default();
-        assert_eq!(stream.strip_extension("foo.bar.ibi"), "foo.bar");
-        assert_eq!(stream.strip_extension("noext"), "noext");
-        assert_eq!(stream.strip_extension(""), "");
+        assert_eq!(BlockStream::strip_extension("foo.bar.ibi"), "foo.bar");
+        assert_eq!(BlockStream::strip_extension("noext"), "noext");
+        assert_eq!(BlockStream::strip_extension(""), "");
     }
 }

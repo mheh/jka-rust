@@ -5,7 +5,10 @@ use std::collections::BTreeMap;
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::limits::MAX_GENTITIES;
 
-use crate::blockstream::cblock::Block;
+use crate::blockstream::cblock::{
+    member_c_string, member_float, peek_member_c_string, peek_member_float, Block,
+};
+use crate::blockstream::cblock_stream::BlockStream;
 use crate::instance::icarus_instance::SequenceId;
 use crate::sequence::csequence::Sequence;
 use crate::sequencer::bstream_s::Bstream;
@@ -302,34 +305,6 @@ fn seq_has_child(icarus: &Icarus, root: SequenceId, target: SequenceId) -> bool 
     false
 }
 
-// Small block-member read helpers (native-endian, §19-guarded on short data).
-
-fn member_float(block: &Block, member_num: &mut i32) -> f32 {
-    let v = peek_member_float(block, *member_num);
-    *member_num += 1;
-    v
-}
-
-fn peek_member_float(block: &Block, member_num: i32) -> f32 {
-    let data = block.get_member_data(member_num).unwrap_or(&[]);
-    let mut buf = [0u8; 4];
-    let n = data.len().min(4);
-    buf[..n].copy_from_slice(&data[..n]);
-    f32::from_ne_bytes(buf)
-}
-
-fn member_c_string(block: &Block, member_num: &mut i32) -> String {
-    let s = peek_member_c_string(block, *member_num);
-    *member_num += 1;
-    s
-}
-
-fn peek_member_c_string(block: &Block, member_num: i32) -> String {
-    let data = block.get_member_data(member_num).unwrap_or(&[]);
-    let len = data.iter().position(|&b| b == 0).unwrap_or(data.len());
-    String::from_utf8_lossy(&data[..len]).into_owned()
-}
-
 // I_* dispatch shims (copy the fn ptr, then call with `&mut Icarus`).
 
 fn i_dprintf(icarus: &mut Icarus, host: &mut dyn EngineHost, level: i32, msg: &str) {
@@ -520,21 +495,6 @@ fn return_sequence(icarus: &Icarus, mut sequence: SequenceId) -> Option<Sequence
         }
     }
     None
-}
-
-/// Raven `CSequencer::StripExtension`.
-/// Source: `oracle/codemp/icarus/Sequencer.cpp:2215-2229`
-fn strip_extension(input: &str) -> String {
-    let bytes = input.as_bytes();
-    let mut i = bytes.len() as isize - 1;
-    while i >= 0 && bytes[i as usize] != b'.' {
-        i -= 1;
-    }
-    if i < 0 {
-        input.to_string()
-    } else {
-        input[..i as usize].to_string()
-    }
 }
 
 // ===========================================================================
@@ -764,7 +724,7 @@ fn parse_run(
 ) -> i32 {
     // Get the name and format it.
     let name0 = peek_member_c_string(&block, 0);
-    let newname = strip_extension(&name0);
+    let newname = BlockStream::strip_extension(&name0);
 
     // Get the file from the game engine (I_LoadFile).
     let load = icarus.interface_export.i_load_file;
@@ -2001,7 +1961,7 @@ mod tests {
 
     #[test]
     fn strip_extension_trims_trailing_dot_segment() {
-        assert_eq!(strip_extension("scripts/foo.ibi"), "scripts/foo");
-        assert_eq!(strip_extension("noext"), "noext");
+        assert_eq!(BlockStream::strip_extension("scripts/foo.ibi"), "scripts/foo");
+        assert_eq!(BlockStream::strip_extension("noext"), "noext");
     }
 }

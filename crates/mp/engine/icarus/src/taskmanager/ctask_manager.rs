@@ -6,7 +6,9 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::limits::MAX_GENTITIES;
 use mp_qshared::shared::vec3_t;
 
-use crate::blockstream::cblock::Block;
+use crate::blockstream::cblock::{
+    member_c_string, member_float, member_int, peek_member_float, Block,
+};
 use crate::sequencer::csequencer::{self, Sequencer};
 use crate::taskmanager::ctask::Task;
 use crate::taskmanager::ctask_group::TaskGroup;
@@ -308,56 +310,6 @@ impl TaskManager {
     /// `#if 0`'d out, so it restores nothing in this build (Divergences).
     /// Source: `oracle/codemp/icarus/TaskManager.cpp:1790-…`
     pub fn load(&mut self) {}
-}
-
-// ---------------------------------------------------------------------------
-// Small transcription helpers (pure block-member reads, no host).
-// ---------------------------------------------------------------------------
-
-/// Read a member's raw data as a native-endian `f32` (`*(float *)GetMemberData`),
-/// advancing `member_num`. Short/absent data reads `0.0` (§19 guard).
-fn member_float(block: &Block, member_num: &mut i32) -> f32 {
-    let data = block.get_member_data(*member_num).unwrap_or(&[]);
-    *member_num += 1;
-    let mut buf = [0u8; 4];
-    let n = data.len().min(4);
-    buf[..n].copy_from_slice(&data[..n]);
-    f32::from_ne_bytes(buf)
-}
-
-/// Read a member's raw data as a native-endian `f32` **without** advancing
-/// (`*(float *)GetMemberData(memberNum)`, no `++`). Short data reads `0.0`.
-fn peek_member_float(block: &Block, member_num: i32) -> f32 {
-    let data = block.get_member_data(member_num).unwrap_or(&[]);
-    let mut buf = [0u8; 4];
-    let n = data.len().min(4);
-    buf[..n].copy_from_slice(&data[..n]);
-    f32::from_ne_bytes(buf)
-}
-
-/// Read a member's raw data as a native-endian `i32` (`*(int *)GetMemberData`),
-/// advancing `member_num`. Short/absent data reads `0` (§19 guard).
-fn member_int(block: &Block, member_num: &mut i32) -> i32 {
-    let data = block.get_member_data(*member_num).unwrap_or(&[]);
-    *member_num += 1;
-    let mut buf = [0u8; 4];
-    let n = data.len().min(4);
-    buf[..n].copy_from_slice(&data[..n]);
-    i32::from_ne_bytes(buf)
-}
-
-/// Read a member's data as a C string (`(char *)GetMemberData`), advancing
-/// `member_num`. Bytes are read up to the first NUL.
-fn member_c_string(block: &Block, member_num: &mut i32) -> String {
-    let data = block.get_member_data(*member_num).unwrap_or(&[]);
-    *member_num += 1;
-    bytes_to_c_string(data)
-}
-
-/// C string out of a raw byte field (up to the first NUL, lossy UTF-8).
-fn bytes_to_c_string(data: &[u8]) -> String {
-    let len = data.iter().position(|&b| b == 0).unwrap_or(data.len());
-    String::from_utf8_lossy(&data[..len]).into_owned()
 }
 
 /// Raven `CTaskManager::Check` — does the member at `memberNum` have id `targetID`?
