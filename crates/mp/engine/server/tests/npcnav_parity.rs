@@ -29,17 +29,11 @@
 //! short-circuit exactly as the dumper pins it.
 
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use mp_engine_server::npcnav::{Navigator, NODE_NONE};
 use mp_host_interface::mock::MockHost;
 use mp_qshared::shared::qfalse;
-
-/// Repo-relative `tools/npcnav-oracle` root (this crate is
-/// `crates/mp/engine/server`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/npcnav-oracle")
-}
+use testkit::oracle_root;
 
 // ---------------------------------------------------------------------------
 // Layout parsing — mirrors `main.cpp`'s `parseLayout` (main.cpp:141-163)
@@ -305,7 +299,7 @@ const FIXTURES: [&str; 4] = ["line3", "diamond", "star6", "grid9"];
 /// Build → `Save` → `dumpAll` reproduces every committed golden byte-for-byte.
 #[test]
 fn matches_oracle_goldens() {
-    let root = oracle_root();
+    let root = oracle_root("npcnav-oracle");
     let mut checked = 0;
     for name in FIXTURES {
         let lay = parse_layout(&root.join("layouts").join(format!("{name}.layout")));
@@ -329,7 +323,7 @@ fn matches_oracle_goldens() {
 /// the 4-byte-`long` shim / deterministic-padding witness (NAV-D1 / RULING 44).
 #[test]
 fn save_matches_nav_fixtures() {
-    let root = oracle_root();
+    let root = oracle_root("npcnav-oracle");
     for name in FIXTURES {
         let lay = parse_layout(&root.join("layouts").join(format!("{name}.layout")));
         let fixture_path = root.join("fixtures").join(format!("{name}.nav"));
@@ -350,7 +344,7 @@ fn save_matches_nav_fixtures() {
 /// retail bytes match the golden exactly.
 #[test]
 fn load_roundtrip_matches_goldens() {
-    let root = oracle_root();
+    let root = oracle_root("npcnav-oracle");
     for name in FIXTURES {
         let lay = parse_layout(&root.join("layouts").join(format!("{name}.layout")));
         let golden_path = root.join("goldens").join(format!("{name}.txt"));

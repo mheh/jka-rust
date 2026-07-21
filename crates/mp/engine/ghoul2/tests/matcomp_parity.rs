@@ -15,15 +15,9 @@
 //! golden is committed, so no C++ toolchain is needed here.
 
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use mp_engine_ghoul2::matcomp::{mc_compress, mc_uncompress, mc_uncompress_quat};
-
-/// Repo-relative `tools/trmodel-oracle` root (this crate is
-/// `crates/mp/engine/ghoul2`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/trmodel-oracle")
-}
+use testkit::oracle_root;
 
 /// Reproduce `dump_matcomp.cpp`'s `dump_mat`: the label line, then three rows of
 /// `  [%08x %08x %08x %08x]  (%.6f %.6f %.6f %.6f)`.
@@ -60,7 +54,7 @@ fn packed_comp(vals: &[u16]) -> [u8; 24] {
 
 #[test]
 fn matcomp_matches_oracle_golden() {
-    let golden_path = oracle_root().join("goldens").join("matcomp.txt");
+    let golden_path = oracle_root("trmodel-oracle").join("goldens").join("matcomp.txt");
     let golden = std::fs::read_to_string(&golden_path).unwrap_or_else(|_| {
         panic!("missing golden {golden_path:?} — run tools/trmodel-oracle/build.sh --regen")
     });

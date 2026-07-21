@@ -201,6 +201,7 @@ version = "0.1.0"
 dependencies = [
  "mp_host_interface",
  "mp_qshared",
+ "testkit",
 ]
 
 [[package]]
@@ -211,6 +212,7 @@ dependencies = [
  "mp_qshared",
  "native_string",
  "native_types",
+ "testkit",
 ]
 
 [[package]]
@@ -228,6 +230,7 @@ dependencies = [
  "native_platform",
  "native_string",
  "native_types",
+ "testkit",
 ]
 
 [[package]]
@@ -238,6 +241,7 @@ dependencies = [
  "mp_host_interface",
  "mp_qshared",
  "native_types",
+ "testkit",
 ]
 
 [[package]]
@@ -267,6 +271,7 @@ dependencies = [
  "native_platform",
  "native_string",
  "native_types",
+ "testkit",
 ]
 
 [[package]]
@@ -284,6 +289,7 @@ dependencies = [
  "native_sort",
  "native_string",
  "native_types",
+ "testkit",
 ]
 
 [[package]]
@@ -312,6 +318,7 @@ dependencies = [
  "mp_host_interface",
  "mp_qshared",
  "native_platform",
+ "testkit",
 ]
 
 [[package]]
@@ -523,6 +530,10 @@ dependencies = [
  "sp_bg",
  "sp_qshared",
 ]
+
+[[package]]
+name = "testkit"
+version = "0.1.0"
 
 [[package]]
 name = "ui"

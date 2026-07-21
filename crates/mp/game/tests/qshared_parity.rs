@@ -20,7 +20,6 @@
 
 use core::ffi::{c_char, c_int};
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use mp_game::prelude::{cstr, qfalse, qtrue};
 use mp_game::q_shared::{
@@ -31,38 +30,11 @@ use mp_game::q_shared::{
     Q_strrchr, Q_strupr, SkipBracedSection, SkipRestOfLine,
 };
 use native_string::info::{Info_RemoveKey, Info_RemoveKey_Big, Info_Validate, Info_ValueForKey};
-
-fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
-}
+use testkit::{compare, oracle_dir};
 
 fn read_fixture(name: &str) -> Vec<u8> {
-    let path = oracle_dir().join("fixtures/qshared").join(name);
+    let path = oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures/qshared").join(name);
     std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
-}
-
-fn compare(name: &str, got: &str) {
-    let golden_path = oracle_dir().join("golden").join(format!("{name}.txt"));
-    let golden = std::fs::read_to_string(&golden_path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", golden_path.display()));
-    if got == golden {
-        return;
-    }
-    let g: Vec<&str> = golden.lines().collect();
-    let o: Vec<&str> = got.lines().collect();
-    for (i, (gl, ol)) in g.iter().zip(o.iter()).enumerate() {
-        if gl != ol {
-            panic!(
-                "{name} parity mismatch at line {} (oracle vs port):\n  oracle: {gl}\n  port:   {ol}",
-                i + 1
-            );
-        }
-    }
-    panic!(
-        "{name} parity length mismatch: oracle {} lines, port {} lines",
-        g.len(),
-        o.len()
-    );
 }
 
 // --- canonical emit helpers (mirror main_qshared.c byte-for-byte) ---
@@ -654,5 +626,5 @@ fn qshared_parity() {
     dump_sprintf(&mut o);
     dump_info(&mut o);
     o.push_str("== end ==\n");
-    compare("qshared", &o);
+    compare(env!("CARGO_MANIFEST_DIR"), "qshared", &o);
 }

@@ -12,3 +12,6 @@ native_string = { path = "../../../native/string" }
 native_types = { path = "../../../native/types" }
 # ruling 56c blanket authorization: §F subsystems depend on the Stage-0 host seam.
 mp_host_interface = { path = "../../host-interface" }
+
+[dev-dependencies]
+testkit = { path = "../../../testkit" }

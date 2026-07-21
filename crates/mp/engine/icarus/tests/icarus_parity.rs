@@ -15,7 +15,6 @@
 use std::ffi::CString;
 use std::fmt::Write as _;
 use std::os::raw::c_char;
-use std::path::PathBuf;
 
 use mp_engine_icarus::blockstream::cblock::Block;
 use mp_engine_icarus::blockstream::cblock_stream::BlockStream;
@@ -31,11 +30,7 @@ use mp_engine_icarus::Icarus;
 use mp_host_interface::mock::MockHost;
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::game_export_t::gameExport_t;
-
-/// Repo-relative `tools/icarus-oracle` root (this crate is `crates/mp/engine/icarus`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/icarus-oracle")
-}
+use testkit::oracle_root;
 
 // ---------------------------------------------------------------------------
 // Unit 1: BlockStream reader (mirrors dump_blockstream.cpp)
@@ -100,7 +95,7 @@ fn dump_blockstream(buf: &[u8]) -> String {
 
 #[test]
 fn blockstream_matches_oracle_goldens() {
-    let root = oracle_root();
+    let root = oracle_root("icarus-oracle");
     let mut checked = 0;
 
     for entry in std::fs::read_dir(root.join("fixtures")).expect("fixtures dir") {
@@ -171,7 +166,7 @@ fn dump_state(icarus: &Icarus, tag: &str, out: &mut String) {
 
 #[test]
 fn q3_registers_matches_oracle_golden() {
-    let golden_path = oracle_root().join("goldens").join("q3_registers.txt");
+    let golden_path = oracle_root("icarus-oracle").join("goldens").join("q3_registers.txt");
     let golden = std::fs::read_to_string(&golden_path)
         .unwrap_or_else(|_| panic!("missing golden {golden_path:?}"));
 
@@ -324,7 +319,7 @@ fn dump_e2e_vars(icarus: &Icarus, out: &mut String) {
 
 #[test]
 fn endtoend_matches_oracle_golden() {
-    let root = oracle_root();
+    let root = oracle_root("icarus-oracle");
     let golden = std::fs::read_to_string(root.join("goldens").join("endtoend_e2e.txt"))
         .expect("read endtoend golden");
 

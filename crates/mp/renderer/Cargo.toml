@@ -15,3 +15,6 @@ native_platform = { path = "../../native/platform" }
 # ruling-56c blanket §F-consumer authorization (TRM-D1(c)) — acyclic since
 # mp_host_interface deps only mp_qshared.
 mp_host_interface = { path = "../host-interface" }
+
+[dev-dependencies]
+testkit = { path = "../../testkit" }

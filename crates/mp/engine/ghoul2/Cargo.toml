@@ -11,3 +11,6 @@ mp_qshared = { path = "../../qshared" }
 # EngineHost services trait (rulings 11/24/31/33/36; G2SV-D14/G2SV-D15). Every §F
 # entry takes `&mut impl EngineHost`; the host-consuming class files `use` it.
 mp_host_interface = { path = "../../host-interface" }
+
+[dev-dependencies]
+testkit = { path = "../../../testkit" }

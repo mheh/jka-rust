@@ -12,40 +12,12 @@
 
 use core::ffi::c_int;
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use mp_game::bg_channel::Rng;
 use mp_game::q_math::*;
 use mp_game::shared::cplane_t;
 use native_sort::qsort::qsort;
-
-fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
-}
-
-fn compare(name: &str, got: &str) {
-    let golden_path = oracle_dir().join("golden").join(format!("{name}.txt"));
-    let golden = std::fs::read_to_string(&golden_path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", golden_path.display()));
-    if got == golden {
-        return;
-    }
-    let g: Vec<&str> = golden.lines().collect();
-    let o: Vec<&str> = got.lines().collect();
-    for (i, (gl, ol)) in g.iter().zip(o.iter()).enumerate() {
-        if gl != ol {
-            panic!(
-                "{name} parity mismatch at line {} (oracle vs port):\n  oracle: {gl}\n  port:   {ol}",
-                i + 1
-            );
-        }
-    }
-    panic!(
-        "{name} parity length mismatch: oracle {} lines, port {} lines",
-        g.len(),
-        o.len()
-    );
-}
+use testkit::{compare, oracle_dir};
 
 // --- bit-exact print helpers (mirror dumpcommon.h) ---
 
@@ -99,7 +71,7 @@ fn v4(o: &mut String, v: &[f32; 4]) {
     );
 }
 fn load_vectors() -> Vec<[f32; 3]> {
-    let path = oracle_dir().join("fixtures/vectors.txt");
+    let path = oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures/vectors.txt");
     let text = std::fs::read_to_string(&path).unwrap();
     let mut out = Vec::new();
     for line in text.lines() {
@@ -561,7 +533,7 @@ fn qmath_parity() {
     dump_planes(&mut o, &vecs);
     dump_vecmath(&mut o, &vecs);
     o.push_str("== end ==\n");
-    compare("qmath", &o);
+    compare(env!("CARGO_MANIFEST_DIR"), "qmath", &o);
 }
 
 // ============================ bg_lib family ============================
@@ -581,7 +553,7 @@ struct Kv {
 
 fn dump_qsort(o: &mut String) {
     o.push_str("== qsort ==\n");
-    let path = oracle_dir().join("fixtures/ints.txt");
+    let path = oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures/ints.txt");
     let text = std::fs::read_to_string(&path).unwrap();
     let mut arr: Vec<c_int> = text.lines().filter_map(|l| l.trim().parse().ok()).collect();
     let n = arr.len();
@@ -633,7 +605,7 @@ fn bglib_parity() {
     let mut o = String::new();
     dump_qsort(&mut o);
     o.push_str("== end ==\n");
-    compare("bglib", &o);
+    compare(env!("CARGO_MANIFEST_DIR"), "bglib", &o);
 }
 
 // ============================ bg_saberLoad family ============================
@@ -1076,7 +1048,7 @@ mod saberload {
         let w_ptr = w as *mut mp_game::world::GameWorld;
         mp_game::g_strap::init_strap_world(w_ptr);
 
-        let dir = oracle_dir().join("fixtures");
+        let dir = oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures");
         let traps = TestTraps::new(dir);
         let mut bg = BgState::new();
 
@@ -1237,6 +1209,6 @@ mod saberload {
         }
 
         o.push_str("== end ==\n");
-        compare("saberload", &o);
+        compare(env!("CARGO_MANIFEST_DIR"), "saberload", &o);
     }
 }

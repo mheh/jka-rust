@@ -29,3 +29,4 @@ native_build_date = { path = "../../native/build-date" }
 # mock engine can sit behind the real `CEngine` seam (the jampgame smoke-test
 # precedent, crates/jampgame/tests/common/mod.rs).
 mp_engine_qcommon = { path = "../engine/qcommon" }
+testkit = { path = "../../testkit" }

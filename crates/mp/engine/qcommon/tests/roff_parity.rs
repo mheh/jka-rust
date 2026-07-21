@@ -36,20 +36,14 @@
 //! out of reach for this integration test; see the returned `problems`.
 
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use mp_engine_qcommon::roff::RoffSystem;
 use mp_host_interface::mock::MockHost;
-
-/// Repo-relative `tools/roff-oracle` root (this crate is
-/// `crates/mp/engine/qcommon`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/roff-oracle")
-}
+use testkit::oracle_root;
 
 /// Read one committed golden (`goldens/<name>`).
 fn read_golden(name: &str) -> String {
-    let path = oracle_root().join("goldens").join(name);
+    let path = oracle_root("roff-oracle").join("goldens").join(name);
     std::fs::read_to_string(&path).unwrap_or_else(|_| {
         panic!("missing golden {path:?} — run tools/roff-oracle/build.sh --regen")
     })
@@ -64,7 +58,7 @@ fn read_golden(name: &str) -> String {
 /// `i32` headers (ROFF-D4), so no LP64 shim is needed (that shim only exists on
 /// the C++ oracle host).
 fn host_with_fixtures() -> MockHost {
-    let fx = oracle_root().join("fixtures");
+    let fx = oracle_root("roff-oracle").join("fixtures");
     let read =
         |rel: &str| std::fs::read(fx.join(rel)).unwrap_or_else(|_| panic!("read fixture {rel}"));
     let mut host = MockHost::new();

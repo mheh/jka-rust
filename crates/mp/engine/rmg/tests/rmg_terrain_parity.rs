@@ -26,15 +26,10 @@
 
 use std::fmt::Write as _;
 use std::os::raw::c_ulong;
-use std::path::PathBuf;
 
 use mp_host_interface::mock::MockHost;
 use mp_host_interface::EngineHost;
-
-/// Repo-relative `tools/rmg-oracle` root (this crate is `crates/mp/engine/rmg`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/rmg-oracle")
-}
+use testkit::oracle_root;
 
 // ---------------------------------------------------------------------------
 // Golden #1: the holdrand LCG substrate (mirrors main.cpp `dumpSeed`)
@@ -179,7 +174,7 @@ fn dump_seed() -> String {
 
 #[test]
 fn seed_matches_oracle_golden() {
-    let golden_path = oracle_root().join("golden").join("seed.txt");
+    let golden_path = oracle_root("rmg-oracle").join("golden").join("seed.txt");
     let golden = std::fs::read_to_string(&golden_path).unwrap_or_else(|_| {
         panic!("missing golden {golden_path:?} — run tools/rmg-oracle/build.sh --regen")
     });

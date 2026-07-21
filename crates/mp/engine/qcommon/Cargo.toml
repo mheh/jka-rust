@@ -28,3 +28,6 @@ mp_host_interface = { path = "../../host-interface" }
 # stable Rust cannot define a C-variadic fn (skeleton-findings resolution 1).
 cc = "1"
 native_build_date = { path = "../../../native/build-date" }
+
+[dev-dependencies]
+testkit = { path = "../../../testkit" }

@@ -20,7 +20,6 @@
 //! Rust dump format matches each `printf`/`putEsc` character for character.
 
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
 
 use mp_engine_qcommon::stringed::api::{
     se_check_for_language_updates, se_get_language_dir, se_get_language_name, se_get_num_languages,
@@ -29,12 +28,7 @@ use mp_engine_qcommon::stringed::api::{
 use mp_engine_qcommon::stringed::interface::se_build_file_list;
 use mp_engine_qcommon::stringed::StringEdPackage;
 use mp_host_interface::mock::MockHost;
-
-/// Repo-relative `tools/stringed-oracle` root (this crate is
-/// `crates/mp/engine/qcommon`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/stringed-oracle")
-}
+use testkit::{oracle_root, walk_fixtures};
 
 /// A `MockHost` whose FS-fixture map (`files`) is seeded from every file under
 /// `tools/stringed-oracle/fixtures/`, keyed by its path relative to that root
@@ -43,25 +37,11 @@ fn oracle_root() -> PathBuf {
 /// (files are raw bytes — CP1252 hi-char fixtures load unmodified).
 fn fixture_host() -> MockHost {
     let mut host = MockHost::new();
-    let fixtures = oracle_root().join("fixtures");
-    seed_dir(&fixtures, &fixtures, &mut host);
+    let fixtures = oracle_root("stringed-oracle").join("fixtures");
+    walk_fixtures(&fixtures, &mut |key, bytes| {
+        host.files.insert(key, bytes);
+    });
     host
-}
-
-/// Recursively insert every regular file under `dir` into `host.files`, keyed
-/// by its `/`-separated path relative to `base`.
-fn seed_dir(base: &Path, dir: &Path, host: &mut MockHost) {
-    for entry in std::fs::read_dir(dir).expect("read fixtures dir") {
-        let path = entry.expect("dir entry").path();
-        if path.is_dir() {
-            seed_dir(base, &path, host);
-        } else {
-            let rel = path.strip_prefix(base).expect("under fixtures root");
-            let key = rel.to_string_lossy().replace('\\', "/");
-            let bytes = std::fs::read(&path).expect("read fixture file");
-            host.files.insert(key, bytes);
-        }
-    }
 }
 
 /// Escaped string printer — mirrors `dump.cpp`'s `putEsc` byte for byte: keeps
@@ -276,7 +256,7 @@ fn dump_parse_lookup() -> String {
 
 #[test]
 fn parse_lookup_matches_oracle_golden() {
-    let golden_path = oracle_root().join("goldens/parse_lookup.txt");
+    let golden_path = oracle_root("stringed-oracle").join("goldens/parse_lookup.txt");
     let golden = std::fs::read_to_string(&golden_path).unwrap_or_else(|_| {
         panic!("missing golden {golden_path:?} — run tools/stringed-oracle/build.sh --regen")
     });
@@ -378,7 +358,7 @@ fn dump_reference_stability() -> String {
 
 #[test]
 fn reference_stability_matches_oracle_golden() {
-    let golden_path = oracle_root().join("goldens/reference_stability.txt");
+    let golden_path = oracle_root("stringed-oracle").join("goldens/reference_stability.txt");
     let golden = std::fs::read_to_string(&golden_path).unwrap_or_else(|_| {
         panic!("missing golden {golden_path:?} — run tools/stringed-oracle/build.sh --regen")
     });
@@ -439,7 +419,7 @@ fn dump_filelist_scan() -> String {
 
 #[test]
 fn filelist_scan_matches_oracle_golden() {
-    let golden_path = oracle_root().join("goldens/filelist_scan.txt");
+    let golden_path = oracle_root("stringed-oracle").join("goldens/filelist_scan.txt");
     let golden = std::fs::read_to_string(&golden_path).unwrap_or_else(|_| {
         panic!("missing golden {golden_path:?} — run tools/stringed-oracle/build.sh --regen")
     });

@@ -28,7 +28,6 @@
 
 use std::fmt::Write as _;
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use core::ffi::c_char;
 
@@ -44,14 +43,10 @@ use mp_renderer::tr_local::model_s::model_t;
 use mp_renderer::tr_local::modtype_t::modtype_t;
 use mp_renderer::tr_local::surface_type_t::surfaceType_t;
 use mp_renderer::tr_model::render_models::RenderModels;
-
-/// Repo-relative `tools/trmodel-oracle` root (this crate is `crates/mp/renderer`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tools/trmodel-oracle")
-}
+use testkit::{oracle_root, walk_fixtures};
 
 fn golden(name: &str) -> String {
-    let path = oracle_root().join("goldens").join(name);
+    let path = oracle_root("trmodel-oracle").join("goldens").join(name);
     fs::read_to_string(&path).unwrap_or_else(|_| {
         panic!("missing golden {path:?} — run tools/trmodel-oracle/build.sh --regen")
     })
@@ -63,28 +58,12 @@ fn golden(name: &str) -> String {
 /// `fixtures/<qpath>`. `*default.gla` is program-internal (the `FakeGLAFile`
 /// intercept) and intentionally has no fixture file.
 fn fixture_host() -> MockHost {
-    let fixtures = oracle_root().join("fixtures");
+    let fixtures = oracle_root("trmodel-oracle").join("fixtures");
     let mut host = MockHost::new();
-    seed_dir(&fixtures, &fixtures, &mut host);
+    walk_fixtures(&fixtures, &mut |qpath, bytes| {
+        host.files.insert(qpath, bytes);
+    });
     host
-}
-
-fn seed_dir(root: &Path, dir: &Path, host: &mut MockHost) {
-    for entry in fs::read_dir(dir).expect("fixtures dir") {
-        let path = entry.expect("dir entry").path();
-        if path.is_dir() {
-            seed_dir(root, &path, host);
-        } else {
-            let qpath = path
-                .strip_prefix(root)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .replace('\\', "/");
-            let bytes = fs::read(&path).expect("read fixture");
-            host.files.insert(qpath, bytes);
-        }
-    }
 }
 
 /// `dump_load.cpp`'s `tname` — `modtype_t` → the golden's name string.

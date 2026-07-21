@@ -21,63 +21,18 @@ use mp_engine_select::Engine;
 use mp_game::g_combat::{CheckArmor, G_GetHitLocation, RaySphereIntersections};
 use mp_game::prelude::*;
 use mp_game::world::{GameContext, GameWorld};
+use testkit::{compare, oracle_dir, pf, pi};
 
 // `YAW` comes from `mp_game::prelude` (canonical `q_math::YAW`, imported above
 // via the glob); no test-local shadow needed.
 
-fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
-}
-
 fn fixtures_dir() -> PathBuf {
-    oracle_dir().join("fixtures/gcombat")
+    oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures/gcombat")
 }
 
 fn read_lines(name: &str) -> String {
     let p = fixtures_dir().join(name);
     std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()))
-}
-
-fn compare(name: &str, got: &str) {
-    let golden_path = oracle_dir().join("golden").join(format!("{name}.txt"));
-    let golden = std::fs::read_to_string(&golden_path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", golden_path.display()));
-    if got == golden {
-        return;
-    }
-    let g: Vec<&str> = golden.lines().collect();
-    let o: Vec<&str> = got.lines().collect();
-    for (i, (gl, ol)) in g.iter().zip(o.iter()).enumerate() {
-        if gl != ol {
-            panic!(
-                "{name} parity mismatch at line {} (oracle vs port):\n  oracle: {gl}\n  port:   {ol}",
-                i + 1
-            );
-        }
-    }
-    panic!(
-        "{name} parity length mismatch: oracle {} lines, port {} lines",
-        g.len(),
-        o.len()
-    );
-}
-
-// --- token parsing (mirrors main_gcombat.c pf/pi) ---
-// A float token is a plain (possibly negative) integer parsed as (float)atol,
-// or an 0xXXXXXXXX f32 bit pattern. An int token is decimal, or 0x hex.
-fn pf(t: &str) -> f32 {
-    if let Some(h) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
-        f32::from_bits(u32::from_str_radix(h, 16).unwrap())
-    } else {
-        t.parse::<i64>().unwrap() as f32
-    }
-}
-fn pi(t: &str) -> i32 {
-    if let Some(h) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
-        i64::from_str_radix(h, 16).unwrap() as i32
-    } else {
-        t.parse::<i64>().unwrap() as i32
-    }
 }
 
 // ----------------------------- raysphere -----------------------------------
@@ -206,7 +161,7 @@ fn run() {
     sec_hitloc(&mut o, ctx);
     sec_armor(&mut o, ctx);
     o.push_str("== end ==\n");
-    compare("gcombat", &o);
+    compare(env!("CARGO_MANIFEST_DIR"), "gcombat", &o);
 }
 
 #[test]

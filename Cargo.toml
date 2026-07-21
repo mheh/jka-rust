@@ -49,6 +49,7 @@ members = [
     "crates/cgame",
     "crates/ui",
     "crates/jagame",
+    "crates/testkit",
 ]
 
 # ABI panic policy (2026-07-08): the game-module cdylibs catch panics at their

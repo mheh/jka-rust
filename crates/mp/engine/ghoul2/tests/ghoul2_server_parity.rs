@@ -21,7 +21,6 @@
 //! `mdxmHeader_t hdr; hdr.numLODs = 2;` — no loader, no disk fixture).
 
 use std::fmt::Write as _;
-use std::path::PathBuf;
 
 use mp_engine_ghoul2::bolts::{
     g2_add_bolt_surf_num, g2_find_bolt_bone_num, g2_find_bolt_surface_num, g2_init_bolt_list,
@@ -33,12 +32,7 @@ use mp_engine_ghoul2::shared::cghoul2_info::CGhoul2Info;
 use mp_engine_ghoul2::shared::surface_info_t::surfaceInfo_t;
 use mp_engine_ghoul2::surfaces::{g2_add_surface, g2_find_override_surface, g2_remove_surface};
 use mp_host_interface::mock::MockHost;
-
-/// Repo-relative `tools/ghoul2-server-oracle` root (this crate is
-/// `crates/mp/engine/ghoul2`).
-fn oracle_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../tools/ghoul2-server-oracle")
-}
+use testkit::oracle_root;
 
 // ---------------------------------------------------------------------------
 // Handle-arithmetic constants the arena dumper hard-codes locally. Private in
@@ -100,7 +94,7 @@ fn arena_show(out: &mut String, arr: &Ghoul2InfoArray, label: &str, h: i32) {
 
 #[test]
 fn arena_matches_oracle_golden() {
-    let golden = std::fs::read_to_string(oracle_root().join("goldens").join("arena.txt"))
+    let golden = std::fs::read_to_string(oracle_root("ghoul2-server-oracle").join("goldens").join("arena.txt"))
         .expect("read arena golden");
 
     // Raven's `TheGhoul2InfoArray()` singleton is the `Ghoul2System.info_array`
@@ -205,7 +199,7 @@ fn dump_bolts(
 
 #[test]
 fn bolts_matches_oracle_golden() {
-    let golden = std::fs::read_to_string(oracle_root().join("goldens").join("bolts.txt"))
+    let golden = std::fs::read_to_string(oracle_root("ghoul2-server-oracle").join("goldens").join("bolts.txt"))
         .expect("read bolts golden");
 
     let mut gh = CGhoul2Info::default();
@@ -319,7 +313,7 @@ fn dump_surfaces(out: &mut String, label: &str, s: &[surfaceInfo_t]) {
 
 #[test]
 fn surfaces_matches_oracle_golden() {
-    let golden = std::fs::read_to_string(oracle_root().join("goldens").join("surfaces.txt"))
+    let golden = std::fs::read_to_string(oracle_root("ghoul2-server-oracle").join("goldens").join("surfaces.txt"))
         .expect("read surfaces golden");
 
     // The dumper's tiny `mdxmHeader_t hdr; hdr.numLODs = 2;` reached over

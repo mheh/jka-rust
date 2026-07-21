@@ -14,45 +14,10 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use mp_game::w_saber::{G_KnockawayForParry, G_SaberLockAnim};
-
-fn oracle_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/oracle")
-}
+use testkit::{compare, oracle_dir, pi};
 
 fn fixtures_dir() -> PathBuf {
-    oracle_dir().join("fixtures/wsaber")
-}
-
-fn compare(name: &str, got: &str) {
-    let golden_path = oracle_dir().join("golden").join(format!("{name}.txt"));
-    let golden = std::fs::read_to_string(&golden_path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", golden_path.display()));
-    if got == golden {
-        return;
-    }
-    let g: Vec<&str> = golden.lines().collect();
-    let o: Vec<&str> = got.lines().collect();
-    for (i, (gl, ol)) in g.iter().zip(o.iter()).enumerate() {
-        if gl != ol {
-            panic!(
-                "{name} parity mismatch at line {} (oracle vs port):\n  oracle: {gl}\n  port:   {ol}",
-                i + 1
-            );
-        }
-    }
-    panic!(
-        "{name} parity length mismatch: oracle {} lines, port {} lines",
-        g.len(),
-        o.len()
-    );
-}
-
-fn pi(t: &str) -> i32 {
-    if let Some(h) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
-        i64::from_str_radix(h, 16).unwrap() as i32
-    } else {
-        t.parse::<i64>().unwrap() as i32
-    }
+    oracle_dir(env!("CARGO_MANIFEST_DIR")).join("fixtures/wsaber")
 }
 
 // Read the single `sweep ...` line's tokens from a fixture (mirrors
@@ -106,5 +71,5 @@ fn wsaber_parity() {
     sec_lockanim(&mut o);
     sec_knockaway(&mut o);
     o.push_str("== end ==\n");
-    compare("wsaber", &o);
+    compare(env!("CARGO_MANIFEST_DIR"), "wsaber", &o);
 }

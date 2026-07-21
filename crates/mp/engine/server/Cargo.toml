@@ -35,3 +35,6 @@ mp_engine_rmg = { path = "../rmg" }
 # transcribed against a `mp_engine_renderer` path — alias rather than touch
 # every call site.
 mp_engine_renderer = { package = "mp_renderer", path = "../../renderer" }
+
+[dev-dependencies]
+testkit = { path = "../../../testkit" }

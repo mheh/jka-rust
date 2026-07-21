@@ -14,3 +14,6 @@ native_types = { path = "../../../native/types" }
 mp_engine_qcommon = { path = "../qcommon" }
 # Every Seam-A/B/C signature threads `&mut impl EngineHost` (RMG-D3, ruling 56c).
 mp_host_interface = { path = "../../host-interface" }
+
+[dev-dependencies]
+testkit = { path = "../../../testkit" }
