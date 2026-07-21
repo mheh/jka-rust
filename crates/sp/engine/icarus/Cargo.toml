@@ -8,3 +8,4 @@ name = "sp_engine_icarus"
 
 [dependencies]
 sp_qshared = { path = "../../qshared" }
+native_types = { path = "../../../native/types" }

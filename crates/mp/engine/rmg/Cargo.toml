@@ -8,6 +8,7 @@ name = "mp_engine_rmg"
 
 [dependencies]
 mp_qshared = { path = "../../qshared" }
+native_types = { path = "../../../native/types" }
 # `RmManager`'s frozen pub API names `CmLandScape`/`CollisionWorld`/`TerrainHandle`
 # (RMG-D4a) — the settled `rmg → qcommon` direction, never the reverse.
 mp_engine_qcommon = { path = "../qcommon" }

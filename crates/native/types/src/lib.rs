@@ -7,12 +7,21 @@
 use core::ffi::{c_int, c_uchar, c_ulong, c_ushort};
 
 pub mod anim;
+pub mod cvar;
+pub mod miniheap;
+pub mod rmg;
 pub mod say;
+pub mod stdio;
 
 pub use anim::anim_event_type::animEventType_t;
 pub use anim::anim_number::{animNumber_t, SABER_ANIM_GROUP_SIZE};
 pub use anim::footstep_type::footstepType_t;
+pub use cvar::vm_cvar_t::vmCvar_t;
+pub use miniheap::cmini_heap::CMiniHeap;
+pub use rmg::ermdir::{ERMDir, DIR_FIRST};
+pub use rmg::symmetry_t::symmetry_t;
 pub use say::saying_t::saying_t;
+pub use stdio::file::FILE;
 
 /// Raven `byte`.
 ///

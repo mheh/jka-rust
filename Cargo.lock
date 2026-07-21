@@ -208,6 +208,7 @@ dependencies = [
  "mp_host_interface",
  "mp_qshared",
  "native_string",
+ "native_types",
 ]
 
 [[package]]
@@ -234,6 +235,7 @@ dependencies = [
  "mp_engine_qcommon",
  "mp_host_interface",
  "mp_qshared",
+ "native_types",
 ]
 
 [[package]]
@@ -435,6 +437,7 @@ dependencies = [
 name = "sp_engine_icarus"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_qshared",
 ]
 
@@ -444,6 +447,7 @@ version = "0.1.0"
 dependencies = [
  "abi_transport",
  "native_platform",
+ "native_types",
  "sp_qshared",
 ]
 
@@ -451,6 +455,7 @@ dependencies = [
 name = "sp_engine_rmg"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_qshared",
 ]
 

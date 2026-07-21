@@ -9,4 +9,5 @@ name = "sp_engine_qcommon"
 [dependencies]
 sp_qshared = { path = "../../qshared" }
 abi_transport = { path = "../../../abi-transport" }
+native_types = { path = "../../../native/types" }
 native_platform = { path = "../../../native/platform" }
