@@ -29,6 +29,7 @@ use std::cell::Cell;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
+use mp_bg::bg_misc::snap_vector;
 use mp_bg::bg_panimate::BG_ParseAnimationFile;
 use mp_bg::bg_pmove::Pmove;
 use mp_game::bg_channel::{BgState, BgTraps, GameCallbacks};
@@ -315,11 +316,9 @@ impl BgTraps for TestTraps {
     }
 
     fn snap_vector(&self, v: *mut f32) {
-        unsafe {
-            *v.add(0) = (*v.add(0)).round_ties_even();
-            *v.add(1) = (*v.add(1)).round_ties_even();
-            *v.add(2) = (*v.add(2)).round_ties_even();
-        }
+        // Canonical `SnapVector`; the trait hands a raw `*mut f32`, reborrowed as
+        // the `&mut vec3_t` the shared impl takes (test-mock seam).
+        snap_vector(unsafe { &mut *(v as *mut vec3_t) });
     }
 
     // --- FS: only the animation.cfg load path uses these ---

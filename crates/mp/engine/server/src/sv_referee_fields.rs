@@ -19,7 +19,7 @@ macro_rules! field_offsets {
 }
 
 pub struct FieldTable {
-    kind: &'static str,
+    pub kind: &'static str,
     fields: &'static [(usize, &'static str)],
     /// Total `size_of` — pins the table's owning type at compile time.
     #[allow(dead_code)]
