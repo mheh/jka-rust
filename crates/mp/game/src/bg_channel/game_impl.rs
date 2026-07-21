@@ -21,9 +21,23 @@ use core::ffi::{c_char, c_int, c_void};
 use mp_engine_select::Engine;
 
 use crate::prelude::*;
-use crate::g_utils::G_EffectIndex;
-use crate::g_utils::G_ModelIndex;
-use crate::g_utils::G_SoundIndex;
+use crate::FighterNPC::FighterIsLanded;
+use crate::g_ICARUScb::Q3_SetParm;
+use crate::g_active::{Client_CheckImpactBBrush, G_CheapWeaponFire};
+use crate::g_cmds::TryGrapple;
+use crate::g_combat::{G_Damage, G_DamageFromKiller};
+use crate::g_mem::G_Alloc;
+use crate::g_spawn::G_NewString;
+use crate::g_utils::{
+    G_AddEvent, G_EffectIndex, G_ModelIndex, G_PlayEffect, G_PlayEffectID, G_SetAnim, G_SoundIndex,
+};
+use crate::g_vehicles::G_FlyVehicleSurfaceDestruction;
+use crate::g_weapon::WP_GetVehicleCamPos;
+use crate::npc_c::NPC_SetAnim;
+use crate::trap;
+use crate::veh_dispatch;
+use crate::w_saber::G_CanBeEnemy;
+use crate::world::GameWorld;
 
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
@@ -55,7 +69,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) {
         // Mechanical delegation. Raven: `trap_Trace` (`G_TRACE`).
         use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
-        crate::trap::Trace(
+        trap::Trace(
             self.engine,
             GTraceArgs::new(results, start, mins, maxs, end, passEntityNum, contentMask),
         )
@@ -65,29 +79,29 @@ impl BgTraps for GameBgTraps<'_> {
         // Real delegation — the pmove slice's PM_SetWaterLevel drives this.
         // Raven: `trap_PointContents` (`G_POINT_CONTENTS`).
         use mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs;
-        crate::trap::PointContents(self.engine, GPointContentsArgs::new(point, passEntityNum))
+        trap::PointContents(self.engine, GPointContentsArgs::new(point, passEntityNum))
     }
 
     fn fs_fopen(&self, qpath: &str, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
         // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`). The caller guarantees
         // `f` is valid.
-        crate::trap::FS_FOpenFile(self.engine, qpath, unsafe { &mut *f }, mode)
+        trap::FS_FOpenFile(self.engine, qpath, unsafe { &mut *f }, mode)
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
         // Mechanical delegation — matches the proven `pointcontents`
         // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
         let buf =
             unsafe { core::slice::from_raw_parts_mut(buffer as *mut u8, len as usize) };
-        crate::trap::FS_Read(self.engine, buf, f)
+        trap::FS_Read(self.engine, buf, f)
     }
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
         // Raven: `trap_FS_Write` (`G_FS_WRITE`).
         let buf = unsafe { core::slice::from_raw_parts(buffer as *const u8, len as usize) };
-        crate::trap::FS_Write(self.engine, buf, f)
+        trap::FS_Write(self.engine, buf, f)
     }
     fn fs_fclose(&self, f: fileHandle_t) {
         // Raven: `trap_FS_FCloseFile` (`G_FS_FCLOSE_FILE`).
-        crate::trap::FS_FCloseFile(self.engine, f)
+        trap::FS_FCloseFile(self.engine, f)
     }
     fn fs_getfilelist(
         &self,
@@ -99,12 +113,12 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_FS_GetFileList` (`G_FS_GETFILELIST`).
         let list =
             unsafe { core::slice::from_raw_parts_mut(listbuf as *mut u8, bufsize as usize) };
-        crate::trap::FS_GetFileList(self.engine, path, extension, list)
+        trap::FS_GetFileList(self.engine, path, extension, list)
     }
 
     fn r_register_skin(&self, name: &str) -> qhandle_t {
         // Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
-        crate::trap::R_RegisterSkin(self.engine, name)
+        trap::R_RegisterSkin(self.engine, name)
     }
 
     fn g2api_init_ghoul2_model(
@@ -119,7 +133,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> c_int {
         // Mechanical delegation. Raven: `trap_G2API_InitGhoul2Model`
         // (`G_G2_INITGHOUL2MODEL`).
-        crate::trap::G2API_InitGhoul2Model(
+        trap::G2API_InitGhoul2Model(
             self.engine,
             ghoul2Ptr,
             fileName,
@@ -133,7 +147,7 @@ impl BgTraps for GameBgTraps<'_> {
     fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void) {
         // Mechanical delegation. Raven: `trap_G2API_CleanGhoul2Models`
         // (`G_G2_CLEANMODELS`).
-        crate::trap::G2API_CleanGhoul2Models(
+        trap::G2API_CleanGhoul2Models(
             self.engine,
             mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(ghoul2Ptr),
         )
@@ -142,7 +156,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Real delegation to the already-wired `trap_G2API_AddBolt` seam
         // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)
         // only carry `&dyn BgTraps`, not `&Engine`.
-        crate::trap::G2API_AddBolt(self.engine, ghoul2, modelIndex, boneName)
+        trap::G2API_AddBolt(self.engine, ghoul2, modelIndex, boneName)
     }
     fn g2api_get_bolt_matrix(
         &self,
@@ -158,7 +172,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> qboolean {
         // Raven: `trap_G2API_GetBoltMatrix` (`G_G2_GETBOLT`).
         use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
-        crate::trap::G2API_GetBoltMatrix(
+        trap::G2API_GetBoltMatrix(
             self.engine,
             GG2GetboltArgs::new(
                 ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale,
@@ -181,7 +195,7 @@ impl BgTraps for GameBgTraps<'_> {
         // The syscall `Args` takes `scale` as `*mut vec3_t`; the bg-visible sig is
         // `*const`, so cast at the seam (the engine never mutates it here).
         use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC::GG2GetboltNorecArgs;
-        crate::trap::G2API_GetBoltMatrix_NoReconstruct(
+        trap::G2API_GetBoltMatrix_NoReconstruct(
             self.engine,
             GG2GetboltNorecArgs::new(
                 ghoul2,
@@ -210,7 +224,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> qboolean {
         // Raven: `trap_G2API_GetBoltMatrix_NoRecNoRot` (`G_G2_GETBOLT_NOREC_NOROT`).
         use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC_NOROT::GG2GetboltNorecNorotArgs;
-        crate::trap::G2API_GetBoltMatrix_NoRecNoRot(
+        trap::G2API_GetBoltMatrix_NoRecNoRot(
             self.engine,
             GG2GetboltNorecNorotArgs::new(
                 ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale,
@@ -232,7 +246,7 @@ impl BgTraps for GameBgTraps<'_> {
         currentTime: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneAngles` (`G_G2_ANGLEOVERRIDE`).
-        (crate::trap::G2API_SetBoneAngles(
+        (trap::G2API_SetBoneAngles(
             self.engine,
             ghoul2,
             modelIndex,
@@ -261,7 +275,7 @@ impl BgTraps for GameBgTraps<'_> {
         blendTime: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_SetBoneAnim` (`G_G2_PLAYANIM`).
-        (crate::trap::G2API_SetBoneAnim(
+        (trap::G2API_SetBoneAnim(
             self.engine,
             ghoul2,
             modelIndex,
@@ -289,7 +303,7 @@ impl BgTraps for GameBgTraps<'_> {
         modelIndex: c_int,
     ) -> qboolean {
         // Raven: `trap_G2API_GetBoneAnim` (`G_G2_GETBONEANIM`).
-        (crate::trap::G2API_GetBoneAnim(
+        (trap::G2API_GetBoneAnim(
             self.engine,
             ghoul2,
             boneName,
@@ -306,7 +320,7 @@ impl BgTraps for GameBgTraps<'_> {
     fn g2api_set_rag_doll(&self, ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
         // Raven: `trap_G2API_SetRagDoll` (`G_G2_SETRAGDOLL`).
         use mp_abi::game::syscalls::G_G2_SETRAGDOLL::GG2SetragdollArgs;
-        crate::trap::G2API_SetRagDoll(self.engine, GG2SetragdollArgs::new(ghoul2, params))
+        trap::G2API_SetRagDoll(self.engine, GG2SetragdollArgs::new(ghoul2, params))
     }
     fn g2api_animate_g2_models(
         &self,
@@ -316,7 +330,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) {
         // Raven: `trap_G2API_AnimateG2Models` (`G_G2_ANIMATEG2MODELS`).
         use mp_abi::game::syscalls::G_G2_ANIMATEG2MODELS::GG2Animateg2ModelsArgs;
-        crate::trap::G2API_AnimateG2Models(
+        trap::G2API_AnimateG2Models(
             self.engine,
             GG2Animateg2ModelsArgs::new(ghoul2, time, params),
         )
@@ -332,7 +346,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_G2API_SetBoneIKState` (`G_G2_SETBONEIKSTATE`).
         // `None` rides through as a null boneName on the wire — the engine's
         // init/reset-IK branch (`G2_bones.cpp:4674`).
-        (crate::trap::G2API_SetBoneIKState(self.engine, ghoul2, time, boneName, ikState, params))
+        (trap::G2API_SetBoneIKState(self.engine, ghoul2, time, boneName, ikState, params))
             as qboolean
     }
     fn g2api_ik_move(
@@ -343,7 +357,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> qboolean {
         // Raven: `trap_G2API_IKMove` (`G_G2_IKMOVE`).
         use mp_abi::game::syscalls::G_G2_IKMOVE::GG2IkmoveArgs;
-        crate::trap::G2API_IKMove(self.engine, GG2IkmoveArgs::new(ghoul2, time, params))
+        trap::G2API_IKMove(self.engine, GG2IkmoveArgs::new(ghoul2, time, params))
     }
     fn g2api_get_surface_render_status(
         &self,
@@ -353,7 +367,7 @@ impl BgTraps for GameBgTraps<'_> {
     ) -> c_int {
         // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus`
         // (G_G2_GETSURFACERENDERSTATUS).
-        crate::trap::G2API_GetSurfaceRenderStatus(self.engine, ghoul2, modelIndex, surfaceName)
+        trap::G2API_GetSurfaceRenderStatus(self.engine, ghoul2, modelIndex, surfaceName)
     }
 
     fn fx_play_effect_id(
@@ -379,24 +393,24 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
         // 3-float buffer (`*mut f32` head == `*mut [f32;3]`).
         use mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs;
-        crate::trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
+        trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
     }
     fn cvar_register(&self, cvar: *mut vmCvar_t, var_name: &str, value: &str, flags: c_int) {
         // Raven: `trap_Cvar_Register` (`G_CVAR_REGISTER`).
         let cvar = unsafe { cvar.as_mut() };
-        crate::trap::Cvar_Register(self.engine, cvar, var_name, value, flags)
+        trap::Cvar_Register(self.engine, cvar, var_name, value, flags)
     }
 
     fn com_printf(&self, msg: &str) {
         // Raven `Com_Printf` -> `trap_Print` (`G_PRINT`), the same route the
         // game-tier `Com_Printf` port takes. Source: `g_main.c:1219-1228`.
-        crate::trap::Printf(self.engine, msg)
+        trap::Printf(self.engine, msg)
     }
     fn com_error(&self, error_level: c_int, msg: &str) {
         // Raven `Com_Error` -> `trap_Error` (`G_ERROR`); `error_level` is dropped
         // at the seam like the game-tier `Com_Error` port. Source: `g_main.c:1208-1217`.
         let _ = error_level;
-        crate::trap::Error(self.engine, msg)
+        trap::Error(self.engine, msg)
     }
 }
 
@@ -410,7 +424,7 @@ pub struct GameCallbacksImpl<'a> {
     /// The one owned `GameWorld` island (raw so a `&mut dyn GameCallbacks` and a
     /// `&mut BgState` borrowed from the same world can coexist across the seam;
     /// STATE-D6 leaf reborrows discipline applies inside the method bodies).
-    pub world: *mut crate::world::GameWorld,
+    pub world: *mut GameWorld,
     pub engine: &'a Engine,
 }
 
@@ -447,7 +461,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let targ_id = ctx.entity_id_of(targ);
             let inflictor_id = ctx.entity_id_of(inflictor);
             let attacker_id = ctx.entity_id_of(attacker);
-            crate::g_combat::G_Damage(
+            G_Damage(
                 &mut ctx,
                 targ_id,
                 inflictor_id,
@@ -490,7 +504,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let pEnt_id = ctx.entity_id_of(pEnt);
             let pVehEnt_id = ctx.entity_id_of(pVehEnt);
             let attacker_id_2 = ctx.entity_id_of(attacker);
-            crate::g_combat::G_DamageFromKiller(
+            G_DamageFromKiller(
                 &mut ctx,
                 pEnt_id,
                 pVehEnt_id,
@@ -507,7 +521,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // Source: `oracle/codemp/game/g_utils.c` (`G_AddEvent`).
         unsafe {
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_utils::G_AddEvent(&mut *(ent), event, eventParm);
+            G_AddEvent(&mut *(ent), event, eventParm);
         }
     }
     fn entity_legs_anim(&self, entNum: c_int) -> c_int {
@@ -526,7 +540,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_mem::G_Alloc(&mut ctx, size)
+        G_Alloc(&mut ctx, size)
     }
     fn new_string(&mut self, string: &str) -> *mut c_char {
         // `G_NewString` copies into the game pool via `ctx.world`; it still takes
@@ -539,14 +553,14 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_spawn::G_NewString(&mut ctx, cstr(string).as_ptr())
+        G_NewString(&mut ctx, cstr(string).as_ptr())
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
         // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned
         // temp-entity return is discarded (as at the bg call sites).
         // Source: `oracle/codemp/game/g_utils.c` (`G_PlayEffect`).
         unsafe {
-            crate::g_utils::G_PlayEffect(fxID, *org, *ang);
+            G_PlayEffect(fxID, *org, *ang);
         }
     }
     fn play_effect_id(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) -> c_int {
@@ -554,7 +568,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // yields its entity number (`ENTITYNUM_NONE` when none was spawned).
         // Source: `oracle/codemp/game/g_utils.c` (`G_PlayEffectID`).
         unsafe {
-            let te = crate::g_utils::G_PlayEffectID(fxID, *org, *ang);
+            let te = G_PlayEffectID(fxID, *org, *ang);
             if te.is_null() {
                 ENTITYNUM_NONE
             } else {
@@ -583,7 +597,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_active::G_CheapWeaponFire(&mut ctx, entNum, weapon);
+        G_CheapWeaponFire(&mut ctx, entNum, weapon);
     }
     fn client_check_impact_bbrush(&mut self, entNum: c_int, impactNum: c_int) {
         // Raven `Client_CheckImpactBBrush(self, other)`; resolve both nums.
@@ -597,7 +611,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let other = &mut (*self.world).g_entities[impactNum as usize] as *mut gentity_t;
             let self_id_2 = ctx.entity_id_of(self_);
             let other_id = ctx.entity_id_of(other);
-            crate::g_active::Client_CheckImpactBBrush(&mut ctx, self_id_2, other_id);
+            Client_CheckImpactBBrush(&mut ctx, self_id_2, other_id);
         }
     }
     fn flyveh_surface_destruction(
@@ -617,7 +631,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_vehicles::G_FlyVehicleSurfaceDestruction(
+        G_FlyVehicleSurfaceDestruction(
             &mut ctx,
             EntityId(entNum as u32),
             trace,
@@ -644,7 +658,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let ent_id_2 = ctx.entity_id_of(ent).unwrap();
-            crate::g_utils::G_SetAnim(
+            G_SetAnim(
                 &mut ctx,
                 ent_id_2,
                 ucmd,
@@ -665,7 +679,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let ent_id_3 = ctx.entity_id_of(ent).unwrap();
-            crate::npc_c::NPC_SetAnim(&mut ctx, ent_id_3, type_, anim, priority);
+            NPC_SetAnim(&mut ctx, ent_id_3, type_, anim, priority);
         }
     }
     fn wp_get_vehicle_cam_pos(
@@ -686,7 +700,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let pilot = &mut (*self.world).g_entities[pilotEntNum as usize] as *mut gentity_t;
             let ent_id_4 = ctx.entity_id_of(ent).unwrap();
             let pilot_id = ctx.entity_id_of(pilot).unwrap();
-            crate::g_weapon::WP_GetVehicleCamPos(&mut ctx, ent_id_4, pilot_id, &mut *camPos);
+            WP_GetVehicleCamPos(&mut ctx, ent_id_4, pilot_id, &mut *camPos);
         }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
@@ -701,7 +715,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let enemy = &mut (*self.world).g_entities[otherNum as usize] as *mut gentity_t;
             let self_id = ctx.entity_id_of(self_).unwrap();
             let enemy_id = ctx.entity_id_of(enemy).unwrap();
-            crate::w_saber::G_CanBeEnemy(&mut ctx, self_id, enemy_id) as qboolean
+            G_CanBeEnemy(&mut ctx, self_id, enemy_id) as qboolean
         }
     }
     fn get_time(&self) -> c_int {
@@ -720,7 +734,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
             let ent_id = ctx.entity_id_of(ent).unwrap();
-            crate::g_cmds::TryGrapple(&mut ctx, ent_id)
+            TryGrapple(&mut ctx, ent_id)
         }
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: &str) {
@@ -733,7 +747,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        crate::g_ICARUScb::Q3_SetParm(&mut ctx, entID, parmNum, cstr(parmValue).as_ptr());
+        Q3_SetParm(&mut ctx, entID, parmNum, cstr(parmValue).as_ptr());
     }
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
         // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
@@ -749,7 +763,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let pVeh = (*vehEnt).m_pVehicle;
             let pEnt =
                 &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t as *mut bgEntity_t;
-            crate::veh_dispatch::board(&mut ctx, pVeh, pEnt)
+            veh_dispatch::board(&mut ctx, pVeh, pEnt)
         }
     }
     fn update_vehicle(&mut self, vehEntNum: c_int, ucmd: *const usercmd_t) {
@@ -762,7 +776,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
-            crate::veh_dispatch::update(&mut ctx, pVeh, ucmd);
+            veh_dispatch::update(&mut ctx, pVeh, ucmd);
         }
     }
     fn pm_animate_vehicle(&mut self, vehEntNum: c_int) {
@@ -775,7 +789,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
-            crate::veh_dispatch::animate(&mut ctx, pVeh);
+            veh_dispatch::animate(&mut ctx, pVeh);
         }
     }
     fn update_rider(&mut self, vehEntNum: c_int, riderEntNum: c_int, ucmd: *mut usercmd_t) {
@@ -798,7 +812,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             } else {
                 ucmd
             };
-            crate::veh_dispatch::update_rider(&mut ctx, pVeh, rider as *mut bgEntity_t, cmd);
+            veh_dispatch::update_rider(&mut ctx, pVeh, rider as *mut bgEntity_t, cmd);
         }
     }
     fn attach_riders(&mut self, vehEntNum: c_int) {
@@ -811,7 +825,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle;
-            crate::veh_dispatch::attach_riders(&mut ctx, pVeh);
+            veh_dispatch::attach_riders(&mut ctx, pVeh);
         }
     }
     fn my_saber(&mut self, client_num: c_int, saber_num: c_int) -> *mut saberInfo_t {
@@ -934,7 +948,7 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         // `oracle/codemp/game/FighterNPC.c:300-308`.
         unsafe {
             let ent = &(*self.world).g_entities[veh_ent_num as usize] as *const gentity_t;
-            crate::FighterNPC::FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
+            FighterIsLanded((*ent).m_pVehicle, (*ent).playerState)
         }
     }
 }
