@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 native_math = { path = "../../native/math" }
 native_sort = { path = "../../native/sort" }
 native_string = { path = "../../native/string" }
+native_types = { path = "../../native/types" }
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }
 mp_abi = { path = "../abi" }

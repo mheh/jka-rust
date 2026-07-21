@@ -21,11 +21,9 @@ pub use core::ffi::{
     c_void,
 };
 
-// Raven `byte` (`q_shared.h:349`, `typedef unsigned char byte`). `native_types`
-// defines it but is not re-exported for this name through `mp_qshared`; the
-// local alias matches the same `c_uchar` width.
+// Raven `byte` (`q_shared.h:349`, `typedef unsigned char byte`).
 // Source: `oracle/codemp/game/q_shared.h:349`
-pub type byte = c_uchar;
+pub use native_types::byte;
 
 // Integration round-1 addendum: the fnskel packets transcribe Raven constant
 // spellings verbatim (per each file's own "integration-deferred" note) without

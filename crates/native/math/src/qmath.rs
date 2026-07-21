@@ -12,7 +12,7 @@ use crate::vector::{vec3_t, vec4_t, vec_t};
 use core::ffi::{c_int, c_schar, c_short, c_uint};
 use native_types::mdxaBone_t;
 
-pub type qboolean = c_int;
+pub use native_types::qboolean;
 type byte = u8;
 
 pub const PITCH: usize = 0;

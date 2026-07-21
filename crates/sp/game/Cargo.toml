@@ -8,6 +8,7 @@ name = "sp_game"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+native_types = { path = "../../native/types" }
 sp_qshared = { path = "../qshared" }
 sp_bg = { path = "../bg" }
 sp_abi = { path = "../abi" }

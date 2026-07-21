@@ -8,4 +8,5 @@ name = "sp_abi"
 
 [dependencies]
 abi_transport = { path = "../../abi-transport" }
+native_types = { path = "../../native/types" }
 sp_qshared = { path = "../qshared" }

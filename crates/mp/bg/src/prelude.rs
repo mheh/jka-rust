@@ -16,7 +16,7 @@ pub use core::ffi::{
 
 // Raven `byte` (`q_shared.h:349`, `typedef unsigned char byte`).
 // Source: `oracle/codemp/game/q_shared.h:349`
-pub type byte = c_uchar;
+pub use native_types::byte;
 
 // --- mp_bg (this crate) re-exports ---
 pub use crate::local::bg_toggleable_surfaces::bgToggleableSurfaces;

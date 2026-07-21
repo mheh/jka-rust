@@ -143,6 +143,7 @@ dependencies = [
  "native_math",
  "native_platform",
  "native_string",
+ "native_types",
 ]
 
 [[package]]
@@ -278,6 +279,7 @@ dependencies = [
  "native_platform",
  "native_sort",
  "native_string",
+ "native_types",
 ]
 
 [[package]]
@@ -380,6 +382,7 @@ name = "sp_abi"
 version = "0.1.0"
 dependencies = [
  "abi_transport",
+ "native_types",
  "sp_qshared",
 ]
 
@@ -398,6 +401,7 @@ dependencies = [
 name = "sp_bg"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_qshared",
 ]
 
@@ -464,6 +468,7 @@ name = "sp_game"
 version = "0.1.0"
 dependencies = [
  "native_platform",
+ "native_types",
  "sp_abi",
  "sp_bg",
  "sp_qshared",

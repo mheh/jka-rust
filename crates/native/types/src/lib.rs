@@ -6,6 +6,14 @@
 
 use core::ffi::{c_int, c_uchar, c_ulong, c_ushort};
 
+pub mod anim;
+pub mod say;
+
+pub use anim::anim_event_type::animEventType_t;
+pub use anim::anim_number::{animNumber_t, SABER_ANIM_GROUP_SIZE};
+pub use anim::footstep_type::footstepType_t;
+pub use say::saying_t::saying_t;
+
 /// Raven `byte`.
 ///
 /// Type definition source: `oracle/code/game/q_shared.h:176`

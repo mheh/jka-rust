@@ -4,10 +4,10 @@
 
 use core::ffi::{c_char, c_int};
 
-/// Raven `clipHandle_t` collision model handle.
+/// Raven `clipHandle_t` collision model handle (canonical: `native_types`).
 ///
 /// Type definition source: `oracle/code/game/q_shared.h:188`
-pub type clipHandle_t = c_int;
+pub use native_types::clipHandle_t;
 
 /// Raven `memtag_t` zone tag wire value.
 ///

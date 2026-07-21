@@ -1,18 +1,3 @@
-//! SP `bg_public.h` footstep type definitions.
-//!
-//! Type definition source: `oracle/code/game/bg_public.h:550-557`
+//! `footstepType_t` footstep type definitions (canonical: `native_types`).
 
-#![allow(non_camel_case_types)]
-
-/// Raven `footstepType_t`.
-///
-/// Type definition source: `oracle/code/game/bg_public.h:550-557`
-#[repr(i32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum footstepType_t {
-    FOOTSTEP_R = 0,
-    FOOTSTEP_L = 1,
-    FOOTSTEP_HEAVY_R = 2,
-    FOOTSTEP_HEAVY_L = 3,
-    NUM_FOOTSTEP_TYPES = 4,
-}
+pub use native_types::footstepType_t;
