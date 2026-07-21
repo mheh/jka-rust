@@ -43,52 +43,9 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::{mdxaBone_t, qhandle_t, VectorNormalize};
 
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
+use crate::mdx::mdxa::MdxaView;
 use crate::render::bone_transform::{g2_transform_bone, multiply_3x4_matrix};
 use crate::shared::bone_info_t::boneInfo_t;
-
-// `mdxaHeader_t`/`mdxaSkelOffsets_t`/`mdxaSkel_t` byte-arithmetic offsets, read
-// off the opaque `*mut c_void` model block `EngineHost::model_mdxa` returns.
-// `G2SV-D5` forbids naming those loader types in this crate, so the ctor/
-// `SmoothLow` reach their fields by fixed offset instead of casting to the
-// struct (Raven does `(byte *)header + sizeof(mdxaHeader_t) + offsets->offsets[i]`,
-// `tr_ghoul2.cpp:416-424`). `MAX_QPATH == 64`, so, from `mdx_format.h`:
-//   `mdxaHeader_t` (`:351-371`): `numBones` @84, total size 100.
-//   `mdxaSkel_t`   (`:388-396`): `parent` @68, `BasePoseMat` @72, `BasePoseMatInv` @120.
-// Source: `oracle/codemp/renderer/mdx_format.h:351-396`
-const MDXA_HEADER_SIZE: usize = 100;
-const MDXA_HEADER_NUM_BONES_OFF: usize = 84;
-const MDXA_SKEL_PARENT_OFF: usize = 68;
-const MDXA_SKEL_BASE_POSE_MAT_OFF: usize = 72;
-const MDXA_SKEL_BASE_POSE_MAT_INV_OFF: usize = 120;
-
-/// Read the `mdxaHeader_t::numBones` field out of the opaque model block.
-///
-/// # Safety
-/// `header` must be the live `.gla` block `EngineHost::model_mdxa` returned
-/// (non-NULL, ≥ `sizeof(mdxaHeader_t)` bytes).
-/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:403`
-unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
-    header
-        .cast::<u8>()
-        .add(MDXA_HEADER_NUM_BONES_OFF)
-        .cast::<i32>()
-        .read_unaligned()
-}
-
-/// Base pointer of bone `index`'s `mdxaSkel_t`, via the `mdxaSkelOffsets_t`
-/// table at `header + sizeof(mdxaHeader_t)` (`tr_ghoul2.cpp:416-421`).
-///
-/// # Safety
-/// As [`mdxa_num_bones`], with `index` in `0..numBones`.
-/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:416-421`
-unsafe fn mdxa_skel(header: *const c_void, index: i32) -> *const u8 {
-    let base = header.cast::<u8>();
-    let offset = base
-        .add(MDXA_HEADER_SIZE + index as usize * core::mem::size_of::<i32>())
-        .cast::<i32>()
-        .read_unaligned();
-    base.add(MDXA_HEADER_SIZE + offset as usize)
-}
 
 /// Raven `struct SBoneCalc` (`tr_ghoul2.cpp:192-201`) — the frame/lerp inputs
 /// for one bone, copied down from parent to child in `EvalLow` before
@@ -235,7 +192,8 @@ impl CBoneCache {
         debug_assert!(!header.is_null(), "CBoneCache::new: null mdxa header");
 
         // SAFETY: `header` is the live `.gla` block from `model_mdxa`.
-        let num_bones = unsafe { mdxa_num_bones(header) };
+        let mdxa = unsafe { MdxaView::from_block(header) };
+        let num_bones = mdxa.num_bones();
         let n = num_bones as usize;
 
         let bones = vec![SBoneCalc::default(); n];
@@ -244,13 +202,7 @@ impl CBoneCache {
 
         // Seed each bone's parent from the model's `mdxaSkel_t` (`:419-425`).
         for (i, bone) in final_bones.iter_mut().enumerate() {
-            // SAFETY: `header` valid, `i < numBones`.
-            let skel = unsafe { mdxa_skel(header, i as i32) };
-            bone.parent = unsafe {
-                skel.add(MDXA_SKEL_PARENT_OFF)
-                    .cast::<i32>()
-                    .read_unaligned()
-            };
+            bone.parent = mdxa.skel(i as i32).parent();
         }
 
         CBoneCache {
@@ -354,17 +306,9 @@ impl CBoneCache {
         // basepose matrices come from the model's `mdxaSkel_t`, read off the
         // same opaque `header` block as the ctor (`G2SV-D5`).
         // SAFETY: `header` is the live `.gla` block; `index` in `0..numBones`.
-        let skel = unsafe { mdxa_skel(self.header, index) };
-        let base_pose_mat: mdxaBone_t = unsafe {
-            skel.add(MDXA_SKEL_BASE_POSE_MAT_OFF)
-                .cast::<mdxaBone_t>()
-                .read_unaligned()
-        };
-        let base_pose_mat_inv: mdxaBone_t = unsafe {
-            skel.add(MDXA_SKEL_BASE_POSE_MAT_INV_OFF)
-                .cast::<mdxaBone_t>()
-                .read_unaligned()
-        };
+        let skel = unsafe { MdxaView::from_block(self.header) }.skel(index);
+        let base_pose_mat: mdxaBone_t = skel.base_pose_mat();
+        let base_pose_mat_inv: mdxaBone_t = skel.base_pose_mat_inv();
 
         let mut temp_matrix = mdxaBone_t {
             matrix: [[0.0; 4]; 3],

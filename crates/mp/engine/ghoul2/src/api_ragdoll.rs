@@ -66,7 +66,7 @@
 //! long as the callee never re-enters `Ghoul2System.info_array` for the same
 //! model index while the split pointer is live.
 
-use core::ffi::{c_char, c_void};
+use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::ghoul2::{
@@ -80,6 +80,7 @@ use mp_qshared::shared::{
 
 use crate::ghoul2_system::Ghoul2System;
 use crate::gore::crag_doll_params::CRagDollParams;
+use crate::mdx::mdxa::MdxaView;
 use crate::ragdoll_update_params::{RagDollUpdateKind, RagDollUpdateParams};
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
@@ -121,14 +122,6 @@ const RAG_BONE_LIGHTWEIGHT: i32 = 0x04000;
 const RAG_PCJ_IK_CONTROLLED: i32 = 0x08000;
 /// Raven `#define RAG_UNSNAPPABLE (0x10000)` (`G2_bones.cpp:1220`).
 const RAG_UNSNAPPABLE: i32 = 0x10000;
-
-/// `sizeof(mdxaHeader_t)` (100 bytes; `oracle/codemp/renderer/mdx_format.h`,
-/// wire layout mirrored — not imported — in `crates/mp/renderer/src/mdx_format/
-/// mdxa_header_t.rs`'s own size assert). `G2SV-D5` forbids this crate naming
-/// `mdxaHeader_t`; `G2_Find_Bone_Rag`'s raw byte arithmetic
-/// (`(byte*)aHeader + sizeof(mdxaHeader_t) + ...`, `G2_bones.cpp:1276-1277`)
-/// is replicated unchanged against this constant instead.
-const MDXA_HEADER_SIZE: usize = 100;
 
 /// Identity `mdxaBone_t` (`G2_bones.cpp:1412-1417`/`4573-4578`, the
 /// `static mdxaBone_t id = {1,0,0,0, 0,1,0,0, 0,0,1,0}` both
@@ -449,19 +442,11 @@ fn skel_bone_name_matches(header: *const c_void, bone_number: i32, bone_name: &s
     if header.is_null() || bone_number < 0 {
         return false;
     }
-    let header = header as *const u8;
-    // SAFETY: mirrors Raven's own `(byte*)aHeader + sizeof(mdxaHeader_t) +
-    // offsets->offsets[boneNumber]` unchanged; `header` is trusted valid for
-    // the model's lifetime (see the invariant above).
-    unsafe {
-        let offsets_base = header.add(MDXA_HEADER_SIZE) as *const i32;
-        let bone_offset = *offsets_base.add(bone_number as usize);
-        let name_ptr = header.add(MDXA_HEADER_SIZE).offset(bone_offset as isize) as *const c_char;
-        core::ffi::CStr::from_ptr(name_ptr)
-            .to_str()
-            .map(|s| s.eq_ignore_ascii_case(bone_name))
-            .unwrap_or(false)
-    }
+    // SAFETY: `header` is non-null here and trusted valid for the model's
+    // lifetime (see the invariant above); `stricmp` is byte-wise case-insensitive.
+    unsafe { MdxaView::from_block(header) }
+        .skel(bone_number)
+        .name_matches(bone_name)
 }
 
 /// Raven `int G2_Find_Bone_Rag(CGhoul2Info *ghlInfo, boneInfo_v &blist,
@@ -1634,16 +1619,20 @@ mod tests {
     /// against a synthetic in-memory `.gla`-shaped buffer.
     #[test]
     fn skel_bone_name_matches_reads_wire_layout() {
+        // `sizeof(mdxaHeader_t)` == 100, `ofsEnd` @96 (`mdx_format.h:351-371`).
+        const MDXA_HEADER_SIZE: usize = 100;
+        const OFS_END: usize = 96;
         const SKEL_SIZE: usize = 176;
-        // header (100 bytes, content irrelevant) + a 2-entry offset table +
-        // two skeleton entries whose `name` field (offset 0) is all this
-        // reads.
+        // header (100 bytes) + a 2-entry offset table + two skeleton entries
+        // whose `name` field (offset 0) is all this reads.
         let mut buf = vec![0u8; MDXA_HEADER_SIZE + 8 + SKEL_SIZE * 2];
+        let ofs_end = buf.len() as i32;
+        buf[OFS_END..OFS_END + 4].copy_from_slice(&ofs_end.to_le_bytes());
         // offsets[0] = 8 (right after the 2-entry offset table itself).
-        buf[MDXA_HEADER_SIZE..MDXA_HEADER_SIZE + 4].copy_from_slice(&8i32.to_ne_bytes());
+        buf[MDXA_HEADER_SIZE..MDXA_HEADER_SIZE + 4].copy_from_slice(&8i32.to_le_bytes());
         // offsets[1] = 8 + SKEL_SIZE.
         buf[MDXA_HEADER_SIZE + 4..MDXA_HEADER_SIZE + 8]
-            .copy_from_slice(&((8 + SKEL_SIZE) as i32).to_ne_bytes());
+            .copy_from_slice(&((8 + SKEL_SIZE) as i32).to_le_bytes());
         let skel0 = MDXA_HEADER_SIZE + 8;
         let skel1 = MDXA_HEADER_SIZE + 8 + SKEL_SIZE;
         buf[skel0..skel0 + 11].copy_from_slice(b"model_root\0");

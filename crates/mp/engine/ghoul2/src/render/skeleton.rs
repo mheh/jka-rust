@@ -74,9 +74,10 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorMA, _VectorSubtract, CrossProduct, DotProductRow, VectorNormalize2,
 };
-use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow, MAX_QPATH};
+use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow};
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
+use crate::mdx::mdxa::MdxaView;
 use crate::render::bone_cache::CBoneCache;
 use crate::render::bone_transform;
 use crate::shared::bolt_info_t::boltInfo_t;
@@ -104,50 +105,6 @@ const MODEL_SHIFT: i32 = BOLT_SHIFT + BOLT_WIDTH;
 /// `g2api_set_new_origin` writes it), matching this crate's per-file constant
 /// duplication convention.
 const GHOUL2_NEWORIGIN: i32 = 0x008;
-
-// ---------------------------------------------------------------------------
-// mdxaHeader_t / mdxaSkel_t byte-offset helpers — a further, file-local copy
-// of the duplication `bones.rs`/`api_bones.rs` already carry for the same
-// header (`G2SV-D5`: this crate never names `mdxaHeader_t`/`mdxaSkel_t`).
-//
-// Source: `oracle/codemp/renderer/mdx_format.h:349-396`
-// ---------------------------------------------------------------------------
-
-/// `mdxaHeader_t` field order: `ident,version:i32` (8) + `name[MAX_QPATH]` +
-/// `fScale:f32` (4) then `numFrames`.
-const MDXA_NUM_FRAMES_OFFSET: usize = 4 + 4 + MAX_QPATH + 4;
-/// `numFrames` (4) + `ofsFrames` (4) then `numBones`.
-const MDXA_NUM_BONES_OFFSET: usize = MDXA_NUM_FRAMES_OFFSET + 4 + 4;
-/// `numBones` (4) + `ofsCompBonePool` (4) + `ofsSkel` (4) + `ofsEnd` (4) =
-/// `sizeof(mdxaHeader_t)`.
-const MDXA_HEADER_SIZE: usize = MDXA_NUM_BONES_OFFSET + 4 + 4 + 4 + 4;
-/// `mdxaSkel_t::BasePoseMat` offset: `name[MAX_QPATH]`(64) + `flags`(4) +
-/// `parent`(4) precede it.
-const SKEL_OFS_BASE_POSE_MAT: usize = MAX_QPATH + 4 + 4;
-/// `mdxaSkel_t::BasePoseMatInv` offset: `BasePoseMat` (48 bytes, `mdxaBone_t`)
-/// precedes it.
-const SKEL_OFS_BASE_POSE_MAT_INV: usize = SKEL_OFS_BASE_POSE_MAT + 48;
-
-/// Raven `mdxaHeader_t->numBones` — `tr_ghoul2.cpp:2104` (`!aHeader->numBones`).
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-pub(crate) unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
-    core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_BONES_OFFSET) as *const i32)
-}
-
-/// Raven `(mdxaSkelOffsets_t*)((byte*)header + sizeof(mdxaHeader_t))->
-/// offsets[boneNum]` then `(mdxaSkel_t*)(base + offset)` —
-/// `tr_ghoul2.cpp:672-673,705-706,745-746,3297-3298`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer
-/// and `bone_index` must be `< numBones`.
-pub(crate) unsafe fn mdxa_skel_ptr(header: *const c_void, bone_index: i32) -> *const u8 {
-    let base = (header as *const u8).add(MDXA_HEADER_SIZE);
-    let skel_offset = core::ptr::read_unaligned((base as *const i32).add(bone_index as usize));
-    base.offset(skel_offset as isize)
-}
 
 /// Raven's file-scope `const static mdxaBone_t identityMatrix` —
 /// `tr_ghoul2.cpp:128-133`. A real (not `const`) item so the "yikes"/no-cache
@@ -592,10 +549,8 @@ pub(crate) fn resolve_bolt_matrix_low(
         // SAFETY: `cache.header` is the block `EngineHost::model_mdxa` handed
         // back for this cache's model (`CBoneCache::new`/refresh); `boneNumber`
         // is caller-set bone data, matching Raven's own unchecked read.
-        let base_pose_mat: mdxaBone_t = unsafe {
-            let skel = mdxa_skel_ptr(cache.header as *const c_void, bolt.boneNumber);
-            core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT) as *const mdxaBone_t)
-        };
+        let base_pose_mat: mdxaBone_t =
+            unsafe { MdxaView::from_block(cache.header) }.skel(bolt.boneNumber).base_pose_mat();
         let mut ret_matrix = IDENTITY_MATRIX;
         // Raven: `Multiply_3x4Matrix(&retMatrix, (mdxaBone_t*)&boneCache.
         // EvalUnsmooth(...), &skel->BasePoseMat);` — dest first arg.
@@ -675,7 +630,7 @@ fn g2_transform_ghoul_bones_inner(
     // Raven: `if (!aHeader->numBones) { assert(0); return; }` — the assert is
     // a compiled no-op under NDEBUG, but the guard + `return` are real control
     // flow that survives.
-    if unsafe { mdxa_num_bones(header as *const c_void) } == 0 {
+    if unsafe { MdxaView::from_block(header) }.num_bones() == 0 {
         return;
     }
 
@@ -896,14 +851,10 @@ pub fn g2_get_bone_matrix_low(
     // back for this cache's model; `bone_num` is caller-provided bone data,
     // matching Raven's own unchecked read (its bounds assert is dead under
     // `-DNDEBUG`).
-    let (base_ptr, base_inv_ptr) = unsafe {
-        let skel = mdxa_skel_ptr(cache.header as *const c_void, bone_num);
-        (
-            skel.add(SKEL_OFS_BASE_POSE_MAT) as *mut mdxaBone_t,
-            skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *mut mdxaBone_t,
-        )
-    };
-    let base_pose_mat: mdxaBone_t = unsafe { core::ptr::read_unaligned(base_ptr) };
+    let skel = unsafe { MdxaView::from_block(cache.header) }.skel(bone_num);
+    let base_ptr = skel.base_pose_mat_ptr() as *mut mdxaBone_t;
+    let base_inv_ptr = skel.base_pose_mat_inv_ptr() as *mut mdxaBone_t;
+    let base_pose_mat: mdxaBone_t = skel.base_pose_mat();
 
     // Raven: `Multiply_3x4Matrix(&bolt, (mdxaBone_t*)&boneCache.Eval(boneNum),
     // &skel->BasePoseMat); // DEST FIRST ARG`
@@ -947,13 +898,11 @@ pub fn g2_get_bone_basepose(
         return (id_ptr, id_ptr);
     };
     // SAFETY: see `g2_get_bone_matrix_low`.
-    unsafe {
-        let skel = mdxa_skel_ptr(cache.header as *const c_void, bone_num);
-        (
-            skel.add(SKEL_OFS_BASE_POSE_MAT) as *mut mdxaBone_t,
-            skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *mut mdxaBone_t,
-        )
-    }
+    let skel = unsafe { MdxaView::from_block(cache.header) }.skel(bone_num);
+    (
+        skel.base_pose_mat_ptr() as *mut mdxaBone_t,
+        skel.base_pose_mat_inv_ptr() as *mut mdxaBone_t,
+    )
 }
 
 /// Raven `void G2_RagGetBoneBasePoseMatrixLow(CGhoul2Info &ghoul2, int
@@ -986,10 +935,8 @@ pub fn g2_rag_get_bone_base_pose_matrix_low(
 
     let mut ret_matrix = IDENTITY_MATRIX;
     // SAFETY: see `g2_get_bone_matrix_low`.
-    let base_pose_mat: mdxaBone_t = unsafe {
-        let skel = mdxa_skel_ptr(cache.header as *const c_void, bone_num);
-        core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT) as *const mdxaBone_t)
-    };
+    let base_pose_mat: mdxaBone_t =
+        unsafe { MdxaView::from_block(cache.header) }.skel(bone_num).base_pose_mat();
     bone_transform::multiply_3x4_matrix(&mut ret_matrix, bone_matrix, &base_pose_mat);
 
     if scale[0] != 0.0 {
@@ -1170,66 +1117,8 @@ mod tests {
     use crate::shared::cghoul2_info_v::CGhoul2Info_v;
     use mp_host_interface::mock::MockHost;
 
-    /// Builds a synthetic `mdxaHeader_t` + `mdxaSkelOffsets_t` + `mdxaSkel_t`
-    /// byte blob (one bone) matching the layout `MDXA_*`/`SKEL_OFS_*` above
-    /// assume, so the raw pointer arithmetic can be checked without any real
-    /// `.gla` file or a live `EngineHost`/`CBoneCache::new` body (still
-    /// `todo!()` in `render/bone_cache.rs`).
-    fn build_test_mdxa(base_pose: mdxaBone_t, base_pose_inv: mdxaBone_t) -> Vec<u8> {
-        let mut buf = vec![0u8; MDXA_HEADER_SIZE];
-        buf[MDXA_NUM_BONES_OFFSET..MDXA_NUM_BONES_OFFSET + 4].copy_from_slice(&1i32.to_ne_bytes());
-
-        // mdxaSkelOffsets_t: one i32 offset (relative to the base), then the
-        // single mdxaSkel_t entry: name[MAX_QPATH] + flags(4) + parent(4) +
-        // BasePoseMat(48) + BasePoseMatInv(48).
-        let skel_offset = 4i32; // one i32 offsets table entry precedes the skel data
-        buf.extend_from_slice(&skel_offset.to_ne_bytes());
-        buf.extend_from_slice(&[0u8; MAX_QPATH]); // name
-        buf.extend_from_slice(&0i32.to_ne_bytes()); // flags
-        buf.extend_from_slice(&(-1i32).to_ne_bytes()); // parent
-        for row in base_pose.matrix {
-            for v in row {
-                buf.extend_from_slice(&v.to_ne_bytes());
-            }
-        }
-        for row in base_pose_inv.matrix {
-            for v in row {
-                buf.extend_from_slice(&v.to_ne_bytes());
-            }
-        }
-        buf
-    }
-
-    #[test]
-    fn mdxa_reads_match_the_assumed_layout() {
-        let base_pose = mdxaBone_t {
-            matrix: [
-                [1.0, 2.0, 3.0, 4.0],
-                [5.0, 6.0, 7.0, 8.0],
-                [9.0, 10.0, 11.0, 12.0],
-            ],
-        };
-        let base_pose_inv = mdxaBone_t {
-            matrix: [
-                [21.0, 22.0, 23.0, 24.0],
-                [25.0, 26.0, 27.0, 28.0],
-                [29.0, 30.0, 31.0, 32.0],
-            ],
-        };
-        let buf = build_test_mdxa(base_pose, base_pose_inv);
-        let header = buf.as_ptr() as *const c_void;
-        unsafe {
-            assert_eq!(mdxa_num_bones(header), 1);
-            let skel = mdxa_skel_ptr(header, 0);
-            let read_base: mdxaBone_t =
-                core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT) as *const mdxaBone_t);
-            let read_base_inv: mdxaBone_t = core::ptr::read_unaligned(
-                skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *const mdxaBone_t,
-            );
-            assert_eq!(read_base, base_pose);
-            assert_eq!(read_base_inv, base_pose_inv);
-        }
-    }
+    // The `mdxaHeader_t`/`mdxaSkel_t` byte-layout reads this file's mdxa helpers
+    // used to check locally now live in `crate::mdx::mdxa`'s own tests.
 
     /// `resolve_bolt_matrix_low`'s three identity-fallback arms (no bone
     /// cache; out-of-range bolt index; a bolt with neither a bone nor a

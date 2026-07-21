@@ -25,6 +25,7 @@
 
 use mp_host_interface::EngineHost;
 
+use crate::mdx::mdxa::MdxaView;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::surface_info_t::surfaceInfo_t;
@@ -220,19 +221,14 @@ pub fn g2_add_bolt(
     // SAFETY: `a_header` is the `EngineHost::model_mdxa` block
     // `G2_SetupModelPointers` cached (the oracle's `mod_a->mdxa`, dereferenced
     // unchecked there too); callers run setup first (`g2api_add_bolt`).
-    let mdxa = ghl_info.a_header;
-    let num_bones = unsafe { crate::render::skeleton::mdxa_num_bones(mdxa) };
+    let mdxa = unsafe { MdxaView::from_block(ghl_info.a_header) };
+    let num_bones = mdxa.num_bones();
 
     // walk the entire list of bones in the gla file for this model and see if
-    // any match the name of the bone we want to find
+    // any match the name of the bone we want to find (`stricmp`, case-insensitive)
     let mut x = 0;
     while x < num_bones {
-        let skel = unsafe { crate::render::skeleton::mdxa_skel_ptr(mdxa, x) };
-        // `mdxaSkel_t.name` is the struct's first member; Raven compares with
-        // `stricmp` (case-insensitive).
-        let name = unsafe { core::ffi::CStr::from_ptr(skel as *const core::ffi::c_char) };
-        // if name is the same, we found it
-        if name.to_bytes().eq_ignore_ascii_case(bone_name.as_bytes()) {
+        if mdxa.skel(x).name_matches(bone_name) {
             break;
         }
         x += 1;
@@ -503,6 +499,9 @@ mod tests {
         let mut skel = [0u8; 64 + 8];
         skel[..8].copy_from_slice(b"testbone");
         mdxa.extend_from_slice(&skel);
+        // ofsEnd @96: the block's total self-describing size (MdxaView::from_block).
+        let ofs_end = mdxa.len() as i32;
+        mdxa[96..100].copy_from_slice(&ofs_end.to_le_bytes());
 
         let mut host = MockHost::new();
         host.mdxm_blocks.insert(1, mdxm);

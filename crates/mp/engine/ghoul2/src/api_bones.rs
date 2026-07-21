@@ -24,13 +24,13 @@
 //! named archetypes of the latter (`G2_API.cpp:1140,1191`: `return qfalse`
 //! before any out-param write).
 
-use core::ffi::c_void;
 use core::mem;
 
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations, MAX_QPATH};
+use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
 
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxa::MdxaView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -43,66 +43,6 @@ use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 ///
 /// Source: `oracle/codemp/ghoul2/G2_API.cpp:992`
 const GHOUL2_RAG_STARTED: i32 = 0x0010;
-
-// ---------------------------------------------------------------------------
-// mdxaHeader_t / mdxaSkel_t byte-offset helpers.
-//
-// `G2SV-D5` forbids naming `mdxaHeader_t`/`mdxaSkel_t` as Rust types in this
-// crate, but two wrappers below read their raw bytes directly off the
-// `EngineHost::model_mdxa`-sourced block (`CGhoul2Info::a_header`), exactly
-// as Raven's `G2API_SetBoneAnimIndex` (`ghlInfo->aHeader->numFrames`) and
-// `G2API_DoesBoneExist` (the skeleton bone-name walk) do. The offsets are the
-// mechanical consequence of the C layout, not a doc-frozen shape; reported
-// upstream (problems) since no doc section spells them out and other files
-// reading the same header (`misc.rs`, `bones.rs`'s by-filename lookups,
-// `render/bone_cache.rs`'s ctor) will need the same numbers.
-//
-// Source: `oracle/codemp/renderer/mdx_format.h:349-396`
-// ---------------------------------------------------------------------------
-
-/// `mdxaHeader_t` field order: `ident,version:i32` (8) + `name[MAX_QPATH]` +
-/// `fScale:f32` (4) then `numFrames`.
-const MDXA_NUM_FRAMES_OFFSET: usize = 4 + 4 + MAX_QPATH + 4;
-/// `numFrames` (4) + `ofsFrames` (4) then `numBones`.
-const MDXA_NUM_BONES_OFFSET: usize = MDXA_NUM_FRAMES_OFFSET + 4 + 4;
-/// `numBones` (4) + `ofsCompBonePool` (4) + `ofsSkel` (4) + `ofsEnd` (4) =
-/// `sizeof(mdxaHeader_t)`, matching Raven's own `(byte*)mdxa +
-/// sizeof(mdxaHeader_t)` arithmetic (`G2_API.cpp:974,1057`).
-const MDXA_HEADER_SIZE: usize = MDXA_NUM_BONES_OFFSET + 4 + 4 + 4 + 4;
-
-/// Raven `mdxaHeader_t->numFrames` — `G2_API.cpp:1058`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-unsafe fn mdxa_num_frames(header: *const c_void) -> i32 {
-    core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_FRAMES_OFFSET) as *const i32)
-}
-
-/// Raven `mdxaHeader_t->numBones` — `G2_API.cpp:974`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
-    core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_BONES_OFFSET) as *const i32)
-}
-
-/// Raven `(mdxaSkelOffsets_t*)((byte*)mdxa + sizeof(mdxaHeader_t))->offsets[i]`
-/// then `(mdxaSkel_t*)((byte*)mdxa + sizeof(mdxaHeader_t) + offset)->name`,
-/// `Q_stricmp`-compared against `bone_name` — `G2_API.cpp:970-984`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer
-/// and `bone_index` must be `< numBones`.
-unsafe fn mdxa_skel_name_matches(header: *const c_void, bone_index: i32, bone_name: &str) -> bool {
-    let base = (header as *const u8).add(MDXA_HEADER_SIZE);
-    let skel_offset = core::ptr::read_unaligned((base as *const i32).add(bone_index as usize));
-    let name_ptr = base.offset(skel_offset as isize);
-    let name_bytes = core::slice::from_raw_parts(name_ptr, MAX_QPATH);
-    let len = name_bytes.iter().position(|&b| b == 0).unwrap_or(MAX_QPATH);
-    core::str::from_utf8(&name_bytes[..len])
-        .map(|name| name.eq_ignore_ascii_case(bone_name))
-        .unwrap_or(false)
-}
 
 /// Raven `G2API_SetBoneAnim` — clamp the anim range/`setFrame` inputs to
 /// sane bounds, then forward to `G2_Set_Bone_Anim` on `ghoul2[modelIndex]`;
@@ -631,7 +571,7 @@ pub fn g2api_set_bone_anim_index(
     // Safety: `res` is true, so `g2_setup_model_pointers` has populated
     // `a_header` from a valid model (G2_API.cpp:1058 dereferences it
     // unconditionally on this path — same faithful no-null-check transcription).
-    let num_frames = unsafe { mdxa_num_frames(ghl_info.a_header) };
+    let num_frames = unsafe { MdxaView::from_block(ghl_info.a_header) }.num_frames();
     crate::bones::g2_set_bone_anim_index(
         &mut ghl_info.blist,
         index,
@@ -711,9 +651,10 @@ pub fn g2api_does_bone_exist(
     }
     // Safety: `mdxa` is a non-null block returned by `g2_setup_model_pointers`
     // (ultimately `EngineHost::model_mdxa`); `num_bones` bounds the walk below.
-    let num_bones = unsafe { mdxa_num_bones(mdxa) };
+    let mdxa = unsafe { MdxaView::from_block(mdxa) };
+    let num_bones = mdxa.num_bones();
     for i in 0..num_bones {
-        if unsafe { mdxa_skel_name_matches(mdxa, i, bone_name) } {
+        if mdxa.skel(i).name_matches(bone_name) {
             return true;
         }
     }
@@ -762,55 +703,8 @@ pub fn g2api_animate_g2_models(g2: &mut Ghoul2System, ghoul2: &mut CGhoul2Info_v
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    /// Builds a synthetic `mdxaHeader_t` + `mdxaSkelOffsets_t` + `mdxaSkel_t`
-    /// byte blob matching the layout `MDXA_*_OFFSET`/`mdxa_*` above assume, so
-    /// the raw pointer arithmetic can be checked without any real `.gla` file
-    /// or a live `EngineHost`/`bones.rs` body (which is still `todo!()`).
-    fn build_test_mdxa(num_frames: i32, bone_names: &[&str]) -> Vec<u8> {
-        let mut buf = vec![0u8; MDXA_HEADER_SIZE];
-        buf[MDXA_NUM_FRAMES_OFFSET..MDXA_NUM_FRAMES_OFFSET + 4]
-            .copy_from_slice(&num_frames.to_ne_bytes());
-        buf[MDXA_NUM_BONES_OFFSET..MDXA_NUM_BONES_OFFSET + 4]
-            .copy_from_slice(&(bone_names.len() as i32).to_ne_bytes());
-
-        // mdxaSkelOffsets_t: one i32 per bone, offsets relative to the base
-        // (header + MDXA_HEADER_SIZE), followed by the skel entries — for this
-        // test each entry is just MAX_QPATH name bytes (mdxa_skel_name_matches
-        // never reads past the name field).
-        let offsets_table_size = bone_names.len() * 4;
-        let mut offset = offsets_table_size;
-        let mut offsets = Vec::new();
-        let mut skel_data = Vec::new();
-        for name in bone_names {
-            offsets.push(offset as i32);
-            let mut name_bytes = vec![0u8; MAX_QPATH];
-            name_bytes[..name.len()].copy_from_slice(name.as_bytes());
-            skel_data.extend_from_slice(&name_bytes);
-            offset += MAX_QPATH;
-        }
-        for off in &offsets {
-            buf.extend_from_slice(&off.to_ne_bytes());
-        }
-        buf.extend_from_slice(&skel_data);
-        buf
-    }
-
-    #[test]
-    fn mdxa_header_reads_match_the_assumed_layout() {
-        let buf = build_test_mdxa(42, &["pelvis", "Head"]);
-        let header = buf.as_ptr() as *const c_void;
-        unsafe {
-            assert_eq!(mdxa_num_frames(header), 42);
-            assert_eq!(mdxa_num_bones(header), 2);
-            // G2API_DoesBoneExist's Q_stricmp match is case-insensitive.
-            assert!(mdxa_skel_name_matches(header, 0, "PELVIS"));
-            assert!(mdxa_skel_name_matches(header, 1, "head"));
-            assert!(!mdxa_skel_name_matches(header, 0, "nonexistent"));
-            assert!(!mdxa_skel_name_matches(header, 1, "pelvis"));
-        }
-    }
+    // The `mdxaHeader_t`/`mdxaSkel_t` byte-layout reads this file used to check
+    // locally now live in `crate::mdx::mdxa`'s own tests.
 
     #[test]
     fn set_bone_anim_clamps_out_of_range_frames() {

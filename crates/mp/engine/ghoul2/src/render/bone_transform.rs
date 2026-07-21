@@ -58,8 +58,10 @@
 
 use core::ffi::c_void;
 
-use mp_qshared::shared::{mdxaBone_t, vec4_t, VectorLength, MAX_QPATH};
+use mp_qshared::shared::{mdxaBone_t, vec4_t, VectorLength};
 
+use crate::matcomp::mc_uncompress_quat;
+use crate::mdx::mdxa::MdxaView;
 use crate::render::bone_cache::CBoneCache;
 use crate::shared::bone_info_t::boneInfo_t;
 
@@ -93,79 +95,6 @@ const BONE_ANIM_BLEND: i32 = 0x0080;
 const BONE_ANIM_TOTAL: i32 =
     BONE_ANIM_OVERRIDE | BONE_ANIM_OVERRIDE_LOOP | BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND;
 
-// ---------------------------------------------------------------------------
-// `mdxaHeader_t`/`mdxaSkel_t` byte-offset helpers.
-//
-// `G2SV-D5` forbids naming `mdxaHeader_t`/`mdxaSkel_t`/`mdxaIndex_t`/
-// `mdxaCompQuatBone_t` as Rust types in this crate. This is another
-// file-local copy of the same byte-arithmetic `bones.rs`/`api_bones.rs`/
-// `api_models.rs` already duplicate for the same header (reported upstream
-// there, followed here for consistency, not a new decision).
-//
-// Source: `oracle/codemp/renderer/mdx_format.h:349-413`
-// ---------------------------------------------------------------------------
-
-/// `mdxaHeader_t` field order: `ident,version:i32` (8) + `name[MAX_QPATH]` +
-/// `fScale:f32` (4) then `numFrames`.
-const MDXA_NUM_FRAMES_OFFSET: usize = 4 + 4 + MAX_QPATH + 4;
-/// `numFrames` (4) then `ofsFrames`.
-const MDXA_OFS_FRAMES_OFFSET: usize = MDXA_NUM_FRAMES_OFFSET + 4;
-/// `ofsFrames` (4) then `numBones`.
-const MDXA_NUM_BONES_OFFSET: usize = MDXA_OFS_FRAMES_OFFSET + 4;
-/// `numBones` (4) then `ofsCompBonePool`.
-const MDXA_OFS_COMP_BONE_POOL_OFFSET: usize = MDXA_NUM_BONES_OFFSET + 4;
-/// `ofsCompBonePool` (4) + `ofsSkel` (4) + `ofsEnd` (4) = `sizeof(mdxaHeader_t)`,
-/// matching Raven's own `(byte*)mdxa + sizeof(mdxaHeader_t)` arithmetic
-/// (`:1687`).
-const MDXA_HEADER_SIZE: usize = MDXA_OFS_COMP_BONE_POOL_OFFSET + 4 + 4 + 4;
-/// `mdxaSkel_t::BasePoseMat` offset: `name[MAX_QPATH]`(64) + `flags`(4) +
-/// `parent`(4) precede it.
-const SKEL_OFS_BASE_POSE_MAT: usize = MAX_QPATH + 4 + 4;
-/// `mdxaSkel_t::BasePoseMatInv` offset: `BasePoseMat` (48 bytes, `mdxaBone_t`)
-/// precedes it.
-const SKEL_OFS_BASE_POSE_MAT_INV: usize = SKEL_OFS_BASE_POSE_MAT + 48;
-/// `mdxaCompQuatBone_t::Comp` size (`mdx_format.h:120`) — 14 raw bytes, no
-/// padding (a `char[14]` member alone forces 1-byte struct alignment).
-const MDXA_COMP_QUAT_BONE_SIZE: usize = 14;
-
-/// Raven `mdxaHeader_t->numFrames` (`:1615` and throughout the clamp checks).
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-unsafe fn mdxa_num_frames(header: *const c_void) -> i32 {
-    core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_FRAMES_OFFSET) as *const i32)
-}
-
-/// Raven `(mdxaSkelOffsets_t*)((byte*)mdxa + sizeof(mdxaHeader_t))->offsets[i]`
-/// then `(mdxaSkel_t*)((byte*)mdxa + sizeof(mdxaHeader_t) + offset)` —
-/// `tr_ghoul2.cpp:1815-1817`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer
-/// and `bone_index` must be `< numBones`.
-unsafe fn mdxa_skel_ptr(header: *const c_void, bone_index: i32) -> *const u8 {
-    let base = (header as *const u8).add(MDXA_HEADER_SIZE);
-    let skel_offset = core::ptr::read_unaligned((base as *const i32).add(bone_index as usize));
-    base.offset(skel_offset as isize)
-}
-
-/// Raven `skel->BasePoseMat` — `tr_ghoul2.cpp:1837` etc.
-///
-/// # Safety
-/// Same preconditions as [`mdxa_skel_ptr`].
-unsafe fn mdxa_skel_base_pose_mat(header: *const c_void, bone_index: i32) -> mdxaBone_t {
-    let skel = mdxa_skel_ptr(header, bone_index);
-    core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT) as *const mdxaBone_t)
-}
-
-/// Raven `skel->BasePoseMatInv` — `tr_ghoul2.cpp:1855` etc.
-///
-/// # Safety
-/// Same preconditions as [`mdxa_skel_ptr`].
-unsafe fn mdxa_skel_base_pose_mat_inv(header: *const c_void, bone_index: i32) -> mdxaBone_t {
-    let skel = mdxa_skel_ptr(header, bone_index);
-    core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *const mdxaBone_t)
-}
 
 /// Raven `void G2_TransformBone(int child,CBoneCache &BC)` — the core
 /// per-bone evaluator `CBoneCache::EvalLow` drives: resolves bone-list
@@ -234,7 +163,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
         // should this animation be overridden by an animation in the bone list?
         if bone_override.flags & (BONE_ANIM_OVERRIDE_LOOP | BONE_ANIM_OVERRIDE) != 0 {
             // SAFETY: same as the function-level note above.
-            let num_frames = unsafe { mdxa_num_frames(bc.header) };
+            let num_frames = unsafe { MdxaView::from_block(bc.header) }.num_frames();
             let tb = &mut bc.bones[child_idx];
             let (mut current_frame, mut new_frame, mut backlerp) =
                 (tb.current_frame, tb.new_frame, tb.backlerp);
@@ -255,7 +184,7 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
 
     // figure out where the location of the bone animation data is
     // SAFETY: same as the function-level note above.
-    let num_frames = unsafe { mdxa_num_frames(bc.header) };
+    let num_frames = unsafe { MdxaView::from_block(bc.header) }.num_frames();
     {
         let tb = &mut bc.bones[child_idx];
         if !(tb.new_frame >= 0 && tb.new_frame < num_frames) {
@@ -380,8 +309,9 @@ pub fn g2_transform_bone(bc: &mut CBoneCache, child: i32) {
 
         // SAFETY: same as the function-level note above; `bone_list_index`
         // is non-negative here (see the invariant note at the top).
-        let base_pose_mat = unsafe { mdxa_skel_base_pose_mat(bc.header, child) };
-        let base_pose_mat_inv = unsafe { mdxa_skel_base_pose_mat_inv(bc.header, child) };
+        let skel = unsafe { MdxaView::from_block(bc.header) }.skel(child);
+        let base_pose_mat = skel.base_pose_mat();
+        let base_pose_mat_inv = skel.base_pose_mat_inv();
         let bone_override_matrix = unsafe { (*bc.root_bone_list)[bone_list_index as usize].matrix };
 
         if is_rag {
@@ -862,48 +792,13 @@ pub fn g2_create_matrix_from_quaterion(mat: &mut mdxaBone_t, quat: &vec4_t) {
     mat.matrix[2][3] = 0.0;
 }
 
-/// Raven `static int G2_GetBonePoolIndex(const mdxaHeader_t *pMDXAHeader, int
-/// iFrame, int iBone)` (private helper of `UnCompressBone`) — computes the
-/// compressed-bone-pool slot for `(frame, bone)`: `iOffsetToIndex = (iFrame *
-/// numBones * 3) + (iBone * 3)` bytes into the header's `ofsFrames` block,
-/// read as an `mdxaIndex_t`, masked to `iIndex & 0x00FFFFFF` (the top byte is
-/// non-index payload; masking off it is noted upstream as an unfixed
-/// big-endian hazard, kept faithfully). `header` is the same opaque
-/// `*mut c_void` model memory as `CBoneCache::header` (`G2SV-D5`: this crate
-/// never names `mdxaHeader_t`/`mdxaIndex_t`).
-///
-/// Not enumerated in this file's roster/method-table row (doc/oracle
-/// mismatch — reported, not improvised around): see the module-doc finding.
-/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:1148-1155`
-fn g2_get_bone_pool_index(header: *const c_void, frame: i32, bone: i32) -> i32 {
-    // Safety: `header` is a valid, non-null `EngineHost::model_mdxa` block
-    // pointer for the whole `CBoneCache` lifetime (`G2SV-D5`, ruling 36).
-    unsafe {
-        let num_bones = core::ptr::read_unaligned(
-            (header as *const u8).add(MDXA_NUM_BONES_OFFSET) as *const i32
-        );
-        let ofs_frames = core::ptr::read_unaligned(
-            (header as *const u8).add(MDXA_OFS_FRAMES_OFFSET) as *const i32,
-        );
-        let offset_to_index = (frame * num_bones * 3) + (bone * 3);
-        let index_ptr = (header as *const u8)
-            .offset(ofs_frames as isize)
-            .offset(offset_to_index as isize) as *const i32;
-        let i_index = core::ptr::read_unaligned(index_ptr);
-        i_index & 0x00FF_FFFF // this will cause problems for big-endian machines... ;-)
-    }
-}
-
 /// Raven `/*static inline*/ void UnCompressBone(float mat[3][4], int
 /// iBoneIndex, const mdxaHeader_t *pMDXAHeader, int iFrame)` — the thin
 /// wrapper `G2_TransformBone` calls (five times, `:1707,1708,1723,1747,1748`)
-/// to decompress one bone's matrix for a given frame: locates the
-/// `mdxaCompQuatBone_t` pool via the header's `ofsCompBonePool` offset,
-/// indexes it with `G2_GetBonePoolIndex`, and hands the 14-byte compressed
+/// to decompress one bone's matrix for a given frame: indexes the
+/// `mdxaCompQuatBone_t` pool via `G2_GetBonePoolIndex`
+/// ([`MdxaView::frame_bone_pool_index`]) and hands the 14-byte compressed
 /// record to `MC_UnCompressQuat` (`matcomp.rs::mc_uncompress_quat`, landed).
-/// Also the sole call site of `G2_RagGetAnimMatrix` (`:1464`, the
-/// not-yet-landed `ragdoll.rs`'s domain) — stubbed here as the primary
-/// (5-call) home per the module-doc finding.
 ///
 /// Not enumerated in this file's roster/method-table row (doc/oracle
 /// mismatch — reported, not improvised around): see the module-doc finding.
@@ -916,17 +811,9 @@ pub fn uncompress_bone(
 ) {
     // Safety: `header` is a valid, non-null `EngineHost::model_mdxa` block
     // pointer for the whole `CBoneCache` lifetime (`G2SV-D5`, ruling 36).
-    unsafe {
-        let ofs_comp_bone_pool = core::ptr::read_unaligned(
-            (header as *const u8).add(MDXA_OFS_COMP_BONE_POOL_OFFSET) as *const i32,
-        );
-        let pool_index = g2_get_bone_pool_index(header, frame, bone_index);
-        let comp_ptr = (header as *const u8)
-            .offset(ofs_comp_bone_pool as isize)
-            .add(pool_index as usize * MDXA_COMP_QUAT_BONE_SIZE);
-        let comp = core::slice::from_raw_parts(comp_ptr, MDXA_COMP_QUAT_BONE_SIZE);
-        crate::matcomp::mc_uncompress_quat(mat, comp);
-    }
+    let mdxa = unsafe { MdxaView::from_block(header) };
+    let pool_index = mdxa.frame_bone_pool_index(frame, bone_index);
+    mc_uncompress_quat(mat, mdxa.comp_bone(pool_index));
 }
 
 #[cfg(test)]
@@ -1038,22 +925,26 @@ mod tests {
     /// depending on any sibling module's still-`todo!()` body.
     #[test]
     fn uncompress_bone_reads_synthetic_header() {
-        let ofs_frames = MDXA_HEADER_SIZE as i32;
+        // mdxaHeader_t offsets (`mdx_format.h:351-371`): numFrames@76, ofsFrames
+        // @80, numBones@84, ofsCompBonePool@88, ofsEnd@96, sizeof == 100.
+        const HEADER_SIZE: usize = 100;
+        const OFS_END: usize = 96;
+        const COMP_SIZE: usize = 14;
+        let ofs_frames = HEADER_SIZE as i32;
         let ofs_comp_bone_pool = ofs_frames + 4; // one mdxaIndex_t (4 bytes) then the pool
 
-        let mut buf = vec![0u8; MDXA_HEADER_SIZE + 4 + MDXA_COMP_QUAT_BONE_SIZE];
-        buf[MDXA_NUM_FRAMES_OFFSET..MDXA_NUM_FRAMES_OFFSET + 4]
-            .copy_from_slice(&1i32.to_ne_bytes());
-        buf[MDXA_OFS_FRAMES_OFFSET..MDXA_OFS_FRAMES_OFFSET + 4]
-            .copy_from_slice(&ofs_frames.to_ne_bytes());
-        buf[MDXA_NUM_BONES_OFFSET..MDXA_NUM_BONES_OFFSET + 4].copy_from_slice(&1i32.to_ne_bytes());
-        buf[MDXA_OFS_COMP_BONE_POOL_OFFSET..MDXA_OFS_COMP_BONE_POOL_OFFSET + 4]
-            .copy_from_slice(&ofs_comp_bone_pool.to_ne_bytes());
+        let mut buf = vec![0u8; HEADER_SIZE + 4 + COMP_SIZE];
+        let ofs_end = buf.len() as i32;
+        buf[76..80].copy_from_slice(&1i32.to_le_bytes()); // numFrames
+        buf[80..84].copy_from_slice(&ofs_frames.to_le_bytes()); // ofsFrames
+        buf[84..88].copy_from_slice(&1i32.to_le_bytes()); // numBones
+        buf[88..92].copy_from_slice(&ofs_comp_bone_pool.to_le_bytes()); // ofsCompBonePool
+        buf[OFS_END..OFS_END + 4].copy_from_slice(&ofs_end.to_le_bytes());
 
         // mdxaIndex_t at ofsFrames: index 0 into the compressed-bone pool
         // (iOffsetToIndex = (0*1*3)+(0*3) = 0, so this IS the pool index).
         let index_pos = ofs_frames as usize;
-        buf[index_pos..index_pos + 4].copy_from_slice(&0i32.to_ne_bytes());
+        buf[index_pos..index_pos + 4].copy_from_slice(&0i32.to_le_bytes());
 
         // A 14-byte compressed record decoding to an identity rotation +
         // zero translation: MC_UnCompressQuat reads w,x,y,z as
@@ -1061,7 +952,7 @@ mod tests {
         // for w and 2*16383=32766 for x/y/z; translation reads
         // (u16/64.0 - 512.0), so 0.0 needs raw u16 = 512*64 = 32768.
         let comp_pos = ofs_comp_bone_pool as usize;
-        let comp = &mut buf[comp_pos..comp_pos + MDXA_COMP_QUAT_BONE_SIZE];
+        let comp = &mut buf[comp_pos..comp_pos + COMP_SIZE];
         comp[0..2].copy_from_slice(&49149u16.to_le_bytes());
         comp[2..4].copy_from_slice(&32766u16.to_le_bytes());
         comp[4..6].copy_from_slice(&32766u16.to_le_bytes());
@@ -1071,7 +962,7 @@ mod tests {
         comp[12..14].copy_from_slice(&32768u16.to_le_bytes());
 
         let header = buf.as_ptr() as *const c_void;
-        let pool_index = g2_get_bone_pool_index(header, 0, 0);
+        let pool_index = unsafe { MdxaView::from_block(header) }.frame_bone_pool_index(0, 0);
         assert_eq!(pool_index, 0);
 
         let mut mat = [[9.0f32; 4]; 3];

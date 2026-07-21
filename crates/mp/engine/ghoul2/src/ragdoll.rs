@@ -128,8 +128,6 @@
 //!    `broadsword_ragtobase > 1`, a tuning cvar that defaults off) is
 //!    unaffected in the default configuration.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::q_math::{
@@ -139,12 +137,13 @@ use mp_qshared::shared::q_math::{
 };
 use mp_qshared::shared::{
     mdxaBone_t, vec3_t, VectorLength, VectorNormalize, CONTENTS_SOLID, CONTENTS_TERRAIN,
-    ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_QPATH,
+    ENTITYNUM_NONE, ENTITYNUM_WORLD,
 };
 
 use crate::api_collision::{g2api_get_time, g2api_give_me_vector_from_matrix};
 use crate::bones::g2_find_bone;
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxa::MdxaView;
 use crate::misc::g2_generate_world_matrix;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::render::bone_transform::{multiply_3x4_matrix, uncompress_bone};
@@ -353,50 +352,6 @@ unsafe fn alias_bone_mut<'a>(ghoul2: *mut CGhoul2Info, index: usize) -> &'a mut 
     unsafe { &mut (*ghoul2).blist[index] }
 }
 
-// ---------------------------------------------------------------------------
-// Private file-local `mdxaSkel_t`/`mdxaSkelOffsets_t` byte-layout walk — see
-// this file's module-doc "problems" note #1. Sizes only, transcribed from
-// `oracle/codemp/renderer/mdx_format.h:350-397`; never an imported
-// `mp_renderer` type (`G2SV-D5`).
-// ---------------------------------------------------------------------------
-
-/// `sizeof(mdxaHeader_t)`: 2 leading ints + `name[MAX_QPATH]` + 7 more ints
-/// (`mdx_format.h:350-371`).
-const MDXA_HEADER_SIZE: usize = 4 + 4 + MAX_QPATH + 4 + 4 + 4 + 4 + 4 + 4;
-/// `mdxaSkel_t` field byte offsets (`mdx_format.h:388-396`): `name[MAX_QPATH]`
-/// (0), `flags:u32` (`MAX_QPATH`), `parent:i32` (`+4`), `BasePoseMat` (`+4`,
-/// 48 bytes), `BasePoseMatInv` (`+48`), `numChildren:i32`, `children[]`.
-const MDXA_SKEL_PARENT_OFS: usize = MAX_QPATH + 4;
-const MDXA_SKEL_NUM_CHILDREN_OFS: usize = MDXA_SKEL_PARENT_OFS + 4 + 48 + 48;
-const MDXA_SKEL_CHILDREN_OFS: usize = MDXA_SKEL_NUM_CHILDREN_OFS + 4;
-
-/// Resolve bone `bone_num`'s `mdxaSkel_t*` (as a raw byte pointer) out of the
-/// loader's `.gla` block, exactly as Raven's `(byte*)header + sizeof(
-/// mdxaHeader_t) + offsets->offsets[boneNum]` idiom does (e.g.
-/// `G2_bones.cpp:1273-1274`, `tr_ghoul2.cpp:614-615`).
-unsafe fn mdxa_skel_ptr(header: *const c_void, bone_num: i32) -> *const u8 {
-    unsafe {
-        let base = header as *const u8;
-        let offsets_table = base.add(MDXA_HEADER_SIZE) as *const i32;
-        let rel_offset = *offsets_table.add(bone_num as usize);
-        base.add(MDXA_HEADER_SIZE).add(rel_offset as usize)
-    }
-}
-unsafe fn mdxa_skel_parent(skel: *const u8) -> i32 {
-    unsafe { *(skel.add(MDXA_SKEL_PARENT_OFS) as *const i32) }
-}
-unsafe fn mdxa_skel_num_children(skel: *const u8) -> i32 {
-    unsafe { *(skel.add(MDXA_SKEL_NUM_CHILDREN_OFS) as *const i32) }
-}
-unsafe fn mdxa_skel_child(skel: *const u8, i: usize) -> i32 {
-    unsafe { *(skel.add(MDXA_SKEL_CHILDREN_OFS + i * 4) as *const i32) }
-}
-unsafe fn mdxa_skel_name(skel: *const u8) -> String {
-    unsafe {
-        let cstr = core::ffi::CStr::from_ptr(skel as *const core::ffi::c_char);
-        cstr.to_string_lossy().into_owned()
-    }
-}
 
 /// Raven `int G2_GetBoneDependents(CGhoul2Info &ghoul2, int boneNum, int
 /// *tempDependents, int maxDep)` — private file-local stopgap (module-doc
@@ -424,31 +379,31 @@ fn g2_get_bone_dependents(
     if header.is_null() {
         return 0;
     }
-    g2_get_bone_dependents_recurse(header, bone_num, out)
+    // SAFETY: `header` is the non-null `EngineHost::model_mdxa` block.
+    let mdxa = unsafe { MdxaView::from_block(header) };
+    g2_get_bone_dependents_recurse(mdxa, bone_num, out)
 }
 
-fn g2_get_bone_dependents_recurse(header: *mut c_void, bone_num: i32, out: &mut [i32]) -> i32 {
-    unsafe {
-        let skel = mdxa_skel_ptr(header, bone_num);
-        let num_children = mdxa_skel_num_children(skel);
-        let mut written = 0usize;
-        for i in 0..num_children as usize {
-            if written >= out.len() {
-                return written as i32;
-            }
-            out[written] = mdxa_skel_child(skel, i);
-            written += 1;
+fn g2_get_bone_dependents_recurse(mdxa: MdxaView, bone_num: i32, out: &mut [i32]) -> i32 {
+    let skel = mdxa.skel(bone_num);
+    let num_children = skel.num_children();
+    let mut written = 0usize;
+    for i in 0..num_children as usize {
+        if written >= out.len() {
+            return written as i32;
         }
-        for i in 0..num_children as usize {
-            if written >= out.len() {
-                break;
-            }
-            let child = mdxa_skel_child(skel, i);
-            let num = g2_get_bone_dependents_recurse(header, child, &mut out[written..]);
-            written += num as usize;
-        }
-        written as i32
+        out[written] = skel.child(i);
+        written += 1;
     }
+    for i in 0..num_children as usize {
+        if written >= out.len() {
+            break;
+        }
+        let child = skel.child(i);
+        let num = g2_get_bone_dependents_recurse(mdxa, child, &mut out[written..]);
+        written += num as usize;
+    }
+    written as i32
 }
 
 /// Raven `bool G2_WasBoneRendered(CGhoul2Info &ghoul2, int boneNum)` —
@@ -490,10 +445,10 @@ fn g2_rag_get_anim_matrix(
         return ZERO_BONE;
     }
 
-    let (skel, name) = unsafe {
-        let skel = mdxa_skel_ptr(header, bone_num);
-        (skel, mdxa_skel_name(skel))
-    };
+    // SAFETY: `header` is the non-null `EngineHost::model_mdxa` block.
+    let mdxa = unsafe { MdxaView::from_block(header) };
+    let skel = mdxa.skel(bone_num);
+    let name = skel.name_lossy();
 
     let bone_list_index = resolve_or_add_bone(ghoul2, &name);
     let Some(bli) = bone_list_index else {
@@ -507,15 +462,12 @@ fn g2_rag_get_anim_matrix(
     let mut anim_matrix = ZERO_BONE;
     uncompress_bone(&mut anim_matrix.matrix, bone_num, header, frame);
 
-    let parent = unsafe { mdxa_skel_parent(skel) };
+    let parent = skel.parent();
     let mut result = ZERO_BONE;
     if bone_num > 0 && parent > -1 {
         // Recursively assure the parent's animFrameMatrix is set up first.
         let _ = g2_rag_get_anim_matrix(g2, ghoul2, parent, frame);
-        let pname = unsafe {
-            let pskel = mdxa_skel_ptr(header, parent);
-            mdxa_skel_name(pskel)
-        };
+        let pname = mdxa.skel(parent).name_lossy();
         let Some(pbli) = resolve_or_add_bone(ghoul2, &pname) else {
             return ZERO_BONE;
         };
@@ -1368,21 +1320,19 @@ fn g2_rag_doll_settle_position_numero_trois_instances(
                 let anim_model = instances[idx].anim_model;
                 let mut found = -1i32;
                 if !a_header.is_null() {
-                    unsafe {
-                        let skel = mdxa_skel_ptr(a_header, bone_number);
-                        let mut b_parent_index = mdxa_skel_parent(skel);
-                        while b_parent_index > 0 {
-                            let pskel = mdxa_skel_ptr(a_header, b_parent_index);
-                            let pname = mdxa_skel_name(pskel);
-                            b_parent_index = mdxa_skel_parent(pskel);
-                            let bli = g2_find_bone(anim_model, &instances[idx].blist, &pname);
-                            if bli != -1
-                                && instances[idx].blist[bli as usize].flags & BONE_ANGLES_RAGDOLL
-                                    != 0
-                            {
-                                found = bli;
-                                break;
-                            }
+                    // SAFETY: `a_header` is the non-null `EngineHost::model_mdxa` block.
+                    let mdxa = unsafe { MdxaView::from_block(a_header) };
+                    let mut b_parent_index = mdxa.skel(bone_number).parent();
+                    while b_parent_index > 0 {
+                        let pskel = mdxa.skel(b_parent_index);
+                        let pname = pskel.name_lossy();
+                        b_parent_index = pskel.parent();
+                        let bli = g2_find_bone(anim_model, &instances[idx].blist, &pname);
+                        if bli != -1
+                            && instances[idx].blist[bli as usize].flags & BONE_ANGLES_RAGDOLL != 0
+                        {
+                            found = bli;
+                            break;
                         }
                     }
                 }
@@ -2274,10 +2224,10 @@ pub fn g2_get_bone_name(ghoul2: &CGhoul2Info, blist: &[boneInfo_t], bone_num: i3
         if entry.boneNumber != bone_num {
             continue;
         }
-        return unsafe {
-            let skel = mdxa_skel_ptr(ghoul2.a_header as *mut c_void, entry.boneNumber);
-            mdxa_skel_name(skel)
-        };
+        // SAFETY: `a_header` is the non-null `EngineHost::model_mdxa` block.
+        return unsafe { MdxaView::from_block(ghoul2.a_header) }
+            .skel(entry.boneNumber)
+            .name_lossy();
     }
     "BONE_NOT_FOUND".to_string()
 }

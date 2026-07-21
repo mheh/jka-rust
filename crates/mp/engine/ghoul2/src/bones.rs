@@ -65,9 +65,11 @@ use core::ffi::c_void;
 
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::Create_Matrix;
-use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations, MAX_QPATH};
+use mp_qshared::shared::{mdxaBone_t, qhandle_t, vec3_t, Eorientations};
 
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxa::MdxaView;
+use crate::mdx::mdxm::MdxmView;
 use crate::ragdoll_update_params::RagDollUpdateParams;
 use crate::shared::bone_info_t::boneInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
@@ -111,100 +113,6 @@ const BONE_NEED_TRANSFORM: i32 = 0x8000;
 ///
 /// Source: `oracle/codemp/ghoul2/G2_bones.cpp:1200`
 const RAG_PCJ_IK_CONTROLLED: i32 = 0x08000;
-
-// ---------------------------------------------------------------------------
-// mdxaHeader_t / mdxaSkel_t byte-offset helpers.
-//
-// `G2SV-D5` forbids naming `mdxaHeader_t`/`mdxaSkel_t` as Rust types in this
-// crate. `CGhoul2Info::anim_model`/`a_header` are both `*const c_void`
-// (`G2SV-D5`) sourced from `EngineHost::model_mdxa`; the port collapses
-// Raven's `model_t *animModel` layer away entirely (the only thing ever read
-// off it in this file is `->mdxa`), so `anim_model` here already IS the raw
-// `mdxaHeader_t` block pointer, exactly like `a_header` — the same byte
-// arithmetic `api_bones.rs`/`api_models.rs` already duplicate for the same
-// header applies unchanged. This is a third, file-local copy of that same
-// duplication (reported upstream there, followed here for consistency, not a
-// new decision).
-//
-// Source: `oracle/codemp/renderer/mdx_format.h:349-396`
-// ---------------------------------------------------------------------------
-
-/// `mdxaHeader_t` field order: `ident,version:i32` (8) + `name[MAX_QPATH]` +
-/// `fScale:f32` (4) then `numFrames`.
-const MDXA_NUM_FRAMES_OFFSET: usize = 4 + 4 + MAX_QPATH + 4;
-/// `numFrames` (4) + `ofsFrames` (4) then `numBones`.
-const MDXA_NUM_BONES_OFFSET: usize = MDXA_NUM_FRAMES_OFFSET + 4 + 4;
-/// `numBones` (4) + `ofsCompBonePool` (4) + `ofsSkel` (4) + `ofsEnd` (4) =
-/// `sizeof(mdxaHeader_t)`, matching Raven's own `(byte*)mdxa +
-/// sizeof(mdxaHeader_t)` arithmetic (`G2_bones.cpp:45-46,83`).
-const MDXA_HEADER_SIZE: usize = MDXA_NUM_BONES_OFFSET + 4 + 4 + 4 + 4;
-/// `mdxaSkel_t::BasePoseMat` offset: `name[MAX_QPATH]`(64) + `flags`(4) +
-/// `parent`(4) precede it.
-const SKEL_OFS_BASE_POSE_MAT: usize = MAX_QPATH + 4 + 4;
-/// `mdxaSkel_t::BasePoseMatInv` offset: `BasePoseMat` (48 bytes, `mdxaBone_t`)
-/// precedes it.
-const SKEL_OFS_BASE_POSE_MAT_INV: usize = SKEL_OFS_BASE_POSE_MAT + 48;
-
-/// Raven `mdxaHeader_t->numBones` — `G2_bones.cpp:86`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-unsafe fn mdxa_num_bones(header: *const c_void) -> i32 {
-    core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_BONES_OFFSET) as *const i32)
-}
-
-/// Raven `mdxaHeader_t->numFrames` — `G2_bones.cpp:844`
-/// (`ghlInfo->aHeader->numFrames`).
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer.
-unsafe fn mdxa_num_frames(header: *const c_void) -> i32 {
-    core::ptr::read_unaligned((header as *const u8).add(MDXA_NUM_FRAMES_OFFSET) as *const i32)
-}
-
-/// Raven `(mdxaSkelOffsets_t*)((byte*)mdxa + sizeof(mdxaHeader_t))->offsets[i]`
-/// then `(mdxaSkel_t*)((byte*)mdxa + sizeof(mdxaHeader_t) + offset)` —
-/// `G2_bones.cpp:45-46,58,83,88,315-316`.
-///
-/// # Safety
-/// `header` must be a valid, non-null `EngineHost::model_mdxa` block pointer
-/// and `bone_index` must be `< numBones`.
-unsafe fn mdxa_skel_ptr(header: *const c_void, bone_index: i32) -> *const u8 {
-    let base = (header as *const u8).add(MDXA_HEADER_SIZE);
-    let skel_offset = core::ptr::read_unaligned((base as *const i32).add(bone_index as usize));
-    base.offset(skel_offset as isize)
-}
-
-/// Raven `!stricmp(skel->name, boneName)` — `G2_bones.cpp:61,90,119`.
-///
-/// # Safety
-/// Same preconditions as [`mdxa_skel_ptr`].
-unsafe fn mdxa_skel_name_matches(header: *const c_void, bone_index: i32, bone_name: &str) -> bool {
-    let skel = mdxa_skel_ptr(header, bone_index);
-    let name_bytes = core::slice::from_raw_parts(skel, MAX_QPATH);
-    let len = name_bytes.iter().position(|&b| b == 0).unwrap_or(MAX_QPATH);
-    core::str::from_utf8(&name_bytes[..len])
-        .map(|name| name.eq_ignore_ascii_case(bone_name))
-        .unwrap_or(false)
-}
-
-/// Raven `skel->BasePoseMat` — `G2_bones.cpp:319`.
-///
-/// # Safety
-/// Same preconditions as [`mdxa_skel_ptr`].
-unsafe fn mdxa_skel_base_pose_mat(header: *const c_void, bone_index: i32) -> mdxaBone_t {
-    let skel = mdxa_skel_ptr(header, bone_index);
-    core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT) as *const mdxaBone_t)
-}
-
-/// Raven `skel->BasePoseMatInv` — `G2_bones.cpp:318`.
-///
-/// # Safety
-/// Same preconditions as [`mdxa_skel_ptr`].
-unsafe fn mdxa_skel_base_pose_mat_inv(header: *const c_void, bone_index: i32) -> mdxaBone_t {
-    let skel = mdxa_skel_ptr(header, bone_index);
-    core::ptr::read_unaligned(skel.add(SKEL_OFS_BASE_POSE_MAT_INV) as *const mdxaBone_t)
-}
 
 // ---------------------------------------------------------------------------
 // Local duplicate of `G2_TimingModel` (module doc findings 4/5).
@@ -365,7 +273,10 @@ pub fn g2_find_bone(anim_model: *const c_void, blist: &[boneInfo_t], bone_name: 
         // Safety: an active bone slot's `boneNumber` indexes `anim_model`'s
         // skeleton; callers hold `anim_model` non-null whenever `blist`
         // carries an active bone, matching Raven's unchecked `mod->mdxa` deref.
-        if unsafe { mdxa_skel_name_matches(anim_model, bone.boneNumber, bone_name) } {
+        if unsafe { MdxaView::from_block(anim_model) }
+            .skel(bone.boneNumber)
+            .name_matches(bone_name)
+        {
             return i as i32;
         }
     }
@@ -382,10 +293,11 @@ pub fn g2_add_bone(anim_model: *const c_void, blist: &mut Vec<boneInfo_t>, bone_
     // Safety: caller holds a valid, non-null anim model pointer whenever it
     // expects a bone to actually be added (matches Raven's unchecked
     // `mod->mdxa->numBones` deref).
-    let num_bones = unsafe { mdxa_num_bones(anim_model) };
+    let mdxa = unsafe { MdxaView::from_block(anim_model) };
+    let num_bones = mdxa.num_bones();
     let mut x = 0i32;
     while x < num_bones {
-        if unsafe { mdxa_skel_name_matches(anim_model, x, bone_name) } {
+        if mdxa.skel(x).name_matches(bone_name) {
             break;
         }
         x += 1;
@@ -399,7 +311,7 @@ pub fn g2_add_bone(anim_model: *const c_void, blist: &mut Vec<boneInfo_t>, bone_
 
     for (i, bone) in blist.iter_mut().enumerate() {
         if bone.boneNumber != -1 {
-            if unsafe { mdxa_skel_name_matches(anim_model, bone.boneNumber, bone_name) } {
+            if mdxa.skel(bone.boneNumber).name_matches(bone_name) {
                 return i as i32;
             }
         } else {
@@ -535,8 +447,9 @@ pub fn g2_generate_matrix(
         // `anim_model` (matches Raven's unchecked `mod->mdxa` dereference;
         // the `*_Index` sibling rejects these flags before ever reaching
         // here with a null model, per its own doc comment below).
-        let base_pose_mat = unsafe { mdxa_skel_base_pose_mat(anim_model, bone_number) };
-        let base_pose_mat_inv = unsafe { mdxa_skel_base_pose_mat_inv(anim_model, bone_number) };
+        let skel = unsafe { MdxaView::from_block(anim_model) }.skel(bone_number);
+        let base_pose_mat = skel.base_pose_mat();
+        let base_pose_mat_inv = skel.base_pose_mat_inv();
 
         let mut temp1 = mdxaBone_t {
             matrix: [[0.0; 4]; 3],
@@ -722,7 +635,7 @@ pub fn g2_set_bone_anim(
         // Safety: `ghl_info.a_header` is a non-null `EngineHost::model_mdxa`
         // block whenever this is reached with a valid instance (matches
         // Raven's unchecked `ghlInfo->aHeader->numFrames` dereference).
-        let num_frames = unsafe { mdxa_num_frames(ghl_info.a_header) };
+        let num_frames = unsafe { MdxaView::from_block(ghl_info.a_header) }.num_frames();
         return g2_set_bone_anim_index(
             blist,
             index,
@@ -912,7 +825,7 @@ pub fn g2_get_bone_anim(
     debug_assert!(!ghl_info.a_header.is_null());
     // Safety: see the debug_assert above; matches Raven's unchecked
     // `ghlInfo->aHeader->numFrames` dereference.
-    let num_frames = unsafe { mdxa_num_frames(ghl_info.a_header) };
+    let num_frames = unsafe { MdxaView::from_block(ghl_info.a_header) }.num_frames();
     g2_get_bone_anim_index(
         blist.as_slice(),
         index,
@@ -1058,7 +971,7 @@ pub fn g2_set_bone_angles_matrix(
         } else {
             // Safety: `mod_m` is a non-null `EngineHost::model_mdxm`-sourced
             // mdxm header block (checked above).
-            let anim_index = unsafe { read_i32_at_mdxm(mod_m, MDXM_OFS_ANIM_INDEX) };
+            let anim_index = unsafe { MdxmView::from_block(mod_m) }.anim_index();
             host.model_mdxa(anim_index) as *const c_void
         }
     } else {
@@ -1094,25 +1007,6 @@ pub fn g2_set_bone_angles_matrix(
     }
     // Raven: `assert(0); return qfalse;`
     false
-}
-
-/// `mdxmHeader_t::animIndex` (`mdx_format.h:161`) — `ident`(4) + `version`(4)
-/// + `name[64]` + `animName[64]` precede it. Duplicated from `api_models.rs`'s
-/// `MDXM_OFS_ANIM_INDEX` (same file-local-duplication convention as the mdxa
-/// offsets above).
-const MDXM_OFS_ANIM_INDEX: usize = 136;
-
-/// Read an `i32` at `offset` bytes into an `EngineHost::model_mdxm`-sourced
-/// block.
-///
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block
-/// the host returned.
-unsafe fn read_i32_at_mdxm(base: *const c_void, offset: usize) -> i32 {
-    (base as *const u8)
-        .add(offset)
-        .cast::<i32>()
-        .read_unaligned()
 }
 
 /// Raven `int G2_Get_Bone_Index(CGhoul2Info *ghoul2, const char *boneName)` —
