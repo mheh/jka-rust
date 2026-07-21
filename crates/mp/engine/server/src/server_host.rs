@@ -210,6 +210,19 @@ pub struct Server {
     pub referee: Referee,
 }
 
+/// Type-erase a live `&mut T` to the `*mut ()` an opaque slot carries — the
+/// shared cast body of every `*_slot` wrapper below.
+fn slot_raw<T>(v: &mut T) -> *mut () {
+    v as *mut T as *mut ()
+}
+
+/// Reborrow an opaque slot's `*mut ()` back as its concrete `&mut T` — the
+/// shared cast body of every `*_from_slot` reborrow below. Each caller
+/// documents its own single-borrow soundness contract.
+unsafe fn slot_as<'a, T>(raw: *mut ()) -> &'a mut T {
+    &mut *(raw as *mut T)
+}
+
 /// Wrap a live `&mut Server` into qcommon's type-erased command slot for
 /// passing INTO qcommon's registration/dispatch seam
 /// (`Cmd_AddCommand`/`Cmd_ExecuteString`/`Cbuf_ExecuteText`). qcommon never
@@ -217,7 +230,7 @@ pub struct Server {
 /// where `server_from_slot` casts it back. Opaque-slot ruling (user,
 /// 2026-07-12, option A).
 pub fn server_slot(sv: &mut Server) -> CmdServerSlot {
-    CmdServerSlot::from_raw(sv as *mut Server as *mut ())
+    CmdServerSlot::from_raw(slot_raw(sv))
 }
 
 /// Cast a qcommon command slot back into the live `&mut Server`, inside a
@@ -229,7 +242,7 @@ pub fn server_slot(sv: &mut Server) -> CmdServerSlot {
 /// the seam), so the erased pointer is non-null, well-aligned, and uniquely
 /// borrowable for the returned reference's lifetime.
 pub unsafe fn server_from_slot(slot: &mut CmdServerSlot) -> &mut Server {
-    &mut *(slot.as_raw() as *mut Server)
+    slot_as(slot.as_raw())
 }
 
 /// Wrap a live `&mut Ghoul2System` into qcommon's type-erased command slot for
@@ -238,7 +251,7 @@ pub unsafe fn server_from_slot(slot: &mut CmdServerSlot) -> &mut Server {
 /// threads it back to our command handlers, where `ghoul2_from_slot` casts it
 /// back. Opaque-slot ruling (user, 2026-07-12, option A).
 pub fn ghoul2_slot(g2: &mut Ghoul2System) -> CmdGhoul2Slot {
-    CmdGhoul2Slot::from_raw(g2 as *mut Ghoul2System as *mut ())
+    CmdGhoul2Slot::from_raw(slot_raw(g2))
 }
 
 /// Cast a qcommon command slot back into the live `&mut Ghoul2System`, inside a
@@ -250,7 +263,7 @@ pub fn ghoul2_slot(g2: &mut Ghoul2System) -> CmdGhoul2Slot {
 /// `Ghoul2System` across the seam), so the erased pointer is non-null,
 /// well-aligned, and uniquely borrowable for the returned reference's lifetime.
 pub unsafe fn ghoul2_from_slot(slot: &mut CmdGhoul2Slot) -> &mut Ghoul2System {
-    &mut *(slot.as_raw() as *mut Ghoul2System)
+    slot_as(slot.as_raw())
 }
 
 /// Wrap a live `&mut RmManager` (the real `mp_engine_rmg` state, owned by
@@ -259,7 +272,7 @@ pub unsafe fn ghoul2_from_slot(slot: &mut CmdGhoul2Slot) -> &mut Ghoul2System {
 /// slot — it only threads it back to server handlers, where `rmg_from_slot`
 /// casts it back. Opaque-slot ruling (user, 2026-07-12, option A).
 pub fn rmg_slot(rmg: &mut RealRmManager) -> CmRmManagerSlot {
-    CmRmManagerSlot::from_raw(rmg as *mut RealRmManager as *mut ())
+    CmRmManagerSlot::from_raw(slot_raw(rmg))
 }
 
 /// Cast a qcommon `cm_load::RmManager` slot back into the live real
@@ -271,7 +284,7 @@ pub fn rmg_slot(rmg: &mut RealRmManager) -> CmRmManagerSlot {
 /// across the seam), so the erased pointer is non-null, well-aligned, and
 /// uniquely borrowable for the returned reference's lifetime.
 pub unsafe fn rmg_from_slot(slot: &mut CmRmManagerSlot) -> &mut RealRmManager {
-    &mut *(slot.as_raw() as *mut RealRmManager)
+    slot_as(slot.as_raw())
 }
 
 /// Wrap a live `&mut RenderModels` (the real `mp_renderer` model registry, owned
@@ -281,7 +294,7 @@ pub unsafe fn rmg_from_slot(slot: &mut CmRmManagerSlot) -> &mut RealRmManager {
 /// handlers, where `rm_from_slot` casts it back. Opaque-slot ruling (user,
 /// 2026-07-12, option A).
 pub fn rm_slot(rm: &mut RealRenderModels) -> CmRenderModelsSlot {
-    CmRenderModelsSlot::from_raw(rm as *mut RealRenderModels as *mut ())
+    CmRenderModelsSlot::from_raw(slot_raw(rm))
 }
 
 /// Cast a qcommon `cm_load::RenderModels` slot back into the live real
@@ -294,7 +307,7 @@ pub fn rm_slot(rm: &mut RealRenderModels) -> CmRenderModelsSlot {
 /// `RenderModels` across the seam), so the erased pointer is non-null,
 /// well-aligned, and uniquely borrowable for the returned reference's lifetime.
 pub unsafe fn rm_from_slot(slot: &mut CmRenderModelsSlot) -> &mut RealRenderModels {
-    &mut *(slot.as_raw() as *mut RealRenderModels)
+    slot_as(slot.as_raw())
 }
 
 /// engine-seam's name for the game dispatcher's `&mut ServerGame` argument — the

@@ -35,7 +35,9 @@ use native_types::clipHandle_t;
 use crate::server::client_s::client_t;
 use crate::server::server_state_t::serverState_t;
 use crate::server::sv_entity_s::svEntity_t;
+use crate::hook_install::sv_from_view;
 use crate::server_host::sv_game_system_call;
+use crate::sv_referee::ref_tap_syscall;
 use crate::sv_renderer::RE_RegisterServerSkin;
 use crate::Server;
 use crate::{
@@ -504,7 +506,7 @@ pub fn SV_GameCommand(view: &mut EngineHostView) -> qboolean {
     // SAFETY: view-constructor slot, single-threaded, no other live cast of this
     // slot for the borrow's duration; `VM_Call` reads `sv.gvm` and never
     // re-casts `view.sv` (rule 7).
-    let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
+    let sv = unsafe { sv_from_view(view) };
     if sv.sv.state as c_int != serverState_t::SS_GAME as c_int {
         return qfalse;
     }
@@ -763,7 +765,7 @@ pub fn SV_GameSystemCalls(
         // Engine referee (record/replay): fold the ordered import number into
         // the frame's syscall digest (no-op when un-armed).
         // SAFETY: view-constructor slot, single-threaded (per-arm pattern).
-        crate::sv_referee::ref_tap_syscall(&mut *(view.sv.as_raw() as *mut Server), trap);
+        ref_tap_syscall(sv_from_view(view), trap);
 
         // rww - alright, DO NOT EVER add a GAME/CGAME/UI generic call without
         // adding a trap to match, and all of these traps must be shared and
@@ -961,7 +963,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::G_LOCATE_GAME_DATA as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_LocateGameData(
                 sv,
                 vma(view.common, args, 1) as *mut sharedEntity_t,
@@ -973,7 +975,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_DROP_CLIENT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             // module-memory seam: one conversion at the trap arm.
             let reason = core::ffi::CStr::from_ptr(vma(view.common, args, 2) as *const c_char)
                 .to_string_lossy()
@@ -982,7 +984,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_SEND_SERVER_COMMAND as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_GameSendServerCommand(
                 view.common,
                 sv,
@@ -992,7 +994,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_LINKENTITY as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             crate::sv_world::SV_LinkEntity(
                 view.common,
                 view.cm,
@@ -1002,7 +1004,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_UNLINKENTITY as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             crate::sv_world::SV_UnlinkEntity(
                 view.common,
                 sv,
@@ -1011,7 +1013,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_ENTITIES_IN_BOX as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return crate::sv_world::SV_AreaEntities(
                 view.common,
                 sv,
@@ -1083,7 +1085,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_POINT_CONTENTS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return crate::sv_world::SV_PointContents(
                 view.common,
                 view.cm,
@@ -1093,12 +1095,12 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::G_SET_SERVER_CULL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             sv.g_svCullDist = vmf(args, 1);
             return 0;
         } else if trap == G::G_SET_BRUSH_MODEL as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_SetBrushModel(
                 view,
                 sv,
@@ -1139,7 +1141,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::G_SET_CONFIGSTRING as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             crate::sv_init::SV_SetConfigstring(
                 view,
                 sv,
@@ -1149,7 +1151,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_GET_CONFIGSTRING as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             crate::sv_init::SV_GetConfigstring(
                 sv,
                 *args.offset(1) as c_int,
@@ -1159,7 +1161,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_SET_USERINFO as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_SetUserinfo(
                 view.common,
                 sv,
@@ -1169,7 +1171,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_GET_USERINFO as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             crate::sv_init::SV_GetUserinfo(
                 view.common,
                 sv,
@@ -1187,7 +1189,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_ADJUST_AREA_PORTAL_STATE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_AdjustAreaPortalState(
                 view.cm,
                 sv,
@@ -1204,16 +1206,16 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::G_BOT_ALLOCATE_CLIENT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return SV_BotAllocateClient(view.common, sv) as isize;
         } else if trap == G::G_BOT_FREE_CLIENT as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_BotFreeClient(view.common, sv, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::G_GET_USERCMD as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_GetUsercmd(
                 view.common,
                 sv,
@@ -1223,13 +1225,13 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_SIEGEPERSSET as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             sv.sv_siegePersData = *(vma(view.common, args, 1)
                 as *const mp_qshared::common::mp::qcommon::siege_pers::siegePers_t);
             return 0;
         } else if trap == G::G_SIEGEPERSGET as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             *(vma(view.common, args, 1)
                 as *mut mp_qshared::common::mp::qcommon::siege_pers::siegePers_t) =
                 sv.sv_siegePersData;
@@ -1239,7 +1241,7 @@ pub fn SV_GameSystemCalls(
         // stay commented out in Raven (sv_game.cpp:648-672) — not transcribed.
         else if trap == G::G_DEBUG_POLYGON_CREATE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return crate::BotImport_DebugPolygonCreate(
                 sv,
                 *args.offset(1) as c_int,
@@ -1248,7 +1250,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::G_DEBUG_POLYGON_DELETE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             crate::BotImport_DebugPolygonDelete(sv, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::G_REAL_TIME as isize {
@@ -1318,7 +1320,7 @@ pub fn SV_GameSystemCalls(
             // dropped before `icarus_run_script` (which may reach sv-touching
             // host methods) so no other cast of this slot is live (rule 7).
             let ent = {
-                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                let sv = sv_from_view(view);
                 ConvertedEntity(
                     view.common,
                     sv,
@@ -1341,7 +1343,7 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
             // before the icarus call (rule 7).
             let ent = {
-                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                let sv = sv_from_view(view);
                 ConvertedEntity(
                     view.common,
                     sv,
@@ -1367,7 +1369,7 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
             // before the icarus call (rule 7).
             let ent = {
-                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                let sv = sv_from_view(view);
                 ConvertedEntity(
                     view.common,
                     sv,
@@ -1380,7 +1382,7 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
             // before the icarus call (rule 7).
             let ent = {
-                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                let sv = sv_from_view(view);
                 ConvertedEntity(
                     view.common,
                     sv,
@@ -1393,7 +1395,7 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded; `sv` cast dropped
             // before the icarus call (rule 7).
             let ent = {
-                let sv = &mut *(view.sv.as_raw() as *mut Server);
+                let sv = sv_from_view(view);
                 ConvertedEntity(
                     view.common,
                     sv,
@@ -1658,17 +1660,17 @@ pub fn SV_GameSystemCalls(
         // rww - END NPC NAV TRAPS
         else if trap == G::G_SET_SHARED_BUFFER as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             sv.sv.mSharedMemory = vma(view.common, args, 1) as *mut c_char;
             return 0;
         } else if trap == G::BOTLIB_SETUP as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return SV_BotLibSetup(view.common, sv, bot) as isize;
         } else if trap == G::BOTLIB_SHUTDOWN as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return SV_BotLibShutdown(sv, bot) as isize;
         }
@@ -1677,7 +1679,7 @@ pub fn SV_GameSystemCalls(
         // &mut BotLib` receiver, threaded through each arm.
         else if trap == G::BOTLIB_LIBVAR_SET as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibVarSet.unwrap())(
                 bot,
@@ -1686,7 +1688,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_LIBVAR_GET as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibVarGet.unwrap())(
                 bot,
@@ -1696,13 +1698,13 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_PC_ADD_GLOBAL_DEFINE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return ((*sv.botlib_export).PC_AddGlobalDefine.unwrap())(
                 vma(view.common, args, 1) as *mut c_char
             ) as isize;
         } else if trap == G::BOTLIB_PC_LOAD_SOURCE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_LoadSourceHandle.unwrap())(
                 bot,
@@ -1710,13 +1712,13 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_PC_FREE_SOURCE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_FreeSourceHandle.unwrap())(bot, *args.offset(1) as c_int)
                 as isize;
         } else if trap == G::BOTLIB_PC_READ_TOKEN as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_ReadTokenHandle.unwrap())(
                 bot,
@@ -1725,7 +1727,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_PC_SOURCE_FILE_AND_LINE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).PC_SourceFileAndLine.unwrap())(
                 bot,
@@ -1735,12 +1737,12 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_START_FRAME as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibStartFrame.unwrap())(bot, vmf(args, 1)) as isize;
         } else if trap == G::BOTLIB_LOAD_MAP as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibLoadMap.unwrap())(
                 bot,
@@ -1748,7 +1750,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_UPDATENTITY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).BotLibUpdateEntity.unwrap())(
                 bot,
@@ -1757,7 +1759,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_TEST as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             // Ported `Test` takes `vec3_t` by value; read Raven's `(float*)VMA(n)` through.
             return ((*sv.botlib_export).Test.unwrap())(
                 *args.offset(1) as c_int,
@@ -1767,12 +1769,12 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_GET_SNAPSHOT_ENTITY as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return SV_BotGetSnapshotEntity(sv, *args.offset(1) as c_int, *args.offset(2) as c_int)
                 as isize;
         } else if trap == G::BOTLIB_GET_CONSOLE_MESSAGE as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return SV_BotGetConsoleMessage(
                 sv,
                 *args.offset(1) as c_int,
@@ -1781,7 +1783,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_USER_COMMAND as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             // The clientNum trap word is ABI-typed `int`; a C module's variadic
             // slot leaves the high 32 bits garbage, so read only the low 32.
             // Hoist the client pointer before the call — `sv` is also passed by
@@ -1801,7 +1803,7 @@ pub fn SV_GameSystemCalls(
         // signature takes `vec3_t`.
         else if trap == G::BOTLIB_AAS_BBOX_AREAS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_BBoxAreas.unwrap())(
                 bot,
@@ -1812,7 +1814,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_AREA_INFO as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_AreaInfo.unwrap())(
                 bot,
@@ -1821,7 +1823,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_AlternativeRouteGoals.unwrap())(
                 bot,
@@ -1836,7 +1838,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_ENTITY_INFO as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).aas.AAS_EntityInfo.unwrap())(
                 bot,
@@ -1846,12 +1848,12 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AAS_INITIALIZED as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_Initialized.unwrap())(bot) as isize;
         } else if trap == G::BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).aas.AAS_PresenceTypeBoundingBox.unwrap())(
                 bot,
@@ -1862,12 +1864,12 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AAS_TIME as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return FloatAsInt(((*sv.botlib_export).aas.AAS_Time.unwrap())(bot)) as isize;
         } else if trap == G::BOTLIB_AAS_POINT_AREA_NUM as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_PointAreaNum.unwrap())(
                 bot,
@@ -1875,7 +1877,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export)
                 .aas
@@ -1884,7 +1886,7 @@ pub fn SV_GameSystemCalls(
                 as isize;
         } else if trap == G::BOTLIB_AAS_TRACE_AREAS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_TraceAreas.unwrap())(
                 bot,
@@ -1896,7 +1898,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_POINT_CONTENTS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_PointContents.unwrap())(
                 bot,
@@ -1904,7 +1906,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_NEXT_BSP_ENTITY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_NextBSPEntity.unwrap())(
                 bot,
@@ -1912,7 +1914,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_ValueForBSPEpairKey.unwrap())(
                 bot,
@@ -1923,7 +1925,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_VectorForBSPEpairKey.unwrap())(
                 bot,
@@ -1933,7 +1935,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_FLOAT_FOR_BSP_EPAIR_KEY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_FloatForBSPEpairKey.unwrap())(
                 bot,
@@ -1943,7 +1945,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_INT_FOR_BSP_EPAIR_KEY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_IntForBSPEpairKey.unwrap())(
                 bot,
@@ -1953,7 +1955,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_AREA_REACHABILITY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_AreaReachability.unwrap())(
                 bot,
@@ -1961,7 +1963,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export)
                 .aas
@@ -1975,7 +1977,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_ENABLE_ROUTING_AREA as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_EnableRoutingArea.unwrap())(
                 bot,
@@ -1984,7 +1986,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_PREDICT_ROUTE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_PredictRoute.unwrap())(
                 bot,
@@ -2002,7 +2004,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_SWIMMING as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_Swimming.unwrap())(
                 bot,
@@ -2010,7 +2012,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).aas.AAS_PredictClientMovement.unwrap())(
                 bot,
@@ -2033,7 +2035,7 @@ pub fn SV_GameSystemCalls(
         // (`sv_game.cpp:1065-1152`).
         else if trap == G::BOTLIB_EA_SAY as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Say.unwrap())(
                 bot,
@@ -2043,7 +2045,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_EA_SAY_TEAM as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_SayTeam.unwrap())(
                 bot,
@@ -2053,7 +2055,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_EA_COMMAND as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Command.unwrap())(
                 bot,
@@ -2063,7 +2065,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_EA_ACTION as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Action.unwrap())(
                 bot,
@@ -2074,91 +2076,91 @@ pub fn SV_GameSystemCalls(
             // trailing `return -1`, reproduced by this arm's absent return.
         } else if trap == G::BOTLIB_EA_GESTURE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Gesture.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_TALK as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Talk.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_ATTACK as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Attack.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_ALT_ATTACK as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Alt_Attack.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_FORCEPOWER as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_ForcePower.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_USE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Use.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_RESPAWN as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Respawn.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_CROUCH as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Crouch.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE_UP as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_MoveUp.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE_DOWN as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_MoveDown.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE_FORWARD as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_MoveForward.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE_BACK as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_MoveBack.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE_LEFT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_MoveLeft.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE_RIGHT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_MoveRight.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_SELECT_WEAPON as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_SelectWeapon.unwrap())(
                 bot,
@@ -2168,19 +2170,19 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_EA_JUMP as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Jump.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_DELAYED_JUMP as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_DelayedJump.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_EA_MOVE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_Move.unwrap())(
                 bot,
@@ -2191,7 +2193,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_EA_VIEW as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_View.unwrap())(
                 bot,
@@ -2202,12 +2204,12 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::BOTLIB_EA_END_REGULAR as isize {
             // Raven `EA_EndRegular` carries no `bot` receiver (`ea_export_t`).
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             ((*sv.botlib_export).ea.EA_EndRegular.unwrap())(*args.offset(1) as c_int, vmf(args, 2));
             return 0;
         } else if trap == G::BOTLIB_EA_GET_INPUT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_GetInput.unwrap())(
                 bot,
@@ -2218,7 +2220,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_EA_RESET_INPUT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ea.EA_ResetInput.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
@@ -2229,7 +2231,7 @@ pub fn SV_GameSystemCalls(
         // reborrow mutably for the receiver.
         else if trap == G::BOTLIB_AI_LOAD_CHARACTER as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotLoadCharacter.unwrap())(
                 bot,
@@ -2238,13 +2240,13 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_FREE_CHARACTER as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotFreeCharacter.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_CHARACTERISTIC_FLOAT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return FloatAsInt(((*sv.botlib_export).ai.Characteristic_Float.unwrap())(
                 bot,
@@ -2253,7 +2255,7 @@ pub fn SV_GameSystemCalls(
             )) as isize;
         } else if trap == G::BOTLIB_AI_CHARACTERISTIC_BFLOAT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return FloatAsInt(((*sv.botlib_export).ai.Characteristic_BFloat.unwrap())(
                 bot,
@@ -2264,7 +2266,7 @@ pub fn SV_GameSystemCalls(
             )) as isize;
         } else if trap == G::BOTLIB_AI_CHARACTERISTIC_INTEGER as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.Characteristic_Integer.unwrap())(
                 bot,
@@ -2273,7 +2275,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_CHARACTERISTIC_BINTEGER as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.Characteristic_BInteger.unwrap())(
                 bot,
@@ -2284,7 +2286,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_CHARACTERISTIC_STRING as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.Characteristic_String.unwrap())(
                 bot,
@@ -2296,18 +2298,18 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_ALLOC_CHAT_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotAllocChatState.unwrap())(bot) as isize;
         } else if trap == G::BOTLIB_AI_FREE_CHAT_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotFreeChatState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_QUEUE_CONSOLE_MESSAGE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotQueueConsoleMessage.unwrap())(
                 bot,
@@ -2318,7 +2320,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_REMOVE_CONSOLE_MESSAGE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotRemoveConsoleMessage.unwrap())(
                 bot,
@@ -2328,7 +2330,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_NEXT_CONSOLE_MESSAGE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotNextConsoleMessage.unwrap())(
                 bot,
@@ -2337,7 +2339,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_NUM_CONSOLE_MESSAGE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotNumConsoleMessages.unwrap())(
                 bot,
@@ -2345,7 +2347,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_INITIAL_CHAT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let a2 = vma(view.common, args, 2) as *mut c_char;
             let a4 = vma(view.common, args, 4) as *mut c_char;
@@ -2374,7 +2376,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_NUM_INITIAL_CHATS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotNumInitialChats.unwrap())(
                 bot,
@@ -2383,7 +2385,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_REPLY_CHAT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let a2 = vma(view.common, args, 2) as *mut c_char;
             let a5 = vma(view.common, args, 5) as *mut c_char;
@@ -2412,13 +2414,13 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_CHAT_LENGTH as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotChatLength.unwrap())(bot, *args.offset(1) as c_int)
                 as isize;
         } else if trap == G::BOTLIB_AI_ENTER_CHAT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotEnterChat.unwrap())(
                 bot,
@@ -2429,7 +2431,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_GET_CHAT_MESSAGE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotGetChatMessage.unwrap())(
                 bot,
@@ -2441,7 +2443,7 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::BOTLIB_AI_STRING_CONTAINS as isize {
             // Raven `StringContains` carries no `bot` receiver.
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return ((*sv.botlib_export).ai.StringContains.unwrap())(
                 vma(view.common, args, 1) as *mut c_char,
                 vma(view.common, args, 2) as *mut c_char,
@@ -2449,7 +2451,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_FIND_MATCH as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotFindMatch.unwrap())(
                 bot,
@@ -2459,7 +2461,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_MATCH_VARIABLE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotMatchVariable.unwrap())(
                 bot,
@@ -2472,14 +2474,14 @@ pub fn SV_GameSystemCalls(
         } else if trap == G::BOTLIB_AI_UNIFY_WHITE_SPACES as isize {
             // Raven `UnifyWhiteSpaces` carries no `bot` receiver.
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             ((*sv.botlib_export).ai.UnifyWhiteSpaces.unwrap())(
                 vma(view.common, args, 1) as *mut c_char
             );
             return 0;
         } else if trap == G::BOTLIB_AI_REPLACE_SYNONYMS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotReplaceSynonyms.unwrap())(
                 bot,
@@ -2489,7 +2491,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_LOAD_CHAT_FILE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let a2 = vma(view.common, args, 2) as *mut c_char;
             let a3 = vma(view.common, args, 3) as *mut c_char;
@@ -2502,7 +2504,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_SET_CHAT_GENDER as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotSetChatGender.unwrap())(
                 bot,
@@ -2512,7 +2514,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_SET_CHAT_NAME as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotSetChatName.unwrap())(
                 bot,
@@ -2523,19 +2525,19 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_RESET_GOAL_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotResetGoalState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_RESET_AVOID_GOALS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotResetAvoidGoals.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_REMOVE_FROM_AVOID_GOALS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotRemoveFromAvoidGoals.unwrap())(
                 bot,
@@ -2545,7 +2547,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_PUSH_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotPushGoal.unwrap())(
                 bot,
@@ -2555,31 +2557,31 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_POP_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotPopGoal.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_EMPTY_GOAL_STACK as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotEmptyGoalStack.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_DUMP_AVOID_GOALS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotDumpAvoidGoals.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_DUMP_GOAL_STACK as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotDumpGoalStack.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_GOAL_NAME as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotGoalName.unwrap())(
                 bot,
@@ -2590,7 +2592,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_GET_TOP_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotGetTopGoal.unwrap())(
                 bot,
@@ -2599,7 +2601,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_GET_SECOND_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotGetSecondGoal.unwrap())(
                 bot,
@@ -2608,7 +2610,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_CHOOSE_LTG_ITEM as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let origin = *(vma(view.common, args, 2) as *const vec3_t);
             let inventory = vma(view.common, args, 3) as *mut c_int;
@@ -2622,7 +2624,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_CHOOSE_NBG_ITEM as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let origin = *(vma(view.common, args, 2) as *const vec3_t);
             let inventory = vma(view.common, args, 3) as *mut c_int;
@@ -2639,7 +2641,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_TOUCHING_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotTouchingGoal.unwrap())(
                 bot,
@@ -2648,7 +2650,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export)
                 .ai
@@ -2662,7 +2664,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_GET_LEVEL_ITEM_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotGetLevelItemGoal.unwrap())(
                 bot,
@@ -2672,7 +2674,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_GET_NEXT_CAMP_SPOT_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotGetNextCampSpotGoal.unwrap())(
                 bot,
@@ -2681,7 +2683,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_GET_MAP_LOCATION_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotGetMapLocationGoal.unwrap())(
                 bot,
@@ -2690,7 +2692,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_AVOID_GOAL_TIME as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return FloatAsInt(((*sv.botlib_export).ai.BotAvoidGoalTime.unwrap())(
                 bot,
@@ -2699,7 +2701,7 @@ pub fn SV_GameSystemCalls(
             )) as isize;
         } else if trap == G::BOTLIB_AI_SET_AVOID_GOAL_TIME as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotSetAvoidGoalTime.unwrap())(
                 bot,
@@ -2710,19 +2712,19 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_INIT_LEVEL_ITEMS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotInitLevelItems.unwrap())(bot);
             return 0;
         } else if trap == G::BOTLIB_AI_UPDATE_ENTITY_ITEMS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotUpdateEntityItems.unwrap())(bot);
             return 0;
         } else if trap == G::BOTLIB_AI_LOAD_ITEM_WEIGHTS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotLoadItemWeights.unwrap())(
                 bot,
@@ -2731,13 +2733,13 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_FREE_ITEM_WEIGHTS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotFreeItemWeights.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotInterbreedGoalFuzzyLogic.unwrap())(
                 bot,
@@ -2748,7 +2750,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotSaveGoalFuzzyLogic.unwrap())(
                 bot,
@@ -2758,7 +2760,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotMutateGoalFuzzyLogic.unwrap())(
                 view.common,
@@ -2769,7 +2771,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_ALLOC_GOAL_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotAllocGoalState.unwrap())(
                 bot,
@@ -2777,19 +2779,19 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_FREE_GOAL_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotFreeGoalState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_RESET_MOVE_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotResetMoveState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_ADD_AVOID_SPOT as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotAddAvoidSpot.unwrap())(
                 bot,
@@ -2801,7 +2803,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_MOVE_TO_GOAL as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let result = vma(view.common, args, 1) as *mut bot_moveresult_t;
             let goal = vma(view.common, args, 3) as *mut bot_goal_t;
@@ -2816,7 +2818,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_MOVE_IN_DIRECTION as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotMoveInDirection.unwrap())(
                 bot,
@@ -2827,19 +2829,19 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_RESET_AVOID_REACH as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotResetAvoidReach.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_RESET_LAST_AVOID_REACH as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotResetLastAvoidReach.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_REACHABILITY_AREA as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotReachabilityArea.unwrap())(
                 bot,
@@ -2848,7 +2850,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_MOVEMENT_VIEW_TARGET as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotMovementViewTarget.unwrap())(
                 bot,
@@ -2861,7 +2863,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_PREDICT_VISIBLE_POSITION as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotPredictVisiblePosition.unwrap())(
                 bot,
@@ -2874,18 +2876,18 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_ALLOC_MOVE_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotAllocMoveState.unwrap())(bot) as isize;
         } else if trap == G::BOTLIB_AI_FREE_MOVE_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotFreeMoveState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_INIT_MOVE_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotInitMoveState.unwrap())(
                 bot,
@@ -2895,7 +2897,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotChooseBestFightWeapon.unwrap())(
                 bot,
@@ -2904,7 +2906,7 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_GET_WEAPON_INFO as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotGetWeaponInfo.unwrap())(
                 bot,
@@ -2915,7 +2917,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::BOTLIB_AI_LOAD_WEAPON_WEIGHTS as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotLoadWeaponWeights.unwrap())(
                 bot,
@@ -2924,24 +2926,24 @@ pub fn SV_GameSystemCalls(
             ) as isize;
         } else if trap == G::BOTLIB_AI_ALLOC_WEAPON_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             return ((*sv.botlib_export).ai.BotAllocWeaponState.unwrap())(bot) as isize;
         } else if trap == G::BOTLIB_AI_FREE_WEAPON_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotFreeWeaponState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_RESET_WEAPON_STATE as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             ((*sv.botlib_export).ai.BotResetWeaponState.unwrap())(bot, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION as isize {
             // SAFETY: view-constructor slots, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             let bot = &mut *(view.bot.as_raw() as *mut BotLib);
             let ranks = vma(view.common, args, 2) as *mut f32;
             let parent1 = vma(view.common, args, 3) as *mut c_int;
@@ -3646,7 +3648,7 @@ pub fn SV_GameSystemCalls(
             return 0;
         } else if trap == G::G_SET_ACTIVE_SUBBSP as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_SetActiveSubBSP(view.cm, sv, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::G_RMG_INIT as isize {
@@ -3691,7 +3693,7 @@ pub fn SV_GameSystemCalls(
             return register_terrain(cm, &mut *view, config_str, qtrue != 0).0 as isize;
         } else if trap == G::G_BOT_UPDATEWAYPOINTS as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_BotWaypointReception(
                 sv,
                 *args.offset(1) as c_int,
@@ -3702,12 +3704,12 @@ pub fn SV_GameSystemCalls(
             // SAFETY: view-constructor slot, single-threaded, no other live cast;
             // `SV_BotCalculatePaths` reaches `sv.bot.gWP*` and `SV_Trace(view, …)`
             // exactly as `SV_SetBrushModel(view, sv, …)` does (SEAM-D11).
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             SV_BotCalculatePaths(view, sv, *args.offset(1) as c_int);
             return 0;
         } else if trap == G::G_GET_ENTITY_TOKEN as isize {
             // SAFETY: view-constructor slot, single-threaded, no other live cast.
-            let sv = &mut *(view.sv.as_raw() as *mut Server);
+            let sv = sv_from_view(view);
             return SV_GetEntityToken(
                 sv,
                 vma(view.common, args, 1) as *mut c_char,
@@ -3776,7 +3778,7 @@ pub fn SV_InitGameProgs(view: &mut EngineHostView, sv: &mut Server) {
 pub fn SV_ShutdownGameProgs(view: &mut EngineHostView) {
     // SAFETY: view-constructor slot, single-threaded, no other live cast of this
     // slot for the borrow's duration (rule 7).
-    let sv = unsafe { &mut *(view.sv.as_raw() as *mut Server) };
+    let sv = unsafe { sv_from_view(view) };
     SV_ShutdownGameProgs_body(view.common, sv);
 }
 
