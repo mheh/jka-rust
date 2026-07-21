@@ -175,6 +175,7 @@ dependencies = [
  "mp_abi",
  "mp_engine_qcommon",
  "mp_qshared",
+ "native_types",
 ]
 
 [[package]]
@@ -421,6 +422,7 @@ dependencies = [
 name = "sp_engine_client"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_abi",
  "sp_engine_qcommon",
  "sp_qshared",

@@ -9,8 +9,10 @@ use core::ffi::{c_int, c_uchar, c_ulong, c_ushort};
 pub mod anim;
 pub mod cvar;
 pub mod miniheap;
+pub mod mp3;
 pub mod rmg;
 pub mod say;
+pub mod snd;
 pub mod stdio;
 
 pub use anim::anim_event_type::animEventType_t;
@@ -18,9 +20,22 @@ pub use anim::anim_number::{animNumber_t, SABER_ANIM_GROUP_SIZE};
 pub use anim::footstep_type::footstepType_t;
 pub use cvar::vm_cvar_t::vmCvar_t;
 pub use miniheap::cmini_heap::CMiniHeap;
+pub use mp3::in_out::IN_OUT;
+pub use mp3::sample::SAMPLE;
+pub use mp3::sbt_function::SBT_FUNCTION;
+pub use mp3::xform_function::XFORM_FUNCTION;
 pub use rmg::ermdir::{ERMDir, DIR_FIRST};
 pub use rmg::symmetry_t::symmetry_t;
 pub use say::saying_t::saying_t;
+pub use snd::ambient_set_s::{ambientSet_s, ambientSet_t, MAX_SET_NAME_LENGTH, MAX_WAVES_PER_GROUP};
+pub use snd::dma_t::dma_t;
+pub use snd::id3v1_1::id3v1_1;
+pub use snd::portable_samplepair_t::portable_samplepair_t;
+pub use snd::set_e::set_e;
+pub use snd::set_keyword_e::setKeyword_e;
+pub use snd::sound_compression_method_t::SoundCompressionMethod_t;
+pub use snd::streamingbuffer::STREAMINGBUFFER;
+pub use snd::wavinfo_t::wavinfo_t;
 pub use stdio::file::FILE;
 
 /// Raven `byte`.

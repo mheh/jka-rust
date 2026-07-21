@@ -1,8 +1,3 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! Raven `XFORM_FUNCTION` — re-exported from the shared `native_types` home.
 
-use std::ffi::c_void;
-
-/// Raven `XFORM_FUNCTION` — an mp3 transform function pointer.
-///
-/// Type definition source: `oracle/code/mp3code/mp3struct.h:14-14`
-pub type XFORM_FUNCTION = extern "C" fn(*mut c_void, i32);
+pub use native_types::XFORM_FUNCTION;

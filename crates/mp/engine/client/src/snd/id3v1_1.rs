@@ -1,34 +1,3 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! Raven `id3v1_1` — re-exported from the shared `native_types` home.
 
-/// Raven `id3v1_1` — ID3v1.1 MP3 tag layout.
-///
-/// Raven: 128 bytes in size.
-/// Type definition source: `oracle/codemp/client/snd_mp3.h:15-25`
-#[repr(C)]
-pub struct id3v1_1 {
-    pub id: [core::ffi::c_char; 3],
-    /// <file basename>
-    pub title: [core::ffi::c_char; 30],
-    /// "Raven Software"
-    pub artist: [core::ffi::c_char; 30],
-    /// "#UNCOMP %d"		// needed
-    pub album: [core::ffi::c_char; 30],
-    /// "2000"
-    pub year: [core::ffi::c_char; 4],
-    /// "#MAXVOL %g"		// needed
-    pub comment: [core::ffi::c_char; 28],
-    pub zero: core::ffi::c_char,
-    pub track: core::ffi::c_char,
-    pub genre: core::ffi::c_char,
-}
-
-const _: () = assert!(core::mem::size_of::<id3v1_1>() == 128);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, id) == 0);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, title) == 3);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, artist) == 33);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, album) == 63);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, year) == 93);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, comment) == 97);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, zero) == 125);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, track) == 126);
-const _: () = assert!(core::mem::offset_of!(id3v1_1, genre) == 127);
+pub use native_types::id3v1_1;
