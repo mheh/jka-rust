@@ -66,6 +66,13 @@ impl<'a> MdxaView<'a> {
         read_i32(self.bytes, OFS_NUM_BONES)
     }
 
+    /// `mdxaHeader_t->ofsEnd` — the block's total self-describing size (the
+    /// reloaded-model size-change check in `G2_SetupModelPointers`/
+    /// `G2_TestModelPointers`).
+    pub fn ofs_end(&self) -> i32 {
+        read_i32(self.bytes, OFS_END)
+    }
+
     /// Bone `i`'s `mdxaSkel_t`, via the `mdxaSkelOffsets_t` table at
     /// `header + sizeof(mdxaHeader_t)` (`mdx_format.h:376-379`).
     pub fn skel(&self, i: i32) -> MdxaSkelView<'a> {

@@ -485,10 +485,12 @@ mod tests {
         use mp_host_interface::mock::MockHost;
 
         // Minimal `.glm` header: numSurfaces=0, so the surface-name search
-        // misses and the bone arm runs (layout per `surfaces.rs` MDXM_*).
+        // misses and the bone arm runs. `ofsEnd`(160) sizes
+        // `MdxmView::from_block`.
         let mut mdxm = vec![0u8; 164];
         mdxm[152..156].copy_from_slice(&0i32.to_ne_bytes());
         mdxm[156..160].copy_from_slice(&164i32.to_ne_bytes());
+        mdxm[160..164].copy_from_slice(&164i32.to_ne_bytes());
 
         // Minimal `.gla`: one bone named "testbone" (layout per `skeleton.rs`
         // MDXA_*: numBones at 84, offsets table after the 100-byte header,

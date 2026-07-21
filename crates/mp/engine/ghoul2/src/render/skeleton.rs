@@ -68,8 +68,6 @@
 //! public entry points and this file's own internal callers route through, so
 //! no borrow conflict and no behavior change.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::{
     _DotProduct, _VectorMA, _VectorSubtract, CrossProduct, DotProductRow, VectorNormalize2,
@@ -78,6 +76,7 @@ use mp_qshared::shared::{mdxaBone_t, vec3_t, VectorNormalize, VectorNormalizeRow
 
 use crate::ghoul2_system::{BoneCacheArena, BoneCacheId, Ghoul2System};
 use crate::mdx::mdxa::MdxaView;
+use crate::mdx::mdxm::{MdxmSurfaceView, MdxmVertView, MdxmView};
 use crate::render::bone_cache::CBoneCache;
 use crate::render::bone_transform;
 use crate::shared::bolt_info_t::boltInfo_t;
@@ -118,55 +117,6 @@ static IDENTITY_MATRIX: mdxaBone_t = mdxaBone_t {
     ],
 };
 
-// ---------------------------------------------------------------------------
-// mdxm mesh byte-offset table — the surface-bolt path (`G2_FindSurface_BC` /
-// `G2_ProcessSurfaceBolt2`) walks `mod->mdxm`'s LOD/surface/vertex arrays.
-// Per `G2SV-D5` this crate never names `mdxmHeader_t`/`mdxmSurface_t`/
-// `mdxmVertex_t` — only byte arithmetic off the raw `EngineHost::model_mdxm`
-// pointer, exactly as the oracle does off `model_t::mdxm`. Offsets derive from
-// the field order in `oracle/codemp/renderer/mdx_format.h`; duplicated locally
-// per this crate's own convention (`surfaces.rs`'s identical header table).
-// ---------------------------------------------------------------------------
-
-/// `mdxmHeader_t::ofsLODs` (`mdx_format.h:166`) — `animIndex`(136) + `numBones`
-/// (4) + `numLODs`(4) precede it.
-const MDXM_OFS_OFS_LODS: usize = 148;
-/// `sizeof(mdxmLOD_t)` — a single `int ofsEnd` (`mdx_format.h:203-207`), whose
-/// value is read at offset 0 while walking to the requested LOD.
-const MDXM_LOD_SIZE: usize = 4;
-
-/// `mdxmSurface_t::ofsVerts` (`mdx_format.h:227`) — `ident`(0) + `thisSurface
-/// Index`(4) + `ofsHeader`(8) + `numVerts`(12) precede it.
-const SURF_OFS_VERTS: usize = 16;
-/// `mdxmSurface_t::ofsTriangles` (`mdx_format.h:230`) — `numTriangles`(20)
-/// precedes it.
-const SURF_OFS_TRIANGLES: usize = 24;
-/// `mdxmSurface_t::ofsBoneReferences` (`mdx_format.h:240`) — `numBone
-/// References`(28) precedes it.
-const SURF_OFS_BONE_REFERENCES: usize = 32;
-
-/// `sizeof(mdxmVertex_t)` (non-`_XBOX`): `normal`(12) + `vertCoords`(12) +
-/// `uiNmWeightsAndBoneIndexes`(4) + `BoneWeightings[4]`(4) — "kept at 32 bytes
-/// for cache-aligning" (`mdx_format.h:263-280`).
-const MDXM_VERTEX_SIZE: usize = 32;
-/// `sizeof(mdxmTriangle_t)` — `int indexes[3]` (`mdx_format.h:250-253`).
-const MDXM_TRIANGLE_SIZE: usize = 12;
-/// `mdxmVertex_t::vertCoords` (`mdx_format.h:272`) — `normal`(12) precedes it.
-const VERT_OFS_VERT_COORDS: usize = 12;
-/// `mdxmVertex_t::uiNmWeightsAndBoneIndexes` (`mdx_format.h:281`).
-const VERT_OFS_WEIGHTS_AND_INDEXES: usize = 24;
-/// `mdxmVertex_t::BoneWeightings[0]` (`mdx_format.h:288`).
-const VERT_OFS_BONE_WEIGHTINGS: usize = 28;
-
-/// `#define iG2_BITS_PER_BONEREF 5` (`mdx_format.h:61`).
-const IG2_BITS_PER_BONEREF: u32 = 5;
-/// `#define iG2_BONEWEIGHT_TOPBITS_SHIFT ((5 * 4) - 8)` (`mdx_format.h:65`).
-const IG2_BONEWEIGHT_TOPBITS_SHIFT: u32 = 12;
-/// `#define iG2_BONEWEIGHT_TOPBITS_AND 0x300` (`mdx_format.h:66`).
-const IG2_BONEWEIGHT_TOPBITS_AND: u32 = 0x300;
-/// `#define fG2_BONEWEIGHT_RECIPROCAL_MULT ((float)(1.0f/1023.0f))`
-/// (`mdx_format.h:60`).
-const FG2_BONEWEIGHT_RECIPROCAL_MULT: f32 = 1.0 / 1023.0;
 /// `#define iG2_TRISIDE_LONGEST 0` (`mdx_format.h:57`).
 const IG2_TRISIDE_LONGEST: usize = 0;
 /// `#define iG2_TRISIDE_SHORTEST 2` (`mdx_format.h:58`).
@@ -178,140 +128,28 @@ const MDX_TAG_ORIGIN: usize = 2;
 /// `surfaces.rs`'s identical copy.
 const G2SURFACEFLAG_GENERATED: i32 = 0x00000200;
 
-/// Read an `i32` at `offset` bytes into a raw block (the block is a
-/// `EngineHost::model_mdxm` pointer, or an interior surface/vertex pointer —
-/// `G2SV-D5`, the header types are never named). `read_unaligned` because
-/// nothing here proves 4-byte alignment; native byte order, no cross-endian
-/// concern at this layer (mirrors `surfaces.rs`'s `read_i32_at`).
-///
-/// # Safety
-/// `base` non-null and `offset..offset+4` inside the block.
-unsafe fn read_i32(base: *const u8, offset: usize) -> i32 {
-    unsafe { base.add(offset).cast::<i32>().read_unaligned() }
-}
-
-/// Read an `f32` at `offset` bytes into a raw block. See [`read_i32`].
-///
-/// # Safety
-/// `base` non-null and `offset..offset+4` inside the block.
-unsafe fn read_f32(base: *const u8, offset: usize) -> f32 {
-    unsafe { base.add(offset).cast::<f32>().read_unaligned() }
-}
-
-/// `G2_GetVertWeights` (`mdx_format.h:290-295`) — the packed weight count (1..4).
-///
-/// # Safety
-/// `vert` must point at a valid `mdxmVertex_t`.
-unsafe fn vert_weights(vert: *const u8) -> i32 {
-    let packed = unsafe { read_i32(vert, VERT_OFS_WEIGHTS_AND_INDEXES) } as u32;
-    ((packed >> 30) + 1) as i32
-}
-
-/// `G2_GetVertBoneIndex` (`mdx_format.h:297-302`) — the `iWeightNum`-th 5-bit
-/// bone reference.
-///
-/// # Safety
-/// `vert` must point at a valid `mdxmVertex_t`.
-unsafe fn vert_bone_index(vert: *const u8, weight_num: i32) -> i32 {
-    let packed = unsafe { read_i32(vert, VERT_OFS_WEIGHTS_AND_INDEXES) } as u32;
-    ((packed >> (IG2_BITS_PER_BONEREF * weight_num as u32)) & ((1 << IG2_BITS_PER_BONEREF) - 1))
-        as i32
-}
-
-/// `G2_GetVertBoneWeight` (`mdx_format.h:304-323`) — the `iWeightNum`-th bone
-/// weight; the last weight closes to `1.0 - fTotalWeight`, the rest decode from
-/// the 8-bit `BoneWeightings[]` entry plus its 2-bit overflow in the packed int
-/// and accumulate into `total_weight`.
-///
-/// # Safety
-/// `vert` must point at a valid `mdxmVertex_t`.
-unsafe fn vert_bone_weight(
-    vert: *const u8,
-    weight_num: i32,
-    total_weight: &mut f32,
-    num_weights: i32,
-) -> f32 {
-    if weight_num == num_weights - 1 {
-        1.0 - *total_weight
-    } else {
-        let packed = unsafe { read_i32(vert, VERT_OFS_WEIGHTS_AND_INDEXES) } as u32;
-        let mut temp = unsafe { *vert.add(VERT_OFS_BONE_WEIGHTINGS + weight_num as usize) } as i32;
-        temp |= ((packed >> (IG2_BONEWEIGHT_TOPBITS_SHIFT + (weight_num as u32 * 2)))
-            & IG2_BONEWEIGHT_TOPBITS_AND) as i32;
-        let bone_weight = FG2_BONEWEIGHT_RECIPROCAL_MULT * temp as f32;
-        *total_weight += bone_weight;
-        bone_weight
-    }
-}
-
 /// Transform one `mdxmVertex_t` into model space by its weighted bones — the
 /// inner accumulation loop `G2_ProcessSurfaceBolt2` runs per triangle vertex
-/// (`tr_ghoul2.cpp:2288-2302` and its three siblings). `bone_refs` is the
-/// surface's `int` bone-reference array; each vert bone index selects into it,
-/// and the referenced bone is evaluated through the cache (`Eval`, not
-/// `EvalRender` — `G2EVALRENDER` is undefined).
-///
-/// # Safety
-/// `vert` a valid `mdxmVertex_t`, `bone_refs` the surface's bone-reference
-/// array, and `cache` the surface's model's live bone cache.
-unsafe fn transform_vertex(
-    cache: &mut CBoneCache,
-    vert: *const u8,
-    bone_refs: *const u8,
-) -> [f32; 3] {
+/// (`tr_ghoul2.cpp:2288-2302` and its three siblings). `surface` provides the
+/// `int` bone-reference array each vert bone index selects into, and the
+/// referenced bone is evaluated through the cache (`Eval`, not `EvalRender` —
+/// `G2EVALRENDER` is undefined).
+fn transform_vertex(cache: &mut CBoneCache, vert: MdxmVertView, surface: MdxmSurfaceView) -> [f32; 3] {
     // VectorClear( pTri[j] );
     let mut p = [0.0f32; 3];
-    let vert_coords = unsafe {
-        [
-            read_f32(vert, VERT_OFS_VERT_COORDS),
-            read_f32(vert, VERT_OFS_VERT_COORDS + 4),
-            read_f32(vert, VERT_OFS_VERT_COORDS + 8),
-        ]
-    };
-    let num_weights = unsafe { vert_weights(vert) };
+    let vert_coords = vert.vert_coords();
+    let num_weights = vert.num_weights();
     let mut total_weight = 0.0f32;
     for k in 0..num_weights {
-        let bone_index = unsafe { vert_bone_index(vert, k) };
-        let bone_weight = unsafe { vert_bone_weight(vert, k, &mut total_weight, num_weights) };
-        let bone_ref = unsafe { read_i32(bone_refs, 4 * bone_index as usize) };
+        let bone_index = vert.bone_index(k);
+        let bone_weight = vert.bone_weight(k, &mut total_weight, num_weights);
+        let bone_ref = surface.bone_ref(bone_index);
         let bone = cache.eval(bone_ref);
         p[0] += bone_weight * (DotProductRow(&bone.matrix[0], vert_coords) + bone.matrix[0][3]);
         p[1] += bone_weight * (DotProductRow(&bone.matrix[1], vert_coords) + bone.matrix[1][3]);
         p[2] += bone_weight * (DotProductRow(&bone.matrix[2], vert_coords) + bone.matrix[2][3]);
     }
     p
-}
-
-/// Raven `void *G2_FindSurface_BC(const model_s *mod, int index, int lod)` —
-/// the by-index surface lookup the surface-bolt path uses: walk `mod->mdxm`'s
-/// LOD list to `lod`, step over the `mdxmLOD_t` header to the
-/// `mdxmLODSurfOffset_t` offset array, and return the pointer to surface
-/// `index`. Takes the raw `mdxm` block directly (this crate never names
-/// `model_s`/`mdxmHeader_t`, `G2SV-D5`); the caller resolves it once via
-/// `EngineHost::model_mdxm`.
-///
-/// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2952-2977`
-///
-/// # Safety
-/// `mdxm` a valid, non-null `EngineHost::model_mdxm` block; `lod` in
-/// `0..numLODs`; `index` in `0..numSurfaces` (matching the oracle's own
-/// unchecked-under-`NDEBUG` asserts).
-unsafe fn find_surface_bc(mdxm: *const c_void, index: i32, lod: i32) -> *const c_void {
-    unsafe {
-        let mdxm = mdxm as *const u8;
-        // point at first lod list
-        let mut current = mdxm.add(read_i32(mdxm, MDXM_OFS_OFS_LODS) as usize);
-        // walk the lods (mdxmLOD_t::ofsEnd is its only, first, field)
-        for _ in 0..lod {
-            let ofs_end = read_i32(current, 0);
-            current = current.add(ofs_end as usize);
-        }
-        // avoid the lod pointer data structure
-        current = current.add(MDXM_LOD_SIZE);
-        // we are now looking at the offset array (mdxmLODSurfOffset_t)
-        let offset = read_i32(current, 4 * index as usize);
-        current.add(offset as usize) as *const c_void
-    }
 }
 
 /// Raven `void G2_ProcessSurfaceBolt2(CBoneCache &boneCache, const
@@ -332,9 +170,9 @@ unsafe fn find_surface_bc(mdxm: *const c_void, index: i32, lod: i32) -> *const c
 /// Source: `oracle/codemp/renderer/tr_ghoul2.cpp:2983-3251`
 fn g2_process_surface_bolt2(
     cache: &mut CBoneCache,
-    surface: *const c_void,
+    surface: Option<MdxmSurfaceView>,
     surf_info: Option<&surfaceInfo_t>,
-    mdxm: *const c_void,
+    mdxm: MdxmView,
 ) -> mdxaBone_t {
     let mut ret_matrix = IDENTITY_MATRIX;
 
@@ -344,35 +182,19 @@ fn g2_process_surface_bolt2(
         let surf_number = surf_info.genPolySurfaceIndex & 0x0ffff;
         let poly_number = (surf_info.genPolySurfaceIndex >> 16) & 0x0ffff;
 
-        // SAFETY: `mdxm` is the surface's model block; `surf_number`/`gen_lod`
-        // index the poly's original surface, matching the oracle's own
-        // unchecked reads off `mod->mdxm`.
-        unsafe {
+        {
             // find original surface our original poly was in.
-            let original_surf = find_surface_bc(mdxm, surf_number, surf_info.genLod) as *const u8;
-            let tri_base = original_surf.add(read_i32(original_surf, SURF_OFS_TRIANGLES) as usize);
-            let poly = tri_base.add(poly_number as usize * MDXM_TRIANGLE_SIZE);
+            let original_surf = mdxm.find_surface(surf_number, surf_info.genLod);
 
             // get the original polys indexes
-            let index0 = read_i32(poly, 0);
-            let index1 = read_i32(poly, 4);
-            let index2 = read_i32(poly, 8);
-
-            // decide where the original verts are
-            let vert_base = original_surf.add(read_i32(original_surf, SURF_OFS_VERTS) as usize);
-            let vert0 = vert_base.add(index0 as usize * MDXM_VERTEX_SIZE);
-            let vert1 = vert_base.add(index1 as usize * MDXM_VERTEX_SIZE);
-            let vert2 = vert_base.add(index2 as usize * MDXM_VERTEX_SIZE);
-
-            let bone_refs =
-                original_surf.add(read_i32(original_surf, SURF_OFS_BONE_REFERENCES) as usize);
+            let [index0, index1, index2] = original_surf.triangle(poly_number);
 
             // now go and transform just the points we need from the surface
             // that was hit originally.
             let p_tri = [
-                transform_vertex(cache, vert0, bone_refs),
-                transform_vertex(cache, vert1, bone_refs),
-                transform_vertex(cache, vert2, bone_refs),
+                transform_vertex(cache, original_surf.vert(index0), original_surf),
+                transform_vertex(cache, original_surf.vert(index1), original_surf),
+                transform_vertex(cache, original_surf.vert(index2), original_surf),
             ];
 
             // work out baryCentricK (Raven's `float baryCentricK = 1.0 - (...)`
@@ -434,24 +256,16 @@ fn g2_process_surface_bolt2(
         //
         // Divergence (§19): oracle derefs `surface` unconditionally; null here is an
         // unreachable oracle null-deref (UB) — pick the defined identity fallback.
-        if surface.is_null() {
+        let Some(surface) = surface else {
             return ret_matrix;
-        }
-        let surface = surface as *const u8;
+        };
 
-        // SAFETY: `surface` is a valid `mdxmSurface_t` (`G2_FindSurface_BC` or
-        // the slist `surfInfo`); its `ofsVerts`/`ofsBoneReferences` interior
-        // reads match the oracle's own.
-        unsafe {
-            // whip through and actually transform each vertex
-            let mut v = surface.add(read_i32(surface, SURF_OFS_VERTS) as usize);
-            let bone_refs = surface.add(read_i32(surface, SURF_OFS_BONE_REFERENCES) as usize);
-
+        {
+            // whip through and actually transform each vertex (Raven advances
+            // `v` by `sizeof(mdxmVertex_t)` per iteration — verts 0,1,2).
             let mut p_tri = [[0.0f32; 3]; 3];
-            for slot in p_tri.iter_mut() {
-                *slot = transform_vertex(cache, v, bone_refs);
-                // v++ (advance by sizeof(mdxmVertex_t))
-                v = v.add(MDXM_VERTEX_SIZE);
+            for (i, slot) in p_tri.iter_mut().enumerate() {
+                *slot = transform_vertex(cache, surface.vert(i as i32), surface);
             }
 
             // work out actual sides of the tag triangle
@@ -566,18 +380,19 @@ pub(crate) fn resolve_bolt_matrix_low(
             }
         }
 
-        let mdxm = host.model_mdxm(cache.model) as *const c_void;
-        let mut surface: *const c_void = core::ptr::null();
+        let mdxm_ptr = host.model_mdxm(cache.model);
         // SAFETY: `mdxm` is `cache.model`'s loader block — non-null on the live
         // bolt path (a built cache implies a valid model), matching the oracle's
         // own unchecked `boneCache.mod->mdxm`.
+        let mdxm = unsafe { MdxmView::from_block(mdxm_ptr) };
+        let mut surface: Option<MdxmSurfaceView> = None;
         if surf_info.is_none() {
-            surface = unsafe { find_surface_bc(mdxm, bolt.surfaceNumber, 0) };
+            surface = Some(mdxm.find_surface(bolt.surfaceNumber, 0));
         }
-        if surface.is_null() {
+        if surface.is_none() {
             if let Some(si) = surf_info {
                 if si.surface < 10000 {
-                    surface = unsafe { find_surface_bc(mdxm, si.surface, 0) };
+                    surface = Some(mdxm.find_surface(si.surface, 0));
                 }
             }
         }

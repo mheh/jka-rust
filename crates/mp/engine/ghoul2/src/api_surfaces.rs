@@ -38,6 +38,7 @@ use mp_host_interface::EngineHost;
 use mp_qshared::shared::error_parm::errorParm_t;
 
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -218,20 +219,6 @@ pub fn g2api_get_surface_name(
     // Raven `static char noSurface[1] = "";` — the shared empty-string fallback.
     const NO_SURFACE: &str = "";
 
-    // `mdxmHeader_t` layout (oracle/codemp/renderer/mdx_format.h:151-172): int
-    // ident, int version, char name[64], char animName[64], int animIndex, int
-    // numBones, int numLODs, int ofsLODs, int numSurfaces, int
-    // ofsSurfHierarchy, int ofsEnd — every field 4-byte-aligned with no
-    // padding, so `numSurfaces` sits at byte offset 152 and
-    // `sizeof(mdxmHeader_t) == 164` (the `mdxmHierarchyOffsets_t` follows
-    // immediately, `:2394`). `mdxmSurfHierarchy_t::name` (`:189`) is its first
-    // field, a NUL-terminated `MAX_QPATH` (64-byte) buffer. This crate never
-    // names the `mdxm*` types (`G2SV-D5`); the offsets below are the same raw
-    // byte arithmetic Raven itself does off the loader-owned block.
-    const NUM_SURFACES_OFFSET: usize = 152;
-    const HEADER_SIZE: usize = 164;
-    const SURF_NAME_LEN: usize = 64;
-
     if !crate::misc::g2_setup_model_pointers(host, ghl_info) {
         return NO_SURFACE.to_string();
     }
@@ -247,7 +234,10 @@ pub fn g2api_get_surface_name(
         );
     }
 
-    let num_surfaces = unsafe { *(mdxm.byte_add(NUM_SURFACES_OFFSET) as *const i32) };
+    // SAFETY: `mdxm` non-null past the error above (ERR_DROP diverges),
+    // matching Raven's own unchecked `mod->mdxm` reads (`G2_API.cpp:2373-2394`).
+    let view = unsafe { MdxmView::from_block(mdxm) };
+    let num_surfaces = view.num_surfaces();
 
     // ok, I guess it's semi-valid for the user to be passing in surface > numSurfs
     // because they don't know how many surfs a model may have.. but how did they
@@ -275,15 +265,7 @@ pub fn g2api_get_surface_name(
         );
     }
 
-    let surf_indexes = unsafe { mdxm.byte_add(HEADER_SIZE) };
-    let offset = unsafe { *(surf_indexes.byte_add(this_surface_index as usize * 4) as *const i32) };
-    let surf_info = unsafe { surf_indexes.byte_offset(offset as isize) };
-    let name_bytes = unsafe { core::slice::from_raw_parts(surf_info as *const u8, SURF_NAME_LEN) };
-    let end = name_bytes
-        .iter()
-        .position(|&b| b == 0)
-        .unwrap_or(SURF_NAME_LEN);
-    String::from_utf8_lossy(&name_bytes[..end]).into_owned()
+    view.surf_hierarchy(this_surface_index).name_lossy()
 }
 
 /// Raven `int G2API_GetSurfaceRenderStatus(CGhoul2Info *ghlInfo, const char

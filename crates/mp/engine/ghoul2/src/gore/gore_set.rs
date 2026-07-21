@@ -69,6 +69,7 @@ use mp_qshared::shared::{mdxaBone_t, vec3_t};
 use crate::api_collision::g2api_get_time;
 use crate::ghoul2_system::Ghoul2System;
 use crate::gore::gore_texture_coordinates::{GoreTextureCoordinates, MAX_LODS};
+use crate::mdx::mdxm::MdxmSurfaceView;
 use crate::gore::sgore_surface::SGoreSurface;
 use crate::shared::cghoul2_info::CGhoul2Info;
 
@@ -353,45 +354,10 @@ impl GoreState {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Raw mdxm surface/triangle field offsets (`G2SV-D5`: `mdxmSurface_t`/
-// `mdxmTriangle_t` are never named in this crate — only byte arithmetic off
-// the raw `surface: *const c_void` pointer, exactly as the oracle body does
-// off its typed `const mdxmSurface_t *surface`). Offsets derived from the
-// field order in `oracle/codemp/renderer/mdx_format.h:219-252`: every field
-// is a plain `int` (4 bytes), so natural alignment introduces no padding.
-// Duplicated locally rather than shared with `api_models.rs`'s equivalent
-// header-field-offset consts (this crate has no shared byte-reader module
-// yet; same per-file duplication convention that file's own doc comment
-// documents for `GHOUL2_NEWORIGIN`).
-// ---------------------------------------------------------------------------
-
-/// `mdxmSurface_t::thisSurfaceIndex` (`mdx_format.h:220`) — `ident`(0) precedes it.
-const MDXM_SURF_OFS_THIS_SURFACE_INDEX: usize = 4;
-/// `mdxmSurface_t::numVerts` (`mdx_format.h:224`).
-const MDXM_SURF_OFS_NUM_VERTS: usize = 12;
-/// `mdxmSurface_t::numTriangles` (`mdx_format.h:227`).
-const MDXM_SURF_OFS_NUM_TRIANGLES: usize = 20;
-/// `mdxmSurface_t::ofsTriangles` (`mdx_format.h:228`).
-const MDXM_SURF_OFS_OFS_TRIANGLES: usize = 24;
-/// `sizeof(mdxmTriangle_t)` (`mdx_format.h:250-252`) — `int indexes[3]`.
-const MDXM_TRIANGLE_SIZE: usize = 12;
-
-/// Reads an `i32` at `offset` bytes into a raw model-memory block. Mirrors
-/// `api_models.rs`'s identical private helper (duplicated per this crate's
-/// established per-file convention, not shared — see the offset-const block
-/// above).
-///
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block.
-unsafe fn read_i32(base: *const c_void, offset: usize) -> i32 {
-    unsafe {
-        (base as *const u8)
-            .add(offset)
-            .cast::<i32>()
-            .read_unaligned()
-    }
-}
+// mdxm surface/triangle reads route through `MdxmSurfaceView` (`mdx/mdxm.rs`),
+// the shared home for the loader-block byte offsets (`G2SV-D5`). The raw
+// `read_vert3` below reads the `TS.TransformedVertsArray`-resolved float buffer,
+// not a model block, and stays.
 
 /// Reads the 3 leading floats (x/y/z; two more floats/vertex follow, unused
 /// here) of transformed vertex `vert_index` out of a `TS.TransformedVertsArray`-
@@ -482,7 +448,7 @@ pub fn g2_gore_polys(
     gore: &mut GoreState,
     g2: &Ghoul2System,
     gore_model_index: i32,
-    surface: *const c_void,
+    surface: MdxmSurfaceView,
     ts: &mut crate::misc::CTraceSurface,
     surf_info: *const c_void,
 ) {
@@ -515,10 +481,10 @@ pub fn g2_gore_polys(
     _VectorMA(saxis, 0.5 * c / ts.ssize, basis2, &mut saxis);
 
     // G2_misc.cpp:841-874: per-vertex splotch-space flags/texcoords.
-    let this_surface_index = unsafe { read_i32(surface, MDXM_SURF_OFS_THIS_SURFACE_INDEX) };
+    let this_surface_index = surface.this_surface_index();
     let verts_ptr = unsafe { *ts.transformed_verts_array.add(this_surface_index as usize) } as usize
         as *const f32;
-    let num_verts = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_VERTS) };
+    let num_verts = surface.num_verts();
     // Raven `assert(numVerts<MAX_GORE_VERTS)` (:845) dropped (NDEBUG no-op).
     let mut overall_flags: i32 = 15;
     let mut gore_verts: Vec<GoreVertScratch> =
@@ -553,8 +519,7 @@ pub fn g2_gore_polys(
         return; // completely off the gore splotch (G2_misc.cpp:875-878).
     }
 
-    let num_triangles = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_TRIANGLES) };
-    let ofs_triangles = unsafe { read_i32(surface, MDXM_SURF_OFS_OFS_TRIANGLES) };
+    let num_triangles = surface.num_triangles();
     let mut new_num_tris: i32 = 0;
     let mut new_num_verts: i32 = 0;
 
@@ -569,16 +534,7 @@ pub fn g2_gore_polys(
     let mut gore_index_copy: Vec<i32> = Vec::new();
 
     for j in 0..num_triangles {
-        // SAFETY: `j < numTriangles`; each triangle is 3 packed ints
-        // (`MDXM_TRIANGLE_SIZE` bytes) at `ofsTriangles + j*12`.
-        let tri_offset = ofs_triangles as usize + j as usize * MDXM_TRIANGLE_SIZE;
-        let indexes = unsafe {
-            [
-                read_i32(surface, tri_offset),
-                read_i32(surface, tri_offset + 4),
-                read_i32(surface, tri_offset + 8),
-            ]
-        };
+        let indexes = surface.triangle(j);
         // Raven's three bounds `assert`s (:918-920) dropped (NDEBUG no-op).
         let tri_flags = 15
             & gore_verts[indexes[0] as usize].flags

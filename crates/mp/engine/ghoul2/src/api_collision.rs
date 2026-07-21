@@ -25,13 +25,9 @@
 //!    ported here as `g2_need_retransform`, this file's own private helper,
 //!    since it has no cross-file caller and no other rostered home.
 //! 2. `g2api_collision_detect_cache`'s transformed-verts-array alloc path reads
-//!    `mod->mdxm->numSurfaces` (`G2_API.cpp:2062`) the same way
-//!    `api_surfaces.rs`'s `g2api_get_surface_name` already does — that file's
-//!    own module doc-comment flags the `mdxmHeader_t` byte-offset table as an
-//!    undocumented shape (no doc section spells it out); this file needs the
-//!    same `numSurfaces` offset and re-derives it locally (no shared home
-//!    exists yet to import it from), duplicating rather than inventing a new
-//!    offset.
+//!    `mod->mdxm->numSurfaces` (`G2_API.cpp:2062`) via `MdxmView::num_surfaces`
+//!    (`mdx/mdxm.rs`, the shared home for the `mdxmHeader_t` byte offsets —
+//!    `G2SV-D5`, the type is never named here).
 
 use mp_host_interface::EngineHost;
 use mp_qshared::common::mp::qcommon::collision_record::MAX_G2_COLLISIONS;
@@ -39,6 +35,7 @@ use mp_qshared::shared::q_math::TransformAndTranslatePoint;
 use mp_qshared::shared::{mdxaBone_t, vec3_t, CollisionRecord_t, Eorientations};
 
 use crate::ghoul2_system::{Ghoul2System, NUM_G2T_TIME};
+use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 
@@ -62,16 +59,6 @@ const BONE_ANIM_OVERRIDE_LOOP: i32 = 0x0010;
 ///
 /// Source: `oracle/codemp/ghoul2/G2.h:14`
 const BONE_NEED_TRANSFORM: i32 = 0x8000;
-
-// `mdxmHeader_t` layout (oracle/codemp/renderer/mdx_format.h:151-172): int
-// ident, int version, char name[64], char animName[64], int animIndex, int
-// numBones, int numLODs, int ofsLODs, int numSurfaces, int ofsSurfHierarchy,
-// int ofsEnd — every field 4-byte-aligned with no padding, so `numSurfaces`
-// sits at byte offset 152 (same derivation `api_surfaces.rs`'s
-// `g2api_get_surface_name` already uses; module-doc gap note #2 above). This
-// crate never names the `mdxm*` types (`G2SV-D5`); the offset below is the
-// same raw byte arithmetic Raven itself does off the loader-owned block.
-const NUM_SURFACES_OFFSET: usize = 152;
 
 /// Raven `static void G2API_CollisionDetectCache(...)`'s private helper
 /// `static inline bool G2_NeedRetransform(CGhoul2Info *g2, int frameNum)` —
@@ -283,7 +270,10 @@ pub fn g2api_collision_detect_cache(
         for idx in 0..ghoul2.size(g2) {
             let model = ghoul2.get(g2, idx).model;
             let mdxm = host.model_mdxm(model);
-            let num_surfaces = unsafe { *(mdxm.byte_add(NUM_SURFACES_OFFSET) as *const i32) };
+            // SAFETY: `mdxm` is this valid model's loader block (post
+            // `G2_SetupModelPointers`), matching Raven's own unchecked
+            // `mod->mdxm->numSurfaces` read (`G2_API.cpp:2062`).
+            let num_surfaces = unsafe { MdxmView::from_block(mdxm) }.num_surfaces();
 
             let info = ghoul2.get_mut(g2, idx);
             if info.transformed_verts_array.is_none() || (info.flags & GHOUL2_ZONETRANSALLOC) == 0 {

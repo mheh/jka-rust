@@ -78,12 +78,12 @@
 //!   `return` beside a dropped `assert(0)`) is preserved, since it is a
 //!   separate C statement that always ran regardless of NDEBUG.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::{errorParm_t, qhandle_t};
 
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxa::MdxaView;
+use crate::mdx::mdxm::MdxmView;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::bone_info_t::boneInfo_t;
 use crate::shared::cghoul2_info::CGhoul2Info;
@@ -97,60 +97,6 @@ use crate::shared::surface_info_t::surfaceInfo_t;
 /// same way between `ghoul2_system.rs` and `info_array.rs`, per their own
 /// doc comments) rather than invented as a new cross-file dependency.
 const GHOUL2_NEWORIGIN: i32 = 0x008;
-
-// ---------------------------------------------------------------------------
-// Raw mdxm/mdxa header field offsets (`G2SV-D5`: the header types themselves
-// are never named in this crate — only byte arithmetic off the raw
-// `EngineHost::model_mdxm`/`model_mdxa` pointer, exactly as the oracle body
-// does off `model_t::mdxm`/`mdxa`). Every offset is derived from the field
-// order in `oracle/codemp/renderer/mdx_format.h`: every field there is an
-// `int`/`float`/a `char[64]` (a multiple of 4), so natural alignment
-// introduces no padding.
-// ---------------------------------------------------------------------------
-
-/// `mdxmHeader_t::animIndex` (`mdx_format.h:161`) — `ident`(4) + `version`(4)
-/// + `name[64]` + `animName[64]` precede it.
-const MDXM_OFS_ANIM_INDEX: usize = 136;
-/// `mdxmHeader_t::numSurfaces` (`mdx_format.h:168`).
-const MDXM_OFS_NUM_SURFACES: usize = 152;
-/// `mdxmHeader_t::ofsSurfHierarchy` (`mdx_format.h:169`).
-const MDXM_OFS_OFS_SURF_HIERARCHY: usize = 156;
-/// `mdxmHeader_t::ofsEnd` (`mdx_format.h:171`).
-const MDXM_OFS_OFS_END: usize = 160;
-
-/// `mdxaHeader_t::ofsEnd` (`mdx_format.h:369`) — `ident`(4) + `version`(4) +
-/// `name[64]` + `fScale`(4) + `numFrames`(4) + `ofsFrames`(4) + `numBones`(4)
-/// + `ofsCompBonePool`(4) + `ofsSkel`(4) precede it.
-const MDXA_OFS_OFS_END: usize = 96;
-
-/// `mdxmSurfHierarchy_t::shader` (first byte only, `mdx_format.h:190`) —
-/// `name[64]`(0) then `flags` (`unsigned int`, 64) precede it.
-const SURF_HIER_OFS_SHADER: usize = 68;
-/// `mdxmSurfHierarchy_t::numChildren` (`mdx_format.h:193`).
-const SURF_HIER_OFS_NUM_CHILDREN: usize = 140;
-/// `mdxmSurfHierarchy_t::childIndexes` base offset (`mdx_format.h:194`); the
-/// next surface entry starts `SURF_HIER_OFS_CHILD_INDEXES + 4*numChildren`
-/// bytes later (`childIndexes[numChildren]`, size comment at `:195`).
-const SURF_HIER_OFS_CHILD_INDEXES: usize = 144;
-
-/// Read an `i32` at `offset` bytes into the block `base` points at (the
-/// block is `EngineHost::model_mdxm`/`model_mdxa`'s raw pointer — `G2SV-D5`,
-/// the header types are never named). `read_unaligned` because nothing here
-/// proves 4-byte alignment on every host; this is the same-process native
-/// byte order the engine already parsed the block into (no cross-endian
-/// concern at this layer).
-///
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block
-/// the host returned.
-unsafe fn read_i32_at(base: *const c_void, offset: usize) -> i32 {
-    unsafe {
-        (base as *const u8)
-            .add(offset)
-            .cast::<i32>()
-            .read_unaligned()
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Manual POD duplicates. `boneInfo_t`/`boltInfo_t`/`surfaceInfo_t` (ABI-frozen
@@ -300,10 +246,10 @@ fn g2_test_model_pointers(ghl_info: &mut CGhoul2Info, host: &mut impl EngineHost
         let mdxm = host.model_mdxm(ghl_info.model);
         ghl_info.current_model = mdxm;
         if !mdxm.is_null() {
-            // SAFETY: `mdxm` is non-null and the header is at least
-            // `MDXM_OFS_OFS_END + 4` bytes (`EngineHost::model_mdxm`'s
-            // contract, `G2SV-D5`).
-            let ofs_end = unsafe { read_i32_at(mdxm, MDXM_OFS_OFS_END) };
+            // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract
+            // (`G2SV-D5`).
+            let view = unsafe { MdxmView::from_block(mdxm) };
+            let ofs_end = view.ofs_end();
             if ghl_info.current_model_size != 0 && ghl_info.current_model_size != ofs_end {
                 host.error(
                     errorParm_t::ERR_DROP,
@@ -312,12 +258,12 @@ fn g2_test_model_pointers(ghl_info: &mut CGhoul2Info, host: &mut impl EngineHost
             }
             ghl_info.current_model_size = ofs_end;
 
-            let anim_index = unsafe { read_i32_at(mdxm, MDXM_OFS_ANIM_INDEX) };
+            let anim_index = view.anim_index();
             let a_header = host.model_mdxa(anim_index);
             ghl_info.anim_model = a_header;
             if !a_header.is_null() {
-                // SAFETY: `a_header` is non-null, same contract as above.
-                let a_ofs_end = unsafe { read_i32_at(a_header, MDXA_OFS_OFS_END) };
+                // SAFETY: `a_header` non-null, same contract as above.
+                let a_ofs_end = unsafe { MdxaView::from_block(a_header) }.ofs_end();
                 if ghl_info.current_anim_model_size != 0
                     && ghl_info.current_anim_model_size != a_ofs_end
                 {
@@ -836,37 +782,6 @@ pub fn g2api_duplicate_ghoul2_instance(
     let _ = g2api_copy_ghoul2_instance(g2, g2_from, g2_to, -1);
 }
 
-/// The mdxm surface-hierarchy walk `g2api_skinless_model` drives — split out
-/// so it is unit-testable against a synthetic `.glm` block without needing a
-/// live `EngineHost`/`CGhoul2Info` (the surrounding `G2_SetupModelPointers`
-/// resolve is a sibling module's concern, `misc.rs`).
-///
-/// Raven: for each of `num_surfaces` entries starting at `ofs_surf_hierarchy`
-/// bytes into `mdxm`, a non-empty `shader` name means "found a surface with a
-/// shader, ok" (`qfalse` = not skinless); reaching the end with none found is
-/// `qtrue`. `surf->shader` is a `char[64]` array, never null itself, so
-/// Raven's `if (surf->shader && surf->shader[0])` collapses to the first byte
-/// check alone.
-///
-/// Source: `oracle/codemp/ghoul2/G2_API.cpp:2508-2521`
-fn mdxm_has_no_shaders(mdxm: *const c_void, num_surfaces: i32, ofs_surf_hierarchy: i32) -> bool {
-    // SAFETY: `mdxm` is a valid `EngineHost::model_mdxm` block (caller's
-    // contract); `ofs_surf_hierarchy`/each `numChildren`-derived stride stay
-    // inside it for a well-formed `.glm` (matching the oracle's own
-    // unchecked walk, `G2_API.cpp:2511-2520`).
-    let mut surf = unsafe { (mdxm as *const u8).add(ofs_surf_hierarchy as usize) as *const c_void };
-    for _ in 0..num_surfaces {
-        let shader_first_byte = unsafe { *(surf as *const u8).add(SURF_HIER_OFS_SHADER) };
-        if shader_first_byte != 0 {
-            return false;
-        }
-        let num_children = unsafe { read_i32_at(surf, SURF_HIER_OFS_NUM_CHILDREN) };
-        let stride = SURF_HIER_OFS_CHILD_INDEXES + 4 * num_children as usize;
-        surf = unsafe { (surf as *const u8).add(stride) as *const c_void };
-    }
-    true
-}
-
 /// Raven `qboolean G2API_SkinlessModel(CGhoul2Info *g2)` — "see if surfs have
 /// any shader info": on `G2_SetupModelPointers` success, walks the model's
 /// `mdxm` surface-hierarchy table and returns `qfalse` at the first surface
@@ -874,6 +789,12 @@ fn mdxm_has_no_shaders(mdxm: *const c_void, num_surfaces: i32, ofs_surf_hierarch
 /// Reads model memory (`mod->mdxm`), served by `EngineHost::model_mdxm`
 /// (ruling 36) once `G2_SetupModelPointers`/registration resolve the handle —
 /// see the module doc-comment's `RE_RegisterModel` gap note.
+///
+/// Raven: for each surface entry (`MdxmView::hierarchy_iter`), a non-empty
+/// `shader` name means "found a surface with a shader, ok" (`qfalse` = not
+/// skinless); reaching the end with none found is `qtrue`. `surf->shader` is a
+/// `char[64]` array, never null itself, so Raven's `if (surf->shader &&
+/// surf->shader[0])` collapses to the first-byte check alone.
 ///
 /// Re-derives the `mdxm` block via `host.model_mdxm(ghl_info.model)` directly
 /// rather than trusting `ghl_info.current_model`'s stored value: that field's
@@ -893,9 +814,9 @@ pub fn g2api_skinless_model(
         let mdxm = host.model_mdxm(ghl_info.model);
         if !mdxm.is_null() {
             // SAFETY: `mdxm` non-null, contract per `EngineHost::model_mdxm`.
-            let num_surfaces = unsafe { read_i32_at(mdxm, MDXM_OFS_NUM_SURFACES) };
-            let ofs_surf_hierarchy = unsafe { read_i32_at(mdxm, MDXM_OFS_OFS_SURF_HIERARCHY) };
-            return mdxm_has_no_shaders(mdxm, num_surfaces, ofs_surf_hierarchy);
+            return unsafe { MdxmView::from_block(mdxm) }
+                .hierarchy_iter()
+                .all(|s| s.shader_first_byte() == 0);
         }
     }
     // found nothing.
@@ -915,56 +836,6 @@ pub fn g2api_ghoul2_size(g2: &Ghoul2System, ghoul2: &CGhoul2Info_v) -> i32 {
 mod tests {
     use super::*;
     use mp_host_interface::mock::MockHost;
-
-    /// Build one synthetic `mdxmSurfHierarchy_t` entry: `name[64]` zeroed,
-    /// `flags`(4) zeroed, `shader[64]` with only byte 0 meaningful here,
-    /// `shaderIndex`(4)/`parentIndex`(4) zeroed, `numChildren`(4), then
-    /// `numChildren` zeroed `i32` child indexes.
-    fn push_surf_entry(buf: &mut Vec<u8>, shader_byte: u8, num_children: i32) {
-        buf.extend(std::iter::repeat(0u8).take(64)); // name
-        buf.extend(0u32.to_ne_bytes()); // flags
-        let mut shader = [0u8; 64];
-        shader[0] = shader_byte;
-        buf.extend(shader);
-        buf.extend(0i32.to_ne_bytes()); // shaderIndex
-        buf.extend(0i32.to_ne_bytes()); // parentIndex
-        buf.extend(num_children.to_ne_bytes()); // numChildren
-        for _ in 0..num_children {
-            buf.extend(0i32.to_ne_bytes());
-        }
-    }
-
-    #[test]
-    fn read_i32_at_reads_native_endian() {
-        let bytes = [0u8, 0, 0, 0, 42, 0, 0, 0];
-        let val = unsafe { read_i32_at(bytes.as_ptr() as *const c_void, 4) };
-        assert_eq!(val, 42);
-    }
-
-    #[test]
-    fn mdxm_has_no_shaders_true_when_every_surface_is_shaderless() {
-        let mut buf = Vec::new();
-        push_surf_entry(&mut buf, 0, 0);
-        push_surf_entry(&mut buf, 0, 2);
-        assert!(mdxm_has_no_shaders(buf.as_ptr() as *const c_void, 2, 0));
-    }
-
-    #[test]
-    fn mdxm_has_no_shaders_false_at_first_shaded_surface() {
-        let mut buf = Vec::new();
-        push_surf_entry(&mut buf, 0, 0);
-        push_surf_entry(&mut buf, b'x', 0);
-        assert!(!mdxm_has_no_shaders(buf.as_ptr() as *const c_void, 2, 0));
-    }
-
-    #[test]
-    fn mdxm_has_no_shaders_honors_ofs_surf_hierarchy() {
-        // A leading junk byte before the real table starts: only the offset
-        // slice should be walked.
-        let mut buf = vec![0xFFu8];
-        push_surf_entry(&mut buf, 0, 0);
-        assert!(mdxm_has_no_shaders(buf.as_ptr() as *const c_void, 1, 1));
-    }
 
     #[test]
     fn dup_cghoul2_info_duplicates_lists_independently() {

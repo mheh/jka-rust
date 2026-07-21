@@ -329,6 +329,8 @@ fn surfaces_matches_oracle_golden() {
     let mut host = MockHost::new();
     let mut mdxm = vec![0u8; MDXM_HEADER_SIZE];
     mdxm[MDXM_OFS_NUM_LODS..MDXM_OFS_NUM_LODS + 4].copy_from_slice(&2i32.to_ne_bytes());
+    // `ofsEnd`(160) sizes `MdxmView::from_block`.
+    mdxm[160..164].copy_from_slice(&(MDXM_HEADER_SIZE as i32).to_ne_bytes());
     host.mdxm_blocks.insert(1, mdxm);
 
     let mut gh = CGhoul2Info::default();

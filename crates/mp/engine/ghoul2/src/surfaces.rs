@@ -99,12 +99,12 @@
 //!    `active_bones` scratch array all-zero (its `Z_Malloc` + `memset(0)`
 //!    initial state) rather than inventing the walk that would populate it.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
-use mp_qshared::shared::{qhandle_t, MAX_QPATH};
+use mp_qshared::shared::qhandle_t;
 
 use crate::ghoul2_system::Ghoul2System;
+use crate::mdx::mdxa::MdxaView;
+use crate::mdx::mdxm::MdxmView;
 use crate::shared::cghoul2_info::CGhoul2Info;
 use crate::shared::cghoul2_info_v::CGhoul2Info_v;
 use crate::shared::surface_info_t::surfaceInfo_t;
@@ -132,110 +132,6 @@ const MODEL_AND: i32 = (1 << MODEL_WIDTH) - 1;
 const BOLT_AND: i32 = (1 << BOLT_WIDTH) - 1;
 const BOLT_SHIFT: i32 = 0;
 const MODEL_SHIFT: i32 = BOLT_SHIFT + BOLT_WIDTH;
-
-// ---------------------------------------------------------------------------
-// Raw mdxm/mdxa header + `mdxmSurfHierarchy_t` byte-offset table (`G2SV-D5`:
-// the header types are never named in this crate — only byte arithmetic off
-// the raw `EngineHost::model_mdxm`/`model_mdxa` pointer, exactly as the oracle
-// body does off `model_t::mdxm`/`mdxa`). Every offset is derived from the
-// field order in `oracle/codemp/renderer/mdx_format.h`; duplicated locally
-// per this crate's own convention (`api_models.rs`'s identical table for the
-// same header types; `api_bones.rs`'s smaller `mdxaHeader_t` table).
-// ---------------------------------------------------------------------------
-
-/// `mdxmHeader_t::animIndex` (`mdx_format.h:161`) — `ident`(4) + `version`(4)
-/// + `name[64]` + `animName[64]` precede it.
-const MDXM_OFS_ANIM_INDEX: usize = 136;
-/// `mdxmHeader_t::numLODs` (`mdx_format.h:165`).
-const MDXM_OFS_NUM_LODS: usize = 144;
-/// `mdxmHeader_t::numSurfaces` (`mdx_format.h:168`).
-const MDXM_OFS_NUM_SURFACES: usize = 152;
-/// `mdxmHeader_t::ofsSurfHierarchy` (`mdx_format.h:169`).
-const MDXM_OFS_OFS_SURF_HIERARCHY: usize = 156;
-/// `sizeof(mdxmHeader_t)` — where the `mdxmHierarchyOffsets_t` offset table
-/// starts (`(mdxmHierarchyOffsets_t*)((byte*)mod->mdxm + sizeof(mdxmHeader_t))`,
-/// `G2_surfaces.cpp:118`); `ident`..`ofsEnd` are eleven 4-byte fields.
-const MDXM_HEADER_SIZE: usize = 164;
-
-/// `mdxaHeader_t::numBones` (`mdx_format.h:365`) — `ident`(4) + `version`(4) +
-/// `name[64]` + `fScale`(4) + `numFrames`(4) + `ofsFrames`(4) precede it.
-const MDXA_OFS_NUM_BONES: usize = 84;
-
-/// `mdxmSurfHierarchy_t::flags` (`mdx_format.h:189`) — `name[64]` precedes it.
-const SURF_HIER_OFS_FLAGS: usize = 64;
-/// `mdxmSurfHierarchy_t::parentIndex` (`mdx_format.h:192`) — `name[64]`(0) +
-/// `flags`(64) + `shader[64]`(68) + `shaderIndex`(132) precede it.
-const SURF_HIER_OFS_PARENT_INDEX: usize = 136;
-/// `mdxmSurfHierarchy_t::numChildren` (`mdx_format.h:193`).
-const SURF_HIER_OFS_NUM_CHILDREN: usize = 140;
-/// `mdxmSurfHierarchy_t::childIndexes` base offset (`mdx_format.h:194`); the
-/// next surface entry starts `SURF_HIER_OFS_CHILD_INDEXES + 4*numChildren`
-/// bytes later (`childIndexes[numChildren]`, size comment at `:195`).
-const SURF_HIER_OFS_CHILD_INDEXES: usize = 144;
-
-/// Read an `i32` at `offset` bytes into the block `base` points at (the block
-/// is `EngineHost::model_mdxm`/`model_mdxa`'s raw pointer — `G2SV-D5`, the
-/// header types are never named). `read_unaligned` because nothing here
-/// proves 4-byte alignment on every host; this is the same-process native
-/// byte order the engine already parsed the block into (no cross-endian
-/// concern at this layer). Mirrors `api_models.rs`'s identical helper.
-///
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block
-/// the host returned.
-unsafe fn read_i32_at(base: *const c_void, offset: usize) -> i32 {
-    unsafe {
-        (base as *const u8)
-            .add(offset)
-            .cast::<i32>()
-            .read_unaligned()
-    }
-}
-
-/// Case-insensitive compare of a raw `mdxmSurfHierarchy_t::name` (`char[64]`,
-/// offset 0) against `name` — Raven's `stricmp`. Mirrors `api_bones.rs`'s
-/// `mdxa_skel_name_matches`.
-///
-/// # Safety
-/// `surf` must point at a valid `mdxmSurfHierarchy_t` entry.
-unsafe fn surf_hier_name_matches(surf: *const c_void, name: &str) -> bool {
-    let bytes = unsafe { core::slice::from_raw_parts(surf as *const u8, MAX_QPATH) };
-    let len = bytes.iter().position(|&b| b == 0).unwrap_or(MAX_QPATH);
-    core::str::from_utf8(&bytes[..len])
-        .map(|s| s.eq_ignore_ascii_case(name))
-        .unwrap_or(false)
-}
-
-/// Read a raw `mdxmSurfHierarchy_t::name` (`char[64]`, offset 0) as an owned,
-/// lossily-decoded `String` — needed where the name itself (not just a
-/// match test) must be forwarded on, e.g. [`g2_is_surface_rendered`]'s
-/// ancestor-name re-lookup.
-///
-/// # Safety
-/// `surf` must point at a valid `mdxmSurfHierarchy_t` entry.
-unsafe fn surf_hier_name(surf: *const c_void) -> String {
-    let bytes = unsafe { core::slice::from_raw_parts(surf as *const u8, MAX_QPATH) };
-    let len = bytes.iter().position(|&b| b == 0).unwrap_or(MAX_QPATH);
-    String::from_utf8_lossy(&bytes[..len]).into_owned()
-}
-
-/// Resolve `surfIndexes->offsets[this_surface_index]` into an
-/// `mdxmSurfHierarchy_t*` — `(mdxmHierarchyOffsets_t*)((byte*)mdxm +
-/// sizeof(mdxmHeader_t))`, then `(byte*)surfIndexes +
-/// surfIndexes->offsets[this_surface_index]` (`G2_surfaces.cpp:118-119`, and
-/// every other direct-index hierarchy lookup below repeats this exact
-/// two-step computation).
-///
-/// # Safety
-/// `mdxm` must be a valid, non-null `EngineHost::model_mdxm` block and
-/// `this_surface_index` must be `< numSurfaces`.
-unsafe fn surf_hierarchy_entry(mdxm: *const c_void, this_surface_index: i32) -> *const c_void {
-    unsafe {
-        let surf_indexes = (mdxm as *const u8).add(MDXM_HEADER_SIZE) as *const c_void;
-        let offset = read_i32_at(surf_indexes, 4 * this_surface_index as usize);
-        (surf_indexes as *const u8).add(offset as usize) as *const c_void
-    }
-}
 
 /// Raven `surfaceInfo_t *G2_FindOverrideSurface(int surfaceNum, surfaceInfo_v
 /// &surfaceList)` — linear search of the override list for `surfaceNum`;
@@ -268,18 +164,9 @@ pub fn g2_is_surface_legal(
     // SAFETY: every call site below has already established `model`'s
     // `mdxm` is non-null (matching the oracle's own unchecked
     // `mod_m->mdxm` dereference — this function itself has no null-check).
-    unsafe {
-        let num_surfaces = read_i32_at(mdxm, MDXM_OFS_NUM_SURFACES);
-        let ofs_surf_hierarchy = read_i32_at(mdxm, MDXM_OFS_OFS_SURF_HIERARCHY);
-        let mut surf = (mdxm as *const u8).add(ofs_surf_hierarchy as usize) as *const c_void;
-        for i in 0..num_surfaces {
-            if surf_hier_name_matches(surf, surface_name) {
-                let flags = read_i32_at(surf, SURF_HIER_OFS_FLAGS);
-                return Some((i, flags));
-            }
-            let num_children = read_i32_at(surf, SURF_HIER_OFS_NUM_CHILDREN);
-            let stride = SURF_HIER_OFS_CHILD_INDEXES + 4 * num_children as usize;
-            surf = (surf as *const u8).add(stride) as *const c_void;
+    for (i, surf) in unsafe { MdxmView::from_block(mdxm) }.hierarchy_iter().enumerate() {
+        if surf.name_matches(surface_name) {
+            return Some((i as i32, surf.flags()));
         }
     }
     None
@@ -318,9 +205,9 @@ fn g2_find_surface_by_name(
             let mdxm = host.model_mdxm(ghl_info.model);
             // SAFETY: `mdxm` non-null (checked above); `this_surface_index`
             // is the resolved hierarchy index for `entry.surface`.
-            let matches = unsafe {
-                surf_hier_name_matches(surf_hierarchy_entry(mdxm, this_surface_index), surface_name)
-            };
+            let matches = unsafe { MdxmView::from_block(mdxm) }
+                .surf_hierarchy(this_surface_index)
+                .name_matches(surface_name);
             if matches {
                 return Some(i as i32);
             }
@@ -453,17 +340,9 @@ pub fn g2_is_surface_off(
     // surface then.
     let mdxm = host.model_mdxm(ghl_info.model);
     // SAFETY: `mdxm` non-null (checked above).
-    unsafe {
-        let num_surfaces = read_i32_at(mdxm, MDXM_OFS_NUM_SURFACES);
-        let ofs_surf_hierarchy = read_i32_at(mdxm, MDXM_OFS_OFS_SURF_HIERARCHY);
-        let mut surf = (mdxm as *const u8).add(ofs_surf_hierarchy as usize) as *const c_void;
-        for _ in 0..num_surfaces {
-            if surf_hier_name_matches(surf, surface_name) {
-                return read_i32_at(surf, SURF_HIER_OFS_FLAGS);
-            }
-            let num_children = read_i32_at(surf, SURF_HIER_OFS_NUM_CHILDREN);
-            let stride = SURF_HIER_OFS_CHILD_INDEXES + 4 * num_children as usize;
-            surf = (surf as *const u8).add(stride) as *const c_void;
+    for surf in unsafe { MdxmView::from_block(mdxm) }.hierarchy_iter() {
+        if surf.name_matches(surface_name) {
+            return surf.flags();
         }
     }
 
@@ -491,7 +370,7 @@ fn g2_find_recursive_surface(
     let mdxm = host.model_mdxm(current_model);
     // SAFETY: `current_model` has already been validated non-null by
     // `g2_set_root_surface`'s own caller-side check.
-    let surf_info = unsafe { surf_hierarchy_entry(mdxm, this_surface_index) };
+    let surf_info = unsafe { MdxmView::from_block(mdxm) }.surf_hierarchy(this_surface_index);
 
     // see if we have an override surface in the surface list
     let surf_override = g2_find_override_surface(surface_num, root_list);
@@ -500,7 +379,7 @@ fn g2_find_recursive_surface(
     // been overriden
     let off_flags = match surf_override {
         Some(o) => o.offFlags,
-        None => unsafe { read_i32_at(surf_info, SURF_HIER_OFS_FLAGS) },
+        None => surf_info.flags(),
     };
 
     // if this surface is not off, indicate as such in the active surface list
@@ -512,12 +391,9 @@ fn g2_find_recursive_surface(
     }
 
     // now recursively call for the children
-    // SAFETY: `surf_info` is the same validated block as above.
-    let num_children = unsafe { read_i32_at(surf_info, SURF_HIER_OFS_NUM_CHILDREN) };
+    let num_children = surf_info.num_children();
     for i in 0..num_children {
-        // SAFETY: `i < numChildren`, inside `surf_info`'s `childIndexes` array.
-        let child_surface_num =
-            unsafe { read_i32_at(surf_info, SURF_HIER_OFS_CHILD_INDEXES + 4 * i as usize) };
+        let child_surface_num = surf_info.child(i);
         g2_find_recursive_surface(
             host,
             current_model,
@@ -611,15 +487,15 @@ pub fn g2_set_root_surface(
     // surfaces below the root point.
     let mdxm = host.model_mdxm(model);
     // SAFETY: `mdxm` non-null (checked above).
-    let num_surfaces = unsafe { read_i32_at(mdxm, MDXM_OFS_NUM_SURFACES) };
+    let view = unsafe { MdxmView::from_block(mdxm) };
+    let num_surfaces = view.num_surfaces();
     let mut active_surfaces = vec![0i32; num_surfaces.max(0) as usize];
 
-    // SAFETY: `mdxm` non-null (checked above).
-    let anim_index = unsafe { read_i32_at(mdxm, MDXM_OFS_ANIM_INDEX) };
+    let anim_index = view.anim_index();
     let mdxa = host.model_mdxa(anim_index);
     // SAFETY: mirrors the oracle's own unchecked `mod_a->mdxa->numBones`
     // dereference (`assert(...animModel)` above it is a dropped NDEBUG no-op).
-    let num_bones = unsafe { read_i32_at(mdxa, MDXA_OFS_NUM_BONES) };
+    let num_bones = unsafe { MdxaView::from_block(mdxa) }.num_bones();
     // Never mutated: `G2_ConstructUsedBoneList` (module doc-comment gap #3)
     // would populate this, but is not this file's to invent — it stays at
     // its `Z_Malloc` + `memset(0)` initial state.
@@ -752,7 +628,7 @@ fn decide_trace_lod(host: &mut impl EngineHost, ghl_info: &CGhoul2Info, use_lod:
     let mdxm = host.model_mdxm(ghl_info.model);
     // SAFETY: mirrors the oracle's own unchecked `ghoul2.currentModel->mdxm`
     // dereference (asserted non-null there; `NDEBUG` no-ops the assert).
-    let num_lods = unsafe { read_i32_at(mdxm, MDXM_OFS_NUM_LODS) };
+    let num_lods = unsafe { MdxmView::from_block(mdxm) }.num_lods();
 
     // now ensure that we haven't selected a lod that doesn't exist for this model.
     if return_lod >= num_lods {
@@ -812,12 +688,9 @@ pub fn g2_get_parent_surface(
     let mdxm = host.model_mdxm(ghl_info.model);
     // SAFETY: contract per `EngineHost::model_mdxm`; `this_surface_index` is
     // the resolved hierarchy index.
-    unsafe {
-        read_i32_at(
-            surf_hierarchy_entry(mdxm, this_surface_index),
-            SURF_HIER_OFS_PARENT_INDEX,
-        )
-    }
+    unsafe { MdxmView::from_block(mdxm) }
+        .surf_hierarchy(this_surface_index)
+        .parent_index()
 }
 
 /// Raven `int G2_GetSurfaceIndex(CGhoul2Info *ghlInfo, const char
@@ -872,15 +745,16 @@ pub fn g2_is_surface_rendered(
 
     // SAFETY: `mdxm` non-null (checked above); `surf_num` is a hierarchy
     // index, already resolved by `g2_is_surface_legal`'s own linear walk.
-    let surf_info = unsafe { surf_hierarchy_entry(mdxm, surf_num) };
-    let mut surf_num = unsafe { read_i32_at(surf_info, SURF_HIER_OFS_PARENT_INDEX) };
+    let mut surf_num = unsafe { MdxmView::from_block(mdxm) }
+        .surf_hierarchy(surf_num)
+        .parent_index();
 
     // walk the surface hierarchy up until we hit the root.
     while surf_num != -1 {
         let mdxm = host.model_mdxm(ghl_info.model);
         // SAFETY: `mdxm` non-null (checked above); `surf_num` is a hierarchy index.
-        let parent_surf_info = unsafe { surf_hierarchy_entry(mdxm, surf_num) };
-        let parent_name = unsafe { surf_hier_name(parent_surf_info) };
+        let parent_surf_info = unsafe { MdxmView::from_block(mdxm) }.surf_hierarchy(surf_num);
+        let parent_name = parent_surf_info.name_lossy();
 
         // find the original surface in the surface list. G2 was bug, above
         // comment was accurate, but we don't want the original flags, we
@@ -901,7 +775,7 @@ pub fn g2_is_surface_rendered(
         }
 
         // set up scan of next parent.
-        surf_num = unsafe { read_i32_at(parent_surf_info, SURF_HIER_OFS_PARENT_INDEX) };
+        surf_num = parent_surf_info.parent_index();
     }
 
     if flags == 0 {
@@ -919,6 +793,15 @@ pub fn g2_is_surface_rendered(
 mod tests {
     use super::*;
     use mp_host_interface::mock::MockHost;
+
+    // `mdxmHeader_t` field offsets the synthetic-block builders below need
+    // (`mdx_format.h:151-172`; the production reads live behind `MdxmView`).
+    const MAX_QPATH: usize = 64;
+    const MDXM_OFS_ANIM_INDEX: usize = 136;
+    const MDXM_OFS_NUM_LODS: usize = 144;
+    const MDXM_OFS_NUM_SURFACES: usize = 152;
+    const MDXM_OFS_OFS_SURF_HIERARCHY: usize = 156;
+    const MDXM_HEADER_SIZE: usize = 164;
 
     /// Build one synthetic `mdxmSurfHierarchy_t` entry (`name[64]`, `flags`(4),
     /// `shader[64]` zeroed, `shaderIndex`(4) zeroed, `parentIndex`(4),
@@ -964,6 +847,15 @@ mod tests {
         buf
     }
 
+    /// Patch `mdxmHeader_t::ofsEnd` (byte 160) to the block's real length —
+    /// `MdxmView::from_block` self-sizes off it — then register it with the
+    /// mock host.
+    fn install_mdxm(host: &mut MockHost, handle: i32, mut buf: Vec<u8>) {
+        let len = buf.len() as i32;
+        buf[160..164].copy_from_slice(&len.to_ne_bytes());
+        host.mdxm_blocks.insert(handle, buf);
+    }
+
     #[test]
     fn g2_find_override_surface_finds_and_misses() {
         let list = vec![surfaceInfo_t {
@@ -985,7 +877,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "child", G2SURFACEFLAG_NODESCENDANTS, 0, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         assert_eq!(
             g2_is_surface_legal(&mut host, 1, "child"),
@@ -1004,7 +896,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "root", 0, -1, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;
@@ -1097,7 +989,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "root", 0, -1, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;
@@ -1132,7 +1024,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "root", 0, -1, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;
@@ -1154,7 +1046,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "root", 0, -1, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;
@@ -1179,7 +1071,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "cape", 0, -1, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
         host.skins
             .insert(5, vec![("hood".to_owned(), "*off".to_owned())]);
         host.skins.insert(
@@ -1213,7 +1105,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "root", G2SURFACEFLAG_OFF, -1, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;
@@ -1235,7 +1127,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "child", 0, 0, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;
@@ -1257,7 +1149,7 @@ mod tests {
         push_surf_hier_entry(&mut buf, "child", 0, 0, &[]);
 
         let mut host = MockHost::new();
-        host.mdxm_blocks.insert(1, buf);
+        install_mdxm(&mut host, 1, buf);
 
         let mut ghl_info = CGhoul2Info::default();
         ghl_info.model = 1;

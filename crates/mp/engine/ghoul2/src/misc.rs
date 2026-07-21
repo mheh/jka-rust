@@ -156,8 +156,6 @@
 //! home exists yet for them, same as that file's own `GHOUL2_ZONETRANSALLOC`/
 //! `MAX_G2_MODELS` duplication precedent) rather than inventing a fake handle.
 
-use core::ffi::c_void;
-
 use mp_host_interface::EngineHost;
 use mp_qshared::shared::q_math::{
     Create_Matrix, Inverse_Matrix, TransformAndTranslatePoint, TransformPoint, _DotProduct,
@@ -168,6 +166,8 @@ use mp_qshared::shared::{errorParm_t, mdxaBone_t, qhandle_t, vec3_t, CollisionRe
 
 use crate::ghoul2_system::{BoneCacheId, Ghoul2System};
 use crate::gore::sskin_gore_data::SSkinGoreData;
+use crate::mdx::mdxa::MdxaView;
+use crate::mdx::mdxm::{MdxmSurfaceView, MdxmView};
 use crate::render::bone_cache::eval_bone_cache;
 use crate::shared::bolt_info_t::boltInfo_t;
 use crate::shared::bone_info_t::boneInfo_t;
@@ -197,69 +197,9 @@ const G2_FRONTFACE: i32 = 1;
 /// Source: `oracle/codemp/ghoul2/ghoul2_shared.h:460`
 const G2_BACKFACE: i32 = 0;
 
-// ---------------------------------------------------------------------------
-// Raw mdxm/mdxa header/record field offsets (`G2SV-D5`: the header types
-// themselves are never named in this crate; duplicated per-file per the
-// `api_models.rs`/`api_collision.rs`/`api_surfaces.rs` precedent — no shared
-// home exists yet). Every field in `oracle/codemp/renderer/mdx_format.h` is a
-// 4-byte-aligned int/float/`char[64]`, so natural alignment introduces no
-// padding.
-// ---------------------------------------------------------------------------
-
+/// `MAX_QPATH` (`q_shared.h`) — the save/load middle-band `file_name` field
+/// width.
 const MAX_QPATH: usize = 64;
-
-// mdxmHeader_t (mdx_format.h:151-172).
-const MDXM_OFS_ANIM_INDEX: usize = 136;
-const MDXM_OFS_NUM_LODS: usize = 144;
-const MDXM_OFS_OFS_LODS: usize = 148;
-const MDXM_OFS_NUM_SURFACES: usize = 152;
-const MDXM_OFS_OFS_SURF_HIERARCHY: usize = 156;
-const MDXM_OFS_OFS_END: usize = 160;
-/// `sizeof(mdxmHeader_t)` — `ofsEnd`(160) + 4. Several oracle call sites walk
-/// straight to `header + sizeof(mdxmHeader_t)` instead of re-reading
-/// `ofsSurfHierarchy` (they are always the same location; kept literal here).
-const MDXM_HEADER_SIZE: usize = 164;
-const MDXM_OFS_ANIM_NAME: usize = 72;
-
-// mdxaHeader_t (mdx_format.h:344-364).
-const MDXA_OFS_NUM_BONES: usize = 84;
-const MDXA_OFS_OFS_END: usize = 96;
-/// `sizeof(mdxaHeader_t)` — `ofsEnd`(96) + 4.
-const MDXA_HEADER_SIZE: usize = 100;
-
-// mdxmSurfHierarchy_t (mdx_format.h:190-196).
-const SURF_HIER_OFS_NAME: usize = 0;
-const SURF_HIER_OFS_FLAGS: usize = 64;
-const SURF_HIER_OFS_NUM_CHILDREN: usize = 140;
-const SURF_HIER_OFS_CHILD_INDEXES: usize = 144;
-
-// mdxmLOD_t (mdx_format.h:210-215): `{ int ofsEnd; }`.
-const MDXM_LOD_OFS_END: usize = 0;
-const MDXM_LOD_SIZE: usize = 4;
-
-// mdxmSurface_t (mdx_format.h:230-245).
-const MDXM_SURF_OFS_THIS_SURFACE_INDEX: usize = 4;
-const MDXM_SURF_OFS_NUM_VERTS: usize = 12;
-const MDXM_SURF_OFS_OFS_VERTS: usize = 16;
-const MDXM_SURF_OFS_NUM_TRIANGLES: usize = 20;
-const MDXM_SURF_OFS_OFS_TRIANGLES: usize = 24;
-const MDXM_SURF_OFS_OFS_BONE_REFS: usize = 32;
-
-// mdxmTriangle_t `{ int indexes[3]; }`.
-const MDXM_TRIANGLE_SIZE: usize = 12;
-
-// mdxmVertex_t (32 bytes: normal(12) + vertCoords(12) + packed(4) + BoneWeightings(4)).
-const MDXM_VERTEX_SIZE: usize = 32;
-
-// mdxaSkelOffsets_t / mdxmHierarchyOffsets_t / mdxmLODSurfOffset_t: `int
-// offsets[N]`, each entry 4 bytes.
-const OFFSETS_ENTRY_SIZE: usize = 4;
-
-// mdxaSkel_t (mdx_format.h:326-334): name[64](0) + flags(64) + parent(68) +
-// BasePoseMat(72,48) + BasePoseMatInv(120,48) + numChildren(168) + children(172).
-const MDXA_SKEL_OFS_NAME: usize = 0;
-const MDXA_SKEL_OFS_BASEPOSE: usize = 72;
-const MDXA_SKEL_OFS_NUM_CHILDREN: usize = 168;
 
 /// Raven `#define GHOUL2_ZONETRANSALLOC 0x2000` — duplicated from
 /// `api_collision.rs` per that file's own no-shared-home precedent.
@@ -267,58 +207,29 @@ const MDXA_SKEL_OFS_NUM_CHILDREN: usize = 168;
 #[allow(dead_code)]
 const GHOUL2_ZONETRANSALLOC: i32 = 0x2000;
 
-// ---------------------------------------------------------------------------
-// Raw byte-arithmetic helpers over `EngineHost::model_mdxm`/`model_mdxa`
-// blocks (`G2SV-D5`: never a named header type, only pointer + offset).
-// ---------------------------------------------------------------------------
+// mdxm/mdxa block reads route through `MdxmView`/`MdxaView` (`mdx/mdxm.rs`,
+// `mdx/mdxa.rs`) — the shared home for the loader-block byte offsets (`G2SV-D5`,
+// the header types are never named here). The only raw reader kept below is
+// `read_flat_vert`, which reads this port's owned flat transformed-verts buffer
+// (an `i32` `Vec`, module-doc gap note #7), not a model block.
 
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block.
-unsafe fn read_i32(base: *const c_void, offset: usize) -> i32 {
-    unsafe {
-        (base as *const u8)
-            .add(offset)
-            .cast::<i32>()
-            .read_unaligned()
+/// Resolve `model`'s surface `index` in LOD `lod` to an `MdxmSurfaceView`
+/// (Raven `void *G2_FindSurface(void *mod, int index, int lod)`); `None` when
+/// `model` has no `mdxm` (the oracle's own null-deref UB, §19 defined here).
+///
+/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1689-1713`
+fn find_surface_view<'a>(
+    host: &mut impl EngineHost,
+    model: qhandle_t,
+    index: i32,
+    lod: i32,
+) -> Option<MdxmSurfaceView<'a>> {
+    let mdxm = host.model_mdxm(model);
+    if mdxm.is_null() {
+        return None;
     }
-}
-
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block.
-unsafe fn read_u32(base: *const c_void, offset: usize) -> u32 {
-    unsafe {
-        (base as *const u8)
-            .add(offset)
-            .cast::<u32>()
-            .read_unaligned()
-    }
-}
-
-/// # Safety
-/// `base` must be non-null and `offset..offset+4` must lie inside the block.
-unsafe fn read_f32(base: *const c_void, offset: usize) -> f32 {
-    unsafe {
-        (base as *const u8)
-            .add(offset)
-            .cast::<f32>()
-            .read_unaligned()
-    }
-}
-
-/// # Safety
-/// `base` must be non-null and `offset..offset+max_len` must lie inside the block.
-unsafe fn read_cstr(base: *const c_void, offset: usize, max_len: usize) -> String {
-    unsafe {
-        let bytes = core::slice::from_raw_parts((base as *const u8).add(offset), max_len);
-        let end = bytes.iter().position(|&b| b == 0).unwrap_or(max_len);
-        String::from_utf8_lossy(&bytes[..end]).into_owned()
-    }
-}
-
-fn byte_add(base: *const c_void, offset: usize) -> *const c_void {
-    // SAFETY: pure pointer arithmetic; the result is only ever dereferenced by
-    // the `read_*` helpers above, whose own safety contract applies there.
-    unsafe { (base as *const u8).add(offset) as *const c_void }
+    // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract.
+    Some(unsafe { MdxmView::from_block(mdxm) }.find_surface(index, lod))
 }
 
 /// Read one flat, bit-punned vertex slot (module-doc gap note #7): 5 `f32`s
@@ -424,34 +335,20 @@ pub fn g2_list_model_surfaces(host: &mut impl EngineHost, file_name: &str) {
     if mdxm.is_null() {
         return;
     }
-    let num_surfaces = unsafe { read_i32(mdxm, MDXM_OFS_NUM_SURFACES) };
-    let ofs_surf_hierarchy = unsafe { read_i32(mdxm, MDXM_OFS_OFS_SURF_HIERARCHY) };
+    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
+    // contract.
+    let view = unsafe { MdxmView::from_block(mdxm) };
     let verbose = host.cvar_integer("r_verbose") != 0;
 
-    let mut surf = byte_add(mdxm, ofs_surf_hierarchy as usize);
-    for x in 0..num_surfaces {
-        let name = unsafe { read_cstr(surf, SURF_HIER_OFS_NAME, MAX_QPATH) };
-        host.print(&format!("Surface {x} Name {name}\n"));
-        let num_children = unsafe { read_i32(surf, SURF_HIER_OFS_NUM_CHILDREN) };
+    for (x, surf) in view.hierarchy_iter().enumerate() {
+        host.print(&format!("Surface {x} Name {}\n", surf.name_lossy()));
+        let num_children = surf.num_children();
         if verbose {
             host.print(&format!("Num Descendants {num_children}\n"));
             for i in 0..num_children {
-                let child = unsafe {
-                    read_i32(
-                        surf,
-                        SURF_HIER_OFS_CHILD_INDEXES + (i as usize) * OFFSETS_ENTRY_SIZE,
-                    )
-                };
-                host.print(&format!("Descendant {child}\n"));
+                host.print(&format!("Descendant {}\n", surf.child(i)));
             }
         }
-        // find the next surface (Raven: `surf + &((mdxmSurfHierarchy_t*)0)->
-        // childIndexes[surf->numChildren]`, i.e. this entry's fixed header
-        // plus its variable `childIndexes` tail).
-        surf = byte_add(
-            surf,
-            SURF_HIER_OFS_CHILD_INDEXES + (num_children as usize) * OFFSETS_ENTRY_SIZE,
-        );
     }
 }
 
@@ -476,31 +373,31 @@ pub fn g2_list_model_bones(host: &mut impl EngineHost, file_name: &str, frame: i
     if mdxm.is_null() {
         return;
     }
-    let anim_index = unsafe { read_i32(mdxm, MDXM_OFS_ANIM_INDEX) };
+    let anim_index = unsafe { MdxmView::from_block(mdxm) }.anim_index();
     let header = host.model_mdxa(anim_index);
     if header.is_null() {
         return;
     }
 
-    let num_bones = unsafe { read_i32(header, MDXA_OFS_NUM_BONES) };
+    // SAFETY: `header` non-null (checked above), `EngineHost::model_mdxa`'s
+    // contract.
+    let mdxa = unsafe { MdxaView::from_block(header) };
+    let num_bones = mdxa.num_bones();
     let verbose = host.cvar_integer("r_verbose") != 0;
-    // Raven: `offsets = (mdxaSkelOffsets_t *)((byte *)header + sizeof(mdxaHeader_t));`
-    let offsets = byte_add(header, MDXA_HEADER_SIZE);
 
     for x in 0..num_bones {
-        let skel_offset = unsafe { read_i32(offsets, (x as usize) * OFFSETS_ENTRY_SIZE) };
-        let skel = byte_add(offsets, skel_offset as usize);
-        let name = unsafe { read_cstr(skel, MDXA_SKEL_OFS_NAME, MAX_QPATH) };
-        host.print(&format!("Bone {x} Name {name}\n"));
+        let skel = mdxa.skel(x);
+        host.print(&format!("Bone {x} Name {}\n", skel.name_lossy()));
 
         // `skel->BasePoseMat.matrix[0..2][3]` — the translation column.
-        let px = unsafe { read_f32(skel, MDXA_SKEL_OFS_BASEPOSE + 12) };
-        let py = unsafe { read_f32(skel, MDXA_SKEL_OFS_BASEPOSE + 28) };
-        let pz = unsafe { read_f32(skel, MDXA_SKEL_OFS_BASEPOSE + 44) };
+        let base = skel.base_pose_mat();
+        let px = base.matrix[0][3];
+        let py = base.matrix[1][3];
+        let pz = base.matrix[2][3];
         host.print(&format!("X pos {px}, Y pos {py}, Z pos {pz}\n"));
 
         if verbose {
-            let num_children = unsafe { read_i32(skel, MDXA_SKEL_OFS_NUM_CHILDREN) };
+            let num_children = skel.num_children();
             host.print(&format!("Num Descendants {num_children}\n"));
             for _ in 0..num_children {
                 // Raven copy/paste bug (module doc comment above): reprints
@@ -524,7 +421,9 @@ pub fn g2_get_anim_file_name(host: &mut impl EngineHost, file_name: &str) -> Opt
     if mdxm.is_null() {
         return None;
     }
-    let anim_name = unsafe { read_cstr(mdxm, MDXM_OFS_ANIM_NAME, MAX_QPATH) };
+    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
+    // contract.
+    let anim_name = unsafe { MdxmView::from_block(mdxm) }.anim_name();
     if anim_name.is_empty() {
         return None;
     }
@@ -564,7 +463,8 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
         ghl_info.current_model = mdxm;
         if !mdxm.is_null() {
             // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract.
-            let ofs_end = unsafe { read_i32(mdxm, MDXM_OFS_OFS_END) };
+            let view = unsafe { MdxmView::from_block(mdxm) };
+            let ofs_end = view.ofs_end();
             if ghl_info.current_model_size != 0 && ghl_info.current_model_size != ofs_end {
                 host.error(
                     errorParm_t::ERR_DROP,
@@ -573,13 +473,13 @@ pub fn g2_setup_model_pointers(host: &mut impl EngineHost, ghl_info: &mut CGhoul
             }
             ghl_info.current_model_size = ofs_end;
 
-            let anim_index = unsafe { read_i32(mdxm, MDXM_OFS_ANIM_INDEX) };
+            let anim_index = view.anim_index();
             let a_header = host.model_mdxa(anim_index);
             ghl_info.anim_model = a_header;
             if !a_header.is_null() {
                 ghl_info.a_header = a_header;
                 // SAFETY: `a_header` non-null, same contract as above.
-                let a_ofs_end = unsafe { read_i32(a_header, MDXA_OFS_OFS_END) };
+                let a_ofs_end = unsafe { MdxaView::from_block(a_header) }.ofs_end();
                 if ghl_info.current_anim_model_size != 0
                     && ghl_info.current_anim_model_size != a_ofs_end
                 {
@@ -651,7 +551,7 @@ fn g2_decide_trace_lod(host: &mut impl EngineHost, ghoul2: &CGhoul2Info, use_lod
     let mdxm = host.model_mdxm(ghoul2.model);
     if !mdxm.is_null() {
         // SAFETY: `mdxm` non-null, `EngineHost::model_mdxm`'s contract.
-        let num_lods = unsafe { read_i32(mdxm, MDXM_OFS_NUM_LODS) };
+        let num_lods = unsafe { MdxmView::from_block(mdxm) }.num_lods();
         if return_lod >= num_lods {
             return_lod = num_lods - 1;
         }
@@ -758,34 +658,6 @@ impl<'a> CTraceSurface<'a> {
     }
 }
 
-/// Internal pointer-returning duplicate of the byte-walk [`g2_find_surface`]
-/// (the public `i32`-returning overload) performs, for the two internal
-/// callers that need the fuller record (`g2_trace_surfaces`/
-/// `g2_transform_surfaces`) rather than just the resolved
-/// `thisSurfaceIndex` (see that function's shape-choice doc comment).
-///
-/// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1689-1713`
-fn g2_find_surface_ptr(
-    host: &mut impl EngineHost,
-    model: qhandle_t,
-    index: i32,
-    lod: i32,
-) -> *const c_void {
-    let mdxm = host.model_mdxm(model);
-    if mdxm.is_null() {
-        return core::ptr::null();
-    }
-    let ofs_lods = unsafe { read_i32(mdxm, MDXM_OFS_OFS_LODS) };
-    let mut current = byte_add(mdxm, ofs_lods as usize);
-    for _ in 0..lod {
-        let ofs_end = unsafe { read_i32(current, MDXM_LOD_OFS_END) };
-        current = byte_add(current, ofs_end as usize);
-    }
-    current = byte_add(current, MDXM_LOD_SIZE);
-    let offset = unsafe { read_i32(current, (index as usize) * OFFSETS_ENTRY_SIZE) };
-    byte_add(current, offset as usize)
-}
-
 /// Raven `static void G2_TraceSurfaces(CTraceSurface &TS)` — resolves
 /// `TS.surfaceNum`'s hierarchy entry (index-based [`g2_find_surface`]) and any
 /// `TS.rootSList` override, then either radius- or point-traces the surface's
@@ -816,30 +688,23 @@ fn g2_trace_surfaces(
     if mdxm.is_null() {
         return;
     }
-    let surface = g2_find_surface_ptr(host, ts.current_model, ts.surface_num, ts.lod);
-    if surface.is_null() {
+    let Some(surface) = find_surface_view(host, ts.current_model, ts.surface_num, ts.lod) else {
         return;
-    }
-    let surf_indexes = byte_add(mdxm, MDXM_HEADER_SIZE);
-    // SAFETY: `surface`/`surf_indexes` non-null, in-bounds per the loader's
-    // model-memory contract (`EngineHost::model_mdxm`).
-    let this_surface_index = unsafe { read_i32(surface, MDXM_SURF_OFS_THIS_SURFACE_INDEX) };
-    let hier_offset = unsafe {
-        read_i32(
-            surf_indexes,
-            (this_surface_index as usize) * OFFSETS_ENTRY_SIZE,
-        )
     };
-    let surf_info = byte_add(surf_indexes, hier_offset as usize);
+    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
+    // contract.
+    let view = unsafe { MdxmView::from_block(mdxm) };
+    let this_surface_index = surface.this_surface_index();
+    let surf_info = view.surf_hierarchy(this_surface_index);
 
     let surf_override = crate::surfaces::g2_find_override_surface(ts.surface_num, ts.root_slist);
-    let mut off_flags = unsafe { read_u32(surf_info, SURF_HIER_OFS_FLAGS) } as i32;
+    let mut off_flags = surf_info.flags();
     if let Some(over) = surf_override {
         off_flags = over.offFlags;
     }
 
     if off_flags == 0 {
-        let num_verts = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_VERTS) };
+        let num_verts = surface.num_verts();
         let base = ts.verts_cursor;
         ts.verts_cursor += (num_verts as usize) * 5;
 
@@ -862,18 +727,12 @@ fn g2_trace_surfaces(
         return;
     }
 
-    let num_children = unsafe { read_i32(surf_info, SURF_HIER_OFS_NUM_CHILDREN) };
+    let num_children = surf_info.num_children();
     for i in 0..num_children {
         if ts.hit_one {
             break;
         }
-        let child = unsafe {
-            read_i32(
-                surf_info,
-                SURF_HIER_OFS_CHILD_INDEXES + (i as usize) * OFFSETS_ENTRY_SIZE,
-            )
-        };
-        ts.surface_num = child;
+        ts.surface_num = surf_info.child(i);
         g2_trace_surfaces(host, ts, world_matrix);
     }
 }
@@ -898,15 +757,13 @@ fn g2_trace_surfaces(
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1092-1219`
 fn g2_trace_polys(
-    surface: *const c_void,
+    surface: MdxmSurfaceView,
     base: usize,
     ts: &mut CTraceSurface,
     world_matrix: &mdxaBone_t,
 ) -> bool {
-    let ofs_triangles = unsafe { read_i32(surface, MDXM_SURF_OFS_OFS_TRIANGLES) };
-    let this_surface_index = unsafe { read_i32(surface, MDXM_SURF_OFS_THIS_SURFACE_INDEX) };
-    let num_triangles = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_TRIANGLES) };
-    let tris = byte_add(surface, ofs_triangles as usize);
+    let this_surface_index = surface.this_surface_index();
+    let num_triangles = surface.num_triangles();
 
     if ts.transformed_verts_array.is_null() {
         return false;
@@ -914,10 +771,10 @@ fn g2_trace_polys(
     let verts_ptr = ts.transformed_verts_array as *const i32;
 
     for j in 0..num_triangles {
-        let tri = byte_add(tris, (j as usize) * MDXM_TRIANGLE_SIZE);
-        let i0 = unsafe { read_i32(tri, 0) } as usize;
-        let i1 = unsafe { read_i32(tri, 4) } as usize;
-        let i2 = unsafe { read_i32(tri, 8) } as usize;
+        let [i0, i1, i2] = surface.triangle(j);
+        let i0 = i0 as usize;
+        let i1 = i1 as usize;
+        let i2 = i2 as usize;
         // SAFETY: `verts_ptr`/`base` are the flat buffer this model's
         // `g2_transform_surfaces` walk populated (module-doc gap note #7);
         // `i0`/`i1`/`i2` are in-bounds triangle vertex indices per the loader.
@@ -1000,7 +857,7 @@ fn g2_trace_polys(
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1222-1427`
 fn g2_radius_trace_polys(
-    surface: *const c_void,
+    surface: MdxmSurfaceView,
     base: usize,
     ts: &mut CTraceSurface,
     world_matrix: &mdxaBone_t,
@@ -1032,7 +889,7 @@ fn g2_radius_trace_polys(
     _VectorScale(basis1, -0.5 * s / ts.f_radius, &mut saxis);
     _VectorMA(saxis, 0.5 * c / ts.f_radius, basis2, &mut saxis);
 
-    let num_verts = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_VERTS) };
+    let num_verts = surface.num_verts();
 
     if ts.transformed_verts_array.is_null() {
         return false;
@@ -1085,16 +942,14 @@ fn g2_radius_trace_polys(
         return false;
     }
 
-    let num_triangles = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_TRIANGLES) };
-    let ofs_triangles = unsafe { read_i32(surface, MDXM_SURF_OFS_OFS_TRIANGLES) };
-    let tris = byte_add(surface, ofs_triangles as usize);
-    let this_surface_index = unsafe { read_i32(surface, MDXM_SURF_OFS_THIS_SURFACE_INDEX) };
+    let num_triangles = surface.num_triangles();
+    let this_surface_index = surface.this_surface_index();
 
     for j in 0..num_triangles {
-        let tri = byte_add(tris, (j as usize) * MDXM_TRIANGLE_SIZE);
-        let i0 = unsafe { read_i32(tri, 0) } as usize;
-        let i1 = unsafe { read_i32(tri, 4) } as usize;
-        let i2 = unsafe { read_i32(tri, 8) } as usize;
+        let [i0, i1, i2] = surface.triangle(j);
+        let i0 = i0 as usize;
+        let i1 = i1 as usize;
+        let i2 = i2 as usize;
 
         let tri_flags = 63 & vert_flags[i0] & vert_flags[i1] & vert_flags[i2];
         if tri_flags != 0 {
@@ -1453,54 +1308,33 @@ pub fn g2_trace_models(
 fn r_transform_each_surface(
     g2: &mut Ghoul2System,
     host: &mut impl EngineHost,
-    surface: *const c_void,
+    surface: MdxmSurfaceView,
     scale: vec3_t,
     transformed_verts: &mut Vec<f32>,
     bone_cache: BoneCacheId,
 ) {
     let _ = host;
 
-    let ofs_bone_references = unsafe { read_i32(surface, MDXM_SURF_OFS_OFS_BONE_REFS) };
-    let bone_refs = byte_add(surface, ofs_bone_references as usize);
-    let num_verts = unsafe { read_i32(surface, MDXM_SURF_OFS_NUM_VERTS) };
-    let ofs_verts = unsafe { read_i32(surface, MDXM_SURF_OFS_OFS_VERTS) };
-    let verts_base = byte_add(surface, ofs_verts as usize);
-    let texcoords_base = byte_add(verts_base, (num_verts as usize) * MDXM_VERTEX_SIZE);
-
+    let num_verts = surface.num_verts();
     let scale_needed = scale[0] != 1.0 || scale[1] != 1.0 || scale[2] != 1.0;
 
     for j in 0..num_verts {
-        let vert = byte_add(verts_base, (j as usize) * MDXM_VERTEX_SIZE);
-        // SAFETY: `vert` is `j < numVerts` into the loader's parsed block.
-        let normal: vec3_t = unsafe { [read_f32(vert, 0), read_f32(vert, 4), read_f32(vert, 8)] };
-        let vert_coords: vec3_t =
-            unsafe { [read_f32(vert, 12), read_f32(vert, 16), read_f32(vert, 20)] };
-        let packed = unsafe { read_u32(vert, 24) };
-        let bone_weightings: [u8; 4] = unsafe {
-            let p = (vert as *const u8).add(28);
-            [*p, *p.add(1), *p.add(2), *p.add(3)]
-        };
+        let vert = surface.vert(j);
+        let normal: vec3_t = vert.normal();
+        let vert_coords: vec3_t = vert.vert_coords();
 
         // Raven `G2_GetVertWeights`/`G2_GetVertBoneIndex`/`G2_GetVertBoneWeight`
         // (`mdx_format.h:266-297`).
-        let num_weights = (packed >> 30) + 1;
+        let num_weights = vert.num_weights();
         let mut temp_vert = [0.0f32; 3];
         let mut temp_normal = [0.0f32; 3];
         let mut total_weight = 0.0f32;
 
         for k in 0..num_weights {
-            let bone_index = ((packed >> (5 * k)) & 0x1F) as i32;
-            let bone_weight = if k == num_weights - 1 {
-                1.0 - total_weight
-            } else {
-                let mut w = bone_weightings[k as usize] as u32;
-                w |= (packed >> (12 + k * 2)) & 0x300;
-                let weight = (1.0f32 / 1023.0f32) * (w as f32);
-                total_weight += weight;
-                weight
-            };
+            let bone_index = vert.bone_index(k);
+            let bone_weight = vert.bone_weight(k, &mut total_weight, num_weights);
 
-            let bone_ref = unsafe { read_i32(bone_refs, (bone_index as usize) * 4) };
+            let bone_ref = surface.bone_ref(bone_index);
             let bone = eval_bone_cache(g2, bone_cache, bone_ref);
 
             for r in 0..3 {
@@ -1511,12 +1345,7 @@ fn r_transform_each_surface(
         }
         let _ = temp_normal;
 
-        let tex: [f32; 2] = unsafe {
-            [
-                read_f32(texcoords_base, (j as usize) * 8),
-                read_f32(texcoords_base, (j as usize) * 8 + 4),
-            ]
-        };
+        let tex: [f32; 2] = surface.texcoord(j);
 
         if scale_needed {
             transformed_verts.push(temp_vert[0] * scale[0]);
@@ -1536,7 +1365,7 @@ fn r_transform_each_surface(
 /// CBoneCache *boneCache, const model_t *currentModel, int lod, vec3_t scale,
 /// CMiniHeap *G2VertSpace, int *TransformedVertArray, bool
 /// secondTimeAround)` — resolves `surfaceNum`'s hierarchy entry (index-based
-/// [`g2_find_surface_ptr`]), applies any `rootSList` override
+/// [`find_surface_view`]), applies any `rootSList` override
 /// (`crate::surfaces::g2_find_override_surface`), forwards to
 /// [`r_transform_each_surface`] when the surface isn't flagged off, then
 /// recurses into every child surface unless `NODESCENDANTS` is set.
@@ -1562,26 +1391,21 @@ fn g2_transform_surfaces(
 ) {
     let _ = second_time_around;
 
-    let surface = g2_find_surface_ptr(host, current_model, surface_num, lod);
-    if surface.is_null() {
+    let Some(surface) = find_surface_view(host, current_model, surface_num, lod) else {
         return;
-    }
+    };
     let mdxm = host.model_mdxm(current_model);
     if mdxm.is_null() {
         return;
     }
-    let surf_indexes = byte_add(mdxm, MDXM_HEADER_SIZE);
-    let this_surface_index = unsafe { read_i32(surface, MDXM_SURF_OFS_THIS_SURFACE_INDEX) };
-    let hier_offset = unsafe {
-        read_i32(
-            surf_indexes,
-            (this_surface_index as usize) * OFFSETS_ENTRY_SIZE,
-        )
-    };
-    let surf_info = byte_add(surf_indexes, hier_offset as usize);
+    // SAFETY: `mdxm` non-null (checked above), `EngineHost::model_mdxm`'s
+    // contract.
+    let view = unsafe { MdxmView::from_block(mdxm) };
+    let this_surface_index = surface.this_surface_index();
+    let surf_info = view.surf_hierarchy(this_surface_index);
 
     let surf_override = crate::surfaces::g2_find_override_surface(surface_num, root_slist);
-    let mut off_flags = unsafe { read_u32(surf_info, SURF_HIER_OFS_FLAGS) } as i32;
+    let mut off_flags = surf_info.flags();
     if let Some(over) = surf_override {
         off_flags = over.offFlags;
     }
@@ -1594,14 +1418,9 @@ fn g2_transform_surfaces(
         return;
     }
 
-    let num_children = unsafe { read_i32(surf_info, SURF_HIER_OFS_NUM_CHILDREN) };
+    let num_children = surf_info.num_children();
     for i in 0..num_children {
-        let child = unsafe {
-            read_i32(
-                surf_info,
-                SURF_HIER_OFS_CHILD_INDEXES + (i as usize) * OFFSETS_ENTRY_SIZE,
-            )
-        };
+        let child = surf_info.child(i);
         g2_transform_surfaces(
             g2,
             host,
@@ -1676,7 +1495,7 @@ pub fn g2_transform_model(
                 // (`G2_misc.cpp:616`) — `EngineHost` exposes only the parsed
                 // `.glm` block, not `model_t` itself (`G2SV-D5`); the two
                 // agree for any model the loader actually built.
-                unsafe { read_i32(mdxm, MDXM_OFS_NUM_LODS) }
+                unsafe { MdxmView::from_block(mdxm) }.num_lods()
             };
             if use_lod >= num_lods {
                 ghoul2.get_mut(g2, i).transformed_verts_array = None;
@@ -1789,11 +1608,10 @@ pub fn g2_generate_world_matrix(angles: vec3_t, origin: vec3_t) -> (mdxaBone_t, 
 ///
 /// Source: `oracle/codemp/ghoul2/G2_misc.cpp:1689-1713`
 pub fn g2_find_surface(host: &mut impl EngineHost, model: qhandle_t, index: i32, lod: i32) -> i32 {
-    let surf = g2_find_surface_ptr(host, model, index, lod);
-    if surf.is_null() {
-        return 0;
+    match find_surface_view(host, model, index, lod) {
+        Some(surf) => surf.this_surface_index(),
+        None => 0,
     }
-    unsafe { read_i32(surf, MDXM_SURF_OFS_THIS_SURFACE_INDEX) }
 }
 
 // ---------------------------------------------------------------------------
@@ -2133,10 +1951,16 @@ mod tests {
 
     #[test]
     fn decide_trace_lod_clamps_to_lod_bias_and_model_lod_count() {
-        // Synthetic mdxmHeader_t: only `numLODs` (offset 144) is populated;
-        // every other field defaults to 0.
+        // `mdxmHeader_t` field offsets (`mdx_format.h:151-172`; production
+        // reads live behind `MdxmView`). Synthetic header: `numLODs` (144) and
+        // `ofsEnd` (160, which sizes `MdxmView::from_block`) populated.
+        const MDXM_OFS_NUM_LODS: usize = 144;
+        const MDXM_OFS_OFS_END: usize = 160;
+        const MDXM_HEADER_SIZE: usize = 164;
         let mut mdxm = vec![0u8; MDXM_HEADER_SIZE];
         mdxm[MDXM_OFS_NUM_LODS..MDXM_OFS_NUM_LODS + 4].copy_from_slice(&3i32.to_ne_bytes());
+        mdxm[MDXM_OFS_OFS_END..MDXM_OFS_OFS_END + 4]
+            .copy_from_slice(&(MDXM_HEADER_SIZE as i32).to_ne_bytes());
         let mut host = MockHost::new();
         host.mdxm_blocks.insert(1, mdxm);
 
