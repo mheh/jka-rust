@@ -300,14 +300,6 @@ array_newtype!(boxed, index;
     pub TempWaypointList, waypointData_t, MAX_STORED_WAYPOINTS);
 
 array_newtype!(zero;
-    /// `char fatalErrorString[4096]` — newtype because a 4096-byte array has no
-    /// library `Default` impl (only arrays up to 32 elements do in stable Rust),
-    /// same gap as `BotChatBuffer`.
-    /// Source: `oracle/codemp/game/g_nav.c:1617`
-    #[derive(Clone, Copy)]
-    pub FatalErrorString, c_char, 4096);
-
-array_newtype!(zero;
     /// Raven `char NPCFile[MAX_QPATH]` (`NPC_stats.c:238`) — the currently-loading
     /// NPC-config file name. `#[repr(transparent)]` keeps the porter idiom
     /// `&globals.NPCFile as *const _ as *const c_char` valid (same treatment as
@@ -316,14 +308,6 @@ array_newtype!(zero;
     /// Source: `oracle/codemp/game/NPC_stats.c:238`
     #[repr(transparent)]
     pub NpcFileBuffer, c_char, MAX_QPATH);
-
-array_newtype!(zero, deref;
-    /// Raven `char gObjectiveCfgStr[1024]` (`g_saga.c:47`). Newtype (>32 array has
-    /// no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter
-    /// idioms `.as_ptr()`/`.as_mut_ptr()` and `write_cstr_field(&mut field, …)`
-    /// valid.
-    /// Source: `oracle/codemp/game/g_saga.c:47`
-    pub ObjectiveCfgStr, c_char, 1024);
 
 array_newtype!(zero, deref;
     /// Raven `char gParseObjectives[MAX_SIEGE_INFO_SIZE]` (`g_saga.c:46`). Newtype
@@ -844,9 +828,11 @@ pub struct GameGlobals {
     /// value directly.
     /// Source: `oracle/codemp/game/g_nav.c:1616`
     pub fatalErrorPointer: usize,
-    /// Raven `char fatalErrorString[4096]`.
+    /// Raven `char fatalErrorString[4096]` — the rolling nav-error log, appended
+    /// to at `fatalErrorPointer` (an owned `String`; the 4096-byte cap is a
+    /// load-time guard in `NAV_WaypointsTooFar`).
     /// Source: `oracle/codemp/game/g_nav.c:1617`
-    pub fatalErrorString: FatalErrorString,
+    pub fatalErrorString: String,
     /// `fatalErrors`. Source: `oracle/codemp/game/g_nav.c:1615`
     pub fatalErrors: c_int,
     /// `navCalculatePaths`. Source: `oracle/codemp/game/g_nav.c:1597`
@@ -865,9 +851,11 @@ pub struct GameGlobals {
     /// `static char team2[512]` — theme text for siege team 2.
     /// Source: `oracle/codemp/game/g_saga.c:18`
     pub team2: Team2Buf,
-    /// `static char gObjectiveCfgStr[1024]` — assembled objective config string.
+    /// `static char gObjectiveCfgStr[1024]` — assembled objective config string
+    /// (an owned `String`; the 1024-byte bound is applied at the write site in
+    /// `G_SiegeCompleteObjective`).
     /// Source: `oracle/codemp/game/g_saga.c:47`
-    pub gObjectiveCfgStr: ObjectiveCfgStr,
+    pub gObjectiveCfgStr: String,
     /// `static char gParseObjectives[MAX_SIEGE_INFO_SIZE]` — siege-config parse
     /// buffer.
     /// Source: `oracle/codemp/game/g_saga.c:46`

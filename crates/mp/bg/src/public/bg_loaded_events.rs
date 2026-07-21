@@ -4,9 +4,7 @@
 
 #![allow(non_camel_case_types)]
 
-use core::ffi::c_char;
-
-use mp_qshared::shared::{qboolean, MAX_QPATH};
+use mp_qshared::shared::qboolean;
 
 use super::animevent::animevent_t;
 
@@ -17,28 +15,29 @@ pub const MAX_ANIM_EVENTS: usize = 300;
 
 /// Raven `bgLoadedEvents_t`.
 ///
+/// `filename` is an owned `String` (the `MAX_QPATH` byte bound is applied at the
+/// write sites); the struct is bg-internal (game/bg-island only, never memcpy'd
+/// across the trap ABI — census-verified; its parse loader is CGAME-side and
+/// dropped), so `#[repr(C)]` and the layout asserts (incl. the ILP32 twin) are
+/// dropped.
 /// Type definition source: `oracle/codemp/game/bg_public.h:335-341`
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct bgLoadedEvents_t {
-    pub filename: [c_char; MAX_QPATH],
+    pub filename: String,
     pub torsoAnimEvents: [animevent_t; MAX_ANIM_EVENTS],
     pub legsAnimEvents: [animevent_t; MAX_ANIM_EVENTS],
     pub eventsParsed: qboolean,
 }
 
-const _: () = assert!(core::mem::offset_of!(bgLoadedEvents_t, filename) == 0);
-const _: () = assert!(core::mem::offset_of!(bgLoadedEvents_t, torsoAnimEvents) == 64);
-#[cfg(target_pointer_width = "64")]
-const _: () = {
-    assert!(core::mem::size_of::<bgLoadedEvents_t>() == 19272);
-    assert!(core::mem::offset_of!(bgLoadedEvents_t, legsAnimEvents) == 9664);
-    assert!(core::mem::offset_of!(bgLoadedEvents_t, eventsParsed) == 19264);
-};
-// ILP32 twin: clang i386 ground truth (msvc and linux-gnu agree).
-#[cfg(target_pointer_width = "32")]
-const _: () = {
-    assert!(core::mem::size_of::<bgLoadedEvents_t>() == 14468);
-    assert!(core::mem::offset_of!(bgLoadedEvents_t, legsAnimEvents) == 7264);
-    assert!(core::mem::offset_of!(bgLoadedEvents_t, eventsParsed) == 14464);
-};
+impl Default for bgLoadedEvents_t {
+    fn default() -> Self {
+        // Matches Raven's zero-initialized static: `animevent_t` is `Copy` POD
+        // (all-zero image valid), so only `filename` needs a real default.
+        bgLoadedEvents_t {
+            filename: String::new(),
+            torsoAnimEvents: unsafe { core::mem::zeroed() },
+            legsAnimEvents: unsafe { core::mem::zeroed() },
+            eventsParsed: 0,
+        }
+    }
+}

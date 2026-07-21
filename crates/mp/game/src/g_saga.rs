@@ -460,7 +460,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 cfg.push_str("-0");
                 objectiveNumTeam2 -= 1;
             }
-            write_cstr_field(&mut ctx.world.globals.gObjectiveCfgStr, &cfg);
+            ctx.world.globals.gObjectiveCfgStr = strncpyz_string(cfg.as_bytes(), 1024);
 
             trap::SetConfigstring(ctx.engine, CS_SIEGE_OBJECTIVES, &cfg);
 
@@ -504,67 +504,62 @@ pub fn G_SiegeSetObjectiveComplete(
     objective: c_int,
     failIt: qboolean,
 ) {
-    unsafe {
-        let buf = ctx.world.globals.gObjectiveCfgStr.as_mut_ptr();
-        let buf_len = cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr)
-            .to_bytes()
-            .len();
-        let needle: &[u8] = if team == SIEGETEAM_TEAM1 {
-            b"t1"
-        } else if team == SIEGETEAM_TEAM2 {
-            b"t2"
-        } else {
-            b""
-        };
+    let needle: &[u8] = if team == SIEGETEAM_TEAM1 {
+        b"t1"
+    } else if team == SIEGETEAM_TEAM2 {
+        b"t2"
+    } else {
+        b""
+    };
 
-        let mut p: *mut c_char = core::ptr::null_mut();
-        if !needle.is_empty() {
-            let mut i = 0usize;
-            while i + needle.len() <= buf_len {
-                if core::slice::from_raw_parts(buf.add(i) as *const u8, needle.len()) == needle {
-                    p = buf.add(i);
-                    break;
-                }
-                i += 1;
-            }
-        }
+    // Operate on the config string's own bytes (ASCII throughout, so byte-level
+    // edits stay valid UTF-8); byte positions match Raven's pointer walk.
+    let mut buf = ctx.world.globals.gObjectiveCfgStr.clone().into_bytes();
+    let buf_len = buf.len();
 
-        if p.is_null() {
-            // Raven: assert(0); return;
-            return;
-        }
-
-        let mut onObjective: c_int = 0;
-
-        // Parse from the beginning of this team's objectives until we get to
-        // the desired objective number.
-        while !p.is_null() && *p != 0 && *p != b'|' as c_char {
-            if *p == b'-' as c_char {
-                onObjective += 1;
-            }
-
-            if onObjective == objective {
-                // this is the one we want; move to the status char.
-                p = p.add(1);
-
-                if failIt != 0 {
-                    *p = b'0' as c_char;
-                } else {
-                    *p = b'1' as c_char;
-                }
+    let mut start: Option<usize> = None;
+    if !needle.is_empty() {
+        let mut i = 0usize;
+        while i + needle.len() <= buf_len {
+            if &buf[i..i + needle.len()] == needle {
+                start = Some(i);
                 break;
             }
+            i += 1;
+        }
+    }
 
-            p = p.add(1);
+    let Some(mut p) = start else {
+        // Raven: assert(0); return;
+        return;
+    };
+
+    let mut onObjective: c_int = 0;
+
+    // Parse from the beginning of this team's objectives until we get to
+    // the desired objective number.
+    while p < buf_len && buf[p] != 0 && buf[p] != b'|' {
+        if buf[p] == b'-' {
+            onObjective += 1;
         }
 
-        // Now re-update the configstring.
-        trap::SetConfigstring(
-            ctx.engine,
-            CS_SIEGE_OBJECTIVES,
-            &cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr).to_string_lossy(),
-        );
+        if onObjective == objective {
+            // this is the one we want; move to the status char.
+            p += 1;
+            if p < buf_len {
+                buf[p] = if failIt != 0 { b'0' } else { b'1' };
+            }
+            break;
+        }
+
+        p += 1;
     }
+
+    ctx.world.globals.gObjectiveCfgStr = String::from_utf8_lossy(&buf).into_owned();
+
+    // Now re-update the configstring.
+    let cfg = ctx.world.globals.gObjectiveCfgStr.clone();
+    trap::SetConfigstring(ctx.engine, CS_SIEGE_OBJECTIVES, &cfg);
 }
 
 /// Raven `G_SiegeGetCompletionStatus` — qtrue if objective is currently complete.
@@ -575,59 +570,56 @@ pub fn G_SiegeGetCompletionStatus(
     team: c_int,
     objective: c_int,
 ) -> qboolean {
-    unsafe {
-        let buf = ctx.world.globals.gObjectiveCfgStr.as_mut_ptr();
-        let buf_len = cstr_from_chars(&ctx.world.globals.gObjectiveCfgStr)
-            .to_bytes()
-            .len();
-        let needle: &[u8] = if team == SIEGETEAM_TEAM1 {
-            b"t1"
-        } else if team == SIEGETEAM_TEAM2 {
-            b"t2"
-        } else {
-            b""
-        };
+    let needle: &[u8] = if team == SIEGETEAM_TEAM1 {
+        b"t1"
+    } else if team == SIEGETEAM_TEAM2 {
+        b"t2"
+    } else {
+        b""
+    };
 
-        let mut p: *mut c_char = core::ptr::null_mut();
-        if !needle.is_empty() {
-            let mut i = 0usize;
-            while i + needle.len() <= buf_len {
-                if core::slice::from_raw_parts(buf.add(i) as *const u8, needle.len()) == needle {
-                    p = buf.add(i);
-                    break;
-                }
-                i += 1;
+    let buf = ctx.world.globals.gObjectiveCfgStr.as_bytes();
+    let buf_len = buf.len();
+
+    let mut start: Option<usize> = None;
+    if !needle.is_empty() {
+        let mut i = 0usize;
+        while i + needle.len() <= buf_len {
+            if &buf[i..i + needle.len()] == needle {
+                start = Some(i);
+                break;
             }
+            i += 1;
         }
-
-        if p.is_null() {
-            // Raven: assert(0); return qfalse;
-            return qfalse;
-        }
-
-        let mut onObjective: c_int = 0;
-
-        while !p.is_null() && *p != 0 && *p != b'|' as c_char {
-            if *p == b'-' as c_char {
-                onObjective += 1;
-            }
-
-            if onObjective == objective {
-                p = p.add(1);
-
-                // return qtrue if it's '1', qfalse if it's anything else
-                if *p == b'1' as c_char {
-                    return qtrue;
-                } else {
-                    return qfalse;
-                }
-            }
-
-            p = p.add(1);
-        }
-
-        qfalse
     }
+
+    let Some(mut p) = start else {
+        // Raven: assert(0); return qfalse;
+        return qfalse;
+    };
+
+    let mut onObjective: c_int = 0;
+
+    while p < buf_len && buf[p] != 0 && buf[p] != b'|' {
+        if buf[p] == b'-' {
+            onObjective += 1;
+        }
+
+        if onObjective == objective {
+            p += 1;
+
+            // return qtrue if it's '1', qfalse if it's anything else
+            if p < buf_len && buf[p] == b'1' {
+                return qtrue;
+            } else {
+                return qfalse;
+            }
+        }
+
+        p += 1;
+    }
+
+    qfalse
 }
 
 /// Raven `UseSiegeTarget` — use the player who triggered the object to fire the

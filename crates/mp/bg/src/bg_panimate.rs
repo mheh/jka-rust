@@ -35,8 +35,10 @@ use core::ffi::CStr;
 use crate::bg_channel::GameCallbacks;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::prelude::*;
+use crate::public::bg_loaded_anim::bgLoadedAnim_t;
 use mp_qshared::shared::com_parse::COM_Parse;
 use native_string::atof::atof_bytes;
+use native_string::strncpyz_string;
 
 // Raven `#define MAX_ANIM_FILES 64`.
 // Source: `oracle/codemp/game/bg_public.h:255`
@@ -1927,11 +1929,13 @@ impl PmoveContext<'_> {
     pub fn BG_InitAnimsets(&mut self) {
         // Raven `memset(&bgAllAnims, 0, sizeof(bgAllAnims))` zeroes the fixed
         // `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` array *in place* — it keeps
-        // the array's fixed length. `Default::default()` would give a length-0
-        // `Vec`, so later `bgAllAnims[0]`/`[nextIndex]` indexing (a fixed-extent
-        // access, e.g. `BG_ParseAnimationFile`) would panic. Re-fill with
-        // `MAX_ANIM_FILES` zeroed entries to preserve Raven's fixed size.
-        self.bg.bgAllAnims = vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize];
+        // the array's fixed length. A length-0 `Vec` would panic later on the
+        // fixed-extent `bgAllAnims[0]`/`[nextIndex]` indexing (e.g.
+        // `BG_ParseAnimationFile`), so re-fill with `MAX_ANIM_FILES` default
+        // entries (empty `filename` + null `anims`) to preserve Raven's fixed
+        // size — `bgLoadedAnim_t` owns a `String`, so this is `Default`, not
+        // `mem::zeroed()`.
+        self.bg.bgAllAnims = vec![bgLoadedAnim_t::default(); MAX_ANIM_FILES as usize];
         self.bg.BGPAFtextLoaded = 0;
     }
 }
@@ -1998,7 +2002,10 @@ impl PmoveContext<'_> {
         if isHumanoid == 0 {
             i = 0;
             while i < self.bg.bgNumAllAnims {
-                if Q_stricmp(self.bg.bgAllAnims[i as usize].filename.as_ptr(), filename) == 0 {
+                if self.bg.bgAllAnims[i as usize]
+                    .filename
+                    .eq_ignore_ascii_case(&unsafe { cstr_to_str(filename) })
+                {
                     animset = self.bg.bgAllAnims[i as usize].anims;
                     return i;
                 }
@@ -2129,18 +2136,15 @@ impl PmoveContext<'_> {
         wasLoaded = self.bg.BGPAFtextLoaded;
 
         if isHumanoid != 0 {
-            write_cstr_field(&mut self.bg.bgAllAnims[0].filename, &unsafe {
-                cstr_to_str(filename)
-            });
+            self.bg.bgAllAnims[0].filename =
+                strncpyz_string(unsafe { cstr_to_str(filename) }.as_bytes(), MAX_QPATH);
             self.bg.bgAllAnims[0].anims = animset;
             self.bg.BGPAFtextLoaded = 1;
 
             usedIndex = 0;
         } else {
-            write_cstr_field(
-                &mut self.bg.bgAllAnims[nextIndex as usize].filename,
-                &unsafe { cstr_to_str(filename) },
-            );
+            self.bg.bgAllAnims[nextIndex as usize].filename =
+                strncpyz_string(unsafe { cstr_to_str(filename) }.as_bytes(), MAX_QPATH);
             self.bg.bgAllAnims[nextIndex as usize].anims = animset;
 
             usedIndex = self.bg.bgNumAllAnims;

@@ -2174,18 +2174,16 @@ pub fn NAV_WaypointsTooFar(ctx: &mut GameContext, wp1: EntityId, wp2: EntityId) 
             // Source: `oracle/codemp/game/g_nav.c:1644`
             let s = format!(
                 "{}{}{}TOO MANY FATAL NAV ERRORS!!!\n",
-                unsafe { cstr_to_str(ctx.world.globals.fatalErrorString.0.as_ptr()) },
+                ctx.world.globals.fatalErrorString,
                 temp,
                 ctx.world.globals.fatalErrors,
             );
             Com_Error(3 /* ERR_DROP */, cstr(&s).as_ptr());
             return qtrue;
         }
-        let bytes = temp.as_bytes();
-        let start = ctx.world.globals.fatalErrorPointer;
-        for (i, &b) in bytes.iter().enumerate() {
-            ctx.world.globals.fatalErrorString.0[start + i] = b as c_char;
-        }
+        // The buffer is append-only, so `fatalErrorPointer` always equals the
+        // accumulated length; appending `temp` matches Raven's write at `start`.
+        ctx.world.globals.fatalErrorString.push_str(&temp);
         ctx.world.globals.fatalErrorPointer += len;
 
         qtrue
@@ -2295,9 +2293,9 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
     // `TempWaypointList` field).
 
     ctx.world.globals.fatalErrors = 0;
-    // Raven: `memset(fatalErrorString, 0, 4096)` — clear the whole buffer.
+    // Raven: `memset(fatalErrorString, 0, 4096)` — clear the accumulated log.
     // Source: `oracle/codemp/game/g_nav.c:1745`
-    ctx.world.globals.fatalErrorString.0.fill(0);
+    ctx.world.globals.fatalErrorString.clear();
     ctx.world.globals.fatalErrorPointer = 0;
 
     for i in 0..ctx.world.globals.numStoredWaypoints as usize {
@@ -2360,7 +2358,7 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
         // Source: `oracle/codemp/game/g_nav.c:1835`
         let s = format!(
             "{}{} FATAL NAV ERRORS\n",
-            unsafe { cstr_to_str(ctx.world.globals.fatalErrorString.0.as_ptr()) },
+            ctx.world.globals.fatalErrorString,
             ctx.world.globals.fatalErrors,
         );
         Com_Printf(&s);

@@ -178,7 +178,9 @@ impl BgState {
             // Sized like Raven's fixed `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` /
             // `bgLoadedEvents_t bgAllEvents[MAX_ANIM_FILES]` zeroed statics
             // (loaders index them directly rather than push/grow).
-            bgAllAnims: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
+            // `bgLoadedAnim_t` owns a `String` (`filename`), so it is seeded via
+            // its `Default` (empty name + null `anims`), not `mem::zeroed()`.
+            bgAllAnims: vec![bgLoadedAnim_t::default(); MAX_ANIM_FILES as usize],
             // Raven initialises this to 2: slot 0 is always the humanoid set and
             // slot 1 always rockettrooper, so dynamically-parsed sets start at 2
             // (`BG_ParseAnimationFile`'s `nextIndex = bgNumAllAnims`). Starting at
@@ -187,7 +189,9 @@ impl BgState {
             // overwrite the humanoid set, and latch `BGPAFtextLoaded`, breaking
             // every player's animations.
             bgNumAllAnims: 2,
-            bgAllEvents: vec![unsafe { core::mem::zeroed() }; MAX_ANIM_FILES as usize],
+            // `bgLoadedEvents_t` owns a `String` (`filename`); seeded via its
+            // `Default`, not `mem::zeroed()`.
+            bgAllEvents: vec![bgLoadedEvents_t::default(); MAX_ANIM_FILES as usize],
             // Raven initialises this to 1 (first entry is the null/default).
             bgNumAnimEvents: 1,
             // Sized like Raven's fixed `animation_t bgHumanoidAnimations[
