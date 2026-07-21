@@ -924,7 +924,7 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
             {
                 // didn't find the name of the thing to target upon win, just
                 // logexit now then.
-                LogExit(ctx, cstr("Objectives completed").as_ptr());
+                LogExit(ctx, "Objectives completed");
                 return;
             }
 
@@ -1715,7 +1715,7 @@ pub fn siegeEndUse(
     activator: Option<EntityId>,
 ) {
     // `ent`/`other`/`activator` are unused handler params (body is a bare LogExit).
-    LogExit(ctx, b"Round ended\0".as_ptr() as *const c_char);
+    LogExit(ctx, "Round ended");
 }
 
 /// Raven `SP_target_siege_end`.

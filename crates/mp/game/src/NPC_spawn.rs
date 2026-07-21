@@ -610,11 +610,10 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                     G_DebugPrint(
                         ctx,
                         WL_DEBUG as i32,
-                        cstr(&format!(
+                        &format!(
                             "NPC {} could not spawn, firing target3 ({}) and removing self\n",
                             tn, t3
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     let t3ptr = ctx.world.entity(ent).target3;
                     crate::g_utils::G_UseTargets2(
@@ -637,12 +636,11 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                     G_DebugPrint(
                         ctx,
                         WL_DEBUG as i32,
-                        cstr(&format!(
+                        &format!(
                             "NPC {} could not spawn, waiting {:.2} secs to try again\n",
                             tn,
                             wait as f32 / 1000.0f32
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     ctx.world.entity_mut(ent).think = Some(EntThink::NPC_Begin).into();
                     let nt = ((ctx.world.level.time as f32) + ctx.world.entity(ent).wait) as i32;

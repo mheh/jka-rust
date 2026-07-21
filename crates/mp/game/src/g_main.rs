@@ -1521,11 +1521,9 @@ pub fn G_LogPrintf(ctx: &mut GameContext, msg: &str) {
 /// Raven `LogExit`.
 ///
 /// Source: `oracle/codemp/game/g_main.c:2249-2303`
-pub fn LogExit(ctx: &mut GameContext, string: *const c_char) {
+pub fn LogExit(ctx: &mut GameContext, string: &str) {
     unsafe {
-        let s = cstr_to_str(string);
-
-        G_LogPrintf(ctx, &format!("Exit: {}\n", s));
+        G_LogPrintf(ctx, &format!("Exit: {}\n", string));
 
         ctx.world.level.intermissionQueued = ctx.world.level.time;
 
@@ -1917,12 +1915,12 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
             }
             if ctx.world.globals.gEscapeTime < ctx.world.level.time {
                 ctx.world.globals.gEscaping = qfalse;
-                LogExit(ctx, cstr("Escape time ended.").as_ptr());
+                LogExit(ctx, "Escape time ended.");
                 return;
             }
             if num_live_clients == 0 {
                 ctx.world.globals.gEscaping = qfalse;
-                LogExit(ctx, cstr("Everyone failed to escape.").as_ptr());
+                LogExit(ctx, "Everyone failed to escape.");
                 return;
             }
         }
@@ -1962,7 +1960,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
                         Com_Printf("POWERDUEL WIN CONDITION: Timelimit hit (1)\n");
                     }
-                    LogExit(ctx, cstr("Timelimit hit.").as_ptr());
+                    LogExit(ctx, "Timelimit hit.");
                     return;
                 }
             }
@@ -1973,7 +1971,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
         {
             if ctx.world.globals.g_endPDuel != qfalse {
                 ctx.world.globals.g_endPDuel = qfalse;
-                LogExit(ctx, cstr("Powerduel ended.").as_ptr());
+                LogExit(ctx, "Powerduel ended.");
             }
             return;
         }
@@ -2007,7 +2005,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                 if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
                     Com_Printf("POWERDUEL WIN CONDITION: Kill limit (1)\n");
                 }
-                LogExit(ctx, cstr(s_kill_limit).as_ptr());
+                LogExit(ctx, s_kill_limit);
                 return;
             }
 
@@ -2019,7 +2017,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                 if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
                     Com_Printf("POWERDUEL WIN CONDITION: Kill limit (2)\n");
                 }
-                LogExit(ctx, cstr(s_kill_limit).as_ptr());
+                LogExit(ctx, s_kill_limit);
                 return;
             }
 
@@ -2046,7 +2044,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
                         Com_Printf("POWERDUEL WIN CONDITION: Duel limit hit (1)\n");
                     }
-                    LogExit(ctx, cstr("Duel limit hit.").as_ptr());
+                    LogExit(ctx, "Duel limit hit.");
                     ctx.world.globals.gDuelExit = qtrue;
                     let netname = cstr_to_str(ctx.world.clients[i as usize].pers.netname.as_ptr());
                     trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}^7 hit the win limit.\n\"", netname));
@@ -2059,7 +2057,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                     if ctx.world.cvars.d_powerDuelPrint.integer != 0 {
                         Com_Printf("POWERDUEL WIN CONDITION: Kill limit (3)\n");
                     }
-                    LogExit(ctx, cstr(s_kill_limit).as_ptr());
+                    LogExit(ctx, s_kill_limit);
                     ctx.world.globals.gDuelExit = qfalse;
                     if print_limit != qfalse {
                         let netname =
@@ -2083,7 +2081,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                 let hit = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_CAPTURE_LIMIT");
                 trap::SendServerCommand(ctx.engine, -1, &format!("print \"{} \"", red));
                 trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}.\n\"", hit));
-                LogExit(ctx, cstr("Capturelimit hit.").as_ptr());
+                LogExit(ctx, "Capturelimit hit.");
                 return;
             }
 
@@ -2094,7 +2092,7 @@ pub fn CheckExitRules(ctx: &mut GameContext) {
                 let hit = G_GetStringEdString(ctx, "MP_SVGAME", "HIT_CAPTURE_LIMIT");
                 trap::SendServerCommand(ctx.engine, -1, &format!("print \"{} \"", blue));
                 trap::SendServerCommand(ctx.engine, -1, &format!("print \"{}.\n\"", hit));
-                LogExit(ctx, cstr("Capturelimit hit.").as_ptr());
+                LogExit(ctx, "Capturelimit hit.");
                 return;
             }
         }

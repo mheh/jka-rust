@@ -2705,7 +2705,7 @@ pub fn Use_Target_Escapetrig(
             }
         }
 
-        LogExit(ctx, c"Escaped!".as_ptr());
+        LogExit(ctx, "Escaped!");
     }
 }
 

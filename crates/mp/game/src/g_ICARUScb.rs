@@ -67,57 +67,55 @@ pub fn Q3_TaskIDClear(taskID: *mut c_int) {
 pub fn G_DebugPrint(
     ctx: &mut GameContext,
     level: c_int,
-    format: *const c_char,
+    text: &str,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    unsafe {
-        if ctx.world.cvars.g_developer.integer != 2 {
-            return;
+    if ctx.world.cvars.g_developer.integer != 2 {
+        return;
+    }
+
+    if level == WL_ERROR as c_int {
+        Com_Printf(&format!("{}ERROR: {}", S_COLOR_RED.to_string_lossy(), text));
+    } else if level == WL_WARNING as c_int {
+        Com_Printf(&format!(
+            "{}WARNING: {}",
+            S_COLOR_YELLOW.to_string_lossy(),
+            text
+        ));
+    } else if level == WL_DEBUG as c_int {
+        let mut ent_num: c_int = text
+            .split_whitespace()
+            .next()
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(0);
+        let buffer = if text.len() > 5 { &text[5..] } else { "" };
+
+        if ent_num < 0 || ent_num > MAX_GENTITIES as c_int {
+            ent_num = 0;
         }
 
-        let text = cstr_to_str(format);
-
-        if level == WL_ERROR as c_int {
-            Com_Printf(&format!("{}ERROR: {}", S_COLOR_RED.to_string_lossy(), text));
-        } else if level == WL_WARNING as c_int {
-            Com_Printf(&format!(
-                "{}WARNING: {}",
-                S_COLOR_YELLOW.to_string_lossy(),
-                text
-            ));
-        } else if level == WL_DEBUG as c_int {
-            let mut ent_num: c_int = text
-                .split_whitespace()
-                .next()
-                .and_then(|t| t.parse().ok())
-                .unwrap_or(0);
-            let buffer = if text.len() > 5 { &text[5..] } else { "" };
-
-            if ent_num < 0 || ent_num > MAX_GENTITIES as c_int {
-                ent_num = 0;
-            }
-
-            let targ = ctx.world.g_entities[ent_num as usize].script_targetname;
-            let targ_str = if targ.is_null() {
-                String::new()
-            } else {
-                cstr_to_str(targ)
-            };
-            Com_Printf(&format!(
-                "{}DEBUG: {}({}): {}\n",
-                S_COLOR_BLUE.to_string_lossy(),
-                targ_str,
-                ent_num,
-                buffer
-            ));
+        let targ = ctx.world.g_entities[ent_num as usize].script_targetname;
+        let targ_str = if targ.is_null() {
+            String::new()
         } else {
-            // default / WL_VERBOSE
-            Com_Printf(&format!(
-                "{}INFO: {}",
-                S_COLOR_GREEN.to_string_lossy(),
-                text
-            ));
-        }
+            // `script_targetname` is a raw `*mut c_char` field; the deref is the
+            // only remaining unsafe reach.
+            unsafe { cstr_to_str(targ) }
+        };
+        Com_Printf(&format!(
+            "{}DEBUG: {}({}): {}\n",
+            S_COLOR_BLUE.to_string_lossy(),
+            targ_str,
+            ent_num,
+            buffer
+        ));
+    } else {
+        // default / WL_VERBOSE
+        Com_Printf(&format!(
+            "{}INFO: {}",
+            S_COLOR_GREEN.to_string_lossy(),
+            text
+        ));
     }
 }
 
@@ -130,8 +128,7 @@ pub fn Q3_GetAnimLower(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_GetAnimLower: attempted to read animation state off non-client!\n\0".as_ptr()
-                as *const c_char,
+            "Q3_GetAnimLower: attempted to read animation state off non-client!\n",
         );
         return std::ptr::null_mut();
     }
@@ -152,8 +149,7 @@ pub fn Q3_GetAnimUpper(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_GetAnimUpper: attempted to read animation state off non-client!\n\0".as_ptr()
-                as *const c_char,
+            "Q3_GetAnimUpper: attempted to read animation state off non-client!\n",
         );
         return std::ptr::null_mut();
     }
@@ -178,7 +174,7 @@ pub fn Q3_GetAnimBoth(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_GetAnimBoth: NULL legs animation string found!\n\0".as_ptr() as *const c_char,
+            "Q3_GetAnimBoth: NULL legs animation string found!\n",
         );
         return std::ptr::null_mut();
     }
@@ -187,7 +183,7 @@ pub fn Q3_GetAnimBoth(ctx: &mut GameContext, ent: EntityId) -> *mut c_char {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_GetAnimBoth: NULL torso animation string found!\n\0".as_ptr() as *const c_char,
+            "Q3_GetAnimBoth: NULL torso animation string found!\n",
         );
         return std::ptr::null_mut();
     }
@@ -479,7 +475,7 @@ pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duratio
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!("Q3_Lerp2Start: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            &format!("Q3_Lerp2Start: ent {} is NOT a mover!\n", entID),
         );
         return;
     }
@@ -537,7 +533,7 @@ pub fn Q3_Lerp2End(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration:
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!("Q3_Lerp2End: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            &format!("Q3_Lerp2End: ent {} is NOT a mover!\n", entID),
         );
         return;
     }
@@ -602,7 +598,7 @@ pub fn Q3_Lerp2Pos(
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!("Q3_Lerp2Pos: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            &format!("Q3_Lerp2Pos: ent {} is NOT a mover!\n", entID),
         );
         return;
     }
@@ -807,7 +803,7 @@ pub fn Q3_Use(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_Use: string is NULL!\n\0".as_ptr() as *const c_char,
+            "Q3_Use: string is NULL!\n",
         );
         return;
     }
@@ -839,10 +835,9 @@ pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            cstr(&format!("Q3_Kill: can't find {}\n", unsafe {
+            &format!("Q3_Kill: can't find {}\n", unsafe {
                 cstr_to_str(name)
-            }))
-            .as_ptr(),
+            }),
         );
         return;
     };
@@ -871,7 +866,7 @@ pub fn Q3_RemoveEnt(ctx: &mut GameContext, victim: EntityId) {
             G_DebugPrint(
                 ctx,
                 WL_WARNING as c_int,
-                b"Q3_RemoveEnt: You can't remove clients in MP!\n\0".as_ptr() as *const c_char,
+                "Q3_RemoveEnt: You can't remove clients in MP!\n",
             );
             debug_assert!(false);
         } else {
@@ -912,7 +907,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             G_DebugPrint(
                 ctx,
                 WL_WARNING as c_int,
-                b"Q3_Remove: can't find enemy\n\0".as_ptr() as *const c_char,
+                "Q3_Remove: can't find enemy\n",
             );
             return;
         }
@@ -928,7 +923,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             G_DebugPrint(
                 ctx,
                 WL_WARNING as c_int,
-                b"Q3_Remove: can't find target\n\0".as_ptr() as *const c_char,
+                "Q3_Remove: can't find target\n",
             );
             return;
         }
@@ -985,12 +980,11 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
-                        cstr(&format!(
+                        &format!(
                             "GET_PARM: {} {} did not have any parms set!\n",
                             cstr_to_str(classname),
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1010,11 +1004,10 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetFloat: SET_XVELOCITY, {} not a client\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1027,11 +1020,10 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetFloat: SET_YVELOCITY, {} not a client\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1044,11 +1036,10 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetFloat: SET_ZVELOCITY, {} not a client\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1078,7 +1069,7 @@ pub fn Q3_GetFloat(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetFloat: SET_FACE___ not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetFloat: SET_FACE___ not implemented\n",
                 );
                 return 0;
             }
@@ -1091,11 +1082,10 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetFloat: SET_ANIM_HOLDTIME_LOWER, {} not a client\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1108,11 +1098,10 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetFloat: SET_ANIM_HOLDTIME_UPPER, {} not a client\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1122,8 +1111,7 @@ pub fn Q3_GetFloat(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetFloat: SET_ANIM_HOLDTIME_BOTH not implemented\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetFloat: SET_ANIM_HOLDTIME_BOTH not implemented\n",
                 );
                 return 0;
             }
@@ -1134,11 +1122,10 @@ pub fn Q3_GetFloat(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetFloat: SET_ARMOR, {} not a client\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1194,7 +1181,7 @@ pub fn Q3_GetFloat(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetFloat: SET_INTERFACE not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetFloat: SET_INTERFACE not implemented\n",
                 );
                 return 0;
             }
@@ -1209,7 +1196,7 @@ pub fn Q3_GetFloat(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetFloat: SET_VIDEO_FADE_IN not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetFloat: SET_VIDEO_FADE_IN not implemented\n",
                 );
                 return 0;
             }
@@ -1217,8 +1204,7 @@ pub fn Q3_GetFloat(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetFloat: SET_VIDEO_FADE_OUT not implemented\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetFloat: SET_VIDEO_FADE_OUT not implemented\n",
                 );
                 return 0;
             }
@@ -1314,8 +1300,7 @@ pub fn Q3_GetVector(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetVector: SET_TELEPORT_DEST not implemented\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetVector: SET_TELEPORT_DEST not implemented\n",
                 );
                 return 0;
             }
@@ -1378,11 +1363,10 @@ pub fn Q3_GetString(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_GetString: invalid ent {} has no parms!\n",
                             cstr_to_str(targetname)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                     return 0;
                 }
@@ -1448,8 +1432,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_LOOK_TARGET, NOT SUPPORTED IN MULTIPLAYER\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetString: SET_LOOK_TARGET, NOT SUPPORTED IN MULTIPLAYER\n",
                 );
             }
             _ if toGet == SET_TARGET2 as i32
@@ -1464,7 +1447,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_NAVGOAL not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_NAVGOAL not implemented\n",
                 );
                 return 0;
             }
@@ -1472,7 +1455,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_VIEWTARGET not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_VIEWTARGET not implemented\n",
                 );
                 return 0;
             }
@@ -1481,7 +1464,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_VIEWENTITY not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_VIEWENTITY not implemented\n",
                 );
                 return 0;
             }
@@ -1489,8 +1472,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_CAPTIONTEXTCOLOR not implemented\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetString: SET_CAPTIONTEXTCOLOR not implemented\n",
                 );
                 return 0;
             }
@@ -1498,8 +1480,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_CENTERTEXTCOLOR not implemented\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetString: SET_CENTERTEXTCOLOR not implemented\n",
                 );
                 return 0;
             }
@@ -1507,8 +1488,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_SCROLLTEXTCOLOR not implemented\n\0".as_ptr()
-                        as *const c_char,
+                    "Q3_GetString: SET_SCROLLTEXTCOLOR not implemented\n",
                 );
                 return 0;
             }
@@ -1516,7 +1496,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_COPY_ORIGIN not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_COPY_ORIGIN not implemented\n",
                 );
                 return 0;
             }
@@ -1524,7 +1504,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_COPY_ORIGIN not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_COPY_ORIGIN not implemented\n",
                 );
                 return 0;
             }
@@ -1532,7 +1512,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_VIDEO_PLAY not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_VIDEO_PLAY not implemented\n",
                 );
                 return 0;
             }
@@ -1540,7 +1520,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_LOADGAME not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_LOADGAME not implemented\n",
                 );
                 return 0;
             }
@@ -1548,7 +1528,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_LOCKYAW not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_LOCKYAW not implemented\n",
                 );
                 return 0;
             }
@@ -1556,7 +1536,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_SCROLLTEXT not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_SCROLLTEXT not implemented\n",
                 );
                 return 0;
             }
@@ -1564,7 +1544,7 @@ pub fn Q3_GetString(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_GetString: SET_LCARSTEXT not implemented\n\0".as_ptr() as *const c_char,
+                    "Q3_GetString: SET_LCARSTEXT not implemented\n",
                 );
                 return 0;
             }
@@ -1701,7 +1681,7 @@ pub fn Q3_SetCopyOrigin(ctx: &mut GameContext, entID: c_int, name: *const c_char
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_SetCopyOrigin: ent not found!\n\0".as_ptr() as *const c_char,
+            "Q3_SetCopyOrigin: ent not found!\n",
         );
     }
 }
@@ -1717,7 +1697,7 @@ pub fn Q3_SetVelocity(ctx: &mut GameContext, entID: c_int, axis: c_int, speed: f
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            cstr(&format!("Q3_SetVelocity: not a client {}\n", entID)).as_ptr(),
+            &format!("Q3_SetVelocity: not a client {}\n", entID),
         );
         return;
     }
@@ -1774,7 +1754,7 @@ pub fn Q3_Lerp2Origin(
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!("Q3_Lerp2Origin: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            &format!("Q3_Lerp2Origin: ent {} is NOT a mover!\n", entID),
         );
         return;
     }
@@ -1854,11 +1834,10 @@ pub fn Q3_SetOriginOffset(ctx: &mut GameContext, entID: c_int, axis: c_int, offs
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!(
+            &format!(
                 "Q3_SetOriginOffset: ent {} is NOT a mover!\n",
                 entID
-            ))
-            .as_ptr(),
+            ),
         );
         return;
     }
@@ -1904,7 +1883,7 @@ pub fn Q3_SetEnemy(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                b"Q3_SetEnemy: no such enemy\n\0".as_ptr() as *const c_char,
+                "Q3_SetEnemy: no such enemy\n",
             );
             return;
         }
@@ -1928,11 +1907,10 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!(
+            &format!(
                 "Q3_SetLeader: ent {} is NOT a player or NPC!\n",
                 entID
-            ))
-            .as_ptr(),
+            ),
         );
         return;
     }
@@ -1978,12 +1956,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a corpse! \"{}\"\n",
                     cstr_to_str(name),
                     cstr_to_str(st)
-                ))
-                .as_ptr(),
+                ),
             );
             return qfalse;
         }
@@ -1992,12 +1969,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a non-NPC: \"{}\"\n",
                     cstr_to_str(name),
                     cstr_to_str(st)
-                ))
-                .as_ptr(),
+                ),
             );
             return qfalse;
         }
@@ -2007,12 +1983,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a dead NPC: \"{}\"\n",
                     cstr_to_str(name),
                     cstr_to_str(st)
-                ))
-                .as_ptr(),
+                ),
             );
             return qfalse;
         }
@@ -2022,12 +1997,11 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetNavGoal: NPC's (\"{}\") navgoal is freed: \"{}\"\n",
                     cstr_to_str(name),
                     cstr_to_str(st)
-                ))
-                .as_ptr(),
+                ),
             );
             return qfalse;
         }
@@ -2057,11 +2031,10 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
                 G_DebugPrint(
                     ctx,
                     WL_ERROR as c_int,
-                    cstr(&format!(
+                    &format!(
                         "Q3_SetNavGoal: can't find NAVGOAL \"{}\"\n",
                         cstr_to_str(name)
-                    ))
-                    .as_ptr(),
+                    ),
                 );
                 return qfalse;
             }
@@ -2101,7 +2074,7 @@ pub fn SetLowerAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            b"SetLowerAnim: ent is NOT a player or NPC!\n\0".as_ptr() as *const c_char,
+            "SetLowerAnim: ent is NOT a player or NPC!\n",
         );
         return;
     }
@@ -2128,7 +2101,7 @@ pub fn SetUpperAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            b"SetUpperAnim: ent is NOT a player or NPC!\n\0".as_ptr() as *const c_char,
+            "SetUpperAnim: ent is NOT a player or NPC!\n",
         );
         return;
     }
@@ -2155,11 +2128,10 @@ pub fn Q3_SetAnimUpper(ctx: &mut GameContext, entID: c_int, anim_name: *const c_
             G_DebugPrint(
                 ctx,
                 WL_WARNING as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetAnimUpper: unknown animation sequence '{}'\n",
                     cstr_to_str(anim_name)
-                ))
-                .as_ptr(),
+                ),
             );
             return qfalse;
         }
@@ -2180,11 +2152,10 @@ pub fn Q3_SetAnimLower(ctx: &mut GameContext, entID: c_int, anim_name: *const c_
             G_DebugPrint(
                 ctx,
                 WL_WARNING as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetAnimLower: unknown animation sequence '{}'\n",
                     cstr_to_str(anim_name)
-                ))
-                .as_ptr(),
+                ),
             );
             return qfalse;
         }
@@ -2203,7 +2174,7 @@ pub fn Q3_SetAnimHoldTime(ctx: &mut GameContext, entID: c_int, int_data: c_int, 
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetAnimHoldTime is not currently supported in MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetAnimHoldTime is not currently supported in MP\n",
     );
 }
 
@@ -2285,11 +2256,10 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetBState: '{}' is not an NPC\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return qtrue;
         }
@@ -2316,11 +2286,10 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
                         G_DebugPrint(
                             ctx,
                             WL_ERROR as c_int,
-                            cstr(&format!(
+                            &format!(
                                 "Q3_SetBState: '{}' is not in a valid waypoint to search from!\n",
                                 cstr_to_str(tn)
-                            ))
-                            .as_ptr(),
+                            ),
                         );
                         return qtrue;
                     }
@@ -2373,11 +2342,10 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetTempBState: '{}' is not an NPC\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return qtrue;
         }
@@ -2405,11 +2373,10 @@ pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const 
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetDefaultBState: '{}' is not an NPC\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return;
         }
@@ -2429,7 +2396,7 @@ pub fn Q3_SetDPitch(ctx: &mut GameContext, entID: c_int, data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDPitch: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDPitch: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2440,7 +2407,7 @@ pub fn Q3_SetDYaw(ctx: &mut GameContext, entID: c_int, data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDYaw: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDYaw: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2451,7 +2418,7 @@ pub fn Q3_SetShootDist(ctx: &mut GameContext, entID: c_int, data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetShootDist: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetShootDist: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2462,7 +2429,7 @@ pub fn Q3_SetVisrange(ctx: &mut GameContext, entID: c_int, data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetVisrange: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetVisrange: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2473,7 +2440,7 @@ pub fn Q3_SetEarshot(ctx: &mut GameContext, entID: c_int, data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetEarshot: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetEarshot: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2484,7 +2451,7 @@ pub fn Q3_SetVigilance(ctx: &mut GameContext, entID: c_int, data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetVigilance: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetVigilance: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2495,7 +2462,7 @@ pub fn Q3_SetVFOV(ctx: &mut GameContext, entID: c_int, data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetVFOV: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetVFOV: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2506,7 +2473,7 @@ pub fn Q3_SetHFOV(ctx: &mut GameContext, entID: c_int, data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetHFOV: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetHFOV: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2517,7 +2484,7 @@ pub fn Q3_SetWidth(ctx: &mut GameContext, entID: c_int, data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetWidth: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetWidth: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2562,7 +2529,7 @@ pub fn Q3_SetVampire(ctx: &mut GameContext, entID: c_int, vampire: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetVampire: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetVampire: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2573,7 +2540,7 @@ pub fn Q3_SetGreetAllies(ctx: &mut GameContext, entID: c_int, greet: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetGreetAllies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetGreetAllies: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2584,7 +2551,7 @@ pub fn Q3_SetViewTarget(ctx: &mut GameContext, entID: c_int, name: *const c_char
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetViewTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetViewTarget: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2595,7 +2562,7 @@ pub fn Q3_SetWatchTarget(ctx: &mut GameContext, entID: c_int, name: *const c_cha
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetWatchTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetWatchTarget: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2624,7 +2591,7 @@ pub fn Q3_SetLoopSound(ctx: &mut GameContext, entID: c_int, name: *const c_char)
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            b"Q3_SetLoopSound: can't find sound file\n\0".as_ptr() as *const c_char,
+            "Q3_SetLoopSound: can't find sound file\n",
         );
     }
 }
@@ -2657,10 +2624,9 @@ pub fn Q3_SetICARUSFreeze(
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            cstr(&format!("Q3_SetICARUSFreeze: invalid ent {}\n", unsafe {
+            &format!("Q3_SetICARUSFreeze: invalid ent {}\n", unsafe {
                 cstr_to_str(name)
-            }))
-            .as_ptr(),
+            }),
         );
         return;
     }
@@ -2680,8 +2646,7 @@ pub fn Q3_SetViewEntity(ctx: &mut GameContext, entID: c_int, name: *const c_char
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetViewEntity currently unsupported in MP, ask if you need it.\n\0".as_ptr()
-            as *const c_char,
+        "Q3_SetViewEntity currently unsupported in MP, ask if you need it.\n",
     );
 }
 
@@ -2709,7 +2674,7 @@ pub fn Q3_SetItem(ctx: &mut GameContext, entID: c_int, item_name: *const c_char)
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetItem: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetItem: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2726,11 +2691,10 @@ pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetWalkSpeed: '{}' is not an NPC!\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return;
         }
@@ -2760,11 +2724,10 @@ pub fn Q3_SetRunSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetRunSpeed: '{}' is not an NPC!\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return;
         }
@@ -2788,7 +2751,7 @@ pub fn Q3_SetYawSpeed(ctx: &mut GameContext, entID: c_int, float_data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetYawSpeed: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetYawSpeed: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2799,7 +2762,7 @@ pub fn Q3_SetAggression(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetAggression: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetAggression: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2810,7 +2773,7 @@ pub fn Q3_SetAim(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetAim: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetAim: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2825,11 +2788,10 @@ pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!(
+            &format!(
                 "Q3_SetFriction: '{}' is not an NPC/player!\n",
                 unsafe { cstr_to_str(tn) }
-            ))
-            .as_ptr(),
+            ),
         );
         return;
     }
@@ -2837,7 +2799,7 @@ pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetFriction currently unsupported in MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetFriction currently unsupported in MP\n",
     );
 }
 
@@ -2854,11 +2816,10 @@ pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetGravity: '{}' is not an NPC/player!\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return;
         }
@@ -2887,7 +2848,7 @@ pub fn Q3_SetShotSpacing(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetShotSpacing: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetShotSpacing: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2898,7 +2859,7 @@ pub fn Q3_SetFollowDist(ctx: &mut GameContext, entID: c_int, float_data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetFollowDist: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetFollowDist: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -2998,7 +2959,7 @@ pub fn Q3_SetTarget2(ctx: &mut GameContext, entID: c_int, target2: *const c_char
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetTarget2 does not exist in MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetTarget2 does not exist in MP\n",
     );
 }
 
@@ -3009,7 +2970,7 @@ pub fn Q3_SetRemoveTarget(ctx: &mut GameContext, entID: c_int, target: *const c_
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetRemoveTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetRemoveTarget: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3020,7 +2981,7 @@ pub fn Q3_SetPainTarget(ctx: &mut GameContext, entID: c_int, targetname: *const 
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetPainTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetPainTarget: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3045,7 +3006,7 @@ pub fn Q3_SetMusicState(ctx: &mut GameContext, dms: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetMusicState: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetMusicState: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3061,7 +3022,7 @@ pub fn Q3_SetForcePowerLevel(
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetForcePowerLevel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetForcePowerLevel: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3121,7 +3082,7 @@ pub fn Q3_SetCaptureGoal(ctx: &mut GameContext, entID: c_int, name: *const c_cha
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetCaptureGoal: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetCaptureGoal: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3132,8 +3093,7 @@ pub fn Q3_SetEvent(ctx: &mut GameContext, entID: c_int, event_name: *const c_cha
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetEvent: NOT SUPPORTED IN MP (may be in future, ask if needed)\n\0".as_ptr()
-            as *const c_char,
+        "Q3_SetEvent: NOT SUPPORTED IN MP (may be in future, ask if needed)\n",
     );
 }
 
@@ -3144,7 +3104,7 @@ pub fn Q3_SetIgnorePain(ctx: &mut GameContext, entID: c_int, data: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetIgnorePain: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetIgnorePain: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3155,7 +3115,7 @@ pub fn Q3_SetIgnoreEnemies(ctx: &mut GameContext, entID: c_int, data: qboolean) 
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetIgnoreEnemies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetIgnoreEnemies: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3166,7 +3126,7 @@ pub fn Q3_SetIgnoreAlerts(ctx: &mut GameContext, entID: c_int, data: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetIgnoreAlerts: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetIgnoreAlerts: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3190,7 +3150,7 @@ pub fn Q3_SetDontShoot(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDontShoot: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDontShoot: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3201,7 +3161,7 @@ pub fn Q3_SetDontFire(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDontFire: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDontFire: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3212,7 +3172,7 @@ pub fn Q3_SetFireWeapon(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetFireWeapon: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetFireWeapon: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3253,7 +3213,7 @@ pub fn Q3_SetLockedEnemy(ctx: &mut GameContext, entID: c_int, locked: qboolean) 
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetLockedEnemy: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetLockedEnemy: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3264,7 +3224,7 @@ pub fn Q3_SetCinematicSkipScript(ctx: &mut GameContext, scriptname: *mut c_char)
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetCinematicSkipScript: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetCinematicSkipScript: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3275,7 +3235,7 @@ pub fn Q3_SetNoMindTrick(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetNoMindTrick: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetNoMindTrick: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3286,7 +3246,7 @@ pub fn Q3_SetCrouched(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetCrouched: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetCrouched: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3303,11 +3263,10 @@ pub fn Q3_SetWalking(ctx: &mut GameContext, entID: c_int, add: qboolean) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetWalking: '{}' is not an NPC!\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return;
         }
@@ -3328,7 +3287,7 @@ pub fn Q3_SetRunning(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetRunning: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetRunning: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3339,7 +3298,7 @@ pub fn Q3_SetForcedMarch(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetForcedMarch: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetForcedMarch: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3350,7 +3309,7 @@ pub fn Q3_SetChaseEnemies(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetChaseEnemies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetChaseEnemies: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3361,7 +3320,7 @@ pub fn Q3_SetLookForEnemies(ctx: &mut GameContext, entID: c_int, add: qboolean) 
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetLookForEnemies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetLookForEnemies: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3372,7 +3331,7 @@ pub fn Q3_SetFaceMoveDir(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetFaceMoveDir: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetFaceMoveDir: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3383,7 +3342,7 @@ pub fn Q3_SetAltFire(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetAltFire: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetAltFire: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3394,7 +3353,7 @@ pub fn Q3_SetDontFlee(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDontFlee: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDontFlee: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3405,7 +3364,7 @@ pub fn Q3_SetNoResponse(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetNoResponse: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetNoResponse: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3416,7 +3375,7 @@ pub fn Q3_SetCombatTalk(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetCombatTalk: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetCombatTalk: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3427,7 +3386,7 @@ pub fn Q3_SetAlertTalk(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetAlertTalk: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetAlertTalk: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3438,7 +3397,7 @@ pub fn Q3_SetUseCpNearest(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetUseCpNearest: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetUseCpNearest: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3449,7 +3408,7 @@ pub fn Q3_SetNoForce(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetNoForce: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetNoForce: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3460,7 +3419,7 @@ pub fn Q3_SetNoAcrobatics(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetNoAcrobatics: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetNoAcrobatics: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3471,7 +3430,7 @@ pub fn Q3_SetUseSubtitles(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetUseSubtitles: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetUseSubtitles: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3482,7 +3441,7 @@ pub fn Q3_SetNoFallToDeath(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetNoFallToDeath: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetNoFallToDeath: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3493,7 +3452,7 @@ pub fn Q3_SetDismemberable(ctx: &mut GameContext, entID: c_int, dismemberable: q
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDismemberable: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDismemberable: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3504,7 +3463,7 @@ pub fn Q3_SetMoreLight(ctx: &mut GameContext, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetMoreLight: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetMoreLight: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3515,7 +3474,7 @@ pub fn Q3_SetUndying(ctx: &mut GameContext, entID: c_int, undying: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetUndying: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetUndying: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3527,7 +3486,7 @@ pub fn Q3_SetInvincible(ctx: &mut GameContext, entID: c_int, invincible: qboolea
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetInvicible: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetInvicible: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3539,7 +3498,7 @@ pub fn Q3_SetForceInvincible(ctx: &mut GameContext, entID: c_int, forceInv: qboo
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetForceInvicible: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetForceInvicible: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3556,11 +3515,10 @@ pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!(
+                &format!(
                     "Q3_SetNoAvoid: '{}' is not an NPC!\n",
                     cstr_to_str(tn)
-                ))
-                .as_ptr(),
+                ),
             );
             return;
         }
@@ -3621,7 +3579,7 @@ pub fn Q3_SetSolid(ctx: &mut GameContext, entID: c_int, solid: qboolean) -> qboo
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            cstr(&format!("Q3_SetSolid: invalid entID {}\n", entID)).as_ptr(),
+            &format!("Q3_SetSolid: invalid entID {}\n", entID),
         );
         return qtrue;
     }
@@ -3669,11 +3627,10 @@ pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            cstr(&format!(
+            &format!(
                 "Q3_SetForwardMove: '{}' is not an NPC/player!\n",
                 unsafe { cstr_to_str(tn) }
-            ))
-            .as_ptr(),
+            ),
         );
         return;
     }
@@ -3681,7 +3638,7 @@ pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetForwardMove: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetForwardMove: NOT SUPPORTED IN MP\n",
     );
     //ent->client->forced_forwardmove = fmoveVal;
 }
@@ -3698,14 +3655,14 @@ pub fn Q3_SetRightMove(ctx: &mut GameContext, entID: c_int, rmoveVal: c_int) {
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            b"Q3_SetRightMove: '%s' is not an NPC/player!\n\0".as_ptr() as *const c_char,
+            "Q3_SetRightMove: '%s' is not an NPC/player!\n",
         );
         return;
     }
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetRightMove: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetRightMove: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3720,15 +3677,14 @@ pub fn Q3_SetLockAngle(ctx: &mut GameContext, entID: c_int, lockAngle: *const c_
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
-            b"Q3_SetLockAngle: '%s' is not an NPC/player!\n\0".as_ptr() as *const c_char,
+            "Q3_SetLockAngle: '%s' is not an NPC/player!\n",
         );
         return;
     }
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetLockAngle is not currently available. Ask if you really need it.\n\0".as_ptr()
-            as *const c_char,
+        "Q3_SetLockAngle is not currently available. Ask if you really need it.\n",
     );
 }
 
@@ -3739,7 +3695,7 @@ pub fn Q3_CameraGroup(ctx: &mut GameContext, entID: c_int, camG: *mut c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_CameraGroup: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_CameraGroup: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3750,7 +3706,7 @@ pub fn Q3_CameraGroupZOfs(ctx: &mut GameContext, camGZOfs: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_CameraGroupZOfs: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_CameraGroupZOfs: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3761,7 +3717,7 @@ pub fn Q3_CameraGroupTag(ctx: &mut GameContext, camGTag: *mut c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_CameraGroupTag: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_CameraGroupTag: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3772,7 +3728,7 @@ pub fn Q3_RemoveRHandModel(ctx: &mut GameContext, entID: c_int, addModel: *mut c
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_RemoveRHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_RemoveRHandModel: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3783,7 +3739,7 @@ pub fn Q3_AddRHandModel(ctx: &mut GameContext, entID: c_int, addModel: *mut c_ch
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_AddRHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_AddRHandModel: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3794,7 +3750,7 @@ pub fn Q3_AddLHandModel(ctx: &mut GameContext, entID: c_int, addModel: *mut c_ch
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_AddLHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_AddLHandModel: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3805,7 +3761,7 @@ pub fn Q3_RemoveLHandModel(ctx: &mut GameContext, entID: c_int, addModel: *mut c
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_RemoveLHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_RemoveLHandModel: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3816,7 +3772,7 @@ pub fn Q3_LookTarget(ctx: &mut GameContext, entID: c_int, targetName: *mut c_cha
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_LookTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_LookTarget: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3827,7 +3783,7 @@ pub fn Q3_Face(ctx: &mut GameContext, entID: c_int, expression: c_int, holdtime:
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_Face: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_Face: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3838,7 +3794,7 @@ pub fn Q3_SetLocation(ctx: &mut GameContext, entID: c_int, location: *const c_ch
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetLocation: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetLocation: NOT SUPPORTED IN MP\n",
     );
     qtrue
 }
@@ -3850,7 +3806,7 @@ pub fn Q3_SetPlayerLocked(ctx: &mut GameContext, entID: c_int, locked: qboolean)
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetPlayerLocked: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetPlayerLocked: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3861,7 +3817,7 @@ pub fn Q3_SetLockPlayerWeapons(ctx: &mut GameContext, entID: c_int, locked: qboo
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetLockPlayerWeapons: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetLockPlayerWeapons: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3872,7 +3828,7 @@ pub fn Q3_SetNoImpactDamage(ctx: &mut GameContext, entID: c_int, noImp: qboolean
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetNoImpactDamage: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetNoImpactDamage: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3940,7 +3896,7 @@ pub fn Q3_SetDelayScriptTime(ctx: &mut GameContext, entID: c_int, delayTime: c_i
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDelayScriptTime: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDelayScriptTime: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3965,7 +3921,7 @@ pub fn Q3_SetDisableShaderAnims(ctx: &mut GameContext, entID: c_int, disabled: c
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetDisableShaderAnims: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetDisableShaderAnims: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3976,7 +3932,7 @@ pub fn Q3_SetShaderAnim(ctx: &mut GameContext, entID: c_int, disabled: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetShaderAnim: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetShaderAnim: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3987,7 +3943,7 @@ pub fn Q3_SetStartFrame(ctx: &mut GameContext, entID: c_int, startFrame: c_int) 
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetStartFrame: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetStartFrame: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -3998,7 +3954,7 @@ pub fn Q3_SetEndFrame(ctx: &mut GameContext, entID: c_int, endFrame: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetEndFrame: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetEndFrame: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4009,7 +3965,7 @@ pub fn Q3_SetAnimFrame(ctx: &mut GameContext, entID: c_int, animFrame: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetAnimFrame: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetAnimFrame: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4020,7 +3976,7 @@ pub fn Q3_SetLoopAnim(ctx: &mut GameContext, entID: c_int, loopAnim: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetLoopAnim: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetLoopAnim: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4031,7 +3987,7 @@ pub fn Q3_SetShields(ctx: &mut GameContext, entID: c_int, shields: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetShields: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetShields: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4050,7 +4006,7 @@ pub fn Q3_SetSaberActive(ctx: &mut GameContext, entID: c_int, active: qboolean) 
         G_DebugPrint(
             ctx,
             WL_WARNING as c_int,
-            cstr(&format!("Q3_SetSaberActive: {} is not a client\n", entID)).as_ptr(),
+            &format!("Q3_SetSaberActive: {} is not a client\n", entID),
         );
     }
 
@@ -4085,7 +4041,7 @@ pub fn Q3_SetCleanDamagingEnts(ctx: &mut GameContext) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_SetCleanDamagingEnts: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_SetCleanDamagingEnts: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4114,7 +4070,7 @@ pub fn SetTextColor(ctx: &mut GameContext, textcolor: vec4_t, color: *const c_ch
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"SetTextColor: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "SetTextColor: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4148,7 +4104,7 @@ pub fn Q3_ScrollText(ctx: &mut GameContext, id: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_ScrollText: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_ScrollText: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4162,7 +4118,7 @@ pub fn Q3_LCARSText(ctx: &mut GameContext, id: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
-        b"Q3_ScrollText: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        "Q3_ScrollText: NOT SUPPORTED IN MP\n",
     );
 }
 
@@ -4322,12 +4278,11 @@ pub fn Q3_Set(
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_SetAnimUpper: {} does not have anim {}!\n",
                             cstr_to_str(tn),
                             cstr_to_str(data)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                 }
                 if Q3_SetAnimLower(ctx, entID, data) != qfalse {
@@ -4345,12 +4300,11 @@ pub fn Q3_Set(
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_SetAnimLower: {} does not have anim {}!\n",
                             cstr_to_str(tn),
                             cstr_to_str(data)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                 }
                 if both >= 2 {
@@ -4437,7 +4391,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetPlayerTeam: Not in MP ATM, let a programmer (ideally Rich) know if you need it\n\0".as_ptr() as *const c_char,
+                    "Q3_SetPlayerTeam: Not in MP ATM, let a programmer (ideally Rich) know if you need it\n",
                 );
             }
 
@@ -4445,7 +4399,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetEnemyTeam: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "Q3_SetEnemyTeam: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -4678,7 +4632,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_LEAN NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_LEAN NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -4738,7 +4692,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    cstr("Q3_SetDefendTarget unimplemented\n").as_ptr(),
+                    "Q3_SetDefendTarget unimplemented\n",
                 );
                 //Q3_SetEnemy( entID, (char *) data);
             }
@@ -4782,11 +4736,10 @@ pub fn Q3_Set(
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
-                        cstr(&format!(
+                        &format!(
                             "Q3_SetBehaviorSet: Invalid bSet {}\n",
                             cstr_to_str(type_name)
-                        ))
-                        .as_ptr(),
+                        ),
                     );
                 }
             }
@@ -4964,7 +4917,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_VERBOSE as c_int,
-                    b"SET_TREASONED is disabled, do not use\n\0".as_ptr() as *const c_char,
+                    "SET_TREASONED is disabled, do not use\n",
                 );
                 /*
                 G_TeamRetaliation( NULL, SV_GentityNum(0), qfalse );
@@ -5172,7 +5125,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetInterface: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "Q3_SetInterface: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5196,7 +5149,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetAdjustAreaPortals: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "Q3_SetAdjustAreaPortals: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5204,7 +5157,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetDmgByHeavyWeapOnly: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "Q3_SetDmgByHeavyWeapOnly: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5212,7 +5165,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetShielded: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "Q3_SetShielded: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5220,7 +5173,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"Q3_SetNoGroups: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "Q3_SetNoGroups: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5248,7 +5201,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_END_SCREENDISSOLVE: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_END_SCREENDISSOLVE: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5257,7 +5210,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_MISSION_STATUS_SCREEN: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_MISSION_STATUS_SCREEN: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5287,7 +5240,7 @@ pub fn Q3_Set(
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
-                        b"SET_VIDEO_PLAY: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                        "SET_VIDEO_PLAY: NOT SUPPORTED IN MP\n",
                     );
                     //SV_SendConsoleCommand( va("inGameCinematic %s\n", (char *)data) );
                 }
@@ -5297,7 +5250,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_VIDEO_FADE_IN: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_VIDEO_FADE_IN: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5305,7 +5258,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_VIDEO_FADE_OUT: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_VIDEO_FADE_OUT: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5316,7 +5269,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_LOADGAME: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_LOADGAME: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5328,28 +5281,28 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_OBJECTIVE_SHOW: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_OBJECTIVE_SHOW: NOT SUPPORTED IN MP\n",
                 );
             }
             _ if toSet == SET_OBJECTIVE_HIDE as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_OBJECTIVE_HIDE: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_OBJECTIVE_HIDE: NOT SUPPORTED IN MP\n",
                 );
             }
             _ if toSet == SET_OBJECTIVE_SUCCEEDED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_OBJECTIVE_SUCCEEDED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_OBJECTIVE_SUCCEEDED: NOT SUPPORTED IN MP\n",
                 );
             }
             _ if toSet == SET_OBJECTIVE_FAILED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_OBJECTIVE_FAILED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_OBJECTIVE_FAILED: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5357,7 +5310,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_OBJECTIVE_CLEARALL: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_OBJECTIVE_CLEARALL: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5365,7 +5318,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_MISSIONFAILED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_MISSIONFAILED: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5373,7 +5326,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_MISSIONSTATUSTEXT: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_MISSIONSTATUSTEXT: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5381,7 +5334,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_MISSIONSTATUSTIME: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_MISSIONSTATUSTIME: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5389,7 +5342,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_CLOSINGCREDITS: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_CLOSINGCREDITS: NOT SUPPORTED IN MP\n",
                 );
             }
 
@@ -5422,7 +5375,7 @@ pub fn Q3_Set(
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
-                    b"SET_HUD: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    "SET_HUD: NOT SUPPORTED IN MP\n",
                 );
             }
 
