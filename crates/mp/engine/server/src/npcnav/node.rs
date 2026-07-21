@@ -45,7 +45,7 @@ fn read_u32(cursor: &mut &[u8]) -> u32 {
 
 /// Reads a little-endian `i32` off the shared read cursor and advances it 4
 /// bytes.
-fn read_i32(cursor: &mut &[u8]) -> i32 {
+pub(crate) fn read_i32(cursor: &mut &[u8]) -> i32 {
     read_u32(cursor) as i32
 }
 

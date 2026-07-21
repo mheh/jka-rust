@@ -36,6 +36,7 @@ use native_string::atoi::atoi;
 use native_string::q_string::{Q_stricmp, Q_stricmpBytes, Q_stricmpn};
 use native_string::q_strncpyz::Q_strncpyzBytes;
 
+use crate::hook_install::sv_from_view;
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
 use crate::server::server_state_t::serverState_t;
@@ -913,16 +914,6 @@ pub fn SV_MapRestart_f(view: &mut EngineHostView, sv: &mut Server, g2: &mut Ghou
         &[sv.svs.time as isize],
     );
     sv.svs.time += 100;
-}
-
-/// Cast the view's type-erased `sv` slot back to the live `Server`, inside a
-/// registered-command handler body (the host-seam twin of
-/// `server_host::server_from_slot`).
-///
-/// SAFETY: view-constructor slot, single-threaded, no other live cast of this
-/// slot for the borrow's duration.
-unsafe fn sv_from_view<'a>(view: &mut EngineHostView) -> &'a mut Server {
-    &mut *(view.sv.as_raw() as *mut Server)
 }
 
 /// Cast the view's type-erased `g2` slot back to the live `Ghoul2System`,

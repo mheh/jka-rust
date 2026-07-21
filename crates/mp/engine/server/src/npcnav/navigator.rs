@@ -60,6 +60,7 @@ use mp_qshared::shared::{
     WORLD_SIZE,
 };
 
+use super::node::read_i32;
 use super::callbacks::{
     GNavCallback_CP_FindCombatPointWaypoints, GNavCallback_G_EntIsBreakable,
     GNavCallback_G_EntIsDoor, GNavCallback_G_EntIsRemovableUsable,
@@ -122,15 +123,6 @@ const ET_NPC: i32 = 13;
 /// Raven `#define EF_DEAD (1<<1)`.
 /// Source: `oracle/codemp/game/bg_public.h:561`
 const EF_DEAD: i32 = 1 << 1;
-
-/// Reads one little-endian `i32` off the front of a byte cursor, advancing it
-/// 4 bytes — the shared in-memory analogue of `FS_Read( &value, 4, file )`
-/// used for the `failedEdges[]` array in [`Navigator::load`].
-fn take_i32(sl: &mut &[u8]) -> i32 {
-    let (head, tail) = sl.split_at(4);
-    *sl = tail;
-    i32::from_le_bytes([head[0], head[1], head[2], head[3]])
-}
 
 /// Raven `Navigator` (C-prefix dropped, NAV-D3 / RULING 40) — see module
 /// doc for the dropped/elided surface.
@@ -300,10 +292,10 @@ impl Navigator {
         // :647) then rebuild `m_edgeLookupMap` (:648-651). Matches Raven: no
         // pre-clear here (Init/Free own that).
         for j in 0..MAX_FAILED_EDGES {
-            let start_id = take_i32(&mut sl);
-            let end_id = take_i32(&mut sl);
-            let check_time = take_i32(&mut sl);
-            let ent_id = take_i32(&mut sl);
+            let start_id = read_i32(&mut sl);
+            let end_id = read_i32(&mut sl);
+            let check_time = read_i32(&mut sl);
+            let ent_id = read_i32(&mut sl);
             self.failed_edges[j] = failedEdge_t {
                 startID: start_id,
                 endID: end_id,

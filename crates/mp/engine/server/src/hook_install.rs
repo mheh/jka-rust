@@ -33,7 +33,7 @@ use crate::sv_world::SV_Trace;
 /// SAFETY (caller): the slot was built by `mp_engine_core`'s view constructor
 /// from the live, unique `&mut Engine.sv`; the engine is single-threaded and
 /// no other cast of this slot is live for the returned borrow's duration.
-unsafe fn sv_from_view<'a>(view: &mut EngineHostView) -> &'a mut Server {
+pub(crate) unsafe fn sv_from_view<'a>(view: &mut EngineHostView) -> &'a mut Server {
     &mut *(view.sv.as_raw() as *mut Server)
 }
 
