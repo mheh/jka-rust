@@ -44,7 +44,7 @@ use crate::world::GameContext;
 use crate::entity::hit_location::HL_GENERIC1;
 use crate::g_utils::{G_AddEvent, G_Sound, G_UseTargets2};
 use crate::npc_c::{RestoreNPCGlobals, SaveNPCGlobals, SetNPCGlobals};
-use crate::q_shared::Q_stricmp;
+use native_string::q_string::Q_stricmp;
 use crate::teams::npcteam::NPCTEAM_NEUTRAL;
 use crate::NPC_combat::{G_ClearEnemy, G_SetEnemy};
 use crate::NPC_utils::{G_ActivateBehavior, NPC_CheckLookTarget, NPC_SetLookTarget};
@@ -950,7 +950,7 @@ pub fn NPC_Respond(ctx: &mut GameContext, self_: EntityId, userNum: c_int) {
         CLASS_BESPIN_COP => {
             let npc_type_ptr = ctx.world.entity(self_).NPC_type;
             let is_variant1 = if !npc_type_ptr.is_null() {
-                Q_stricmp(npc_type_ptr, cstr("bespincop").as_ptr()) == 0
+                Q_stricmp(&(unsafe { cstr_to_str(npc_type_ptr) }), "bespincop") == 0
             } else {
                 false
             };

@@ -40,7 +40,7 @@ use crate::g_utils::{
 use crate::game_cvars::{GameCvars, GAME_CVAR_TABLE};
 use crate::npc_c::ClearNPCGlobals;
 use crate::q_math::VectorLength;
-use crate::q_shared::Q_stricmp;
+use native_string::q_string::Q_stricmp;
 use crate::w_force::WP_ForcePowersUpdate;
 use crate::w_saber::{WP_SaberPositionUpdate, WP_SaberStartMissileBlockCheck};
 use crate::world::GameWorld;
@@ -2657,7 +2657,7 @@ pub fn CheckCvars(ctx: &mut GameContext) {
             trap::Cvar_Set(ctx.engine, "g_password", &password);
 
             let pw = cstr_to_str(ctx.world.cvars.g_password.string.as_ptr());
-            if !pw.is_empty() && Q_stricmp(cstr(&pw).as_ptr(), cstr("none").as_ptr()) != 0 {
+            if !pw.is_empty() && Q_stricmp(&pw, "none") != 0 {
                 trap::Cvar_Set(ctx.engine, "g_needpass", "1");
             } else {
                 trap::Cvar_Set(ctx.engine, "g_needpass", "0");

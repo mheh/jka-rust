@@ -16,6 +16,7 @@ use crate::bg_channel::GameBgTraps;
 use crate::prelude::*;
 use crate::g_utils::G_ModelIndex;
 use crate::g_utils::G_SoundIndex;
+use native_string::q_string::Q_stricmp;
 
 // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
 // (`c_int`, cast here to match the `vec3_t` components they seed).
@@ -491,9 +492,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         let mut sound: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut playerModel: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-        if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), ctx.world.entity(spawner).NPC_type)
-            == 0
-        {
+        if Q_stricmp("random", &cstr_to_str(ctx.world.entity(spawner).NPC_type)) == 0 {
             //sorry, can't precache a random just yet
             return;
         }
@@ -571,7 +570,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                if Q_stricmp("none", &cstr_to_str(value)) == 0 {
                     // (nothing — headModelName not wired yet, matches oracle's
                     // commented-out Q_strncpyz)
                 }
@@ -590,7 +589,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                if Q_stricmp("none", &cstr_to_str(value)) == 0 {
                     // (nothing — torsoModelName not wired yet)
                 }
                 md3_model = 1;
@@ -931,7 +930,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         (*client_ptr).ps.customRGBA[2] = 255;
         (*client_ptr).ps.customRGBA[3] = 255;
 
-        if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), NPCName) == 0 {
+        if Q_stricmp("random", &cstr_to_str(NPCName)) == 0 {
             //Randomly assemble a starfleet guy
             //NPC_BuildRandom( NPC );
             crate::g_main::Com_Printf("RANDOM NPC NOT SUPPORTED IN MP\n");
@@ -1010,7 +1009,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                if crate::q_shared::Q_stricmp(value, cstr("random").as_ptr()) == 0 {
+                if Q_stricmp(&cstr_to_str(value), "random") == 0 {
                     (*client_ptr).ps.customRGBA[0] = ctx.world.bg_state.rng.Q_irand(0, 255);
                     (*client_ptr).ps.customRGBA[1] = ctx.world.bg_state.rng.Q_irand(0, 255);
                     (*client_ptr).ps.customRGBA[2] = ctx.world.bg_state.rng.Q_irand(0, 255);
@@ -1063,7 +1062,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                if Q_stricmp("none", &cstr_to_str(value)) == 0 {
                     //Zero the head clamp range so the torso & legs don't lag behind
                     (*ri).headYawRangeLeft = 0;
                     (*ri).headYawRangeRight = 0;
@@ -1084,7 +1083,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 {
                     continue;
                 }
-                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                if Q_stricmp("none", &cstr_to_str(value)) == 0 {
                     //Zero the torso clamp range so the legs don't lag behind
                     (*ri).torsoYawRangeLeft = 0;
                     (*ri).torsoYawRangeRight = 0;
@@ -1822,7 +1821,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     {
                         continue;
                     }
-                    if crate::q_shared::Q_stricmp(cstr("flyswim").as_ptr(), value) == 0 {
+                    if Q_stricmp("flyswim", &cstr_to_str(value)) == 0 {
                         (*client_ptr).ps.eFlags2 |= mp_bg::public::entity_effects::EF2_FLYING;
                     }
                     //NPC->client->moveType = (movetype_t)MoveTypeNameToEnum(value);

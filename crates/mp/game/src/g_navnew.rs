@@ -46,6 +46,8 @@ use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
+use native_string::q_string::Q_stricmp;
+
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::gentity::MAX_FAILED_NODES;
@@ -628,7 +630,9 @@ pub fn NAVNEW_ResolveEntityCollision(
     let blocker = blocker.unwrap();
     //Doors are ignored
     let blocker_classname = ctx.world.entity(blocker).classname;
-    if crate::q_shared::Q_stricmp(blocker_classname, cstr("func_door").as_ptr()) == 0 {
+    if !blocker_classname.is_null()
+        && Q_stricmp(&(unsafe { cstr_to_str(blocker_classname) }), "func_door") == 0
+    {
         let mut center = [0.0f32; 3];
         CalcTeamDoorCenter(ctx, blocker, &mut center);
         let self_origin = ctx.world.entity(self_).r.currentOrigin;

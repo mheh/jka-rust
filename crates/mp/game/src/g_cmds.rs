@@ -20,6 +20,7 @@ use crate::trap;
 use mp_bg::bg_misc::selected_holdable_tag;
 use native_string::atof::atof_bytes;
 use native_string::atoi::{atoi, atoi_bytes};
+use native_string::q_string::Q_stricmp;
 
 /// Raven `SAY_ALL`/`SAY_TEAM`/`SAY_TELL` chat-mode `#define`s.
 ///
@@ -1962,7 +1963,7 @@ pub fn Cmd_VoiceCommand_f(ctx: &mut GameContext, ent: EntityId) {
             if names[i].is_none() {
                 break;
             }
-            if crate::q_shared::Q_stricmp(names[i].unwrap().as_ptr(), cstr(&s).as_ptr()) == 0 {
+            if Q_stricmp(names[i].unwrap().to_str().unwrap(), &s) == 0 {
                 break;
             }
             i += 1;
@@ -3415,7 +3416,7 @@ pub fn Cmd_DebugSetBodyAnim_f(ctx: &mut GameContext, self_: EntityId, flags: c_i
         }
 
         while (i as usize) < MAX_ANIMATIONS as usize {
-            if crate::q_shared::Q_stricmp(cstr(&arg).as_ptr(), animTable[i as usize].name) == 0 {
+            if Q_stricmp(&arg, &cstr_to_str(animTable[i as usize].name)) == 0 {
                 break;
             }
             i += 1;
