@@ -154,6 +154,7 @@ dependencies = [
  "mp_bg",
  "mp_qshared",
  "mp_uishared",
+ "native_types",
 ]
 
 [[package]]
@@ -321,6 +322,7 @@ dependencies = [
  "mp_bg",
  "mp_qshared",
  "mp_uishared",
+ "native_types",
 ]
 
 [[package]]
@@ -329,6 +331,7 @@ version = "0.1.0"
 dependencies = [
  "mp_bg",
  "mp_qshared",
+ "native_types",
 ]
 
 [[package]]
@@ -412,6 +415,7 @@ dependencies = [
 name = "sp_cgame"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_abi",
  "sp_bg",
  "sp_qshared",
@@ -504,6 +508,7 @@ dependencies = [
 name = "sp_ui"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_abi",
  "sp_bg",
  "sp_qshared",
@@ -514,6 +519,7 @@ dependencies = [
 name = "sp_uishared"
 version = "0.1.0"
 dependencies = [
+ "native_types",
  "sp_bg",
  "sp_qshared",
 ]

@@ -7,5 +7,6 @@ edition = "2021"
 name = "sp_uishared"
 
 [dependencies]
+native_types = { path = "../../native/types" }
 sp_qshared = { path = "../qshared" }
 sp_bg = { path = "../bg" }

@@ -1,34 +1,3 @@
-#![allow(non_camel_case_types, non_snake_case)]
+//! `footstep_t` footstep surface-type enumeration (canonical: `native_types`).
 
-/// Raven `footstep_t` — footstep sound type enumeration.
-///
-/// Type definition source: `oracle/code/cgame/cg_media.h:6-34`
-#[repr(i32)]
-pub enum footstep_t {
-    FOOTSTEP_STONEWALK,
-    FOOTSTEP_STONERUN,
-    FOOTSTEP_METALWALK,
-    FOOTSTEP_METALRUN,
-    FOOTSTEP_PIPEWALK,
-    FOOTSTEP_PIPERUN,
-    FOOTSTEP_SPLASH,
-    FOOTSTEP_WADE,
-    FOOTSTEP_SWIM,
-    FOOTSTEP_SNOWWALK,
-    FOOTSTEP_SNOWRUN,
-    FOOTSTEP_SANDWALK,
-    FOOTSTEP_SANDRUN,
-    FOOTSTEP_GRASSWALK,
-    FOOTSTEP_GRASSRUN,
-    FOOTSTEP_DIRTWALK,
-    FOOTSTEP_DIRTRUN,
-    FOOTSTEP_MUDWALK,
-    FOOTSTEP_MUDRUN,
-    FOOTSTEP_GRAVELWALK,
-    FOOTSTEP_GRAVELRUN,
-    FOOTSTEP_RUGWALK,
-    FOOTSTEP_RUGRUN,
-    FOOTSTEP_WOODWALK,
-    FOOTSTEP_WOODRUN,
-    FOOTSTEP_TOTAL,
-}
+pub use native_types::footstep_t;

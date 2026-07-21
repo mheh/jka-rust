@@ -7,6 +7,8 @@
 use core::ffi::{c_int, c_uchar, c_ulong, c_ushort};
 
 pub mod anim;
+pub mod cgame;
+pub mod client;
 pub mod cvar;
 pub mod miniheap;
 pub mod mp3;
@@ -14,10 +16,17 @@ pub mod rmg;
 pub mod say;
 pub mod snd;
 pub mod stdio;
+pub mod ui;
+pub mod uishared;
 
 pub use anim::anim_event_type::animEventType_t;
 pub use anim::anim_number::{animNumber_t, SABER_ANIM_GROUP_SIZE};
 pub use anim::footstep_type::footstepType_t;
+pub use cgame::footstep_t::footstep_t;
+pub use cgame::le_flag_t::leFlag_t;
+pub use cgame::powerup_info_t::powerupInfo_t;
+pub use client::field_t::field_t;
+pub use client::kbutton_t::kbutton_t;
 pub use cvar::vm_cvar_t::vmCvar_t;
 pub use miniheap::cmini_heap::CMiniHeap;
 pub use mp3::in_out::IN_OUT;
@@ -37,6 +46,13 @@ pub use snd::sound_compression_method_t::SoundCompressionMethod_t;
 pub use snd::streamingbuffer::STREAMINGBUFFER;
 pub use snd::wavinfo_t::wavinfo_t;
 pub use stdio::file::FILE;
+pub use ui::mod_info_t::modInfo_t;
+pub use ui::player_species_info_t::playerSpeciesInfo_t;
+pub use uishared::column_info_s::{columnInfo_s, columnInfo_t};
+pub use uishared::edit_field_def_s::{editFieldDef_s, editFieldDef_t};
+pub use uishared::list_box_def_s::{listBoxDef_s, listBoxDef_t};
+pub use uishared::rect_def_t::rectDef_t;
+pub use uishared::text_scroll_def_s::{textScrollDef_s, textScrollDef_t};
 
 /// Raven `byte`.
 ///

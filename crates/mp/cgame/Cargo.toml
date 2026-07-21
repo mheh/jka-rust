@@ -8,6 +8,7 @@ name = "mp_cgame"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+native_types = { path = "../../native/types" }
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }
 mp_uishared = { path = "../uishared" }
