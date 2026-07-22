@@ -15,7 +15,8 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::force_reload::ForceReload_e;
 use mp_qshared::shared::game_state::MAX_CONFIGSTRINGS;
 use mp_qshared::shared::limits::{MAX_CLIENTS, MAX_NAME_LENGTH, MAX_STRING_CHARS};
-use native_string::cstr::strncpyz_string;
+use native_string::cstr::{buf_to_string, strncpyz_string};
+use native_string::Info_ValueForKey;
 use mp_qshared::shared::qboolean;
 
 use mp_engine_ghoul2::api_collision::g2api_set_time;
@@ -57,7 +58,7 @@ use mp_engine_qcommon::z_memman_pc::{
     CopyString, Hunk_Clear, Hunk_SetMark, Z_Free, Z_Malloc,
 };
 use mp_qshared::shared::fileHandle_t;
-use mp_qshared::shared::q_string::{Info_ValueForKey, Q_stricmp, Q_strncpyz};
+use mp_qshared::shared::q_string::{Q_stricmp, Q_strncpyz};
 use std::ffi::CString;
 
 use crate::sv_ccmds::SV_AddOperatorCommands;
@@ -268,8 +269,8 @@ pub fn SV_SetUserinfo(common: &mut Common, sv: &mut Server, index: c_int, mut va
         );
         // Raven `Q_strncpyz(cl->name, Info_ValueForKey(val,"name"), sizeof(cl->name))`
         // — extract the name and byte-truncate to MAX_NAME_LENGTH into the String.
-        let name_src = Info_ValueForKey(val as *mut c_char, c"name".as_ptr() as *mut c_char);
-        (*client).name = strncpyz_string(CStr::from_ptr(name_src).to_bytes(), MAX_NAME_LENGTH);
+        let name_src = Info_ValueForKey(&buf_to_string(CStr::from_ptr(val).to_bytes()), "name");
+        (*client).name = strncpyz_string(name_src.as_bytes(), MAX_NAME_LENGTH);
     }
 }
 

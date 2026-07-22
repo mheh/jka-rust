@@ -15,6 +15,7 @@ use std::io::Write;
 use crate::common::error::com_error as com_error_fn;
 use crate::files_common::{FS_FOpenFileWrite, FS_ForceFlush, FS_Initialized, FS_Write};
 use mp_qshared::shared::q_string::Q_strncpyz;
+use native_string::InfoSetResult;
 
 use crate::qcommon::net_chan_cpp_consts::MAX_LOOPBACK;
 use crate::qcommon::net_limits::MAX_MSGLEN;
@@ -730,4 +731,23 @@ fn com_printf_cstr(msg: &str) -> std::ffi::CString {
     let bytes = msg.as_bytes();
     let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
     std::ffi::CString::new(&bytes[..end]).unwrap()
+}
+
+/// Reproduce the `Com_Printf` warning Raven's `Info_SetValueForKey`/`_Big`
+/// emits on a rejected or oversize set — the consumer-side effect
+/// [`native_string::info`] leaves to callers (DEC-32): the value logic lives in
+/// `native_string`, the print stays engine-side. Only the length-exceeded text
+/// differs between the Big/non-Big forms (`exceeded_msg`). The retired
+/// pointer-based shim (`mp_qshared::shared::q_string`) routed these through its
+/// `com_printf_lit` stub (`eprint!`); the sink is kept identical here.
+///
+/// Source: `oracle/codemp/game/q_shared.c:1280-1319, 1328-1366`
+pub fn info_set_report(result: InfoSetResult, exceeded_msg: &str) {
+    match result {
+        InfoSetResult::Set => {}
+        InfoSetResult::ContainsBackslash => eprint!("Can't use keys or values with a \\\n"),
+        InfoSetResult::ContainsSemicolon => eprint!("Can't use keys or values with a semicolon\n"),
+        InfoSetResult::ContainsQuote => eprint!("Can't use keys or values with a \"\n"),
+        InfoSetResult::LengthExceeded => eprint!("{exceeded_msg}"),
+    }
 }

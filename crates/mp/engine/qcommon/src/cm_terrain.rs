@@ -81,6 +81,7 @@ use mp_qshared::shared::error_parm::errorParm_t;
 use mp_qshared::shared::{vec3_t, vec3pair_t};
 use native_string::atof::atof;
 use native_string::atoi::atoi;
+use native_string::Info_ValueForKey;
 
 use crate::cm::cbrush_s::cbrush_t;
 use crate::cm::cbrushside_s::cbrushside_t;
@@ -117,31 +118,6 @@ const BRUSH_SIDES_PER_TERXEL: usize = 8;
 /// Source: `oracle/codemp/qcommon/qcommon.h:1094-1097`
 fn round_f(value: f32) -> i32 {
     (value + 0.5).floor() as i32
-}
-
-/// Raven `Info_ValueForKey(s, key)` reduced to the idiomatic `&str` form the
-/// terrain config/terrain-def parse needs. Raven's rotating-buffer copy
-/// (`q_shared.c`) collapses to a borrow into `s`; callers copy (parse/`format!`)
-/// before any mutation. The `\key\value\…` walk and Raven's case-INSENSITIVE
-/// key match (`Q_stricmp`) are preserved. No shared `Info_ValueForKey` is
-/// reachable from `mp_engine_qcommon` (the game-tier one lives in `mp_game`,
-/// the wrong dependency direction), so this leaf string helper is ported
-/// locally — a §14 explicit dep, not a silent fake (Divergences note).
-///
-/// Source: `oracle/codemp/game/q_shared.c` (`Info_ValueForKey`)
-fn info_value_for_key<'a>(s: &'a str, key: &str) -> &'a str {
-    let body = s.strip_prefix('\\').unwrap_or(s);
-    let mut it = body.split('\\');
-    loop {
-        match (it.next(), it.next()) {
-            (Some(k), Some(v)) => {
-                if k.eq_ignore_ascii_case(key) {
-                    return v;
-                }
-            }
-            _ => return "",
-        }
-    }
 }
 
 /// Raven `Com_ParseTextFile(file, parser, cleanFirst)` — opens `file`, reads it
@@ -358,24 +334,24 @@ impl CmLandScape {
         let _ = server;
 
         // Extract the relevant data from the config string.
-        let height_map_key = info_value_for_key(configstring, "heightMap");
+        let height_map_key = Info_ValueForKey(configstring, "heightMap");
         // Raven `atol`; identical to `atoi` on the 32-bit retail target.
-        let num_patches = atoi(info_value_for_key(configstring, "numPatches"));
-        let terxels = atoi(info_value_for_key(configstring, "terxels"));
-        let has_physics = atoi(info_value_for_key(configstring, "physics")) != 0;
+        let num_patches = atoi(&Info_ValueForKey(configstring, "numPatches"));
+        let terxels = atoi(&Info_ValueForKey(configstring, "terxels"));
+        let has_physics = atoi(&Info_ValueForKey(configstring, "physics")) != 0;
         // Raven parses `seed` with `strtoul` into a local that is never read
         // (`cm_terrain.cpp:137`, dead) — dropped (§C10), no observable effect.
 
         let bounds: vec3pair_t = [
             [
-                atof(info_value_for_key(configstring, "minx")) as f32,
-                atof(info_value_for_key(configstring, "miny")) as f32,
-                atof(info_value_for_key(configstring, "minz")) as f32,
+                atof(&Info_ValueForKey(configstring, "minx")) as f32,
+                atof(&Info_ValueForKey(configstring, "miny")) as f32,
+                atof(&Info_ValueForKey(configstring, "minz")) as f32,
             ],
             [
-                atof(info_value_for_key(configstring, "maxx")) as f32,
-                atof(info_value_for_key(configstring, "maxy")) as f32,
-                atof(info_value_for_key(configstring, "maxz")) as f32,
+                atof(&Info_ValueForKey(configstring, "maxx")) as f32,
+                atof(&Info_ValueForKey(configstring, "maxy")) as f32,
+                atof(&Info_ValueForKey(configstring, "maxz")) as f32,
             ],
         ];
 
@@ -496,7 +472,7 @@ impl CmLandScape {
     ///
     /// Source: `oracle/codemp/qcommon/cm_terrain.cpp:39-110`
     fn load_terrain_def(&mut self, cm: &mut CollisionWorld, host: &mut impl EngineHost, td: &str) {
-        let terrain_def = info_value_for_key(td, "terrainDef").to_owned();
+        let terrain_def = Info_ValueForKey(td, "terrainDef");
         // Com_DPrintf trace print (`:46`) is developer-only, no golden effect —
         // dropped.
 

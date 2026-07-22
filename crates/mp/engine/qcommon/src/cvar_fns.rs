@@ -16,7 +16,7 @@
 //!
 //! Source: `oracle/codemp/qcommon/cvar.cpp`
 
-use core::ffi::{c_char, c_float, c_int, c_uint, CStr};
+use core::ffi::{c_char, c_float, c_int, c_uint};
 use std::ffi::CString;
 
 use native_types::fileHandle_t;
@@ -27,8 +27,8 @@ use mp_qshared::shared::cvar::{
     CVAR_USER_CREATED, MAX_CVAR_VALUE_STRING,
 };
 use mp_qshared::shared::error_parm::errorParm_t;
-use mp_qshared::shared::limits::{BIG_INFO_STRING, MAX_INFO_STRING, MAX_STRING_TOKENS};
-use mp_qshared::shared::q_string::{Info_SetValueForKey, Info_SetValueForKey_Big};
+use mp_qshared::shared::limits::MAX_STRING_TOKENS;
+use native_string::{Info_SetValueForKey, Info_SetValueForKey_Big};
 
 use native_string::atof::atof;
 use native_string::atoi::atoi;
@@ -39,7 +39,7 @@ use crate::cmd::Cmd_AddCommand;
 use crate::cmd_common::{Cmd_Argc, Cmd_Argv};
 use crate::common::engine_host_view::EngineHostView;
 use crate::common::error::com_error;
-use crate::common::{com_printf, Common};
+use crate::common::{com_printf, info_set_report, Common};
 use crate::common_fns::Com_DPrintf;
 use crate::cvar::cvar_consts::MAX_CVARS;
 use crate::files_common::FS_Printf;
@@ -696,22 +696,19 @@ pub fn Cvar_Restart_f(view: &mut EngineHostView) {
 /// returned owned `String` (string-data migration).
 /// Source: `oracle/codemp/qcommon/cvar.cpp:811-845`
 pub fn Cvar_InfoString(common: &Common, bit: c_int) -> String {
-    let mut info = [0 as c_char; MAX_INFO_STRING];
+    let mut info = String::new();
 
     for &h in &common.cvar_vars {
         let var = common.cvar(h);
         if (var.flags & CVAR_INTERNAL) == 0 && (var.flags & bit) != 0 {
-            // Info_SetValueForKey still speaks C buffers (q_string family,
-            // P4); the owned name/string convert at this internal seam.
-            let key = CString::new(var.name.as_str()).unwrap();
-            let val = CString::new(var.string.as_str()).unwrap();
-            Info_SetValueForKey(info.as_mut_ptr(), key.as_ptr(), val.as_ptr());
+            info_set_report(
+                Info_SetValueForKey(&mut info, &var.name, &var.string),
+                "Info string length exceeded\n",
+            );
         }
     }
     // The `kungFuSafety` g_debugMelee block is commented out in the oracle.
-    unsafe { CStr::from_ptr(info.as_ptr()) }
-        .to_string_lossy()
-        .into_owned()
+    info
 }
 
 /// Raven `Cvar_InfoString_Big` — handles large info strings (`CS_SYSTEMINFO`).
@@ -720,19 +717,18 @@ pub fn Cvar_InfoString(common: &Common, bit: c_int) -> String {
 /// returned owned `String` (string-data migration).
 /// Source: `oracle/codemp/qcommon/cvar.cpp:854-869`
 pub fn Cvar_InfoString_Big(common: &Common, bit: c_int) -> String {
-    let mut info = [0 as c_char; BIG_INFO_STRING];
+    let mut info = String::new();
 
     for &h in &common.cvar_vars {
         let var = common.cvar(h);
         if (var.flags & CVAR_INTERNAL) == 0 && (var.flags & bit) != 0 {
-            let key = CString::new(var.name.as_str()).unwrap();
-            let val = CString::new(var.string.as_str()).unwrap();
-            Info_SetValueForKey_Big(info.as_mut_ptr(), key.as_ptr(), val.as_ptr());
+            info_set_report(
+                Info_SetValueForKey_Big(&mut info, &var.name, &var.string),
+                "BIG Info string length exceeded\n",
+            );
         }
     }
-    unsafe { CStr::from_ptr(info.as_ptr()) }
-        .to_string_lossy()
-        .into_owned()
+    info
 }
 
 /// Raven `Cvar_InfoStringBuffer`.

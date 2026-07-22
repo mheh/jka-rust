@@ -8,7 +8,7 @@
 
 use core::ffi::{c_char, c_int, CStr};
 
-use mp_engine_qcommon::common::common::Common;
+use mp_engine_qcommon::common::common::{info_set_report, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::cvar_fns::{Cvar_Set, Cvar_VariableValue};
 use mp_engine_qcommon::qcommon::net_limits::{MAX_DOWNLOAD_BLKSIZE, MAX_DOWNLOAD_WINDOW};
@@ -30,15 +30,17 @@ use crate::server::server_static_t::MAX_CHALLENGES;
 use crate::Server;
 
 use native_string::atoi::atoi;
-use native_string::cstr::strncpyz_string;
+use native_string::cstr::{buf_to_string, cstr, strncpyz_string};
+use native_string::{Info_SetValueForKey, Info_ValueForKey};
 use native_string::q_string::{Q_strcmpBytes, Q_stricmp};
-use native_string::q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
+use native_string::q_strncpyz::Q_strncpyz;
 
 use mp_engine_qcommon::cmd_common::Cmd_Argv;
-use mp_qshared::shared::limits::MAX_NAME_LENGTH;
+use mp_engine_qcommon::net_chan::NET_AdrToString;
+use mp_qshared::shared::limits::{MAX_INFO_STRING, MAX_NAME_LENGTH};
 use mp_qshared::shared::MAX_QPATH;
 
-use mp_qshared::shared::q_string::{Com_sprintf, Info_SetValueForKey, Info_ValueForKey};
+use mp_qshared::shared::q_string::Com_sprintf;
 
 /// Raven `SV_ResetPureClient_f`.
 ///
@@ -54,10 +56,14 @@ pub fn SV_ResetPureClient_f(cl: *mut client_t) {
 /// Source: `oracle/codemp/server/sv_client.cpp:1452-1500`
 pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
     unsafe {
-        let name = Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"name".as_ptr() as *mut c_char);
+        // Raven reads/writes `cl->userinfo` in place; the `&str`/`String` info
+        // API works a snapshot, written back after the one mutating set below.
+        let mut userinfo = buf_to_string(CStr::from_ptr((*cl).userinfo.as_ptr()).to_bytes());
+
+        let name = Info_ValueForKey(&userinfo, "name");
         // Raven `Q_strncpyz(cl->name, ..., sizeof(cl->name))` — byte-truncate the
         // extracted name to MAX_NAME_LENGTH into the String field.
-        (*cl).name = strncpyz_string(CStr::from_ptr(name).to_bytes(), MAX_NAME_LENGTH);
+        (*cl).name = strncpyz_string(name.as_bytes(), MAX_NAME_LENGTH);
 
         // if the client is on the same subnet as the server and we aren't running an
         // internet public server, assume they don't need a rate choke
@@ -67,9 +73,7 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
             // lans should not rate limit
             (*cl).rate = 99999;
         } else {
-            let val =
-                Info_ValueForKey((*cl).userinfo.as_mut_ptr(), c"rate".as_ptr() as *mut c_char);
-            let val = core::ffi::CStr::from_ptr(val).to_string_lossy();
+            let val = Info_ValueForKey(&userinfo, "rate");
             if !val.is_empty() {
                 let i = atoi(&val);
                 (*cl).rate = i;
@@ -83,28 +87,21 @@ pub fn SV_UserinfoChanged(view: &mut EngineHostView, cl: *mut client_t) {
             }
         }
 
-        let val = Info_ValueForKey(
-            (*cl).userinfo.as_mut_ptr(),
-            c"handicap".as_ptr() as *mut c_char,
-        );
-        let val = core::ffi::CStr::from_ptr(val).to_string_lossy();
+        let val = Info_ValueForKey(&userinfo, "handicap");
         if !val.is_empty() {
             let i = atoi(&val);
             if i <= 0 || i > 100 || val.len() > 4 {
-                Info_SetValueForKey(
-                    (*cl).userinfo.as_mut_ptr(),
-                    c"handicap".as_ptr() as *mut c_char,
-                    c"100".as_ptr() as *mut c_char,
+                info_set_report(
+                    Info_SetValueForKey(&mut userinfo, "handicap", "100"),
+                    "Info string length exceeded\n",
                 );
+                let ui_len = (*cl).userinfo.len();
+                Q_strncpyz(&mut (*cl).userinfo, &userinfo, ui_len);
             }
         }
 
         // snaps command
-        let val = Info_ValueForKey(
-            (*cl).userinfo.as_mut_ptr(),
-            c"snaps".as_ptr() as *mut c_char,
-        );
-        let val = core::ffi::CStr::from_ptr(val).to_string_lossy();
+        let val = Info_ValueForKey(&userinfo, "snaps");
         if !val.is_empty() {
             let mut i = atoi(&val);
             if i < 1 {
@@ -632,21 +629,11 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
     unsafe {
         mp_engine_qcommon::common::common::com_printf(view.common, "SVC_DirectConnect ()\n");
 
-        let mut userinfo = [0 as c_char; mp_qshared::shared::limits::MAX_INFO_STRING as usize];
-        let ui_len = userinfo.len();
-        Q_strncpyz(
-            &mut userinfo,
-            mp_engine_qcommon::cmd_common::Cmd_Argv(view.common, 1),
-            ui_len,
-        );
+        // Raven `Q_strncpyz(userinfo, Cmd_Argv(1), sizeof(userinfo))` — byte-
+        // truncate the argv to MAX_INFO_STRING into the owned info string.
+        let mut userinfo = strncpyz_string(Cmd_Argv(view.common, 1).as_bytes(), MAX_INFO_STRING);
 
-        let version = atoi(
-            &core::ffi::CStr::from_ptr(Info_ValueForKey(
-                userinfo.as_mut_ptr(),
-                c"protocol".as_ptr() as *mut c_char,
-            ))
-            .to_string_lossy(),
-        );
+        let version = atoi(&Info_ValueForKey(&userinfo, "protocol"));
         if version != mp_engine_qcommon::qcommon::protocol::PROTOCOL_VERSION {
             mp_engine_qcommon::net_chan::NET_OutOfBandPrint(
                 view.common,
@@ -664,20 +651,8 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             return;
         }
 
-        let challenge = atoi(
-            &core::ffi::CStr::from_ptr(Info_ValueForKey(
-                userinfo.as_mut_ptr(),
-                c"challenge".as_ptr() as *mut c_char,
-            ))
-            .to_string_lossy(),
-        );
-        let qport = atoi(
-            &core::ffi::CStr::from_ptr(Info_ValueForKey(
-                userinfo.as_mut_ptr(),
-                c"qport".as_ptr() as *mut c_char,
-            ))
-            .to_string_lossy(),
-        );
+        let challenge = atoi(&Info_ValueForKey(&userinfo, "challenge"));
+        let qport = atoi(&Info_ValueForKey(&userinfo, "qport"));
 
         let max_clients = view.common.cvar(view.common.sv_maxclients).integer;
 
@@ -746,10 +721,13 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 return;
             }
             // force the IP key/value pair so the game can filter based on ip
-            Info_SetValueForKey(
-                userinfo.as_mut_ptr(),
-                c"ip".as_ptr() as *mut c_char,
-                mp_engine_qcommon::net_chan::NET_AdrToString(view.common, from) as *mut c_char,
+            info_set_report(
+                Info_SetValueForKey(
+                    &mut userinfo,
+                    "ip",
+                    &buf_to_string(CStr::from_ptr(NET_AdrToString(view.common, from)).to_bytes()),
+                ),
+                "Info string length exceeded\n",
             );
 
             let ping = sv.svs.time - sv.svs.challenges[i].pingTime;
@@ -816,10 +794,9 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             }
         } else {
             // force the "ip" info key to "localhost"
-            Info_SetValueForKey(
-                userinfo.as_mut_ptr(),
-                c"ip".as_ptr() as *mut c_char,
-                c"localhost".as_ptr() as *mut c_char,
+            info_set_report(
+                Info_SetValueForKey(&mut userinfo, "ip", "localhost"),
+                "Info string length exceeded\n",
             );
         }
 
@@ -882,10 +859,9 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
                 // if "sv_privateClients" is set > 0, then that number
                 // of client slots will be reserved for connections that
                 // have "password" set to the value of "sv_privatePassword"
-                let password =
-                    Info_ValueForKey(userinfo.as_mut_ptr(), c"password".as_ptr() as *mut c_char);
+                let password = Info_ValueForKey(&userinfo, "password");
                 let start_index: c_int = if Q_strcmpBytes(
-                    core::ffi::CStr::from_ptr(password).to_bytes(),
+                    password.as_bytes(),
                     view.common
                         .cvar(view.common.sv_privatePassword)
                         .string
@@ -980,13 +956,9 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
             qport,
         );
 
-        // save the userinfo (C-array to C-array: the byte-exact Bytes form)
+        // save the userinfo (owned info string into the client's C array)
         let cl_ui_len = (*cl_ptr).userinfo.len();
-        Q_strncpyzBytes(
-            &mut (*cl_ptr).userinfo,
-            core::ffi::CStr::from_ptr(userinfo.as_ptr()).to_bytes(),
-            cl_ui_len,
-        );
+        Q_strncpyz(&mut (*cl_ptr).userinfo, &userinfo, cl_ui_len);
 
         // get the game a chance to reject this connection or modify the userinfo
         // Real `&mut Server` in scope — reach the game VM directly (rule 7).
@@ -1046,7 +1018,8 @@ pub fn SV_DirectConnect(view: &mut EngineHostView, sv: &mut Server, from: netadr
 
         // RECORD tap: human connect (bot connects are re-created by the module
         // in replay and are deliberately not recorded).
-        crate::sv_referee::ref_tap_direct_connect(sv, client_num, userinfo.as_ptr());
+        let userinfo_c = cstr(&userinfo);
+        crate::sv_referee::ref_tap_direct_connect(sv, client_num, userinfo_c.as_ptr());
 
         (*cl_ptr).nextSnapshotTime = sv.svs.time;
         (*cl_ptr).lastPacketTime = sv.svs.time;

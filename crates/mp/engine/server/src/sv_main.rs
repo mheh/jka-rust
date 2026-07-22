@@ -17,7 +17,7 @@ use mp_engine_ghoul2::api_collision::g2api_set_time;
 use mp_engine_ghoul2::ghoul2_system::Ghoul2System;
 use mp_engine_qcommon::cmd_common::{Cbuf_AddText, Cmd_Argc, Cmd_Argv, Cmd_TokenizeString};
 use mp_engine_qcommon::cmd_pc::Cmd_ExecuteString;
-use mp_engine_qcommon::common::common::{com_printf, Common};
+use mp_engine_qcommon::common::common::{com_printf, info_set_report, Common};
 use mp_engine_qcommon::common::engine_host_view::EngineHostView;
 use mp_engine_qcommon::common_fns::{
     Com_BeginRedirect, Com_DPrintf, Com_EndRedirect, Com_Milliseconds,
@@ -46,13 +46,12 @@ use mp_qshared::common::mp::qcommon::netadrtype_t::netadrtype_t;
 use mp_qshared::common::mp::qcommon::netsrc_t::netsrc_t;
 use mp_qshared::shared::cvar::{CVAR_SERVERINFO, CVAR_SYSTEMINFO};
 use mp_qshared::shared::limits::MAX_INFO_STRING;
-use mp_qshared::shared::q_format::FmtArg;
-use mp_qshared::shared::q_string::{
-    va, Com_sprintf, Info_SetValueForKey, Info_ValueForKey, Q_strncmp, Q_strncpyz,
-};
+use mp_qshared::shared::q_string::{Com_sprintf, Q_strncmp, Q_strncpyz};
 use mp_qshared::shared::swap::BigShort;
 use mp_qshared::shared::{qboolean, qfalse, qtrue, MAX_STRING_CHARS};
+use native_string::cstr::buf_to_string;
 use native_string::q_string::{Q_strcmp, Q_stricmp};
+use native_string::{Info_SetValueForKey, Info_ValueForKey};
 
 use crate::server::client_s::client_t;
 use crate::server::client_state_t::clientState_t;
@@ -405,42 +404,34 @@ pub fn SV_MasterShutdown(view: &mut EngineHostView, sv: &mut Server) {
 pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
     let mut player = [0 as c_char; 1024];
     let mut status = [0 as c_char; MAX_MSGLEN];
-    let mut infostring = [0 as c_char; MAX_INFO_STRING];
 
-    let serverinfo = Cvar_InfoString(view.common, CVAR_SERVERINFO);
-    let serverinfo_c = CString::new(serverinfo.as_str()).unwrap_or_default();
+    let mut infostring = Cvar_InfoString(view.common, CVAR_SERVERINFO);
     unsafe {
-        strcpy(infostring.as_mut_ptr(), serverinfo_c.as_ptr());
-
         // echo back the parameter to status, so master servers can use it as a
         // challenge to prevent timed spoofed reply packets that add ghost servers
-        // still-C infostring builder (Info_* migrates in P4): NUL-terminate
-        // the argv value for the call's duration.
-        let challenge = CString::new(Cmd_Argv(view.common, 1)).unwrap_or_default();
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"challenge".as_ptr(),
-            challenge.as_ptr(),
+        info_set_report(
+            Info_SetValueForKey(&mut infostring, "challenge", Cmd_Argv(view.common, 1)),
+            "Info string length exceeded\n",
         );
 
         // add "demo" to the sv_keywords if restricted
         if Cvar_VariableValue(view.common, "fs_restrict") != 0.0 {
             let mut keywords = [0 as c_char; MAX_INFO_STRING];
-            let existing = CStr::from_ptr(Info_ValueForKey(
-                infostring.as_ptr(),
-                c"sv_keywords".as_ptr(),
-            ))
-            .to_string_lossy()
-            .into_owned();
+            let existing = Info_ValueForKey(&infostring, "sv_keywords");
+            // Preserve Raven's `Com_sprintf` MAX_INFO_STRING truncation for the
+            // intermediate "demo <existing>" build before the set.
             Com_sprintf(
                 keywords.as_mut_ptr(),
                 keywords.len() as c_int,
                 &format!("demo {}", existing),
             );
-            Info_SetValueForKey(
-                infostring.as_mut_ptr(),
-                c"sv_keywords".as_ptr(),
-                keywords.as_ptr(),
+            info_set_report(
+                Info_SetValueForKey(
+                    &mut infostring,
+                    "sv_keywords",
+                    &buf_to_string(CStr::from_ptr(keywords.as_ptr()).to_bytes()),
+                ),
+                "Info string length exceeded\n",
             );
         }
 
@@ -476,7 +467,7 @@ pub fn SVC_Status(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
             from,
             format!(
                 "statusResponse\n{}\n{}",
-                CStr::from_ptr(infostring.as_ptr()).to_string_lossy(),
+                infostring,
                 CStr::from_ptr(status.as_ptr()).to_string_lossy()
             ),
         );
@@ -492,168 +483,143 @@ pub fn SVC_Info(view: &mut EngineHostView, sv: &mut Server, from: netadr_t) {
         return;
     }
 
-    let mut infostring = [0 as c_char; MAX_INFO_STRING];
+    let mut infostring = String::new();
 
-    let sv_hostname_c =
-        CString::new(view.common.cvar(view.common.sv_hostname).string.as_str()).unwrap_or_default();
-    let sv_mapname_c =
-        CString::new(view.common.cvar(view.common.sv_mapname).string.as_str()).unwrap_or_default();
     let gamedir = Cvar_VariableString(view.common, "fs_game").to_string();
-    let gamedir_c = CString::new(gamedir.as_str()).unwrap_or_default();
 
-    unsafe {
-        // don't count privateclients
-        let mut count = 0;
-        for i in view.common.cvar(view.common.sv_privateClients).integer
-            ..view.common.cvar(view.common.sv_maxclients).integer
-        {
-            if sv.svs.clients[i as usize].state as c_int >= clientState_t::CS_CONNECTED as c_int {
-                count += 1;
-            }
+    // don't count privateclients
+    let mut count = 0;
+    for i in view.common.cvar(view.common.sv_privateClients).integer
+        ..view.common.cvar(view.common.sv_maxclients).integer
+    {
+        if sv.svs.clients[i as usize].state as c_int >= clientState_t::CS_CONNECTED as c_int {
+            count += 1;
         }
+    }
 
-        infostring[0] = 0;
+    // echo back the parameter to status, so servers can use it as a
+    // challenge to prevent timed spoofed reply packets that add ghost servers
+    info_set_report(
+        Info_SetValueForKey(&mut infostring, "challenge", Cmd_Argv(view.common, 1)),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(&mut infostring, "protocol", &format!("{PROTOCOL_VERSION}")),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "hostname",
+            &view.common.cvar(view.common.sv_hostname).string,
+        ),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "mapname",
+            &view.common.cvar(view.common.sv_mapname).string,
+        ),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(&mut infostring, "clients", &format!("{count}")),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "sv_maxclients",
+            &format!(
+                "{}",
+                view.common.cvar(view.common.sv_maxclients).integer
+                    - view.common.cvar(view.common.sv_privateClients).integer
+            ),
+        ),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "gametype",
+            &format!("{}", view.common.cvar(view.common.sv_gametype).integer),
+        ),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "needpass",
+            &format!("{}", view.common.cvar(view.common.sv_needpass).integer),
+        ),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "truejedi",
+            &format!("{}", Cvar_VariableIntegerValue(view.common, "g_jediVmerc")),
+        ),
+        "Info string length exceeded\n",
+    );
+    let w_disable = if view.common.cvar(view.common.sv_gametype).integer == GT_DUEL
+        || view.common.cvar(view.common.sv_gametype).integer == GT_POWERDUEL
+    {
+        Cvar_VariableIntegerValue(view.common, "g_duelWeaponDisable")
+    } else {
+        Cvar_VariableIntegerValue(view.common, "g_weaponDisable")
+    };
+    info_set_report(
+        Info_SetValueForKey(&mut infostring, "wdisable", &format!("{w_disable}")),
+        "Info string length exceeded\n",
+    );
+    info_set_report(
+        Info_SetValueForKey(
+            &mut infostring,
+            "fdisable",
+            &format!(
+                "{}",
+                Cvar_VariableIntegerValue(view.common, "g_forcePowerDisable")
+            ),
+        ),
+        "Info string length exceeded\n",
+    );
+    //Info_SetValueForKey( infostring, "pure", va("%i", sv_pure->integer) );
 
-        // echo back the parameter to status, so servers can use it as a
-        // challenge to prevent timed spoofed reply packets that add ghost servers
-        // still-C infostring builder (Info_* migrates in P4): NUL-terminate
-        // the argv value for the call's duration.
-        let challenge = CString::new(Cmd_Argv(view.common, 1)).unwrap_or_default();
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"challenge".as_ptr(),
-            challenge.as_ptr(),
-        );
-
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"protocol".as_ptr(),
-            va(c"%i".as_ptr(), &[FmtArg::Int(PROTOCOL_VERSION)]),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"hostname".as_ptr(),
-            sv_hostname_c.as_ptr(),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"mapname".as_ptr(),
-            sv_mapname_c.as_ptr(),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"clients".as_ptr(),
-            va(c"%i".as_ptr(), &[FmtArg::Int(count)]),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"sv_maxclients".as_ptr(),
-            va(
-                c"%i".as_ptr(),
-                &[FmtArg::Int(
-                    view.common.cvar(view.common.sv_maxclients).integer
-                        - view.common.cvar(view.common.sv_privateClients).integer,
-                )],
-            ),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"gametype".as_ptr(),
-            va(
-                c"%i".as_ptr(),
-                &[FmtArg::Int(
-                    view.common.cvar(view.common.sv_gametype).integer,
-                )],
-            ),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"needpass".as_ptr(),
-            va(
-                c"%i".as_ptr(),
-                &[FmtArg::Int(
-                    view.common.cvar(view.common.sv_needpass).integer,
-                )],
-            ),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"truejedi".as_ptr(),
-            va(
-                c"%i".as_ptr(),
-                &[FmtArg::Int(Cvar_VariableIntegerValue(
-                    view.common,
-                    "g_jediVmerc",
-                ))],
-            ),
-        );
-        let w_disable = if view.common.cvar(view.common.sv_gametype).integer == GT_DUEL
-            || view.common.cvar(view.common.sv_gametype).integer == GT_POWERDUEL
-        {
-            Cvar_VariableIntegerValue(view.common, "g_duelWeaponDisable")
-        } else {
-            Cvar_VariableIntegerValue(view.common, "g_weaponDisable")
-        };
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"wdisable".as_ptr(),
-            va(c"%i".as_ptr(), &[FmtArg::Int(w_disable)]),
-        );
-        Info_SetValueForKey(
-            infostring.as_mut_ptr(),
-            c"fdisable".as_ptr(),
-            va(
-                c"%i".as_ptr(),
-                &[FmtArg::Int(Cvar_VariableIntegerValue(
-                    view.common,
-                    "g_forcePowerDisable",
-                ))],
-            ),
-        );
-        //Info_SetValueForKey( infostring, "pure", va("%i", sv_pure->integer) );
-
-        if view.common.cvar(view.common.sv_minPing).integer != 0 {
+    if view.common.cvar(view.common.sv_minPing).integer != 0 {
+        info_set_report(
             Info_SetValueForKey(
-                infostring.as_mut_ptr(),
-                c"minPing".as_ptr(),
-                va(
-                    c"%i".as_ptr(),
-                    &[FmtArg::Int(
-                        view.common.cvar(view.common.sv_minPing).integer,
-                    )],
-                ),
-            );
-        }
-        if view.common.cvar(view.common.sv_maxPing).integer != 0 {
-            Info_SetValueForKey(
-                infostring.as_mut_ptr(),
-                c"maxPing".as_ptr(),
-                va(
-                    c"%i".as_ptr(),
-                    &[FmtArg::Int(
-                        view.common.cvar(view.common.sv_maxPing).integer,
-                    )],
-                ),
-            );
-        }
-        if !gamedir.is_empty() {
-            Info_SetValueForKey(
-                infostring.as_mut_ptr(),
-                c"game".as_ptr(),
-                gamedir_c.as_ptr(),
-            );
-        }
-
-        NET_OutOfBandPrint(
-            view.common,
-            netsrc_t::NS_SERVER,
-            from,
-            format!(
-                "infoResponse\n{}",
-                CStr::from_ptr(infostring.as_ptr()).to_string_lossy()
+                &mut infostring,
+                "minPing",
+                &format!("{}", view.common.cvar(view.common.sv_minPing).integer),
             ),
+            "Info string length exceeded\n",
         );
     }
+    if view.common.cvar(view.common.sv_maxPing).integer != 0 {
+        info_set_report(
+            Info_SetValueForKey(
+                &mut infostring,
+                "maxPing",
+                &format!("{}", view.common.cvar(view.common.sv_maxPing).integer),
+            ),
+            "Info string length exceeded\n",
+        );
+    }
+    if !gamedir.is_empty() {
+        info_set_report(
+            Info_SetValueForKey(&mut infostring, "game", &gamedir),
+            "Info string length exceeded\n",
+        );
+    }
+
+    NET_OutOfBandPrint(
+        view.common,
+        netsrc_t::NS_SERVER,
+        from,
+        format!("infoResponse\n{infostring}"),
+    );
 }
 
 /// No-op redirect flush. Raven installs `SV_FlushRedirect` as the

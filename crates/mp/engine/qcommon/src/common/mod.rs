@@ -14,7 +14,7 @@ pub mod opaque_slots;
 pub mod qrand;
 pub mod sys_event_queue;
 
-pub use common::{com_printf, Common};
+pub use common::{com_printf, info_set_report, Common};
 pub use engine_hooks::EngineHooks;
 pub use engine_host_view::EngineHostView;
 pub use error::{com_error, ComError, ErrorLevel, ErrorState};
