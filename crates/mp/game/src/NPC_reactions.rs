@@ -655,10 +655,9 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
     }
 
     // Attempt to fire any paintargets we might have
-    let paintarget = ctx.world.entity(self_).paintarget;
-    if !paintarget.is_null() && unsafe { *paintarget } != 0 {
-        let paintarget = unsafe { cstr_to_str(paintarget) };
-        G_UseTargets2(ctx, Some(self_), Some(other_id), Some(&paintarget));
+    let paintarget = ctx.world.entity(self_).paintarget.clone();
+    if let Some(paintarget) = paintarget.as_deref().filter(|s| !s.is_empty()) {
+        G_UseTargets2(ctx, Some(self_), Some(other_id), Some(paintarget));
     }
 
     RestoreNPCGlobals(ctx);

@@ -42,7 +42,6 @@ use crate::NPC_goal::G_BoundsOverlap;
 use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
 use native_string::Q_stricmp;
 use native_string::strncpyz_string;
-use std::ffi::CStr;
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
@@ -2220,15 +2219,15 @@ pub fn NAV_StoreWaypoint(ctx: &mut GameContext, ent: EntityId) {
     let targetname = ctx.entity(ent).targetname_str();
     let target = ctx.entity(ent).target.clone();
     let target2 = ctx.entity(ent).target2.clone();
-    let target3 = ctx.entity(ent).target3;
-    let target4 = ctx.entity(ent).target4;
+    let target3 = ctx.entity(ent).target3.clone();
+    let target4 = ctx.entity(ent).target4.clone();
     let health = ctx.entity(ent).health;
 
     // `targetname`/`target`/`target2` decode through the accessors (`None` ≡
-    // Raven NULL); `target3`/`target4` stay `*mut c_char` into the entity arena.
-    // Each is `Q_strncpyz`-bound (`MAX_QPATH-1` bytes) into the now-`String`
-    // waypoint field; an absent source leaves the field at its cleared (empty)
-    // value, matching Raven's skipped copy over zeroed storage.
+    // Raven NULL); `target3`/`target4` are owned `String`s (`""` ≡ absent).
+    // Each is `Q_strncpyz`-bound (`MAX_QPATH-1` bytes) into the `String` waypoint
+    // field; an absent source leaves the field at its cleared (empty) value,
+    // matching Raven's skipped copy over zeroed storage.
     if let Some(targetname) = targetname {
         ctx.world.globals.tempWaypointList[i].targetname =
             strncpyz_string(targetname.as_bytes(), MAX_QPATH as usize);
@@ -2241,13 +2240,13 @@ pub fn NAV_StoreWaypoint(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.globals.tempWaypointList[i].target2 =
             strncpyz_string(target2.as_bytes(), MAX_QPATH as usize);
     }
-    if !target3.is_null() {
+    if !target3.is_empty() {
         ctx.world.globals.tempWaypointList[i].target3 =
-            strncpyz_string(unsafe { CStr::from_ptr(target3) }.to_bytes(), MAX_QPATH as usize);
+            strncpyz_string(target3.as_bytes(), MAX_QPATH as usize);
     }
-    if !target4.is_null() {
+    if !target4.is_empty() {
         ctx.world.globals.tempWaypointList[i].target4 =
-            strncpyz_string(unsafe { CStr::from_ptr(target4) }.to_bytes(), MAX_QPATH as usize);
+            strncpyz_string(target4.as_bytes(), MAX_QPATH as usize);
     }
     ctx.world.globals.tempWaypointList[i].nodeID = health;
 

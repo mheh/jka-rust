@@ -4,7 +4,6 @@
 //! Filled by the jampgame mega-pass.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use core::ffi::CStr;
 
 use crate::prelude::*;
 use crate::g_utils::G_BSPIndex;
@@ -537,9 +536,9 @@ pub fn SP_terrain(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.cvars.g_RMG.integer = 1;
 
         ctx.world.entity_mut(ent).s.angles = [0.0, 0.0, 0.0];
-        let model = ctx.world.entity(ent).model;
+        let model = ctx.world.entity(ent).model.clone();
         let ep: *mut gentity_t = ctx.world.entity_mut(ent);
-        trap::SetBrushModel(ctx.engine, ep.cast(), &cstr_to_str(model));
+        trap::SetBrushModel(ctx.engine, ep.cast(), model.as_deref().unwrap_or(""));
 
         // Get the shader from the top of the brush
         let shader_num: c_int = 0;
@@ -1686,14 +1685,13 @@ pub fn SP_misc_ammo_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.entity_mut(ent).health = 60;
         }
 
-        let model = ctx.world.entity(ent).model;
-        if model.is_null() || *model == 0 {
-            ctx.world.entity_mut(ent).model =
-                c"/models/items/a_pwr_converter.md3".as_ptr() as *mut c_char;
+        // `None`/`""` ≡ Raven's `!ent->model || !ent->model[0]` guard.
+        if ctx.world.entity(ent).model.as_deref().unwrap_or("").is_empty() {
+            ctx.world.entity_mut(ent).model = Some("/models/items/a_pwr_converter.md3".to_owned());
         }
 
-        let model = ctx.world.entity(ent).model;
-        let mi = G_ModelIndex(&cstr_to_str(model));
+        let model = ctx.world.entity(ent).model.clone();
+        let mi = G_ModelIndex(model.as_deref().unwrap_or(""));
         {
             let e = ctx.world.entity_mut(ent);
             e.s.modelindex = mi;
@@ -1825,14 +1823,14 @@ pub fn SP_misc_shield_floor_unit(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.entity_mut(ent).health = 60;
         }
 
-        let model = ctx.world.entity(ent).model;
-        if model.is_null() || *model == 0 {
+        // `None`/`""` ≡ Raven's `!ent->model || !ent->model[0]` guard.
+        if ctx.world.entity(ent).model.as_deref().unwrap_or("").is_empty() {
             ctx.world.entity_mut(ent).model =
-                c"/models/items/a_shield_converter.md3".as_ptr() as *mut c_char;
+                Some("/models/items/a_shield_converter.md3".to_owned());
         }
 
-        let model = ctx.world.entity(ent).model;
-        let mi = G_ModelIndex(&cstr_to_str(model));
+        let model = ctx.world.entity(ent).model.clone();
+        let mi = G_ModelIndex(model.as_deref().unwrap_or(""));
         {
             let e = ctx.world.entity_mut(ent);
             e.s.modelindex = mi;
@@ -1911,8 +1909,8 @@ pub fn SP_misc_model_shield_power_converter(ctx: &mut GameContext, ent: EntityId
         e.r.maxs = [16.0, 16.0, 16.0];
     }
 
-    let model = ctx.world.entity(ent).model;
-    let mi = G_ModelIndex(&(unsafe { cstr_to_str(model) }));
+    let model = ctx.world.entity(ent).model.clone();
+    let mi = G_ModelIndex(model.as_deref().unwrap_or(""));
     {
         let e = ctx.world.entity_mut(ent);
         e.s.modelindex = mi;
@@ -2056,8 +2054,8 @@ pub fn SP_misc_model_ammo_power_converter(ctx: &mut GameContext, ent: EntityId) 
         e.r.maxs = [16.0, 16.0, 16.0];
     }
 
-    let model = ctx.world.entity(ent).model;
-    let mi = G_ModelIndex(&(unsafe { cstr_to_str(model) }));
+    let model = ctx.world.entity(ent).model.clone();
+    let mi = G_ModelIndex(model.as_deref().unwrap_or(""));
     {
         let e = ctx.world.entity_mut(ent);
         e.s.modelindex = mi;
@@ -2196,8 +2194,8 @@ pub fn SP_misc_model_health_power_converter(ctx: &mut GameContext, ent: EntityId
         e.r.maxs = [16.0, 16.0, 16.0];
     }
 
-    let model = ctx.world.entity(ent).model;
-    let mi = G_ModelIndex(&(unsafe { cstr_to_str(model) }));
+    let model = ctx.world.entity(ent).model.clone();
+    let mi = G_ModelIndex(model.as_deref().unwrap_or(""));
     {
         let e = ctx.world.entity_mut(ent);
         e.s.modelindex = mi;
@@ -2315,9 +2313,9 @@ pub fn fx_runner_think(ctx: &mut GameContext, ent: EntityId) {
 
     if ctx.world.entity(ent).spawnflags & 2 == 0 && ctx.world.entity(ent).s.loopSound == 0 {
         // NOT ONESHOT...this is an assy thing to do
-        let sound_set = ctx.world.entity(ent).soundSet;
-        if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-            let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
+        let sound_set = ctx.world.entity(ent).soundSet.clone();
+        if !sound_set.is_empty() {
+            let ssi = G_SoundSetIndex(ctx, &sound_set);
             let e = ctx.world.entity_mut(ent);
             e.s.soundSetIndex = ssi;
             e.s.loopIsSoundset = qtrue;
@@ -2360,9 +2358,9 @@ pub fn fx_runner_use(
             G_UseTargets2(ctx, Some(self_), Some(self_), target2.as_deref());
         }
 
-        let sound_set = ctx.world.entity(self_).soundSet;
-        if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-            let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
+        let sound_set = ctx.world.entity(self_).soundSet.clone();
+        if !sound_set.is_empty() {
+            let ssi = G_SoundSetIndex(ctx, &sound_set);
             ctx.world.entity_mut(self_).s.soundSetIndex = ssi;
             G_AddEvent(
                 ctx.world.entity_mut(self_),
@@ -2380,9 +2378,9 @@ pub fn fx_runner_use(
             //	up the nextthink time.
             fx_runner_think(ctx, self_);
 
-            let sound_set = ctx.world.entity(self_).soundSet;
-            if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-                let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
+            let sound_set = ctx.world.entity(self_).soundSet.clone();
+            if !sound_set.is_empty() {
+                let ssi = G_SoundSetIndex(ctx, &sound_set);
                 ctx.world.entity_mut(self_).s.soundSetIndex = ssi;
                 G_AddEvent(
                     ctx.world.entity_mut(self_),
@@ -2400,9 +2398,9 @@ pub fn fx_runner_use(
             // turn off fx on client
             ctx.world.entity_mut(self_).s.modelindex2 = FX_STATE_OFF;
 
-            let sound_set = ctx.world.entity(self_).soundSet;
-            if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-                let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
+            let sound_set = ctx.world.entity(self_).soundSet.clone();
+            if !sound_set.is_empty() {
+                let ssi = G_SoundSetIndex(ctx, &sound_set);
                 ctx.world.entity_mut(self_).s.soundSetIndex = ssi;
                 G_AddEvent(
                     ctx.world.entity_mut(self_),
@@ -2470,9 +2468,9 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
         // We won't even consider thinking until we are used
         ctx.world.entity_mut(ent).nextthink = -1;
     } else {
-        let sound_set = ctx.world.entity(ent).soundSet;
-        if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-            let ssi = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(sound_set as *const c_char) }));
+        let sound_set = ctx.world.entity(ent).soundSet.clone();
+        if !sound_set.is_empty() {
+            let ssi = G_SoundSetIndex(ctx, &sound_set);
             let e = ctx.world.entity_mut(ent);
             e.s.soundSetIndex = ssi;
             e.s.loopSound = BMS_MID;

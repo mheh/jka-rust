@@ -597,12 +597,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         if ctx.world.entity(ent).spawnflags & SFB_NOTSOLID == 0 {
             if NPC_SpotWouldTelefrag(ctx, ent) != 0 {
                 if ctx.world.entity(ent).wait < (0) as f32 {
-                    let target3 = ctx.world.entity(ent).target3;
-                    let t3 = if target3.is_null() {
-                        String::new()
-                    } else {
-                        cstr_to_str(target3 as *const c_char)
-                    };
+                    let t3 = ctx.world.entity(ent).target3.clone();
                     let tn = ctx.world.entity(ent).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
@@ -612,12 +607,9 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                             tn, t3
                         ),
                     );
-                    let t3ptr = ctx.world.entity(ent).target3;
-                    let t3s = if t3ptr.is_null() {
-                        None
-                    } else {
-                        Some(unsafe { cstr_to_str(t3ptr) })
-                    };
+                    // `target3` is an owned `String` (`""` ≡ absent), so an empty
+                    // value fires nothing — matching Raven's NULL-pointer skip.
+                    let t3s = (!t3.is_empty()).then_some(t3);
                     G_UseTargets2(ctx, Some(ent), Some(ent), t3s.as_deref());
                     ctx.world.entity_mut(ent).think = Some(EntThink::G_FreeEntity).into();
                     let nt = ctx.world.level.time + 100;
@@ -911,16 +903,20 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         let veh = ctx.world.entity(ent).m_pVehicle;
         if !veh.is_null() {
             if (*veh).m_iDroidUnitTag != -1 {
-                let mut droid_npc_type: *mut c_char = core::ptr::null_mut();
-                let model2 = ctx.world.entity(ent).model2;
-                if !model2.is_null() && *model2.as_ref().unwrap_or(&0) != 0 {
-                    droid_npc_type = model2;
+                let model2 = ctx.world.entity(ent).model2.clone();
+                // Raven prefers `ent->model2`, else the vehicle's `droidNPC`;
+                // `None` ≡ the C null pointer that skips the spawn (empty
+                // `model2` is absent, but a non-null empty `droidNPC` still
+                // enters the block, exactly as Raven).
+                let droid_npc_type = if !model2.is_empty() {
+                    Some(model2)
                 } else if !(*(*veh).m_pVehicleInfo).droidNPC.is_null() {
-                    droid_npc_type = (*(*veh).m_pVehicleInfo).droidNPC;
-                }
+                    Some(cstr_to_str((*(*veh).m_pVehicleInfo).droidNPC as *const c_char))
+                } else {
+                    None
+                };
 
-                if !droid_npc_type.is_null() {
-                    let mut droid_npc_type_s = cstr_to_str(droid_npc_type as *const c_char);
+                if let Some(mut droid_npc_type_s) = droid_npc_type {
                     if Q_stricmp("random", &droid_npc_type_s) == 0
                         || Q_stricmp("default", &droid_npc_type_s) == 0
                     {
@@ -1279,7 +1275,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             (*newent).healingclass = (*ent).healingclass.clone();
             (*newent).healingsound = (*ent).healingsound.clone();
             (*newent).healingrate = (*ent).healingrate;
-            (*newent).model2 = (*ent).model2;
+            (*newent).model2 = (*ent).model2.clone();
         } else {
             (*((*newent).client)).ps.weapon = WP_NONE;
         }
@@ -1357,8 +1353,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             }
         };
         (*newent).target2 = (*ent).target2.clone();
-        (*newent).target3 = (*ent).target3;
-        (*newent).target4 = (*ent).target4;
+        (*newent).target3 = (*ent).target3.clone();
+        (*newent).target4 = (*ent).target4.clone();
         (*newent).wait = (*ent).wait;
 
         let mut index = BSET_FIRST;
@@ -1387,11 +1383,11 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         );
         (*newent).spawnflags = (*ent).spawnflags;
 
-        if !(*ent).paintarget.is_null() {
-            (*newent).paintarget = (*ent).paintarget;
+        if (*ent).paintarget.is_some() {
+            (*newent).paintarget = (*ent).paintarget.clone();
         }
-        if !(*ent).opentarget.is_null() {
-            (*newent).opentarget = (*ent).opentarget;
+        if (*ent).opentarget.is_some() {
+            (*newent).opentarget = (*ent).opentarget.clone();
         }
 
         (*newent).s.eType = ET_NPC as c_int;
@@ -1459,10 +1455,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             if (*ent).target.is_some() {
                 crate::g_utils::G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(ent));
             }
-            if !(*ent).closetarget.is_null() {
-                // `closetarget` stays a `*mut c_char` (G4); decode into the owned
-                // `target` (its spawn value was already `\n`-translated).
-                (*newent).target = Some(cstr_to_str((*ent).closetarget));
+            if let Some(ct) = (*ent).closetarget.clone() {
+                // `closetarget` is an owned `Option<String>` (G4); when set, it
+                // bridges into the owned `target` (both `\n`-translated at spawn).
+                (*newent).target = Some(ct);
             }
             ctx.ent_set(ctx.entity_id_of(ent).unwrap(), PrefixSet::Targetname(None));
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
@@ -1628,7 +1624,6 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2103-2173`
 pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean {
     unsafe {
-        let mut droid_npc_type: *const c_char = core::ptr::null();
         // `NPC_type` is `Option<String>` (`None` ≡ Raven NULL); pass a NULL
         // pointer through to the bg-tier loader when unset, else a `CString`.
         let sp_npc_type = ctx.world.entity(spawner).NPC_type.clone();
@@ -1713,26 +1708,32 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             }
         }
 
-        let sp_model2 = ctx.world.entity(spawner).model2;
-        if !sp_model2.is_null() && *sp_model2 != 0 {
-            droid_npc_type = sp_model2 as *const c_char;
+        // Raven prefers the spawner's `model2`, else the vehicle's `droidNPC`;
+        // `""` ≡ absent for both (`model2` owned, `droidNPC` non-null-and-non-
+        // empty per Raven's explicit guard).
+        let sp_model2 = ctx.world.entity(spawner).model2.clone();
+        let droid_npc_type = if !sp_model2.is_empty() {
+            sp_model2
         } else if !(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize]
             .droidNPC
             .is_null()
             && *(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC != 0
         {
-            droid_npc_type =
-                (&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC as *const c_char;
-        }
+            cstr_to_str(
+                (&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize].droidNPC as *const c_char,
+            )
+        } else {
+            String::new()
+        };
 
-        if !droid_npc_type.is_null() {
-            if Q_stricmp("random", &cstr_to_str(droid_npc_type)) == 0
-                || Q_stricmp("default", &cstr_to_str(droid_npc_type)) == 0
+        if !droid_npc_type.is_empty() {
+            if Q_stricmp("random", &droid_npc_type) == 0
+                || Q_stricmp("default", &droid_npc_type) == 0
             {
                 NPC_PrecacheType(ctx, "r2d2");
                 NPC_PrecacheType(ctx, "r5d2");
             } else {
-                NPC_PrecacheType(ctx, &cstr_to_str(droid_npc_type));
+                NPC_PrecacheType(ctx, &droid_npc_type);
             }
         }
         qtrue

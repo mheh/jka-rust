@@ -28,7 +28,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::q_shared::Q_strlen as strlen;
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 
 use crate::prelude::*;
 use crate::ent_fn_enums::{dispatch_spawn, spawn_for_classname};
@@ -383,16 +383,8 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, s) + core::mem::offset_of!(entityState_t, origin),
         fieldtype_t::F_VECTOR,
     ),
-    field(
-        c"model",
-        core::mem::offset_of!(gentity_t, model),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"model2",
-        core::mem::offset_of!(gentity_t, model2),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"model", set_model),
+    field_owned(c"model2", set_model2),
     field(
         c"spawnflags",
         core::mem::offset_of!(gentity_t, spawnflags),
@@ -405,26 +397,14 @@ pub static FIELDS: &[BG_field_t] = &[
     ),
     field_owned(c"target", set_target),
     field_owned(c"target2", set_target2),
-    field(
-        c"target3",
-        core::mem::offset_of!(gentity_t, target3),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"target4",
-        core::mem::offset_of!(gentity_t, target4),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"target3", set_target3),
+    field_owned(c"target4", set_target4),
     field_owned(c"target5", set_target5),
     field_owned(c"target6", set_target6),
     field_owned(c"NPC_targetname", set_NPC_targetname),
     field_owned(c"NPC_target", set_NPC_target),
     field_owned(c"NPC_target2", set_target2), // NPC_spawner only
-    field(
-        c"NPC_target4",
-        core::mem::offset_of!(gentity_t, target4),
-        fieldtype_t::F_LSTRING,
-    ), // NPC_spawner only
+    field_owned(c"NPC_target4", set_target4), // NPC_spawner only
     field_owned(c"NPC_type", set_NPC_type),
     field(
         c"targetname",
@@ -481,21 +461,9 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, alt_fire),
         fieldtype_t::F_INT,
     ), // for movers to use linear movement
-    field(
-        c"closetarget",
-        core::mem::offset_of!(gentity_t, closetarget),
-        fieldtype_t::F_LSTRING,
-    ), // for doors
-    field(
-        c"opentarget",
-        core::mem::offset_of!(gentity_t, opentarget),
-        fieldtype_t::F_LSTRING,
-    ), // for doors
-    field(
-        c"paintarget",
-        core::mem::offset_of!(gentity_t, paintarget),
-        fieldtype_t::F_LSTRING,
-    ), // for doors
+    field_owned(c"closetarget", set_closetarget), // for doors
+    field_owned(c"opentarget", set_opentarget),   // for doors
+    field_owned(c"paintarget", set_paintarget),   // for doors
     field_owned(c"goaltarget", set_goaltarget), // for siege
     field_owned(c"idealclass", set_idealclass), // for siege spawnpoints
     // rww - icarus stuff:
@@ -590,11 +558,7 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, fullName),
         fieldtype_t::F_LSTRING,
     ),
-    field(
-        c"soundSet",
-        core::mem::offset_of!(gentity_t, soundSet),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"soundSet", set_soundSet),
     field(
         c"radius",
         core::mem::offset_of!(gentity_t, radius),
@@ -695,11 +659,23 @@ fn set_NPC_type(ent: *mut byte, val: &str) {
 fn set_NPC_targetname(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).NPC_targetname = val.to_owned() };
 }
+fn set_target3(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).target3 = val.to_owned() };
+}
+fn set_target4(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).target4 = val.to_owned() };
+}
 fn set_target5(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).target5 = val.to_owned() };
 }
 fn set_target6(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).target6 = val.to_owned() };
+}
+fn set_model2(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).model2 = val.to_owned() };
+}
+fn set_soundSet(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).soundSet = val.to_owned() };
 }
 fn set_targetShaderName(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).targetShaderName = val.to_owned() };
@@ -724,6 +700,22 @@ fn set_target2(ent: *mut byte, val: &str) {
 }
 fn set_team(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).team = Some(val.to_owned()) };
+}
+
+// `model`/`closetarget`/`opentarget`/`paintarget` are `Option<String>` (`None` ≡
+// Raven NULL); a present spawn key — even `""` — is `Some(..)`, matching Raven's
+// non-NULL pool pointer.
+fn set_model(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).model = Some(val.to_owned()) };
+}
+fn set_closetarget(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).closetarget = Some(val.to_owned()) };
+}
+fn set_opentarget(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).opentarget = Some(val.to_owned()) };
+}
+fn set_paintarget(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).paintarget = Some(val.to_owned()) };
 }
 
 // `message` is `Option<String>` too, but its old `F_LSTRING` write ran through
@@ -1291,22 +1283,21 @@ pub fn SP_bsp_worldspawn() -> qboolean {
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:1394-1415`
 pub fn G_PrecacheSoundsets(ctx: &mut GameContext) {
-    unsafe {
-        let mut counted_sets: c_int = 0;
+    let mut counted_sets: c_int = 0;
 
-        for i in 0..(mp_qshared::shared::MAX_GENTITIES as usize) {
-            let soundSet = ctx.world.g_entities[i].soundSet;
-
-            if ctx.world.g_entities[i].inuse != qfalse && !soundSet.is_null() && *soundSet != 0 {
-                if counted_sets >= MAX_AMBIENT_SETS {
-                    panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n");
-                    // Com_Error(ERR_DROP, ...) -> panic
-                }
-
-                let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
-                ctx.world.g_entities[i].s.soundSetIndex = idx;
-                counted_sets += 1;
+    for i in 0..MAX_GENTITIES {
+        // `soundSet` is now an owned `String` (`""` ≡ Raven's NULL-or-empty
+        // guard `!soundSet || !soundSet[0]`).
+        if ctx.world.g_entities[i].inuse != qfalse && !ctx.world.g_entities[i].soundSet.is_empty() {
+            if counted_sets >= MAX_AMBIENT_SETS {
+                panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n");
+                // Com_Error(ERR_DROP, ...) -> panic
             }
+
+            let soundSet = ctx.world.g_entities[i].soundSet.clone();
+            let idx = G_SoundSetIndex(ctx, &soundSet);
+            ctx.world.g_entities[i].s.soundSetIndex = idx;
+            counted_sets += 1;
         }
     }
 }

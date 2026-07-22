@@ -36,7 +36,6 @@ use crate::q_math::{
 use native_string::atoi_bytes;
 use native_string::Q_stricmp;
 use crate::NPC_combat::G_SetEnemy;
-use crate::NPC_utils::VALIDSTRING;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::bg_misc::snap_vector;
@@ -274,13 +273,10 @@ pub fn TurretG2Pain(
     attacker: Option<EntityId>,
     damage: c_int,
 ) {
-    let paintarget = ctx.world.entity(self_).paintarget;
-    if !paintarget.is_null() && unsafe { VALIDSTRING(paintarget as *const c_char) } {
+    let paintarget = ctx.world.entity(self_).paintarget.clone();
+    if let Some(paintarget) = paintarget.as_deref().filter(|s| !s.is_empty()) {
         if ctx.world.entity(self_).genericValue8 < ctx.world.level.time {
-            // `paintarget` stays a `*mut c_char` slot; decode it for the
-            // `Option<&str>` seam (known non-null here from the guard above).
-            let paintarget_s = unsafe { cstr_to_str(paintarget) };
-            G_UseTargets2(ctx, Some(self_), Some(self_), Some(&paintarget_s));
+            G_UseTargets2(ctx, Some(self_), Some(self_), Some(paintarget));
             let gv4 = ctx.world.entity(self_).genericValue4;
             let t = ctx.world.level.time;
             ctx.world.entity_mut(self_).genericValue8 = t + gv4;

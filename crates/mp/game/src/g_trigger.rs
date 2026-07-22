@@ -96,8 +96,8 @@ pub fn InitTrigger(ctx: &mut GameContext, self_id: EntityId) {
     }
 
     let self_ptr = ctx.world.entity_mut(self_id) as *mut gentity_t;
-    let model = ctx.world.entity(self_id).model;
-    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
+    let model = ctx.world.entity(self_id).model.clone();
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), model.as_deref().unwrap_or(""));
     ctx.world.entity_mut(self_id).r.contents = CONTENTS_TRIGGER; // replaces the -1 from trap_SetBrushModel
     ctx.world.entity_mut(self_id).r.svFlags = SVF_NOCLIENT;
 
@@ -125,13 +125,9 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
 
     G_ActivateBehavior(ctx, Some(ent), bSet_t::BSET_USE as c_int);
 
-    let sound_set = ctx.world.entity(ent).soundSet;
-    if !sound_set.is_null() && unsafe { *sound_set } != 0 {
-        trap::SetConfigstring(
-            ctx.engine,
-            CS_GLOBAL_AMBIENT_SET,
-            &unsafe { cstr_to_str(sound_set) },
-        );
+    let sound_set = ctx.world.entity(ent).soundSet.clone();
+    if !sound_set.is_empty() {
+        trap::SetConfigstring(ctx.engine, CS_GLOBAL_AMBIENT_SET, &sound_set);
     }
 
     let activator = ctx.world.entity(ent).activator;
@@ -139,13 +135,11 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
     if ctx.world.entity(ent).genericValue4 != 0 {
         // we want to activate target3 for team1 or target4 for team2
         let gv4 = ctx.world.entity(ent).genericValue4;
-        let target3 = ctx.world.entity(ent).target3;
-        let target4 = ctx.world.entity(ent).target4;
-        if gv4 == SIEGETEAM_TEAM1 && !target3.is_null() && unsafe { *target3 } != 0 {
-            let target3 = unsafe { cstr_to_str(target3) };
+        let target3 = ctx.world.entity(ent).target3.clone();
+        let target4 = ctx.world.entity(ent).target4.clone();
+        if gv4 == SIEGETEAM_TEAM1 && !target3.is_empty() {
             G_UseTargets2(ctx, Some(ent), activator, Some(&target3));
-        } else if gv4 == SIEGETEAM_TEAM2 && !target4.is_null() && unsafe { *target4 } != 0 {
-            let target4 = unsafe { cstr_to_str(target4) };
+        } else if gv4 == SIEGETEAM_TEAM2 && !target4.is_empty() {
             G_UseTargets2(ctx, Some(ent), activator, Some(&target4));
         }
 
@@ -312,10 +306,9 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                     if ctx.world.entity(obj_item).genericValue7 != sess_team {
                         // The carrier of the item is not on the team which
                         // disallows objective scoring for it
-                        let obj_target3 = ctx.world.entity(obj_item).target3;
-                        if !obj_target3.is_null() && unsafe { *obj_target3 } != 0 {
+                        let obj_target3 = ctx.world.entity(obj_item).target3.clone();
+                        if !obj_target3.is_empty() {
                             // if it has a target3, fire it off instead of using the trigger
-                            let obj_target3 = unsafe { cstr_to_str(obj_target3) };
                             G_UseTargets2(ctx, Some(obj_item), Some(obj_item), Some(&obj_target3));
 
                             //3-24-03 - want to fire off the target too I guess, if we have one.
@@ -2406,9 +2399,9 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
             if !copy_asteroid.is_null() {
                 let copy_id = ctx.entity_id_of(copy_asteroid).unwrap();
 
-                let c_model = ctx.world.entity(copy_id).model;
+                let c_model = ctx.world.entity(copy_id).model.clone();
                 ctx.world.entity_mut(new_id).model = c_model;
-                let c_model2 = ctx.world.entity(copy_id).model2;
+                let c_model2 = ctx.world.entity(copy_id).model2.clone();
                 ctx.world.entity_mut(new_id).model2 = c_model2;
                 let c_health = ctx.world.entity(copy_id).health;
                 ctx.world.entity_mut(new_id).health = c_health;
@@ -2464,8 +2457,8 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
 /// Source: `oracle/codemp/game/g_trigger.c:1986-2007`
 pub fn SP_trigger_asteroid_field(ctx: &mut GameContext, self_: EntityId) {
     let self_ptr = ctx.world.entity_mut(self_) as *mut gentity_t;
-    let model = ctx.world.entity(self_).model;
-    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
+    let model = ctx.world.entity(self_).model.clone();
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), model.as_deref().unwrap_or(""));
     // self->r.contents = CONTENTS_TRIGGER; // replaces the -1 from trap_SetBrushModel
     ctx.world.entity_mut(self_).r.contents = 0;
     ctx.world.entity_mut(self_).r.svFlags = SVF_NOCLIENT;

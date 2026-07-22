@@ -1969,12 +1969,9 @@ pub fn SiegeItemDie(
         ctx.world.entity_mut(self_).nextthink = t;
 
         // Fire off the death target if we've got one.
-        let target4 = ctx.world.entity(self_).target4;
-        if !target4.is_null() && *target4 != 0 {
-            // `target4` stays a `*mut c_char` slot; decode it for the
-            // `Option<&str>` seam (known non-null here from the guard).
-            let target4_s = cstr_to_str(target4);
-            G_UseTargets2(ctx, Some(self_), Some(self_), Some(&target4_s));
+        let target4 = ctx.world.entity(self_).target4.clone();
+        if !target4.is_empty() {
+            G_UseTargets2(ctx, Some(self_), Some(self_), Some(&target4));
         }
     }
 }
@@ -2024,10 +2021,11 @@ pub fn SiegeItemUse(
         // take off nodraw
         ctx.world.entity_mut(ent).s.eFlags &= !EF_NODRAW;
 
-        let paintarget = ctx.world.entity(ent).paintarget;
-        if !paintarget.is_null() && *paintarget != 0 {
+        // `None`/`""` ≡ Raven's `!ent->paintarget || !ent->paintarget[0]` guard.
+        let paintarget = ctx.world.entity(ent).paintarget.clone();
+        if let Some(paintarget) = paintarget.as_deref().filter(|s| !s.is_empty()) {
             // want to be on this guy's origin now then
-            let targ = G_Find(ctx, None, EntFindField::Targetname, &cstr_to_str(paintarget));
+            let targ = G_Find(ctx, None, EntFindField::Targetname, paintarget);
             let targ = ctx.entity_id_of(targ);
 
             if let Some(targ) = targ {
@@ -2060,8 +2058,8 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
             return;
         }
 
-        let model = ctx.world.entity(ent).model;
-        if model.is_null() || *model == 0 {
+        // `None`/`""` ≡ Raven's `!ent->model || !ent->model[0]` guard.
+        if ctx.world.entity(ent).model.as_deref().unwrap_or("").is_empty() {
             G_Error(ctx, "You must specify a model for misc_siege_item types.");
         }
 
@@ -2184,20 +2182,14 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.entity_mut(ent).s.genericenemyindex = idx;
         }
 
-        let model = ctx.world.entity(ent).model;
-        ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(&cstr_to_str(model));
+        let model = ctx.world.entity(ent).model.clone().unwrap_or_default();
+        ctx.world.entity_mut(ent).s.modelindex = G_ModelIndex(&model);
 
         // Is the model a ghoul2 model?
         // Raven indexes `model[strlen(model) - 4]`, which underflows for names
         // shorter than 4 chars; the `>= 4` guard defines that case as leaving
         // modelGhoul2 unset.
-        let model_str = core::ffi::CStr::from_ptr(model).to_bytes();
-        if model_str.len() >= 4
-            && Q_stricmp(
-                &cstr_to_str(model_str[model_str.len() - 4..].as_ptr() as *const c_char),
-                ".glm",
-            ) == 0
-        {
+        if model.len() >= 4 && model[model.len() - 4..].eq_ignore_ascii_case(".glm") {
             // apparently so.
             ctx.world.entity_mut(ent).s.modelGhoul2 = 1;
         }

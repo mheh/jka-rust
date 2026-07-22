@@ -99,13 +99,13 @@ pub const BMS_END: c_int = 2;
 ///
 /// Source: `oracle/codemp/game/g_mover.c:45-60`
 pub fn G_PlayDoorLoopSound(ctx: &mut GameContext, ent: EntityId) {
-    let soundSet = ctx.entity(ent).soundSet;
-    // Raw C-string deref of the engine-owned soundSet path (seam).
-    if soundSet.is_null() || unsafe { *soundSet } == 0 {
+    let soundSet = ctx.entity(ent).soundSet.clone();
+    // `""` ≡ Raven's NULL-or-empty guard `!soundSet || !soundSet[0]`.
+    if soundSet.is_empty() {
         return;
     }
 
-    let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
+    let idx = G_SoundSetIndex(ctx, &soundSet);
     let e = ctx.entity_mut(ent);
     e.s.soundSetIndex = idx;
     e.s.loopIsSoundset = qtrue;
@@ -116,13 +116,13 @@ pub fn G_PlayDoorLoopSound(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:68-78`
 pub fn G_PlayDoorSound(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
-    let soundSet = ctx.entity(ent).soundSet;
-    // Raw C-string deref of the engine-owned soundSet path (seam).
-    if soundSet.is_null() || unsafe { *soundSet } == 0 {
+    let soundSet = ctx.entity(ent).soundSet.clone();
+    // `""` ≡ Raven's NULL-or-empty guard `!soundSet || !soundSet[0]`.
+    if soundSet.is_empty() {
         return;
     }
 
-    let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
+    let idx = G_SoundSetIndex(ctx, &soundSet);
     ctx.entity_mut(ent).s.soundSetIndex = idx;
 
     G_AddEvent(
@@ -918,10 +918,7 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
             if (*ent).activator.is_none() {
                 (*ent).activator = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), ent);
             }
-            let opentarget = {
-                let p = (*ent).opentarget;
-                (!p.is_null()).then(|| cstr_to_str(p))
-            };
+            let opentarget = (*ent).opentarget.clone();
             G_UseTargets2(ctx, ent_eid, activator_eid, opentarget.as_deref());
         } else if (*ent).moverState == MOVER_2TO1 {
             // closed
@@ -946,10 +943,7 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
                     GAdjustAreaPortalStateArgs::new(ent.cast(), qfalse),
                 );
             }
-            let closetarget = {
-                let p = (*ent).closetarget;
-                (!p.is_null()).then(|| cstr_to_str(p))
-            };
+            let closetarget = (*ent).closetarget.clone();
             G_UseTargets2(ctx, ent_eid, activator_eid, closetarget.as_deref());
         } else {
             G_Error(ctx, "Reached_BinaryMover: bad moverState");
@@ -1237,18 +1231,15 @@ pub fn InitMoverTrData(ent: &mut gentity_t) {
 pub fn InitMover(ctx: &mut GameContext, ent: EntityId) {
     // if the "model2" key is set, use a seperate model
     // for drawing, but clip against the brushes
-    let model2 = ctx.entity(ent).model2;
-    // Raw C-string derefs of the engine-owned model2 path (seam).
-    if !model2.is_null() && unsafe { *model2 } != 0 {
+    let model2 = ctx.entity(ent).model2.clone();
+    // `""` ≡ Raven's `!ent->model2 || !ent->model2[0]` guard.
+    if !model2.is_empty() {
         // Raven `strstr(ent->model2, ".glm")` — use Rust string contains check
-        if unsafe { std::ffi::CStr::from_ptr(model2) }
-            .to_string_lossy()
-            .contains(".glm")
-        {
+        if model2.contains(".glm") {
             // for now, not supported in MP.
             ctx.entity_mut(ent).s.modelindex2 = 0;
         } else {
-            ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(&(unsafe { cstr_to_str(model2) }));
+            ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(&model2);
         }
     }
 
@@ -1806,9 +1797,9 @@ pub fn SP_func_door(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).pos1 = origin;
 
     // calculate second position
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
     // G_SetMovedir reads angles, writes movedir, then clears angles.
     let mut angles = ctx.entity(ent).s.angles;
     let mut movedir = ctx.entity(ent).movedir;
@@ -2014,9 +2005,9 @@ pub fn SP_func_plat(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).wait = 1000.0;
 
     // create second position
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
 
     let mut height = 0.0f32;
     if G_SpawnFloat(
@@ -2102,9 +2093,9 @@ pub fn SP_func_button(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).pos1 = origin;
 
     // calculate second position
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
 
     let mut lip = 0.0f32;
     G_SpawnFloat(ctx, c"lip".as_ptr(), c"4".as_ptr(), &mut lip as *mut f32);
@@ -2343,9 +2334,9 @@ pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
         return;
     }
 
-    let model = ctx.entity(self_).model;
+    let model = ctx.entity(self_).model.clone();
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
-    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), model.as_deref().unwrap_or(""));
     InitMover(ctx, self_);
 
     ctx.entity_mut(self_).reached = Some(EntReached::Reached_Train).into();
@@ -2361,9 +2352,9 @@ pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1956-2019`
 pub fn SP_func_static(ctx: &mut GameContext, ent: EntityId) {
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
 
     let origin = ctx.entity(ent).s.origin;
     ctx.entity_mut(ent).pos1 = origin;
@@ -2470,9 +2461,9 @@ pub fn func_rotating_use(
         ctx.entity_mut(self_).s.loopSound = 0;
         ctx.entity_mut(self_).s.loopIsSoundset = qfalse;
         // play stop sound too?
-        let soundSet = ctx.entity(self_).soundSet;
-        if !soundSet.is_null() && unsafe { *soundSet } != 0 {
-            let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
+        let soundSet = ctx.entity(self_).soundSet.clone();
+        if !soundSet.is_empty() {
+            let idx = G_SoundSetIndex(ctx, &soundSet);
             ctx.entity_mut(self_).s.soundSetIndex = idx;
             G_AddEvent(
                 ctx.entity_mut(self_),
@@ -2481,9 +2472,9 @@ pub fn func_rotating_use(
             );
         }
     } else {
-        let soundSet = ctx.entity(self_).soundSet;
-        if !soundSet.is_null() && unsafe { *soundSet } != 0 {
-            let idx = G_SoundSetIndex(ctx, &(unsafe { cstr_to_str(soundSet as *const c_char) }));
+        let soundSet = ctx.entity(self_).soundSet.clone();
+        if !soundSet.is_empty() {
+            let idx = G_SoundSetIndex(ctx, &soundSet);
             ctx.entity_mut(self_).s.soundSetIndex = idx;
             G_AddEvent(
                 ctx.entity_mut(self_),
@@ -2508,9 +2499,9 @@ pub fn SP_func_rotating(ctx: &mut GameContext, ent: EntityId) {
         SP_func_breakable(ctx, ent);
         ctx.entity_mut(ent).spawnflags = sav_spawnflags;
     } else {
-        let model = ctx.entity(ent).model;
+        let model = ctx.entity(ent).model.clone();
         let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-        trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+        trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
         InitMover(ctx, ent);
 
         let origin = ctx.entity(ent).s.origin;
@@ -2624,9 +2615,9 @@ pub fn SP_func_bobbing(ctx: &mut GameContext, ent: EntityId) {
         &mut phase as *mut f32,
     );
 
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
     InitMover(ctx, ent);
 
     let origin = ctx.entity(ent).s.origin;
@@ -2677,9 +2668,9 @@ pub fn SP_func_pendulum(ctx: &mut GameContext, ent: EntityId) {
         &mut phase as *mut f32,
     );
 
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
 
     // find pendulum length
     let mut length = ctx.entity(ent).r.mins[2].abs();
@@ -3054,15 +3045,16 @@ pub fn funcBBrushPain(
             return;
         }
 
-        if !(*self_).paintarget.is_null() && *(*self_).paintarget != 0 {
-            let paintarget = cstr_to_str((*self_).paintarget);
+        // `None`/`""` ≡ Raven's `!self->paintarget || !self->paintarget[0]` guard.
+        let paintarget = (*self_).paintarget.clone();
+        if let Some(paintarget) = paintarget.as_deref().filter(|s| !s.is_empty()) {
             if (*self_).activator.is_none() {
                 if !attacker.is_null() && (*attacker).inuse != 0 && !(*attacker).client.is_null() {
                     G_UseTargets2(
                         ctx,
                         ctx.entity_id_of(self_),
                         ctx.entity_id_of(attacker),
-                        Some(&paintarget),
+                        Some(paintarget),
                     );
                 }
             } else {
@@ -3070,7 +3062,7 @@ pub fn funcBBrushPain(
                 let activator_ptr =
                     crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*self_).activator);
                 let activator_eid = ctx.entity_id_of(activator_ptr);
-                G_UseTargets2(ctx, self_eid, activator_eid, Some(&paintarget));
+                G_UseTargets2(ctx, self_eid, activator_eid, Some(paintarget));
             }
         }
 
@@ -3156,18 +3148,18 @@ pub fn InitBBrush(ctx: &mut GameContext, ent: EntityId) {
     let origin = ctx.entity(ent).s.origin;
     ctx.entity_mut(ent).pos1 = origin;
 
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
 
     ctx.entity_mut(ent).die = Some(EntDie::funcBBrushDie).into();
     ctx.entity_mut(ent).flags |= flags::FL_BBRUSH;
 
     // if the "model2" key is set, use a separate model for drawing, but
     // clip against the brushes
-    let model2 = ctx.entity(ent).model2;
-    if !model2.is_null() && unsafe { *model2 } != 0 {
-        ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(&(unsafe { cstr_to_str(model2) }));
+    let model2 = ctx.entity(ent).model2.clone();
+    if !model2.is_empty() {
+        ctx.entity_mut(ent).s.modelindex2 = G_ModelIndex(&model2);
     }
 
     // if the "color" or "light" keys are set, setup constantLight
@@ -3319,7 +3311,7 @@ pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
         ctx.entity_mut(self_).teamnodmg = atoi_bytes(team.as_deref().unwrap().as_bytes());
     }
     ctx.entity_mut(self_).team = None;
-    if ctx.entity(self_).model.is_null() {
+    if ctx.entity(self_).model.is_none() {
         G_Error(ctx, "func_breakable with NULL model\n");
     }
     InitBBrush(ctx, self_);
@@ -3517,9 +3509,9 @@ pub fn GlassUse(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:2957-2990`
 pub fn SP_func_glass(ctx: &mut GameContext, ent: EntityId) {
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
     InitMover(ctx, ent);
 
     ctx.entity_mut(ent).r.svFlags = SVF_GLASS_BRUSH;
@@ -3562,9 +3554,9 @@ pub fn func_wait_return_solid(ctx: &mut GameContext, self_: EntityId) {
     // once a frame, see if it's clear
     ctx.entity_mut(self_).clipmask = CONTENTS_BODY;
     if ctx.entity(self_).spawnflags & 16 == 0 || G_TestEntityPosition(ctx, self_).is_null() {
-        let model = ctx.entity(self_).model;
+        let model = ctx.entity(self_).model.clone();
         let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
-        trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
+        trap::SetBrushModel(ctx.engine, self_ptr.cast(), model.as_deref().unwrap_or(""));
         InitMover(ctx, self_);
         let origin = ctx.entity(self_).s.origin;
         ctx.entity_mut(self_).s.pos.trBase = origin;
@@ -3710,9 +3702,9 @@ pub fn func_usable_die(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3140-3203`
 pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
-    let model = ctx.entity(self_).model;
+    let model = ctx.entity(self_).model.clone();
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
-    trap::SetBrushModel(ctx.engine, self_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, self_ptr.cast(), model.as_deref().unwrap_or(""));
     InitMover(ctx, self_);
     let origin = ctx.entity(self_).s.origin;
     ctx.entity_mut(self_).s.pos.trBase = origin;
@@ -3728,20 +3720,16 @@ pub fn SP_func_usable(ctx: &mut GameContext, self_: EntityId) {
     );
     ctx.entity_mut(self_).genericValue5 = genericValue5;
 
-    let model2 = ctx.entity(self_).model2;
-    // Raw C-string derefs of the engine-owned model2 path (seam).
-    if !model2.is_null() && unsafe { *model2 } != 0 {
-        // Raven `strstr(self->model2, ".glm")` — no ported `strstr`
-        // binding in this crate; `CStr::contains` is the equivalent
-        // substring check.
-        if unsafe { std::ffi::CStr::from_ptr(model2) }
-            .to_string_lossy()
-            .contains(".glm")
-        {
+    let model2 = ctx.entity(self_).model2.clone();
+    // `""` ≡ Raven's `!self->model2 || !self->model2[0]` guard.
+    if !model2.is_empty() {
+        // Raven `strstr(self->model2, ".glm")` — `str::contains` is the
+        // equivalent substring check.
+        if model2.contains(".glm") {
             // for now, not supported in MP.
             ctx.entity_mut(self_).s.modelindex2 = 0;
         } else {
-            ctx.entity_mut(self_).s.modelindex2 = G_ModelIndex(&(unsafe { cstr_to_str(model2) }));
+            ctx.entity_mut(self_).s.modelindex2 = G_ModelIndex(&model2);
         }
     }
 
@@ -3818,9 +3806,9 @@ pub fn use_wall(
 ///
 /// Source: `oracle/codemp/game/g_mover.c:3256-3279`
 pub fn SP_func_wall(ctx: &mut GameContext, ent: EntityId) {
-    let model = ctx.entity(ent).model;
+    let model = ctx.entity(ent).model.clone();
     let ent_ptr: *mut gentity_t = ctx.entity_mut(ent);
-    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), &unsafe { cstr_to_str(model) });
+    trap::SetBrushModel(ctx.engine, ent_ptr.cast(), model.as_deref().unwrap_or(""));
 
     let origin = ctx.entity(ent).s.origin;
     ctx.entity_mut(ent).pos1 = origin;

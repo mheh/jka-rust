@@ -3155,12 +3155,8 @@ pub fn player_die(
             {
                 //deathScript = qtrue;
             }
-            let target4 = (*self_).target4;
-            let target4 = if target4.is_null() {
-                None
-            } else {
-                Some(cstr_to_str(target4))
-            };
+            let target4 = (*self_).target4.clone();
+            let target4 = if target4.is_empty() { None } else { Some(target4) };
             crate::g_utils::G_UseTargets2(
                 ctx,
                 ctx.entity_id_of(self_),

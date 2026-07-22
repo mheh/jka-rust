@@ -164,10 +164,14 @@ pub struct gentity_t {
     /// FL_* variables.
     /// Raven field source: `oracle/codemp/game/g_local.h:213`
     pub flags: c_int,
+    /// Owned copy of the QuakeEd model name; `None` ≡ Raven NULL (readers
+    /// distinguish an unset model from an empty one — e.g. the brush-model guard
+    /// in `g_mover`).
     /// Raven field source: `oracle/codemp/game/g_local.h:215`
-    pub model: *mut c_char,
+    pub model: Option<String>,
+    /// Owned copy of the QuakeEd secondary model name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:216`
-    pub model2: *mut c_char,
+    pub model2: String,
     /// Level.time when the object was freed.
     /// Raven field source: `oracle/codemp/game/g_local.h:217`
     pub freetime: c_int,
@@ -243,10 +247,12 @@ pub struct gentity_t {
     /// Owned copy of the QuakeEd secondary target name; `None` ≡ Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:255`
     pub target2: Option<String>,
+    /// Owned copy of the QuakeEd tertiary target name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:256`
-    pub target3: *mut c_char,
+    pub target3: String,
+    /// Owned copy of the QuakeEd quaternary target name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:257`
-    pub target4: *mut c_char,
+    pub target4: String,
     /// Owned copy of the siege-item target name; `""` ≡ absent.
     /// Mainly added for siege items.
     /// Raven field source: `oracle/codemp/game/g_local.h:258`
@@ -267,12 +273,16 @@ pub struct gentity_t {
     pub targetShaderNewName: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:264`
     pub target_ent: Option<EntityId>,
+    /// Owned copy of the door close-target name; `None` ≡ Raven NULL (readers
+    /// null-check before use).
     /// Raven field source: `oracle/codemp/game/g_local.h:266`
-    pub closetarget: *mut c_char,
+    pub closetarget: Option<String>,
+    /// Owned copy of the door open-target name; `None` ≡ Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:267`
-    pub opentarget: *mut c_char,
+    pub opentarget: Option<String>,
+    /// Owned copy of the pain-target name; `None` ≡ Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:268`
-    pub paintarget: *mut c_char,
+    pub paintarget: Option<String>,
     /// Owned copy of the siege goal-target name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:270`
     pub goaltarget: String,
@@ -401,8 +411,9 @@ pub struct gentity_t {
     pub genericValue14: c_int,
     /// Raven field source: `oracle/codemp/game/g_local.h:346`
     pub genericValue15: c_int,
+    /// Owned copy of the QuakeEd sound-set name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:348`
-    pub soundSet: *mut c_char,
+    pub soundSet: String,
     /// Raven field source: `oracle/codemp/game/g_local.h:350`
     pub isSaberEntity: qboolean,
     /// If entity takes damage, redirect to...
@@ -562,8 +573,16 @@ impl gentity_t {
         let _ = core::mem::take(&mut self.idealclass);
         let _ = core::mem::take(&mut self.target);
         let _ = core::mem::take(&mut self.target2);
+        let _ = core::mem::take(&mut self.target3);
+        let _ = core::mem::take(&mut self.target4);
         let _ = core::mem::take(&mut self.team);
         let _ = core::mem::take(&mut self.message);
+        let _ = core::mem::take(&mut self.model);
+        let _ = core::mem::take(&mut self.model2);
+        let _ = core::mem::take(&mut self.soundSet);
+        let _ = core::mem::take(&mut self.closetarget);
+        let _ = core::mem::take(&mut self.opentarget);
+        let _ = core::mem::take(&mut self.paintarget);
     }
 
     /// Seats a fresh empty `String` into every owned-`String` tail field of a
@@ -591,8 +610,16 @@ impl gentity_t {
         core::ptr::write(core::ptr::addr_of_mut!((*p).idealclass), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).target), None);
         core::ptr::write(core::ptr::addr_of_mut!((*p).target2), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).target3), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).target4), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).team), None);
         core::ptr::write(core::ptr::addr_of_mut!((*p).message), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).model), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).model2), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).soundSet), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).closetarget), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).opentarget), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).paintarget), None);
     }
 }
 

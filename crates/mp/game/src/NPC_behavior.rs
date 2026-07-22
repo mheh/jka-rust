@@ -915,12 +915,8 @@ pub fn NPC_BSRemove(ctx: &mut GameContext) {
         GInPvsArgs::new(&npc_origin as *const _, &ent0_origin as *const _),
     ) == 0
     {
-        let target3 = ctx.world.entity(npc_id).target3;
-        let target3 = if target3.is_null() {
-            None
-        } else {
-            Some(unsafe { cstr_to_str(target3) })
-        };
+        let target3 = ctx.world.entity(npc_id).target3.clone();
+        let target3 = if target3.is_empty() { None } else { Some(target3) };
         G_UseTargets2(ctx, Some(npc_id), Some(npc_id), target3.as_deref());
         let level_time = ctx.world.level.time;
         let ent = ctx.world.entity_mut(npc_id) as *mut gentity_t;
