@@ -1041,7 +1041,7 @@ pub fn WP_SaberParseParms(
             // saber type
             if qstricmp_eq(tok, c"saberType") {
                 let value = parse_string_field!();
-                let saberType = GetIDForString(SaberTable.as_ptr() as *mut stringID_table_t, value);
+                let saberType = GetIDForString(SaberTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberType >= saberType_t::SABER_SINGLE as c_int
                     && saberType <= saberType_t::NUM_SABERS as c_int
                 {
@@ -1322,7 +1322,7 @@ pub fn WP_SaberParseParms(
             // force power restrictions
             if qstricmp_eq(tok, c"forceRestrict") {
                 let value = parse_string_field!();
-                let fp = GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, value);
+                let fp = GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if fp >= FP_FIRST && fp < NUM_FORCE_POWERS as c_int {
                     s.forceRestrictions |= 1 << fp;
                 }
@@ -1481,7 +1481,7 @@ pub fn WP_SaberParseParms(
             // kata move
             if qstricmp_eq(tok, c"kataMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.kataMove = saberMove;
                 }
@@ -1490,7 +1490,7 @@ pub fn WP_SaberParseParms(
             // lungeAtkMove move
             if qstricmp_eq(tok, c"lungeAtkMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.lungeAtkMove = saberMove;
                 }
@@ -1499,7 +1499,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkUpMove move
             if qstricmp_eq(tok, c"jumpAtkUpMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkUpMove = saberMove;
                 }
@@ -1508,7 +1508,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkFwdMove move
             if qstricmp_eq(tok, c"jumpAtkFwdMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkFwdMove = saberMove;
                 }
@@ -1517,7 +1517,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkBackMove move
             if qstricmp_eq(tok, c"jumpAtkBackMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkBackMove = saberMove;
                 }
@@ -1526,7 +1526,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkRightMove move
             if qstricmp_eq(tok, c"jumpAtkRightMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkRightMove = saberMove;
                 }
@@ -1535,7 +1535,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkLeftMove move
             if qstricmp_eq(tok, c"jumpAtkLeftMove") {
                 let value = parse_string_field!();
-                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
+                saberMove = GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkLeftMove = saberMove;
                 }
@@ -1544,7 +1544,7 @@ pub fn WP_SaberParseParms(
             // readyAnim
             if qstricmp_eq(tok, c"readyAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.readyAnim = anim;
                 }
@@ -1553,7 +1553,7 @@ pub fn WP_SaberParseParms(
             // drawAnim
             if qstricmp_eq(tok, c"drawAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.drawAnim = anim;
                 }
@@ -1562,7 +1562,7 @@ pub fn WP_SaberParseParms(
             // putawayAnim
             if qstricmp_eq(tok, c"putawayAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.putawayAnim = anim;
                 }
@@ -1571,7 +1571,7 @@ pub fn WP_SaberParseParms(
             // tauntAnim
             if qstricmp_eq(tok, c"tauntAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.tauntAnim = anim;
                 }
@@ -1580,7 +1580,7 @@ pub fn WP_SaberParseParms(
             // bowAnim
             if qstricmp_eq(tok, c"bowAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.bowAnim = anim;
                 }
@@ -1589,7 +1589,7 @@ pub fn WP_SaberParseParms(
             // meditateAnim
             if qstricmp_eq(tok, c"meditateAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.meditateAnim = anim;
                 }
@@ -1598,7 +1598,7 @@ pub fn WP_SaberParseParms(
             // flourishAnim
             if qstricmp_eq(tok, c"flourishAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.flourishAnim = anim;
                 }
@@ -1607,7 +1607,7 @@ pub fn WP_SaberParseParms(
             // gloatAnim
             if qstricmp_eq(tok, c"gloatAnim") {
                 let value = parse_string_field!();
-                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
+                anim = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(value));
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.gloatAnim = anim;
                 }

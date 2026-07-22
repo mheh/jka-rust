@@ -2084,7 +2084,10 @@ impl PmoveContext<'_> {
                 break;
             }
 
-            animNum = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, token);
+            animNum =
+                GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &unsafe {
+                    cstr_to_str(token)
+                });
             if animNum == -1 {
                 continue;
             }

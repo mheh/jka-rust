@@ -91,25 +91,10 @@ unsafe fn com_printf_lit(msg: &str) {
     crate::g_main::Com_Printf(msg);
 }
 
-/// Raven `GetIDForString`.
-///
-/// Source: `oracle/codemp/game/q_shared.c:13-27`
-pub fn GetIDForString(table: *mut stringID_table_t, string: *const c_char) -> c_int {
-    unsafe {
-        let mut index: isize = 0;
-        loop {
-            let entry = *table.offset(index);
-            if entry.name.is_null() || *entry.name == 0 {
-                break;
-            }
-            if crate::q_shared::Q_stricmp(entry.name as *const c_char, string) == 0 {
-                return entry.id;
-            }
-            index += 1;
-        }
-        -1
-    }
-}
+// `GetIDForString` is canonical in `mp_qshared` (the shared-tier
+// `q_string.rs`); re-exported here so this file's importers keep resolving
+// `crate::q_shared::GetIDForString`.
+pub use mp_qshared::shared::q_string::GetIDForString;
 
 /// Raven `GetStringForID`.
 ///

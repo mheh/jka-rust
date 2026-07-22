@@ -2853,14 +2853,13 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
     // Raven `TeamNames[TEAM_NUM_TEAMS]` (NPC_stats.c:133), the NPC team_t names
     // (the many commented-out Trek-era entries collapse to these three).
     const TEAM_NAMES: [&str; TEAM_NUM_TEAMS as usize] = ["", "player", "enemy", "neutral"];
-    let mut name: [c_char; 1024] = [0; 1024];
     let mut kill_team: team_t = TEAM_FREE;
     let mut kill_non_sf = 0u32;
 
     let arg2 = trap::Argv(ctx.engine, 2, 1024);
-    write_cstr_field(&mut name, &arg2);
+    let mut name = strncpyz_string(arg2.as_bytes(), 1024);
 
-    if name[0] == 0 {
+    if name.is_empty() {
         Com_Printf("Error, Expected:\n");
         Com_Printf(
             "NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n",
@@ -2872,11 +2871,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
         return;
     }
 
-    if Q_stricmp("team", &(unsafe { cstr_to_str(name.as_ptr()) })) == 0 {
+    if Q_stricmp("team", &name) == 0 {
         let arg3 = trap::Argv(ctx.engine, 3, 1024);
-        write_cstr_field(&mut name, &arg3);
+        name = strncpyz_string(arg3.as_bytes(), 1024);
 
-        if name[0] == 0 {
+        if name.is_empty() {
             Com_Printf(
                 "NPC_Kill Error: 'npc kill team' requires a team name!\n",
             );
@@ -2889,20 +2888,15 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
             return;
         }
 
-        if Q_stricmp("nonally", &(unsafe { cstr_to_str(name.as_ptr()) })) == 0 {
+        if Q_stricmp("nonally", &name) == 0 {
             kill_non_sf = 1;
         } else {
-            kill_team = GetIDForString(
-                TeamTable.as_ptr() as *mut stringID_table_t,
-                name.as_ptr() as *const c_char,
-            ) as team_t;
+            kill_team =
+                GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &name) as team_t;
 
             if kill_team == TEAM_FREE {
                 Com_Printf(
-                    &format!(
-                        "NPC_Kill Error: team '{}' not recognized\n",
-                        unsafe { cstr_to_str(name.as_ptr() as *const c_char) }
-                    ),
+                    &format!("NPC_Kill Error: team '{}' not recognized\n", name),
                 );
                 Com_Printf("Valid team names are:\n");
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
@@ -2996,8 +2990,8 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                     }
                 }
             } else if player.targetname_str().as_deref().is_some_and(|tn| {
-                Q_stricmp(&(unsafe { cstr_to_str(name.as_ptr() as *const c_char) }), tn) == 0
-            }) || Q_stricmp("all", &(unsafe { cstr_to_str(name.as_ptr() as *const c_char) })) == 0
+                Q_stricmp(&name, tn) == 0
+            }) || Q_stricmp("all", &name) == 0
             {
                 Com_Printf(
                     &format!(

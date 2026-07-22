@@ -939,7 +939,7 @@ pub fn Q3_GetFloat(
     unsafe {
         let id = EntityId(entID as u32);
 
-        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
+        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(name));
 
         match toGet {
             _ if toGet == SET_PARM1 as i32
@@ -1251,7 +1251,7 @@ pub fn Q3_GetVector(
     unsafe {
         let id = EntityId(entID as u32);
 
-        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
+        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(name));
 
         match toGet {
             _ if toGet == SET_PARM1 as i32
@@ -1315,7 +1315,7 @@ pub fn Q3_GetString(
     unsafe {
         let id = EntityId(entID as u32);
 
-        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
+        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(name));
 
         match toGet {
             _ if toGet == SET_ANIM_BOTH as i32 => {
@@ -2120,7 +2120,7 @@ pub fn SetUpperAnim(ctx: &mut GameContext, entID: c_int, animID: c_int) {
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2384-2405`
 pub fn Q3_SetAnimUpper(ctx: &mut GameContext, entID: c_int, anim_name: *const c_char) -> qboolean {
     unsafe {
-        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, anim_name);
+        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(anim_name));
 
         if animID == -1 {
             G_DebugPrint(
@@ -2144,7 +2144,7 @@ pub fn Q3_SetAnimUpper(ctx: &mut GameContext, entID: c_int, anim_name: *const c_
 /// Source: `oracle/codemp/game/g_ICARUScb.c:2414-2437`
 pub fn Q3_SetAnimLower(ctx: &mut GameContext, entID: c_int, anim_name: *const c_char) -> qboolean {
     unsafe {
-        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, anim_name);
+        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(anim_name));
 
         if animID == -1 {
             G_DebugPrint(
@@ -2263,7 +2263,7 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
         }
         let npc = ctx.world.entity(id).NPC;
 
-        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
+        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(bs_name));
         if bSID > -1 {
             if bSID == (BS_SEARCH) as i32 || bSID == (BS_WANDER) as i32 {
                 let wp = ctx.world.entity(id).waypoint;
@@ -2349,7 +2349,7 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
         }
         let npc = ctx.world.entity(id).NPC;
 
-        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
+        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(bs_name));
         if bSID > -1 {
             (*npc).tempBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
         }
@@ -2380,7 +2380,7 @@ pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const 
         }
         let npc = ctx.world.entity(id).NPC;
 
-        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
+        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(bs_name));
         if bSID > -1 {
             (*npc).defaultBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
         }
@@ -2653,7 +2653,9 @@ pub fn Q3_SetViewEntity(ctx: &mut GameContext, entID: c_int, name: *const c_char
 /// Source: `oracle/codemp/game/g_ICARUScb.c:3104-3111`
 pub fn Q3_SetWeapon(ctx: &mut GameContext, entID: c_int, wp_name: *const c_char) {
     let id = EntityId(entID as u32);
-    let wp = GetIDForString(WPTable.as_ptr() as *mut stringID_table_t, wp_name);
+    let wp = GetIDForString(WPTable.as_ptr() as *mut stringID_table_t, &unsafe {
+        cstr_to_str(wp_name)
+    });
 
     let client = ctx.world.entity(id).client;
     // Pool client (NPC): deref raw through the copied pointer (Raven assumes
@@ -4147,7 +4149,7 @@ pub fn Q3_Set(
         let data_s = cstr_to_str(data);
 
         // Set this for callbacks
-        let toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, type_name);
+        let toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &cstr_to_str(type_name));
 
         // Raven's `sscanf(data, "%f %f %f", ...)` at the three vector arms
         // below now routes through the shared libc-`%f` scanner

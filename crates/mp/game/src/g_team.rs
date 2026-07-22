@@ -1377,7 +1377,7 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
 
         qsort(&mut clients[..cnt as usize], SortClients);
 
-        let mut string: [c_char; 8192] = [0; 8192];
+        let mut string = String::new();
         let mut stringlength: usize = 0;
 
         // Oracle re-initializes `cnt = 0` in the second loop header (g_team.c:1134).
@@ -1404,27 +1404,21 @@ pub fn TeamplayInfoMessage(ctx: &mut GameContext, ent: EntityId) {
                     (*pcl).ps.weapon,
                     powerups
                 );
-                let entry_bytes = entry.as_bytes();
-                let entry_len = entry_bytes.len();
+                let j = entry.len();
 
-                if stringlength + entry_len > 8192 {
+                // Raven skips any entry that would push past `char string[8192]`.
+                if stringlength + j > 8192 {
                     break;
                 }
 
-                for j in 0..entry_len {
-                    string[stringlength + j] = entry_bytes[j] as c_char;
-                }
-                stringlength += entry_len;
+                string.push_str(&entry);
+                stringlength += j;
                 cnt += 1;
             }
         }
 
         let ent_idx = ent.index();
-        let cmd = format!(
-            "tinfo {} {}",
-            cnt,
-            String::from_iter(string[0..stringlength].iter().map(|&c| c as u8 as char))
-        );
+        let cmd = format!("tinfo {} {}", cnt, string);
         trap::SendServerCommand(ctx.engine, ent_idx as c_int, &cmd);
     }
 }

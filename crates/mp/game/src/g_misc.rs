@@ -3583,8 +3583,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
     }
     if !s.is_empty() {
         // use a different weapon
-        let s_c = cstr(&s);
-        let w = GetIDForString(WPTable.as_ptr() as *mut _, s_c.as_ptr() as *mut c_char);
+        let w = GetIDForString(WPTable.as_ptr() as *mut _, &s);
         ctx.world.entity_mut(self_).s.weapon = w;
         unsafe {
             (*client).ps.weapon = w;

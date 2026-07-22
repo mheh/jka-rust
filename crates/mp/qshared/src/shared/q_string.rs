@@ -1,7 +1,9 @@
 //! `q_shared.c` string primitives — the shared-tier home for engine-island
 //! callers (`mp_game` carries its own module-island copies in `q_shared.rs`).
 
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, CStr};
+
+use native_string::Q_stricmpBytes;
 
 use crate::shared::limits::{BIG_INFO_STRING, MAX_INFO_STRING, MAX_TOKEN_CHARS};
 use crate::shared::q_format::{c_vsprintf, FmtArg};
@@ -910,7 +912,7 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
 /// Raven `GetIDForString`.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:13-27`
-pub fn GetIDForString(table: *mut stringID_table_t, string: *const c_char) -> c_int {
+pub fn GetIDForString(table: *mut stringID_table_t, string: &str) -> c_int {
     unsafe {
         let mut index: isize = 0;
         loop {
@@ -918,7 +920,7 @@ pub fn GetIDForString(table: *mut stringID_table_t, string: *const c_char) -> c_
             if entry.name.is_null() || *entry.name == 0 {
                 break;
             }
-            if Q_stricmp(entry.name as *const c_char, string) == 0 {
+            if Q_stricmpBytes(CStr::from_ptr(entry.name).to_bytes(), string.as_bytes()) == 0 {
                 return entry.id;
             }
             index += 1;

@@ -657,11 +657,8 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 // Raven bug (transcribed faithfully): sprintf's from `token`
                 // (still "playerTeam"), not the just-parsed `value`.
                 let tk = format!("NPC{}", cstr_to_str(token));
-                let tk_c = cstr(&tk);
-                player_team = crate::q_shared::GetIDForString(
-                    TeamTable.as_ptr() as *mut stringID_table_t,
-                    tk_c.as_ptr(),
-                );
+                player_team =
+                    GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &tk);
                 continue;
             }
 
@@ -763,9 +760,9 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
                 {
                     continue;
                 }
-                let cur_weap = crate::q_shared::GetIDForString(
+                let cur_weap = GetIDForString(
                     mp_bg::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
-                    value,
+                    &cstr_to_str(value),
                 );
                 if cur_weap > WP_NONE && cur_weap < WP_NUM_WEAPONS {
                     crate::g_items::RegisterItem(
@@ -1607,11 +1604,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     continue;
                 }
                 let tk = format!("NPC{}", cstr_to_str(token));
-                let tk_c = cstr(&tk);
-                let team_id = crate::q_shared::GetIDForString(
-                    TeamTable.as_ptr() as *mut stringID_table_t,
-                    tk_c.as_ptr(),
-                );
+                let team_id =
+                    GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &tk);
                 (*client_ptr).playerTeam = team_id;
                 ctx.world.entity_mut(NPC).s.teamowner = team_id;
                 continue;
@@ -1629,11 +1623,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     continue;
                 }
                 let tk = format!("NPC{}", cstr_to_str(token));
-                let tk_c = cstr(&tk);
-                (*client_ptr).enemyTeam = crate::q_shared::GetIDForString(
-                    TeamTable.as_ptr() as *mut stringID_table_t,
-                    tk_c.as_ptr(),
-                );
+                (*client_ptr).enemyTeam =
+                    GetIDForString(TeamTable.as_ptr() as *mut stringID_table_t, &tk);
                 continue;
             }
 
@@ -1648,9 +1639,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 {
                     continue;
                 }
-                let class_id = crate::q_shared::GetIDForString(
+                let class_id = GetIDForString(
                     ClassTable.as_ptr() as *mut stringID_table_t,
-                    value,
+                    &cstr_to_str(value),
                 );
                 // Divergence (§19): Raven stores GetIDForString's -1 miss (SP-only
                 // class names) straight into the enum; `class_t` can't hold -1, and
@@ -2000,9 +1991,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                     continue;
                 }
                 //FIXME: need to precache the weapon, too?  (in above func)
-                let weap = crate::q_shared::GetIDForString(
+                let weap = GetIDForString(
                     mp_bg::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
-                    value,
+                    &cstr_to_str(value),
                 );
                 if weap >= WP_NONE && weap <= (WP_NUM_WEAPONS as c_int) {
                     (*client_ptr).ps.weapon = weap;
@@ -2045,9 +2036,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
             }
 
             //force powers
-            let fp = crate::q_shared::GetIDForString(
+            let fp = GetIDForString(
                 mp_bg::bg_saga::FPTable.as_ptr() as *mut stringID_table_t,
-                token,
+                &cstr_to_str(token),
             );
             if fp >= FP_FIRST && fp < mp_qshared::shared::force_powers::NUM_FORCE_POWERS {
                 let mut n0: c_int = 0;

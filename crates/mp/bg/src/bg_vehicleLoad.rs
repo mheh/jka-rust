@@ -94,7 +94,7 @@ pub fn BG_ParseVehWeaponParm(
                     VF_VEHTYPE => {
                         let vt = GetIDForString(
                             VehicleTable.as_ptr() as *mut stringID_table_t,
-                            cstr(&value).as_ptr(),
+                            &value,
                         );
                         *(b.add(field.ofs as usize) as *mut vehicleType_t) =
                             core::mem::transmute(vt);
@@ -102,7 +102,7 @@ pub fn BG_ParseVehWeaponParm(
                     VF_ANIM => {
                         let anim = GetIDForString(
                             animTable.as_ptr() as *mut stringID_table_t,
-                            cstr(&value).as_ptr(),
+                            &value,
                         );
                         *(b.add(field.ofs as usize) as *mut c_int) = anim;
                     }
@@ -429,7 +429,7 @@ pub fn BG_ParseVehicleParm(
                     VF_VEHTYPE => {
                         let vt = GetIDForString(
                             VehicleTable.as_ptr() as *mut stringID_table_t,
-                            cstr(&value).as_ptr(),
+                            &value,
                         );
                         *(b.add(field.ofs as usize) as *mut vehicleType_t) =
                             core::mem::transmute(vt);
@@ -437,7 +437,7 @@ pub fn BG_ParseVehicleParm(
                     VF_ANIM => {
                         let anim = GetIDForString(
                             animTable.as_ptr() as *mut stringID_table_t,
-                            cstr(&value).as_ptr(),
+                            &value,
                         );
                         *(b.add(field.ofs as usize) as *mut c_int) = anim;
                     }

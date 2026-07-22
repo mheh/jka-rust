@@ -631,7 +631,7 @@ impl Dispatch<GameIcarusSoundindex> for GameContext<'_> {
 impl Dispatch<GameIcarusGetsetidforstring> for GameContext<'_> {
     fn dispatch(&mut self, _args: ()) -> c_int {
         let m = self.world.gSharedBuffer.getsetidforstring();
-        let string = m.string.as_ptr() as *const c_char;
-        GetIDForString(setTable.as_ptr() as *mut stringID_table_t, string)
+        let string = unsafe { cstr_to_str(m.string.as_ptr() as *const c_char) };
+        GetIDForString(setTable.as_ptr() as *mut stringID_table_t, &string)
     }
 }

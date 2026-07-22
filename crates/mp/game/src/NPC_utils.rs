@@ -719,8 +719,7 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
     // FLAG: gNPC_t (NPC) deref stays raw (recipe 2c).
     let npc = ctx.world.entity(self_id).NPC;
     if !npc.is_null() {
-        let bs_name_c = cstr(&bs_name);
-        bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name_c.as_ptr());
+        bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, &bs_name);
     }
 
     if bSID > -1 {
