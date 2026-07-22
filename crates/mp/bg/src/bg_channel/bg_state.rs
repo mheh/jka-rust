@@ -24,6 +24,7 @@ use crate::public::bg_loaded_anim::bgLoadedAnim_t;
 use crate::public::bg_loaded_events::bgLoadedEvents_t;
 use crate::public::saber_move_data::saberMoveData_t;
 use crate::public::saber_move_data_table::saberMoveData;
+use crate::saga::siege_team_t::MAX_SIEGE_TEAMS;
 use crate::vehicles::vehicle_s::MAX_VEHICLES;
 use mp_qshared::shared::limits::MAX_VEH_WEAPONS;
 
@@ -238,7 +239,12 @@ impl BgState {
                 .map(|_| siegeClass_t::default())
                 .collect(),
             bgNumSiegeClasses: 0,
-            bgSiegeTeams: Vec::new(),
+            // Sized like Raven's fixed `siegeTeam_t bgSiegeTeams[MAX_SIEGE_TEAMS]`
+            // zeroed static: the team loader indexes `[bgNumSiegeTeams]` directly
+            // (bg_saga.c pattern), so an empty `Vec` panics on the first parse.
+            bgSiegeTeams: (0..MAX_SIEGE_TEAMS)
+                .map(|_| unsafe { core::mem::zeroed() })
+                .collect(),
             bgNumSiegeTeams: 0,
             team1Theme: core::ptr::null_mut(),
             team2Theme: core::ptr::null_mut(),

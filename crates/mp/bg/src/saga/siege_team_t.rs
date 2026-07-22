@@ -49,6 +49,11 @@ pub const SIEGETEAM_TEAM1: i32 = 1;
 /// Source: `oracle/codemp/game/bg_saga.h:4`
 pub const SIEGETEAM_TEAM2: i32 = 2;
 
+/// Raven `MAX_SIEGE_TEAMS` — up to 16 diffent teams.
+///
+/// Source: `oracle/codemp/game/bg_saga.h:15`
+pub const MAX_SIEGE_TEAMS: usize = 16;
+
 /// Raven `siegeTeam_t` — one team's siege class roster.
 ///
 /// Type definition source: `oracle/codemp/game/bg_saga.h:82-88`
