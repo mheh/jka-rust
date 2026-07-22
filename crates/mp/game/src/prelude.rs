@@ -100,7 +100,7 @@ pub use crate::w_force::mindTrickTime;
 pub use mp_bg::bg_vehicleLoad_tables::*;
 pub use mp_bg::vehicles::{vehFieldType_t, vehFieldType_t::*, vehField_t};
 pub use mp_qshared::shared::RAND_MAX;
-pub use native_string::sscanf::sscanf_f32s;
+pub use native_string::sscanf_f32s;
 // `BG_GiveMeVectorFromMatrix` lives in `bg_misc` (its oracle home,
 // `bg_misc.c:736`); the canonical export for bare-use sites.
 pub use crate::saber::w_saber_consts::*;
@@ -326,7 +326,7 @@ pub use crate::q_shared::{
     va, COM_StripExtension, GetIDForString, Q_strchr, Q_strcmp, Q_stricmp, Q_strncmp, Q_strncpyz,
     Q_strupr,
 };
-pub use native_string::info::{Info_RemoveKey, Info_Validate, Info_ValueForKey};
+pub use native_string::{Info_RemoveKey, Info_Validate, Info_ValueForKey};
 pub use crate::w_saber::WP_SaberCanBlock;
 pub use crate::FighterNPC::FighterIsLanded;
 pub use crate::NPC_AI_Atst::NPC_ATST_Precache;

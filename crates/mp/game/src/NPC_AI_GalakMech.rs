@@ -24,7 +24,7 @@ use crate::g_utils::G_SoundOnEnt;
 use crate::trap;
 // Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
 // genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;

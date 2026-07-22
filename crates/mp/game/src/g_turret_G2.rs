@@ -33,7 +33,7 @@ use crate::q_math::{
     vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
     VectorNormalize,
 };
-use crate::q_shared::Q_stricmp;
+use native_string::Q_stricmp;
 use crate::NPC_combat::G_SetEnemy;
 use crate::NPC_utils::VALIDSTRING;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
@@ -969,13 +969,13 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
             // only attack clients
             let flags = ctx.world.entity(target_id).flags;
             let takedamage = ctx.world.entity(target_id).takedamage;
-            let t_npc_tn = ctx.world.entity(target_id).NPC_targetname;
+            let t_npc_tn = ctx.world.entity(target_id).NPC_targetname.clone();
             let s_tn = ctx.world.entity(self_).targetname;
             if flags & FL_BBRUSH == 0
                 || takedamage == 0
-                || (!t_npc_tn.is_null()
+                || (!t_npc_tn.is_empty()
                     && !s_tn.is_null()
-                    && Q_stricmp(t_npc_tn as *const c_char, s_tn as *const c_char) != 0)
+                    && Q_stricmp(&t_npc_tn, &(unsafe { cstr_to_str(s_tn) })) != 0)
             {
                 continue;
             }

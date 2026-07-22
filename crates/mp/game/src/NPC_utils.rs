@@ -66,7 +66,7 @@ use crate::NPC_senses::{
 };
 use crate::NPC_sounds::G_AddVoiceEvent;
 use mp_qshared::shared::force_powers::FP_SPEED;
-use native_string::atof::atof;
+use native_string::atof;
 
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;

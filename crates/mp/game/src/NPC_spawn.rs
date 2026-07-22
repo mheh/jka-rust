@@ -36,8 +36,8 @@ use crate::g_public_consts::SVF_NOCLIENT;
 use crate::q_shared::FOFS_targetname;
 use crate::NPC_stats::TeamTable;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
-use native_string::q_string::Q_stricmp;
-use native_string::q_string::Q_strncmp;
+use native_string::Q_stricmp;
+use native_string::Q_strncmp;
 use native_string::strncpyz_string;
 use crate::q_shared;
 use crate::g_spawn::G_NewString;
@@ -160,8 +160,8 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
             trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, "head_hatchcover", 0);
         }
         if {
-            let p = ctx.world.entity(ent).NPC_type;
-            !p.is_null() && Q_stricmp("wampa", &cstr_to_str(p)) == 0
+            let p = ctx.world.entity(ent).NPC_type.as_deref();
+            p.is_some_and(|p| Q_stricmp("wampa", p) == 0)
         } {
             crate::NPC_AI_Wampa::Wampa_SetBolts(ctx, Some(ent));
             ctx.world.entity_mut(ent).s.g2radius = 80;
@@ -180,14 +180,14 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.entity_mut(ent).health *= 4;
         }
         if {
-            let p = ctx.world.entity(ent).NPC_type;
-            !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+            let p = ctx.world.entity(ent).NPC_type.as_deref();
+            p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
         } {
             (*npc).scriptFlags |= SCF_NO_FORCE;
         }
         if {
-            let p = ctx.world.entity(ent).NPC_type;
-            !p.is_null() && Q_stricmp("emperor", &cstr_to_str(p)) == 0
+            let p = ctx.world.entity(ent).NPC_type.as_deref();
+            p.is_some_and(|p| Q_stricmp("emperor", p) == 0)
         } {
             (*npc).scriptFlags |= SCF_DONT_FIRE;
         }
@@ -235,8 +235,8 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
             }
             NPCTEAM_NEUTRAL => {
                 if {
-                    let p = ctx.world.entity(ent).NPC_type;
-                    !p.is_null() && Q_stricmp(&cstr_to_str(p), "gonk") == 0
+                    let p = ctx.world.entity(ent).NPC_type.as_deref();
+                    p.is_some_and(|p| Q_stricmp(p, "gonk") == 0)
                 } {
                     ctx.world.entity_mut(ent).r.svFlags |= SVF_PLAYER_USABLE;
                 }
@@ -277,8 +277,8 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
                         }
                     }
                     if {
-                        let p = ctx.world.entity(ent).NPC_type;
-                        !p.is_null() && Q_stricmp(&cstr_to_str(p), "galak_mech") == 0
+                        let p = ctx.world.entity(ent).NPC_type.as_deref();
+                        p.is_some_and(|p| Q_stricmp(p, "galak_mech") == 0)
                     } {
                         crate::NPC_AI_GalakMech::NPC_GalakMech_Init(ctx, ent);
                     }
@@ -312,19 +312,10 @@ pub fn NPC_SetMiscDefaultData(ctx: &mut GameContext, ent: EntityId) {
 /// Raven: not sure how to handle this, should I pass in class instead of team
 /// and go from there? - dmv
 /// Source: `oracle/codemp/game/NPC_spawn.c:509-749`
-pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: *const c_char) -> c_int {
-    // Faithful transcription of the C string-compare cascade. Q_stricmp /
-    // Q_strncmp are pure string helpers (bg-shared); NPC_type is a NUL
-    // terminated C string handed to us by the (unported) caller — safe to
-    // read here since we only borrow it for comparisons.
-    let name = unsafe {
-        if NPC_type.is_null() {
-            std::borrow::Cow::Borrowed("")
-        } else {
-            std::ffi::CStr::from_ptr(NPC_type).to_string_lossy()
-        }
-    };
-    let name = name.as_ref();
+pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: &str) -> c_int {
+    // Faithful transcription of the C string-compare cascade. `NPC_type` is the
+    // NPC species name; the caller maps Raven's NULL pointer to `""`.
+    let name = NPC_type;
 
     let stricmp = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
     // Q_strncmp is case-SENSITIVE (unlike Q_stricmp); compare prefixes exactly.
@@ -490,8 +481,8 @@ pub fn NPC_SetWeapons(ctx: &mut GameContext, ent: EntityId) {
     let mut bestWeap: c_int = WP_NONE;
     let player_team = unsafe { (*client).playerTeam };
     let spawnflags = ctx.world.entity(ent).spawnflags;
-    let npc_type = ctx.world.entity(ent).NPC_type;
-    let weapons = NPC_WeaponsForTeam(player_team, spawnflags, npc_type as *const c_char);
+    let npc_type = ctx.world.entity(ent).NPC_type.clone();
+    let weapons = NPC_WeaponsForTeam(player_team, spawnflags, npc_type.as_deref().unwrap_or(""));
 
     unsafe {
         (*client).ps.stats[STAT_WEAPONS as usize] = 0;
@@ -688,8 +679,8 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if {
-            let p = ctx.world.entity(ent).NPC_type;
-            !p.is_null() && Q_stricmp("rodian", &cstr_to_str(p)) == 0
+            let p = ctx.world.entity(ent).NPC_type.as_deref();
+            p.is_some_and(|p| Q_stricmp("rodian", p) == 0)
         } {
             match ctx.world.cvars.g_spskill.integer {
                 0 => (*npc).stats.aim = (1.0) as i32,
@@ -702,8 +693,8 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                 || (*client).NPC_class == CLASS_SWAMPTROOPER
                 || (*client).NPC_class == CLASS_IMPWORKER
                 || {
-                    let p = ctx.world.entity(ent).NPC_type;
-                    !p.is_null() && Q_stricmp("rodian2", &cstr_to_str(p)) == 0
+                    let p = ctx.world.entity(ent).NPC_type.as_deref();
+                    p.is_some_and(|p| Q_stricmp("rodian2", p) == 0)
                 }
             {
                 match ctx.world.cvars.g_spskill.integer {
@@ -1172,13 +1163,13 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         (*newent).playerState = &mut (*((*newent).client)).ps as *mut playerState_t;
 
-        if (*ent).NPC_type.is_null() {
-            (*ent).NPC_type = c"random".as_ptr() as *mut c_char;
+        if (*ent).NPC_type.is_none() {
+            (*ent).NPC_type = Some("random".to_owned());
         } else {
-            (*ent).NPC_type = q_shared::Q_strlwr(G_NewString(
-                ctx,
-                (*ent).NPC_type as *const c_char,
-            ));
+            // Raven `Q_strlwr(G_NewString(NPC_type))` — lowercase the owned name in
+            // place (ASCII, matching Q_strlwr).
+            let lowered = (*ent).NPC_type.as_deref().unwrap().to_ascii_lowercase();
+            (*ent).NPC_type = Some(lowered);
         }
 
         if (*ent).r.svFlags & SVF_NO_BASIC_SOUNDS != 0 {
@@ -1206,8 +1197,12 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 world: ctx.world_raw(),
                 engine: ctx.engine,
             };
+            // `NPC_type` is `Some` here (normalized above); materialize a
+            // `CString` for the vehicle-loader consumers that still take
+            // `*const c_char` (bg tier / `G_Create*NPC`).
+            let npc_type_c = cstr((*ent).NPC_type.as_deref().unwrap());
             let i_veh_index = BG_VehicleGetIndex(
-                (*ent).NPC_type as *const c_char,
+                npc_type_c.as_ptr(),
                 &mut ctx.world.bg_state,
                 &crate::bg_channel::GameBgTraps::new(ctx.engine),
                 &mut callbacks,
@@ -1224,28 +1219,28 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                     crate::AnimalNPC::G_CreateAnimalNPC(
                         ctx,
                         &mut (*newent).m_pVehicle,
-                        (*ent).NPC_type as *const c_char,
+                        npc_type_c.as_ptr(),
                     );
                 }
                 VH_SPEEDER => {
                     crate::SpeederNPC::G_CreateSpeederNPC(
                         ctx,
                         &mut (*newent).m_pVehicle,
-                        (*ent).NPC_type as *const c_char,
+                        npc_type_c.as_ptr(),
                     );
                 }
                 VH_FIGHTER => {
                     crate::FighterNPC::G_CreateFighterNPC(
                         ctx,
                         &mut (*newent).m_pVehicle,
-                        (*ent).NPC_type as *const c_char,
+                        npc_type_c.as_ptr(),
                     );
                 }
                 VH_WALKER => {
                     crate::WalkerNPC::G_CreateWalkerNPC(
                         ctx,
                         &mut (*newent).m_pVehicle,
-                        (*ent).NPC_type as *const c_char,
+                        npc_type_c.as_ptr(),
                     );
                 }
                 _ => {
@@ -1253,7 +1248,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                         &format!(
                             "{} ERROR: Couldn't spawn NPC {}\n",
                             S_COLOR_RED.to_string_lossy(),
-                            cstr_to_str((*ent).NPC_type as *const c_char)
+                            (*ent).NPC_type.as_deref().unwrap_or("")
                         ),
                     );
                     crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
@@ -1303,9 +1298,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*((*newent).client)).ps.origin);
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*newent).r.currentOrigin);
         crate::g_utils::G_SetOrigin(&mut *(newent), (*ent).s.origin);
+        let npc_type_owned = (*ent).NPC_type.clone().unwrap_or_default();
         if crate::NPC_stats::NPC_ParseParms(
             ctx,
-            (*ent).NPC_type as *const c_char,
+            &npc_type_owned,
             ctx.entity_id_of(newent).unwrap(),
         ) == qfalse
         {
@@ -1313,7 +1309,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 &format!(
                     "{} ERROR: Couldn't spawn NPC {}\n",
                     S_COLOR_RED.to_string_lossy(),
-                    cstr_to_str((*ent).NPC_type as *const c_char)
+                    npc_type_owned
                 ),
             );
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(newent));
@@ -1321,10 +1317,10 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             return core::ptr::null_mut();
         }
 
-        if !(*ent).NPC_type.is_null() {
-            if Q_stricmp(&cstr_to_str((*ent).NPC_type as *const c_char), "kyle") == 0 {
+        if let Some(npc_type) = (*ent).NPC_type.as_deref() {
+            if Q_stricmp(npc_type, "kyle") == 0 {
                 (*((*newent).NPC)).aiFlags |= NPCAI_MATCHPLAYERWEAPON;
-            } else if Q_stricmp(&cstr_to_str((*ent).NPC_type as *const c_char), "test") == 0 {
+            } else if Q_stricmp(npc_type, "test") == 0 {
                 let base = ctx.world.g_entities.as_mut_ptr();
                 for n in 0..1 {
                     let e = base.add(n as usize);
@@ -1344,8 +1340,23 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         if (*newent).health == 0 {
             (*newent).health = (*ent).health;
         }
-        (*newent).script_targetname = (*ent).NPC_targetname;
-        (*newent).targetname = (*ent).NPC_targetname;
+        // `NPC_targetname` is now an owned `String` (`""` ≡ absent); `targetname`
+        // and `script_targetname` are PREFIX `*mut c_char` slots the engine reads.
+        // Raven aliased one pool allocation into both; two G_NewString copies are
+        // content-identical (no pointer-identity compare exists — verified), and
+        // G_NewString restores the `\n` translation the old F_LSTRING carried.
+        // Empty → NULL, matching Raven's NULL-pointer alias when unset.
+        {
+            let npc_targetname = (*ent).NPC_targetname.clone();
+            if npc_targetname.is_empty() {
+                (*newent).script_targetname = core::ptr::null_mut();
+                (*newent).targetname = core::ptr::null_mut();
+            } else {
+                let npc_targetname_c = cstr(&npc_targetname);
+                (*newent).script_targetname = G_NewString(ctx, npc_targetname_c.as_ptr());
+                (*newent).targetname = G_NewString(ctx, npc_targetname_c.as_ptr());
+            }
+        }
         // `NPC_target` is now an owned `String` (`""` ≡ absent); `target` stays a
         // G_Alloc-pool `*mut c_char` this batch. Materialize a pool copy via
         // G_NewString (which also restores the `\n` translation the old
@@ -1374,7 +1385,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         }
 
         (*newent).classname = c"NPC".as_ptr() as *mut c_char;
-        (*newent).NPC_type = (*ent).NPC_type;
+        (*newent).NPC_type = (*ent).NPC_type.clone();
         trap::UnlinkEntity(
             ctx.engine,
             mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(newent.cast()),
@@ -1545,10 +1556,10 @@ pub fn NPC_Spawn(
 /// Raven `NPC_PrecacheType`.
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:1961-1971`
-pub fn NPC_PrecacheType(ctx: &mut GameContext, NPC_type: *mut c_char) {
+pub fn NPC_PrecacheType(ctx: &mut GameContext, NPC_type: &str) {
     let fakespawner = crate::g_utils::G_Spawn(ctx);
     if let Some(id) = Some(fakespawner) {
-        ctx.world.entity_mut(id).NPC_type = NPC_type;
+        ctx.world.entity_mut(id).NPC_type = Some(NPC_type.to_owned());
         crate::NPC_stats::NPC_Precache(ctx, id);
         crate::g_utils::G_FreeEntity(ctx, Some(id));
     }
@@ -1607,8 +1618,8 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
         ctx.world.entity_mut(self_).s.shouldtarget = qtrue;
     }
 
-    let npc_type = ctx.world.entity(self_).NPC_type;
-    crate::NPC_stats::NPC_PrecacheAnimationCFG(npc_type as *const c_char);
+    let npc_type = ctx.world.entity(self_).NPC_type.clone();
+    crate::NPC_stats::NPC_PrecacheAnimationCFG(npc_type.as_deref().unwrap_or(""));
 
     crate::NPC_stats::NPC_Precache(ctx, self_);
 
@@ -1627,7 +1638,13 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
 pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean {
     unsafe {
         let mut droid_npc_type: *const c_char = core::ptr::null();
-        let sp_npc_type = ctx.world.entity(spawner).NPC_type;
+        // `NPC_type` is `Option<String>` (`None` ≡ Raven NULL); pass a NULL
+        // pointer through to the bg-tier loader when unset, else a `CString`.
+        let sp_npc_type = ctx.world.entity(spawner).NPC_type.clone();
+        let sp_npc_type_c = sp_npc_type.as_deref().map(cstr);
+        let sp_npc_type_ptr = sp_npc_type_c
+            .as_ref()
+            .map_or(core::ptr::null(), |c| c.as_ptr());
         let mut callbacks = crate::bg_channel::GameCallbacksImpl {
             // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
             // field aliasing bg_state; a raw store is required (bg-seam re-entry).
@@ -1635,7 +1652,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             engine: ctx.engine,
         };
         let i_veh_index = BG_VehicleGetIndex(
-            sp_npc_type as *const c_char,
+            sp_npc_type_ptr,
             &mut ctx.world.bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
             &mut callbacks,
@@ -1644,7 +1661,7 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             return qfalse;
         }
 
-        G_ModelIndex(&format!("${}", cstr_to_str(sp_npc_type as *const c_char)));
+        G_ModelIndex(&format!("${}", sp_npc_type.as_deref().unwrap_or("")));
 
         let p_veh_info = &(&ctx.world.bg_state.g_vehicleInfo)[i_veh_index as usize];
         if !p_veh_info.model.is_null() && *p_veh_info.model != 0 {
@@ -1721,10 +1738,10 @@ pub fn NPC_VehiclePrecache(ctx: &mut GameContext, spawner: EntityId) -> qboolean
             if Q_stricmp("random", &cstr_to_str(droid_npc_type)) == 0
                 || Q_stricmp("default", &cstr_to_str(droid_npc_type)) == 0
             {
-                NPC_PrecacheType(ctx, cstr("r2d2").into_raw());
-                NPC_PrecacheType(ctx, cstr("r5d2").into_raw());
+                NPC_PrecacheType(ctx, "r2d2");
+                NPC_PrecacheType(ctx, "r5d2");
             } else {
-                NPC_PrecacheType(ctx, droid_npc_type as *mut c_char);
+                NPC_PrecacheType(ctx, &cstr_to_str(droid_npc_type));
             }
         }
         qtrue
@@ -1756,8 +1773,8 @@ pub fn NPC_VehicleSpawnUse(
 pub fn SP_NPC_Vehicle(ctx: &mut GameContext, self_: EntityId) {
     let mut drop_time: f32 = 0.0;
     let mut t: c_int = 0;
-    if ctx.world.entity(self_).NPC_type.is_null() {
-        ctx.world.entity_mut(self_).NPC_type = c"swoop".as_ptr() as *mut c_char;
+    if ctx.world.entity(self_).NPC_type.is_none() {
+        ctx.world.entity_mut(self_).NPC_type = Some("swoop".to_owned());
     }
 
     if ctx.world.entity(self_).classname.is_null() {
@@ -1815,7 +1832,7 @@ pub fn SP_NPC_Vehicle(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2338-2345`
 pub fn SP_NPC_Kyle(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Kyle".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Kyle".to_owned());
     WP_SetSaberModel(None, CLASS_KYLE);
     SP_NPC_spawner(ctx, self_);
 }
@@ -1824,7 +1841,7 @@ pub fn SP_NPC_Kyle(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2354-2359`
 pub fn SP_NPC_Lando(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Lando".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Lando".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -1832,7 +1849,7 @@ pub fn SP_NPC_Lando(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2368-2373`
 pub fn SP_NPC_Jan(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Jan".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Jan".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -1840,7 +1857,7 @@ pub fn SP_NPC_Jan(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2382-2389`
 pub fn SP_NPC_Luke(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Luke".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Luke".to_owned());
     WP_SetSaberModel(None, CLASS_LUKE);
     SP_NPC_spawner(ctx, self_);
 }
@@ -1849,7 +1866,7 @@ pub fn SP_NPC_Luke(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2398-2403`
 pub fn SP_NPC_MonMothma(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"MonMothma".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("MonMothma".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -1857,7 +1874,7 @@ pub fn SP_NPC_MonMothma(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2412-2419`
 pub fn SP_NPC_Tavion(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Tavion".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Tavion".to_owned());
     WP_SetSaberModel(None, CLASS_TAVION);
     SP_NPC_spawner(ctx, self_);
 }
@@ -1868,11 +1885,11 @@ pub fn SP_NPC_Tavion(ctx: &mut GameContext, self_: EntityId) {
 pub fn SP_NPC_Tavion_New(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
     if e.spawnflags & 1 != 0 {
-        e.NPC_type = c"tavion_scepter".as_ptr() as *mut c_char;
+        e.NPC_type = Some("tavion_scepter".to_owned());
     } else if e.spawnflags & 2 != 0 {
-        e.NPC_type = c"tavion_sith_sword".as_ptr() as *mut c_char;
+        e.NPC_type = Some("tavion_sith_sword".to_owned());
     } else {
-        e.NPC_type = c"tavion_new".as_ptr() as *mut c_char;
+        e.NPC_type = Some("tavion_new".to_owned());
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -1883,9 +1900,9 @@ pub fn SP_NPC_Tavion_New(ctx: &mut GameContext, self_: EntityId) {
 pub fn SP_NPC_Alora(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
     if e.spawnflags & 1 != 0 {
-        e.NPC_type = c"alora_dual".as_ptr() as *mut c_char;
+        e.NPC_type = Some("alora_dual".to_owned());
     } else {
-        e.NPC_type = c"alora".as_ptr() as *mut c_char;
+        e.NPC_type = Some("alora".to_owned());
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -1895,22 +1912,22 @@ pub fn SP_NPC_Alora(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2487-2524`
 pub fn SP_NPC_Reborn_New(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         if e.spawnflags & 4 != 0 {
             if e.spawnflags & 1 != 0 {
-                e.NPC_type = c"reborn_dual2".as_ptr() as *mut c_char;
+                e.NPC_type = Some("reborn_dual2".to_owned());
             } else if e.spawnflags & 2 != 0 {
-                e.NPC_type = c"reborn_staff2".as_ptr() as *mut c_char;
+                e.NPC_type = Some("reborn_staff2".to_owned());
             } else {
-                e.NPC_type = c"reborn_new2".as_ptr() as *mut c_char;
+                e.NPC_type = Some("reborn_new2".to_owned());
             }
         } else {
             if e.spawnflags & 1 != 0 {
-                e.NPC_type = c"reborn_dual".as_ptr() as *mut c_char;
+                e.NPC_type = Some("reborn_dual".to_owned());
             } else if e.spawnflags & 2 != 0 {
-                e.NPC_type = c"reborn_staff".as_ptr() as *mut c_char;
+                e.NPC_type = Some("reborn_staff".to_owned());
             } else {
-                e.NPC_type = c"reborn_new".as_ptr() as *mut c_char;
+                e.NPC_type = Some("reborn_new".to_owned());
             }
         }
     }
@@ -1922,30 +1939,30 @@ pub fn SP_NPC_Reborn_New(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2542-2593`
 pub fn SP_NPC_Cultist_Saber(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         if e.spawnflags & 1 != 0 {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_med_throw".as_ptr() as *mut c_char
+                Some("cultist_saber_med_throw".to_owned())
             } else {
-                c"cultist_saber_med".as_ptr() as *mut c_char
+                Some("cultist_saber_med".to_owned())
             };
         } else if e.spawnflags & 2 != 0 {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_strong_throw".as_ptr() as *mut c_char
+                Some("cultist_saber_strong_throw".to_owned())
             } else {
-                c"cultist_saber_strong".as_ptr() as *mut c_char
+                Some("cultist_saber_strong".to_owned())
             };
         } else if e.spawnflags & 2 != 0 {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_all_throw".as_ptr() as *mut c_char
+                Some("cultist_saber_all_throw".to_owned())
             } else {
-                c"cultist_saber_all".as_ptr() as *mut c_char
+                Some("cultist_saber_all".to_owned())
             };
         } else {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_throw".as_ptr() as *mut c_char
+                Some("cultist_saber_throw".to_owned())
             } else {
-                c"cultist_saber".as_ptr() as *mut c_char
+                Some("cultist_saber".to_owned())
             };
         }
     }
@@ -1957,30 +1974,30 @@ pub fn SP_NPC_Cultist_Saber(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2611-2662`
 pub fn SP_NPC_Cultist_Saber_Powers(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         if e.spawnflags & 1 != 0 {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_med_throw2".as_ptr() as *mut c_char
+                Some("cultist_saber_med_throw2".to_owned())
             } else {
-                c"cultist_saber_med2".as_ptr() as *mut c_char
+                Some("cultist_saber_med2".to_owned())
             };
         } else if e.spawnflags & 2 != 0 {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_strong_throw2".as_ptr() as *mut c_char
+                Some("cultist_saber_strong_throw2".to_owned())
             } else {
-                c"cultist_saber_strong2".as_ptr() as *mut c_char
+                Some("cultist_saber_strong2".to_owned())
             };
         } else if e.spawnflags & 2 != 0 {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_all_throw2".as_ptr() as *mut c_char
+                Some("cultist_saber_all_throw2".to_owned())
             } else {
-                c"cultist_saber_all2".as_ptr() as *mut c_char
+                Some("cultist_saber_all2".to_owned())
             };
         } else {
             e.NPC_type = if e.spawnflags & 8 != 0 {
-                c"cultist_saber_throw".as_ptr() as *mut c_char
+                Some("cultist_saber_throw".to_owned())
             } else {
-                c"cultist_saber2".as_ptr() as *mut c_char
+                Some("cultist_saber2".to_owned())
             };
         }
     }
@@ -1991,9 +2008,9 @@ pub fn SP_NPC_Cultist_Saber_Powers(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2679-2725`
 pub fn SP_NPC_Cultist(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         if ctx.world.entity(self_).spawnflags & 1 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = core::ptr::null_mut();
+            ctx.world.entity_mut(self_).NPC_type = None;
             ctx.world.entity_mut(self_).spawnflags = 0;
             match ctx.world.bg_state.rng.Q_irand(0, 2) {
                 0 => ctx.world.entity_mut(self_).spawnflags |= 1,
@@ -2007,13 +2024,13 @@ pub fn SP_NPC_Cultist(ctx: &mut GameContext, self_: EntityId) {
             SP_NPC_Cultist_Saber(ctx, self_);
             return;
         } else if ctx.world.entity(self_).spawnflags & 2 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"cultist_grip".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("cultist_grip".to_owned());
         } else if ctx.world.entity(self_).spawnflags & 4 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"cultist_lightning".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("cultist_lightning".to_owned());
         } else if ctx.world.entity(self_).spawnflags & 8 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"cultist_drain".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("cultist_drain".to_owned());
         } else {
-            ctx.world.entity_mut(self_).NPC_type = c"cultist".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("cultist".to_owned());
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2024,8 +2041,8 @@ pub fn SP_NPC_Cultist(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2737-2744`
 pub fn SP_NPC_Cultist_Commando(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
-        e.NPC_type = c"cultistcommando".as_ptr() as *mut c_char;
+    if e.NPC_type.is_none() {
+        e.NPC_type = Some("cultistcommando".to_owned());
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2034,7 +2051,7 @@ pub fn SP_NPC_Cultist_Commando(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2755-2759`
 pub fn SP_NPC_Cultist_Destroyer(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"cultist".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("cultist".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2042,7 +2059,7 @@ pub fn SP_NPC_Cultist_Destroyer(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2768-2773`
 pub fn SP_NPC_Reelo(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Reelo".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Reelo".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2051,10 +2068,10 @@ pub fn SP_NPC_Reelo(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2784-2797`
 pub fn SP_NPC_Galak(ctx: &mut GameContext, self_: EntityId) {
     if ctx.world.entity(self_).spawnflags & 1 != 0 {
-        ctx.world.entity_mut(self_).NPC_type = c"Galak_Mech".as_ptr() as *mut c_char;
+        ctx.world.entity_mut(self_).NPC_type = Some("Galak_Mech".to_owned());
         crate::NPC_AI_GalakMech::NPC_GalakMech_Precache(ctx);
     } else {
-        ctx.world.entity_mut(self_).NPC_type = c"Galak".as_ptr() as *mut c_char;
+        ctx.world.entity_mut(self_).NPC_type = Some("Galak".to_owned());
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2063,7 +2080,7 @@ pub fn SP_NPC_Galak(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2806-2813`
 pub fn SP_NPC_Desann(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Desann".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Desann".to_owned());
     WP_SetSaberModel(None, CLASS_DESANN);
     SP_NPC_spawner(ctx, self_);
 }
@@ -2072,7 +2089,7 @@ pub fn SP_NPC_Desann(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2822-2827`
 pub fn SP_NPC_Bartender(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Bartender".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Bartender".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2080,7 +2097,7 @@ pub fn SP_NPC_Bartender(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2836-2841`
 pub fn SP_NPC_MorganKatarn(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"MorganKatarn".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("MorganKatarn".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2088,13 +2105,13 @@ pub fn SP_NPC_MorganKatarn(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2857-2887`
 pub fn SP_NPC_Jedi(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         if ctx.world.entity(self_).spawnflags & 1 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"jeditrainer".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("jeditrainer".to_owned());
         } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"Jedi".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("Jedi".to_owned());
         } else {
-            ctx.world.entity_mut(self_).NPC_type = c"Jedi2".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("Jedi2".to_owned());
         }
     }
     WP_SetSaberModel(None, CLASS_JEDI);
@@ -2105,11 +2122,11 @@ pub fn SP_NPC_Jedi(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2896-2911`
 pub fn SP_NPC_Prisoner(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         let t = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-            c"Prisoner".as_ptr() as *mut c_char
+            Some("Prisoner".to_owned())
         } else {
-            c"Prisoner2".as_ptr() as *mut c_char
+            Some("Prisoner2".to_owned())
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2120,11 +2137,11 @@ pub fn SP_NPC_Prisoner(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:2920-2935`
 pub fn SP_NPC_Rebel(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         let t = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-            c"Rebel".as_ptr() as *mut c_char
+            Some("Rebel".to_owned())
         } else {
-            c"Rebel2".as_ptr() as *mut c_char
+            Some("Rebel2".to_owned())
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2136,18 +2153,18 @@ pub fn SP_NPC_Rebel(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:2955-2986`
 pub fn SP_NPC_Stormtrooper(ctx: &mut GameContext, self_: EntityId) {
     if ctx.world.entity(self_).spawnflags & 8 != 0 {
-        ctx.world.entity_mut(self_).NPC_type = c"rockettrooper".as_ptr() as *mut c_char;
+        ctx.world.entity_mut(self_).NPC_type = Some("rockettrooper".to_owned());
     } else if ctx.world.entity(self_).spawnflags & 4 != 0 {
-        ctx.world.entity_mut(self_).NPC_type = c"stofficeralt".as_ptr() as *mut c_char;
+        ctx.world.entity_mut(self_).NPC_type = Some("stofficeralt".to_owned());
     } else if ctx.world.entity(self_).spawnflags & 2 != 0 {
-        ctx.world.entity_mut(self_).NPC_type = c"stcommander".as_ptr() as *mut c_char;
+        ctx.world.entity_mut(self_).NPC_type = Some("stcommander".to_owned());
     } else if ctx.world.entity(self_).spawnflags & 1 != 0 {
-        ctx.world.entity_mut(self_).NPC_type = c"stofficer".as_ptr() as *mut c_char;
+        ctx.world.entity_mut(self_).NPC_type = Some("stofficer".to_owned());
     } else {
         let t = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-            c"StormTrooper".as_ptr() as *mut c_char
+            Some("StormTrooper".to_owned())
         } else {
-            c"StormTrooper2".as_ptr() as *mut c_char
+            Some("StormTrooper2".to_owned())
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2166,7 +2183,7 @@ pub fn SP_NPC_StormtrooperOfficer(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3001-3006`
 pub fn SP_NPC_Snowtrooper(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"snowtrooper".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("snowtrooper".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2174,7 +2191,7 @@ pub fn SP_NPC_Snowtrooper(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3016-3021`
 pub fn SP_NPC_Tie_Pilot(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"stormpilot".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("stormpilot".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2182,11 +2199,11 @@ pub fn SP_NPC_Tie_Pilot(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3030-3045`
 pub fn SP_NPC_Ugnaught(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         let t = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-            c"Ugnaught".as_ptr() as *mut c_char
+            Some("Ugnaught".to_owned())
         } else {
-            c"Ugnaught2".as_ptr() as *mut c_char
+            Some("Ugnaught2".to_owned())
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2198,11 +2215,11 @@ pub fn SP_NPC_Ugnaught(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3056-3071`
 pub fn SP_NPC_Jawa(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         e.NPC_type = if e.spawnflags & 1 != 0 {
-            c"jawa_armed".as_ptr() as *mut c_char
+            Some("jawa_armed".to_owned())
         } else {
-            c"jawa".as_ptr() as *mut c_char
+            Some("jawa".to_owned())
         };
     }
     SP_NPC_spawner(ctx, self_);
@@ -2212,16 +2229,16 @@ pub fn SP_NPC_Jawa(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3084-3110`
 pub fn SP_NPC_Gran(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         if ctx.world.entity(self_).spawnflags & 1 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"granshooter".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("granshooter".to_owned());
         } else if ctx.world.entity(self_).spawnflags & 2 != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"granboxer".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("granboxer".to_owned());
         } else {
             let t = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-                c"gran".as_ptr() as *mut c_char
+                Some("gran".to_owned())
             } else {
-                c"gran2".as_ptr() as *mut c_char
+                Some("gran2".to_owned())
             };
             ctx.world.entity_mut(self_).NPC_type = t;
         }
@@ -2234,11 +2251,11 @@ pub fn SP_NPC_Gran(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3121-3136`
 pub fn SP_NPC_Rodian(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         e.NPC_type = if e.spawnflags & 1 != 0 {
-            c"rodian2".as_ptr() as *mut c_char
+            Some("rodian2".to_owned())
         } else {
-            c"rodian".as_ptr() as *mut c_char
+            Some("rodian".to_owned())
         };
     }
     SP_NPC_spawner(ctx, self_);
@@ -2248,12 +2265,12 @@ pub fn SP_NPC_Rodian(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3145-3167`
 pub fn SP_NPC_Weequay(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         let t = match ctx.world.bg_state.rng.Q_irand(0, 3) {
-            0 => c"Weequay".as_ptr() as *mut c_char,
-            1 => c"Weequay2".as_ptr() as *mut c_char,
-            2 => c"Weequay3".as_ptr() as *mut c_char,
-            _ => c"Weequay4".as_ptr() as *mut c_char,
+            0 => Some("Weequay".to_owned()),
+            1 => Some("Weequay2".to_owned()),
+            2 => Some("Weequay3".to_owned()),
+            _ => Some("Weequay4".to_owned()),
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2265,8 +2282,8 @@ pub fn SP_NPC_Weequay(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3176-3184`
 pub fn SP_NPC_Trandoshan(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
-        e.NPC_type = c"Trandoshan".as_ptr() as *mut c_char;
+    if e.NPC_type.is_none() {
+        e.NPC_type = Some("Trandoshan".to_owned());
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2276,11 +2293,11 @@ pub fn SP_NPC_Trandoshan(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3193-3208`
 pub fn SP_NPC_Tusken(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         e.NPC_type = if e.spawnflags & 1 != 0 {
-            c"tuskensniper".as_ptr() as *mut c_char
+            Some("tuskensniper".to_owned())
         } else {
-            c"tusken".as_ptr() as *mut c_char
+            Some("tusken".to_owned())
         };
     }
     SP_NPC_spawner(ctx, self_);
@@ -2291,8 +2308,8 @@ pub fn SP_NPC_Tusken(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3217-3225`
 pub fn SP_NPC_Noghri(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
-        e.NPC_type = c"noghri".as_ptr() as *mut c_char;
+    if e.NPC_type.is_none() {
+        e.NPC_type = Some("noghri".to_owned());
     }
     SP_NPC_spawner(ctx, self_);
 }
@@ -2302,11 +2319,11 @@ pub fn SP_NPC_Noghri(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3235-3250`
 pub fn SP_NPC_SwampTrooper(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         e.NPC_type = if e.spawnflags & 1 != 0 {
-            c"SwampTrooper2".as_ptr() as *mut c_char
+            Some("SwampTrooper2".to_owned())
         } else {
-            c"SwampTrooper".as_ptr() as *mut c_char
+            Some("SwampTrooper".to_owned())
         };
     }
     SP_NPC_spawner(ctx, self_);
@@ -2317,13 +2334,13 @@ pub fn SP_NPC_SwampTrooper(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3267-3301`
 pub fn SP_NPC_Imperial(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         if e.spawnflags & 1 != 0 {
-            e.NPC_type = c"ImpOfficer".as_ptr() as *mut c_char;
+            e.NPC_type = Some("ImpOfficer".to_owned());
         } else if e.spawnflags & 2 != 0 {
-            e.NPC_type = c"ImpCommander".as_ptr() as *mut c_char;
+            e.NPC_type = Some("ImpCommander".to_owned());
         } else {
-            e.NPC_type = c"Imperial".as_ptr() as *mut c_char;
+            e.NPC_type = Some("Imperial".to_owned());
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2333,13 +2350,13 @@ pub fn SP_NPC_Imperial(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3310-3329`
 pub fn SP_NPC_ImpWorker(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         if ctx.world.bg_state.rng.Q_irand(0, 2) == 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"ImpWorker".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("ImpWorker".to_owned());
         } else if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-            ctx.world.entity_mut(self_).NPC_type = c"ImpWorker2".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("ImpWorker2".to_owned());
         } else {
-            ctx.world.entity_mut(self_).NPC_type = c"ImpWorker3".as_ptr() as *mut c_char;
+            ctx.world.entity_mut(self_).NPC_type = Some("ImpWorker3".to_owned());
         }
     }
     SP_NPC_spawner(ctx, self_);
@@ -2349,11 +2366,11 @@ pub fn SP_NPC_ImpWorker(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3338-3353`
 pub fn SP_NPC_BespinCop(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         let t = if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-            c"BespinCop".as_ptr() as *mut c_char
+            Some("BespinCop".to_owned())
         } else {
-            c"BespinCop2".as_ptr() as *mut c_char
+            Some("BespinCop2".to_owned())
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2365,17 +2382,17 @@ pub fn SP_NPC_BespinCop(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3372-3400`
 pub fn SP_NPC_Reborn(ctx: &mut GameContext, self_: EntityId) {
     let e = ctx.world.entity_mut(self_);
-    if e.NPC_type.is_null() {
+    if e.NPC_type.is_none() {
         if e.spawnflags & 1 != 0 {
-            e.NPC_type = c"rebornforceuser".as_ptr() as *mut c_char;
+            e.NPC_type = Some("rebornforceuser".to_owned());
         } else if e.spawnflags & 2 != 0 {
-            e.NPC_type = c"rebornfencer".as_ptr() as *mut c_char;
+            e.NPC_type = Some("rebornfencer".to_owned());
         } else if e.spawnflags & 4 != 0 {
-            e.NPC_type = c"rebornacrobat".as_ptr() as *mut c_char;
+            e.NPC_type = Some("rebornacrobat".to_owned());
         } else if e.spawnflags & 8 != 0 {
-            e.NPC_type = c"rebornboss".as_ptr() as *mut c_char;
+            e.NPC_type = Some("rebornboss".to_owned());
         } else {
-            e.NPC_type = c"reborn".as_ptr() as *mut c_char;
+            e.NPC_type = Some("reborn".to_owned());
         }
     }
     WP_SetSaberModel(None, CLASS_REBORN);
@@ -2386,11 +2403,11 @@ pub fn SP_NPC_Reborn(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3409-3427`
 pub fn SP_NPC_ShadowTrooper(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).NPC_type.is_null() {
+    if ctx.world.entity(self_).NPC_type.is_none() {
         let t = if ctx.world.bg_state.rng.Q_irand(0, 1) == 0 {
-            c"ShadowTrooper".as_ptr() as *mut c_char
+            Some("ShadowTrooper".to_owned())
         } else {
-            c"ShadowTrooper2".as_ptr() as *mut c_char
+            Some("ShadowTrooper2".to_owned())
         };
         ctx.world.entity_mut(self_).NPC_type = t;
     }
@@ -2403,7 +2420,7 @@ pub fn SP_NPC_ShadowTrooper(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3439-3444`
 pub fn SP_NPC_Monster_Murjj(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Murjj".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Murjj".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2411,7 +2428,7 @@ pub fn SP_NPC_Monster_Murjj(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3453-3458`
 pub fn SP_NPC_Monster_Swamp(ctx: &mut GameContext, self_: EntityId) {
-    ctx.world.entity_mut(self_).NPC_type = c"Swamp".as_ptr() as *mut c_char;
+    ctx.world.entity_mut(self_).NPC_type = Some("Swamp".to_owned());
     SP_NPC_spawner(ctx, self_);
 }
 
@@ -2419,7 +2436,7 @@ pub fn SP_NPC_Monster_Swamp(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3467-3472`
 pub fn SP_NPC_Monster_Howler(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"howler".as_ptr() as *const c_char);
+    let s = Some("howler".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2428,7 +2445,7 @@ pub fn SP_NPC_Monster_Howler(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3481-3487`
 pub fn SP_NPC_MineMonster(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"minemonster".as_ptr() as *const c_char);
+    let s = Some("minemonster".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_MineMonster_Precache(ctx);
@@ -2438,7 +2455,7 @@ pub fn SP_NPC_MineMonster(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3496-3501`
 pub fn SP_NPC_Monster_Claw(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"Claw".as_ptr() as *const c_char);
+    let s = Some("Claw".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2447,7 +2464,7 @@ pub fn SP_NPC_Monster_Claw(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3510-3515`
 pub fn SP_NPC_Monster_Glider(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"Glider".as_ptr() as *const c_char);
+    let s = Some("Glider".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2456,7 +2473,7 @@ pub fn SP_NPC_Monster_Glider(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3524-3529`
 pub fn SP_NPC_Monster_Flier2(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"Flier2".as_ptr() as *const c_char);
+    let s = Some("Flier2".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2465,7 +2482,7 @@ pub fn SP_NPC_Monster_Flier2(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3538-3543`
 pub fn SP_NPC_Monster_Lizard(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"Lizard".as_ptr() as *const c_char);
+    let s = Some("Lizard".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2474,7 +2491,7 @@ pub fn SP_NPC_Monster_Lizard(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3552-3557`
 pub fn SP_NPC_Monster_Fish(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"Fish".as_ptr() as *const c_char);
+    let s = Some("Fish".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2483,7 +2500,7 @@ pub fn SP_NPC_Monster_Fish(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3568-3575`
 pub fn SP_NPC_Monster_Wampa(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"wampa".as_ptr() as *const c_char);
+    let s = Some("wampa".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     NPC_Wampa_Precache(ctx);
     SP_NPC_spawner(ctx, self_);
@@ -2493,7 +2510,7 @@ pub fn SP_NPC_Monster_Wampa(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3584-3589`
 pub fn SP_NPC_Monster_Rancor(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"rancor".as_ptr() as *const c_char);
+    let s = Some("rancor".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
 }
@@ -2502,7 +2519,7 @@ pub fn SP_NPC_Monster_Rancor(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3602-3609`
 pub fn SP_NPC_Droid_Interrogator(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"interrogator".as_ptr() as *const c_char);
+    let s = Some("interrogator".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Interrogator_Precache(ctx, Some(self_));
@@ -2512,7 +2529,7 @@ pub fn SP_NPC_Droid_Interrogator(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3620-3627`
 pub fn SP_NPC_Droid_Probe(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"probe".as_ptr() as *const c_char);
+    let s = Some("probe".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Probe_Precache(ctx);
@@ -2522,7 +2539,7 @@ pub fn SP_NPC_Droid_Probe(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3639-3646`
 pub fn SP_NPC_Droid_Mark1(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"mark1".as_ptr() as *const c_char);
+    let s = Some("mark1".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Mark1_Precache(ctx);
@@ -2532,7 +2549,7 @@ pub fn SP_NPC_Droid_Mark1(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3658-3665`
 pub fn SP_NPC_Droid_Mark2(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"mark2".as_ptr() as *const c_char);
+    let s = Some("mark2".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Mark2_Precache(ctx);
@@ -2543,9 +2560,9 @@ pub fn SP_NPC_Droid_Mark2(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3674-3688`
 pub fn SP_NPC_Droid_ATST(ctx: &mut GameContext, self_: EntityId) {
     let s = if ctx.world.entity(self_).spawnflags & 1 != 0 {
-        G_NewString(ctx, c"atst_vehicle".as_ptr() as *const c_char)
+        Some("atst_vehicle".to_owned())
     } else {
-        G_NewString(ctx, c"atst".as_ptr() as *const c_char)
+        Some("atst".to_owned())
     };
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
@@ -2556,7 +2573,7 @@ pub fn SP_NPC_Droid_ATST(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3699-3706`
 pub fn SP_NPC_Droid_Remote(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"remote".as_ptr() as *const c_char);
+    let s = Some("remote".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Remote_Precache(ctx);
@@ -2566,7 +2583,7 @@ pub fn SP_NPC_Droid_Remote(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3717-3724`
 pub fn SP_NPC_Droid_Seeker(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"seeker".as_ptr() as *const c_char);
+    let s = Some("seeker".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Seeker_Precache(ctx);
@@ -2576,7 +2593,7 @@ pub fn SP_NPC_Droid_Seeker(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3735-3742`
 pub fn SP_NPC_Droid_Sentry(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"sentry".as_ptr() as *const c_char);
+    let s = Some("sentry".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Sentry_Precache(ctx);
@@ -2586,7 +2603,7 @@ pub fn SP_NPC_Droid_Sentry(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3755-3763`
 pub fn SP_NPC_Droid_Gonk(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"gonk".as_ptr() as *const c_char);
+    let s = Some("gonk".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Gonk_Precache(ctx);
@@ -2596,7 +2613,7 @@ pub fn SP_NPC_Droid_Gonk(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:3776-3785`
 pub fn SP_NPC_Droid_Mouse(ctx: &mut GameContext, self_: EntityId) {
-    let s = G_NewString(ctx, c"mouse".as_ptr() as *const c_char);
+    let s = Some("mouse".to_owned());
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
     NPC_Mouse_Precache(ctx);
@@ -2607,9 +2624,9 @@ pub fn SP_NPC_Droid_Mouse(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3798-3812`
 pub fn SP_NPC_Droid_R2D2(ctx: &mut GameContext, self_: EntityId) {
     let s = if ctx.world.entity(self_).spawnflags & 1 != 0 {
-        G_NewString(ctx, c"r2d2_imp".as_ptr() as *const c_char)
+        Some("r2d2_imp".to_owned())
     } else {
-        G_NewString(ctx, c"r2d2".as_ptr() as *const c_char)
+        Some("r2d2".to_owned())
     };
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
@@ -2621,9 +2638,9 @@ pub fn SP_NPC_Droid_R2D2(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3826-3840`
 pub fn SP_NPC_Droid_R5D2(ctx: &mut GameContext, self_: EntityId) {
     let s = if ctx.world.entity(self_).spawnflags & 1 != 0 {
-        G_NewString(ctx, c"r5d2_imp".as_ptr() as *const c_char)
+        Some("r5d2_imp".to_owned())
     } else {
-        G_NewString(ctx, c"r5d2".as_ptr() as *const c_char)
+        Some("r5d2".to_owned())
     };
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
@@ -2635,9 +2652,9 @@ pub fn SP_NPC_Droid_R5D2(ctx: &mut GameContext, self_: EntityId) {
 /// Source: `oracle/codemp/game/NPC_spawn.c:3851-3864`
 pub fn SP_NPC_Droid_Protocol(ctx: &mut GameContext, self_: EntityId) {
     let s = if ctx.world.entity(self_).spawnflags & 1 != 0 {
-        G_NewString(ctx, c"protocol_imp".as_ptr() as *const c_char)
+        Some("protocol_imp".to_owned())
     } else {
-        G_NewString(ctx, c"protocol".as_ptr() as *const c_char)
+        Some("protocol".to_owned())
     };
     ctx.world.entity_mut(self_).NPC_type = s;
     SP_NPC_spawner(ctx, self_);
@@ -2749,10 +2766,10 @@ pub fn NPC_SpawnType(
     );
 
     unsafe {
-        (*npc_spawner).NPC_type = G_NewString(ctx, cstr(npc_type).as_ptr());
+        (*npc_spawner).NPC_type = Some(npc_type.to_owned());
 
         if let Some(targetname) = targetname {
-            (*npc_spawner).NPC_targetname = G_NewString(ctx, cstr(targetname).as_ptr());
+            (*npc_spawner).NPC_targetname = targetname.to_owned();
         }
 
         (*npc_spawner).count = 1;
@@ -2924,7 +2941,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                     Com_Printf(
                         &format!(
                             "Killing NPC {} named {}\n",
-                            unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                            player.NPC_type.as_deref().unwrap_or(""),
                             unsafe { cstr_to_str(player.targetname as *const c_char) }
                         ),
                     );
@@ -2946,7 +2963,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         }
                     }
                 }
-            } else if !player.NPC_type.is_null() && !player.classname.is_null() {
+            } else if player.NPC_type.is_some() && !player.classname.is_null() {
                 unsafe {
                     if (*player.classname) != b'\0' as c_char
                         && Q_stricmp("NPC_starfleet", &cstr_to_str(player.classname)) != 0
@@ -2954,8 +2971,8 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         Com_Printf(
                             &format!(
                                 "Removing NPC spawner {} with NPC named {}\n",
-                                cstr_to_str(player.NPC_type as *const c_char),
-                                cstr_to_str(player.NPC_targetname as *const c_char)
+                                player.NPC_type.as_deref().unwrap_or(""),
+                                player.NPC_targetname.clone()
                             ),
                         );
                         // STAGE-1: raw pointer cast ends the `player` borrow before
@@ -2971,7 +2988,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                     Com_Printf(
                         &format!(
                             "Killing NPC {} named {}\n",
-                            unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                            player.NPC_type.as_deref().unwrap_or(""),
                             unsafe { cstr_to_str(player.targetname as *const c_char) }
                         ),
                     );
@@ -2998,7 +3015,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                 Com_Printf(
                     &format!(
                         "Killing NPC {} named {}\n",
-                        unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                        player.NPC_type.as_deref().unwrap_or(""),
                         unsafe { cstr_to_str(player.targetname as *const c_char) }
                     ),
                 );

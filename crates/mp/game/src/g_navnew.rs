@@ -46,7 +46,7 @@ use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;

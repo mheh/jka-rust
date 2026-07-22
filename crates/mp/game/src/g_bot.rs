@@ -8,8 +8,8 @@ use crate::trap;
 use mp_bg::public::gametype::{
     GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_POWERDUEL, GT_SIEGE, GT_TEAM,
 };
-use native_string::atof::atof;
-use native_string::atoi::atoi;
+use native_string::atof;
+use native_string::atoi;
 
 use crate::ai_main::BotAISetupClient;
 use crate::ai_wpnav::LoadPath_ThisLevel;
@@ -22,7 +22,7 @@ use crate::g_team::{S_COLOR_RED, S_COLOR_YELLOW};
 use crate::level::bot_settings::bot_settings_t;
 use crate::q_shared::{COM_Parse, COM_ParseExt, Info_SetValueForKey};
 use native_string::{buf_to_string, strncpyz_string};
-use native_string::info::Info_ValueForKey;
+use native_string::Info_ValueForKey;
 use native_string::{Q_CleanStr, Q_stricmp};
 use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
 

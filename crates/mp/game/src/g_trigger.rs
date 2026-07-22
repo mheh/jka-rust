@@ -39,7 +39,7 @@ use crate::g_utils::{
 use crate::q_math::vec3_origin;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
@@ -550,11 +550,11 @@ pub fn Touch_Multi(
             }
         }
 
-        let npc_targetname = ctx.world.entity(self_id).NPC_targetname;
-        if !npc_targetname.is_null() && unsafe { *npc_targetname } != 0 {
+        let npc_targetname = ctx.world.entity(self_id).NPC_targetname.clone();
+        if !npc_targetname.is_empty() {
             let script_targetname = ctx.world.entity(other).script_targetname;
             if !script_targetname.is_null() && unsafe { *script_targetname } != 0 {
-                if q_shared::Q_stricmp(npc_targetname, script_targetname) != 0 {
+                if Q_stricmp(&npc_targetname, &(unsafe { cstr_to_str(script_targetname) })) != 0 {
                     // not the right guy to fire me off
                     return;
                 }

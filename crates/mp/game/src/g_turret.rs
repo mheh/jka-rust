@@ -30,7 +30,7 @@ use crate::prelude::*;
 use crate::q_math::{
     vectoangles, AngleNormalize180, AngleSubtract, AngleVectors, VectorLengthSquared, PITCH, YAW,
 };
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use crate::trap;
 use crate::NPC_combat::G_SetEnemy;
 use mp_bg::bg_misc::snap_vector;
@@ -694,14 +694,14 @@ pub fn turret_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 
             let atst_name = "atst_vehicle";
             let target_is_atst = {
-                let p = ctx.world.entity(target_id).NPC_type;
-                !p.is_null() && Q_stricmp(&(unsafe { cstr_to_str(p) }), atst_name) == 0
+                let p = ctx.world.entity(target_id).NPC_type.as_deref();
+                p.is_some_and(|p| Q_stricmp(p, atst_name) == 0)
             };
             let has_best = bestTarget.is_some();
             let best_is_atst = match bestTarget {
                 Some(b) => {
-                    let p = ctx.world.entity(b).NPC_type;
-                    !p.is_null() && Q_stricmp(&(unsafe { cstr_to_str(p) }), atst_name) == 0
+                    let p = ctx.world.entity(b).NPC_type.as_deref();
+                    p.is_some_and(|p| Q_stricmp(p, atst_name) == 0)
                 }
                 None => false,
             };

@@ -33,8 +33,8 @@ use std::ffi::{CStr, CString};
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
-use native_string::atof::atof_bytes;
-use native_string::atoi::atoi_bytes;
+use native_string::atof_bytes;
+use native_string::atoi_bytes;
 
 use crate::g_items::G_SpawnItem;
 use crate::g_main::{G_Error, G_Printf};
@@ -42,7 +42,7 @@ use crate::g_mem::G_Alloc;
 use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};
 use crate::NPC_utils::G_ActivateBehavior;
-use native_string::q_string::{Q_stricmp, Q_strncmp};
+use native_string::{Q_stricmp, Q_strncmp};
 use mp_bg::bg_misc::{BG_FindItem, BG_ParseField};
 use mp_bg::bg_panimate::BG_ParseAnimationFile;
 
@@ -425,11 +425,7 @@ pub static FIELDS: &[BG_field_t] = &[
     ),
     field_owned(c"target5", set_target5),
     field_owned(c"target6", set_target6),
-    field(
-        c"NPC_targetname",
-        core::mem::offset_of!(gentity_t, NPC_targetname),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"NPC_targetname", set_NPC_targetname),
     field_owned(c"NPC_target", set_NPC_target),
     field(
         c"NPC_target2",
@@ -441,11 +437,7 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, target4),
         fieldtype_t::F_LSTRING,
     ), // NPC_spawner only
-    field(
-        c"NPC_type",
-        core::mem::offset_of!(gentity_t, NPC_type),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"NPC_type", set_NPC_type),
     field(
         c"targetname",
         core::mem::offset_of!(gentity_t, targetname),
@@ -714,6 +706,14 @@ fn set_ownername(ent: *mut byte, val: &str) {
 }
 fn set_NPC_target(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).NPC_target = val.to_owned() };
+}
+// `NPC_type` is `Option<String>` (`None` ≡ Raven NULL); a present spawn key —
+// even `""` — is `Some(..)`, matching Raven's non-NULL pool pointer.
+fn set_NPC_type(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).NPC_type = Some(val.to_owned()) };
+}
+fn set_NPC_targetname(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).NPC_targetname = val.to_owned() };
 }
 fn set_target5(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).target5 = val.to_owned() };

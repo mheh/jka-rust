@@ -20,7 +20,7 @@ use crate::q_math::{
     _VectorCopy, _VectorMA, _VectorSubtract, vectoangles, AngleNormalize180, AnglesSubtract,
     VectorLengthSquared, VectorNormalize,
 };
-use native_string::q_string::{Q_stricmp, Q_strncmp};
+use native_string::{Q_stricmp, Q_strncmp};
 use crate::trap;
 use crate::NPC_utils::NPC_SetBoneAngles;
 use mp_bg::public::team::TEAM_SPECTATOR;
@@ -340,11 +340,11 @@ pub fn VEH_TurretFindEnemies(
                     // not a breakable brush
                     || ctx.world.entity(target_id).takedamage == qfalse
                     // is a bbrush, but invincible
-                    || (!ctx.world.entity(target_id).NPC_targetname.is_null()
+                    || (!ctx.world.entity(target_id).NPC_targetname.is_empty()
                         && !ctx.world.entity(parent).targetname.is_null()
-                        && q_shared::Q_stricmp(
-                            ctx.world.entity(target_id).NPC_targetname,
-                            ctx.world.entity(parent).targetname,
+                        && Q_stricmp(
+                            &ctx.world.entity(target_id).NPC_targetname,
+                            &(unsafe { cstr_to_str(ctx.world.entity(parent).targetname) }),
                         ) != 0)
                 {
                     // not in invicible bbrush, but can only be broken by an NPC that is not me

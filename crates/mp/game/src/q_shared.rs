@@ -17,8 +17,8 @@ use core::ffi::CStr;
 
 use crate::c_format::{c_vsprintf, FmtArg};
 use crate::prelude::*;
-use native_string::atof::atof_bytes;
-use native_string::info::InfoSetResult;
+use native_string::atof_bytes;
+use native_string::InfoSetResult;
 
 // S5-5: the `QSharedScratch` type and the `QSharedScratch`-threaded
 // `COM_Parse*` family are canonical in `mp_qshared` now (below the bg tier so

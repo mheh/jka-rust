@@ -21,8 +21,8 @@ use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
 use mp_bg::bg_misc::selected_holdable_tag;
 use mp_bg::public::gametype::GT_SIEGE;
-use native_string::atof::atof_bytes;
-use native_string::atoi::{atoi, atoi_bytes};
+use native_string::atof_bytes;
+use native_string::{atoi, atoi_bytes};
 use native_string::strncpyz_string;
 use native_string::{Q_CleanStr, Q_stricmp};
 

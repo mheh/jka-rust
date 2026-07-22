@@ -11,7 +11,7 @@ use crate::client::spectator_state::spectatorState_t::*;
 use crate::g_main::{G_PowerDuelCount, G_Printf};
 use crate::prelude::*;
 use mp_bg::public::duel_team::duelTeam_t::*;
-use native_string::atoi::atoi;
+use native_string::atoi;
 use native_string::strncpyz_string;
 
 /// Raven `G_WriteClientSessionData`.

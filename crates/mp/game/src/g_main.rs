@@ -18,7 +18,7 @@
 
 
 use crate::prelude::*;
-use native_string::atof::atof_bytes;
+use native_string::atof_bytes;
 
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};

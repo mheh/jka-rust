@@ -32,7 +32,7 @@ use core::ffi::CStr;
 use crate::g_utils::{G_Find, G_TempEntity};
 use crate::prelude::*;
 use crate::q_math::VectorLength;
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use crate::trap;
 use core::mem::size_of;
 use mp_abi::game::syscalls::G_BOT_CALCULATEPATHS::GBotCalculatepathsArgs;
@@ -41,8 +41,8 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
-use native_string::atof::atof_bytes;
-use native_string::atoi::atoi_bytes;
+use native_string::atof_bytes;
+use native_string::atoi_bytes;
 
 /// Raven `botGlobalNavWeaponWeights[WP_NUM_WEAPONS]` — per-weapon-index bot
 /// pickup weighting table used by nav item scoring. C's brace initializer is

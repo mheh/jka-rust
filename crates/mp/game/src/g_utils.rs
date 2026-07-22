@@ -16,7 +16,7 @@
 
 use crate::prelude::*;
 use crate::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use native_string::strncpyz_string;
 
 use crate::client::gclient_t;

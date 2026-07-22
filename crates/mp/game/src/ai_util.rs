@@ -21,7 +21,7 @@ use mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerV
 use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFile;
 use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFile;
 use mp_abi::game::syscalls::G_FS_READ::GFsRead;
-use native_string::atof::atof_bytes;
+use native_string::atof_bytes;
 
 /// Raven `B_TempAlloc`.
 ///

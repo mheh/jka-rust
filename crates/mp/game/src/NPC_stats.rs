@@ -17,7 +17,7 @@ use crate::q_shared::COM_BeginParseSession;
 use crate::prelude::*;
 use crate::g_utils::G_ModelIndex;
 use crate::g_utils::G_SoundIndex;
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use mp_bg::bg_saberLoad::qstricmp_eq;
 
 // `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` canonical in `mp_bg::public::viewheight`
@@ -438,7 +438,7 @@ pub fn G_ParseAnimFileSet(
 /// Raven: entire body is compiled out (`#if 0 //rwwFIXMEFIXME: Actually
 /// precache stuff here.` ... `#endif`) — the live function is a no-op.
 /// Source: `oracle/codemp/game/NPC_stats.c:439-548`
-pub fn NPC_PrecacheAnimationCFG(NPC_type: *const c_char) {
+pub fn NPC_PrecacheAnimationCFG(NPC_type: &str) {
     let _ = NPC_type;
     // Deliberate no-op: matches the oracle's `#if 0`-disabled body verbatim.
 }
@@ -450,12 +450,11 @@ pub fn NPC_PrecacheWeapons(
     ctx: &mut GameContext,
     playerTeam: team_t,
     spawnflags: c_int,
-    NPCtype: *mut c_char,
+    NPCtype: &str,
 ) {
     use mp_bg::weapons::weapon_t::{WP_NUM_WEAPONS, WP_SABER};
 
-    let weapons =
-        crate::NPC_spawn::NPC_WeaponsForTeam(playerTeam, spawnflags, NPCtype as *const c_char);
+    let weapons = crate::NPC_spawn::NPC_WeaponsForTeam(playerTeam, spawnflags, NPCtype);
 
     let mut curWeap = WP_SABER;
     while curWeap < WP_NUM_WEAPONS {
@@ -487,7 +486,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         let mut sound: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut playerModel: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
 
-        if Q_stricmp("random", &cstr_to_str(ctx.world.entity(spawner).NPC_type)) == 0 {
+        if Q_stricmp("random", ctx.world.entity(spawner).NPC_type.as_deref().unwrap_or("")) == 0 {
             //sorry, can't precache a random just yet
             return;
         }
@@ -510,7 +509,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
             if *token == 0 {
                 return;
             }
-            if crate::q_shared::Q_stricmp(token, ctx.world.entity(spawner).NPC_type) == 0 {
+            if Q_stricmp(&cstr_to_str(token), ctx.world.entity(spawner).NPC_type.as_deref().unwrap_or("")) == 0 {
                 break;
             }
             crate::q_shared::SkipBracedSection(
@@ -543,7 +542,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
             if *token == 0 {
                 let msg = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
-                    cstr_to_str(ctx.world.entity(spawner).NPC_type)
+                    ctx.world.entity(spawner).NPC_type.as_deref().unwrap_or("")
                 );
                 crate::g_main::Com_Printf(&msg);
                 return;
@@ -811,12 +810,12 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
 
         //precache this NPC's possible weapons
         let spawner_spawnflags = ctx.world.entity(spawner).spawnflags;
-        let spawner_npc_type = ctx.world.entity(spawner).NPC_type;
+        let spawner_npc_type = ctx.world.entity(spawner).NPC_type.clone();
         crate::NPC_stats::NPC_PrecacheWeapons(
             ctx,
             player_team,
             spawner_spawnflags,
-            spawner_npc_type,
+            spawner_npc_type.as_deref().unwrap_or(""),
         );
 
         //	CG_RegisterNPCCustomSounds( &ci );
@@ -829,7 +828,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
 /// Raven `NPC_ParseParms`.
 ///
 /// Source: `oracle/codemp/game/NPC_stats.c:974-3233`
-pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: EntityId) -> qboolean {
+pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) -> qboolean {
     use crate::client::render_info::renderInfo_t;
     use crate::npc::g_npcstats_e::gNPCstats_t;
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
@@ -863,8 +862,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         let mut npcSaber2: c_int = 0;
 
         write_cstr_field(&mut customSkin, "default");
-        if NPCName.is_null() || *NPCName == 0 {
-            NPCName = c"Player".as_ptr();
+        if NPCName.is_empty() {
+            NPCName = "Player";
         }
 
         let npc_ptr = ctx.world.entity(NPC).NPC;
@@ -924,7 +923,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         (*client_ptr).ps.customRGBA[2] = 255;
         (*client_ptr).ps.customRGBA[3] = 255;
 
-        if Q_stricmp("random", &cstr_to_str(NPCName)) == 0 {
+        if Q_stricmp("random", NPCName) == 0 {
             //Randomly assemble a starfleet guy
             //NPC_BuildRandom( NPC );
             crate::g_main::Com_Printf("RANDOM NPC NOT SUPPORTED IN MP\n");
@@ -948,7 +947,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             if *token == 0 {
                 return 0;
             }
-            if crate::q_shared::Q_stricmp(token, NPCName) == 0 {
+            if Q_stricmp(&cstr_to_str(token), NPCName) == 0 {
                 break;
             }
             crate::q_shared::SkipBracedSection(
@@ -980,7 +979,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             if *token == 0 {
                 let msg = format!(
                     "ERROR: unexpected EOF while parsing '{}'\n",
-                    cstr_to_str(NPCName)
+                    NPCName
                 );
                 crate::g_main::Com_Printf(&msg);
                 return 0;
@@ -1214,7 +1213,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             let msg = format!(
                                 "WARNING: bad {} in NPC '{}'\n",
                                 cstr_to_str(token),
-                                cstr_to_str(NPCName)
+                                NPCName
                             );
                             crate::g_main::Com_Printf(&msg);
                             continue 'parse;
@@ -1252,7 +1251,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     let msg = format!(
                         "bad {} in NPC '{}'\n",
                         cstr_to_str(token),
-                        cstr_to_str(NPCName)
+                        NPCName
                     );
                     crate::g_main::Com_Printf(&msg);
                     continue;
@@ -1293,7 +1292,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             let msg = format!(
                                 "bad {} in NPC '{}'\n",
                                 cstr_to_str(token),
-                                cstr_to_str(NPCName)
+                                NPCName
                             );
                             crate::g_main::Com_Printf(&msg);
                             continue 'parse;
@@ -1335,7 +1334,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                 let msg = format!(
                                     "bad {} in NPC '{}'\n",
                                     cstr_to_str(token),
-                                    cstr_to_str(NPCName)
+                                    NPCName
                                 );
                                 crate::g_main::Com_Printf(&msg);
                                 continue 'parse;
@@ -1368,7 +1367,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1398,7 +1397,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1430,7 +1429,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1459,7 +1458,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1488,7 +1487,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1517,7 +1516,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1566,7 +1565,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     let msg = format!(
                         "WARNING: bad {} in NPC '{}'\n",
                         cstr_to_str(token),
-                        cstr_to_str(NPCName)
+                        NPCName
                     );
                     crate::g_main::Com_Printf(&msg);
                     continue;
@@ -1671,7 +1670,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         //you didn't spawn this guy right!
                         let msg = format!(
                             "ERROR: Tried to spawn a vehicle NPC ({}) without using NPC_Vehicle or 'NPC spawn vehicle <vehiclename>'!!!  Bad, bad, bad!  Shame on you!\n",
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         return 0; // qfalse
@@ -1704,7 +1703,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                             let msg = format!(
                                 "bad {} in NPC '{}'\n",
                                 cstr_to_str(token),
-                                cstr_to_str(NPCName)
+                                NPCName
                             );
                             crate::g_main::Com_Printf(&msg);
                             continue 'parse;
@@ -1841,7 +1840,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1873,7 +1872,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                                 let msg = format!(
                                     "WARNING: bad {} in NPC '{}'\n",
                                     cstr_to_str(token),
-                                    cstr_to_str(NPCName)
+                                    NPCName
                                 );
                                 crate::g_main::Com_Printf(&msg);
                                 continue 'parse;
@@ -1905,7 +1904,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "WARNING: bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -1943,7 +1942,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         let msg = format!(
                             "WARNING: bad {} in NPC '{}'\n",
                             cstr_to_str(token),
-                            cstr_to_str(NPCName)
+                            NPCName
                         );
                         crate::g_main::Com_Printf(&msg);
                         continue;
@@ -2511,7 +2510,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 let msg = format!(
                     "WARNING: unknown keyword '{}' while parsing '{}'\n",
                     cstr_to_str(token),
-                    cstr_to_str(NPCName)
+                    NPCName
                 );
                 crate::g_main::Com_Printf(&msg);
             }
@@ -2558,7 +2557,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
             if !client_ptr.is_null() && (*client_ptr).NPC_class == CLASS_VEHICLE {
                 //vehicles want their names fed in as models
                 //we put the $ in front to indicate a name and not a model
-                write_cstr_field(&mut playerModel, &format!("${}", cstr_to_str(NPCName)));
+                write_cstr_field(&mut playerModel, &format!("${}", NPCName));
             }
             crate::g_client::SetupGameGhoul2Model(
                 ctx,
@@ -2567,9 +2566,9 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                 customSkin.as_mut_ptr(),
             );
 
-            if ctx.world.entity(NPC).NPC_type.is_null() {
+            if ctx.world.entity(NPC).NPC_type.is_none() {
                 //just do this for now so NPC_Precache can see the name.
-                ctx.world.entity_mut(NPC).NPC_type = NPCName as *mut c_char;
+                ctx.world.entity_mut(NPC).NPC_type = Some(NPCName.to_owned());
                 set_type_back = 1;
             }
 
@@ -2577,7 +2576,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
 
             if set_type_back != 0 {
                 //don't want this being set if we aren't ready yet.
-                ctx.world.entity_mut(NPC).NPC_type = std::ptr::null_mut();
+                ctx.world.entity_mut(NPC).NPC_type = None;
             }
         } else {
             crate::g_main::Com_Printf("MD3 MODEL NPC'S ARE NOT SUPPORTED IN MP!\n");

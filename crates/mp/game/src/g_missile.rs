@@ -15,7 +15,7 @@ use crate::prelude::*;
 use crate::trap;
 // Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
 // genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 
 use crate::g_weapon::SnapVectorTowards;
 use crate::q_math::{

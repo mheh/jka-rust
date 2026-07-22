@@ -184,12 +184,15 @@ pub struct gentity_t {
     /// Brushes with this content value will be collided against when moving.
     /// Raven field source: `oracle/codemp/game/g_local.h:226`
     pub clipmask: c_int,
+    /// Owned NPC species name for NPC_spawners; `None` ≡ Raven NULL (the code
+    /// distinguishes a never-set spawner from one whose type resolved to `""`).
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:230`
-    pub NPC_type: *mut c_char,
+    pub NPC_type: Option<String>,
+    /// Owned copy of the NPC_spawner's target name; `""` ≡ absent.
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:231`
-    pub NPC_targetname: *mut c_char,
+    pub NPC_targetname: String,
     /// Owned copy of the NPC_spawner's target name; `""` ≡ absent.
     /// Only used by NPC_spawners.
     /// Raven field source: `oracle/codemp/game/g_local.h:232`
@@ -445,6 +448,8 @@ impl gentity_t {
         let _ = core::mem::take(&mut self.healingclass);
         let _ = core::mem::take(&mut self.healingsound);
         let _ = core::mem::take(&mut self.ownername);
+        let _ = core::mem::take(&mut self.NPC_type);
+        let _ = core::mem::take(&mut self.NPC_targetname);
         let _ = core::mem::take(&mut self.NPC_target);
         let _ = core::mem::take(&mut self.target5);
         let _ = core::mem::take(&mut self.target6);
@@ -468,6 +473,8 @@ impl gentity_t {
         core::ptr::write(core::ptr::addr_of_mut!((*p).healingclass), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).healingsound), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).ownername), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).NPC_type), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).NPC_targetname), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).NPC_target), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).target5), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).target6), String::new());

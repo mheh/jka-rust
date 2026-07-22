@@ -39,7 +39,7 @@ use crate::npc::g_npc_t::gNPC_t;
 use crate::prelude::*;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
-use native_string::atoi::atoi_bytes;
+use native_string::atoi_bytes;
 use native_string::strncpyz_string;
 use native_string::MAX_INFO_STRING;
 

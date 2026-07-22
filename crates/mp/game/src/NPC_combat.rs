@@ -41,7 +41,7 @@ use crate::q_math::{
 };
 // Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
 // genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use crate::teams::class::*;
 use crate::teams::npcteam::{NPCTEAM_ENEMY, NPCTEAM_FREE, NPCTEAM_NEUTRAL, NPCTEAM_PLAYER};
 use crate::NPC_AI_Default::NPC_LostEnemyDecideChase;
@@ -568,9 +568,9 @@ pub fn G_SetEnemy(ctx: &mut GameContext, self_: EntityId, enemy: Option<EntityId
             }
 
             //Alert anyone else in the area
-            let npc_type = ctx.world.entity(self_).NPC_type;
-            if (npc_type.is_null() || Q_stricmp("desperado", &cstr_to_str(npc_type)) != 0)
-                && (npc_type.is_null() || Q_stricmp("paladin", &cstr_to_str(npc_type)) != 0)
+            let npc_type = ctx.world.entity(self_).NPC_type.clone();
+            if npc_type.as_deref().map_or(true, |s| Q_stricmp("desperado", s) != 0)
+                && npc_type.as_deref().map_or(true, |s| Q_stricmp("paladin", s) != 0)
             {
                 //special holodeck enemies exception
                 if (*client).ps.fd.forceGripBeingGripped < level_time as f32 {

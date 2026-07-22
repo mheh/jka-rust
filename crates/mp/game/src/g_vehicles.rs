@@ -48,7 +48,7 @@ use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
     AngleSubtract, AngleVectors, VectorNormalize,
 };
-use native_string::q_string::Q_strncmp;
+use native_string::Q_strncmp;
 use crate::trap;
 use crate::NPC_spawn::NPC_Spawn_Do;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;

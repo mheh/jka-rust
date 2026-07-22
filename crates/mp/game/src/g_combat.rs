@@ -23,7 +23,7 @@ use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleVectors,
     DirToByte, DistanceSquared, VectorCompare, VectorLengthSquared, VectorNormalize,
 };
-use native_string::q_string::{Q_stricmp, Q_strncmp};
+use native_string::{Q_stricmp, Q_strncmp};
 use native_string::strncpyz_string;
 use crate::g_vehicles::G_ShipSurfaceForSurfName;
 use crate::teams::class::class_t;

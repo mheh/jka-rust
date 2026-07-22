@@ -40,7 +40,7 @@ use crate::q_shared::Com_sprintf;
 use crate::trap;
 use crate::NPC_goal::G_BoundsOverlap;
 use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use native_string::strncpyz_string;
 use std::ffi::CStr;
 

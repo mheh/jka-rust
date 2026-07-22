@@ -40,7 +40,7 @@ use crate::g_utils::{
 };
 use crate::q_math::AngleVectors;
 use crate::NPC_utils::G_ActivateBehavior;
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;

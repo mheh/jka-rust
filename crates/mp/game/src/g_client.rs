@@ -46,7 +46,7 @@ use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_FREE, DUELTEAM_LONE, DUELTEA
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
-use native_string::atoi::atoi;
+use native_string::atoi;
 use native_string::strncpyz_string;
 use native_string::Q_stricmp;
 

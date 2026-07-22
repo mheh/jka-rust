@@ -21,10 +21,10 @@ use crate::prelude::*;
 use crate::g_utils::G_EffectIndex;
 use crate::g_utils::G_SoundIndex;
 use crate::g_utils::G_SoundOnEnt;
-use native_string::atof::atof;
+use native_string::atof;
 // Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
 // genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 
 // Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
 // (voice/entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s —
@@ -253,8 +253,8 @@ pub fn WP_ResistForcePush(
         if (ctx.world.entity(self_id).s.number == 0
             || (*client).NPC_class == CLASS_DESANN
             || {
-                let p = ctx.world.entity(self_id).NPC_type;
-                !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                let p = ctx.world.entity(self_id).NPC_type.as_deref();
+                p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
             }
             || (*client).NPC_class == CLASS_LUKE)
             && (crate::q_math::VectorLengthSquared((*client).ps.velocity) > 10000.0
@@ -1720,7 +1720,7 @@ pub fn Jedi_AdjustSaberAnimLevel(ctx: &mut GameContext, self_: Option<EntityId>,
         }
 
         if ctx.world.cvars.d_JediAI.integer != 0 {
-            let ty = cstr_to_str(ctx.world.entity(self_).NPC_type);
+            let ty = ctx.world.entity(self_).NPC_type.clone().unwrap_or_default();
             if (*client).ps.fd.saberAnimLevel == FORCE_LEVEL_1 {
                 crate::g_main::Com_Printf(
                     &format!("^2{} Saber Attack Set: fast\n", ty),
@@ -1928,8 +1928,8 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
         } else if enemy_dist <= 64
             && (((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0
                 || ({
-                    let p = (*npc).NPC_type;
-                    !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                    let p = (*npc).NPC_type.as_deref();
+                    p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
                 } && ctx.world.bg_state.rng.Q_irand(0, 10) == 0))
         {
             //can't use saber and they're in striking range
@@ -2172,8 +2172,8 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                 }
                 if (*client).NPC_class == CLASS_DESANN
                     || {
-                        let p = (*npc).NPC_type;
-                        !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                        let p = (*npc).NPC_type.as_deref();
+                        p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
                     }
                 {
                     chanceScale = 1;
@@ -2188,8 +2188,8 @@ pub fn Jedi_CombatDistance(ctx: &mut GameContext, enemy_dist: c_int) {
                     && (enemy_dist > ctx.world.bg_state.rng.Q_irand(100, 200)
                         || ((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0
                         || ({
-                            let p = (*npc).NPC_type;
-                            !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                            let p = (*npc).NPC_type.as_deref();
+                            p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
                         } && ctx.world.bg_state.rng.Q_irand(0, 3) == 0))
                     && enemy_dist < 500
                     && (ctx.world.bg_state.rng.Q_irand(0, chanceScale * 10) < 5
@@ -5213,8 +5213,8 @@ pub fn Jedi_AttackDecide(ctx: &mut GameContext, enemy_dist: c_int) -> qboolean {
             if (*client).NPC_class == CLASS_DESANN
                 || (*client).NPC_class == CLASS_LUKE
                 || {
-                    let p = (*npc).NPC_type;
-                    !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                    let p = (*npc).NPC_type.as_deref();
+                    p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
                 }
             {
                 chance = 20;
@@ -5740,8 +5740,8 @@ pub fn Jedi_CheckEnemyMovement(ctx: &mut GameContext, enemy_dist: f32) {
             && (*client).NPC_class != CLASS_DESANN
             && (*client).NPC_class != CLASS_LUKE
             && {
-                let p = (*npc).NPC_type;
-                p.is_null() || Q_stricmp("Yoda", &cstr_to_str(p)) != 0
+                let p = (*npc).NPC_type.as_deref();
+                p.map_or(true, |p| Q_stricmp("Yoda", p) != 0)
             }
         {
             let npc_id = ent_id(ge, npc);
@@ -6369,8 +6369,8 @@ pub fn NPC_Jedi_Pain(
         crate::g_timer::TIMER_Set(ctx, Some(self_), c"parryTime".as_ptr(), -1);
         if unsafe { (*client).NPC_class } == CLASS_DESANN
             || {
-                let p = ctx.world.entity(self_).NPC_type;
-                !p.is_null() && Q_stricmp("Yoda", &(unsafe { cstr_to_str(p) })) == 0
+                let p = ctx.world.entity(self_).NPC_type.as_deref();
+                p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
             }
         {
             //less for Desann
@@ -6977,8 +6977,8 @@ pub fn Jedi_CanPullBackSaber(ctx: &mut GameContext, self_: EntityId) -> qboolean
         || unsafe { (*client).NPC_class } == CLASS_LUKE
         || unsafe { (*client).NPC_class } == CLASS_DESANN
         || {
-            let p = ctx.world.entity(self_).NPC_type;
-            !p.is_null() && Q_stricmp("Yoda", &(unsafe { cstr_to_str(p) })) == 0
+            let p = ctx.world.entity(self_).NPC_type.as_deref();
+            p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
         }
     {
         return qtrue;
@@ -7131,8 +7131,8 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
                 let chance: f32;
                 if (*client).NPC_class == CLASS_DESANN
                     || {
-                        let p = (*npc).NPC_type;
-                        !p.is_null() && Q_stricmp("Yoda", &cstr_to_str(p)) == 0
+                        let p = (*npc).NPC_type.as_deref();
+                        p.is_some_and(|p| Q_stricmp("Yoda", p) == 0)
                     }
                 {
                     if ctx.world.cvars.g_spskill.integer != 0 {

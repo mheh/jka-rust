@@ -24,7 +24,7 @@
 use crate::prelude::*;
 // Shadows the prelude's `crate::q_shared::Q_stricmp` glob export (pointer version);
 // genuine pointer-vs-pointer survivors are re-qualified `crate::q_shared::Q_stricmp`.
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 
 // Constants used by the ported (non-parked) bodies below. Raven `#define`/enum
 // constants live in the already-ported qshared/bg type modules; the prelude

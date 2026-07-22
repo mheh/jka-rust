@@ -14,7 +14,7 @@ use crate::g_utils::{G_BoxInBounds, G_RadiusList};
 use crate::prelude::*;
 use crate::w_force::Jedi_DodgeEvasion;
 use mp_bg::public::entity_type::entityType_t;
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::probe;

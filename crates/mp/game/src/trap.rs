@@ -229,7 +229,7 @@ use core::ffi::c_void;
 use mp_qshared::common::mp::gentity_s;
 use mp_qshared::common::mp::qcommon::sharedSetBoneIKStateParams_t;
 use mp_qshared::shared::{fileHandle_t, fsMode_t, qhandle_t, vec3_t, vmCvar_t};
-use native_string::cstr::{buf_to_string, cstr};
+use native_string::{buf_to_string, cstr};
 
 /// Raven `trap_AAS_EntityInfo` (`g_syscalls.c:655-657`) — `BOTLIB_AAS_ENTITY_INFO`.
 /// C: `void trap_AAS_EntityInfo(int entnum, void /* struct aas_entityinfo_s */ *info)`

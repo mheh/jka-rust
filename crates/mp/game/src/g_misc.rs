@@ -8,8 +8,8 @@ use core::ffi::CStr;
 
 use crate::prelude::*;
 use crate::g_utils::G_BSPIndex;
-use native_string::atof::atof_bytes;
-use native_string::atoi::atoi_bytes;
+use native_string::atof_bytes;
+use native_string::atoi_bytes;
 
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
 use crate::g_client::SetClientViewAngle;
@@ -30,7 +30,7 @@ use crate::level::tag_owner::{MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME, TAG_GE
 use crate::q_math::vec3_origin;
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
 use crate::q_shared::{GetIDForString, Info_SetValueForKey, Q_strlwr};
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 use native_string::strncpyz_string;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;

@@ -20,8 +20,8 @@ use core::ffi::CStr;
 use crate::g_nav::NAV_FindClosestWaypointForEnt;
 use crate::prelude::*;
 use crate::q_math::vec3_origin;
-use native_string::atof::{atof, atof_bytes};
-use native_string::q_string::{Q_stricmp, Q_strncmp};
+use native_string::{atof, atof_bytes};
+use native_string::{Q_stricmp, Q_strncmp};
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`

@@ -10,7 +10,7 @@ use crate::q_shared::COM_BeginParseSession;
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameWorld;
-use native_string::q_string::Q_stricmp;
+use native_string::Q_stricmp;
 
 // IP filter type: holds mask and compare value for IP filtering.
 // Source: oracle/codemp/game/g_svcmds.c:41-45

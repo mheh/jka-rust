@@ -119,6 +119,48 @@ impl gentity_t {
   `.clone()` (worker B verified zero pointer-identity compares exist).
 - `G_FindTeams` targetname transfer: prefix field, unchanged.
 
+### 4d-bis. Prefix accessor methods (ratified addition, 2026-07-21)
+
+All game-code access to the prefix string slots goes through one impl block on
+`gentity_t` — raw field access to these slots outside it is a style violation.
+Asymmetric shape (user ruling 2026-07-21): **one `set()` taking an enum-variant
+payload for writes; named `_str()` methods for reads.** Rust has no named
+parameters — the enum variant is the idiomatic equivalent, and it gives the A1
+invariant (ownership + slot updated in one statement, valid at every trap
+boundary) exactly ONE home instead of one per method. Reads stay per-field
+methods because their return shapes genuinely differ (String vs Option<String>)
+and there is no invariant to centralize on the read path.
+
+```rust
+pub enum PrefixSet<'a> {
+    Classname(&'a str),
+    Targetname(Option<&'a str>),      // None = Raven NULL
+    FullName(Option<&'a str>),
+    ScriptTargetname(Option<&'a str>),
+    BehaviorSet(usize, Option<&'a str>),
+    ClassnameStatic(&'static CStr),   // c"noclass"/"freed" literal path
+}
+
+impl gentity_t {
+    // writes: single choke point — the ONE place the slot transaction lives
+    // (G_NewString/pool now, the G6 ledger transaction later)
+    pub fn set(&mut self, ctx: &mut GameContext, field: PrefixSet)
+    // reads decode the LIVE slot (engines write slots; no caching)
+    pub fn classname_str(&self) -> String            // NULL -> ""
+    pub fn targetname_str(&self) -> Option<String>   // NULL preserved
+    pub fn fullname_str(&self) -> Option<String>
+    pub fn script_targetname_str(&self) -> Option<String>
+    pub fn behavior_set_str(&self, i: usize) -> Option<String>
+}
+// call sites read like named args:  ent.set(ctx, Classname("trigger_multiple"));
+```
+
+Lands with G3 (reads + the set() choke point, where G_Find funnels prefix
+traffic); G6 swaps set()'s interior onto the ledger without touching call
+sites. The NPC template-copy prefix aliasing routes through an explicit
+`alias_from` helper preserving Raven's shared-pointer semantics, documented at
+the one site that uses it.
+
 ### 4e. Removals / retentions
 - REMOVED: `G_AddSpawnVarToken`, `spawnVarChars` pool, `FOFS_*` constants,
   `fieldofs` offset walking, `ZeroValid for gentity_t`, `rofftarget`+`roffname`
