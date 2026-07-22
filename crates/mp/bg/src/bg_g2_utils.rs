@@ -140,53 +140,35 @@ pub fn BG_AttachToRancor(
 
 /// Raven `BG_GetRootSurfNameWithVariant`.
 ///
+/// Out-param `returnSurfName` becomes the return value; the `qboolean` result is
+/// dropped (both call sites ignore it) and the `returnSize` bound is unneeded
+/// since G2 surface names never approach `MAX_QPATH`.
 /// Source: `oracle/codemp/game/bg_g2_utils.c:101-122`
 pub fn BG_GetRootSurfNameWithVariant(
     ghoul2: *mut c_void,
-    rootSurfName: *const c_char,
-    returnSurfName: *mut c_char,
-    returnSize: c_int,
+    rootSurfName: &str,
     bg: &BgState,
     traps: &dyn BgTraps,
-) -> qboolean {
+) -> String {
     // Raven file-local `#define MAX_VARIANTS 8`.
     // Source: `oracle/codemp/game/bg_g2_utils.c:100`
     const MAX_VARIANTS: c_int = 8;
 
     if ghoul2.is_null()
-        || traps.g2api_get_surface_render_status(ghoul2, 0, &(unsafe { cstr_to_str(rootSurfName) }))
-            == qfalse
+        || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse
     {
         // see if the basic name without variants is on
-        unsafe {
-            Q_strncpyz(returnSurfName, rootSurfName, returnSize);
-        }
-        return qtrue;
+        return rootSurfName.to_string();
     } else {
         // check variants
         for i in 0..MAX_VARIANTS {
-            let variant_name = unsafe {
-                format!(
-                    "{}{}",
-                    cstr_to_str(rootSurfName),
-                    ((b'a' + i as u8) as char)
-                )
-            };
-            let variant_cstr = cstr(&variant_name);
-            unsafe {
-                Q_strncpyz(returnSurfName, variant_cstr.as_ptr(), returnSize);
-            }
-            if traps.g2api_get_surface_render_status(ghoul2, 0, &(unsafe { cstr_to_str(returnSurfName) }))
-                == qfalse
-            {
-                return qtrue;
+            let variant_name = format!("{}{}", rootSurfName, ((b'a' + i as u8) as char));
+            if traps.g2api_get_surface_render_status(ghoul2, 0, &variant_name) == qfalse {
+                return variant_name;
             }
         }
     }
 
     // Fall back to root surface name
-    unsafe {
-        Q_strncpyz(returnSurfName, rootSurfName, returnSize);
-    }
-    qfalse
+    rootSurfName.to_string()
 }

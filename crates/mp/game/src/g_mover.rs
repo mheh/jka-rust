@@ -1631,7 +1631,7 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
                     ctx,
                     ctx.entity_id_of(owner),
                     core::mem::offset_of!(gentity_t, target) as c_int,
-                    (*door).targetname,
+                    &cstr_to_str((*door).targetname),
                 );
                 if owner.is_null() {
                     break;
@@ -1646,7 +1646,7 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
                     ctx,
                     ctx.entity_id_of(owner),
                     core::mem::offset_of!(gentity_t, target2) as c_int,
-                    (*door).targetname,
+                    &cstr_to_str((*door).targetname),
                 );
                 if owner.is_null() {
                     break;
@@ -1663,7 +1663,7 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
                 ctx,
                 ctx.entity_id_of(owner),
                 core::mem::offset_of!(gentity_t, classname) as c_int,
-                c"trigger_door".as_ptr(),
+                "trigger_door",
             );
             if owner.is_null() {
                 break;
@@ -1708,7 +1708,7 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                         ctx,
                         ctx.entity_id_of(owner),
                         core::mem::offset_of!(gentity_t, target) as c_int,
-                        (*ent).targetname,
+                        &cstr_to_str((*ent).targetname),
                     );
                     if owner.is_null() {
                         break;
@@ -1727,7 +1727,7 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                         ctx,
                         ctx.entity_id_of(owner),
                         core::mem::offset_of!(gentity_t, target2) as c_int,
-                        (*ent).targetname,
+                        &cstr_to_str((*ent).targetname),
                     );
                     if owner.is_null() {
                         break;
@@ -2244,15 +2244,21 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
     unsafe {
-        (*ent).nextTrain = ent_id_opt(
-            ctx.world.g_entities.as_mut_ptr(),
+        // Raven passes `ent->target` (possibly NULL) to G_Find, where a NULL match
+        // never compares equal and yields NULL; preserve that by not searching on
+        // a NULL target rather than reading it as a string.
+        let train_target = (*ent).target;
+        let found = if train_target.is_null() {
+            core::ptr::null_mut()
+        } else {
             G_Find(
                 ctx,
                 ctx.entity_id_of(core::ptr::null_mut()),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
-                (*ent).target,
-            ),
-        );
+                &cstr_to_str(train_target),
+            )
+        };
+        (*ent).nextTrain = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), found);
         if (*ent).nextTrain.is_none() {
             Com_Printf("func_train at %s with an unfound target\n");
             // Free me?`
@@ -2287,7 +2293,7 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
                     ctx,
                     ctx.entity_id_of(core::ptr::null_mut()),
                     core::mem::offset_of!(gentity_t, targetname) as c_int,
-                    (*path).target,
+                    &cstr_to_str((*path).target),
                 );
                 if next.is_null() {
                     // end of path

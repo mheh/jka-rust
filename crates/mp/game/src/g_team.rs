@@ -558,9 +558,9 @@ pub fn Team_FragBonuses(
 
         // find the flag
         let c = if (*attacker_cl).sess.sessionTeam as c_int == TEAM_RED {
-            c"team_CTF_redflag"
+            "team_CTF_redflag"
         } else if (*attacker_cl).sess.sessionTeam as c_int == TEAM_BLUE {
-            c"team_CTF_blueflag"
+            "team_CTF_blueflag"
         } else {
             return;
         };
@@ -580,7 +580,7 @@ pub fn Team_FragBonuses(
 
         let mut flag: Option<EntityId> = None;
         loop {
-            let f = G_Find(ctx, flag, fofs_classname(), c.as_ptr());
+            let f = G_Find(ctx, flag, fofs_classname(), c);
             flag = ctx.entity_id_of(f);
             if f.is_null() {
                 break;
@@ -733,12 +733,12 @@ pub fn Team_CheckHurtCarrier(
 ///
 /// Source: `oracle/codemp/game/g_team.c:568-599`
 pub fn Team_ResetFlag(ctx: &mut GameContext, team: c_int) -> Option<EntityId> {
-    let classname: &CStr = if team == TEAM_RED {
-        c"team_CTF_redflag"
+    let classname: &str = if team == TEAM_RED {
+        "team_CTF_redflag"
     } else if team == TEAM_BLUE {
-        c"team_CTF_blueflag"
+        "team_CTF_blueflag"
     } else if team == TEAM_FREE {
-        c"team_CTF_neutralflag"
+        "team_CTF_neutralflag"
     } else {
         return None;
     };
@@ -746,7 +746,7 @@ pub fn Team_ResetFlag(ctx: &mut GameContext, team: c_int) -> Option<EntityId> {
     let mut ent: Option<EntityId> = None;
     let mut rent: Option<EntityId> = None;
     loop {
-        let e = G_Find(ctx, ent, fofs_classname(), classname.as_ptr());
+        let e = G_Find(ctx, ent, fofs_classname(), classname);
         ent = ctx.entity_id_of(e);
         if e.is_null() {
             break;
@@ -1199,26 +1199,26 @@ pub fn SelectRandomTeamSpawnPoint(
     team: team_t,
     siegeClass: c_int,
 ) -> Option<EntityId> {
-    let classname: &CStr = if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int {
+    let classname: &str = if ctx.world.cvars.g_gametype.integer == GT_SIEGE as c_int {
         if team == SIEGETEAM_TEAM1 as team_t {
-            c"info_player_siegeteam1"
+            "info_player_siegeteam1"
         } else {
-            c"info_player_siegeteam2"
+            "info_player_siegeteam2"
         }
     } else {
         if teamstate == TEAM_BEGIN {
             if team == TEAM_RED as team_t {
-                c"team_CTF_redplayer"
+                "team_CTF_redplayer"
             } else if team == TEAM_BLUE as team_t {
-                c"team_CTF_blueplayer"
+                "team_CTF_blueplayer"
             } else {
                 return None;
             }
         } else {
             if team == TEAM_RED as team_t {
-                c"team_CTF_redspawn"
+                "team_CTF_redspawn"
             } else if team == TEAM_BLUE as team_t {
-                c"team_CTF_bluespawn"
+                "team_CTF_bluespawn"
             } else {
                 return None;
             }
@@ -1236,7 +1236,7 @@ pub fn SelectRandomTeamSpawnPoint(
         // Oracle's `while ((spot = G_Find(...)) != NULL)` — break on null before
         // taking an id (the STAGE-1 body unwrapped pre-null-check, which would
         // panic on the terminating iteration; oracle just exits the loop).
-        let s = G_Find(ctx, spot, fofs_classname(), classname.as_ptr());
+        let s = G_Find(ctx, spot, fofs_classname(), classname);
         spot = ctx.entity_id_of(s);
         if s.is_null() {
             break;
@@ -1259,7 +1259,7 @@ pub fn SelectRandomTeamSpawnPoint(
     }
 
     if count == 0 {
-        let s = G_Find(ctx, None, fofs_classname(), classname.as_ptr());
+        let s = G_Find(ctx, None, fofs_classname(), classname);
         return ctx.entity_id_of(s);
     }
 

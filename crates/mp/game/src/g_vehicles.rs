@@ -2134,29 +2134,25 @@ pub fn G_FlyVehicleImpactDir(ctx: &mut GameContext, veh: EntityId, trace: *mut t
 /// Raven `G_ShipSurfaceForSurfName` — map a surface name to its ship surface id.
 ///
 /// Source: `oracle/codemp/game/g_vehicles.c:2930-2959`
-pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
-    if surfaceName.is_null() {
-        return -1;
-    }
-    let surfaceName = unsafe { cstr_to_str(surfaceName) };
-    if Q_strncmp("nose", &surfaceName, 4) == 0
-        || Q_strncmp("f_gear", &surfaceName, 6) == 0
-        || Q_strncmp("glass", &surfaceName, 5) == 0
+pub fn G_ShipSurfaceForSurfName(surfaceName: &str) -> c_int {
+    if Q_strncmp("nose", surfaceName, 4) == 0
+        || Q_strncmp("f_gear", surfaceName, 6) == 0
+        || Q_strncmp("glass", surfaceName, 5) == 0
     {
         return SHIPSURF_FRONT;
     }
-    if Q_strncmp("body", &surfaceName, 4) == 0 {
+    if Q_strncmp("body", surfaceName, 4) == 0 {
         return SHIPSURF_BACK;
     }
-    if Q_strncmp("r_wing1", &surfaceName, 7) == 0
-        || Q_strncmp("r_wing2", &surfaceName, 7) == 0
-        || Q_strncmp("r_gear", &surfaceName, 6) == 0
+    if Q_strncmp("r_wing1", surfaceName, 7) == 0
+        || Q_strncmp("r_wing2", surfaceName, 7) == 0
+        || Q_strncmp("r_gear", surfaceName, 6) == 0
     {
         return SHIPSURF_RIGHT;
     }
-    if Q_strncmp("l_wing1", &surfaceName, 7) == 0
-        || Q_strncmp("l_wing2", &surfaceName, 7) == 0
-        || Q_strncmp("l_gear", &surfaceName, 6) == 0
+    if Q_strncmp("l_wing1", surfaceName, 7) == 0
+        || Q_strncmp("l_wing2", surfaceName, 7) == 0
+        || Q_strncmp("l_gear", surfaceName, 6) == 0
     {
         return SHIPSURF_LEFT;
     }

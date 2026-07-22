@@ -2442,7 +2442,7 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target_field,
+            &(unsafe { cstr_to_str(target_field) }),
         );
 
         if target.is_null() {
@@ -2472,7 +2472,7 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target2_field,
+            &(unsafe { cstr_to_str(target2_field) }),
         );
 
         if target.is_null() {
@@ -3414,7 +3414,7 @@ pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target_field,
+            &(unsafe { cstr_to_str(target_field) }),
         );
         let mut dir: vec3_t = [0.0, 0.0, 0.0];
 
@@ -3565,7 +3565,7 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target_field,
+            &(unsafe { cstr_to_str(target_field) }),
         );
         if !targ.is_null() {
             let targ_id = ctx.entity_id_of(targ).unwrap();

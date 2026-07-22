@@ -14,6 +14,7 @@
 //! via `ctx.entity_id_of(ptr)`.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_utils::G_Find;
 use crate::prelude::*;
 use crate::g_utils::G_SoundOnEnt;
 use crate::teams::class::class_t;
@@ -728,7 +729,7 @@ pub fn NPC_ShowDebugInfo(ctx: &mut GameContext) {
     let mut found: *mut gentity_t = core::ptr::null_mut();
     loop {
         let found_id = ctx.entity_id_of(found);
-        found = crate::g_utils::G_Find(ctx, found_id, fieldofs, c"NPC".as_ptr());
+        found = G_Find(ctx, found_id, fieldofs, "NPC");
         if found.is_null() {
             break;
         }

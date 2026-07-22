@@ -20,6 +20,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::ai_main::BotAIShutdownClient;
+use crate::g_utils::G_Find;
 use crate::entity::flags::{FL_NO_BOTS, FL_NO_HUMANS};
 use crate::g_bot::G_RemoveQueuedBotBegin;
 use crate::g_cmds::{BroadcastTeamChange, G_SetSaber, SetTeam, StopFollowing};
@@ -733,11 +734,11 @@ pub fn SelectNearestDeathmatchSpawnPoint(ctx: &mut GameContext, from: vec3_t) ->
         let mut spot: *mut gentity_t = core::ptr::null_mut();
 
         loop {
-            spot = crate::g_utils::G_Find(
+            spot = G_Find(
                 ctx,
                 ctx.entity_id_of(spot),
                 fofs_classname(),
-                b"info_player_deathmatch\0".as_ptr() as *const c_char,
+                "info_player_deathmatch",
             );
             if spot.is_null() {
                 break;
@@ -767,11 +768,11 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: &mut GameContext) -> *mut gentity_t
     let mut spots: [*mut gentity_t; MAX_SPAWN_POINTS] = [core::ptr::null_mut(); MAX_SPAWN_POINTS];
 
     loop {
-        spot = crate::g_utils::G_Find(
+        spot = G_Find(
             ctx,
             ctx.entity_id_of(spot),
             fofs_classname(),
-            b"info_player_deathmatch\0".as_ptr() as *const c_char,
+            "info_player_deathmatch",
         );
         if spot.is_null() {
             break;
@@ -785,11 +786,11 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: &mut GameContext) -> *mut gentity_t
 
     if count == 0 {
         // no spots that won't telefrag
-        return crate::g_utils::G_Find(
+        return G_Find(
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
             fofs_classname(),
-            b"info_player_deathmatch\0".as_ptr() as *const c_char,
+            "info_player_deathmatch",
         );
     }
 
@@ -823,12 +824,12 @@ pub fn SelectRandomFurthestSpawnPoint(
             && team != TEAM_SPECTATOR
         {
             let classname = if team == TEAM_RED {
-                b"info_player_start_red\0".as_ptr() as *const c_char
+                "info_player_start_red"
             } else {
-                b"info_player_start_blue\0".as_ptr() as *const c_char
+                "info_player_start_blue"
             };
             loop {
-                spot = crate::g_utils::G_Find(
+                spot = G_Find(
                     ctx,
                     ctx.entity_id_of(spot),
                     fofs_classname(),
@@ -879,11 +880,11 @@ pub fn SelectRandomFurthestSpawnPoint(
             // couldn't find any of the above
             spot = core::ptr::null_mut();
             loop {
-                spot = crate::g_utils::G_Find(
+                spot = G_Find(
                     ctx,
                     ctx.entity_id_of(spot),
                     fofs_classname(),
-                    b"info_player_deathmatch\0".as_ptr() as *const c_char,
+                    "info_player_deathmatch",
                 );
                 if spot.is_null() {
                     break;
@@ -925,11 +926,11 @@ pub fn SelectRandomFurthestSpawnPoint(
                 }
             }
             if numSpots == 0 {
-                spot = crate::g_utils::G_Find(
+                spot = G_Find(
                     ctx,
                     ctx.entity_id_of(core::ptr::null_mut()),
                     fofs_classname(),
-                    b"info_player_deathmatch\0".as_ptr() as *const c_char,
+                    "info_player_deathmatch",
                 );
                 if spot.is_null() {
                     // Raven `G_Error("Couldn't find a spawn point")` drops the game
@@ -973,14 +974,14 @@ pub fn SelectDuelSpawnPoint(
     const DUELTEAM_DOUBLE: c_int = 2;
     const DUELTEAM_SINGLE: c_int = 3;
     unsafe {
-        let mut spotName: *const c_char = if team == DUELTEAM_LONE {
-            b"info_player_duel1\0".as_ptr() as *const c_char
+        let mut spotName: &str = if team == DUELTEAM_LONE {
+            "info_player_duel1"
         } else if team == DUELTEAM_DOUBLE {
-            b"info_player_duel2\0".as_ptr() as *const c_char
+            "info_player_duel2"
         } else if team == DUELTEAM_SINGLE {
-            b"info_player_duel\0".as_ptr() as *const c_char
+            "info_player_duel"
         } else {
-            b"info_player_deathmatch\0".as_ptr() as *const c_char
+            "info_player_deathmatch"
         };
 
         // Raven `tryAgain:` — the goto retarget becomes a loop restart.
@@ -992,7 +993,7 @@ pub fn SelectDuelSpawnPoint(
 
             loop {
                 spot =
-                    crate::g_utils::G_Find(ctx, ctx.entity_id_of(spot), fofs_classname(), spotName);
+                    G_Find(ctx, ctx.entity_id_of(spot), fofs_classname(), spotName);
                 if spot.is_null() {
                     break;
                 }
@@ -1033,22 +1034,18 @@ pub fn SelectDuelSpawnPoint(
                 }
             }
             if numSpots == 0 {
-                if crate::q_shared::Q_stricmp(
-                    spotName,
-                    b"info_player_deathmatch\0".as_ptr() as *const c_char,
-                ) != 0
-                {
+                if !spotName.eq_ignore_ascii_case("info_player_deathmatch") {
                     // try the loop again with info_player_deathmatch as the target
-                    spotName = b"info_player_deathmatch\0".as_ptr() as *const c_char;
+                    spotName = "info_player_deathmatch";
                     continue;
                 }
 
                 // no free duel or DM spots, just try the first DM spot
-                spot = crate::g_utils::G_Find(
+                spot = G_Find(
                     ctx,
                     ctx.entity_id_of(core::ptr::null_mut()),
                     fofs_classname(),
-                    b"info_player_deathmatch\0".as_ptr() as *const c_char,
+                    "info_player_deathmatch",
                 );
                 if spot.is_null() {
                     // Raven `G_Error("Couldn't find a spawn point")` drops the game
@@ -1104,11 +1101,11 @@ pub fn SelectInitialSpawnPoint(
     unsafe {
         let mut spot: *mut gentity_t = core::ptr::null_mut();
         loop {
-            spot = crate::g_utils::G_Find(
+            spot = G_Find(
                 ctx,
                 ctx.entity_id_of(spot),
                 fofs_classname(),
-                b"info_player_deathmatch\0".as_ptr() as *const c_char,
+                "info_player_deathmatch",
             );
             if spot.is_null() {
                 break;

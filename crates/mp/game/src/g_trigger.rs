@@ -1816,13 +1816,19 @@ pub fn shipboundary_touch(
         return;
     }
 
+    // A NULL `target` never matches in Raven's G_Find; keep that by not searching
+    // rather than reading NULL as a string.
     let target = ctx.world.entity(self_).target;
-    let ent = G_Find(
-        ctx,
-        None,
-        core::mem::offset_of!(gentity_t, targetname) as c_int,
-        target,
-    );
+    let ent = if target.is_null() {
+        core::ptr::null_mut()
+    } else {
+        G_Find(
+            ctx,
+            None,
+            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            &(unsafe { cstr_to_str(target) }),
+        )
+    };
     let ent_id = ctx.entity_id_of(ent);
     if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
         // this is bad
@@ -1989,13 +1995,19 @@ pub fn hyperspace_touch(
                     (*other_client).ps.eFlags2 &= !EF2_HYPERSPACE;
                 }
                 // Get the offset from the local position
+                // A NULL `target` never matches in Raven's G_Find; keep that by
+                // not searching rather than reading NULL as a string.
                 let target = ctx.world.entity(self_).target;
-                let ent = G_Find(
-                    ctx,
-                    None,
-                    core::mem::offset_of!(gentity_t, targetname) as c_int,
-                    target,
-                );
+                let ent = if target.is_null() {
+                    core::ptr::null_mut()
+                } else {
+                    G_Find(
+                        ctx,
+                        None,
+                        core::mem::offset_of!(gentity_t, targetname) as c_int,
+                        &(unsafe { cstr_to_str(target) }),
+                    )
+                };
                 let ent_id = ctx.entity_id_of(ent);
                 if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
                     // this is bad
@@ -2020,13 +2032,19 @@ pub fn hyperspace_touch(
                 let u_diff = up[0] * diff[0] + up[1] * diff[1] + up[2] * diff[2];
 
                 // Now get the base position of the destination
+                // A NULL `target2` never matches in Raven's G_Find; keep that by
+                // not searching rather than reading NULL as a string.
                 let target2 = ctx.world.entity(self_).target2;
-                let ent = G_Find(
-                    ctx,
-                    None,
-                    core::mem::offset_of!(gentity_t, targetname) as c_int,
-                    target2,
-                );
+                let ent = if target2.is_null() {
+                    core::ptr::null_mut()
+                } else {
+                    G_Find(
+                        ctx,
+                        None,
+                        core::mem::offset_of!(gentity_t, targetname) as c_int,
+                        &(unsafe { cstr_to_str(target2) }),
+                    )
+                };
                 let ent_id = ctx.entity_id_of(ent);
                 if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
                     // this is bad
@@ -2086,13 +2104,19 @@ pub fn hyperspace_touch(
         }
         return;
     } else {
+        // A NULL `target` never matches in Raven's G_Find; keep that by not
+        // searching rather than reading NULL as a string.
         let target = ctx.world.entity(self_).target;
-        let ent = G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
-        );
+        let ent = if target.is_null() {
+            core::ptr::null_mut()
+        } else {
+            G_Find(
+                ctx,
+                None,
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                &(unsafe { cstr_to_str(target) }),
+            )
+        };
         let ent_id = ctx.entity_id_of(ent);
         if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
             // this is bad
@@ -2249,16 +2273,26 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
     // which re-derives its id); the body reaches entity fields via accessors.
     let mut t_count: c_int = 0;
     let mut t: *mut gentity_t = core::ptr::null_mut();
-    let target = ctx.world.entity(self_).target;
+    // A NULL `target` never matches in Raven's G_Find; read it as `Option<String>`
+    // so a NULL target yields no matches instead of dereferencing NULL.
+    let target_ptr = ctx.world.entity(self_).target;
+    let target = if target_ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { cstr_to_str(target_ptr) })
+    };
 
     loop {
         let t_id = ctx.entity_id_of(t);
-        t = G_Find(
-            ctx,
-            t_id,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
-        );
+        t = match &target {
+            Some(target) => G_Find(
+                ctx,
+                t_id,
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                target,
+            ),
+            None => core::ptr::null_mut(),
+        };
         if t.is_null() {
             break;
         }
@@ -2272,12 +2306,15 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
     }
 
     if t_count == 1 {
-        return G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
-        );
+        return match &target {
+            Some(target) => G_Find(
+                ctx,
+                None,
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                target,
+            ),
+            None => core::ptr::null_mut(),
+        };
     }
 
     // FIXME: need a seed
@@ -2286,12 +2323,15 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
     t = core::ptr::null_mut();
     loop {
         let t_id = ctx.entity_id_of(t);
-        t = G_Find(
-            ctx,
-            t_id,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
-        );
+        t = match &target {
+            Some(target) => G_Find(
+                ctx,
+                t_id,
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                target,
+            ),
+            None => core::ptr::null_mut(),
+        };
         if t.is_null() {
             break;
         }

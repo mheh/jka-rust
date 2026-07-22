@@ -24,6 +24,8 @@ use crate::q_math::{
     DirToByte, DistanceSquared, VectorCompare, VectorLengthSquared, VectorNormalize,
 };
 use native_string::q_string::{Q_stricmp, Q_strncmp};
+use native_string::strncpyz_string;
+use crate::g_vehicles::G_ShipSurfaceForSurfName;
 use crate::teams::class::class_t;
 use crate::trap;
 use crate::w_saber::UpdateClientRenderBolts;
@@ -3676,59 +3678,47 @@ pub fn G_Dismember(
         let mut newPoint: vec3_t = [0.0; 3];
         let mut dir: vec3_t = [0.0; 3];
         let mut vel: vec3_t = [0.0; 3];
-        let mut limbName: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        let mut stubName: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-        let mut stubCapName: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        let mut limbName: String = String::new();
+        let mut stubName: String = String::new();
+        let mut stubCapName: String = String::new();
 
         if limbType == G2_MODELPART_HEAD as c_int {
-            write_cstr_field(&mut limbName, "head");
-            write_cstr_field(&mut stubCapName, "torso_cap_head");
+            limbName = "head".to_string();
+            stubCapName = "torso_cap_head".to_string();
         } else if limbType == G2_MODELPART_WAIST as c_int {
-            write_cstr_field(&mut limbName, "torso");
-            write_cstr_field(&mut stubCapName, "hips_cap_torso");
+            limbName = "torso".to_string();
+            stubCapName = "hips_cap_torso".to_string();
         } else {
             // (limb root surf, stub root surf, cap suffix) per part.
             let (limb_root, stub_root, cap_suffix) = if limbType == G2_MODELPART_LARM as c_int {
-                (c"l_arm", c"torso", "l_arm")
+                ("l_arm", "torso", "l_arm")
             } else if limbType == G2_MODELPART_RARM as c_int {
-                (c"r_arm", c"torso", "r_arm")
+                ("r_arm", "torso", "r_arm")
             } else if limbType == G2_MODELPART_RHAND as c_int {
-                (c"r_hand", c"r_arm", "r_hand")
+                ("r_hand", "r_arm", "r_hand")
             } else if limbType == G2_MODELPART_LLEG as c_int {
-                (c"l_leg", c"hips", "l_leg")
+                ("l_leg", "hips", "l_leg")
             } else {
                 // umm... just default to the right leg, I guess (same as on client)
-                (c"r_leg", c"hips", "r_leg")
+                ("r_leg", "hips", "r_leg")
             };
-            BG_GetRootSurfNameWithVariant(
+            limbName = BG_GetRootSurfNameWithVariant(
                 ghoul2,
-                limb_root.as_ptr(),
-                limbName.as_mut_ptr(),
-                limbName.len() as c_int,
+                limb_root,
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            BG_GetRootSurfNameWithVariant(
+            stubName = BG_GetRootSurfNameWithVariant(
                 ghoul2,
-                stub_root.as_ptr(),
-                stubName.as_mut_ptr(),
-                stubName.len() as c_int,
+                stub_root,
                 &ctx.world.bg_state,
                 &GameBgTraps::new(ctx.engine),
             );
-            write_cstr_field(
-                &mut stubCapName,
-                &format!("{}_cap_{}", cstr_to_str(stubName.as_ptr()), cap_suffix),
-            );
+            stubCapName = format!("{}_cap_{}", stubName, cap_suffix);
         }
 
         if !ghoul2.is_null()
-            && trap::G2API_GetSurfaceRenderStatus(
-                ctx.engine,
-                ghoul2,
-                0,
-                &cstr_to_str(limbName.as_ptr()),
-            ) != 0
+            && trap::G2API_GetSurfaceRenderStatus(ctx.engine, ghoul2, 0, &limbName) != 0
         {
             // is it already off? If so there's no reason to be doing it again.
             return;
@@ -3861,13 +3851,8 @@ pub fn G_Dismember(
 
         if ctx.entity(ent).s.eType == entityType_t::ET_NPC as c_int && !ghoul2.is_null() {
             // if it's an npc remove these surfs on the server too.
-            trap::G2API_SetSurfaceOnOff(
-                ctx.engine,
-                ghoul2,
-                &cstr_to_str(limbName.as_ptr()),
-                0x00000100,
-            );
-            trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, &cstr_to_str(stubCapName.as_ptr()), 0);
+            trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, &limbName, 0x00000100);
+            trap::G2API_SetSurfaceOnOff(ctx.engine, ghoul2, &stubCapName, 0);
         }
 
         let customRGBA = ctx.entity(ent).s.customRGBA;
@@ -4014,7 +3999,7 @@ pub fn G_GetHitQuad(ctx: &mut GameContext, self_: EntityId, hitloc: vec3_t) -> c
 pub fn G_GetHitLocFromSurfName(
     ctx: &mut GameContext,
     ent: EntityId,
-    surfName: *const c_char,
+    surfName: &str,
     hitLoc: *mut c_int,
     point: vec3_t,
     dir: vec3_t,
@@ -4036,7 +4021,7 @@ pub fn G_GetHitLocFromSurfName(
 
         *hitLoc = HL_NONE;
 
-        if surfName.is_null() || *surfName == 0 {
+        if surfName.is_empty() {
             return qfalse;
         }
 
@@ -4073,9 +4058,9 @@ pub fn G_GetHitLocFromSurfName(
             footRBolt = trap::G2API_AddBolt(ctx.engine, ctx.entity(ent).ghoul2, 0, "*r_leg_foot");
         }
 
-        // surfName is proven non-null and non-empty by the early guard above.
-        let surf_name_s = cstr_to_str(surfName);
-        let stricmp = |lit: &str| Q_stricmp(lit, &surf_name_s) == 0;
+        // surfName is proven non-empty by the early guard above.
+        let surf_name_s = surfName;
+        let stricmp = |lit: &str| Q_stricmp(lit, surf_name_s) == 0;
 
         if !ctx.entity(ent).client.is_null() && (*client).NPC_class == class_t::CLASS_ATST {
             if stricmp("head_light_blaster_cann") {
@@ -4127,7 +4112,7 @@ pub fn G_GetHitLocFromSurfName(
             return qfalse;
         }
 
-        let strncmp = |lit: &str, n: usize| Q_strncmp(lit, &surf_name_s, n) == 0;
+        let strncmp = |lit: &str, n: usize| Q_strncmp(lit, surf_name_s, n) == 0;
 
         let actualTime = ctx.world.level.time;
         if strncmp("hips", 4) {
@@ -4532,8 +4517,6 @@ pub fn G_CheckForDismemberment(
                 && !ctx.entity(ent).client.is_null()
                 && (*client).g2LastSurfaceTime == ctx.world.level.time
             {
-                let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-
                 let hitSurfaceName = trap::G2API_GetSurfaceName(
                     ctx.engine,
                     ctx.entity(ent).ghoul2,
@@ -4541,13 +4524,13 @@ pub fn G_CheckForDismemberment(
                     0,
                     MAX_QPATH as usize,
                 );
-                write_cstr_field(&mut hitSurface, &hitSurfaceName);
+                let hitSurface = strncpyz_string(hitSurfaceName.as_bytes(), MAX_QPATH as usize);
 
-                if hitSurface[0] != 0 {
+                if !hitSurface.is_empty() {
                     G_GetHitLocFromSurfName(
                         ctx,
                         ent,
-                        hitSurface.as_ptr(),
+                        &hitSurface,
                         &mut hitLoc,
                         point,
                         [0.0; 3],
@@ -4649,8 +4632,6 @@ pub fn G_LocationBasedDamageModifier(
                 && !ctx.entity(ent).client.is_null()
                 && (*client).g2LastSurfaceTime == ctx.world.level.time)
         {
-            let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-
             let hitSurfaceName = trap::G2API_GetSurfaceName(
                 ctx.engine,
                 ctx.entity(ent).ghoul2,
@@ -4658,13 +4639,13 @@ pub fn G_LocationBasedDamageModifier(
                 0,
                 MAX_QPATH as usize,
             );
-            write_cstr_field(&mut hitSurface, &hitSurfaceName);
+            let hitSurface = strncpyz_string(hitSurfaceName.as_bytes(), MAX_QPATH as usize);
 
-            if hitSurface[0] != 0 {
+            if !hitSurface.is_empty() {
                 G_GetHitLocFromSurfName(
                     ctx,
                     ent,
-                    hitSurface.as_ptr(),
+                    &hitSurface,
                     &mut hitLoc,
                     point,
                     [0.0; 3],
@@ -5335,8 +5316,6 @@ pub fn G_Damage(
                     // get the last surf that was hit
                     if !(*targ).client.is_null() && (*tc).g2LastSurfaceTime == ctx.world.level.time
                     {
-                        let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-
                         let hitSurfaceName = trap::G2API_GetSurfaceName(
                             ctx.engine,
                             (*targ).ghoul2,
@@ -5344,11 +5323,11 @@ pub fn G_Damage(
                             0,
                             MAX_QPATH as usize,
                         );
-                        write_cstr_field(&mut hitSurface, &hitSurfaceName);
+                        let hitSurface =
+                            strncpyz_string(hitSurfaceName.as_bytes(), MAX_QPATH as usize);
 
-                        if hitSurface[0] != 0 {
-                            surface =
-                                crate::g_vehicles::G_ShipSurfaceForSurfName(hitSurface.as_ptr());
+                        if !hitSurface.is_empty() {
+                            surface = G_ShipSurfaceForSurfName(&hitSurface);
 
                             if take != 0 && surface > 0 {
                                 // hit a certain part of the ship
@@ -5750,8 +5729,6 @@ pub fn G_Damage(
                 && (*((*targ).client)).g2LastSurfaceTime == ctx.world.level.time
             {
                 let tc = (*targ).client;
-                let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-
                 let hitSurfaceName = trap::G2API_GetSurfaceName(
                     ctx.engine,
                     (*targ).ghoul2,
@@ -5759,16 +5736,16 @@ pub fn G_Damage(
                     0,
                     MAX_QPATH as usize,
                 );
-                write_cstr_field(&mut hitSurface, &hitSurfaceName);
+                let hitSurface = strncpyz_string(hitSurfaceName.as_bytes(), MAX_QPATH as usize);
 
-                if hitSurface[0] != 0 {
+                if !hitSurface.is_empty() {
                     let targ_eid = ctx.entity_id_of(targ).unwrap();
                     // STAGE-2b: irreducible — &mut world.globals.gPainHitLoc out-param aliases the ctx passed to the same G_GetHitLocFromSurfName call.
                     let hit_loc_out = &mut (*ctx.world_raw()).globals.gPainHitLoc;
                     G_GetHitLocFromSurfName(
                         ctx,
                         targ_eid,
-                        hitSurface.as_ptr(),
+                        &hitSurface,
                         hit_loc_out,
                         point,
                         dir_val,

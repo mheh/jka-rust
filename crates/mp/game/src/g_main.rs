@@ -1267,7 +1267,7 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
                     ctx,
                     search_start,
                     classname_ofs,
-                    cstr("info_player_intermission_red").as_ptr(),
+                    "info_player_intermission_red",
                 );
                 if !ent.is_null() && !(*ent).target2.is_null() {
                     let ent_id = ctx.entity_id_of(ent);
@@ -1280,7 +1280,7 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
                     ctx,
                     search_start,
                     classname_ofs,
-                    cstr("info_player_intermission_blue").as_ptr(),
+                    "info_player_intermission_blue",
                 );
                 if !ent.is_null() && !(*ent).target2.is_null() {
                     let ent_id = ctx.entity_id_of(ent);
@@ -1295,7 +1295,7 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
                 ctx,
                 search_start,
                 classname_ofs,
-                cstr("info_player_intermission").as_ptr(),
+                "info_player_intermission",
             );
         }
         if ent.is_null() {

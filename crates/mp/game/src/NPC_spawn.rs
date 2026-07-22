@@ -38,6 +38,7 @@ use crate::NPC_stats::TeamTable;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
 use native_string::q_string::Q_stricmp;
 use native_string::q_string::Q_strncmp;
+use native_string::strncpyz_string;
 use crate::q_shared;
 use crate::g_spawn::G_NewString;
 
@@ -938,23 +939,18 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                 }
 
                 if !droid_npc_type.is_null() {
-                    if Q_stricmp("random", &cstr_to_str(droid_npc_type as *const c_char)) == 0
-                        || Q_stricmp("default", &cstr_to_str(droid_npc_type as *const c_char))
-                            == 0
+                    let mut droid_npc_type_s = cstr_to_str(droid_npc_type as *const c_char);
+                    if Q_stricmp("random", &droid_npc_type_s) == 0
+                        || Q_stricmp("default", &droid_npc_type_s) == 0
                     {
-                        droid_npc_type = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
-                            cstr("r2d2").into_raw()
+                        droid_npc_type_s = if ctx.world.bg_state.rng.Q_irand(0, 1) != 0 {
+                            "r2d2".to_string()
                         } else {
-                            cstr("r5d2").into_raw()
+                            "r5d2".to_string()
                         };
                     }
-                    let droid_ent = NPC_SpawnType(
-                        ctx,
-                        Some(ent),
-                        droid_npc_type,
-                        core::ptr::null_mut(),
-                        qfalse,
-                    );
+                    let droid_ent =
+                        NPC_SpawnType(ctx, Some(ent), &droid_npc_type_s, None, qfalse);
                     if !droid_ent.is_null() {
                         if !(*droid_ent).client.is_null() {
                             let ent_number = ctx.world.entity(ent).s.number;
@@ -2641,14 +2637,15 @@ pub fn SP_NPC_Droid_Protocol(ctx: &mut GameContext, self_: EntityId) {
 pub fn NPC_SpawnType(
     ctx: &mut GameContext,
     ent: Option<EntityId>,
-    npc_type: *mut c_char,
-    targetname: *mut c_char,
+    npc_type: &str,
+    targetname: Option<&str>,
     isVehicle: qboolean,
 ) -> *mut gentity_t {
     // STAGE-1: `ent` is `Option<EntityId>` (the body null-checks it); re-derived
-    // to a raw pointer, verbatim body preserved (Stage-2 debt). `npc_type`/
-    // `targetname` are C strings and stay raw; the return stays raw `*mut
-    // gentity_t` (return conversion is a later pass).
+    // to a raw pointer, verbatim body preserved (Stage-2 debt). `npc_type` is a
+    // name string (`&str`); Raven's nullable `targetname` becomes `Option<&str>`
+    // so the "only set NPC_targetname when non-NULL" distinction is preserved.
+    // The return stays raw `*mut gentity_t` (return conversion is a later pass).
     let ent: *mut gentity_t = ent.map_or(core::ptr::null_mut(), |i| ctx.entity_mut(i));
     let npc_spawner_eid = G_Spawn(ctx);
     let npc_spawner = ctx.entity_mut(npc_spawner_eid) as *mut gentity_t;
@@ -2663,15 +2660,9 @@ pub fn NPC_SpawnType(
         (*npc_spawner).nextthink = ctx.world.level.time + FRAMETIME;
     }
 
-    if npc_type.is_null() {
+    if npc_type.is_empty() {
+        Com_Printf("Error, expected one of:\n NPC spawn [NPC type (from ext_data/NPCs)]\n NPC spawn vehicle [VEH type (from ext_data/vehicles)]\n");
         return std::ptr::null_mut();
-    }
-
-    unsafe {
-        if (*npc_type) == b'\0' as c_char {
-            Com_Printf("Error, expected one of:\n NPC spawn [NPC type (from ext_data/NPCs)]\n NPC spawn vehicle [VEH type (from ext_data/vehicles)]\n");
-            return std::ptr::null_mut();
-        }
     }
 
     if ent.is_null() || unsafe { (*ent).client.is_null() } {
@@ -2745,10 +2736,10 @@ pub fn NPC_SpawnType(
     );
 
     unsafe {
-        (*npc_spawner).NPC_type = G_NewString(ctx, npc_type);
+        (*npc_spawner).NPC_type = G_NewString(ctx, cstr(npc_type).as_ptr());
 
-        if !targetname.is_null() {
-            (*npc_spawner).NPC_targetname = G_NewString(ctx, targetname);
+        if let Some(targetname) = targetname {
+            (*npc_spawner).NPC_targetname = G_NewString(ctx, cstr(targetname).as_ptr());
         }
 
         (*npc_spawner).count = 1;
@@ -2760,13 +2751,7 @@ pub fn NPC_SpawnType(
     }
 
     // Call precache funcs
-    let npc_type_str = unsafe {
-        if npc_type.is_null() {
-            ""
-        } else {
-            std::ffi::CStr::from_ptr(npc_type).to_str().unwrap_or("")
-        }
-    };
+    let npc_type_str = npc_type;
 
     if Q_stricmp("gonk", npc_type_str) == 0 {
         NPC_Gonk_Precache(ctx);
@@ -2813,29 +2798,29 @@ pub fn NPC_SpawnType(
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4020-4039`
 pub fn NPC_Spawn_f(ctx: &mut GameContext, ent: EntityId) {
-    let mut npc_type: [c_char; 1024] = [0; 1024];
-    let mut targetname: [c_char; 1024] = [0; 1024];
+    let mut npc_type: String;
+    let targetname: String;
     let mut is_vehicle = 0u32;
 
     let arg2 = trap::Argv(ctx.engine, 2, 1024);
-    write_cstr_field(&mut npc_type, &arg2);
+    npc_type = strncpyz_string(arg2.as_bytes(), 1024);
 
-    if Q_stricmp("vehicle", &(unsafe { cstr_to_str(npc_type.as_ptr()) })) == 0 {
+    if Q_stricmp("vehicle", &npc_type) == 0 {
         is_vehicle = 1;
         let arg3 = trap::Argv(ctx.engine, 3, 1024);
-        write_cstr_field(&mut npc_type, &arg3);
+        npc_type = strncpyz_string(arg3.as_bytes(), 1024);
         let arg4 = trap::Argv(ctx.engine, 4, 1024);
-        write_cstr_field(&mut targetname, &arg4);
+        targetname = strncpyz_string(arg4.as_bytes(), 1024);
     } else {
         let arg3 = trap::Argv(ctx.engine, 3, 1024);
-        write_cstr_field(&mut targetname, &arg3);
+        targetname = strncpyz_string(arg3.as_bytes(), 1024);
     }
 
     NPC_SpawnType(
         ctx,
         Some(ent),
-        npc_type.as_mut_ptr(),
-        targetname.as_mut_ptr(),
+        &npc_type,
+        Some(&targetname),
         (is_vehicle) as i32,
     );
 }
@@ -3061,11 +3046,10 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
             1
         };
     } else if Q_stricmp("score", &cmd) == 0 {
-        let mut cmd2: [c_char; 1024] = [0; 1024];
         let arg2 = trap::Argv(ctx.engine, 2, 1024);
-        write_cstr_field(&mut cmd2, &arg2);
+        let cmd2 = strncpyz_string(arg2.as_bytes(), 1024);
 
-        if cmd2[0] == 0 {
+        if cmd2.is_empty() {
             // Show the score for all NPCs
             Com_Printf("SCORE LIST:\n");
             for i in 0..ENTITYNUM_WORLD as usize {
@@ -3081,15 +3065,13 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
                 ctx,
                 ctx.entity_id_of(std::ptr::null_mut()),
                 FOFS_targetname,
-                cmd2.as_ptr() as *const c_char,
+                &cmd2,
             );
             if !found_ent.is_null() && !unsafe { (*found_ent).client.is_null() } {
                 NPC_PrintScore(ctx, ctx.entity_id_of(found_ent).unwrap());
             } else {
                 Com_Printf(
-                    &format!("ERROR: NPC score - no such NPC {}\n", unsafe {
-                        cstr_to_str(cmd2.as_ptr() as *const c_char)
-                    }),
+                    &format!("ERROR: NPC score - no such NPC {}\n", cmd2),
                 );
             }
         }

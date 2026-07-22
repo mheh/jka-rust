@@ -6187,9 +6187,8 @@ pub fn BotCheckDetPacks(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let myLen: f32;
 
         let fofs = core::mem::offset_of!(gentity_t, classname) as c_int;
-        let cname = cstr("detpack");
         loop {
-            dp = G_Find(ctx, ctx.entity_id_of(dp), fofs, cname.as_ptr());
+            dp = G_Find(ctx, ctx.entity_id_of(dp), fofs, "detpack");
             if dp.is_null() {
                 break;
             }

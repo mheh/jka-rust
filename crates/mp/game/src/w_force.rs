@@ -40,6 +40,7 @@ use crate::prelude::*;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 use native_string::atoi::atoi_bytes;
+use native_string::strncpyz_string;
 use native_string::MAX_INFO_STRING;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
@@ -242,7 +243,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         // legalizes it in place below, and the parse loop that follows reads the
         // legalized contents back out of this same buffer, not a stale copy.
         // Source: `oracle/codemp/game/w_force.c:155` (`char forcePowers[256];`)
-        let mut forcePowers: [c_char; 256] = [0; 256];
+        let mut forcePowers = String::new();
 
         // Raven `char userinfo[MAX_INFO_STRING]` — scratch for the userinfo
         // query; its only consumer is `Info_ValueForKey`, so it is an owned
@@ -255,7 +256,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         };
 
         let val = Info_ValueForKey(&userinfo, "forcepowers");
-        write_cstr_field(&mut forcePowers, &val);
+        forcePowers = strncpyz_string(val.as_bytes(), 256);
 
         if ent_svflags & SVF_BOT != 0
             && !(&ctx.world.globals.botstates)[ent_number as usize].is_null()
@@ -266,7 +267,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                     .forceinfo
                     .as_ptr() as *const c_char,
             );
-            write_cstr_field(&mut forcePowers, &bot_forceinfo);
+            forcePowers = strncpyz_string(bot_forceinfo.as_bytes(), 256);
         }
 
         //rww - parse through the string manually and eat out all the appropriate data
@@ -275,7 +276,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         if ctx.world.cvars.g_forceBasedTeams.integer != 0 {
             if (*cl).sess.sessionTeam == TEAM_RED {
                 warnClient = (BG_LegalizedForcePowers(
-                    forcePowers.as_mut_ptr(),
+                    &mut forcePowers,
                     maxRank,
                     HasSetSaberOnly(ctx) as qboolean,
                     FORCE_DARKSIDE as c_int,
@@ -284,7 +285,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                 ) == 0) as qboolean;
             } else if (*cl).sess.sessionTeam == TEAM_BLUE {
                 warnClient = (BG_LegalizedForcePowers(
-                    forcePowers.as_mut_ptr(),
+                    &mut forcePowers,
                     maxRank,
                     HasSetSaberOnly(ctx) as qboolean,
                     FORCE_LIGHTSIDE as c_int,
@@ -293,7 +294,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                 ) == 0) as qboolean;
             } else {
                 warnClient = (BG_LegalizedForcePowers(
-                    forcePowers.as_mut_ptr(),
+                    &mut forcePowers,
                     maxRank,
                     HasSetSaberOnly(ctx) as qboolean,
                     0,
@@ -303,7 +304,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             }
         } else {
             warnClient = (BG_LegalizedForcePowers(
-                forcePowers.as_mut_ptr(),
+                &mut forcePowers,
                 maxRank,
                 HasSetSaberOnly(ctx) as qboolean,
                 0,
@@ -315,7 +316,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         // Read the buffer back out post-legalize (Raven re-reads `forcePowers[i]`
         // in the parse loop below — the same array `BG_LegalizedForcePowers` just
         // wrote into), not the pre-call string.
-        let fp_bytes = cstr_to_str(forcePowers.as_ptr()).into_bytes();
+        let fp_bytes = forcePowers.into_bytes();
 
         let mut i_r: usize;
         let mut readBuf: [u8; 256] = [0; 256];

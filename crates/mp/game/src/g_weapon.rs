@@ -3095,7 +3095,7 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
             ctx,
             ctx.entity_id_of(found),
             fofs_classname,
-            c"laserTrap".as_ptr(),
+            "laserTrap",
         );
         if found.is_null() {
             break;
@@ -3525,7 +3525,7 @@ pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
                 ctx,
                 ctx.entity_id_of(found),
                 fofs_classname,
-                c"detpack".as_ptr(),
+                "detpack",
             );
             if found.is_null() {
                 break;
@@ -3592,7 +3592,7 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: bo
             ctx,
             ctx.entity_id_of(found),
             fofs_classname,
-            c"detpack".as_ptr(),
+            "detpack",
         );
         if found.is_null() {
             break;

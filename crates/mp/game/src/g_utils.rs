@@ -16,6 +16,7 @@
 
 use crate::prelude::*;
 use crate::q_math::{_DotProduct, _VectorMA, _VectorSubtract};
+use native_string::q_string::Q_stricmp;
 use native_string::strncpyz_string;
 
 use crate::client::gclient_t;
@@ -269,7 +270,7 @@ pub fn G_Find(
     ctx: &mut GameContext,
     from: Option<EntityId>,
     fieldofs: c_int,
-    r#match: *const c_char,
+    r#match: &str,
 ) -> *mut gentity_t {
     // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
     let from: *mut gentity_t =
@@ -283,7 +284,7 @@ pub fn G_Find(
         while cur < base.add(num_entities as usize) {
             if (*cur).inuse != qfalse {
                 let s = *((cur as *mut u8).add(fieldofs as usize) as *mut *mut c_char);
-                if !s.is_null() && Q_stricmp(s, r#match) == 0 {
+                if !s.is_null() && Q_stricmp(&cstr_to_str(s), r#match) == 0 {
                     return cur;
                 }
             }
@@ -605,7 +606,7 @@ pub fn G_PickTarget(ctx: &mut GameContext, targetname: *mut c_char) -> *mut gent
                 ctx,
                 ctx.entity_id_of(ent),
                 crate::q_shared::FOFS_targetname,
-                targetname,
+                &cstr_to_str(targetname),
             );
             if ent.is_null() {
                 break;
@@ -710,7 +711,7 @@ pub fn G_UseTargets2(
             ctx,
             ctx.entity_id_of(t),
             crate::q_shared::FOFS_targetname,
-            string,
+            &(unsafe { cstr_to_str(string) }),
         );
         if t.is_null() {
             break;

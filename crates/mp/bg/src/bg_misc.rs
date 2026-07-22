@@ -348,17 +348,15 @@ pub fn BG_ParseField(
 ///
 /// Source: `oracle/codemp/game/bg_misc.c:439-732`
 pub fn BG_LegalizedForcePowers(
-    powerOut: *mut c_char,
+    powerOut: &mut String,
     maxRank: c_int,
     freeSaber: qboolean,
     teamForce: c_int,
     gametype: c_int,
     fpDisabled: c_int,
 ) -> qboolean {
-    unsafe {
-        let orig = std::ffi::CStr::from_ptr(powerOut)
-            .to_string_lossy()
-            .into_owned();
+    {
+        let orig = powerOut.clone();
         let mut maintains_validity = qtrue;
 
         let power_buf: String;
@@ -566,9 +564,7 @@ pub fn BG_LegalizedForcePowers(
             out.push(char::from_digit(final_powers[i].max(0) as u32, 10).unwrap_or('0'));
         }
 
-        let bytes = out.as_bytes();
-        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, powerOut, bytes.len());
-        *powerOut.add(bytes.len()) = 0;
+        *powerOut = out;
 
         maintains_validity
     }

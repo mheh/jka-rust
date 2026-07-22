@@ -11,6 +11,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::client::client_connected::CON_CONNECTED;
+use crate::g_utils::G_Find;
 use crate::client::player_team_state::playerTeamStateState_t;
 use crate::g_svcmds::AddIP;
 use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
@@ -3610,22 +3611,22 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                 let sArg = trap::Argv(ctx.engine, 1, MAX_STRING_CHARS);
 
                 let targetname_ofs = std::mem::offset_of!(gentity_t, targetname) as c_int;
-                let mut targ = crate::g_utils::G_Find(
+                let mut targ = G_Find(
                     ctx,
                     ctx.entity_id_of(std::ptr::null_mut()),
                     targetname_ofs,
-                    cstr(&sArg).as_ptr(),
+                    &sArg,
                 );
 
                 while !targ.is_null() {
                     if let Some(use_fn) = (*targ).use_.get() {
                         crate::ent_fn_enums::dispatch_use(ctx, use_fn, targ, ent, ent);
                     }
-                    targ = crate::g_utils::G_Find(
+                    targ = G_Find(
                         ctx,
                         ctx.entity_id_of(targ),
                         targetname_ofs,
-                        cstr(&sArg).as_ptr(),
+                        &sArg,
                     );
                 }
             }

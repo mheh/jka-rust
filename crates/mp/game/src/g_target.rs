@@ -68,7 +68,7 @@ pub fn Use_Target_Give(
             ctx,
             ctx.entity_id_of(t),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            ent_target,
+            &(unsafe { cstr_to_str(ent_target) }),
         );
         if t.is_null() {
             break;
@@ -668,7 +668,7 @@ pub fn target_laser_start(ctx: &mut GameContext, self_: EntityId) {
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
+            &(unsafe { cstr_to_str(target) }),
         );
         if ent.is_null() {
             // G_Printf("%s at %s: %s is a bad target\n", self->classname, vtos(self->s.origin), self->target);
@@ -1018,18 +1018,29 @@ pub fn target_random_use(
         ctx.entity_mut(self_).use_ = FnId::NONE;
     }
 
-    let target = ctx.entity(self_).target;
+    // Raven's `self->target` (possibly NULL) feeds G_Find, where a NULL match
+    // never compares equal; read it as `Option<String>` so a NULL target yields
+    // no matches instead of dereferencing NULL.
+    let target_ptr = ctx.entity(self_).target;
+    let target = if target_ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { cstr_to_str(target_ptr) })
+    };
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
 
     // Count matching targets
     loop {
-        t = G_Find(
-            ctx,
-            ctx.entity_id_of(t),
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
-        );
+        t = match &target {
+            Some(target) => G_Find(
+                ctx,
+                ctx.entity_id_of(t),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                target,
+            ),
+            None => core::ptr::null_mut(),
+        };
         if t.is_null() {
             break;
         }
@@ -1052,12 +1063,15 @@ pub fn target_random_use(
     t_count = 0;
 
     loop {
-        t = G_Find(
-            ctx,
-            ctx.entity_id_of(t),
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            target,
-        );
+        t = match &target {
+            Some(target) => G_Find(
+                ctx,
+                ctx.entity_id_of(t),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                target,
+            ),
+            None => core::ptr::null_mut(),
+        };
         if t.is_null() {
             break;
         }
@@ -1245,14 +1259,25 @@ pub fn SP_target_scriptrunner(ctx: &mut GameContext, self_: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_target.c:900-907`
 pub fn G_SetActiveState(ctx: &mut GameContext, targetstring: *mut c_char, actState: qboolean) {
+    // Raven passes `targetstring` (possibly NULL) to G_Find, where a NULL match
+    // never compares equal; read it as `Option<String>` so a NULL string yields
+    // no matches instead of dereferencing NULL.
+    let targetstring = if targetstring.is_null() {
+        None
+    } else {
+        Some(unsafe { cstr_to_str(targetstring) })
+    };
     let mut target: *mut gentity_t = core::ptr::null_mut();
     loop {
-        target = G_Find(
-            ctx,
-            ctx.entity_id_of(target),
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            targetstring as *const c_char,
-        );
+        target = match &targetstring {
+            Some(targetstring) => G_Find(
+                ctx,
+                ctx.entity_id_of(target),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                targetstring,
+            ),
+            None => core::ptr::null_mut(),
+        };
         if target.is_null() {
             break;
         }

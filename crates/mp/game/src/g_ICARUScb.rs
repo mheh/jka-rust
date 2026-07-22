@@ -818,7 +818,7 @@ pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            name,
+            &(unsafe { cstr_to_str(name) }),
         );
         ctx.entity_id_of(found)
     };
@@ -909,7 +909,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            name,
+            &(unsafe { cstr_to_str(name) }),
         );
         if victim.is_null() {
             G_DebugPrint(
@@ -926,7 +926,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
                 ctx,
                 Some(vid),
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
-                name,
+                &(unsafe { cstr_to_str(name) }),
             );
         }
     }
@@ -1659,7 +1659,7 @@ pub fn Q3_SetCopyOrigin(ctx: &mut GameContext, entID: c_int, name: *const c_char
         ctx,
         None,
         core::mem::offset_of!(gentity_t, targetname) as c_int,
-        name,
+        &(unsafe { cstr_to_str(name) }),
     );
 
     if !found.is_null() {
@@ -1864,7 +1864,7 @@ pub fn Q3_SetEnemy(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            name,
+            &(unsafe { cstr_to_str(name) }),
         );
 
         if enemy.is_null() {
@@ -1913,7 +1913,7 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             ctx,
             None,
             core::mem::offset_of!(gentity_t, targetname) as c_int,
-            name,
+            &(unsafe { cstr_to_str(name) }),
         );
 
         if leader.is_null() {
@@ -2013,7 +2013,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
                 ctx,
                 None,
                 core::mem::offset_of!(gentity_t, targetname) as c_int,
-                name,
+                &(unsafe { cstr_to_str(name) }),
             );
             if targ.is_null() {
                 G_DebugPrint(
@@ -2597,14 +2597,14 @@ pub fn Q3_SetICARUSFreeze(
         ctx,
         None,
         core::mem::offset_of!(gentity_t, targetname) as c_int,
-        name,
+        &(unsafe { cstr_to_str(name) }),
     );
     if self_.is_null() {
         self_ = G_Find(
             ctx,
             None,
             core::mem::offset_of!(gentity_t, script_targetname) as c_int,
-            name,
+            &(unsafe { cstr_to_str(name) }),
         );
     }
 

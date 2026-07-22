@@ -1775,7 +1775,7 @@ pub fn GetObjectThatTargets(ctx: &mut GameContext, ent: EntityId) -> *mut gentit
     // `FOFS(target)` — byte offset of `gentity_t::target` — is the field
     // this scan matches against.
     let fieldofs = core::mem::offset_of!(gentity_t, target) as c_int;
-    let next = G_Find(ctx, None, fieldofs, targetname);
+    let next = G_Find(ctx, None, fieldofs, &(unsafe { cstr_to_str(targetname) }));
 
     if !next.is_null() {
         return next;
@@ -2850,7 +2850,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
             core::mem::offset_of!(gentity_t, classname) as c_int,
-            c"terrain".as_ptr(),
+            "terrain",
         );
 
         let et_terrain = mp_bg::public::entity_type::entityType_t::ET_TERRAIN as c_int;

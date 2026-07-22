@@ -585,11 +585,10 @@ pub fn UseSiegeTarget(
     // so no empty check here.
 
     let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
-    let target_c = cstr(target);
 
     let mut t: Option<EntityId> = None;
     loop {
-        let t_raw = G_Find(ctx, t, targetname_ofs, target_c.as_ptr());
+        let t_raw = G_Find(ctx, t, targetname_ofs, target);
         t = ctx.entity_id_of(t_raw);
         let Some(t_id) = t else {
             break;
@@ -2037,7 +2036,7 @@ pub fn SiegeItemUse(
         if !paintarget.is_null() && *paintarget != 0 {
             // want to be on this guy's origin now then
             let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
-            let targ = G_Find(ctx, None, targetname_ofs, paintarget as *const c_char);
+            let targ = G_Find(ctx, None, targetname_ofs, &cstr_to_str(paintarget));
             let targ = ctx.entity_id_of(targ);
 
             if let Some(targ) = targ {

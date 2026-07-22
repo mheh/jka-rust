@@ -1471,13 +1471,7 @@ pub fn ItemUse_Seeker(ctx: &mut GameContext, ent: EntityId) {
         && ctx.world.cvars.d_siegeSeekerNPC.integer != 0
     {
         // actualy spawn a remote NPC
-        let remote = NPC_SpawnType(
-            ctx,
-            Some(ent),
-            c"remote".as_ptr() as *mut c_char,
-            core::ptr::null_mut(),
-            qfalse,
-        );
+        let remote = NPC_SpawnType(ctx, Some(ent), "remote", None, qfalse);
         if !remote.is_null() {
             let remote_id = ctx.entity_id_of(remote).unwrap();
             // FLAG: NPC client pointer; deref stays raw (recipe 2b — remote is an NPC).
