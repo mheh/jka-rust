@@ -74,8 +74,9 @@ pub fn AddRemap(
     newShader: *const c_char,
     timeOffset: f32,
 ) {
-    // `oldShader`/`newShader` remain seam pointers (entity `targetShaderName*`
-    // fields); read them once into owned strings. Raven's `strcpy` into the
+    // `oldShader`/`newShader` are `*const c_char` params (callers pass `CString`
+    // views of the owned `targetShaderName*` fields); read them once into owned
+    // strings. Raven's `strcpy` into the
     // `MAX_QPATH` fields is bounded here (its C overrun is UB); the compare is
     // `Q_stricmp == 0` (ASCII case-fold).
     let old_shader = unsafe { cstr_to_str(oldShader) };
