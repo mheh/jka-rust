@@ -3558,11 +3558,8 @@ pub fn SetupGameGhoul2Model(
                             if (*((*ent).client)).siegeClass != -1 {
                                 let scl = &(&ctx.world.bg_state.bgSiegeClasses)
                                     [(*((*ent).client)).siegeClass as usize];
-                                if scl.forcedSkin[0] as c_int != 0 {
-                                    write_cstr_field(
-                                        &mut skin,
-                                        &cstr_to_str(scl.forcedSkin.as_ptr()),
-                                    );
+                                if !scl.forcedSkin.is_empty() {
+                                    write_cstr_field(&mut skin, &scl.forcedSkin);
                                 }
                             }
                         }
@@ -4191,9 +4188,9 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 // make sure the saber models are updated
                 G_SaberModelSetup(ctx, ctx.entity_id_of(ent).unwrap());
 
-                if scl.forcedModel[0] as c_int != 0 {
+                if !scl.forcedModel.is_empty() {
                     // be sure to override the model we actually use
-                    write_cstr_field(&mut model, &cstr_to_str(scl.forcedModel.as_ptr()));
+                    write_cstr_field(&mut model, &scl.forcedModel);
                     if ctx.world.cvars.d_perPlayerGhoul2.integer != 0 {
                         let model_str = cstr_to_str(model.as_ptr());
                         if Q_stricmp(&model_str, &(*client).modelname) != 0 {

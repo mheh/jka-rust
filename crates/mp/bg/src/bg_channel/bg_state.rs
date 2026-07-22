@@ -235,7 +235,7 @@ impl BgState {
             // it unpopulated), so an empty `Vec` would panic where C reads zeros.
             // Same fixed-array pre-size convention as `g_vehicleInfo`/`bgAllAnims`.
             bgSiegeClasses: (0..MAX_SIEGE_CLASSES)
-                .map(|_| unsafe { core::mem::zeroed() })
+                .map(|_| siegeClass_t::default())
                 .collect(),
             bgNumSiegeClasses: 0,
             bgSiegeTeams: Vec::new(),

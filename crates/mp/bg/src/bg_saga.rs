@@ -1148,14 +1148,10 @@ pub fn BG_SiegeParseClassFile(
             parse_buf.as_mut_ptr(),
         ) != 0
         {
-            strcpy(
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .forcedModel
-                    .as_mut_ptr(),
-                parse_buf.as_ptr(),
-            );
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel =
+                cstr_to_str(parse_buf.as_ptr());
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel[0] = 0;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel = String::new();
         }
 
         if BG_SiegeGetPairedValue(
@@ -1164,14 +1160,10 @@ pub fn BG_SiegeParseClassFile(
             parse_buf.as_mut_ptr(),
         ) != 0
         {
-            strcpy(
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .forcedSkin
-                    .as_mut_ptr(),
-                parse_buf.as_ptr(),
-            );
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin =
+                cstr_to_str(parse_buf.as_ptr());
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin[0] = 0;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin = String::new();
         }
 
         if BG_SiegeGetPairedValue(
