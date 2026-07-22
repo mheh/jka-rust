@@ -598,8 +598,12 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
             MAX_GENTITIES as c_int,
         );
 
+        // Raven derefs `SV_GentityNum(passEntityNum)` even for the bot AI's
+        // `ignore = -1` (OOB read before the arena — UB); define -1/out-of-range
+        // as "no owner, shared" instead.
+        let pass_in_range = (0..MAX_GENTITIES as c_int).contains(&(*clip).passEntityNum);
         let passOwnerNum: c_int;
-        if (*clip).passEntityNum != ENTITYNUM_NONE {
+        if (*clip).passEntityNum != ENTITYNUM_NONE && pass_in_range {
             let passEnt = crate::sv_game::SV_GentityNum(sv, (*clip).passEntityNum);
             passOwnerNum = if (*passEnt).r.ownerNum == ENTITYNUM_NONE {
                 -1
@@ -611,9 +615,11 @@ pub fn SV_ClipMoveToEntities(view: &mut EngineHostView, sv: &mut Server, clip: *
         }
 
         let mut thisOwnerShared = true;
-        let passEnt2 = crate::sv_game::SV_GentityNum(sv, (*clip).passEntityNum);
-        if (*passEnt2).r.svFlags & SVF_OWNERNOTSHARED != 0 {
-            thisOwnerShared = false;
+        if pass_in_range {
+            let passEnt2 = crate::sv_game::SV_GentityNum(sv, (*clip).passEntityNum);
+            if (*passEnt2).r.svFlags & SVF_OWNERNOTSHARED != 0 {
+                thisOwnerShared = false;
+            }
         }
 
         for i in 0..num {
