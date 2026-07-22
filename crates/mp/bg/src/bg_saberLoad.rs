@@ -910,7 +910,7 @@ const DEFAULT_SABER: &std::ffi::CStr = c"Kyle";
 ///
 /// Source: `oracle/codemp/game/bg_saberLoad.c:617-2572`
 pub fn WP_SaberParseParms(
-    SaberName: *const c_char,
+    saber_name: &str,
     saber: *mut saberInfo_t,
     bg: &mut BgState,
     traps: &dyn BgTraps,
@@ -929,11 +929,16 @@ pub fn WP_SaberParseParms(
         // Set defaults so that, if it fails, there's at least something there
         WP_SaberSetDefaults(saber, callbacks);
 
-        if SaberName.is_null() || *SaberName == 0 {
+        // Raven's `!SaberName || !SaberName[0]` treats a null and an empty name
+        // identically; the empty `&str` is the single defined form of both.
+        if saber_name.is_empty() {
             c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
             triedDefault = qtrue;
         } else {
-            c_strcpy(useSaber.as_mut_ptr(), SaberName);
+            // Raven's `strcpy(useSaber, SaberName)` is unbounded; `useSaber` is
+            // 1024 and saber names are short, so the bound only clips the
+            // otherwise-UB overflow case.
+            write_cstr_field(&mut useSaber, saber_name);
         }
 
         if bg.SaberParms.is_empty() {
@@ -2312,7 +2317,7 @@ pub fn WP_SetSaber(
 
         if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName, bg, traps) == qfalse {
             WP_SaberParseParms(
-                c"Kyle".as_ptr(),
+                "Kyle",
                 sabers.offset(saberNum as isize),
                 bg,
                 traps,
@@ -2320,7 +2325,7 @@ pub fn WP_SetSaber(
             ); // get saber info
         } else {
             WP_SaberParseParms(
-                saberName,
+                &cstr_to_str(saberName),
                 sabers.offset(saberNum as isize),
                 bg,
                 traps,

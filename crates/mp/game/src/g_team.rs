@@ -1275,10 +1275,9 @@ pub fn SelectRandomTeamSpawnPoint(
                 let idealclass = ctx.world.entity(sid).idealclass;
                 if !idealclass.is_null() && unsafe { *idealclass } != 0 {
                     let bg_classes = &ctx.world.bg_state.bgSiegeClasses;
-                    let class_name =
-                        unsafe { CStr::from_ptr(bg_classes[siegeClass as usize].name.as_ptr()) };
-                    let spot_class = unsafe { CStr::from_ptr(idealclass) };
-                    if Q_stricmp(class_name.as_ptr(), spot_class.as_ptr()) == 0 {
+                    let class_name = &bg_classes[siegeClass as usize].name;
+                    let spot_class = unsafe { cstr_to_str(idealclass) };
+                    if class_name.eq_ignore_ascii_case(&spot_class) {
                         class_spots[class_count as usize] = spots[i as usize];
                         class_count += 1;
                     }

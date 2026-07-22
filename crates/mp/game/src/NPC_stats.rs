@@ -2164,7 +2164,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     engine: ctx.engine,
                 };
                 mp_bg::bg_saberLoad::WP_SaberParseParms(
-                    saber_name,
+                    &cstr_to_str(saber_name),
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut ctx.world.bg_state,
                     &GameBgTraps::new(ctx.engine),
@@ -2202,7 +2202,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                         engine: ctx.engine,
                     };
                     mp_bg::bg_saberLoad::WP_SaberParseParms(
-                        saber_name,
+                        &cstr_to_str(saber_name),
                         &mut (*client_ptr).saber[1] as *mut saberInfo_t,
                         &mut ctx.world.bg_state,
                         &GameBgTraps::new(ctx.engine),
@@ -2536,7 +2536,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
                     engine: ctx.engine,
                 };
                 mp_bg::bg_saberLoad::WP_SaberParseParms(
-                    cstr("Kyle").as_ptr(),
+                    "Kyle",
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut ctx.world.bg_state,
                     &GameBgTraps::new(ctx.engine),

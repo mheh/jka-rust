@@ -1111,12 +1111,7 @@ pub fn BG_SiegeParseClassFile(
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "name") {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
-            strcpy(
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .name
-                    .as_mut_ptr(),
-                parse_buf.as_ptr(),
-            );
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name = cstr_to_str(parse_buf.as_ptr());
         } else {
             panic!("Siege class without name entry");
         }
@@ -1139,26 +1134,18 @@ pub fn BG_SiegeParseClassFile(
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber1") {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
-            strcpy(
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .saber1
-                    .as_mut_ptr(),
-                parse_buf.as_ptr(),
-            );
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1 =
+                cstr_to_str(parse_buf.as_ptr());
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1[0] = 0;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1 = String::new();
         }
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber2") {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
-            strcpy(
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .saber2
-                    .as_mut_ptr(),
-                parse_buf.as_ptr(),
-            );
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2 =
+                cstr_to_str(parse_buf.as_ptr());
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2[0] = 0;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2 = String::new();
         }
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saberstyle") {
@@ -1277,16 +1264,10 @@ pub fn BG_SiegeParseClassFile(
 
         if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "uishader") {
             Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
+            // QAGAME clears the shader handle and NUL-fills the portrait name
+            // (`memset(uiPortrait,0,...)`); only cgame/ui register the shader.
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortraitShader = 0;
-            core::ptr::write_bytes(
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .uiPortrait
-                    .as_mut_ptr(),
-                0,
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                    .uiPortrait
-                    .len(),
-            );
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait = String::new();
         } else {
             panic!("Siege class without uishader entry");
         }
@@ -1323,11 +1304,7 @@ pub fn BG_SiegeParseClassFile(
             // SPC_INFANTRY default here). Source: `bg_saga.c:1041-1044`
             let s = format!(
                 "ERROR: no class_shader defined for class {}\n",
-                cstr_to_str(
-                    bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
-                        .name
-                        .as_ptr()
-                )
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name
             );
             traps.com_printf(&s);
         }
@@ -1393,28 +1370,28 @@ pub fn BG_GetUIPortraitFile(
     classIndex: c_short,
     cntIndex: c_short,
     bg: &BgState,
-) -> *mut c_char {
+) -> String {
     unsafe {
         let mut count: isize = 0;
         let mut i: isize;
 
         let stm = BG_SiegeFindThemeForTeam(team, bg);
         if stm.is_null() {
-            return core::ptr::null_mut();
+            return String::new();
         }
 
         i = 0;
         while i < (*stm).numClasses as isize {
             if (*(*stm).classes[i as usize]).playerClass == classIndex {
                 if count == cntIndex as isize {
-                    return (*(*stm).classes[i as usize]).uiPortrait.as_mut_ptr();
+                    return (*(*stm).classes[i as usize]).uiPortrait.clone();
                 }
                 count += 1;
             }
             i += 1;
         }
 
-        core::ptr::null_mut()
+        String::new()
     }
 }
 
@@ -1533,19 +1510,17 @@ pub fn BG_SiegeLoadClasses(
 /// Raven `BG_SiegeFindClassByName`.
 ///
 /// Source: `oracle/codemp/game/bg_saga.c:1219-1233`
-pub fn BG_SiegeFindClassByName(classname: *const c_char, bg: &BgState) -> *mut siegeClass_t {
-    unsafe {
-        let mut i: isize = 0;
+pub fn BG_SiegeFindClassByName(classname: &str, bg: &BgState) -> *mut siegeClass_t {
+    let mut i: isize = 0;
 
-        while i < bg.bgNumSiegeClasses as isize {
-            if Q_stricmp(bg.bgSiegeClasses[i as usize].name.as_ptr(), classname) == 0 {
-                return &bg.bgSiegeClasses[i as usize] as *const siegeClass_t as *mut siegeClass_t;
-            }
-            i += 1;
+    while i < bg.bgNumSiegeClasses as isize {
+        if bg.bgSiegeClasses[i as usize].name.eq_ignore_ascii_case(classname) {
+            return &bg.bgSiegeClasses[i as usize] as *const siegeClass_t as *mut siegeClass_t;
         }
-
-        core::ptr::null_mut()
+        i += 1;
     }
+
+    core::ptr::null_mut()
 }
 
 /// Raven `BG_SiegeParseTeamFile`.
@@ -1608,7 +1583,7 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
                 }
 
                 let num_classes = bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize;
-                let found_class = BG_SiegeFindClassByName(parse_buf.as_ptr(), bg);
+                let found_class = BG_SiegeFindClassByName(&cstr_to_str(parse_buf.as_ptr()), bg);
                 bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[num_classes] = found_class;
 
                 if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[num_classes].is_null() {
@@ -1694,7 +1669,6 @@ pub fn BG_PrecacheSabersForSiegeTeam(
 ) {
     unsafe {
         let mut saber: saberInfo_t = core::mem::zeroed();
-        let mut saber_name: *mut c_char;
         let mut s_num: isize;
 
         let t = BG_SiegeFindThemeForTeam(team, bg);
@@ -1706,21 +1680,15 @@ pub fn BG_PrecacheSabersForSiegeTeam(
                 s_num = 0;
 
                 while s_num < MAX_SABERS as isize {
-                    saber_name = match s_num {
-                        0 => &mut (*(*t).classes[i as usize]).saber1[0] as *mut c_char,
-                        1 => &mut (*(*t).classes[i as usize]).saber2[0] as *mut c_char,
-                        _ => core::ptr::null_mut(),
+                    let saber_name: String = match s_num {
+                        0 => (*(*t).classes[i as usize]).saber1.clone(),
+                        1 => (*(*t).classes[i as usize]).saber2.clone(),
+                        _ => String::new(),
                     };
 
-                    if !saber_name.is_null() && *saber_name != 0 {
-                        WP_SaberParseParms(
-                            saber_name as *const c_char,
-                            &mut saber,
-                            bg,
-                            traps,
-                            callbacks,
-                        );
-                        if Q_stricmp(saber_name as *const c_char, saber.name.as_ptr()) == 0 {
+                    if !saber_name.is_empty() {
+                        WP_SaberParseParms(&saber_name, &mut saber, bg, traps, callbacks);
+                        if saber_name.eq_ignore_ascii_case(&cstr_to_str(saber.name.as_ptr())) {
                             if saber.model[0] != 0 {
                                 BG_ModelCache(saber.model.as_ptr(), core::ptr::null(), bg, traps);
                             }
@@ -1739,7 +1707,7 @@ pub fn BG_PrecacheSabersForSiegeTeam(
 /// Raven `BG_SiegeCheckClassLegality`.
 ///
 /// Source: `oracle/codemp/game/bg_saga.c:1416-1453`
-pub fn BG_SiegeCheckClassLegality(team: c_int, classname: *mut c_char, bg: &BgState) -> qboolean {
+pub fn BG_SiegeCheckClassLegality(team: c_int, classname: &mut String, bg: &BgState) -> bool {
     unsafe {
         let mut team_ptr: *mut *mut siegeTeam_t = core::ptr::null_mut();
         let mut i: isize = 0;
@@ -1749,23 +1717,23 @@ pub fn BG_SiegeCheckClassLegality(team: c_int, classname: *mut c_char, bg: &BgSt
         } else if team == SIEGETEAM_TEAM2 {
             team_ptr = &bg.team2Theme as *const *mut siegeTeam_t as *mut *mut siegeTeam_t;
         } else {
-            return qtrue;
+            return true;
         }
 
         if team_ptr.is_null() || (*team_ptr).is_null() {
-            return qtrue;
+            return true;
         }
 
         while i < (**team_ptr).numClasses as isize {
-            if Q_stricmp(classname, (**team_ptr).classes[i as usize].cast()) == 0 {
-                return qtrue;
+            if classname.eq_ignore_ascii_case(&(*(**team_ptr).classes[i as usize]).name) {
+                return true;
             }
             i += 1;
         }
 
-        strcpy(classname, (*(**team_ptr).classes[0]).name.as_ptr());
+        *classname = (*(**team_ptr).classes[0]).name.clone();
 
-        qfalse
+        false
     }
 }
 
@@ -1810,17 +1778,15 @@ pub fn BG_SiegeSetTeamTheme(team: c_int, themeName: *mut c_char, bg: &mut BgStat
 /// Raven `BG_SiegeFindClassIndexByName`.
 ///
 /// Source: `oracle/codemp/game/bg_saga.c:1489-1503`
-pub fn BG_SiegeFindClassIndexByName(classname: *const c_char, bg: &BgState) -> c_int {
-    unsafe {
-        let mut i: isize = 0;
+pub fn BG_SiegeFindClassIndexByName(classname: &str, bg: &BgState) -> c_int {
+    let mut i: isize = 0;
 
-        while i < bg.bgNumSiegeClasses as isize {
-            if Q_stricmp(bg.bgSiegeClasses[i as usize].name.as_ptr(), classname) == 0 {
-                return i as c_int;
-            }
-            i += 1;
+    while i < bg.bgNumSiegeClasses as isize {
+        if bg.bgSiegeClasses[i as usize].name.eq_ignore_ascii_case(classname) {
+            return i as c_int;
         }
-
-        -1
+        i += 1;
     }
+
+    -1
 }

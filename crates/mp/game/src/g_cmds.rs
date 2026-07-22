@@ -18,6 +18,7 @@ use crate::g_utils::G_SoundIndex;
 use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
 use mp_bg::bg_misc::selected_holdable_tag;
+use mp_bg::public::gametype::GT_SIEGE;
 use native_string::atof::atof_bytes;
 use native_string::atoi::{atoi, atoi_bytes};
 use native_string::strncpyz_string;
@@ -760,8 +761,6 @@ pub fn G_GetDuelWinner(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 ///
 /// Source: `oracle/codemp/game/g_cmds.c:670-718`
 pub fn BroadcastTeamChange(ctx: &mut GameContext, ent: EntityId, oldTeam: c_int) {
-    use mp_bg::public::gametype::GT_SIEGE;
-
     unsafe {
         // `ent` is the commanding player, so its client slot is `ent.index()`.
         let cidx = ent.index();
@@ -1254,8 +1253,9 @@ pub fn G_TeamForSiegeClass(ctx: &mut GameContext, clName: *const c_char) -> c_in
         while team <= SIEGETEAM_TEAM2 {
             let scl = (*stm).classes[i as usize];
 
-            if !scl.is_null() && (*scl).name[0] != 0 {
-                if crate::q_shared::Q_stricmp(clName, (*scl).name.as_ptr()) == 0 {
+            if !scl.is_null() {
+                let name: &str = &(*scl).name;
+                if !name.is_empty() && name.eq_ignore_ascii_case(&cstr_to_str(clName)) {
                     return team;
                 }
             }
@@ -1342,16 +1342,14 @@ pub fn Cmd_SiegeClass_f(ctx: &mut GameContext, ent: EntityId) {
 
         let preScore = ctx.world.client(cidx).ps.persistant[PERS_SCORE as usize];
 
-        let mut classname_buf = [0 as c_char; 64];
-        write_cstr_field(&mut classname_buf, &className);
+        let mut classname_buf = strncpyz_string(className.as_bytes(), 64);
         mp_bg::bg_saga::BG_SiegeCheckClassLegality(
             team,
-            classname_buf.as_mut_ptr(),
-            &mut ctx.world.bg_state,
+            &mut classname_buf,
+            &ctx.world.bg_state,
         );
 
-        let cn = cstr_to_str(classname_buf.as_ptr());
-        ctx.world.client_mut(cidx).sess.siegeClass = strncpyz_string(cn.as_bytes(), 64);
+        ctx.world.client_mut(cidx).sess.siegeClass = strncpyz_string(classname_buf.as_bytes(), 64);
 
         crate::g_client::ClientUserinfoChanged(ctx, ent.index() as c_int);
 
@@ -1431,17 +1429,15 @@ pub fn G_SetSaber(
     ctx: &mut GameContext,
     ent: EntityId,
     saberNum: c_int,
-    saberName: *mut c_char,
+    saberName: &str,
     siegeOverride: qboolean,
 ) -> qboolean {
     // STAGE-1: EntityId param, raw body re-derived verbatim (Stage-2 debt).
     let ent: *mut gentity_t = ctx.entity_mut(ent);
-    use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
         let client = (*ent).client;
         let mut truncSaberName = [0 as c_char; 64];
-        let mut i: usize = 0;
 
         let bgSiegeClasses = &ctx.world.bg_state.bgSiegeClasses;
 
@@ -1449,17 +1445,14 @@ pub fn G_SetSaber(
             && ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && (*client).siegeClass != -1
             && (bgSiegeClasses[(*client).siegeClass as usize].saberStance != 0
-                || bgSiegeClasses[(*client).siegeClass as usize].saber1[0] != 0
-                || bgSiegeClasses[(*client).siegeClass as usize].saber2[0] != 0)
+                || !bgSiegeClasses[(*client).siegeClass as usize].saber1.is_empty()
+                || !bgSiegeClasses[(*client).siegeClass as usize].saber2.is_empty())
         {
             return qfalse;
         }
 
-        while *saberName.add(i) != 0 && i < 64 - 1 {
-            truncSaberName[i] = *saberName.add(i);
-            i += 1;
-        }
-        truncSaberName[i] = 0;
+        // Raven copies up to 63 bytes of `saberName` then NUL-terminates.
+        write_cstr_field(&mut truncSaberName, saberName);
 
         if saberNum == 0
             && (Q_stricmp("none", &cstr_to_str(truncSaberName.as_ptr())) == 0

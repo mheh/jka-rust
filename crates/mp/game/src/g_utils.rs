@@ -1770,7 +1770,8 @@ pub fn TryHeal(ctx: &mut GameContext, ent: Option<EntityId>, target: Option<Enti
     let healingclass = ctx.world.entity(target_id).healingclass;
     let scl_matches = {
         let scl = &ctx.world.bg_state.bgSiegeClasses[siegeClass as usize];
-        Q_stricmp(scl.name.as_ptr(), healingclass) == 0
+        let hc = unsafe { cstr_to_str(healingclass) };
+        scl.name.eq_ignore_ascii_case(&hc)
     };
     if !scl_matches {
         return qfalse;

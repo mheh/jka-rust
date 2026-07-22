@@ -277,8 +277,8 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
         }
 
         let siege_class = unsafe { (*ac).siegeClass } as usize;
-        let siege_class_name = ctx.world.bg_state.bgSiegeClasses[siege_class].name.as_ptr();
-        if G_NameInTriggerClassList(siege_class_name as *mut c_char, idealclass) == 0 {
+        let siege_class_name = cstr(&ctx.world.bg_state.bgSiegeClasses[siege_class].name);
+        if G_NameInTriggerClassList(siege_class_name.as_ptr() as *mut c_char, idealclass) == 0 {
             // wasn't in the list
             return;
         }
@@ -614,8 +614,9 @@ pub fn Touch_Multi(
                 }
 
                 let siege_class = unsafe { (*other_client).siegeClass } as usize;
-                let siege_class_name = ctx.world.bg_state.bgSiegeClasses[siege_class].name.as_ptr();
-                if G_NameInTriggerClassList(siege_class_name as *mut c_char, idealclass) == 0 {
+                let siege_class_name = cstr(&ctx.world.bg_state.bgSiegeClasses[siege_class].name);
+                if G_NameInTriggerClassList(siege_class_name.as_ptr() as *mut c_char, idealclass) == 0
+                {
                     // wasn't in the list
                     return;
                 }

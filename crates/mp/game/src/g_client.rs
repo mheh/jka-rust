@@ -2021,51 +2021,21 @@ pub fn ClientBegin(ctx: &mut GameContext, clientNum: c_int, allowTeamReset: qboo
                         sab1 = "dual_1";
                         sab2 = "none";
                     }
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        cstr(sab1).as_ptr() as *mut c_char,
-                        qfalse,
-                    );
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        cstr(sab2).as_ptr() as *mut c_char,
-                        qfalse,
-                    );
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, sab1, qfalse);
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, sab2, qfalse);
                     Info_SetValueForKey(&mut userinfo, "saber1", sab1);
                     Info_SetValueForKey(&mut userinfo, "saber2", sab2);
                     trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
                 } else {
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        cstr(&saber_val).as_ptr() as *mut c_char,
-                        qfalse,
-                    );
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, &saber_val, qfalse);
                 }
 
                 if !saber_val.is_empty() && saber2_val.is_empty() {
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        c"none".as_ptr() as *mut c_char,
-                        qfalse,
-                    );
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, "none", qfalse);
                     Info_SetValueForKey(&mut userinfo, "saber2", "none");
                     trap::SetUserinfo(ctx.engine, clientNum, &userinfo);
                 } else {
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        cstr(&saber2_val).as_ptr() as *mut c_char,
-                        qfalse,
-                    );
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, &saber2_val, qfalse);
                 }
             }
 
@@ -2455,13 +2425,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
                     || saber.is_empty()
                     || (*client).saber[0].model[0] == 0
                 {
-                    if G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        l,
-                        cstr(&value).as_ptr() as *mut c_char,
-                        qfalse,
-                    ) != qfalse
+                    if G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), l, &value, qfalse)
+                        != qfalse
                     {
                         changed_saber = qtrue;
                     } else if saber.is_empty() || (*client).saber[0].model[0] == 0 {
@@ -3989,7 +3954,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
         // (and their color keys) are not truncated before parsing.
         let mut c1: [c_char; 1024] = [0; 1024];
         let mut c2: [c_char; 1024] = [0; 1024];
-        let mut className: [c_char; 260] = [0; 260];
+        let mut className = String::new();
         let mut saberName: [c_char; 260] = [0; 260];
         let mut saber2Name: [c_char; 260] = [0; 260];
         let mut maxHealth: c_int = 0;
@@ -4118,26 +4083,21 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
 
         // Set the siege class
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE {
-            write_cstr_field(&mut className, &(*client).sess.siegeClass);
+            className = strncpyz_string((*client).sess.siegeClass.as_bytes(), 260);
 
             // This function will see if the given class is legal for the given team.
             // If not className will be filled in with the first legal class for this team.
             // Now that the team is legal for sure, we'll go ahead and get an index for it.
-            (*client).siegeClass =
-                BG_SiegeFindClassIndexByName(className.as_ptr(), &ctx.world.bg_state);
+            (*client).siegeClass = BG_SiegeFindClassIndexByName(&className, &ctx.world.bg_state);
             if (*client).siegeClass == -1 {
                 // ok, get the first valid class for the team you're on then, I guess.
-                BG_SiegeCheckClassLegality(team, className.as_mut_ptr(), &ctx.world.bg_state);
-                (*client).sess.siegeClass = strncpyz_string(
-                    core::slice::from_raw_parts(className.as_ptr() as *const u8, className.len()),
-                    64,
-                );
-                (*client).siegeClass =
-                    BG_SiegeFindClassIndexByName(className.as_ptr(), &ctx.world.bg_state);
+                BG_SiegeCheckClassLegality(team, &mut className, &ctx.world.bg_state);
+                (*client).sess.siegeClass = strncpyz_string(className.as_bytes(), 64);
+                (*client).siegeClass = BG_SiegeFindClassIndexByName(&className, &ctx.world.bg_state);
             } else {
                 // otherwise, make sure the class we are using is legal.
                 G_ValidateSiegeClassForTeam(ctx, ctx.entity_id_of(ent).unwrap(), team);
-                write_cstr_field(&mut className, &(*client).sess.siegeClass);
+                className = strncpyz_string((*client).sess.siegeClass.as_bytes(), 260);
             }
 
             // Set the sabers if the class dictates
@@ -4148,41 +4108,17 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 let scl =
                     &(&(*ctx.world_raw()).bg_state.bgSiegeClasses)[(*client).siegeClass as usize];
 
-                if scl.saber1[0] as c_int != 0 {
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        scl.saber1.as_ptr() as *mut c_char,
-                        qtrue,
-                    );
+                if !scl.saber1.is_empty() {
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, &scl.saber1, qtrue);
                 } else {
                     // default I guess
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        0,
-                        cstr("Kyle").as_ptr() as *mut c_char,
-                        qtrue,
-                    );
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 0, "Kyle", qtrue);
                 }
-                if scl.saber2[0] as c_int != 0 {
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        1,
-                        scl.saber2.as_ptr() as *mut c_char,
-                        qtrue,
-                    );
+                if !scl.saber2.is_empty() {
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 1, &scl.saber2, qtrue);
                 } else {
                     // no second saber then
-                    G_SetSaber(
-                        ctx,
-                        ctx.entity_id_of(ent).unwrap(),
-                        1,
-                        cstr("none").as_ptr() as *mut c_char,
-                        qtrue,
-                    );
+                    G_SetSaber(ctx, ctx.entity_id_of(ent).unwrap(), 1, "none", qtrue);
                 }
 
                 // make sure the saber models are updated
@@ -4212,7 +4148,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 }
             }
         } else {
-            write_cstr_field(&mut className, "none");
+            className = "none".to_string();
         }
 
         // Set the saber name
@@ -4275,7 +4211,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 Info_ValueForKey(&userinfo, "skill"),
                 teamTask,
                 teamLeader,
-                cstr_to_str(className.as_ptr()),
+                className,
                 cstr_to_str(saberName.as_ptr()),
                 cstr_to_str(saber2Name.as_ptr()),
                 (*client).sess.duelTeam,
@@ -4295,7 +4231,7 @@ pub fn ClientUserinfoChanged(ctx: &mut GameContext, clientNum: c_int) {
                 (*client).sess.losses,
                 teamTask,
                 teamLeader,
-                cstr_to_str(className.as_ptr()),
+                className,
                 cstr_to_str(saberName.as_ptr()),
                 cstr_to_str(saber2Name.as_ptr()),
                 (*client).sess.duelTeam,

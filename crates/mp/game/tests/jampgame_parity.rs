@@ -1071,9 +1071,7 @@ mod saberload {
             traps.reset_regs();
 
             let mut saber: saberInfo_t = unsafe { core::mem::zeroed() };
-            let cname = cstr(name);
-            let ret =
-                WP_SaberParseParms(cname.as_ptr(), &mut saber, &mut bg, &traps, &mut callbacks);
+            let ret = WP_SaberParseParms(name, &mut saber, &mut bg, &traps, &mut callbacks);
 
             let pi = |o: &mut String, tag: &str, v: c_int| {
                 let _ = writeln!(o, "{tag} {v}");

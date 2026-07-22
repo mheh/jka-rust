@@ -31,7 +31,7 @@ use crate::g_utils::{
 };
 use crate::q_shared::Info_SetValueForKey;
 use native_string::strncpyz_string;
-use native_string::{buf_to_string, strcat_string, Q_stricmp, Q_strncpyzBytes};
+use native_string::{atoi_bytes, buf_to_string, strcat_string, Q_stricmp, Q_strncpyzBytes};
 use mp_bg::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
     BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
@@ -567,7 +567,7 @@ pub fn UseSiegeTarget(
     ctx: &mut GameContext,
     other: Option<EntityId>,
     en: Option<EntityId>,
-    target: *mut c_char,
+    target: &str,
 ) {
     // Raven: "looks like we don't have access to a player, so just use
     // the activating entity" — when `en` has no client, all three uses
@@ -581,15 +581,15 @@ pub fn UseSiegeTarget(
     if en.is_none() {
         return;
     }
-    if target.is_null() {
-        return;
-    }
+    // Raven guards only `if (!target)` (null); an empty name is still searched,
+    // so no empty check here.
 
     let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
+    let target_c = cstr(target);
 
     let mut t: Option<EntityId> = None;
     loop {
-        let t_raw = G_Find(ctx, t, targetname_ofs, target as *const c_char);
+        let t_raw = G_Find(ctx, t, targetname_ofs, target_c.as_ptr());
         t = ctx.entity_id_of(t_raw);
         let Some(t_id) = t else {
             break;
@@ -927,10 +927,9 @@ pub fn G_ValidateSiegeClassForTeam(ctx: &mut GameContext, ent: EntityId, team: c
                 // go through the team and see its valid classes, can we find
                 // one that matches our current player class?
                 if !(*stm).classes[i as usize].is_null() {
-                    if q_shared::Q_stricmp(
-                        (*scl).name.as_ptr(),
-                        (*(*stm).classes[i as usize]).name.as_ptr(),
-                    ) == 0
+                    if (*scl)
+                        .name
+                        .eq_ignore_ascii_case(&(*(*stm).classes[i as usize]).name)
                     {
                         // the class we're using is already ok for this team.
                         return;
@@ -947,14 +946,11 @@ pub fn G_ValidateSiegeClassForTeam(ctx: &mut GameContext, ent: EntityId, team: c
             if newClassIndex != -1 {
                 // ok, let's find it in the global class array
                 (*cl).siegeClass = BG_SiegeFindClassIndexByName(
-                    (*(*stm).classes[newClassIndex as usize]).name.as_ptr(),
+                    &(*(*stm).classes[newClassIndex as usize]).name,
                     &ctx.world.bg_state,
                 );
                 (*cl).sess.siegeClass = strncpyz_string(
-                    core::slice::from_raw_parts(
-                        (*(*stm).classes[newClassIndex as usize]).name.as_ptr() as *const u8,
-                        (*(*stm).classes[newClassIndex as usize]).name.len(),
-                    ),
+                    (*(*stm).classes[newClassIndex as usize]).name.as_bytes(),
                     64,
                 );
             }
@@ -1272,11 +1268,10 @@ pub fn siegeTriggerUse(
     activator: Option<EntityId>,
 ) {
     unsafe {
-        let mut teamstr: [c_char; 64] = [0; 64];
-        let mut objectivestr: [c_char; 64] = [0; 64];
+        let mut teamstr = String::new();
+        let mut objectivestr = String::new();
         let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
             [0; MAX_SIEGE_INFO_SIZE as usize];
-        let teamstr_len = teamstr.len();
         let desiredobjective_len = desiredobjective.len();
         let mut clUser: c_int = ENTITYNUM_NONE;
         let mut r#final: c_int = 0;
@@ -1299,51 +1294,48 @@ pub fn siegeTriggerUse(
         }
 
         if ctx.world.entity(ent).side == SIEGETEAM_TEAM1 {
-            write_cstr_field(&mut teamstr, &ctx.world.globals.team1);
+            teamstr = strncpyz_string(ctx.world.globals.team1.as_bytes(), 64);
         } else {
-            write_cstr_field(&mut teamstr, &ctx.world.globals.team2);
+            teamstr = strncpyz_string(ctx.world.globals.team2.as_bytes(), 64);
         }
 
         if let Some(objectives) = BG_SiegeGetValueGroup(
             &buf_to_string(&ctx.world.bg_state.siege_info),
-            &cstr_to_str(teamstr.as_ptr()),
+            &teamstr,
         ) {
             ctx.world.globals.gParseObjectives = objectives;
             let obj_num = ctx.world.entity(ent).objective;
-            write_cstr_field(&mut objectivestr, &format!("Objective{}", obj_num));
+            objectivestr = strncpyz_string(format!("Objective{}", obj_num).as_bytes(), 64);
 
             if let Some(desired) = BG_SiegeGetValueGroup(
                 &ctx.world.globals.gParseObjectives.clone(),
-                &cstr_to_str(objectivestr.as_ptr()),
+                &objectivestr,
             ) {
                 Q_strncpyzBytes(&mut desiredobjective, desired.as_bytes(), desiredobjective_len);
                 if let Some(val) =
                     BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "final")
                 {
-                    Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
-                    r#final = atoi(teamstr.as_ptr());
+                    teamstr = strncpyz_string(val.as_bytes(), 64);
+                    r#final = atoi_bytes(teamstr.as_bytes());
                 }
 
                 if let Some(val) =
                     BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "target")
                 {
-                    Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
-                    let mut i: isize = 0;
-                    while teamstr[i as usize] != 0 {
-                        if teamstr[i as usize] == b'\r' as c_char
-                            || teamstr[i as usize] == b'\n' as c_char
-                        {
-                            teamstr[i as usize] = 0;
-                        }
-                        i += 1;
+                    teamstr = strncpyz_string(val.as_bytes(), 64);
+                    // Raven NUL-terminates at the first carriage-return/newline.
+                    if let Some(pos) =
+                        teamstr.as_bytes().iter().position(|&b| b == b'\r' || b == b'\n')
+                    {
+                        teamstr.truncate(pos);
                     }
-                    UseSiegeTarget(ctx, other, activator, teamstr.as_mut_ptr());
+                    UseSiegeTarget(ctx, other, activator, &teamstr);
                 }
 
                 let ent_target = ctx.world.entity(ent).target;
                 if !ent_target.is_null() && *ent_target != 0 {
                     // use this too
-                    UseSiegeTarget(ctx, other, activator, ent_target);
+                    UseSiegeTarget(ctx, other, activator, &cstr_to_str(ent_target));
                 }
 
                 let side = ctx.world.entity(ent).side;
