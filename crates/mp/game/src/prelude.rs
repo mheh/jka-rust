@@ -308,7 +308,7 @@ pub use crate::g_items::{RegisterItem, Touch_Item};
 pub use crate::g_log::G_LogWeaponFire;
 pub use crate::g_main::{Com_Printf, G_RunThink};
 pub use crate::g_nav::{FlyingCreature, NAV_HitNavGoal, NPC_SetMoveGoal};
-pub use crate::g_spawn::{G_NewString, G_SpawnFloat, G_SpawnInt, G_SpawnString, G_SpawnVector};
+pub use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString, G_SpawnVector};
 pub use crate::g_timer::TIMER_Done;
 pub use crate::g_utils::{
     EntFindField, G_AddEvent, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_ScaleNetHealth,

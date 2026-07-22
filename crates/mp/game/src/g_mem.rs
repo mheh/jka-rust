@@ -5,6 +5,11 @@
 //! (STATE-D6), and `G_Alloc` reaches them through the `ctx.world` channel the
 //! rest of the module already threads — no global/`static mut` (porting-rules
 //! §B3). `G_InitMemory`/`Svcmd_GameMem_f` already took `ctx`.
+//!
+//! After the prefix-string arena landed (the `G_NewString` deletion), the pool's
+//! only remaining consumer is the ICARUS `parms_t` block (`g_ICARUScb.rs`); the
+//! string half of `G_Alloc` moved to `GameWorld::prefixStrings`. The pool itself
+//! is unchanged (not redesigned this batch).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

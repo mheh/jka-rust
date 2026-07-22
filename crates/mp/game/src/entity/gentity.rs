@@ -21,7 +21,7 @@ use mp_qshared::common::mp::qcommon::{entityState_t, parms_t, playerState_t};
 use mp_qshared::shared::{entityShared_t, qboolean, vec3_t};
 
 use crate::client::gclient::gclient_t;
-use crate::g_spawn::G_NewString;
+use crate::g_spawn::translate_newlines;
 use crate::npc::g_npc_t::gNPC_t;
 use crate::world::game_context::GameContext;
 
@@ -459,11 +459,12 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
 
-/// Write payload for [`gentity_t::set`] — one variant per writable prefix
-/// string slot, so a single choke point owns the pool-pointer transaction for
+/// Write payload for [`GameContext::ent_set`] — one variant per writable prefix
+/// string slot, so a single choke point owns the slot-pointer transaction for
 /// every prefix write in game code. `Option` payloads carry Raven's NULL (`None`
-/// → NULL slot); `str` payloads are copied through `G_NewString` (`\n`
-/// translation, pool allocation) exactly as the C `x = G_NewString(...)` did.
+/// → NULL slot); `str` payloads are copied into the level-lifetime prefix-string
+/// arena ([`GameWorld::prefixStrings`]) with the `\n` translation Raven's
+/// `x = G_NewString(...)` performed.
 pub enum PrefixSet<'a> {
     /// `classname` slot. Always present in Raven (`x = G_NewString(...)`).
     Classname(&'a str),
@@ -476,7 +477,7 @@ pub enum PrefixSet<'a> {
     /// `behaviorSet[i]` slot; `None` ≡ Raven NULL.
     BehaviorSet(usize, Option<&'a str>),
     /// `classname` slot written straight from a `'static` C literal (Raven's
-    /// `x = "noclass"` / `"freed"` path), bypassing the `G_NewString` pool copy.
+    /// `x = "noclass"` / `"freed"` path), bypassing the prefix-string arena.
     ClassnameStatic(&'static CStr),
 }
 
@@ -493,16 +494,6 @@ pub enum PrefixSlot {
 }
 
 impl gentity_t {
-    /// The single choke point for every prefix string write in game code: stores
-    /// the payload into the addressed `*mut c_char` slot as a pointer
-    /// REPLACEMENT (never an in-place edit of the pooled bytes), so the slot is
-    /// valid at every trap boundary. `Some`/`str` payloads route through
-    /// `G_NewString` (pool copy + `\n` translation); `None` writes a NULL slot;
-    /// the `ClassnameStatic` arm stores a `'static` literal pointer directly.
-    /// Prefix slots keep their `*mut c_char` layout permanently (drop-in engine
-    /// ABI); a later batch swaps this interior for an ownership ledger without
-    /// touching call sites.
-
     /// Aliases a prefix pool pointer from `src`'s slot into `self`'s same slot —
     /// a raw pointer copy preserving Raven's shared-allocation semantics (the C
     /// `dst->x = src->x` left both slots pointing at the one `G_Alloc` buffer).
@@ -511,8 +502,11 @@ impl gentity_t {
     /// `targetname`) and `NPC_Spawn_Do` (spawner clones its template's slots).
     ///
     /// # Safety
-    /// `src` must outlive the aliased pointer (both entities live in the same
-    /// arena, so the pool buffer persists until entity free).
+    /// The aliased pointer stays valid regardless of either entity's lifetime:
+    /// the pointed-at bytes are owned by the level-lifetime, append-only prefix
+    /// arena ([`GameWorld::prefixStrings`]), which never drops an entry on entity
+    /// free (byte-faithful to Raven's never-freed `G_Alloc` pool), so the copy is
+    /// sound until level teardown.
     pub unsafe fn alias_from(&mut self, src: &gentity_t, slot: PrefixSlot) {
         match slot {
             PrefixSlot::Targetname => self.targetname = src.targetname,
@@ -623,20 +617,33 @@ impl gentity_t {
     }
 }
 
-/// Pool copy of `name` (Raven `G_NewString`: `\n` translation) when present, or
-/// a NULL slot when absent — the shared body behind [`PrefixSet`]'s `Option`
-/// arms, mirroring Raven's `x = value ? G_NewString(value) : NULL`.
 impl GameContext<'_> {
+    /// Stores `s` into the level-lifetime prefix-string arena
+    /// ([`GameWorld::prefixStrings`]) — reproducing Raven `G_NewString`'s
+    /// `\n`-escape translation — and returns a `*mut c_char` into that owned
+    /// `CString`'s stable heap buffer for a prefix slot. Replaces `G_NewString`:
+    /// the copy is owned for the level's lifetime and never freed on entity free
+    /// (byte-faithful to Raven's never-freed `G_Alloc` pool). Taking the pointer
+    /// before moving the `CString` into the `Vec` is sound — the move relocates
+    /// only the `CString` struct, not its heap buffer, so the pointer stays
+    /// valid across this and every later push.
+    /// Source: replaces `oracle/codemp/game/g_spawn.c:724-749` (`G_NewString`).
+    pub fn prefix_string(&mut self, s: &str) -> *mut c_char {
+        let s_c = cstr(&translate_newlines(s));
+        let ptr = s_c.as_ptr() as *mut c_char;
+        self.world.prefixStrings.push(s_c);
+        ptr
+    }
+
     /// The single prefix-slot write choke point (design §4d-bis). One borrow at
-    /// a time: the pool copy is made first (`G_NewString` — pure bump alloc, no
-    /// trap), then the slot is written through a fresh entity borrow, so the
-    /// slot is never observable in a partial state at any trap boundary and no
-    /// `&mut` into the arena coexists with the world borrow.
+    /// a time: the arena copy is made first ([`Self::prefix_string`] — no trap),
+    /// then the slot is written through a fresh entity borrow, so the slot is
+    /// never observable in a partial state at any trap boundary and no `&mut`
+    /// into the arena coexists with the world borrow.
     pub fn ent_set(&mut self, id: EntityId, field: PrefixSet) {
         match field {
             PrefixSet::Classname(name) => {
-                let name_c = cstr(name);
-                let s = G_NewString(self, name_c.as_ptr());
+                let s = self.prefix_string(name);
                 self.entity_mut(id).classname = s;
             }
             PrefixSet::ClassnameStatic(name) => {
@@ -662,12 +669,13 @@ impl GameContext<'_> {
     }
 }
 
+/// Arena copy of `name` (via [`GameContext::prefix_string`]: `\n` translation)
+/// when present, or a NULL slot when absent — the shared body behind
+/// [`PrefixSet`]'s `Option` arms, mirroring Raven's
+/// `x = value ? G_NewString(value) : NULL`.
 fn new_string_or_null(ctx: &mut GameContext, name: Option<&str>) -> *mut c_char {
     match name {
-        Some(s) => {
-            let s_c = cstr(s);
-            G_NewString(ctx, s_c.as_ptr())
-        }
+        Some(s) => ctx.prefix_string(s),
         None => core::ptr::null_mut(),
     }
 }

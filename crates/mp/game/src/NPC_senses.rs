@@ -1250,13 +1250,13 @@ pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
     );
 
     // `self->target` is now an owned `Option<String>`; the interest point's
-    // `target` slot stays a `*mut c_char` filled by `G_NewString` (Raven's
-    // `if (self->target && self->target[0])` non-empty guard).
+    // `target` slot stays a `*mut c_char`, now filled from the level-lifetime
+    // prefix arena via `prefix_string` (which reproduced `G_NewString`'s copy)
+    // under Raven's `if (self->target && self->target[0])` non-empty guard.
     let target = ctx.entity(self_).target.clone();
     if target.as_deref().is_some_and(|s| !s.is_empty()) {
-        let target_c = cstr(target.as_deref().unwrap());
         let idx = ctx.world.level.numInterestPoints as usize;
-        ctx.world.level.interestPoints[idx].target = G_NewString(ctx, target_c.as_ptr());
+        ctx.world.level.interestPoints[idx].target = ctx.prefix_string(target.as_deref().unwrap());
     }
 
     ctx.world.level.numInterestPoints += 1;

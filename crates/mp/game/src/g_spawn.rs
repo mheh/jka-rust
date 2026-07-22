@@ -39,7 +39,6 @@ use native_string::atoi_bytes;
 
 use crate::g_items::G_SpawnItem;
 use crate::g_main::{G_Error, G_Printf};
-use crate::g_mem::G_Alloc;
 use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};
 use crate::NPC_utils::G_ActivateBehavior;
@@ -295,44 +294,6 @@ pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
         &format!("{} doesn't have a spawn function\n", classname_disp),
     );
     qfalse
-}
-
-/// Raven `G_NewString` — builds a copy of the string, translating `\n` to
-/// real linefeeds so message texts can be multi-line.
-///
-/// Source: `oracle/codemp/game/g_spawn.c:724-749`
-pub fn G_NewString(ctx: &mut GameContext, string: *const c_char) -> *mut c_char {
-    unsafe {
-        let mut l = 0isize;
-        while *string.offset(l) != 0 {
-            l += 1;
-        }
-        l += 1; // + 1 for the NUL, matching `strlen(string) + 1`
-
-        let newb = G_Alloc(ctx, l as c_int) as *mut c_char;
-        let mut new_p = newb;
-
-        let mut i: isize = 0;
-        while i < l {
-            let c = *string.offset(i);
-            if c == b'\\' as c_char && i < l - 1 {
-                i += 1;
-                let c2 = *string.offset(i);
-                if c2 == b'n' as c_char {
-                    *new_p = b'\n' as c_char;
-                } else {
-                    *new_p = b'\\' as c_char;
-                }
-                new_p = new_p.offset(1);
-            } else {
-                *new_p = c;
-                new_p = new_p.offset(1);
-            }
-            i += 1;
-        }
-
-        newb
-    }
 }
 
 /// `fields[]` (`BG_field_t[]`) — this file's own file-scope table, feeding

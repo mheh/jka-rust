@@ -194,15 +194,17 @@ the one site that uses it.
   (mandatory: NPC spawn, siege, vote, train/door paths).
 - **G6** (follow-on, separately gated) — prefix side-table ownership: the five
   prefix slots + behaviorSet keep their `*mut c_char` layout, but allocations
-  move from the G_Alloc pool to a per-entity `CString` ledger on GameWorld;
-  writes go setter → ledger stores the CString → slot gets `.as_ptr()`.
+  move from the G_Alloc pool to a **level-lifetime append-only `Vec<CString>`
+  arena on GameWorld** (user ruling 2026-07-22: entries drop only at level
+  shutdown — byte-faithful to Raven's pool, whose allocations outlive entity
+  free; a per-entity ledger would dangle under `alias_from`/engine-side
+  pointer copies like ICARUS `script_targetname = targetname`);
+  writes go setter → arena stores the CString → slot gets `.as_ptr()`.
   READS STAY SLOT-BASED (engine ICARUS writes slots — e.g.
-  `script_targetname = targetname` — so the slot is the truth; the ledger is
+  `script_targetname = targetname` — so the slot is the truth; the arena is
   an ownership record, never a read path). Deletes G_NewString + the string
-  half of G_Alloc; the pool then serves only ICARUS `parms_t`. Discipline:
-  setter keeps the old CString alive until the slot is rewritten; entity free
-  clears slots before dropping ledger entries; 'static literal writes
-  (c"noclass"/"freed") bypass the ledger.
+  half of G_Alloc; the pool then serves only ICARUS `parms_t`. 'static
+  literal writes (c"noclass"/"freed") bypass the arena.
 
 ## 6. Open rulings
 

@@ -27,7 +27,6 @@ use crate::g_active::{Client_CheckImpactBBrush, G_CheapWeaponFire};
 use crate::g_cmds::TryGrapple;
 use crate::g_combat::{G_Damage, G_DamageFromKiller};
 use crate::g_mem::G_Alloc;
-use crate::g_spawn::G_NewString;
 use crate::g_utils::{
     G_AddEvent, G_EffectIndex, G_ModelIndex, G_PlayEffect, G_PlayEffectID, G_SetAnim, G_SoundIndex,
 };
@@ -543,17 +542,16 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         G_Alloc(&mut ctx, size)
     }
     fn new_string(&mut self, string: &str) -> *mut c_char {
-        // `G_NewString` copies into the game pool via `ctx.world`; it still takes
-        // a `*const c_char`, so re-encode the `&str` for the call (the temporary
-        // `CString` outlives the copy).
-        // Source: `oracle/codemp/game/g_spawn.c` (`G_NewString`).
+        // `prefix_string` stores the copy in `ctx.world`'s level-lifetime prefix
+        // arena (replacing `G_NewString`'s pool copy) and returns the slot pointer.
+        // Source: `oracle/codemp/game/g_spawn.c:724-749` (`G_NewString`).
         // SAFETY: seam reborrow of the impl's owned world island (STATE-D6);
         // single-threaded module, no live sibling borrow across this call.
         let mut ctx = GameContext {
             world: unsafe { &mut *self.world },
             engine: self.engine,
         };
-        G_NewString(&mut ctx, cstr(string).as_ptr())
+        ctx.prefix_string(string)
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
         // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned

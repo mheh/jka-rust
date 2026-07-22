@@ -2,6 +2,7 @@
 
 use core::ffi::c_int;
 use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
+use std::ffi::CString;
 
 use crate::entity::gentity_t;
 use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
@@ -61,6 +62,22 @@ pub struct GameWorld {
     /// Source: `oracle/codemp/game/g_mem.c:13-14`
     pub memoryPool: Box<[u8; 262144]>, // 256 * 1024
     pub allocPoint: c_int,
+
+    /// Level-lifetime, append-only ownership record for the five `*mut c_char`
+    /// prefix string slots + `behaviorSet` — the replacement for the string half
+    /// of Raven's `G_Alloc` bump pool (`memoryPool`, which now serves only
+    /// ICARUS `parms_t`). The prefix slots keep their `*mut c_char` layout
+    /// permanently (drop-in engine ABI); their bytes live in these owned
+    /// `CString`s, and each write pushes a fresh `CString` then stores its
+    /// `.as_ptr()` into the slot. Entries are NEVER dropped or replaced on entity
+    /// free or slot rewrite — `alias_from` and engine-side ICARUS
+    /// `script_targetname = targetname` pointer copies alias arbitrary older
+    /// entries, and Raven's pool was likewise never freed — so they persist until
+    /// `GameWorld` is torn down. `Vec` growth relocates only the `Vec`'s spine
+    /// (the `CString` structs); each `CString`'s heap buffer stays put, so a slot
+    /// pointer returned by an earlier push remains valid across later pushes.
+    /// Source: replaces `oracle/codemp/game/g_spawn.c:724-749` (`G_NewString`).
+    pub prefixStrings: Vec<CString>,
 
     /// The bg tier's session-lifetime state: the anim/saber/
     /// vehicle tables, the `BG_Alloc` pool, and the RNG. Game reaches the
@@ -219,6 +236,7 @@ impl GameWorld {
             teamCounter: [0; 4],
             memoryPool,
             allocPoint: 0,
+            prefixStrings: Vec::new(),
             // Zeroed session state with the LCG seeded to Raven's `holdrand`.
             bg_state: crate::bg_channel::BgState::new(),
             refTagOwnerMap,
@@ -268,6 +286,7 @@ impl GameWorld {
             addr_of_mut!((*p).teamCounter).write([0; 4]);
             addr_of_mut!((*p).memoryPool).write(native_platform::zeroed_box());
             addr_of_mut!((*p).allocPoint).write(0);
+            addr_of_mut!((*p).prefixStrings).write(Vec::new());
             addr_of_mut!((*p).bg_state).write(crate::bg_channel::BgState::new());
             addr_of_mut!((*p).refTagOwnerMap).write(native_platform::zeroed_box());
             addr_of_mut!((*p).gSharedBuffer).write(native_platform::zeroed_box());

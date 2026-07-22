@@ -40,7 +40,6 @@ use native_string::Q_stricmp;
 use native_string::Q_strncmp;
 use native_string::strncpyz_string;
 use crate::q_shared;
-use crate::g_spawn::G_NewString;
 
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC
