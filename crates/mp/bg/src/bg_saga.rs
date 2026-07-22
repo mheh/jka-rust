@@ -26,6 +26,7 @@ use crate::prelude::*;
 use mp_qshared::shared::q_string::Q_strcmp;
 use mp_qshared::shared::q_string::Q_stricmp;
 use native_string::atof::atof_bytes;
+use native_string::{Q_stricmpBytes, Q_strncpyzBytes};
 // `strlen` resolves to `Q_strlen` (the `g_spawn.rs` precedent for aliasing the
 // libc name); `strcpy`/`strcat` are the file-local unchecked helpers below,
 // matching the `c_strcpy` house pattern in `q_shared.rs` / `bg_saberLoad.rs`
@@ -498,171 +499,110 @@ pub fn BG_SiegeStripTabs(buf: *mut c_char) {
 
 /// Raven `BG_SiegeGetValueGroup`.
 ///
+/// Reshaped (#13 batch 2i): `buf`/`group` are `&str`; the found group is
+/// returned as an owned `String` (Raven's `outbuf` copy is unbounded, so no
+/// truncation to preserve), `None` for the not-found `return 0`. The parse is
+/// byte-positional over `buf.as_bytes()` (an out-of-range index reads 0, the C
+/// NUL terminator the `buf[i+1]` comment lookahead relies on) so byte positions
+/// match Raven exactly.
 /// Source: `oracle/codemp/game/bg_saga.c:191-406`
-pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut c_char) -> c_int {
-    unsafe {
-        let mut i: isize = 0;
-        let mut j: isize;
-        let mut check_group = [0 as c_char; 4096];
-        let mut is_group: bool;
-        let mut parse_groups: c_int;
+pub fn BG_SiegeGetValueGroup(buf: &str, group: &str) -> Option<String> {
+    const TAB: u8 = SIEGECHAR_TAB as u8;
+    let bytes = buf.as_bytes();
+    let len = bytes.len();
+    let at = |idx: isize| -> u8 {
+        if idx < 0 || idx as usize >= len {
+            0
+        } else {
+            bytes[idx as usize]
+        }
+    };
 
-        while *buf.offset(i) != 0 {
-            let c = *buf.offset(i);
-            if c != b' ' as c_char
-                && c != b'{' as c_char
-                && c != b'}' as c_char
-                && c != b'\n' as c_char
-                && c != b'\r' as c_char
-                && c != SIEGECHAR_TAB
-            {
-                // we're on a valid character
-                if *buf.offset(i) == b'/' as c_char && *buf.offset(i + 1) == b'/' as c_char {
-                    // this is a comment, so skip over it
-                    while *buf.offset(i) != 0
-                        && *buf.offset(i) != b'\n' as c_char
-                        && *buf.offset(i) != b'\r' as c_char
-                        && *buf.offset(i) != SIEGECHAR_TAB
-                    {
+    let mut i: isize = 0;
+    let mut check_group: Vec<u8> = Vec::new();
+    let mut out: Vec<u8> = Vec::new();
+    let mut is_group: bool;
+    let mut parse_groups: c_int;
+
+    while at(i) != 0 {
+        let c = at(i);
+        if c != b' ' && c != b'{' && c != b'}' && c != b'\n' && c != b'\r' && c != TAB {
+            // we're on a valid character
+            if at(i) == b'/' && at(i + 1) == b'/' {
+                // this is a comment, so skip over it
+                while at(i) != 0 && at(i) != b'\n' && at(i) != b'\r' && at(i) != TAB {
+                    i += 1;
+                }
+            } else {
+                // parse to the next space/endline/eos and check this value against our group value.
+                check_group.clear();
+
+                while at(i) != b' '
+                    && at(i) != b'\n'
+                    && at(i) != b'\r'
+                    && at(i) != TAB
+                    && at(i) != b'{'
+                    && at(i) != 0
+                {
+                    if at(i) == b'/' && at(i + 1) == b'/' {
+                        // hit a comment, break out.
+                        break;
+                    }
+
+                    check_group.push(at(i));
+                    i += 1;
+                }
+
+                // Make sure this is a group as opposed to a globally defined value.
+                if at(i) == b'/' && at(i + 1) == b'/' {
+                    // stopped on a comment, so first parse to the end of it.
+                    while at(i) != 0 && at(i) != b'\n' && at(i) != b'\r' {
                         i += 1;
                     }
-                } else {
-                    // parse to the next space/endline/eos and check this value against our group value.
-                    j = 0;
-
-                    while *buf.offset(i) != b' ' as c_char
-                        && *buf.offset(i) != b'\n' as c_char
-                        && *buf.offset(i) != b'\r' as c_char
-                        && *buf.offset(i) != SIEGECHAR_TAB
-                        && *buf.offset(i) != b'{' as c_char
-                        && *buf.offset(i) != 0
-                    {
-                        if *buf.offset(i) == b'/' as c_char && *buf.offset(i + 1) == b'/' as c_char
-                        {
-                            // hit a comment, break out.
-                            break;
-                        }
-
-                        check_group[j as usize] = *buf.offset(i);
-                        j += 1;
+                    while at(i) == b'\n' || at(i) == b'\r' {
                         i += 1;
                     }
-                    check_group[j as usize] = 0;
+                }
 
-                    // Make sure this is a group as opposed to a globally defined value.
-                    if *buf.offset(i) == b'/' as c_char && *buf.offset(i + 1) == b'/' as c_char {
-                        // stopped on a comment, so first parse to the end of it.
-                        while *buf.offset(i) != 0
-                            && *buf.offset(i) != b'\n' as c_char
-                            && *buf.offset(i) != b'\r' as c_char
-                        {
-                            i += 1;
-                        }
-                        while *buf.offset(i) == b'\n' as c_char || *buf.offset(i) == b'\r' as c_char
-                        {
-                            i += 1;
-                        }
-                    }
+                if at(i) == 0 {
+                    // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                    panic!("Unexpected EOF while looking for group");
+                }
 
-                    if *buf.offset(i) == 0 {
-                        // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                        panic!("Unexpected EOF while looking for group");
-                    }
+                is_group = false;
 
-                    is_group = false;
+                while (at(i) != 0 && at(i) == b' ')
+                    || at(i) == TAB
+                    || at(i) == b'\n'
+                    || at(i) == b'\r'
+                {
+                    // parse to the next valid character
+                    i += 1;
+                }
 
-                    while (*buf.offset(i) != 0 && *buf.offset(i) == b' ' as c_char)
-                        || *buf.offset(i) == SIEGECHAR_TAB
-                        || *buf.offset(i) == b'\n' as c_char
-                        || *buf.offset(i) == b'\r' as c_char
-                    {
-                        // parse to the next valid character
+                if at(i) == b'{' {
+                    // if the next valid character is an opening bracket, then this is indeed a group
+                    is_group = true;
+                }
+
+                // Is this the one we want?
+                if is_group && Q_stricmpBytes(&check_group, group.as_bytes()) == 0 {
+                    // guess so. Parse until we hit the { indicating the beginning of the group.
+                    while at(i) != b'{' && at(i) != 0 {
                         i += 1;
                     }
 
-                    if *buf.offset(i) == b'{' as c_char {
-                        // if the next valid character is an opening bracket, then this is indeed a group
-                        is_group = true;
-                    }
-
-                    // Is this the one we want?
-                    if is_group && Q_stricmp(check_group.as_ptr(), group) == 0 {
-                        // guess so. Parse until we hit the { indicating the beginning of the group.
-                        while *buf.offset(i) != b'{' as c_char && *buf.offset(i) != 0 {
-                            i += 1;
-                        }
-
-                        if *buf.offset(i) != 0 {
-                            // We're at the start of the group now, so parse to the closing bracket.
-                            j = 0;
-                            parse_groups = 0;
-
-                            while (*buf.offset(i) != b'}' as c_char || parse_groups != 0)
-                                && *buf.offset(i) != 0
-                            {
-                                if *buf.offset(i) == b'{' as c_char {
-                                    // increment for the opening bracket.
-                                    parse_groups += 1;
-                                } else if *buf.offset(i) == b'}' as c_char {
-                                    // decrement for the closing bracket
-                                    parse_groups -= 1;
-                                }
-
-                                if parse_groups < 0 {
-                                    // Syntax error, I guess.
-                                    panic!("Found a closing bracket without an opening bracket while looking for group");
-                                    // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                                }
-
-                                if (*buf.offset(i) != b'{' as c_char || parse_groups > 1)
-                                    && (*buf.offset(i) != b'}' as c_char || parse_groups > 0)
-                                {
-                                    // don't put the start and end brackets for this group into the output buffer
-                                    *outbuf.offset(j) = *buf.offset(i);
-                                    j += 1;
-                                }
-
-                                if *buf.offset(i) == b'}' as c_char && parse_groups == 0 {
-                                    // Alright, we can break out now.
-                                    break;
-                                }
-
-                                i += 1;
-                            }
-                            *outbuf.offset(j) = 0;
-
-                            // Verify that we ended up on the closing bracket.
-                            if *buf.offset(i) != b'}' as c_char {
-                                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                                panic!("Group is missing a closing bracket");
-                            }
-
-                            // Strip the tabs so we're friendly for value parsing.
-                            BG_SiegeStripTabs(outbuf);
-
-                            return 1; // we got it, so return 1.
-                        } else {
-                            panic!("Error parsing group in file, unexpected EOF before opening bracket while looking for group");
-                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                        }
-                    } else if !is_group {
-                        // if it wasn't a group, parse to the end of the line
-                        while *buf.offset(i) != 0
-                            && *buf.offset(i) != b'\n' as c_char
-                            && *buf.offset(i) != b'\r' as c_char
-                        {
-                            i += 1;
-                        }
-                    } else {
-                        // this was a group but we not the one we wanted to find, so parse by it.
+                    if at(i) != 0 {
+                        // We're at the start of the group now, so parse to the closing bracket.
+                        out.clear();
                         parse_groups = 0;
 
-                        while *buf.offset(i) != 0
-                            && (*buf.offset(i) != b'}' as c_char || parse_groups != 0)
-                        {
-                            if *buf.offset(i) == b'{' as c_char {
+                        while (at(i) != b'}' || parse_groups != 0) && at(i) != 0 {
+                            if at(i) == b'{' {
+                                // increment for the opening bracket.
                                 parse_groups += 1;
-                            } else if *buf.offset(i) == b'}' as c_char {
+                            } else if at(i) == b'}' {
+                                // decrement for the closing bracket
                                 parse_groups -= 1;
                             }
 
@@ -672,7 +612,14 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
                                 // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                             }
 
-                            if *buf.offset(i) == b'}' as c_char && parse_groups == 0 {
+                            if (at(i) != b'{' || parse_groups > 1)
+                                && (at(i) != b'}' || parse_groups > 0)
+                            {
+                                // don't put the start and end brackets for this group into the output buffer
+                                out.push(at(i));
+                            }
+
+                            if at(i) == b'}' && parse_groups == 0 {
                                 // Alright, we can break out now.
                                 break;
                             }
@@ -680,225 +627,261 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
                             i += 1;
                         }
 
-                        if *buf.offset(i) != b'}' as c_char {
-                            panic!("Found an opening bracket without a matching closing bracket while looking for group");
+                        // Verify that we ended up on the closing bracket.
+                        if at(i) != b'}' {
                             // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                            panic!("Group is missing a closing bracket");
+                        }
+
+                        // Strip the tabs so we're friendly for value parsing.
+                        // Raven `BG_SiegeStripTabs`: tabs -> spaces in place, no
+                        // char dropped (i_r tracks i 1:1).
+                        for b in out.iter_mut() {
+                            if *b == TAB {
+                                *b = b' ';
+                            }
+                        }
+
+                        return Some(String::from_utf8_lossy(&out).into_owned()); // we got it.
+                    } else {
+                        panic!("Error parsing group in file, unexpected EOF before opening bracket while looking for group");
+                        // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                    }
+                } else if !is_group {
+                    // if it wasn't a group, parse to the end of the line
+                    while at(i) != 0 && at(i) != b'\n' && at(i) != b'\r' {
+                        i += 1;
+                    }
+                } else {
+                    // this was a group but we not the one we wanted to find, so parse by it.
+                    parse_groups = 0;
+
+                    while at(i) != 0 && (at(i) != b'}' || parse_groups != 0) {
+                        if at(i) == b'{' {
+                            parse_groups += 1;
+                        } else if at(i) == b'}' {
+                            parse_groups -= 1;
+                        }
+
+                        if parse_groups < 0 {
+                            // Syntax error, I guess.
+                            panic!("Found a closing bracket without an opening bracket while looking for group");
+                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                        }
+
+                        if at(i) == b'}' && parse_groups == 0 {
+                            // Alright, we can break out now.
+                            break;
                         }
 
                         i += 1;
                     }
-                }
-            } else if c == b'{' as c_char {
-                // we're in a group that isn't the one we want, so parse to the end.
-                parse_groups = 0;
 
-                while *buf.offset(i) != 0 && (*buf.offset(i) != b'}' as c_char || parse_groups != 0)
-                {
-                    if *buf.offset(i) == b'{' as c_char {
-                        parse_groups += 1;
-                    } else if *buf.offset(i) == b'}' as c_char {
-                        parse_groups -= 1;
-                    }
-
-                    if parse_groups < 0 {
-                        // Syntax error, I guess.
-                        panic!("Found a closing bracket without an opening bracket while looking for group");
+                    if at(i) != b'}' {
+                        panic!("Found an opening bracket without a matching closing bracket while looking for group");
                         // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                    }
-
-                    if *buf.offset(i) == b'}' as c_char && parse_groups == 0 {
-                        // Alright, we can break out now.
-                        break;
                     }
 
                     i += 1;
                 }
+            }
+        } else if c == b'{' {
+            // we're in a group that isn't the one we want, so parse to the end.
+            parse_groups = 0;
 
-                if *buf.offset(i) != b'}' as c_char {
-                    panic!("Found an opening bracket without a matching closing bracket while looking for group");
+            while at(i) != 0 && (at(i) != b'}' || parse_groups != 0) {
+                if at(i) == b'{' {
+                    parse_groups += 1;
+                } else if at(i) == b'}' {
+                    parse_groups -= 1;
+                }
+
+                if parse_groups < 0 {
+                    // Syntax error, I guess.
+                    panic!("Found a closing bracket without an opening bracket while looking for group");
                     // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                 }
+
+                if at(i) == b'}' && parse_groups == 0 {
+                    // Alright, we can break out now.
+                    break;
+                }
+
+                i += 1;
             }
 
-            if *buf.offset(i) == 0 {
-                break;
+            if at(i) != b'}' {
+                panic!("Found an opening bracket without a matching closing bracket while looking for group");
+                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
             }
-            i += 1;
         }
 
-        0 // guess we never found it.
+        if at(i) == 0 {
+            break;
+        }
+        i += 1;
     }
+
+    None // guess we never found it.
 }
 
 /// Raven `BG_SiegeGetPairedValue`.
 ///
+/// Reshaped (#13 batch 2i): `buf`/`key` are `&str`; the paired value is returned
+/// as an owned `String` (Raven's `outbuf` copy is unbounded), `None` for the
+/// not-found `return 0`. Byte-positional over `buf.as_bytes()` (out-of-range
+/// index reads 0, the C NUL terminator).
 /// Source: `oracle/codemp/game/bg_saga.c:408-562`
-pub fn BG_SiegeGetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c_char) -> c_int {
-    unsafe {
-        let mut i: isize = 0;
-        let mut j: isize;
-        let mut k: isize;
-        let mut check_key = [0 as c_char; 4096];
+pub fn BG_SiegeGetPairedValue(buf: &str, key: &str) -> Option<String> {
+    const TAB: u8 = SIEGECHAR_TAB as u8;
+    let bytes = buf.as_bytes();
+    let len = bytes.len();
+    let at = |idx: isize| -> u8 {
+        if idx < 0 || idx as usize >= len {
+            0
+        } else {
+            bytes[idx as usize]
+        }
+    };
 
-        while *buf.offset(i) != 0 {
-            let c = *buf.offset(i);
-            if c != b' ' as c_char
-                && c != b'{' as c_char
-                && c != b'}' as c_char
-                && c != b'\n' as c_char
-                && c != b'\r' as c_char
-            {
-                // we're on a valid character
-                if *buf.offset(i) == b'/' as c_char && *buf.offset(i + 1) == b'/' as c_char {
-                    // this is a comment, so skip over it
-                    while *buf.offset(i) != 0
-                        && *buf.offset(i) != b'\n' as c_char
-                        && *buf.offset(i) != b'\r' as c_char
-                    {
+    let mut i: isize = 0;
+    let mut k: isize;
+    let mut check_key: Vec<u8> = Vec::new();
+    let mut out: Vec<u8> = Vec::new();
+
+    while at(i) != 0 {
+        let c = at(i);
+        if c != b' ' && c != b'{' && c != b'}' && c != b'\n' && c != b'\r' {
+            // we're on a valid character
+            if at(i) == b'/' && at(i + 1) == b'/' {
+                // this is a comment, so skip over it
+                while at(i) != 0 && at(i) != b'\n' && at(i) != b'\r' {
+                    i += 1;
+                }
+            } else {
+                // parse to the next space/endline/eos and check this value against our key value.
+                check_key.clear();
+
+                while at(i) != b' '
+                    && at(i) != b'\n'
+                    && at(i) != b'\r'
+                    && at(i) != TAB
+                    && at(i) != 0
+                {
+                    if at(i) == b'/' && at(i + 1) == b'/' {
+                        // hit a comment, break out.
+                        break;
+                    }
+
+                    check_key.push(at(i));
+                    i += 1;
+                }
+
+                k = i;
+
+                while at(k) != 0 && (at(k) == b' ' || at(k) == b'\n' || at(k) == b'\r') {
+                    k += 1;
+                }
+
+                if at(k) == b'{' {
+                    // this is not the start of a value but rather of a group. We don't want to look in subgroups so skip over the whole thing.
+                    let mut open_b: c_int = 0;
+
+                    while at(i) != 0 && (at(i) != b'}' || open_b != 0) {
+                        if at(i) == b'{' {
+                            open_b += 1;
+                        } else if at(i) == b'}' {
+                            open_b -= 1;
+                        }
+
+                        if open_b < 0 {
+                            panic!("Unexpected closing bracket (too many) while parsing to end of group");
+                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                        }
+
+                        if at(i) == b'}' && open_b == 0 {
+                            // this is the end of the group
+                            break;
+                        }
+                        i += 1;
+                    }
+
+                    if at(i) == b'}' {
                         i += 1;
                     }
                 } else {
-                    // parse to the next space/endline/eos and check this value against our key value.
-                    j = 0;
-
-                    while *buf.offset(i) != b' ' as c_char
-                        && *buf.offset(i) != b'\n' as c_char
-                        && *buf.offset(i) != b'\r' as c_char
-                        && *buf.offset(i) != SIEGECHAR_TAB
-                        && *buf.offset(i) != 0
-                    {
-                        if *buf.offset(i) == b'/' as c_char && *buf.offset(i + 1) == b'/' as c_char
-                        {
-                            // hit a comment, break out.
-                            break;
-                        }
-
-                        check_key[j as usize] = *buf.offset(i);
-                        j += 1;
-                        i += 1;
-                    }
-                    check_key[j as usize] = 0;
-
-                    k = i;
-
-                    while *buf.offset(k) != 0
-                        && (*buf.offset(k) == b' ' as c_char
-                            || *buf.offset(k) == b'\n' as c_char
-                            || *buf.offset(k) == b'\r' as c_char)
-                    {
-                        k += 1;
-                    }
-
-                    if *buf.offset(k) == b'{' as c_char {
-                        // this is not the start of a value but rather of a group. We don't want to look in subgroups so skip over the whole thing.
-                        let mut open_b: c_int = 0;
-
-                        while *buf.offset(i) != 0
-                            && (*buf.offset(i) != b'}' as c_char || open_b != 0)
-                        {
-                            if *buf.offset(i) == b'{' as c_char {
-                                open_b += 1;
-                            } else if *buf.offset(i) == b'}' as c_char {
-                                open_b -= 1;
+                    // Is this the one we want?
+                    if at(i) != b'/' || at(i + 1) != b'/' {
+                        // make sure we didn't stop on a comment, if we did then this is considered an error in the file.
+                        if Q_stricmpBytes(&check_key, key.as_bytes()) == 0 {
+                            // guess so. Parse along to the next valid character, then put that into the output buffer and return 1.
+                            while (at(i) == b' ' || at(i) == b'\n' || at(i) == b'\r' || at(i) == TAB)
+                                && at(i) != 0
+                            {
+                                i += 1;
                             }
 
-                            if open_b < 0 {
-                                panic!("Unexpected closing bracket (too many) while parsing to end of group");
+                            if at(i) != 0 {
+                                // We're at the start of the value now.
+                                let mut parse_to_quote = false;
+
+                                if at(i) == b'"' {
+                                    // if the value is in quotes, then stop at the next quote instead of ' '
+                                    i += 1;
+                                    parse_to_quote = true;
+                                }
+
+                                out.clear();
+                                while (!parse_to_quote
+                                    && at(i) != b' '
+                                    && at(i) != b'\n'
+                                    && at(i) != b'\r')
+                                    || (parse_to_quote && at(i) != b'"')
+                                {
+                                    if at(i) == b'/' && at(i + 1) == b'/' {
+                                        // hit a comment after the value? This isn't an ideal way to be writing things, but we'll support it anyway.
+                                        break;
+                                    }
+                                    out.push(at(i));
+                                    i += 1;
+
+                                    if at(i) == 0 {
+                                        if parse_to_quote {
+                                            panic!("Unexpected EOF while looking for endquote, error finding paired value for");
+                                        // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                        } else {
+                                            panic!("Unexpected EOF while looking for space or endline, error finding paired value for");
+                                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                        }
+                                    }
+                                }
+
+                                return Some(String::from_utf8_lossy(&out).into_owned()); // we got it.
+                            } else {
+                                panic!("Error parsing file, unexpected EOF while looking for valud");
                                 // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                             }
-
-                            if *buf.offset(i) == b'}' as c_char && open_b == 0 {
-                                // this is the end of the group
-                                break;
+                        } else {
+                            // if that wasn't the desired key, then make sure we parse to the end of the line, so we don't mistake a value for a key
+                            while at(i) != 0 && at(i) != b'\n' {
+                                i += 1;
                             }
-                            i += 1;
-                        }
-
-                        if *buf.offset(i) == b'}' as c_char {
-                            i += 1;
                         }
                     } else {
-                        // Is this the one we want?
-                        if *buf.offset(i) != b'/' as c_char || *buf.offset(i + 1) != b'/' as c_char
-                        {
-                            // make sure we didn't stop on a comment, if we did then this is considered an error in the file.
-                            if Q_stricmp(check_key.as_ptr(), key) == 0 {
-                                // guess so. Parse along to the next valid character, then put that into the output buffer and return 1.
-                                while (*buf.offset(i) == b' ' as c_char
-                                    || *buf.offset(i) == b'\n' as c_char
-                                    || *buf.offset(i) == b'\r' as c_char
-                                    || *buf.offset(i) == SIEGECHAR_TAB)
-                                    && *buf.offset(i) != 0
-                                {
-                                    i += 1;
-                                }
-
-                                if *buf.offset(i) != 0 {
-                                    // We're at the start of the value now.
-                                    let mut parse_to_quote = false;
-
-                                    if *buf.offset(i) == b'"' as c_char {
-                                        // if the value is in quotes, then stop at the next quote instead of ' '
-                                        i += 1;
-                                        parse_to_quote = true;
-                                    }
-
-                                    j = 0;
-                                    while (!parse_to_quote
-                                        && *buf.offset(i) != b' ' as c_char
-                                        && *buf.offset(i) != b'\n' as c_char
-                                        && *buf.offset(i) != b'\r' as c_char)
-                                        || (parse_to_quote && *buf.offset(i) != b'"' as c_char)
-                                    {
-                                        if *buf.offset(i) == b'/' as c_char
-                                            && *buf.offset(i + 1) == b'/' as c_char
-                                        {
-                                            // hit a comment after the value? This isn't an ideal way to be writing things, but we'll support it anyway.
-                                            break;
-                                        }
-                                        *outbuf.offset(j) = *buf.offset(i);
-                                        j += 1;
-                                        i += 1;
-
-                                        if *buf.offset(i) == 0 {
-                                            if parse_to_quote {
-                                                panic!("Unexpected EOF while looking for endquote, error finding paired value for");
-                                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                                            } else {
-                                                panic!("Unexpected EOF while looking for space or endline, error finding paired value for");
-                                                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                                            }
-                                        }
-                                    }
-                                    *outbuf.offset(j) = 0;
-
-                                    return 1; // we got it, so return 1.
-                                } else {
-                                    panic!("Error parsing file, unexpected EOF while looking for valud");
-                                    // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                                }
-                            } else {
-                                // if that wasn't the desired key, then make sure we parse to the end of the line, so we don't mistake a value for a key
-                                while *buf.offset(i) != 0 && *buf.offset(i) != b'\n' as c_char {
-                                    i += 1;
-                                }
-                            }
-                        } else {
-                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
-                            panic!("Error parsing file, found comment, expected value for key");
-                        }
+                        // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                        panic!("Error parsing file, found comment, expected value for key");
                     }
                 }
             }
-
-            if *buf.offset(i) == 0 {
-                break;
-            }
-            i += 1;
         }
 
-        0 // guess we never found it.
+        if at(i) == 0 {
+            break;
+        }
+        i += 1;
     }
+
+    None // guess we never found it.
 }
 
 /// Raven `BG_SiegeTranslateForcePowers`.
@@ -1094,6 +1077,8 @@ pub fn BG_SiegeParseClassFile(
         let mut i: isize = 0;
         let mut class_info = [0 as c_char; 4096];
         let mut parse_buf = [0 as c_char; 4096];
+        let class_info_len = class_info.len();
+        let parse_buf_len = parse_buf.len();
 
         len = traps.fs_fopen(&cstr_to_str(filename), &mut f, FS_READ);
 
@@ -1106,12 +1091,12 @@ pub fn BG_SiegeParseClassFile(
         class_info[len as usize] = 0;
 
         if !descBuffer.is_null() {
-            if BG_SiegeGetPairedValue(
-                class_info.as_mut_ptr(),
-                c"description".as_ptr() as *mut c_char,
-                descBuffer.as_mut().unwrap().desc.as_mut_ptr(),
-            ) == 0
+            let desc_len = (*descBuffer).desc.len();
+            if let Some(val) =
+                BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "description")
             {
+                Q_strncpyzBytes(&mut (*descBuffer).desc, val.as_bytes(), desc_len);
+            } else {
                 strcpy(
                     (*descBuffer).desc.as_mut_ptr(),
                     c"DESCRIPTION UNAVAILABLE".as_ptr(),
@@ -1120,18 +1105,12 @@ pub fn BG_SiegeParseClassFile(
             assert!(strlen((*descBuffer).desc.as_ptr()) < SIEGE_CLASS_DESC_LEN as usize);
         }
 
-        BG_SiegeGetValueGroup(
-            class_info.as_mut_ptr(),
-            c"ClassInfo".as_ptr() as *mut c_char,
-            class_info.as_mut_ptr(),
-        );
+        if let Some(val) = BG_SiegeGetValueGroup(&cstr_to_str(class_info.as_ptr()), "ClassInfo") {
+            Q_strncpyzBytes(&mut class_info, val.as_bytes(), class_info_len);
+        }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"name".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "name") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             strcpy(
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
                     .name
@@ -1142,36 +1121,24 @@ pub fn BG_SiegeParseClassFile(
             panic!("Siege class without name entry");
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"model".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "model") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel =
                 cstr_to_str(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel = String::new();
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"skin".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "skin") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin =
                 cstr_to_str(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin = String::new();
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"saber1".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber1") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             strcpy(
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
                     .saber1
@@ -1182,12 +1149,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1[0] = 0;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"saber2".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber2") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             strcpy(
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
                     .saber2
@@ -1198,12 +1161,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2[0] = 0;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"saberstyle".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saberstyle") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance =
                 BG_SiegeTranslateGenericTable(
                     parse_buf.as_mut_ptr(),
@@ -1214,12 +1173,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = 0;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"sabercolor".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "sabercolor") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaberColor =
                 atoi(parse_buf.as_ptr());
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qtrue;
@@ -1227,12 +1182,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qfalse;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"saber2color".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "saber2color") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaber2Color =
                 atoi(parse_buf.as_ptr());
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaber2Color = qtrue;
@@ -1240,12 +1191,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaber2Color = qfalse;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"weapons".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "weapons") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons =
                 BG_SiegeTranslateGenericTable(
                     parse_buf.as_mut_ptr(),
@@ -1260,12 +1207,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons |= 1 << WP_MELEE;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"forcepowers".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "forcepowers") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             BG_SiegeTranslateForcePowers(
                 parse_buf.as_mut_ptr(),
                 &mut bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize],
@@ -1278,12 +1221,8 @@ pub fn BG_SiegeParseClassFile(
             }
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"classflags".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "classflags") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags =
                 BG_SiegeTranslateGenericTable(
                     parse_buf.as_mut_ptr(),
@@ -1294,46 +1233,30 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = 0;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"maxhealth".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "maxhealth") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = atoi(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = 100;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"starthealth".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "starthealth") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth = atoi(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth =
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"maxarmor".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "maxarmor") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = atoi(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = 0;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"startarmor".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "startarmor") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor = atoi(parse_buf.as_ptr());
             if bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor == 0 {
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor =
@@ -1344,24 +1267,16 @@ pub fn BG_SiegeParseClassFile(
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"speed".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "speed") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed =
                 atof_bytes(unsafe { CStr::from_ptr(parse_buf.as_ptr()) }.to_bytes()) as f32;
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed = 1.0f32;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"uishader".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "uishader") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortraitShader = 0;
             core::ptr::write_bytes(
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
@@ -1376,12 +1291,8 @@ pub fn BG_SiegeParseClassFile(
             panic!("Siege class without uishader entry");
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"class_shader".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "class_shader") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = 0;
             let title_length: usize = strlen(parse_buf.as_ptr());
             // Oracle only falls back to SPC_INFANTRY when the loop runs to
@@ -1421,12 +1332,8 @@ pub fn BG_SiegeParseClassFile(
             traps.com_printf(&s);
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"holdables".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "holdables") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems =
                 BG_SiegeTranslateGenericTable(
                     parse_buf.as_mut_ptr(),
@@ -1437,12 +1344,8 @@ pub fn BG_SiegeParseClassFile(
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = 0;
         }
 
-        if BG_SiegeGetPairedValue(
-            class_info.as_mut_ptr(),
-            c"powerups".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(class_info.as_ptr()), "powerups") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups =
                 BG_SiegeTranslateGenericTable(
                     parse_buf.as_mut_ptr(),
@@ -1654,7 +1557,8 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
         let mut len: c_int;
         let mut team_info = [0 as c_char; 2048];
         let mut parse_buf = [0 as c_char; 1024];
-        let mut look_string = [0 as c_char; 256];
+        let team_info_len = team_info.len();
+        let parse_buf_len = parse_buf.len();
         let mut i: isize = 1;
         let mut success: bool = true;
 
@@ -1668,12 +1572,8 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
         traps.fs_fclose(f);
         team_info[len as usize] = 0;
 
-        if BG_SiegeGetPairedValue(
-            team_info.as_mut_ptr(),
-            c"name".as_ptr() as *mut c_char,
-            parse_buf.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(&cstr_to_str(team_info.as_ptr()), "name") {
+            Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
             strcpy(
                 bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize]
                     .name
@@ -1688,24 +1588,20 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
 
         bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses = 0;
 
-        if BG_SiegeGetValueGroup(
-            team_info.as_mut_ptr(),
-            c"Classes".as_ptr() as *mut c_char,
-            team_info.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetValueGroup(&cstr_to_str(team_info.as_ptr()), "Classes") {
+            Q_strncpyzBytes(&mut team_info, val.as_bytes(), team_info_len);
             while success && i < MAX_SIEGE_CLASSES as isize {
                 // Build the lookString for class#i
                 let look_string_str = format!("class{}", i);
-                strcpy(look_string.as_mut_ptr(), c"class".as_ptr());
-                let num_str = format!("{}", i);
-                strcat(look_string.as_mut_ptr(), cstr(&num_str).as_ptr());
 
-                success = BG_SiegeGetPairedValue(
-                    team_info.as_mut_ptr(),
-                    look_string.as_mut_ptr(),
-                    parse_buf.as_mut_ptr(),
-                ) != 0;
+                success = if let Some(val) =
+                    BG_SiegeGetPairedValue(&cstr_to_str(team_info.as_ptr()), &look_string_str)
+                {
+                    Q_strncpyzBytes(&mut parse_buf, val.as_bytes(), parse_buf_len);
+                    true
+                } else {
+                    false
+                };
 
                 if !success {
                     break;

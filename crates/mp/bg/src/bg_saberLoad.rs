@@ -942,7 +942,7 @@ pub fn WP_SaberParseParms(
 
         // try to parse it out
         let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
-        COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
+        COM_BeginParseSession(&mut bg.qs, "saberinfo");
 
         // look for the right saber
         loop {
@@ -954,7 +954,7 @@ pub fn WP_SaberParseParms(
                 if triedDefault == qfalse {
                     // fall back to default and restart, should always be there
                     p = bg.SaberParms.as_ptr() as *const c_char;
-                    COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
+                    COM_BeginParseSession(&mut bg.qs, "saberinfo");
                     c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
                     triedDefault = qtrue;
                 } else {
@@ -2170,7 +2170,7 @@ pub fn WP_SaberParseParm(
 
         // try to parse it out
         let mut p: *const c_char = bg.SaberParms.as_ptr() as *const c_char;
-        COM_BeginParseSession(&mut bg.qs, c"saberinfo".as_ptr());
+        COM_BeginParseSession(&mut bg.qs, "saberinfo");
 
         // look for the right saber
         loop {

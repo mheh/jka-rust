@@ -36,8 +36,8 @@ pub use info::{
     Info_Validate, Info_ValueForKey, InfoSetResult, BIG_INFO_STRING, MAX_INFO_STRING,
 };
 pub use q_string::{
-    Q_stricmp, Q_stricmpBytes, Q_stricmpn, Q_stricmpnBytes, Q_strcat, Q_strcmp, Q_strcmpBytes,
-    Q_strlwr, Q_strncmp, Q_strncmpBytes, Q_CleanStr,
+    strcat_string, Q_stricmp, Q_stricmpBytes, Q_stricmpn, Q_stricmpnBytes, Q_strcat, Q_strcmp,
+    Q_strcmpBytes, Q_strlwr, Q_strncmp, Q_strncmpBytes, Q_CleanStr,
 };
 pub use q_strncpyz::{Q_strncpyz, Q_strncpyzBytes};
 pub use sscanf::sscanf_f32s;

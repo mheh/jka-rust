@@ -299,37 +299,6 @@ array_newtype!(boxed, index;
     /// Source: `oracle/codemp/game/g_nav.c:1660`
     pub TempWaypointList, waypointData_t, MAX_STORED_WAYPOINTS);
 
-array_newtype!(zero;
-    /// Raven `char NPCFile[MAX_QPATH]` (`NPC_stats.c:238`) — the currently-loading
-    /// NPC-config file name. `#[repr(transparent)]` keeps the porter idiom
-    /// `&globals.NPCFile as *const _ as *const c_char` valid (same treatment as
-    /// `NpcDataBuffer`); newtype so `GameGlobals` keeps a derive-shaped `Default`
-    /// (`MAX_QPATH` = 64 > 32 has no library `Default`).
-    /// Source: `oracle/codemp/game/NPC_stats.c:238`
-    #[repr(transparent)]
-    pub NpcFileBuffer, c_char, MAX_QPATH);
-
-array_newtype!(zero, deref;
-    /// Raven `char gParseObjectives[MAX_SIEGE_INFO_SIZE]` (`g_saga.c:46`). Newtype
-    /// (>32 array has no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep
-    /// the porter idiom `.as_mut_ptr()` valid.
-    /// Source: `oracle/codemp/game/g_saga.c:46`
-    pub ParseObjectivesBuffer, c_char, MAX_SIEGE_INFO_SIZE);
-
-array_newtype!(zero, deref;
-    /// Raven `static char team1[512]` (`g_saga.c:17`). Newtype (>32 array has no
-    /// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
-    /// `.as_ptr()`/`.as_mut_ptr()` valid.
-    /// Source: `oracle/codemp/game/g_saga.c:17`
-    pub Team1Buf, c_char, 512);
-
-array_newtype!(zero, deref;
-    /// Raven `static char team2[512]` (`g_saga.c:18`). Newtype (>32 array has no
-    /// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
-    /// `.as_ptr()`/`.as_mut_ptr()` valid.
-    /// Source: `oracle/codemp/game/g_saga.c:18`
-    pub Team2Buf, c_char, 512);
-
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
 /// char newShader[MAX_QPATH]; float timeOffset; }`. `oldShader`/`newShader` are
 /// owned `String`s (the `MAX_QPATH` byte bound is applied at the write sites in
@@ -552,9 +521,9 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/NPC_stats.c:3238`
     pub npcParseBuffer: NpcDataBuffer,
     /// Raven `char NPCFile[MAX_QPATH]` — the currently-loading NPC-config file
-    /// name (parse cursor state).
+    /// name (parse-error text only; never written in MP, so an owned `String`).
     /// Source: `oracle/codemp/game/NPC_stats.c:238`
-    pub NPCFile: NpcFileBuffer,
+    pub NPCFile: String,
     // --- `ai_main.c` file-scope globals ---
     /// `botstates` (`bot_state_t *[MAX_CLIENTS]`; null-init raw pointers).
     /// Source: `oracle/codemp/game/ai_main.c:46`
@@ -845,21 +814,23 @@ pub struct GameGlobals {
     // --- `g_saga.c` file-scope globals ---
     /// `gImperialCountdown`. Source: `oracle/codemp/game/g_saga.c:30`
     pub gImperialCountdown: c_int,
-    /// `static char team1[512]` — theme text for siege team 1.
+    /// `static char team1[512]` — theme text for siege team 1 (an owned
+    /// `String`; the 511-byte bound is applied at the write sites in `G_SiegeInit`).
     /// Source: `oracle/codemp/game/g_saga.c:17`
-    pub team1: Team1Buf,
-    /// `static char team2[512]` — theme text for siege team 2.
+    pub team1: String,
+    /// `static char team2[512]` — theme text for siege team 2 (an owned
+    /// `String`; the 511-byte bound is applied at the write sites in `G_SiegeInit`).
     /// Source: `oracle/codemp/game/g_saga.c:18`
-    pub team2: Team2Buf,
+    pub team2: String,
     /// `static char gObjectiveCfgStr[1024]` — assembled objective config string
     /// (an owned `String`; the 1024-byte bound is applied at the write site in
     /// `G_SiegeCompleteObjective`).
     /// Source: `oracle/codemp/game/g_saga.c:47`
     pub gObjectiveCfgStr: String,
     /// `static char gParseObjectives[MAX_SIEGE_INFO_SIZE]` — siege-config parse
-    /// buffer.
+    /// buffer (an owned `String`; the parse fns produce owned values).
     /// Source: `oracle/codemp/game/g_saga.c:46`
-    pub gParseObjectives: ParseObjectivesBuffer,
+    pub gParseObjectives: String,
     /// `gRebelCountdown`. Source: `oracle/codemp/game/g_saga.c:31`
     pub gRebelCountdown: c_int,
     /// `gSiegeBeginTime`. Source: `oracle/codemp/game/g_saga.c:39`

@@ -15,8 +15,8 @@
 use core::ffi::{c_char, c_int};
 
 use crate::shared::limits::MAX_TOKEN_CHARS;
-use crate::shared::q_string::Q_strncpyz;
 use crate::shared::{qboolean, qfalse, qtrue};
+use native_string::Q_strncpyzBytes;
 
 /// Raven's `q_shared.c` file-static parse/format state, moved into
 /// `BgState.qs` (safe-state Stage 3 — no `static mut`, rule B3). Rotation
@@ -55,18 +55,14 @@ impl QSharedScratch {
 /// Raven `COM_BeginParseSession`.
 ///
 /// Raven calls `Com_sprintf` with a `"%s"` format; since Rust has no varargs,
-/// this copies the name directly via `Q_strncpyz` (same result).
+/// this copies the name directly via the byte-bounded `Q_strncpyzBytes` (same
+/// result). `name` is `&str` (#13 batch 2i); the `com_parsename` buffer stays a
+/// fixed `[c_char; MAX_TOKEN_CHARS]` (parse-error text only), so the copy keeps
+/// Raven's `MAX_TOKEN_CHARS` byte bound.
 /// Source: `oracle/codemp/game/q_shared.c:284-288`
-pub fn COM_BeginParseSession(qs: &mut QSharedScratch, name: *const c_char) {
-    // (Redundant `unsafe` wrapper dropped vs. the game copy — `Q_strncpyz` is a
-    // safe fn; behavior identical. The game file masked the `unused_unsafe`
-    // warning via its blanket `#![allow(unused)]`.)
+pub fn COM_BeginParseSession(qs: &mut QSharedScratch, name: &str) {
     qs.com_lines = 0;
-    Q_strncpyz(
-        qs.com_parsename.as_mut_ptr(),
-        name,
-        MAX_TOKEN_CHARS as c_int,
-    );
+    Q_strncpyzBytes(&mut qs.com_parsename, name.as_bytes(), MAX_TOKEN_CHARS);
 }
 
 /// Raven `COM_GetCurrentParseLine`.

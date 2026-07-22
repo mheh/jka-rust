@@ -117,8 +117,8 @@ fn dump_tokens(o: &mut String) {
     let mut qs = QSharedScratch::zeroed();
 
     // pass 1: allowLineBreaks = qtrue
-    let name = cstr("tokens");
-    COM_BeginParseSession(&mut qs, name.as_ptr());
+    let name = "tokens";
+    COM_BeginParseSession(&mut qs, name);
     let mut p: *const c_char = cb.as_ptr();
     for _ in 0..200 {
         let tok = COM_ParseExt(&mut qs, &mut p, qtrue);
@@ -138,7 +138,7 @@ fn dump_tokens(o: &mut String) {
     }
 
     // pass 2: allowLineBreaks = qfalse (empty token returned at line breaks)
-    COM_BeginParseSession(&mut qs, name.as_ptr());
+    COM_BeginParseSession(&mut qs, name);
     p = cb.as_ptr();
     for _ in 0..200 {
         let tok = COM_ParseExt(&mut qs, &mut p, qfalse);
@@ -178,11 +178,11 @@ fn dump_braced(o: &mut String) {
         "{ unterminated { block ",
         "noBrace token here",
     ];
-    let name = cstr("braced");
+    let name = "braced";
     let mut qs = QSharedScratch::zeroed();
     for (i, input) in cases.iter().enumerate() {
         let cb = cbuf(input);
-        COM_BeginParseSession(&mut qs, name.as_ptr());
+        COM_BeginParseSession(&mut qs, name);
         let mut p: *const c_char = cb.as_ptr();
         SkipBracedSection(&mut qs, &mut p);
         let off: i64 = if p.is_null() {
@@ -210,11 +210,11 @@ fn dump_skipline(o: &mut String) {
         "\nimmediate",
         "a\nb\nc",
     ];
-    let name = cstr("skipline");
+    let name = "skipline";
     let mut qs = QSharedScratch::zeroed();
     for (i, input) in cases.iter().enumerate() {
         let cb = cbuf(input);
-        COM_BeginParseSession(&mut qs, name.as_ptr());
+        COM_BeginParseSession(&mut qs, name);
         let mut p: *const c_char = cb.as_ptr();
         SkipRestOfLine(&mut qs, &mut p);
         // Raven's SkipRestOfLine consumes the terminating NUL when there is no

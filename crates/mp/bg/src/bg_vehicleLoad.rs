@@ -159,7 +159,7 @@ pub fn VEH_LoadVehWeapon(
         // `p` walks the `VehWeaponParms` text buffer via `COM_ParseExt`'s
         // `*const *const c_char` cursor idiom.
         let mut p: *const c_char = bg.VehWeaponParms.as_ptr() as *const c_char;
-        COM_BeginParseSession(&mut bg.qs, cstr("vehWeapons").as_ptr());
+        COM_BeginParseSession(&mut bg.qs, "vehWeapons");
 
         let veh_index = bg.numVehicleWeapons as usize;
         let vehWeapon: *mut vehWeaponInfo_t = &mut bg.g_vehWeaponInfo[veh_index];
@@ -502,7 +502,7 @@ pub fn VEH_LoadVehicle(
         }
 
         let mut p: *const c_char = bg.VehicleParms.as_ptr() as *const c_char;
-        COM_BeginParseSession(&mut bg.qs, cstr("vehicles").as_ptr());
+        COM_BeginParseSession(&mut bg.qs, "vehicles");
 
         let veh_index = bg.numVehicles as usize;
         let vehicle: *mut vehicleInfo_t = &mut bg.g_vehicleInfo[veh_index];

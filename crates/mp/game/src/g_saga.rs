@@ -24,15 +24,14 @@ use crate::g_client::{ClientBegin, ClientSpawn, ClientUserinfoChanged};
 use crate::g_combat::AddScore;
 use crate::g_exphysics::G_RunExPhys;
 use crate::g_items::RegisterItem;
-use crate::g_main::{G_Error, LogExit};
+use crate::g_main::{Com_Printf, G_Error, LogExit};
 use crate::g_utils::{
     G_EffectIndex, G_Find, G_IconIndex, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity,
     G_UseTargets2, GlobalUse,
 };
 use crate::q_shared::Info_SetValueForKey;
-use crate::q_shared::Q_strcat;
 use native_string::strncpyz_string;
-use native_string::Q_stricmp;
+use native_string::{buf_to_string, strcat_string, Q_stricmp, Q_strncpyzBytes};
 use mp_bg::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
 use mp_bg::bg_saga::{
     BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
@@ -115,9 +114,10 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
         let mut teamIcon: [c_char; 128] = [0; 128];
         let mut goalreq: [c_char; 64] = [0; 64];
         let mut teams: [c_char; 2048] = [0; 2048];
-        let mut objective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
-            [0; MAX_SIEGE_INFO_SIZE as usize];
         let mut objecStr: [c_char; 8192] = [0; 8192];
+        let teamIcon_len = teamIcon.len();
+        let goalreq_len = goalreq.len();
+        let teams_len = teams.len();
         let mut len: c_int = 0;
         let mut objectiveNumTeam1: c_int = 0;
         let mut objectiveNumTeam2: c_int = 0;
@@ -191,23 +191,20 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             ctx.world.bg_state.siege_valid = 1;
 
             // See if players should be specs or ingame preround
-            if BG_SiegeGetPairedValue(
-                ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-                b"preround_state\0".as_ptr() as *mut c_char,
-                teams.as_mut_ptr(),
-            ) != 0
-            {
+            if let Some(val) = BG_SiegeGetPairedValue(
+                &buf_to_string(&ctx.world.bg_state.siege_info),
+                "preround_state",
+            ) {
+                Q_strncpyzBytes(&mut teams, val.as_bytes(), teams_len);
                 if teams[0] != 0 {
                     ctx.world.globals.g_preroundState = atoi(teams.as_ptr());
                 }
             }
 
-            if BG_SiegeGetValueGroup(
-                ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-                b"Teams\0".as_ptr() as *mut c_char,
-                teams.as_mut_ptr(),
-            ) != 0
+            if let Some(val) =
+                BG_SiegeGetValueGroup(&buf_to_string(&ctx.world.bg_state.siege_info), "Teams")
             {
+                Q_strncpyzBytes(&mut teams, val.as_bytes(), teams_len);
                 if ctx.world.cvars.g_siegeTeam1.string[0] != 0
                     && Q_stricmp(
                         &cstr_to_str(ctx.world.cvars.g_siegeTeam1.string.as_ptr()),
@@ -215,17 +212,17 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                     ) != 0
                 {
                     // check for override
-                    write_cstr_field(
-                        &mut ctx.world.globals.team1,
-                        &cstr_from_chars(&ctx.world.cvars.g_siegeTeam1.string).to_string_lossy(),
+                    ctx.world.globals.team1 = strncpyz_string(
+                        cstr_from_chars(&ctx.world.cvars.g_siegeTeam1.string).to_bytes(),
+                        512,
                     );
                 } else {
                     // otherwise use level default
-                    BG_SiegeGetPairedValue(
-                        teams.as_mut_ptr(),
-                        b"team1\0".as_ptr() as *mut c_char,
-                        ctx.world.globals.team1.as_mut_ptr(),
-                    );
+                    if let Some(val) =
+                        BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team1")
+                    {
+                        ctx.world.globals.team1 = val;
+                    }
                 }
 
                 if ctx.world.cvars.g_siegeTeam2.string[0] != 0
@@ -234,54 +231,37 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                         "none",
                     ) != 0
                 {
-                    write_cstr_field(
-                        &mut ctx.world.globals.team2,
-                        &cstr_from_chars(&ctx.world.cvars.g_siegeTeam2.string).to_string_lossy(),
+                    ctx.world.globals.team2 = strncpyz_string(
+                        cstr_from_chars(&ctx.world.cvars.g_siegeTeam2.string).to_bytes(),
+                        512,
                     );
                 } else {
-                    BG_SiegeGetPairedValue(
-                        teams.as_mut_ptr(),
-                        b"team2\0".as_ptr() as *mut c_char,
-                        ctx.world.globals.team2.as_mut_ptr(),
-                    );
+                    if let Some(val) =
+                        BG_SiegeGetPairedValue(&cstr_to_str(teams.as_ptr()), "team2")
+                    {
+                        ctx.world.globals.team2 = val;
+                    }
                 }
             } else {
                 G_Error(ctx, "Siege teams not defined");
             }
 
-            if BG_SiegeGetValueGroup(
-                ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-                ctx.world.globals.team2.as_mut_ptr(),
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-            ) != 0
-            {
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"TeamIcon\0".as_ptr() as *mut c_char,
-                    teamIcon.as_mut_ptr(),
-                ) != 0
-                {
-                    trap::Cvar_Set(
-                        ctx.engine,
-                        "team2_icon",
-                        &cstr_from_chars(&teamIcon).to_string_lossy(),
-                    );
+            if let Some(val) = BG_SiegeGetValueGroup(
+                &buf_to_string(&ctx.world.bg_state.siege_info),
+                &ctx.world.globals.team2.clone(),
+            ) {
+                ctx.world.globals.gParseObjectives = val;
+                let go = ctx.world.globals.gParseObjectives.clone();
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "TeamIcon") {
+                    trap::Cvar_Set(ctx.engine, "team2_icon", &val);
                 }
 
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"RequiredObjectives\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "RequiredObjectives") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     ctx.world.globals.rebel_goals_required = atoi(goalreq.as_ptr());
                 }
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"Timed\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "Timed") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     ctx.world.globals.rebel_time_limit = atoi(goalreq.as_ptr()) * 1000;
                     if ctx.world.cvars.g_siegeTeamSwitch.integer != 0
                         && ctx.world.globals.g_siegePersistant.beatingTime != 0
@@ -293,51 +273,30 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                             ctx.world.level.time + ctx.world.globals.rebel_time_limit;
                     }
                 }
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"attackers\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "attackers") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     ctx.world.globals.rebel_attackers = atoi(goalreq.as_ptr());
                 }
             }
 
-            if BG_SiegeGetValueGroup(
-                ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-                ctx.world.globals.team1.as_mut_ptr(),
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-            ) != 0
-            {
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"TeamIcon\0".as_ptr() as *mut c_char,
-                    teamIcon.as_mut_ptr(),
-                ) != 0
-                {
-                    trap::Cvar_Set(
-                        ctx.engine,
-                        "team1_icon",
-                        &cstr_from_chars(&teamIcon).to_string_lossy(),
-                    );
+            if let Some(val) = BG_SiegeGetValueGroup(
+                &buf_to_string(&ctx.world.bg_state.siege_info),
+                &ctx.world.globals.team1.clone(),
+            ) {
+                ctx.world.globals.gParseObjectives = val;
+                let go = ctx.world.globals.gParseObjectives.clone();
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "TeamIcon") {
+                    trap::Cvar_Set(ctx.engine, "team1_icon", &val);
                 }
 
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"RequiredObjectives\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "RequiredObjectives") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     ctx.world.globals.imperial_goals_required = atoi(goalreq.as_ptr());
                 }
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"Timed\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "Timed") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     if ctx.world.globals.rebel_time_limit != 0 {
-                        crate::g_main::Com_Printf("Tried to set imperial time limit, but there's already a rebel time limit!\nOnly one team can have a time limit.\n");
+                        Com_Printf("Tried to set imperial time limit, but there's already a rebel time limit!\nOnly one team can have a time limit.\n");
                     } else {
                         ctx.world.globals.imperial_time_limit = atoi(goalreq.as_ptr()) * 1000;
                         if ctx.world.cvars.g_siegeTeamSwitch.integer != 0
@@ -351,12 +310,8 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                         }
                     }
                 }
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"attackers\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "attackers") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     ctx.world.globals.imperial_attackers = atoi(goalreq.as_ptr());
                 }
             }
@@ -383,18 +338,14 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
             }
 
             // Get and set the team themes for each team.
-            if BG_SiegeGetValueGroup(
-                ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-                ctx.world.globals.team1.as_mut_ptr(),
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-            ) != 0
-            {
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"UseTeam\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+            if let Some(val) = BG_SiegeGetValueGroup(
+                &buf_to_string(&ctx.world.bg_state.siege_info),
+                &ctx.world.globals.team1.clone(),
+            ) {
+                ctx.world.globals.gParseObjectives = val;
+                let go = ctx.world.globals.gParseObjectives.clone();
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "UseTeam") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     BG_SiegeSetTeamTheme(
                         SIEGETEAM_TEAM1,
                         goalreq.as_mut_ptr(),
@@ -405,29 +356,20 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
                 // Now count up the objectives for this team.
                 let mut i: c_int = 1;
                 write_cstr_field(&mut objecStr, &format!("Objective{}", i));
-                while BG_SiegeGetValueGroup(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    objecStr.as_mut_ptr(),
-                    objective.as_mut_ptr(),
-                ) != 0
-                {
+                while BG_SiegeGetValueGroup(&go, &cstr_to_str(objecStr.as_ptr())).is_some() {
                     objectiveNumTeam1 += 1;
                     i += 1;
                     write_cstr_field(&mut objecStr, &format!("Objective{}", i));
                 }
             }
-            if BG_SiegeGetValueGroup(
-                ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-                ctx.world.globals.team2.as_mut_ptr(),
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-            ) != 0
-            {
-                if BG_SiegeGetPairedValue(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    b"UseTeam\0".as_ptr() as *mut c_char,
-                    goalreq.as_mut_ptr(),
-                ) != 0
-                {
+            if let Some(val) = BG_SiegeGetValueGroup(
+                &buf_to_string(&ctx.world.bg_state.siege_info),
+                &ctx.world.globals.team2.clone(),
+            ) {
+                ctx.world.globals.gParseObjectives = val;
+                let go = ctx.world.globals.gParseObjectives.clone();
+                if let Some(val) = BG_SiegeGetPairedValue(&go, "UseTeam") {
+                    Q_strncpyzBytes(&mut goalreq, val.as_bytes(), goalreq_len);
                     BG_SiegeSetTeamTheme(
                         SIEGETEAM_TEAM2,
                         goalreq.as_mut_ptr(),
@@ -437,12 +379,7 @@ pub fn InitSiegeMode(ctx: &mut GameContext) {
 
                 let mut i: c_int = 1;
                 write_cstr_field(&mut objecStr, &format!("Objective{}", i));
-                while BG_SiegeGetValueGroup(
-                    ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                    objecStr.as_mut_ptr(),
-                    objective.as_mut_ptr(),
-                ) != 0
-                {
+                while BG_SiegeGetValueGroup(&go, &cstr_to_str(objecStr.as_ptr())).is_some() {
                     objectiveNumTeam2 += 1;
                     i += 1;
                     write_cstr_field(&mut objecStr, &format!("Objective{}", i));
@@ -864,6 +801,7 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
     unsafe {
         let nomatter: vec3_t = [0.0, 0.0, 0.0];
         let mut teamstr: [c_char; 1024] = [0; 1024];
+        let teamstr_len = teamstr.len();
         let mut originalWinningClient = winningclient;
         let mut winningclient = winningclient;
 
@@ -885,15 +823,9 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
         // Instead of exiting like this, fire off a target, and let it handle
         // things. Can be a script or whatever the designer wants.
         if winningteam == SIEGETEAM_TEAM1 {
-            write_cstr_field(
-                &mut teamstr,
-                &cstr_from_chars(&ctx.world.globals.team1).to_string_lossy(),
-            );
+            write_cstr_field(&mut teamstr, &ctx.world.globals.team1);
         } else {
-            write_cstr_field(
-                &mut teamstr,
-                &cstr_from_chars(&ctx.world.globals.team2).to_string_lossy(),
-            );
+            write_cstr_field(&mut teamstr, &ctx.world.globals.team2);
         }
 
         trap::SetConfigstring(
@@ -905,18 +837,16 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
         ctx.world.globals.gSiegeRoundEnded = qtrue;
         ctx.world.globals.gSiegeRoundWinningTeam = winningteam;
 
-        if BG_SiegeGetValueGroup(
-            ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-            teamstr.as_mut_ptr(),
-            ctx.world.globals.gParseObjectives.as_mut_ptr(),
-        ) != 0
-        {
-            if BG_SiegeGetPairedValue(
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                b"roundover_target\0".as_ptr() as *mut c_char,
-                teamstr.as_mut_ptr(),
-            ) == 0
+        if let Some(val) = BG_SiegeGetValueGroup(
+            &buf_to_string(&ctx.world.bg_state.siege_info),
+            &cstr_to_str(teamstr.as_ptr()),
+        ) {
+            ctx.world.globals.gParseObjectives = val;
+            if let Some(val) =
+                BG_SiegeGetPairedValue(&ctx.world.globals.gParseObjectives.clone(), "roundover_target")
             {
+                Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
+            } else {
                 // didn't find the name of the thing to target upon win, just
                 // logexit now then.
                 LogExit(ctx, "Objectives completed");
@@ -1109,6 +1039,7 @@ pub fn SiegeBeginRound(ctx: &mut GameContext, entNum: c_int) {
     unsafe {
         // entNum is just used as something to fire targets from.
         let mut targname: [c_char; 1024] = [0; 1024];
+        let targname_len = targname.len();
 
         if ctx.world.globals.g_preroundState == 0 {
             // if players are not ingame on round start then respawn them now
@@ -1147,12 +1078,11 @@ pub fn SiegeBeginRound(ctx: &mut GameContext, entNum: c_int) {
 
         // Now check if there's something to fire off at the round start, if
         // so do it.
-        if BG_SiegeGetPairedValue(
-            ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-            b"roundbegin_target\0".as_ptr() as *mut c_char,
-            targname.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(val) = BG_SiegeGetPairedValue(
+            &buf_to_string(&ctx.world.bg_state.siege_info),
+            "roundbegin_target",
+        ) {
+            Q_strncpyzBytes(&mut targname, val.as_bytes(), targname_len);
             if targname[0] != 0 {
                 G_UseTargets2(
                     ctx,
@@ -1346,6 +1276,8 @@ pub fn siegeTriggerUse(
         let mut objectivestr: [c_char; 64] = [0; 64];
         let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
             [0; MAX_SIEGE_INFO_SIZE as usize];
+        let teamstr_len = teamstr.len();
+        let desiredobjective_len = desiredobjective.len();
         let mut clUser: c_int = ENTITYNUM_NONE;
         let mut r#final: c_int = 0;
 
@@ -1367,47 +1299,35 @@ pub fn siegeTriggerUse(
         }
 
         if ctx.world.entity(ent).side == SIEGETEAM_TEAM1 {
-            write_cstr_field(
-                &mut teamstr,
-                &cstr_from_chars(&ctx.world.globals.team1).to_string_lossy(),
-            );
+            write_cstr_field(&mut teamstr, &ctx.world.globals.team1);
         } else {
-            write_cstr_field(
-                &mut teamstr,
-                &cstr_from_chars(&ctx.world.globals.team2).to_string_lossy(),
-            );
+            write_cstr_field(&mut teamstr, &ctx.world.globals.team2);
         }
 
-        if BG_SiegeGetValueGroup(
-            ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-            teamstr.as_mut_ptr(),
-            ctx.world.globals.gParseObjectives.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(objectives) = BG_SiegeGetValueGroup(
+            &buf_to_string(&ctx.world.bg_state.siege_info),
+            &cstr_to_str(teamstr.as_ptr()),
+        ) {
+            ctx.world.globals.gParseObjectives = objectives;
             let obj_num = ctx.world.entity(ent).objective;
             write_cstr_field(&mut objectivestr, &format!("Objective{}", obj_num));
 
-            if BG_SiegeGetValueGroup(
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                objectivestr.as_mut_ptr(),
-                desiredobjective.as_mut_ptr(),
-            ) != 0
-            {
-                if BG_SiegeGetPairedValue(
-                    desiredobjective.as_mut_ptr(),
-                    b"final\0".as_ptr() as *mut c_char,
-                    teamstr.as_mut_ptr(),
-                ) != 0
+            if let Some(desired) = BG_SiegeGetValueGroup(
+                &ctx.world.globals.gParseObjectives.clone(),
+                &cstr_to_str(objectivestr.as_ptr()),
+            ) {
+                Q_strncpyzBytes(&mut desiredobjective, desired.as_bytes(), desiredobjective_len);
+                if let Some(val) =
+                    BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "final")
                 {
+                    Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
                     r#final = atoi(teamstr.as_ptr());
                 }
 
-                if BG_SiegeGetPairedValue(
-                    desiredobjective.as_mut_ptr(),
-                    b"target\0".as_ptr() as *mut c_char,
-                    teamstr.as_mut_ptr(),
-                ) != 0
+                if let Some(val) =
+                    BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "target")
                 {
+                    Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
                     let mut i: isize = 0;
                     while teamstr[i as usize] != 0 {
                         if teamstr[i as usize] == b'\r' as c_char
@@ -1595,6 +1515,8 @@ pub fn decompTriggerUse(
         let mut objectivestr: [c_char; 64] = [0; 64];
         let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
             [0; MAX_SIEGE_INFO_SIZE as usize];
+        let teamstr_len = teamstr.len();
+        let desiredobjective_len = desiredobjective.len();
 
         if ctx.world.globals.gSiegeRoundEnded != 0 {
             return;
@@ -1613,37 +1535,27 @@ pub fn decompTriggerUse(
 
         // Find out if this objective counts toward the final objective count
         if side == SIEGETEAM_TEAM1 {
-            write_cstr_field(
-                &mut teamstr,
-                &cstr_from_chars(&ctx.world.globals.team1).to_string_lossy(),
-            );
+            write_cstr_field(&mut teamstr, &ctx.world.globals.team1);
         } else {
-            write_cstr_field(
-                &mut teamstr,
-                &cstr_from_chars(&ctx.world.globals.team2).to_string_lossy(),
-            );
+            write_cstr_field(&mut teamstr, &ctx.world.globals.team2);
         }
 
-        if BG_SiegeGetValueGroup(
-            ctx.world.bg_state.siege_info.as_mut_ptr() as *mut c_char,
-            teamstr.as_mut_ptr(),
-            ctx.world.globals.gParseObjectives.as_mut_ptr(),
-        ) != 0
-        {
+        if let Some(objectives) = BG_SiegeGetValueGroup(
+            &buf_to_string(&ctx.world.bg_state.siege_info),
+            &cstr_to_str(teamstr.as_ptr()),
+        ) {
+            ctx.world.globals.gParseObjectives = objectives;
             write_cstr_field(&mut objectivestr, &format!("Objective{}", objective));
 
-            if BG_SiegeGetValueGroup(
-                ctx.world.globals.gParseObjectives.as_mut_ptr(),
-                objectivestr.as_mut_ptr(),
-                desiredobjective.as_mut_ptr(),
-            ) != 0
-            {
-                if BG_SiegeGetPairedValue(
-                    desiredobjective.as_mut_ptr(),
-                    b"final\0".as_ptr() as *mut c_char,
-                    teamstr.as_mut_ptr(),
-                ) != 0
+            if let Some(desired) = BG_SiegeGetValueGroup(
+                &ctx.world.globals.gParseObjectives.clone(),
+                &cstr_to_str(objectivestr.as_ptr()),
+            ) {
+                Q_strncpyzBytes(&mut desiredobjective, desired.as_bytes(), desiredobjective_len);
+                if let Some(val) =
+                    BG_SiegeGetPairedValue(&cstr_to_str(desiredobjective.as_ptr()), "final")
                 {
+                    Q_strncpyzBytes(&mut teamstr, val.as_bytes(), teamstr_len);
                     r#final = atoi(teamstr.as_ptr());
                 }
             }
@@ -2460,8 +2372,7 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
     unsafe {
         let mut count: c_int = 0;
         let mut i: c_int = 0;
-        let mut str_buf: [c_char; MAX_STRING_CHARS] = [0; MAX_STRING_CHARS];
-        let mut scratch: [c_char; MAX_STRING_CHARS] = [0; MAX_STRING_CHARS];
+        let mut str_buf = String::new();
 
         while i < ctx.world.level.num_entities && count < MAX_EXDATA_ENTS_TO_SEND {
             let id = EntityId(i as u32);
@@ -2490,33 +2401,22 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
                 // another client in the same pvs, send his jive
                 if count != 0 {
                     // append a separating space if we are not the first in the list
-                    Q_strcat(
-                        str_buf.as_mut_ptr(),
-                        str_buf.len() as c_int,
-                        b" \0".as_ptr() as *const c_char,
-                    );
+                    strcat_string(&mut str_buf, MAX_STRING_CHARS, " ");
                 } else {
                     // otherwise create the prepended chunk
-                    write_cstr_field(&mut str_buf, "sxd ");
+                    str_buf = strncpyz_string(b"sxd ", MAX_STRING_CHARS);
                 }
 
                 // append the stats
                 let cl = ent_cl;
-                write_cstr_field(
-                    &mut scratch,
-                    &format!(
-                        "{}|{}|{}|{}",
-                        ent_num,
-                        (*cl).ps.stats[statIndex_t::STAT_HEALTH as usize],
-                        (*cl).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize],
-                        (*cl).ps.ammo[weaponData[(*cl).ps.weapon as usize].ammoIndex as usize],
-                    ),
+                let scratch = format!(
+                    "{}|{}|{}|{}",
+                    ent_num,
+                    (*cl).ps.stats[statIndex_t::STAT_HEALTH as usize],
+                    (*cl).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize],
+                    (*cl).ps.ammo[weaponData[(*cl).ps.weapon as usize].ammoIndex as usize],
                 );
-                Q_strcat(
-                    str_buf.as_mut_ptr(),
-                    str_buf.len() as c_int,
-                    scratch.as_ptr(),
-                );
+                strcat_string(&mut str_buf, MAX_STRING_CHARS, &scratch);
                 count += 1;
             }
             i += 1;
@@ -2529,10 +2429,6 @@ pub fn G_SiegeClientExData(ctx: &mut GameContext, msgTarg: EntityId) {
 
         // send the string to him
         let msgtarg_num = ctx.world.entity(msgTarg).s.number;
-        trap::SendServerCommand(
-            ctx.engine,
-            msgtarg_num,
-            &cstr_from_chars(&str_buf).to_string_lossy(),
-        );
+        trap::SendServerCommand(ctx.engine, msgtarg_num, &str_buf);
     }
 }

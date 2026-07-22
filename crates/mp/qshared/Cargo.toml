@@ -9,4 +9,5 @@ name = "mp_qshared"
 [dependencies]
 native_math = { path = "../../native/math" }
 native_platform = { path = "../../native/platform" }
+native_string = { path = "../../native/string" }
 native_types = { path = "../../native/types" }

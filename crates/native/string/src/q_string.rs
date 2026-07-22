@@ -160,9 +160,8 @@ pub fn Q_strlwr(s: &mut [c_char]) {
     }
 }
 
-/// Raven `Q_strcat` — bounded append of `src` after `dest`'s NUL (Raven
-/// `Com_Error(ERR_FATAL)`s on an already-overflowed dest; the panic mirrors
-/// the frozen Group-A error path).
+/// Raven `Q_strcat` — bounded append of `src` after `dest`'s NUL; panics where
+/// Raven `Com_Error(ERR_FATAL, "Q_strcat: already overflowed")` fires.
 ///
 /// Source: `oracle/codemp/game/q_shared.c:929-937`
 pub fn Q_strcat(dest: &mut [c_char], size: usize, src: &str) {
@@ -171,6 +170,22 @@ pub fn Q_strcat(dest: &mut [c_char], size: usize, src: &str) {
         panic!("Q_strcat: already overflowed");
     }
     crate::q_strncpyz::Q_strncpyz(&mut dest[l1..], src, size - l1);
+}
+
+/// Raven `Q_strcat` into an owned `String` — the migrated-field twin of
+/// [`Q_strcat`] for locals that became `String`. Appends `src` after `dest`,
+/// keeping at most `size - 1` total bytes (Raven's `Q_strncpyz(dest+l1, src,
+/// size-l1)` bound); panics where Raven `Com_Error(ERR_FATAL, "Q_strcat: already
+/// overflowed")` fires. Byte-truncating, lossy-decoded on the appended slice.
+///
+/// Source: `oracle/codemp/game/q_shared.c:929-937`
+pub fn strcat_string(dest: &mut String, size: usize, src: &str) {
+    let l1 = dest.len();
+    if l1 >= size {
+        panic!("Q_strcat: already overflowed");
+    }
+    let n = src.as_bytes().len().min(size - l1 - 1);
+    dest.push_str(&String::from_utf8_lossy(&src.as_bytes()[..n]));
 }
 
 #[cfg(test)]

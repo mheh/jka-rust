@@ -493,9 +493,8 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
         write_cstr_field(&mut custom_skin, "default");
 
         let npc_parms: *const c_char = (&ctx.world.globals.NPCParms) as *const _ as *const c_char;
-        let npc_file: *const c_char = (&ctx.world.globals.NPCFile) as *const _ as *const c_char;
         let mut p: *const c_char = npc_parms;
-        crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, npc_file);
+        crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, &ctx.world.globals.NPCFile);
 
         // look for the right NPC
         loop {
@@ -932,9 +931,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
         }
 
         let npc_parms: *const c_char = (&ctx.world.globals.NPCParms) as *const _ as *const c_char;
-        let npc_file: *const c_char = (&ctx.world.globals.NPCFile) as *const _ as *const c_char;
         let mut p: *const c_char = npc_parms;
-        crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, npc_file);
+        crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, &ctx.world.globals.NPCFile);
 
         // look for the right NPC
         loop {
