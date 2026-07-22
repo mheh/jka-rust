@@ -4,25 +4,22 @@
 
 #![allow(non_camel_case_types)]
 
-use core::ffi::{c_char, c_int};
-
-use mp_qshared::shared::MAX_QPATH;
+use core::ffi::c_int;
 
 /// Raven `waypointData_t` — cleared as each map is entered.
 ///
+/// The five name fields hold `Q_strncpyz`-bounded (`MAX_QPATH`) copies of an
+/// entity's targetname/target chain; they are owned `String`s (the byte bound
+/// is applied at the `NAV_StoreWaypoint` write sites). Game-internal storage
+/// (`tempWaypointList`), so layout is free.
+///
 /// Type definition source: `oracle/codemp/game/g_local.h:810-818`
-#[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Default)]
 pub struct waypointData_t {
-    pub targetname: [c_char; MAX_QPATH],
-    pub target: [c_char; MAX_QPATH],
-    pub target2: [c_char; MAX_QPATH],
-    pub target3: [c_char; MAX_QPATH],
-    pub target4: [c_char; MAX_QPATH],
+    pub targetname: String,
+    pub target: String,
+    pub target2: String,
+    pub target3: String,
+    pub target4: String,
     pub nodeID: c_int,
 }
-const _: () = assert!(core::mem::size_of::<waypointData_t>() == 324);
-
-// `#[repr(C)]` POD (`c_char`/`c_int` fields only); the all-zero image is a valid
-// inhabitant, so `tempWaypointList` builds heap-first via `zeroed_box`.
-unsafe impl native_platform::ZeroValid for waypointData_t {}

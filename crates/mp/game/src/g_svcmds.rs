@@ -6,6 +6,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::g_main::G_Printf;
+use crate::q_shared::COM_BeginParseSession;
 use crate::prelude::*;
 use crate::trap;
 use crate::world::GameWorld;
@@ -398,7 +399,7 @@ pub fn G_LoadIPBans(ctx: &mut GameContext) {
     // §19 DIVERGENCE: oracle passes the uninitialized `char banIPFile[MAX_QPATH]`
     // to COM_BeginParseSession (UB); the name is only used in parse-error text, so
     // we substitute "banip.txt". Source: `oracle/codemp/game/g_svcmds.c:339,352`.
-    crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, "banip.txt");
+    COM_BeginParseSession(&mut ctx.world.bg_state.qs, "banip.txt");
 
     let mut p: *const c_char = ban_ip_buffer.as_ptr() as *const c_char;
     let token = crate::q_shared::COM_ParseExt(&mut ctx.world.bg_state.qs, &mut p, qtrue);

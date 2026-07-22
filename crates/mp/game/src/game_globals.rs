@@ -291,13 +291,36 @@ array_newtype!(boxed;
     /// Source: `oracle/codemp/game/ai_wpnav.c:19`
     pub NodeTable, nodeobject_t, MAX_NODETABLE_SIZE);
 
-array_newtype!(boxed, index;
-    /// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
-    /// Boxed so the ~162 KB of POD lives on the heap (not the `GameGlobals` stack
-    /// image, which the engine's `vmMain(GAME_INIT)` builds on a constrained
-    /// stack); `waypointData_t` is `#[repr(C)]` POD so an all-zero image is valid.
-    /// Source: `oracle/codemp/game/g_nav.c:1660`
-    pub TempWaypointList, waypointData_t, MAX_STORED_WAYPOINTS);
+/// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
+/// Boxed so the array lives on the heap (not the `GameGlobals` stack image,
+/// which the engine's `vmMain(GAME_INIT)` builds on a constrained stack); the
+/// element owns `String`s (non-`Copy`, no zero image), so it is built
+/// element-by-element on the heap via a `Vec`.
+/// Source: `oracle/codemp/game/g_nav.c:1660`
+pub struct TempWaypointList(pub Box<[waypointData_t; MAX_STORED_WAYPOINTS]>);
+
+impl Default for TempWaypointList {
+    fn default() -> Self {
+        let items: Vec<waypointData_t> =
+            (0..MAX_STORED_WAYPOINTS).map(|_| waypointData_t::default()).collect();
+        let boxed: Box<[waypointData_t; MAX_STORED_WAYPOINTS]> =
+            items.into_boxed_slice().try_into().ok().unwrap();
+        TempWaypointList(boxed)
+    }
+}
+
+impl Index<usize> for TempWaypointList {
+    type Output = waypointData_t;
+    fn index(&self, i: usize) -> &waypointData_t {
+        &self.0[i]
+    }
+}
+
+impl IndexMut<usize> for TempWaypointList {
+    fn index_mut(&mut self, i: usize) -> &mut waypointData_t {
+        &mut self.0[i]
+    }
+}
 
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
 /// char newShader[MAX_QPATH]; float timeOffset; }`. `oldShader`/`newShader` are

@@ -8,6 +8,8 @@
 
 use crate::prelude::*;
 use crate::world::GameWorld;
+use native_string::strncpyz_string;
+use std::ffi::CStr;
 
 use crate::entity::flags::FL_INACTIVE;
 use crate::g_combat::{AddScore, G_Damage};
@@ -491,10 +493,11 @@ pub fn SP_target_speaker(ctx: &mut GameContext, ent: EntityId) {
         ctx.entity_mut(ent).spawnflags |= 8;
     }
 
-    let mut buffer: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-    Q_strncpyz(buffer.as_mut_ptr(), s, MAX_QPATH as c_int);
+    // `s` is a `*mut c_char` into the entity arena; read it through the seam and
+    // `Q_strncpyz`-bound it (`MAX_QPATH-1` bytes) for the sound-index lookup.
+    let buffer = strncpyz_string(unsafe { CStr::from_ptr(s) }.to_bytes(), MAX_QPATH as usize);
 
-    let noise_index = G_SoundIndex(&(unsafe { cstr_to_str(buffer.as_ptr()) }));
+    let noise_index = G_SoundIndex(&buffer);
     let e = ctx.entity_mut(ent);
     e.noise_index = noise_index;
 

@@ -3038,12 +3038,9 @@ pub fn NPC_PrintScore(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4183-4243`
 pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
-    let mut cmd: [c_char; 1024] = [0; 1024];
+    let cmd = trap::Argv(ctx.engine, 1, 1024);
 
-    let arg1 = trap::Argv(ctx.engine, 1, 1024);
-    write_cstr_field(&mut cmd, &arg1);
-
-    if cmd[0] == 0 {
+    if cmd.is_empty() {
         Com_Printf("Valid NPC commands are:\n");
         Com_Printf(" spawn [NPC type (from NCPCs.cfg)]\n");
         Com_Printf(
@@ -3053,21 +3050,17 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
         Com_Printf(
             " score [NPC targetname] (prints number of kills per NPC)\n",
         );
-    } else if Q_stricmp("spawn", &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) })) == 0 {
+    } else if Q_stricmp("spawn", &cmd) == 0 {
         NPC_Spawn_f(ctx, ent);
-    } else if Q_stricmp("kill", &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) })) == 0 {
+    } else if Q_stricmp("kill", &cmd) == 0 {
         NPC_Kill_f(ctx);
-    } else if Q_stricmp(
-        "showbounds",
-        &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) }),
-    ) == 0
-    {
+    } else if Q_stricmp("showbounds", &cmd) == 0 {
         ctx.world.globals.showBBoxes = if ctx.world.globals.showBBoxes != 0 {
             0
         } else {
             1
         };
-    } else if Q_stricmp("score", &(unsafe { cstr_to_str(cmd.as_ptr() as *const c_char) })) == 0 {
+    } else if Q_stricmp("score", &cmd) == 0 {
         let mut cmd2: [c_char; 1024] = [0; 1024];
         let arg2 = trap::Argv(ctx.engine, 2, 1024);
         write_cstr_field(&mut cmd2, &arg2);

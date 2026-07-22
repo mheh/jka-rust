@@ -41,6 +41,8 @@ use crate::trap;
 use crate::NPC_goal::G_BoundsOverlap;
 use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
 use native_string::q_string::Q_stricmp;
+use native_string::strncpyz_string;
+use std::ffi::CStr;
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
@@ -2217,42 +2219,29 @@ pub fn NAV_StoreWaypoint(ctx: &mut GameContext, ent: EntityId) {
     let target4 = ctx.entity(ent).target4;
     let health = ctx.entity(ent).health;
 
+    // `targetname`..`target4` are `*mut c_char` into the entity arena; read each
+    // through the seam and `Q_strncpyz`-bound it (`MAX_QPATH-1` bytes) into the
+    // now-`String` waypoint field. A null source leaves the field at its cleared
+    // (empty) value, matching Raven's skipped copy over zeroed storage.
     if !targetname.is_null() {
-        Q_strncpyz(
-            ctx.world.globals.tempWaypointList[i]
-                .targetname
-                .as_mut_ptr(),
-            targetname,
-            MAX_QPATH as c_int,
-        );
+        ctx.world.globals.tempWaypointList[i].targetname =
+            strncpyz_string(unsafe { CStr::from_ptr(targetname) }.to_bytes(), MAX_QPATH as usize);
     }
     if !target.is_null() {
-        Q_strncpyz(
-            ctx.world.globals.tempWaypointList[i].target.as_mut_ptr(),
-            target,
-            MAX_QPATH as c_int,
-        );
+        ctx.world.globals.tempWaypointList[i].target =
+            strncpyz_string(unsafe { CStr::from_ptr(target) }.to_bytes(), MAX_QPATH as usize);
     }
     if !target2.is_null() {
-        Q_strncpyz(
-            ctx.world.globals.tempWaypointList[i].target2.as_mut_ptr(),
-            target2,
-            MAX_QPATH as c_int,
-        );
+        ctx.world.globals.tempWaypointList[i].target2 =
+            strncpyz_string(unsafe { CStr::from_ptr(target2) }.to_bytes(), MAX_QPATH as usize);
     }
     if !target3.is_null() {
-        Q_strncpyz(
-            ctx.world.globals.tempWaypointList[i].target3.as_mut_ptr(),
-            target3,
-            MAX_QPATH as c_int,
-        );
+        ctx.world.globals.tempWaypointList[i].target3 =
+            strncpyz_string(unsafe { CStr::from_ptr(target3) }.to_bytes(), MAX_QPATH as usize);
     }
     if !target4.is_null() {
-        Q_strncpyz(
-            ctx.world.globals.tempWaypointList[i].target4.as_mut_ptr(),
-            target4,
-            MAX_QPATH as c_int,
-        );
+        ctx.world.globals.tempWaypointList[i].target4 =
+            strncpyz_string(unsafe { CStr::from_ptr(target4) }.to_bytes(), MAX_QPATH as usize);
     }
     ctx.world.globals.tempWaypointList[i].nodeID = health;
 
@@ -2262,18 +2251,15 @@ pub fn NAV_StoreWaypoint(ctx: &mut GameContext, ent: EntityId) {
 /// Raven `NAV_GetStoredWaypoint`.
 ///
 /// Source: `oracle/codemp/game/g_nav.c:1713-1732`
-pub fn NAV_GetStoredWaypoint(ctx: &mut GameContext, targetname: *mut c_char) -> c_int {
-    // `targetname` is a caller-owned C string pointer (not an entity); the NUL
-    // check derefs it raw.
-    if targetname.is_null() || unsafe { *targetname } == 0 {
+pub fn NAV_GetStoredWaypoint(ctx: &mut GameContext, targetname: &str) -> c_int {
+    // Raven's `!targetname || !targetname[0]` guard: NULL and empty are treated
+    // identically, so an empty string returns -1.
+    if targetname.is_empty() {
         return -1;
     }
     for i in 0..ctx.world.globals.numStoredWaypoints as usize {
-        if ctx.world.globals.tempWaypointList[i].targetname[0] != 0
-            && crate::q_shared::Q_stricmp(
-                targetname,
-                ctx.world.globals.tempWaypointList[i].targetname.as_ptr(),
-            ) == 0
+        if !ctx.world.globals.tempWaypointList[i].targetname.is_empty()
+            && targetname.eq_ignore_ascii_case(&ctx.world.globals.tempWaypointList[i].targetname)
         {
             return i as c_int;
         }
@@ -2299,9 +2285,11 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
     ctx.world.globals.fatalErrorPointer = 0;
 
     for i in 0..ctx.world.globals.numStoredWaypoints as usize {
-        let target_ptr = ctx.world.globals.tempWaypointList[i].target.as_mut_ptr();
-        let target = NAV_GetStoredWaypoint(ctx, target_ptr);
-        let target2_ptr = ctx.world.globals.tempWaypointList[i].target2.as_mut_ptr();
+        // Clone each name out first: the field is now an owned `String`, so a
+        // borrow of it cannot coexist with the `&mut ctx` the lookup needs.
+        let target_name = ctx.world.globals.tempWaypointList[i].target.clone();
+        let target = NAV_GetStoredWaypoint(ctx, &target_name);
+        let target2_name = ctx.world.globals.tempWaypointList[i].target2.clone();
         if target != -1 {
             trap::Nav_HardConnect(
                 ctx.engine,
@@ -2312,8 +2300,8 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
             );
         }
 
-        let target2 = NAV_GetStoredWaypoint(ctx, target2_ptr);
-        let target3_ptr = ctx.world.globals.tempWaypointList[i].target3.as_mut_ptr();
+        let target2 = NAV_GetStoredWaypoint(ctx, &target2_name);
+        let target3_name = ctx.world.globals.tempWaypointList[i].target3.clone();
         if target2 != -1 {
             trap::Nav_HardConnect(
                 ctx.engine,
@@ -2324,8 +2312,8 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
             );
         }
 
-        let target3 = NAV_GetStoredWaypoint(ctx, target3_ptr);
-        let target4_ptr = ctx.world.globals.tempWaypointList[i].target4.as_mut_ptr();
+        let target3 = NAV_GetStoredWaypoint(ctx, &target3_name);
+        let target4_name = ctx.world.globals.tempWaypointList[i].target4.clone();
         if target3 != -1 {
             trap::Nav_HardConnect(
                 ctx.engine,
@@ -2336,7 +2324,7 @@ pub fn NAV_CalculatePaths(ctx: &mut GameContext, filename: *const c_char, checks
             );
         }
 
-        let target4 = NAV_GetStoredWaypoint(ctx, target4_ptr);
+        let target4 = NAV_GetStoredWaypoint(ctx, &target4_name);
         if target4 != -1 {
             trap::Nav_HardConnect(
                 ctx.engine,

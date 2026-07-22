@@ -13,6 +13,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_channel::GameBgTraps;
+use crate::q_shared::COM_BeginParseSession;
 use crate::prelude::*;
 use crate::g_utils::G_ModelIndex;
 use crate::g_utils::G_SoundIndex;
@@ -494,7 +495,7 @@ pub fn NPC_Precache(ctx: &mut GameContext, spawner: EntityId) {
 
         let npc_parms: *const c_char = (&ctx.world.globals.NPCParms) as *const _ as *const c_char;
         let mut p: *const c_char = npc_parms;
-        crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, &ctx.world.globals.NPCFile);
+        COM_BeginParseSession(&mut ctx.world.bg_state.qs, &ctx.world.globals.NPCFile);
 
         // look for the right NPC
         loop {
@@ -932,7 +933,7 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: *const c_char, NPC: Ent
 
         let npc_parms: *const c_char = (&ctx.world.globals.NPCParms) as *const _ as *const c_char;
         let mut p: *const c_char = npc_parms;
-        crate::q_shared::COM_BeginParseSession(&mut ctx.world.bg_state.qs, &ctx.world.globals.NPCFile);
+        COM_BeginParseSession(&mut ctx.world.bg_state.qs, &ctx.world.globals.NPCFile);
 
         // look for the right NPC
         loop {

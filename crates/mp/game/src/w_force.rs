@@ -40,6 +40,7 @@ use crate::prelude::*;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 use native_string::atoi::atoi_bytes;
+use native_string::MAX_INFO_STRING;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/codemp/game/q_shared.h`
@@ -237,23 +238,23 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
             return;
         }
 
-        let mut userinfo: [c_char; 1024] = [0; 1024];
         // Raven `char forcePowers[256]` — an IN/OUT C buffer: `BG_LegalizedForcePowers`
         // legalizes it in place below, and the parse loop that follows reads the
         // legalized contents back out of this same buffer, not a stale copy.
         // Source: `oracle/codemp/game/w_force.c:155` (`char forcePowers[256];`)
         let mut forcePowers: [c_char; 256] = [0; 256];
 
-        if ent_etype == ET_NPC as c_int && ent_number >= MAX_CLIENTS as c_int {
+        // Raven `char userinfo[MAX_INFO_STRING]` — scratch for the userinfo
+        // query; its only consumer is `Info_ValueForKey`, so it is an owned
+        // `String` (the engine bounds the query to the buffer size).
+        let userinfo = if ent_etype == ET_NPC as c_int && ent_number >= MAX_CLIENTS as c_int {
             //rwwFIXMEFIXME: Temp
-            write_cstr_field(&mut userinfo, "forcepowers\\7-1-333003000313003120");
+            "forcepowers\\7-1-333003000313003120".to_string()
         } else {
-            let userinfo_str = trap::GetUserinfo(ctx.engine, ent_number, userinfo.len());
-            write_cstr_field(&mut userinfo, &userinfo_str);
-        }
+            trap::GetUserinfo(ctx.engine, ent_number, MAX_INFO_STRING)
+        };
 
-        let userinfo_str = cstr_to_str(userinfo.as_ptr());
-        let val = Info_ValueForKey(&userinfo_str, "forcepowers");
+        let val = Info_ValueForKey(&userinfo, "forcepowers");
         write_cstr_field(&mut forcePowers, &val);
 
         if ent_svflags & SVF_BOT != 0

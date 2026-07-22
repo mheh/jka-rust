@@ -12,6 +12,7 @@
 
 use crate::client::client_connected::CON_CONNECTED;
 use crate::client::player_team_state::playerTeamStateState_t;
+use crate::g_svcmds::AddIP;
 use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
 use crate::prelude::*;
 use crate::g_utils::G_SoundIndex;
@@ -610,7 +611,7 @@ pub fn G_CheckTKAutoKickBan(ctx: &mut GameContext, ent: EntityId) {
                 // it in a C buffer (convention 7).
                 let mut ipbuf = [0 as c_char; 32];
                 write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
-                crate::g_svcmds::AddIP(ctx, ipbuf.as_mut_ptr());
+                AddIP(ctx, ipbuf.as_mut_ptr());
 
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "TKBAN");
                 let s = format!(
@@ -692,7 +693,7 @@ pub fn Cmd_Kill_f(ctx: &mut GameContext, ent: EntityId) {
                 // it in a C buffer (convention 7).
                 let mut ipbuf = [0 as c_char; 32];
                 write_cstr_field(&mut ipbuf, &ctx.world.client(cidx).sess.IPstring);
-                crate::g_svcmds::AddIP(ctx, ipbuf.as_mut_ptr());
+                AddIP(ctx, ipbuf.as_mut_ptr());
                 let m = crate::g_main::G_GetStringEdString(ctx, "MP_SVGAME_ADMIN", "SUICIDEBAN");
                 let s = format!(
                     "print \"{} {}\n\"",
