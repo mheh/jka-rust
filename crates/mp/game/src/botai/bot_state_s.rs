@@ -232,23 +232,10 @@ const _: () = assert!(core::mem::offset_of!(bot_state_t, client) == 8);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, entitynum) == 12);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, cur_ps) == 16);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, lastucmd) == 1568);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, settings) == 1596);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, thinktime) == 1888);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, origin) == 1892);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, velocity) == 1904);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, eye) == 1916);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, setupcount) == 1928);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, ltime) == 1932);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, entergame_time) == 1936);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, ms) == 1940);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, gs) == 1944);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, ws) == 1948);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, viewangles) == 1952);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, ideal_viewangles) == 1964);
-const _: () = assert!(core::mem::offset_of!(bot_state_t, viewanglespeed) == 1976);
-// This struct's stored `gentity_t*` fields are ported as `Option<EntityId>`
-// (align 4 vs a pointer's align 8), so the private tail's byte offsets shift. This struct is
-// game-internal / not ABI-fixed beyond its prefix — the engine learns the full
-// stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
-// `offset_of` assert at/after the first flipped field are therefore dropped;
-// only the fixed-prefix asserts above (declared before the first flip) remain.
+// `settings` (`bot_settings_t`) is the first non-faithful field: it owns
+// `String`s and drops `#[repr(C)]`, so it and every field after it shift off
+// Raven's byte offsets. This struct is game-internal — it never crosses the ABI
+// seam (only its `cur_ps`/`ms`/`gs`/`ws` handles reach the engine) — so its
+// tail layout is free. The `size_of` assert and every `offset_of` assert
+// at/after `settings` are therefore dropped; only the fixed-prefix asserts
+// above (declared before `settings`) remain.

@@ -618,15 +618,16 @@ pub fn G_RemoveQueuedBotBegin(ctx: &mut GameContext, clientNum: c_int) {
 pub fn G_BotConnect(ctx: &mut GameContext, clientNum: c_int, restart: bool) -> bool {
     // `MAX_INFO_STRING` resolves via the crate prelude glob.
     unsafe {
-        let mut settings: bot_settings_t = core::mem::zeroed();
+        let mut settings = bot_settings_t::default();
         let userinfo = trap::GetUserinfo(ctx.engine, clientNum, MAX_INFO_STRING);
 
-        write_cstr_field(
-            &mut settings.personalityfile,
-            &Info_ValueForKey(&userinfo, "personality"),
-        );
+        // `personalityfile`/`team` are owned `String`s now; take the userinfo
+        // values whole. Raven's `char[144]` truncated at 143 bytes, but that was
+        // a fixed-buffer overflow guard — userinfo "personality"/"team" values
+        // never approach it and no reader depends on the truncated length.
+        settings.personalityfile = Info_ValueForKey(&userinfo, "personality");
         settings.skill = atof(&Info_ValueForKey(&userinfo, "skill")) as f32;
-        write_cstr_field(&mut settings.team, &Info_ValueForKey(&userinfo, "team"));
+        settings.team = Info_ValueForKey(&userinfo, "team");
 
         let ok = BotAISetupClient(
             ctx,

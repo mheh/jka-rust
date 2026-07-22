@@ -11,8 +11,12 @@
 
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 use core::ptr::null_mut;
+use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
 
 use native_platform::zeroed_box;
+
+use crate::botai::bot_state_s::bot_state_t;
+use crate::level::bot_settings::bot_settings_t;
 
 use crate::botai::nodeobject_s::nodeobject_t;
 use crate::g_svcmds::ipFilter_t;
@@ -208,12 +212,60 @@ pub struct botSpawnQueue_t {
     pub spawnTime: c_int,
 }
 
-array_newtype!(null, index;
-    /// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state pointers
-    /// (`ai_main.c` file-scope global). Newtype because a raw-pointer array has no
-    /// library `Default` impl.
-    /// Source: `oracle/codemp/game/ai_main.c:46`
-    pub BotStates, *mut bot_state_t, MAX_CLIENTS);
+/// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state, now owned:
+/// each slot is an `Option<Box<bot_state_t>>` (`None` ≡ Raven's null slot).
+/// Raven allocated these off the `B_Alloc` bump pool; here the game owns them,
+/// and the `Box`'s stable heap address feeds the raw-pointer body code in
+/// `ai_main.c` unchanged via [`BotStates::ptr`].
+/// Source: `oracle/codemp/game/ai_main.c:46`
+pub struct BotStates(pub [Option<Box<bot_state_t>>; MAX_CLIENTS]);
+
+impl Default for BotStates {
+    fn default() -> Self {
+        BotStates(core::array::from_fn(|_| None))
+    }
+}
+
+impl BotStates {
+    /// Raw `*mut bot_state_t` for slot `i` — the `Box`'s stable heap address, or
+    /// null when the slot is `None`. `ai_main.c`'s body code reads bot state
+    /// across `ctx`-mutating calls (STAGE-2b irreducible aliasing), so it takes
+    /// this raw pointer rather than a checked borrow; `ptr(i).is_null()` is the
+    /// faithful equivalent of Raven's `botstates[i] == NULL`.
+    #[inline]
+    pub fn ptr(&self, i: usize) -> *mut bot_state_t {
+        match &self.0[i] {
+            Some(b) => &**b as *const bot_state_t as *mut bot_state_t,
+            None => null_mut(),
+        }
+    }
+}
+
+/// A fresh zeroed `bot_state_t` on the heap, mirroring Raven's
+/// `memset(B_Alloc(sizeof(bot_state_t)), 0, ...)` in `BotAISetupClient`.
+/// `bot_state_t` stopped being zero-valid when its `settings` field grew owned
+/// `String`s, so this zeroes the POD bulk (`alloc_zeroed`) and then seats a
+/// valid empty `settings` into the one owned slot — the codebase's
+/// zeroed-then-seat convention (`zeroed_clients`).
+/// Source: `oracle/codemp/game/ai_main.c:824-831`
+pub fn zeroed_bot_state() -> Box<bot_state_t> {
+    let layout = Layout::new::<bot_state_t>();
+    // SAFETY: `alloc_zeroed` yields storage that is all-zero-valid for every
+    // `bot_state_t` field except the `String`-bearing `settings`; the `ptr::write`
+    // seats a valid empty `settings` (its zeroed bytes never dropped) before
+    // ownership passes to the `Box`, so the whole state is initialized.
+    unsafe {
+        let p = alloc_zeroed(layout) as *mut bot_state_t;
+        if p.is_null() {
+            handle_alloc_error(layout);
+        }
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*p).settings),
+            bot_settings_t::default(),
+        );
+        Box::from_raw(p)
+    }
+}
 
 array_newtype!(null, index;
     /// `gNPC_t *gNPCPtrs[MAX_GENTITIES]` — per-entity NPC state pointers
@@ -548,7 +600,7 @@ pub struct GameGlobals {
     /// Source: `oracle/codemp/game/NPC_stats.c:238`
     pub NPCFile: String,
     // --- `ai_main.c` file-scope globals ---
-    /// `botstates` (`bot_state_t *[MAX_CLIENTS]`; null-init raw pointers).
+    /// `botstates` (`bot_state_t *[MAX_CLIENTS]`; owned `Option<Box<_>>` slots).
     /// Source: `oracle/codemp/game/ai_main.c:46`
     pub botstates: BotStates,
     /// `droppedBlueFlag` (`gentity_t *`; raw pointer, matches the

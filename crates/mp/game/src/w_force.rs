@@ -259,11 +259,11 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         forcePowers = strncpyz_string(val.as_bytes(), 256);
 
         if ent_svflags & SVF_BOT != 0
-            && !(&ctx.world.globals.botstates)[ent_number as usize].is_null()
+            && ctx.world.globals.botstates.0[ent_number as usize].is_some()
         {
             //if it's a bot just copy the info directly from its personality
             let bot_forceinfo = cstr_to_str(
-                (*(&ctx.world.globals.botstates)[ent_number as usize])
+                (*ctx.world.globals.botstates.ptr(ent_number as usize))
                     .forceinfo
                     .as_ptr() as *const c_char,
             );
@@ -348,7 +348,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
         let mut fp_bytes = fp_bytes;
         if gametype != GT_SIEGE as c_int
             && ent_svflags & SVF_BOT != 0
-            && !(&ctx.world.globals.botstates)[ent_number as usize].is_null()
+            && ctx.world.globals.botstates.0[ent_number as usize].is_some()
         {
             //hmm..I'm going to cheat here.
             let oldI = i;
@@ -361,7 +361,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                     if i_r as c_int == FP_ABSORB {
                         fp_bytes[i] = b'3';
                     }
-                    if (*(&ctx.world.globals.botstates)[ent_number as usize])
+                    if (*ctx.world.globals.botstates.ptr(ent_number as usize))
                         .settings
                         .skill
                         >= 4.0
@@ -374,7 +374,7 @@ pub fn WP_InitForcePowers(ctx: &mut GameContext, ent: Option<EntityId>) {
                         }
                     }
                 } else if (*cl).ps.fd.forceSide == FORCE_DARKSIDE as c_int {
-                    if (*(&ctx.world.globals.botstates)[ent_number as usize])
+                    if (*ctx.world.globals.botstates.ptr(ent_number as usize))
                         .settings
                         .skill
                         >= 4.0

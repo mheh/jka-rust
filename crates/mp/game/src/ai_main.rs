@@ -27,7 +27,7 @@ use crate::prelude::*;
 use crate::g_bot::G_CheckBotSpawn;
 use crate::g_public_consts::SVF_NOCLIENT;
 use crate::g_utils::G_Find;
-use crate::game_globals::BotStates;
+use crate::game_globals::{zeroed_bot_state, BotStates};
 use crate::w_force::ForcePowerUsableOn;
 use mp_bg::bg_misc::BG_GetItemIndexByTag;
 use mp_bg::bg_panimate::{BG_SaberInKata, BG_SaberInSpecial};
@@ -212,7 +212,7 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
             return;
         }
 
-        if clientnum != -1 && (*botstates).0[clientnum as usize].is_null() {
+        if clientnum != -1 && (*botstates).0[clientnum as usize].is_none() {
             return;
         }
 
@@ -247,7 +247,7 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
         }
 
         if clientnum != -1 {
-            let bi = (*botstates).0[clientnum as usize];
+            let bi = (*botstates).ptr(clientnum as usize);
             if ordernum == -1 {
                 BotReportStatus(ctx, bi);
             } else {
@@ -263,7 +263,7 @@ pub fn BotOrder(ctx: &mut GameContext, ent: Option<EntityId>, clientnum: c_int, 
         } else {
             let mut i: usize = 0;
             while i < MAX_CLIENTS {
-                let bi = (*botstates).0[i];
+                let bi = (*botstates).ptr(i);
                 if !bi.is_null()
                     && OnSameTeam(ctx, Some(ent_h), ctx.entity_id_of(base.add(i))) != qfalse
                 {
@@ -745,7 +745,7 @@ pub fn BotAI(ctx: &mut GameContext, client: c_int, thinktime: f32) -> c_int {
     // The `#ifdef _DEBUG` timing block is dropped (§20, debug-only).
     unsafe {
         trap::EA_ResetInput(ctx.engine, BotlibEaResetInputArgs::new(client));
-        let bs = (&ctx.world.globals.botstates)[client as usize];
+        let bs = ctx.world.globals.botstates.ptr(client as usize);
         if bs.is_null() || (*bs).inuse == qfalse {
             let msg = format!("BotAI: client {} is not setup\n", client);
             BotAI_Print(PRT_FATAL, cstr(&msg).as_ptr() as *mut c_char);
@@ -800,7 +800,7 @@ pub fn BotScheduleBotThink(ctx: &mut GameContext) {
     unsafe {
         let mut botnum: c_int = 0;
         for i in 0..MAX_CLIENTS {
-            let bi = (&ctx.world.globals.botstates)[i];
+            let bi = ctx.world.globals.botstates.ptr(i);
             if bi.is_null() || (*bi).inuse == qfalse {
                 continue;
             }
@@ -839,34 +839,39 @@ pub fn BotAISetupClient(
     restart: qboolean,
 ) -> c_int {
     unsafe {
-        if (&ctx.world.globals.botstates)[client as usize].is_null() {
-            // `bot_state_t` holds `*mut wpobject_t` fields (align 8); pad the pool
-            // to an 8-byte boundary first (see `BG_AllocPad8`) so every later
-            // `(*bs).field` access is safely dereferenceable.
-            mp_bg::bg_misc::BG_AllocPad8(&mut ctx.world.bg_state);
-            (&mut ctx.world.globals.botstates)[client as usize] =
-                crate::ai_util::B_Alloc(ctx, core::mem::size_of::<bot_state_t>() as c_int)
-                    as *mut bot_state_t;
+        // First setup boxes a fresh zeroed state on the heap; re-setup resets the
+        // existing state in place (Raven reused the same `B_Alloc` pool block,
+        // `memset` to zero). `bot_state_t` owns a `String`-bearing `settings`, so
+        // the in-place reset drops that field, byte-zeros the POD bulk, then
+        // re-seats an empty `settings` — the codebase's take/zero/seat convention
+        // (`G_FreeEntity`). The owned `Box` also gives proper 8-byte alignment,
+        // so Raven's `BG_AllocPad8` pool-alignment step is no longer needed.
+        if ctx.world.globals.botstates.0[client as usize].is_none() {
+            ctx.world.globals.botstates.0[client as usize] = Some(zeroed_bot_state());
+        } else {
+            let bs = ctx.world.globals.botstates.ptr(client as usize);
+            core::ptr::drop_in_place(core::ptr::addr_of_mut!((*bs).settings));
+            core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
+            core::ptr::write(
+                core::ptr::addr_of_mut!((*bs).settings),
+                bot_settings_t::default(),
+            );
         }
 
-        // C's `memset(bs, 0, sizeof(bot_state_t))` is byte-wise; BG_Alloc's bump
-        // allocator only guarantees 4-byte alignment, not `bot_state_t`'s 8, so the
-        // typed write_bytes (which checks pointee alignment) must not be used here.
-        core::ptr::write_bytes(
-            (&ctx.world.globals.botstates)[client as usize] as *mut u8,
-            0,
-            core::mem::size_of::<bot_state_t>(),
-        );
+        let bs = ctx.world.globals.botstates.ptr(client as usize);
 
-        let bs = (&ctx.world.globals.botstates)[client as usize];
-
-        if !bs.is_null() && (*bs).inuse != qfalse {
+        // The reset above zeroed `inuse`, so this faithfully-preserved Raven guard
+        // (`if (bs && bs->inuse)`) never fires; `bs` is a live `Box` address here,
+        // never null.
+        if (*bs).inuse != qfalse {
             let msg = format!("BotAISetupClient: client {} already setup\n", client);
             BotAI_Print(PRT_FATAL, cstr(&msg).as_ptr() as *mut c_char);
             return qfalse;
         }
 
-        core::ptr::copy_nonoverlapping(settings, &mut (*bs).settings, 1);
+        // Raven `memcpy(&bs->settings, settings, sizeof(bot_settings_t))` — clone
+        // the caller's owned-`String` settings into the freshly-seated field.
+        (*bs).settings = (*settings).clone();
 
         (*bs).client = client; // need the client number before personality stuff
 
@@ -925,7 +930,7 @@ pub fn BotAISetupClient(
 /// Source: `oracle/codemp/game/ai_main.c:891-914`
 pub fn BotAIShutdownClient(ctx: &mut GameContext, client: c_int, restart: qboolean) -> c_int {
     unsafe {
-        let bs = (&ctx.world.globals.botstates)[client as usize];
+        let bs = ctx.world.globals.botstates.ptr(client as usize);
         if bs.is_null() || (*bs).inuse == qfalse {
             return qfalse;
         }
@@ -935,10 +940,17 @@ pub fn BotAIShutdownClient(ctx: &mut GameContext, client: c_int, restart: qboole
         trap::BotFreeGoalState(ctx.engine, BotlibAiFreeGoalStateArgs::new((*bs).gs));
         // free the weapon weights
         trap::BotFreeWeaponState(ctx.engine, BotlibAiFreeWeaponStateArgs::new((*bs).ws));
-        // clear the bot state
-        // Byte-wise, like C's memset: `bs` comes from B_Alloc/BG_Alloc's 4-byte
-        // bump allocator, not guaranteed 8-aligned for bot_state_t's pointer fields.
+        // clear the bot state (Raven `memset(bs, 0, sizeof(*bs))`): drop the owned
+        // `settings` String, byte-zero the POD bulk, then re-seat an empty
+        // `settings` (take/zero/seat convention — never dropping the zeroed image).
+        // The slot's `Box` stays allocated, mirroring Raven leaving the pool block
+        // in place with `inuse` cleared.
+        core::ptr::drop_in_place(core::ptr::addr_of_mut!((*bs).settings));
         core::ptr::write_bytes(bs as *mut u8, 0, core::mem::size_of::<bot_state_t>());
+        core::ptr::write(
+            core::ptr::addr_of_mut!((*bs).settings),
+            bot_settings_t::default(),
+        );
         // set the inuse flag to qfalse
         (*bs).inuse = qfalse;
         // there's one bot less
@@ -949,8 +961,9 @@ pub fn BotAIShutdownClient(ctx: &mut GameContext, client: c_int, restart: qboole
 
 /// Raven `BotResetState`.
 ///
-/// `settings`/`cur_ps` are `Copy`, so the save/zero/restore mirrors Raven's
-/// memcpy+memset+memcpy exactly.
+/// `cur_ps` is `Copy` and `settings` is moved out and back with `ptr::read`/
+/// `ptr::write` (its owned `String`s are preserved, never dropped), so the
+/// save/zero/restore mirrors Raven's memcpy+memset+memcpy exactly.
 ///
 /// Source: `oracle/codemp/game/ai_main.c:924-959`
 pub fn BotResetState(ctx: &mut GameContext, bs: *mut bot_state_t) {
@@ -1004,7 +1017,7 @@ pub fn BotResetState(ctx: &mut GameContext, bs: *mut bot_state_t) {
 pub fn BotAILoadMap(ctx: &mut GameContext, restart: c_int) -> c_int {
     unsafe {
         for i in 0..MAX_CLIENTS {
-            let bi = (&ctx.world.globals.botstates)[i];
+            let bi = ctx.world.globals.botstates.ptr(i);
             if !bi.is_null() && (*bi).inuse != qfalse {
                 BotResetState(ctx, bi);
                 (*bi).setupcount = 4;
@@ -1795,8 +1808,8 @@ pub fn BotTrace_Jump(ctx: &mut GameContext, bs: *mut bot_state_t, traceto: vec3_
         if tr.fraction == 1.0 {
             if orTr >= 0
                 && orTr < MAX_CLIENTS as c_int
-                && !(&ctx.world.globals.botstates)[orTr as usize].is_null()
-                && (*(&ctx.world.globals.botstates)[orTr as usize]).jumpTime
+                && ctx.world.globals.botstates.0[orTr as usize].is_some()
+                && (*ctx.world.globals.botstates.ptr(orTr as usize)).jumpTime
                     > ctx.world.level.time as f32
             {
                 // so bots don't try to jump over each other at the same time
@@ -2049,7 +2062,7 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
         }
 
         let bot_ent_id = Some(ent_id(base, base.add((*bot).ps.clientNum as usize)));
-        let bs_a = (&ctx.world.globals.botstates)[attacker_num as usize];
+        let bs_a = ctx.world.globals.botstates.ptr(attacker_num as usize);
 
         if !bs_a.is_null() {
             // if the client attacking us is a bot as well
@@ -2057,7 +2070,7 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
             let mut i: usize = 0;
 
             while i < MAX_CLIENTS {
-                let bi = (&ctx.world.globals.botstates)[i];
+                let bi = ctx.world.globals.botstates.ptr(i);
                 if !bi.is_null() && i as c_int != (*bs_a).client && (*bi).lastAttacked == bot_ent_id
                 {
                     (*bi).lastAttacked = None;
@@ -2070,7 +2083,7 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
             let mut i: usize = 0;
 
             while i < MAX_CLIENTS {
-                let bi = (&ctx.world.globals.botstates)[i];
+                let bi = ctx.world.globals.botstates.ptr(i);
                 if !bi.is_null() && (*bi).lastAttacked == bot_ent_id {
                     (*bi).lastAttacked = None;
                 }
@@ -2079,7 +2092,7 @@ pub fn BotDamageNotification(ctx: &mut GameContext, bot: EntityId, attacker: Opt
             }
         }
 
-        let bs = (&ctx.world.globals.botstates)[(*bot).ps.clientNum as usize];
+        let bs = ctx.world.globals.botstates.ptr((*bot).ps.clientNum as usize);
 
         if bs.is_null() {
             return;
@@ -2257,7 +2270,7 @@ pub fn PassLovedOneCheck(
         let mut i: c_int = 0;
 
         let ent_num = ctx.world.entity(ent.unwrap()).s.number;
-        if (&ctx.world.globals.botstates)[ent_num as usize].is_null() {
+        if ctx.world.globals.botstates.0[ent_num as usize].is_none() {
             // not a bot
             return 1;
         }
@@ -2266,7 +2279,7 @@ pub fn PassLovedOneCheck(
             return 1;
         }
 
-        let loved = (&ctx.world.globals.botstates)[ent_num as usize];
+        let loved = ctx.world.globals.botstates.ptr(ent_num as usize);
 
         while i < (*bs).lovednum {
             // `netname` is a `String`; compare against the remembered loved name
@@ -3172,8 +3185,8 @@ pub fn CTFTakesPriority(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_int {
                     numOnEnemyTeam += 1;
                 }
 
-                if !(&ctx.world.globals.botstates)[(*ent).s.number as usize].is_null() {
-                    let bst = (&ctx.world.globals.botstates)[(*ent).s.number as usize];
+                if ctx.world.globals.botstates.0[(*ent).s.number as usize].is_some() {
+                    let bst = ctx.world.globals.botstates.ptr((*ent).s.number as usize);
                     if (*bst).ctfState == bot_ctf_state_t::CTFSTATE_ATTACKER as c_int
                         || (*bst).ctfState == bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int
                     {
@@ -3492,7 +3505,7 @@ pub fn Siege_CountDefenders(ctx: &mut GameContext, bs: *mut bot_state_t) -> c_in
 
         while i < MAX_CLIENTS {
             ent = base.add(i);
-            bot = (&ctx.world.globals.botstates)[i];
+            bot = ctx.world.globals.botstates.ptr(i);
 
             if !ent.is_null() && !(*ent).client.is_null() && !bot.is_null() {
                 if (*bot).siegeState == bot_siege_state_t::SIEGESTATE_DEFENDER as c_int
@@ -4274,8 +4287,8 @@ pub fn CommanderBotCTFAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
                     numOnEnemyTeam += 1;
                 }
 
-                if !(&ctx.world.globals.botstates)[(*ent).s.number as usize].is_null() {
-                    let bst = (&ctx.world.globals.botstates)[(*ent).s.number as usize];
+                if ctx.world.globals.botstates.0[(*ent).s.number as usize].is_some() {
+                    let bst = ctx.world.globals.botstates.ptr((*ent).s.number as usize);
                     if (*bst).ctfState == bot_ctf_state_t::CTFSTATE_ATTACKER as c_int
                         || (*bst).ctfState == bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int
                     {
@@ -4298,10 +4311,10 @@ pub fn CommanderBotCTFAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
-                && !(&ctx.world.globals.botstates)[i].is_null()
-                && (*(&ctx.world.globals.botstates)[i]).squadLeader.is_some()
+                && ctx.world.globals.botstates.0[i].is_some()
+                && (*ctx.world.globals.botstates.ptr(i)).squadLeader.is_some()
                 && (*base.add(
-                    (*(&ctx.world.globals.botstates)[i])
+                    (*ctx.world.globals.botstates.ptr(i))
                         .squadLeader
                         .unwrap()
                         .index(),
@@ -4332,9 +4345,9 @@ pub fn CommanderBotCTFAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
         while i < squadmates {
             if !squad[i as usize].is_null()
                 && !(*squad[i as usize]).client.is_null()
-                && !(&ctx.world.globals.botstates)[(*squad[i as usize]).s.number as usize].is_null()
+                && ctx.world.globals.botstates.0[(*squad[i as usize]).s.number as usize].is_some()
             {
-                let sbst = (&ctx.world.globals.botstates)[(*squad[i as usize]).s.number as usize];
+                let sbst = ctx.world.globals.botstates.ptr((*squad[i as usize]).s.number as usize);
                 if (*sbst).ctfState != bot_ctf_state_t::CTFSTATE_GETFLAGHOME as c_int {
                     // never tell a bot to stop trying to bring the flag to the base
                     if defendAttackPriority != 0 {
@@ -4401,9 +4414,9 @@ pub fn CommanderBotSiegeAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
                     ctx.entity_id_of(base.add((*bs).client as usize)),
                     ctx.entity_id_of(ent),
                 ) != 0
-                && !(&ctx.world.globals.botstates)[(*ent).s.number as usize].is_null()
+                && ctx.world.globals.botstates.0[(*ent).s.number as usize].is_some()
             {
-                bst = (&ctx.world.globals.botstates)[(*ent).s.number as usize];
+                bst = ctx.world.globals.botstates.ptr((*ent).s.number as usize);
 
                 if !bst.is_null() && (*bst).isSquadLeader == 0 && (*bst).state_Forced == 0 {
                     squad[squadmates as usize] = ent;
@@ -4436,7 +4449,7 @@ pub fn CommanderBotSiegeAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut i: c_int = 0;
 
         while i < squadmates && !squad[i as usize].is_null() {
-            bst = (&ctx.world.globals.botstates)[(*squad[i as usize]).s.number as usize];
+            bst = ctx.world.globals.botstates.ptr((*squad[i as usize]).s.number as usize);
 
             if commanded > teammates / 2 {
                 break;
@@ -4500,9 +4513,9 @@ pub fn CommanderBotTeamplayAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
                     ctx.entity_id_of(base.add((*bs).client as usize)),
                     ctx.entity_id_of(ent),
                 ) != 0
-                && !(&ctx.world.globals.botstates)[(*ent).s.number as usize].is_null()
+                && ctx.world.globals.botstates.0[(*ent).s.number as usize].is_some()
             {
-                bst = (&ctx.world.globals.botstates)[(*ent).s.number as usize];
+                bst = ctx.world.globals.botstates.ptr((*ent).s.number as usize);
 
                 if foundsquadleader != 0 && !bst.is_null() && (*bst).isSquadLeader != 0 {
                     // never more than one squad leader
@@ -4543,7 +4556,7 @@ pub fn CommanderBotTeamplayAI(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut i: c_int = 0;
 
         while i < squadmates && !squad[i as usize].is_null() {
-            bst = (&ctx.world.globals.botstates)[(*squad[i as usize]).s.number as usize];
+            bst = ctx.world.globals.botstates.ptr((*squad[i as usize]).s.number as usize);
 
             if !bst.is_null() && (*bst).state_Forced == 0 {
                 // only order if this guy is not being ordered directly by the real player team leader
@@ -5754,7 +5767,7 @@ pub fn BotDeathNotify(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let clients = ctx.world.level.clients;
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
-            let bi = (&ctx.world.globals.botstates)[i];
+            let bi = ctx.world.globals.botstates.ptr(i);
             if !bi.is_null() && (*bi).lovednum != 0 {
                 let mut ltest: c_int = 0;
                 while ltest < (*bi).lovednum {
@@ -5983,7 +5996,7 @@ pub fn CheckForFriendInLOF(ctx: &mut GameContext, bs: *mut bot_state_t) -> *mut 
                     return trent;
                 }
 
-                let bstate = (&ctx.world.globals.botstates)[(*trent).s.number as usize];
+                let bstate = ctx.world.globals.botstates.ptr((*trent).s.number as usize);
                 if !bstate.is_null() && GetLoveLevel(ctx, bs, bstate) > 1 {
                     return trent;
                 }
@@ -6011,7 +6024,7 @@ pub fn BotScanForLeader(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
             let ent = base.add(i);
-            let bstate = (&ctx.world.globals.botstates)[i];
+            let bstate = ctx.world.globals.botstates.ptr(i);
 
             if !ent.is_null()
                 && !(*ent).client.is_null()
@@ -6050,7 +6063,7 @@ pub fn BotReplyGreetings(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let mut numhello: c_int = 0;
 
         while i < MAX_CLIENTS {
-            let bi = (&ctx.world.globals.botstates)[i];
+            let bi = ctx.world.globals.botstates.ptr(i);
 
             if !bi.is_null() && (*bi).canChat != 0 && i as c_int != (*bs).client {
                 (*bi).chatObject = Some(ent_id(base, base.add((*bs).client as usize)));
@@ -6393,7 +6406,7 @@ pub fn Bot_SetForcedMovement(
     up: c_int,
 ) {
     unsafe {
-        let bs = (&ctx.world.globals.botstates)[bot as usize];
+        let bs = ctx.world.globals.botstates.ptr(bot as usize);
 
         if bs.is_null() {
             //not a bot
@@ -6636,10 +6649,10 @@ pub fn StandardBotAI(ctx: &mut GameContext, bs: *mut bot_state_t, thinktime: f32
                     let sect = cstr("Died");
                     crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
                 } else if PassLovedOneCheck(ctx, bs, ctx.entity_id_of(lastHurt)) == 0
-                    && !(&ctx.world.globals.botstates)[(*lastHurt).s.number as usize].is_null()
+                    && ctx.world.globals.botstates.0[(*lastHurt).s.number as usize].is_some()
                     && PassLovedOneCheck(
                         ctx,
-                        (&ctx.world.globals.botstates)[(*lastHurt).s.number as usize],
+                        ctx.world.globals.botstates.ptr((*lastHurt).s.number as usize),
                         ctx.entity_id_of(me),
                     ) != 0
                 {
@@ -8075,7 +8088,7 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
         // execute scheduled bot AI
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
-            let bi = (&ctx.world.globals.botstates)[i];
+            let bi = ctx.world.globals.botstates.ptr(i);
             if bi.is_null() || (*bi).inuse == 0 {
                 i += 1;
                 continue;
@@ -8097,7 +8110,7 @@ pub fn BotAIStartFrame(ctx: &mut GameContext, time: c_int) -> c_int {
         // execute bot user commands every frame
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
-            let bi = (&ctx.world.globals.botstates)[i];
+            let bi = ctx.world.globals.botstates.ptr(i);
             if bi.is_null() || (*bi).inuse == 0 {
                 i += 1;
                 continue;
@@ -8244,7 +8257,7 @@ pub fn BotAIShutdown(ctx: &mut GameContext, restart: c_int) -> c_int {
             //shutdown all the bots in the botlib
             let mut i: usize = 0;
             while i < MAX_CLIENTS {
-                let bi = (&ctx.world.globals.botstates)[i];
+                let bi = ctx.world.globals.botstates.ptr(i);
                 if !bi.is_null() && (*bi).inuse != 0 {
                     BotAIShutdownClient(ctx, (*bi).client, restart);
                 }
