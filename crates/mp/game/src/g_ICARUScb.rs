@@ -95,14 +95,9 @@ pub fn G_DebugPrint(
             ent_num = 0;
         }
 
-        let targ = ctx.world.g_entities[ent_num as usize].script_targetname;
-        let targ_str = if targ.is_null() {
-            String::new()
-        } else {
-            // `script_targetname` is a raw `*mut c_char` field; the deref is the
-            // only remaining unsafe reach.
-            unsafe { cstr_to_str(targ) }
-        };
+        let targ_str = ctx.world.g_entities[ent_num as usize]
+            .script_targetname_str()
+            .unwrap_or_default();
         Com_Printf(&format!(
             "{}DEBUG: {}({}): {}\n",
             S_COLOR_BLUE.to_string_lossy(),
@@ -215,10 +210,9 @@ pub fn Q3_PlaySound(
     let sound_handle = G_SoundIndex(&(unsafe { cstr_to_str(final_name.as_ptr()) }));
     let mut b_broadcast = qfalse;
 
-    let classname = ctx.world.entity(id).classname;
+    let classname = ctx.world.entity(id).classname_str();
     if Q_stricmp(&(unsafe { cstr_to_str(channel) }), "CHAN_ANNOUNCER") == 0
-        || (!classname.is_null()
-            && Q_stricmp("target_scriptrunner", &(unsafe { cstr_to_str(classname) })) == 0)
+        || Q_stricmp("target_scriptrunner", &classname) == 0
     {
         b_broadcast = qtrue;
     }
@@ -417,7 +411,7 @@ pub fn Blocked_Mover(ctx: &mut GameContext, ent: EntityId, other: Option<EntityI
             || (!o.client.is_null()
                 && o.health <= 0
                 && o.r.contents == CONTENTS_CORPSE
-                && o.message.is_null()))
+                && o.message.is_none()))
     {
         // if your not a client, or your a dead client remove yourself...
         // if an item or weapon can we do a little explosion..?
@@ -465,8 +459,7 @@ pub fn Q3_Lerp2Start(ctx: &mut GameContext, entID: c_int, taskID: c_int, duratio
     let is_not_mover = {
         let e = ctx.world.entity(id);
         !e.client.is_null()
-            || (!e.classname.is_null()
-                && Q_stricmp(&(unsafe { cstr_to_str(e.classname) }), "target_scriptrunner") == 0)
+            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -521,8 +514,7 @@ pub fn Q3_Lerp2End(ctx: &mut GameContext, entID: c_int, taskID: c_int, duration:
     let is_not_mover = {
         let e = ctx.world.entity(id);
         !e.client.is_null()
-            || (!e.classname.is_null()
-                && Q_stricmp(&(unsafe { cstr_to_str(e.classname) }), "target_scriptrunner") == 0)
+            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -584,8 +576,7 @@ pub fn Q3_Lerp2Pos(
     let is_not_mover = {
         let e = ctx.world.entity(id);
         !e.client.is_null()
-            || (!e.classname.is_null()
-                && Q_stricmp(&(unsafe { cstr_to_str(e.classname) }), "target_scriptrunner") == 0)
+            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -802,7 +793,8 @@ pub fn Q3_Use(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
         return;
     }
 
-    G_UseTargets2(ctx, Some(id), Some(id), target);
+    let target = unsafe { cstr_to_str(target) };
+    G_UseTargets2(ctx, Some(id), Some(id), Some(&target));
 }
 
 /// Raven `Q3_Kill`.
@@ -819,7 +811,7 @@ pub fn Q3_Kill(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         let found = G_Find(
             ctx,
             None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            EntFindField::Targetname,
             &(unsafe { cstr_to_str(name) }),
         );
         ctx.entity_id_of(found)
@@ -910,7 +902,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         let mut victim = G_Find(
             ctx,
             None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            EntFindField::Targetname,
             &(unsafe { cstr_to_str(name) }),
         );
         if victim.is_null() {
@@ -927,7 +919,7 @@ pub fn Q3_Remove(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
             victim = G_Find(
                 ctx,
                 Some(vid),
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                EntFindField::Targetname,
                 &(unsafe { cstr_to_str(name) }),
             );
         }
@@ -969,15 +961,15 @@ pub fn Q3_GetFloat(
             {
                 let parms = ctx.world.entity(id).parms;
                 if parms.is_null() {
-                    let classname = ctx.world.entity(id).classname;
-                    let targetname = ctx.world.entity(id).targetname;
+                    let classname = ctx.world.entity(id).classname_str();
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
                         &format!(
                             "GET_PARM: {} {} did not have any parms set!\n",
-                            cstr_to_str(classname),
-                            cstr_to_str(targetname)
+                            classname,
+                            targetname
                         ),
                     );
                     return 0;
@@ -994,13 +986,13 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_XVELOCITY as i32 => {
                 let client = ctx.world.entity(id).client;
                 if client.is_null() {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetFloat: SET_XVELOCITY, {} not a client\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
@@ -1010,13 +1002,13 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_YVELOCITY as i32 => {
                 let client = ctx.world.entity(id).client;
                 if client.is_null() {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetFloat: SET_YVELOCITY, {} not a client\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
@@ -1026,13 +1018,13 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_ZVELOCITY as i32 => {
                 let client = ctx.world.entity(id).client;
                 if client.is_null() {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetFloat: SET_ZVELOCITY, {} not a client\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
@@ -1072,13 +1064,13 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_ANIM_HOLDTIME_LOWER as i32 => {
                 let client = ctx.world.entity(id).client;
                 if client.is_null() {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetFloat: SET_ANIM_HOLDTIME_LOWER, {} not a client\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
@@ -1088,13 +1080,13 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_ANIM_HOLDTIME_UPPER as i32 => {
                 let client = ctx.world.entity(id).client;
                 if client.is_null() {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetFloat: SET_ANIM_HOLDTIME_UPPER, {} not a client\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
@@ -1112,13 +1104,13 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_ARMOR as i32 => {
                 let client = ctx.world.entity(id).client;
                 if client.is_null() {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetFloat: SET_ARMOR, {} not a client\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
@@ -1353,20 +1345,38 @@ pub fn Q3_GetString(
                 if !parms.is_null() {
                     *value = (*parms).parm[(toGet - SET_PARM1 as i32) as usize].as_mut_ptr();
                 } else {
-                    let targetname = ctx.world.entity(id).targetname;
+                    let targetname = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_WARNING as c_int,
                         &format!(
                             "Q3_GetString: invalid ent {} has no parms!\n",
-                            cstr_to_str(targetname)
+                            targetname
                         ),
                     );
                     return 0;
                 }
             }
-            _ if toGet == SET_TARGET as i32 => *value = ctx.world.entity(id).target,
+            _ if toGet == SET_TARGET as i32 => {
+                // Raven returned `ent->target` (a pool pointer) directly; the
+                // owned `Option<String>` is staged NUL-terminated into scratch
+                // and returned by pointer (`None` → NULL, dispatch skips the
+                // copy). The dispatch `strcpy`s it out immediately.
+                match ctx.world.entity(id).target.clone() {
+                    Some(target) => {
+                        let buf = &mut ctx.world.scratch.icarus_get_string;
+                        write_cstr_field(buf, &target);
+                        *value = buf.as_mut_ptr();
+                    }
+                    None => *value = std::ptr::null_mut(),
+                }
+            }
             _ if toGet == SET_LOCATION as i32 => return 0,
+            // The `behaviorSet`/`targetname`/`fullName` returns below hand the
+            // LIVE prefix slot pointer straight to the ICARUS dispatch (which
+            // `strcpy`s it out immediately) — the ABI-seam use the prefix stays
+            // `*mut c_char` for; an owned `String` has no stable NUL-terminated
+            // pointer, so these stay raw slot reads (not `_str()` decodes).
             _ if toGet == SET_SPAWNSCRIPT as i32 => {
                 *value = ctx.world.entity(id).behaviorSet[BSET_SPAWN as usize]
             }
@@ -1660,7 +1670,7 @@ pub fn Q3_SetCopyOrigin(ctx: &mut GameContext, entID: c_int, name: *const c_char
     let found = G_Find(
         ctx,
         None,
-        core::mem::offset_of!(gentity_t, targetname) as c_int,
+        EntFindField::Targetname,
         &(unsafe { cstr_to_str(name) }),
     );
 
@@ -1739,8 +1749,7 @@ pub fn Q3_Lerp2Origin(
     let is_not_mover = {
         let e = ctx.world.entity(id);
         !e.client.is_null()
-            || (!e.classname.is_null()
-                && Q_stricmp(&(unsafe { cstr_to_str(e.classname) }), "target_scriptrunner") == 0)
+            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -1817,8 +1826,7 @@ pub fn Q3_SetOriginOffset(ctx: &mut GameContext, entID: c_int, axis: c_int, offs
     let is_not_mover = {
         let e = ctx.world.entity(id);
         !e.client.is_null()
-            || (!e.classname.is_null()
-                && Q_stricmp(&(unsafe { cstr_to_str(e.classname) }), "target_scriptrunner") == 0)
+            || Q_stricmp(&e.classname_str(), "target_scriptrunner") == 0
     };
     if is_not_mover {
         G_DebugPrint(
@@ -1865,7 +1873,7 @@ pub fn Q3_SetEnemy(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         let enemy = G_Find(
             ctx,
             None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            EntFindField::Targetname,
             &(unsafe { cstr_to_str(name) }),
         );
 
@@ -1914,7 +1922,7 @@ pub fn Q3_SetLeader(ctx: &mut GameContext, entID: c_int, name: *const c_char) {
         let leader = G_Find(
             ctx,
             None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            EntFindField::Targetname,
             &(unsafe { cstr_to_str(name) }),
         );
 
@@ -1942,55 +1950,55 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
         let mut goalPos: vec3_t = [0.0, 0.0, 0.0];
 
         if ctx.world.entity(id).health == 0 {
-            let st = ctx.world.entity(id).script_targetname;
+            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a corpse! \"{}\"\n",
                     cstr_to_str(name),
-                    cstr_to_str(st)
+                    st
                 ),
             );
             return qfalse;
         }
         if ctx.world.entity(id).NPC.is_null() {
-            let st = ctx.world.entity(id).script_targetname;
+            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a non-NPC: \"{}\"\n",
                     cstr_to_str(name),
-                    cstr_to_str(st)
+                    st
                 ),
             );
             return qfalse;
         }
         let npc = ctx.world.entity(id).NPC;
         if (*npc).tempGoal.is_none() {
-            let st = ctx.world.entity(id).script_targetname;
+            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a dead NPC: \"{}\"\n",
                     cstr_to_str(name),
-                    cstr_to_str(st)
+                    st
                 ),
             );
             return qfalse;
         }
         let temp_goal_id = (*npc).tempGoal.unwrap();
         if ctx.world.entity(temp_goal_id).inuse == 0 {
-            let st = ctx.world.entity(id).script_targetname;
+            let st = ctx.world.entity(id).script_targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetNavGoal: NPC's (\"{}\") navgoal is freed: \"{}\"\n",
                     cstr_to_str(name),
-                    cstr_to_str(st)
+                    st
                 ),
             );
             return qfalse;
@@ -2014,7 +2022,7 @@ pub fn Q3_SetNavGoal(ctx: &mut GameContext, entID: c_int, name: *const c_char) -
             let targ = G_Find(
                 ctx,
                 None,
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                EntFindField::Targetname,
                 &(unsafe { cstr_to_str(name) }),
             );
             if targ.is_null() {
@@ -2242,13 +2250,13 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetBState: '{}' is not an NPC\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return qtrue;
@@ -2272,13 +2280,13 @@ pub fn Q3_SetBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_char)
                             core::mem::transmute::<c_int, bState_t>(bSID),
                         );
                     } else {
-                        let tn = ctx.world.entity(id).targetname;
+                        let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
                         G_DebugPrint(
                             ctx,
                             WL_ERROR as c_int,
                             &format!(
                                 "Q3_SetBState: '{}' is not in a valid waypoint to search from!\n",
-                                cstr_to_str(tn)
+                                tn
                             ),
                         );
                         return qtrue;
@@ -2328,13 +2336,13 @@ pub fn Q3_SetTempBState(ctx: &mut GameContext, entID: c_int, bs_name: *const c_c
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetTempBState: '{}' is not an NPC\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return qtrue;
@@ -2359,13 +2367,13 @@ pub fn Q3_SetDefaultBState(ctx: &mut GameContext, entID: c_int, bs_name: *const 
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetDefaultBState: '{}' is not an NPC\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return;
@@ -2598,14 +2606,14 @@ pub fn Q3_SetICARUSFreeze(
     let mut self_ = G_Find(
         ctx,
         None,
-        core::mem::offset_of!(gentity_t, targetname) as c_int,
+        EntFindField::Targetname,
         &(unsafe { cstr_to_str(name) }),
     );
     if self_.is_null() {
         self_ = G_Find(
             ctx,
             None,
-            core::mem::offset_of!(gentity_t, script_targetname) as c_int,
+            EntFindField::ScriptTargetname,
             &(unsafe { cstr_to_str(name) }),
         );
     }
@@ -2677,13 +2685,13 @@ pub fn Q3_SetWalkSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetWalkSpeed: '{}' is not an NPC!\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return;
@@ -2710,13 +2718,13 @@ pub fn Q3_SetRunSpeed(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetRunSpeed: '{}' is not an NPC!\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return;
@@ -2774,13 +2782,13 @@ pub fn Q3_SetFriction(ctx: &mut GameContext, entID: c_int, int_data: c_int) {
     let id = EntityId(entID as u32);
 
     if ctx.world.entity(id).client.is_null() {
-        let tn = ctx.world.entity(id).targetname;
+        let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
             &format!(
                 "Q3_SetFriction: '{}' is not an NPC/player!\n",
-                unsafe { cstr_to_str(tn) }
+                tn
             ),
         );
         return;
@@ -2802,13 +2810,13 @@ pub fn Q3_SetGravity(ctx: &mut GameContext, entID: c_int, float_data: f32) {
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).client.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetGravity: '{}' is not an NPC/player!\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return;
@@ -2920,11 +2928,11 @@ pub fn Q3_SetCount(ctx: &mut GameContext, entID: c_int, data: *const c_char) {
 pub fn Q3_SetTargetName(ctx: &mut GameContext, entID: c_int, targetname: *const c_char) {
     let id = EntityId(entID as u32);
 
-    if Q_stricmp("NULL", &(unsafe { cstr_to_str(targetname) })) == 0 {
-        ctx.world.entity_mut(id).targetname = std::ptr::null_mut();
+    let targetname = unsafe { cstr_to_str(targetname) };
+    if Q_stricmp("NULL", &targetname) == 0 {
+        ctx.ent_set(id, PrefixSet::Targetname(None));
     } else {
-        let s = G_NewString(ctx, targetname);
-        ctx.world.entity_mut(id).targetname = s;
+        ctx.ent_set(id, PrefixSet::Targetname(Some(&targetname)));
     }
 }
 
@@ -2934,11 +2942,13 @@ pub fn Q3_SetTargetName(ctx: &mut GameContext, entID: c_int, targetname: *const 
 pub fn Q3_SetTarget(ctx: &mut GameContext, entID: c_int, target: *const c_char) {
     let id = EntityId(entID as u32);
 
-    if Q_stricmp("NULL", &(unsafe { cstr_to_str(target) })) == 0 {
-        ctx.world.entity_mut(id).target = std::ptr::null_mut();
+    // ICARUS `"NULL"` sentinel maps to `None`; any other value is an owned copy
+    // (`target` is a tail `Option<String>`, so no pool allocation).
+    let target = unsafe { cstr_to_str(target) };
+    if Q_stricmp("NULL", &target) == 0 {
+        ctx.world.entity_mut(id).target = None;
     } else {
-        let s = G_NewString(ctx, target);
-        ctx.world.entity_mut(id).target = s;
+        ctx.world.entity_mut(id).target = Some(target);
     }
 }
 
@@ -2981,11 +2991,11 @@ pub fn Q3_SetPainTarget(ctx: &mut GameContext, entID: c_int, targetname: *const 
 pub fn Q3_SetFullName(ctx: &mut GameContext, entID: c_int, fullName: *const c_char) {
     let id = EntityId(entID as u32);
 
-    if Q_stricmp("NULL", &(unsafe { cstr_to_str(fullName) })) == 0 {
-        ctx.world.entity_mut(id).fullName = std::ptr::null_mut();
+    let fullName = unsafe { cstr_to_str(fullName) };
+    if Q_stricmp("NULL", &fullName) == 0 {
+        ctx.ent_set(id, PrefixSet::FullName(None));
     } else {
-        let s = G_NewString(ctx, fullName);
-        ctx.world.entity_mut(id).fullName = s;
+        ctx.ent_set(id, PrefixSet::FullName(Some(&fullName)));
     }
 }
 
@@ -3249,13 +3259,13 @@ pub fn Q3_SetWalking(ctx: &mut GameContext, entID: c_int, add: qboolean) {
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetWalking: '{}' is not an NPC!\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return;
@@ -3501,13 +3511,13 @@ pub fn Q3_SetNoAvoid(ctx: &mut GameContext, entID: c_int, noAvoid: qboolean) {
         let id = EntityId(entID as u32);
 
         if ctx.world.entity(id).NPC.is_null() {
-            let tn = ctx.world.entity(id).targetname;
+            let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
                 &format!(
                     "Q3_SetNoAvoid: '{}' is not an NPC!\n",
-                    cstr_to_str(tn)
+                    tn
                 ),
             );
             return;
@@ -3613,13 +3623,13 @@ pub fn Q3_SetForwardMove(ctx: &mut GameContext, entID: c_int, fmoveVal: c_int) {
 
     // `ent` is `&g_entities[entID]` — never NULL, so Raven's `!ent` guard is dead.
     if ctx.world.entity(id).client.is_null() {
-        let tn = ctx.world.entity(id).targetname;
+        let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
         G_DebugPrint(
             ctx,
             WL_ERROR as c_int,
             &format!(
                 "Q3_SetForwardMove: '{}' is not an NPC/player!\n",
-                unsafe { cstr_to_str(tn) }
+                tn
             ),
         );
         return;
@@ -3864,16 +3874,17 @@ pub fn Q3_SetBehaviorSet(
         }
 
         if Q_stricmp("NULL", &(unsafe { cstr_to_str(scriptname) })) == 0 {
-            if !ctx.world.entity(id).behaviorSet[bSet as usize].is_null() {
+            if ctx.world.entity(id).behavior_set_str(bSet as usize).is_some() {
                 //			gi.TagFree( ent->behaviorSet[bSet] );
             }
-            ctx.world.entity_mut(id).behaviorSet[bSet as usize] = core::ptr::null_mut();
+            ctx.ent_set(id, PrefixSet::BehaviorSet(bSet as usize, None));
         } else if !scriptname.is_null() {
-            if !ctx.world.entity(id).behaviorSet[bSet as usize].is_null() {
+            if ctx.world.entity(id).behavior_set_str(bSet as usize).is_some() {
                 //				gi.TagFree( ent->behaviorSet[bSet] );
             }
-            let s = G_NewString(ctx, scriptname); //FIXME: This really isn't good...
-            ctx.world.entity_mut(id).behaviorSet[bSet as usize] = s;
+            //FIXME: This really isn't good...
+            let scriptname = unsafe { cstr_to_str(scriptname) };
+            ctx.ent_set(id, PrefixSet::BehaviorSet(bSet as usize, Some(&scriptname)));
         }
         qtrue
     }
@@ -4152,8 +4163,8 @@ pub fn Q3_Set(
                     sscanf_f32s(&s, &mut vector_data);
                 }
                 G_SetOrigin(ctx.world.entity_mut(id), vector_data);
-                let classname = ctx.world.entity(id).classname;
-                if Q_strncmp("NPC_", &cstr_to_str(classname), 4) == 0 {
+                let classname = ctx.world.entity(id).classname_str();
+                if Q_strncmp("NPC_", &classname, 4) == 0 {
                     //hack for moving spawners
                     crate::q_math::_VectorCopy(vector_data, &mut ctx.world.entity_mut(id).s.origin);
                 }
@@ -4267,13 +4278,13 @@ pub fn Q3_Set(
                     );
                     both += 1;
                 } else {
-                    let tn = ctx.world.entity(id).targetname;
+                    let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
                         &format!(
                             "Q3_SetAnimUpper: {} does not have anim {}!\n",
-                            cstr_to_str(tn),
+                            tn,
                             cstr_to_str(data)
                         ),
                     );
@@ -4289,13 +4300,13 @@ pub fn Q3_Set(
                     );
                     both += 1;
                 } else {
-                    let tn = ctx.world.entity(id).targetname;
+                    let tn = ctx.world.entity(id).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_ERROR as c_int,
                         &format!(
                             "Q3_SetAnimLower: {} does not have anim {}!\n",
-                            cstr_to_str(tn),
+                            tn,
                             cstr_to_str(data)
                         ),
                     );
@@ -5184,7 +5195,7 @@ pub fn Q3_Set(
                 } else if Q_stricmp("false", &data_s) == 0 {
                     Q3_SetInactive(ctx, entID, qfalse);
                 } else if Q_stricmp("unlocked", &data_s) == 0 {
-                    UnLockDoors(&mut ctx.world.g_entities[entID as usize]);
+                    UnLockDoors(ctx, EntityId(entID as u32));
                 } else if Q_stricmp("locked", &data_s) == 0 {
                     LockDoors(&mut ctx.world.g_entities[entID as usize]);
                 }

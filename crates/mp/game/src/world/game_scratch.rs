@@ -7,7 +7,7 @@
 //! The `tv` 8-slot ring's rotation index semantics are preserved exactly.
 #![allow(non_snake_case, non_upper_case_globals)]
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 
 use mp_qshared::shared::vec3_t;
 
@@ -34,6 +34,15 @@ pub struct GameScratch {
     /// buffer.
     /// Source: `oracle/codemp/game/g_utils.c:627-642`
     pub tv_vecs: [[f32; 3]; 8],
+
+    /// C-string staging for `Q3_GetString`'s `SET_TARGET` arm: `target` is now
+    /// an owned `Option<String>`, so its NUL-terminated view is materialized
+    /// here and returned by pointer (the ICARUS dispatch `strcpy`s it out
+    /// immediately, so the buffer only needs to outlive the call). Raven
+    /// returned `ent->target` directly; this replaces that persistent pool
+    /// pointer. Sized to the engine's 2048-byte `T_G_ICARUS_GETSTRING.value`.
+    /// Source: `oracle/codemp/game/g_ICARUScb.c:1642-1854`
+    pub icarus_get_string: [c_char; 2048],
 }
 
 impl GameScratch {
@@ -49,6 +58,7 @@ impl GameScratch {
             }; 12],
             tv_index: 0,
             tv_vecs: [[0.0; 3]; 8],
+            icarus_get_string: [0; 2048],
         }
     }
 }

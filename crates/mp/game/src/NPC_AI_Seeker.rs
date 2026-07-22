@@ -505,8 +505,8 @@ pub fn Seeker_Fire(ctx: &mut GameContext) {
     );
 
     {
+        ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"blaster"));
         let missile = ctx.world.entity_mut(missile_id);
-        missile.classname = c"blaster".as_ptr().cast_mut();
         missile.s.weapon = WP_BLASTER as c_int;
         missile.damage = 5;
         missile.dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;

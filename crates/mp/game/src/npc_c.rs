@@ -128,7 +128,7 @@ pub fn CorpsePhysics(ctx: &mut GameContext, self_: EntityId) {
                 //self->r.maxs[2] = -8;
             }
 
-            if !ctx.world.entity(self_).message.is_null() {
+            if ctx.world.entity(self_).message.is_some() {
                 ctx.world.entity_mut(self_).r.contents |= CONTENTS_TRIGGER;
             }
         }
@@ -170,7 +170,7 @@ pub fn NPC_RemoveBody(ctx: &mut GameContext, self_: EntityId) {
             (*npc).nextBStateThink = ctx.world.level.time + FRAMETIME;
         }
 
-        if !ctx.world.entity(self_).message.is_null() {
+        if ctx.world.entity(self_).message.is_some() {
             //I still have a key
             return;
         }
@@ -723,13 +723,10 @@ pub fn NPC_ShowDebugInfo(ctx: &mut GameContext) {
     }
     // Raven `NPCDEBUG_RED` (`NPC.c:658`) — const color, not GameWorld state.
     const NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
-    // Raven `FOFS(classname)` macro.
-    let fieldofs = core::mem::offset_of!(gentity_t, classname) as c_int;
-
     let mut found: *mut gentity_t = core::ptr::null_mut();
     loop {
         let found_id = ctx.entity_id_of(found);
-        found = G_Find(ctx, found_id, fieldofs, "NPC");
+        found = G_Find(ctx, found_id, EntFindField::Classname, "NPC");
         if found.is_null() {
             break;
         }

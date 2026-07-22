@@ -16,6 +16,7 @@ use crate::client::player_team_state::playerTeamStateState_t;
 use crate::g_svcmds::AddIP;
 use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
 use crate::prelude::*;
+use core::ffi::CStr;
 use crate::g_utils::G_SoundIndex;
 use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
@@ -453,8 +454,10 @@ pub fn Cmd_Give_f(ctx: &mut GameContext, cmdent: EntityId, baseArg: c_int) {
             let it_id = crate::g_utils::G_Spawn(ctx);
             let origin = ctx.world.entity(ent).r.currentOrigin;
             crate::q_math::_VectorCopy(origin, &mut ctx.world.entity_mut(it_id).s.origin);
-            let classname = it.classname_cstr() as *mut c_char;
-            ctx.world.entity_mut(it_id).classname = classname;
+            // Raven `ent->classname = item->classname`: aliases the item table's
+            // `'static` classname pointer (no pool copy).
+            let classname: &'static CStr = unsafe { CStr::from_ptr(it.classname_cstr()) };
+            ctx.ent_set(it_id, PrefixSet::ClassnameStatic(classname));
             crate::g_items::G_SpawnItem(ctx, it_id, it);
             crate::g_items::FinishSpawningItem(ctx, it_id);
             let mut trace: trace_t = core::mem::zeroed();
@@ -3610,11 +3613,10 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
             if trap::Argc(ctx.engine) > 1 {
                 let sArg = trap::Argv(ctx.engine, 1, MAX_STRING_CHARS);
 
-                let targetname_ofs = std::mem::offset_of!(gentity_t, targetname) as c_int;
                 let mut targ = G_Find(
                     ctx,
                     ctx.entity_id_of(std::ptr::null_mut()),
-                    targetname_ofs,
+                    EntFindField::Targetname,
                     &sArg,
                 );
 
@@ -3625,7 +3627,7 @@ pub fn ClientCommand(ctx: &mut GameContext, clientNum: c_int) {
                     targ = G_Find(
                         ctx,
                         ctx.entity_id_of(targ),
-                        targetname_ofs,
+                        EntFindField::Targetname,
                         &sArg,
                     );
                 }

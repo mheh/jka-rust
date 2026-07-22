@@ -141,10 +141,18 @@ pub enum PrefixSet<'a> {
     ClassnameStatic(&'static CStr),   // c"noclass"/"freed" literal path
 }
 
-impl gentity_t {
+impl GameContext<'_> {
     // writes: single choke point — the ONE place the slot transaction lives
-    // (G_NewString/pool now, the G6 ledger transaction later)
-    pub fn set(&mut self, ctx: &mut GameContext, field: PrefixSet)
+    // (G_NewString/pool now, the G6 ledger transaction later).
+    // SOUNDNESS (revised 2026-07-22 after a referee-caught miscompilation): a
+    // `set(&mut self /*gentity*/, ctx)` method holds two live `&mut` into the
+    // same GameWorld (entity + world) — LLVM noalias UB that manifested as an
+    // impossible Some("") read. The choke point is therefore a GameContext
+    // method: pool copy first (trap-free), slot written through a fresh single
+    // borrow — never two arena borrows alive at once.
+    pub fn ent_set(&mut self, id: EntityId, field: PrefixSet)
+}
+impl gentity_t {
     // reads decode the LIVE slot (engines write slots; no caching)
     pub fn classname_str(&self) -> String            // NULL -> ""
     pub fn targetname_str(&self) -> Option<String>   // NULL preserved
@@ -152,11 +160,11 @@ impl gentity_t {
     pub fn script_targetname_str(&self) -> Option<String>
     pub fn behavior_set_str(&self, i: usize) -> Option<String>
 }
-// call sites read like named args:  ent.set(ctx, Classname("trigger_multiple"));
+// call sites read like named args:  ctx.ent_set(ent, Classname("trigger_multiple"));
 ```
 
 Lands with G3 (reads + the set() choke point, where G_Find funnels prefix
-traffic); G6 swaps set()'s interior onto the ledger without touching call
+traffic); G6 swaps ent_set()'s interior onto the ledger without touching call
 sites. The NPC template-copy prefix aliasing routes through an explicit
 `alias_from` helper preserving Raven's shared-pointer semantics, documented at
 the one site that uses it.

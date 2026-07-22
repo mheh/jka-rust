@@ -471,9 +471,9 @@ pub fn Svcmd_EntityList_f(ctx: &mut GameContext) {
             G_Printf(ctx, type_str);
         }
 
-        let classname = ctx.world.entity(id).classname;
-        if !classname.is_null() {
-            G_Printf(ctx, &unsafe { cstr_to_str(classname) });
+        let classname = ctx.world.entity(id).classname_str();
+        if !classname.is_empty() {
+            G_Printf(ctx, &classname);
         }
 
         G_Printf(ctx, "\n");

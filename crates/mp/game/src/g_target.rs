@@ -16,6 +16,7 @@ use crate::g_combat::{AddScore, G_Damage};
 use crate::g_main::Com_Error;
 use crate::g_misc::TeleportPlayer;
 use crate::g_team::Team_ReturnFlag;
+use crate::g_spawn::translate_newlines;
 use crate::g_utils::{
     G_AddEvent, G_Find, G_PickTarget, G_SetOrigin, G_UseTargets, G_UseTargets2, GlobalUse,
 };
@@ -55,21 +56,16 @@ pub fn Use_Target_Give(
         return;
     }
 
-    let ent_target = ctx.entity(ent).target;
-    if ent_target.is_null() {
+    let ent_target = ctx.entity(ent).target.clone();
+    let Some(ent_target) = ent_target else {
         return;
-    }
+    };
 
     // trace_t has no zeroing constructor; the mem::zeroed is a plain POD-init.
     let mut trace: trace_t = unsafe { core::mem::zeroed() };
     let mut t: *mut gentity_t = core::ptr::null_mut();
     loop {
-        t = G_Find(
-            ctx,
-            ctx.entity_id_of(t),
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(ent_target) }),
-        );
+        t = G_Find(ctx, ctx.entity_id_of(t), EntFindField::Targetname, &ent_target);
         if t.is_null() {
             break;
         }
@@ -263,34 +259,29 @@ pub fn Use_Target_Print(
 
     if ctx.entity(ent).genericValue15 > level_time {
         Com_Printf("TARGET PRINT ERRORS:\n");
-        unsafe {
-            if let Some(activator) = activator {
-                let classname = ctx.entity(activator).classname;
-                if !classname.is_null() && *classname != 0 {
-                    Com_Printf(&format!(
-                        "activator classname: {}\n",
-                        cstr_to_str(classname)
-                    ));
-                }
-                let target = ctx.entity(activator).target;
-                if !target.is_null() && *target != 0 {
-                    Com_Printf(&format!("activator target: {}\n", cstr_to_str(target)));
-                }
-                let targetname = ctx.entity(activator).targetname;
-                if !targetname.is_null() && *targetname != 0 {
-                    Com_Printf(&format!(
-                        "activator targetname: {}\n",
-                        cstr_to_str(targetname)
-                    ));
-                }
+        if let Some(activator) = activator {
+            let classname = ctx.entity(activator).classname_str();
+            if !classname.is_empty() {
+                Com_Printf(&format!("activator classname: {}\n", classname));
             }
-            let ent_targetname = ctx.entity(ent).targetname;
-            if !ent_targetname.is_null() && *ent_targetname != 0 {
+            let target = ctx.entity(activator).target.clone();
+            if target.as_deref().is_some_and(|s| !s.is_empty()) {
+                Com_Printf(&format!("activator target: {}\n", target.as_deref().unwrap()));
+            }
+            let targetname = ctx.entity(activator).targetname_str();
+            if targetname.as_deref().is_some_and(|s| !s.is_empty()) {
                 Com_Printf(&format!(
-                    "print targetname: {}\n",
-                    cstr_to_str(ent_targetname)
+                    "activator targetname: {}\n",
+                    targetname.as_deref().unwrap()
                 ));
             }
+        }
+        let ent_targetname = ctx.entity(ent).targetname_str();
+        if ent_targetname.as_deref().is_some_and(|s| !s.is_empty()) {
+            Com_Printf(&format!(
+                "print targetname: {}\n",
+                ent_targetname.as_deref().unwrap()
+            ));
         }
         Com_Error(
             ERR_DROP as c_int,
@@ -303,7 +294,7 @@ pub fn Use_Target_Print(
     let ent_id = ctx.entity_id_of(ent_ptr);
     G_ActivateBehavior(ctx, ent_id, bSet_t::BSET_USE as c_int);
 
-    let message = ctx.entity(ent).message;
+    let message = ctx.entity(ent).message.clone();
     let spawnflags = ctx.entity(ent).spawnflags;
 
     if spawnflags & 4 != 0 {
@@ -316,14 +307,13 @@ pub fn Use_Target_Print(
         if let Some(activator) = activator {
             if !ctx.entity(activator).client.is_null() {
                 // make sure there's a valid client ent to send it to
-                let msg = unsafe { crate::cstr_util::cstr_to_str(message) };
+                let msg = message.as_deref().unwrap();
+                let mb = msg.as_bytes();
                 let client_num = ctx.entity(activator).s.number;
-                unsafe {
-                    if *message == b'@' as c_char && *message.add(1) != b'@' as c_char {
-                        trap::SendServerCommand(ctx.engine, client_num, &format!("cps \"{}\"", msg));
-                    } else {
-                        trap::SendServerCommand(ctx.engine, client_num, &format!("cp \"{}\"", msg));
-                    }
+                if mb.first() == Some(&b'@') && mb.get(1) != Some(&b'@') {
+                    trap::SendServerCommand(ctx.engine, client_num, &format!("cps \"{}\"", msg));
+                } else {
+                    trap::SendServerCommand(ctx.engine, client_num, &format!("cp \"{}\"", msg));
                 }
             }
         }
@@ -331,34 +321,36 @@ pub fn Use_Target_Print(
     }
 
     if spawnflags & 3 != 0 {
-        let msg = unsafe { crate::cstr_util::cstr_to_str(message) };
+        let msg = message.as_deref().unwrap();
+        let mb = msg.as_bytes();
+        let at_prefix = mb.first() == Some(&b'@') && mb.get(1) != Some(&b'@');
         if spawnflags & 1 != 0 {
-            if unsafe { *message == b'@' as c_char && *message.add(1) != b'@' as c_char } {
+            if at_prefix {
                 G_TeamCommand(
                     ctx,
                     TEAM_RED,
-                    crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr() as *mut c_char,
+                    cstr(&format!("cps \"{}\"", msg)).as_ptr() as *mut c_char,
                 );
             } else {
                 G_TeamCommand(
                     ctx,
                     TEAM_RED,
-                    crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr() as *mut c_char,
+                    cstr(&format!("cp \"{}\"", msg)).as_ptr() as *mut c_char,
                 );
             }
         }
         if spawnflags & 2 != 0 {
-            if unsafe { *message == b'@' as c_char && *message.add(1) != b'@' as c_char } {
+            if at_prefix {
                 G_TeamCommand(
                     ctx,
                     TEAM_BLUE,
-                    crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr() as *mut c_char,
+                    cstr(&format!("cps \"{}\"", msg)).as_ptr() as *mut c_char,
                 );
             } else {
                 G_TeamCommand(
                     ctx,
                     TEAM_BLUE,
-                    crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr() as *mut c_char,
+                    cstr(&format!("cp \"{}\"", msg)).as_ptr() as *mut c_char,
                 );
             }
         }
@@ -366,8 +358,9 @@ pub fn Use_Target_Print(
     }
 
     // Send to all players
-    let msg = unsafe { crate::cstr_util::cstr_to_str(message) };
-    if unsafe { *message == b'@' as c_char && *message.add(1) != b'@' as c_char } {
+    let msg = message.as_deref().unwrap();
+    let mb = msg.as_bytes();
+    if mb.first() == Some(&b'@') && mb.get(1) != Some(&b'@') {
         trap::SendServerCommand(ctx.engine, -1, &format!("cps \"{}\"", msg));
     } else {
         trap::SendServerCommand(ctx.engine, -1, &format!("cp \"{}\"", msg));
@@ -654,13 +647,13 @@ pub fn target_laser_use(
 pub fn target_laser_start(ctx: &mut GameContext, self_: EntityId) {
     ctx.entity_mut(self_).s.eType = (mp_bg::public::entity_type::entityType_t::ET_BEAM) as i32;
 
-    let target = ctx.entity(self_).target;
-    if !target.is_null() {
+    let target = ctx.entity(self_).target.clone();
+    if let Some(target) = target {
         let ent = G_Find(
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(target) }),
+            EntFindField::Targetname,
+            &target,
         );
         if ent.is_null() {
             // G_Printf("%s at %s: %s is a bad target\n", self->classname, vtos(self->s.origin), self->target);
@@ -713,8 +706,8 @@ pub fn target_teleporter_use(
 
     G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
 
-    let target = ctx.entity(self_).target;
-    let dest = G_PickTarget(ctx, target);
+    let target = ctx.entity(self_).target.clone();
+    let dest = G_PickTarget(ctx, target.as_deref());
     let Some(dest_id) = ctx.entity_id_of(dest) else {
         // G_Printf(ctx, "Couldn't find teleporter destination\n") — the
         // staged signature has no engine handle to route the outbound
@@ -733,7 +726,7 @@ pub fn target_teleporter_use(
 ///
 /// Source: `oracle/codemp/game/g_target.c:460-465`
 pub fn SP_target_teleporter(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.entity(self_).targetname.is_null() {
+    if ctx.entity(self_).targetname_str().is_none() {
         // Informational print; dropped.
     }
 
@@ -788,8 +781,8 @@ pub fn target_relay_use(
     }
 
     if ctx.entity(self_).spawnflags & 4 != 0 {
-        let target = ctx.entity(self_).target;
-        let ent = G_PickTarget(ctx, target);
+        let target = ctx.entity(self_).target.clone();
+        let ent = G_PickTarget(ctx, target.as_deref());
         if let Some(ent_id) = ctx.entity_id_of(ent) {
             if ctx.entity(ent_id).use_.is_some() {
                 GlobalUse(
@@ -878,17 +871,14 @@ pub fn target_location_linkup(ctx: &mut GameContext, ent: EntityId) {
     let num_entities = ctx.world.level.num_entities as usize;
     for i in 0..num_entities {
         let id = EntityId(i as u32);
-        let classname = ctx.entity(id).classname;
-        if !classname.is_null()
-            && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "target_location") == 0
-        {
+        if Q_stricmp(&ctx.entity(id).classname_str(), "target_location") == 0 {
             // lets overload some variables!
             ctx.entity_mut(id).health = n; // use for location marking
-            let message = ctx.entity(id).message;
+            let message = ctx.entity(id).message.clone();
             trap::SetConfigstring(
                 ctx.engine,
                 mp_bg::public::configstring::CS_LOCATIONS + n,
-                &unsafe { cstr_to_str(message) },
+                message.as_deref().unwrap_or(""),
             );
             n += 1;
             // `level.locationHead` is a raw `gentity_t*` seam field (§D5); the
@@ -943,13 +933,13 @@ pub fn target_counter_use(
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
     let self_id = ctx.entity_id_of(self_ptr);
     if ctx.entity(self_).count != 0 {
-        let target2 = ctx.entity(self_).target2;
-        if !target2.is_null() {
+        let target2 = ctx.entity(self_).target2.clone();
+        if target2.is_some() {
             G_UseTargets2(
                 ctx,
                 Some(self_),
                 ctx.entity_id_of(activator_ptr),
-                target2 as *const c_char,
+                target2.as_deref(),
             );
         }
         return;
@@ -1013,24 +1003,14 @@ pub fn target_random_use(
     // Raven's `self->target` (possibly NULL) feeds G_Find, where a NULL match
     // never compares equal; read it as `Option<String>` so a NULL target yields
     // no matches instead of dereferencing NULL.
-    let target_ptr = ctx.entity(self_).target;
-    let target = if target_ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { cstr_to_str(target_ptr) })
-    };
+    let target = ctx.entity(self_).target.clone();
     let activator_ptr =
         unsafe { crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), activator) };
 
     // Count matching targets
     loop {
         t = match &target {
-            Some(target) => G_Find(
-                ctx,
-                ctx.entity_id_of(t),
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                target,
-            ),
+            Some(target) => G_Find(ctx, ctx.entity_id_of(t), EntFindField::Targetname, target),
             None => core::ptr::null_mut(),
         };
         if t.is_null() {
@@ -1056,12 +1036,7 @@ pub fn target_random_use(
 
     loop {
         t = match &target {
-            Some(target) => G_Find(
-                ctx,
-                ctx.entity_id_of(t),
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                target,
-            ),
+            Some(target) => G_Find(ctx, ctx.entity_id_of(t), EntFindField::Targetname, target),
             None => core::ptr::null_mut(),
         };
         if t.is_null() {
@@ -1110,14 +1085,14 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
     if ctx.entity(self_).count != -1 {
         if ctx.entity(self_).count <= 0 {
             ctx.entity_mut(self_).use_ = FnId::NONE;
-            ctx.entity_mut(self_).behaviorSet[bSet_t::BSET_USE as usize] = core::ptr::null_mut();
+            ctx.ent_set(self_, PrefixSet::BehaviorSet(bSet_t::BSET_USE as usize, None));
             return;
         } else {
             ctx.entity_mut(self_).count -= 1;
         }
     }
 
-    if !ctx.entity(self_).behaviorSet[bSet_t::BSET_USE as usize].is_null() {
+    if ctx.entity(self_).behavior_set_str(bSet_t::BSET_USE as usize).is_some() {
         if ctx.entity(self_).spawnflags & 1 != 0 {
             if ctx.entity(self_).activator.is_none() {
                 if ctx.world.cvars.g_developer.integer != 0 {
@@ -1134,15 +1109,12 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
                 GIcarusIsinitializedArgs::new(ctx.entity(self_).s.number),
             ) == 0
             {
-                // `script_targetname` is a `*const c_char` seam field; the char
-                // deref stays unsafe, the field access goes through the accessor.
-                let stn = ctx.entity(activator_id).script_targetname;
-                if stn.is_null() || unsafe { *stn == b'\0' as c_char } {
+                let stn = ctx.entity(activator_id).script_targetname_str();
+                if stn.as_deref().map_or(true, |s| s.is_empty()) {
                     // DIVERGENCE: store owned string instead of va() pointer
                     let name = format!("newICARUSEnt{}", ctx.world.globals.numNewICARUSEnts);
                     ctx.world.globals.numNewICARUSEnts += 1;
-                    let s = G_NewString(ctx, cstr(&name).as_ptr());
-                    ctx.entity_mut(activator_id).script_targetname = s;
+                    ctx.ent_set(activator_id, PrefixSet::ScriptTargetname(Some(&name)));
                 }
 
                 if trap::ICARUS_ValidEnt(
@@ -1169,11 +1141,14 @@ pub fn scriptrunner_run(ctx: &mut GameContext, self_: EntityId) {
             if ctx.world.cvars.g_developer.integer != 0 {
                 // Informational debug message
             }
-            let behavior = ctx.entity(self_).behaviorSet[bSet_t::BSET_USE as usize];
+            let behavior = ctx
+                .entity(self_)
+                .behavior_set_str(bSet_t::BSET_USE as usize)
+                .unwrap();
             let script_path = format!(
                 "{}/{}",
                 unsafe { cstr_to_str(Q3_SCRIPT_DIR.as_ptr()) },
-                unsafe { cstr_to_str(behavior) }
+                behavior
             );
             trap::ICARUS_RunScript(
                 ctx.engine,
@@ -1250,24 +1225,16 @@ pub fn SP_target_scriptrunner(ctx: &mut GameContext, self_: EntityId) {
 /// Raven `G_SetActiveState`.
 ///
 /// Source: `oracle/codemp/game/g_target.c:900-907`
-pub fn G_SetActiveState(ctx: &mut GameContext, targetstring: *mut c_char, actState: qboolean) {
+pub fn G_SetActiveState(ctx: &mut GameContext, targetstring: Option<&str>, actState: qboolean) {
     // Raven passes `targetstring` (possibly NULL) to G_Find, where a NULL match
-    // never compares equal; read it as `Option<String>` so a NULL string yields
-    // no matches instead of dereferencing NULL.
-    let targetstring = if targetstring.is_null() {
-        None
-    } else {
-        Some(unsafe { cstr_to_str(targetstring) })
-    };
+    // never compares equal; a `None` string yields no matches instead of
+    // dereferencing NULL.
     let mut target: *mut gentity_t = core::ptr::null_mut();
     loop {
-        target = match &targetstring {
-            Some(targetstring) => G_Find(
-                ctx,
-                ctx.entity_id_of(target),
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                targetstring,
-            ),
+        target = match targetstring {
+            Some(targetstring) => {
+                G_Find(ctx, ctx.entity_id_of(target), EntFindField::Targetname, targetstring)
+            }
             None => core::ptr::null_mut(),
         };
         if target.is_null() {
@@ -1295,8 +1262,8 @@ pub fn target_activate_use(
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
     let self_id = ctx.entity_id_of(self_ptr);
     G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
-    let target = ctx.entity(self_).target;
-    G_SetActiveState(ctx, target, qtrue);
+    let target = ctx.entity(self_).target.clone();
+    G_SetActiveState(ctx, target.as_deref(), qtrue);
 }
 
 /// Raven `target_deactivate_use`.
@@ -1311,8 +1278,8 @@ pub fn target_deactivate_use(
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
     let self_id = ctx.entity_id_of(self_ptr);
     G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
-    let target = ctx.entity(self_).target;
-    G_SetActiveState(ctx, target, qfalse);
+    let target = ctx.entity(self_).target.clone();
+    G_SetActiveState(ctx, target.as_deref(), qfalse);
 }
 
 /// Raven `SP_target_activate`.
@@ -1345,11 +1312,11 @@ pub fn target_level_change_use(
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
     let self_id = ctx.entity_id_of(self_ptr);
     G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
-    let message = ctx.entity(self_).message;
+    let message = ctx.entity(self_).message.clone();
     trap::SendConsoleCommand(
         ctx.engine,
         cbufExec_t::EXEC_NOW as c_int,
-        &format!("map {}", unsafe { cstr_to_str(message) }),
+        &format!("map {}", message.as_deref().unwrap_or("")),
     );
 }
 
@@ -1358,12 +1325,10 @@ pub fn target_level_change_use(
 /// Source: `oracle/codemp/game/g_target.c:955-970`
 pub fn SP_target_level_change(ctx: &mut GameContext, self_: EntityId) {
     let (_, s) = G_SpawnString(ctx, "mapname", "");
-    let s_c = cstr(&s);
-    let msg = G_NewString(ctx, s_c.as_ptr());
-    ctx.entity_mut(self_).message = msg;
+    ctx.entity_mut(self_).message = Some(translate_newlines(&s));
 
-    let message = ctx.entity(self_).message;
-    if message.is_null() || unsafe { *message == b'\0' as c_char } {
+    let message = ctx.entity(self_).message.clone();
+    if message.as_deref().map_or(true, |s| s.is_empty()) {
         // G_Error("target_level_change with no mapname!\n");
         return;
     }
@@ -1385,11 +1350,11 @@ pub fn target_play_music_use(
     let self_ptr: *mut gentity_t = ctx.entity_mut(self_);
     let self_id = ctx.entity_id_of(self_ptr);
     G_ActivateBehavior(ctx, self_id, bSet_t::BSET_USE as c_int);
-    let message = ctx.entity(self_).message;
+    let message = ctx.entity(self_).message.clone();
     trap::SetConfigstring(
         ctx.engine,
         mp_bg::public::configstring::CS_MUSIC,
-        &unsafe { cstr_to_str(message) },
+        message.as_deref().unwrap_or(""),
     );
 }
 
@@ -1404,9 +1369,7 @@ pub fn SP_target_play_music(ctx: &mut GameContext, self_: EntityId) {
         // Error case; informational message dropped.
     }
 
-    let s_c = cstr(&s);
-    let msg = G_NewString(ctx, s_c.as_ptr());
-    ctx.entity_mut(self_).message = msg;
+    ctx.entity_mut(self_).message = Some(translate_newlines(&s));
 
     ctx.entity_mut(self_).use_ = Some(EntUse::target_play_music_use).into();
 }

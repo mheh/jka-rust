@@ -33,6 +33,7 @@ use crate::q_math::{
     vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
     VectorNormalize,
 };
+use native_string::atoi_bytes;
 use native_string::Q_stricmp;
 use crate::NPC_combat::G_SetEnemy;
 use crate::NPC_utils::VALIDSTRING;
@@ -276,7 +277,10 @@ pub fn TurretG2Pain(
     let paintarget = ctx.world.entity(self_).paintarget;
     if !paintarget.is_null() && unsafe { VALIDSTRING(paintarget as *const c_char) } {
         if ctx.world.entity(self_).genericValue8 < ctx.world.level.time {
-            G_UseTargets2(ctx, Some(self_), Some(self_), paintarget as *const c_char);
+            // `paintarget` stays a `*mut c_char` slot; decode it for the
+            // `Option<&str>` seam (known non-null here from the guard above).
+            let paintarget_s = unsafe { cstr_to_str(paintarget) };
+            G_UseTargets2(ctx, Some(self_), Some(self_), Some(&paintarget_s));
             let gv4 = ctx.world.entity(self_).genericValue4;
             let t = ctx.world.level.time;
             ctx.world.entity_mut(self_).genericValue8 = t + gv4;
@@ -393,7 +397,7 @@ pub fn turretG2_die(
             e.s.apos.trDelta = [0.0, 0.0, 0.0];
         }
 
-        if !ctx.world.entity(self_).target.is_null() {
+        if ctx.world.entity(self_).target.is_some() {
             G_UseTargets(ctx, Some(self_), attacker);
         }
 
@@ -524,7 +528,6 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
 
         {
             let b = ctx.world.entity_mut(bolt_id);
-            b.classname = c"turret_proj".as_ptr() as *mut c_char;
             b.nextthink = ltime + 10000;
             b.think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity).into();
             b.s.eType = ET_MISSILE as c_int;
@@ -543,6 +546,10 @@ pub fn turretG2_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: &
             // Set bounding box
             b.r.maxs = [1.5, 1.5, 1.5];
         }
+        // Prefix write routes through the single `set()` choke point (Raven
+        // `bolt->classname = "turret_proj"`); raw-ptr-into-ctx seam because
+        // `set()` needs `ctx` while the entity is borrowed.
+        ctx.ent_set(bolt_id, PrefixSet::ClassnameStatic(c"turret_proj"));
         let maxs = ctx.world.entity(bolt_id).r.maxs;
         crate::q_math::_VectorScale(maxs, -1.0, &mut ctx.world.entity_mut(bolt_id).r.mins);
 
@@ -970,12 +977,12 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
             let flags = ctx.world.entity(target_id).flags;
             let takedamage = ctx.world.entity(target_id).takedamage;
             let t_npc_tn = ctx.world.entity(target_id).NPC_targetname.clone();
-            let s_tn = ctx.world.entity(self_).targetname;
+            let s_tn = ctx.world.entity(self_).targetname_str();
             if flags & FL_BBRUSH == 0
                 || takedamage == 0
                 || (!t_npc_tn.is_empty()
-                    && !s_tn.is_null()
-                    && Q_stricmp(&t_npc_tn, &(unsafe { cstr_to_str(s_tn) })) != 0)
+                    && s_tn.is_some()
+                    && Q_stricmp(&t_npc_tn, s_tn.as_deref().unwrap()) != 0)
             {
                 continue;
             }
@@ -1088,9 +1095,9 @@ pub fn turretG2_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean
 
     if found != 0 {
         G_SetEnemy(ctx, self_, bestTarget);
-        let target2 = ctx.world.entity(self_).target2;
-        if unsafe { VALIDSTRING(target2 as *const c_char) } {
-            G_UseTargets2(ctx, Some(self_), Some(self_), target2 as *const c_char);
+        let target2 = ctx.world.entity(self_).target2.clone();
+        if target2.as_deref().is_some_and(|s| !s.is_empty()) {
+            G_UseTargets2(ctx, Some(self_), Some(self_), target2.as_deref());
         }
     }
 
@@ -1345,14 +1352,16 @@ pub fn finish_spawning_turretG2(ctx: &mut GameContext, base: EntityId) {
     ctx.world.entity_mut(base).s.eType = ET_GENERAL as c_int;
 
     // Handle team damage immunity
-    let team = ctx.world.entity(base).team;
+    let team = ctx.world.entity(base).team.clone();
     let teamnodmg = ctx.world.entity(base).teamnodmg;
-    if !team.is_null() && unsafe { *team } != 0 && teamnodmg == 0 {
-        // Source: oracle/codemp/game/g_turret_G2.c:1105
-        let v = atoi(team as *const c_char);
-        ctx.world.entity_mut(base).teamnodmg = v;
+    if let Some(team_s) = team.as_deref() {
+        if !team_s.is_empty() && teamnodmg == 0 {
+            // Source: oracle/codemp/game/g_turret_G2.c:1105
+            let v = atoi_bytes(team_s.as_bytes());
+            ctx.world.entity_mut(base).teamnodmg = v;
+        }
     }
-    ctx.world.entity_mut(base).team = core::ptr::null_mut();
+    ctx.world.entity_mut(base).team = None;
 
     // Set up explosion effects
     G_EffectIndex("turret/explode");

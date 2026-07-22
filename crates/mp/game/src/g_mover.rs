@@ -40,7 +40,7 @@ use crate::g_utils::{
 };
 use crate::q_math::AngleVectors;
 use crate::NPC_utils::G_ActivateBehavior;
-use native_string::Q_stricmp;
+use native_string::{atoi_bytes, Q_stricmp};
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
@@ -268,8 +268,7 @@ pub fn G_TryPushingEntity(
         // comment — the EF_MOVER_STOP branch is `#if 0`'d out, g_mover.c:164-172).
         if (*pusher).s.apos.trType != trType_t::TR_STATIONARY
             && ((*pusher).spawnflags & 16) != 0
-            && !(*pusher).classname.is_null()
-            && Q_stricmp(&cstr_to_str((*pusher).classname), "func_rotating") == 0
+            && Q_stricmp(&(*pusher).classname_str(), "func_rotating") == 0
         {
             // just blow the fuck out of them
             G_Damage(
@@ -919,7 +918,11 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
             if (*ent).activator.is_none() {
                 (*ent).activator = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), ent);
             }
-            G_UseTargets2(ctx, ent_eid, activator_eid, (*ent).opentarget);
+            let opentarget = {
+                let p = (*ent).opentarget;
+                (!p.is_null()).then(|| cstr_to_str(p))
+            };
+            G_UseTargets2(ctx, ent_eid, activator_eid, opentarget.as_deref());
         } else if (*ent).moverState == MOVER_2TO1 {
             // closed
             let mut doorcenter: vec3_t = [0.0; 3];
@@ -943,7 +946,11 @@ pub fn Reached_BinaryMover(ctx: &mut GameContext, ent: EntityId) {
                     GAdjustAreaPortalStateArgs::new(ent.cast(), qfalse),
                 );
             }
-            G_UseTargets2(ctx, ent_eid, activator_eid, (*ent).closetarget);
+            let closetarget = {
+                let p = (*ent).closetarget;
+                (!p.is_null()).then(|| cstr_to_str(p))
+            };
+            G_UseTargets2(ctx, ent_eid, activator_eid, closetarget.as_deref());
         } else {
             G_Error(ctx, "Reached_BinaryMover: bad moverState");
         }
@@ -1006,7 +1013,8 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
             } else {
                 (*ent).nextthink = ctx.world.level.time + (*ent).wait as c_int;
             }
-            G_UseTargets2(ctx, ent_eid, activator_eid, (*ent).target2);
+            let target2 = (*ent).target2.clone();
+            G_UseTargets2(ctx, ent_eid, activator_eid, target2.as_deref());
             return;
         }
 
@@ -1102,24 +1110,18 @@ pub fn Use_BinaryMover_Go(ctx: &mut GameContext, ent: EntityId) {
 /// walk stays a confined raw-pointer chase (it reconstructs the arena base
 /// from each node, so there is no ctx/world to reach through).
 /// Source: `oracle/codemp/game/g_mover.c:830-845`
-pub fn UnLockDoors(ent: &mut gentity_t) {
-    unsafe {
-        let mut slave = ent as *mut gentity_t;
-        loop {
-            // want to allow locked toggle doors, so keep the targetname
-            if (*slave).spawnflags & MOVER_TOGGLE == 0 {
-                (*slave).targetname = core::ptr::null_mut(); // not usable ever again
-            }
-            (*slave).spawnflags &= !MOVER_LOCKED;
-            (*slave).s.frame = 1; // second stage of anim
-            slave = crate::ent_id::resolve(
-                slave.offset(-((*slave).s.number as isize)),
-                (*slave).teamchain,
-            );
-            if slave.is_null() {
-                break;
-            }
+pub fn UnLockDoors(ctx: &mut GameContext, ent: EntityId) {
+    let mut slave = Some(ent);
+    while let Some(sid) = slave {
+        // want to allow locked toggle doors, so keep the targetname
+        if ctx.world.entity(sid).spawnflags & MOVER_TOGGLE == 0 {
+            // not usable ever again
+            ctx.ent_set(sid, PrefixSet::Targetname(None));
         }
+        let s = ctx.world.entity_mut(sid);
+        s.spawnflags &= !MOVER_LOCKED;
+        s.s.frame = 1; // second stage of anim
+        slave = ctx.world.entity(sid).teamchain;
     }
 }
 
@@ -1185,7 +1187,7 @@ pub fn Use_BinaryMover(
 
         if (*ent).spawnflags & MOVER_LOCKED != 0 {
             // a locked door, unlock it
-            UnLockDoors(&mut *ent);
+            UnLockDoors(ctx, ctx.entity_id_of(ent).unwrap());
             return;
         }
 
@@ -1571,7 +1573,7 @@ pub fn Think_SpawnNewDoorTrigger(ctx: &mut GameContext, ent: EntityId) {
         (*other).r.contents = CONTENTS_TRIGGER;
         (*other).touch = Some(EntTouch::Touch_DoorTrigger).into();
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(other.cast()));
-        (*other).classname = c"trigger_door".as_ptr() as *mut c_char;
+        ctx.ent_set(other_eid, PrefixSet::ClassnameStatic(c"trigger_door"));
         // remember the thinnest axis
         (*other).count = best as c_int;
 
@@ -1598,8 +1600,8 @@ pub fn G_EntIsDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
         return qfalse;
     }
 
-    let classname = ctx.world.g_entities[entityNum as usize].classname;
-    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "func_door") == 0 {
+    let classname = ctx.world.g_entities[entityNum as usize].classname_str();
+    if Q_stricmp(&classname, "func_door") == 0 {
         // blocked by a door
         return qtrue;
     }
@@ -1624,15 +1626,10 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
                     crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*door).teammaster);
             }
         }
-        if !(*door).targetname.is_null() {
+        if let Some(door_targetname) = (*door).targetname_str() {
             // find out what is targeting it
             loop {
-                owner = G_Find(
-                    ctx,
-                    ctx.entity_id_of(owner),
-                    core::mem::offset_of!(gentity_t, target) as c_int,
-                    &cstr_to_str((*door).targetname),
-                );
+                owner = G_Find(ctx, ctx.entity_id_of(owner), EntFindField::Target, &door_targetname);
                 if owner.is_null() {
                     break;
                 }
@@ -1645,8 +1642,8 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
                 owner = G_Find(
                     ctx,
                     ctx.entity_id_of(owner),
-                    core::mem::offset_of!(gentity_t, target2) as c_int,
-                    &cstr_to_str((*door).targetname),
+                    EntFindField::Target2,
+                    &door_targetname,
                 );
                 if owner.is_null() {
                     break;
@@ -1659,12 +1656,7 @@ pub fn G_FindDoorTrigger(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t
 
         owner = core::ptr::null_mut();
         loop {
-            owner = G_Find(
-                ctx,
-                ctx.entity_id_of(owner),
-                core::mem::offset_of!(gentity_t, classname) as c_int,
-                "trigger_door",
-            );
+            owner = G_Find(ctx, ctx.entity_id_of(owner), EntFindField::Classname, "trigger_door");
             if owner.is_null() {
                 break;
             }
@@ -1700,23 +1692,16 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                     );
                 }
             }
-            if !(*ent).targetname.is_null() {
+            if let Some(ent_targetname) = (*ent).targetname_str() {
                 // find out what is targeting it
                 owner = core::ptr::null_mut();
                 loop {
-                    owner = G_Find(
-                        ctx,
-                        ctx.entity_id_of(owner),
-                        core::mem::offset_of!(gentity_t, target) as c_int,
-                        &cstr_to_str((*ent).targetname),
-                    );
+                    owner = G_Find(ctx, ctx.entity_id_of(owner), EntFindField::Target, &ent_targetname);
                     if owner.is_null() {
                         break;
                     }
-                    if {
-                        let cn = (*owner).classname;
-                        !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "trigger_multiple") == 0
-                    } && (*owner).flags & flags::FL_INACTIVE == 0
+                    if Q_stricmp(&(*owner).classname_str(), "trigger_multiple") == 0
+                        && (*owner).flags & flags::FL_INACTIVE == 0
                     {
                         return qtrue;
                     }
@@ -1726,16 +1711,14 @@ pub fn G_EntIsUnlockedDoor(ctx: &mut GameContext, entityNum: c_int) -> qboolean 
                     owner = G_Find(
                         ctx,
                         ctx.entity_id_of(owner),
-                        core::mem::offset_of!(gentity_t, target2) as c_int,
-                        &cstr_to_str((*ent).targetname),
+                        EntFindField::Target2,
+                        &ent_targetname,
                     );
                     if owner.is_null() {
                         break;
                     }
-                    if {
-                        let cn = (*owner).classname;
-                        !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "trigger_multiple") == 0
-                    } && (*owner).flags & flags::FL_INACTIVE == 0
+                    if Q_stricmp(&(*owner).classname_str(), "trigger_multiple") == 0
+                        && (*owner).flags & flags::FL_INACTIVE == 0
                     {
                         return qtrue;
                     }
@@ -1875,7 +1858,7 @@ pub fn SP_func_door(ctx: &mut GameContext, ent: EntityId) {
         }
 
         if ctx.entity(ent).spawnflags & MOVER_LOCKED == 0
-            && (!ctx.entity(ent).targetname.is_null()
+            && (ctx.entity(ent).targetname_str().is_some()
                 || health != 0
                 || ctx.entity(ent).spawnflags & MOVER_PLAYER_USE != 0
                 || ctx.entity(ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
@@ -2066,7 +2049,7 @@ pub fn SP_func_plat(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).parent = Some(ent); // so it can be treated as a door
 
     // spawn the trigger if one hasn't been custom made
-    if ctx.entity(ent).targetname.is_null() {
+    if ctx.entity(ent).targetname_str().is_none() {
         SpawnPlatTrigger(ctx, ent);
     }
 }
@@ -2247,16 +2230,10 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
         // Raven passes `ent->target` (possibly NULL) to G_Find, where a NULL match
         // never compares equal and yields NULL; preserve that by not searching on
         // a NULL target rather than reading it as a string.
-        let train_target = (*ent).target;
-        let found = if train_target.is_null() {
-            core::ptr::null_mut()
-        } else {
-            G_Find(
-                ctx,
-                ctx.entity_id_of(core::ptr::null_mut()),
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                &cstr_to_str(train_target),
-            )
+        let train_target = (*ent).target.clone();
+        let found = match train_target.as_deref() {
+            Some(train_target) => G_Find(ctx, None, EntFindField::Targetname, train_target),
+            None => core::ptr::null_mut(),
         };
         (*ent).nextTrain = ent_id_opt(ctx.world.g_entities.as_mut_ptr(), found);
         if (*ent).nextTrain.is_none() {
@@ -2280,21 +2257,16 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
                 start = path;
             }
 
-            if (*path).target.is_null() {
+            let Some(path_target) = (*path).target.clone() else {
                 // end of path
                 break;
-            }
+            };
 
             // find a path_corner among the targets — there may also be
             // other targets that get fired when the corner is reached
             let mut next: *mut gentity_t;
             loop {
-                next = G_Find(
-                    ctx,
-                    ctx.entity_id_of(core::ptr::null_mut()),
-                    core::mem::offset_of!(gentity_t, targetname) as c_int,
-                    &cstr_to_str((*path).target),
-                );
+                next = G_Find(ctx, None, EntFindField::Targetname, &path_target);
                 if next.is_null() {
                     // end of path
                     break;
@@ -2303,10 +2275,7 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
                 // ported binding in this crate; `Q_stricmp` is the closest
                 // available equivalent (case-insensitive) and is a no-op
                 // difference for the literal "path_corner" classname.
-                if {
-                    let cn = (*next).classname;
-                    !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "path_corner") == 0
-                } {
+                if Q_stricmp(&(*next).classname_str(), "path_corner") == 0 {
                     break;
                 }
             }
@@ -2320,7 +2289,7 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
             path = next;
         }
 
-        if (*ent).targetname.is_null() || ((*ent).spawnflags & 1) != 0
+        if (*ent).targetname_str().is_none() || ((*ent).spawnflags & 1) != 0
         /* start on */
         {
             // start the train moving from the first corner
@@ -2335,7 +2304,7 @@ pub fn Think_SetupTrainTargets(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_mover.c:1873-1880`
 pub fn SP_path_corner(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.entity(self_).targetname.is_null() {
+    if ctx.entity(self_).targetname_str().is_none() {
         G_Printf(ctx, "path_corner with no targetname at %s\n");
         let origin = ctx.entity(self_).s.origin;
         let _ = vtos(ctx, origin);
@@ -2366,7 +2335,7 @@ pub fn SP_func_train(ctx: &mut GameContext, self_: EntityId) {
         ctx.entity_mut(self_).speed = 100.0;
     }
 
-    if ctx.entity(self_).target.is_null() {
+    if ctx.entity(self_).target.is_none() {
         let absmin = ctx.entity(self_).r.absmin;
         let _ = vtos(ctx, absmin);
         G_Printf(ctx, "func_train without a target at %s\n");
@@ -2874,7 +2843,7 @@ pub fn funcBBrushDieGo(ctx: &mut GameContext, self_: EntityId) {
 
         let up = [0.0f32, 0.0, 1.0];
 
-        if !(*self_).target.is_null() && !attacker.is_none() {
+        if (*self_).target.is_some() && !attacker.is_none() {
             let self_eid = ctx.entity_id_of(self_);
             let attacker_ptr = attacker.map_or(std::ptr::null_mut(), |id| {
                 &mut ctx.world.g_entities[id.index()] as *mut gentity_t
@@ -3051,7 +3020,7 @@ pub fn funcBBrushUse(
         G_ActivateBehavior(ctx, ctx.entity_id_of(self_), bSet_t::BSET_USE as c_int);
         if (*self_).spawnflags & 64 != 0 {
             // Using it doesn't break it, makes it use it's targets
-            if !(*self_).target.is_null() && *(*self_).target != 0 {
+            if (*self_).target.as_deref().is_some_and(|s| !s.is_empty()) {
                 G_UseTargets(ctx, ctx.entity_id_of(self_), ctx.entity_id_of(activator));
             }
         } else {
@@ -3086,13 +3055,14 @@ pub fn funcBBrushPain(
         }
 
         if !(*self_).paintarget.is_null() && *(*self_).paintarget != 0 {
+            let paintarget = cstr_to_str((*self_).paintarget);
             if (*self_).activator.is_none() {
                 if !attacker.is_null() && (*attacker).inuse != 0 && !(*attacker).client.is_null() {
                     G_UseTargets2(
                         ctx,
                         ctx.entity_id_of(self_),
                         ctx.entity_id_of(attacker),
-                        (*self_).paintarget,
+                        Some(&paintarget),
                     );
                 }
             } else {
@@ -3100,7 +3070,7 @@ pub fn funcBBrushPain(
                 let activator_ptr =
                     crate::ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), (*self_).activator);
                 let activator_eid = ctx.entity_id_of(activator_ptr);
-                G_UseTargets2(ctx, self_eid, activator_eid, (*self_).paintarget);
+                G_UseTargets2(ctx, self_eid, activator_eid, Some(&paintarget));
             }
         }
 
@@ -3341,15 +3311,14 @@ pub fn SP_func_breakable(ctx: &mut GameContext, self_: EntityId) {
     ctx.entity_mut(self_).pain = Some(EntPain::funcBBrushPain).into();
     ctx.entity_mut(self_).touch = Some(EntTouch::funcBBrushTouch).into();
 
-    let team = ctx.entity(self_).team;
-    if !team.is_null()
-        && unsafe { *team } != 0
+    let team = ctx.entity(self_).team.clone();
+    if team.as_deref().is_some_and(|s| !s.is_empty())
         && ctx.world.cvars.g_gametype.integer == GT_SIEGE
         && ctx.entity(self_).teamnodmg == 0
     {
-        ctx.entity_mut(self_).teamnodmg = atoi(team);
+        ctx.entity_mut(self_).teamnodmg = atoi_bytes(team.as_deref().unwrap().as_bytes());
     }
-    ctx.entity_mut(self_).team = core::ptr::null_mut();
+    ctx.entity_mut(self_).team = None;
     if ctx.entity(self_).model.is_null() {
         G_Error(ctx, "func_breakable with NULL model\n");
     }
@@ -3376,22 +3345,20 @@ pub fn G_EntIsBreakable(ctx: &mut GameContext, entityNum: c_int) -> qboolean {
 
     let ent = &ctx.world.g_entities[entityNum as usize];
     let svFlags = ent.r.svFlags;
-    let classname = ent.classname;
+    let classname = ent.classname_str();
 
     if svFlags & SVF_GLASS_BRUSH != 0 {
         return qtrue;
     }
 
-    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "func_breakable") == 0 {
+    if Q_stricmp(&classname, "func_breakable") == 0 {
         return qtrue;
     }
 
-    if !classname.is_null()
-        && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "misc_model_breakable") == 0
-    {
+    if Q_stricmp(&classname, "misc_model_breakable") == 0 {
         return qtrue;
     }
-    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "misc_maglock") == 0 {
+    if Q_stricmp(&classname, "misc_maglock") == 0 {
         return qtrue;
     }
 
@@ -3606,12 +3573,11 @@ pub fn func_wait_return_solid(ctx: &mut GameContext, self_: EntityId) {
         ctx.entity_mut(self_).s.eFlags &= !EF_NODRAW;
         ctx.entity_mut(self_).use_ = Some(EntUse::func_usable_use).into();
         ctx.entity_mut(self_).clipmask = 0;
-        let target2 = ctx.entity(self_).target2;
-        // Raw C-string deref of the engine-owned target2 name (seam).
-        if !target2.is_null() && unsafe { *target2 } != 0 {
+        let target2 = ctx.entity(self_).target2.clone();
+        if target2.as_deref().is_some_and(|s| !s.is_empty()) {
             // `ent_id::resolve` then `entity_id_of` round-trips `activator` to itself.
             let activator_eid = ctx.entity(self_).activator;
-            G_UseTargets2(ctx, Some(self_), activator_eid, target2);
+            G_UseTargets2(ctx, Some(self_), activator_eid, target2.as_deref());
         }
     } else {
         ctx.entity_mut(self_).clipmask = 0;
@@ -3637,12 +3603,12 @@ pub fn func_usable_think(self_: &mut gentity_t) {
 /// Source: `oracle/codemp/game/g_mover.c:3037-3048`
 pub fn G_EntIsRemovableUsable(ctx: &mut GameContext, entNum: c_int) -> qboolean {
     let ent = &ctx.world.g_entities[entNum as usize];
-    let classname = ent.classname;
+    let classname = ent.classname_str();
     let eFlags = ent.s.eFlags;
     let spawnflags = ent.spawnflags;
-    let targetname = ent.targetname;
-    if !classname.is_null() && Q_stricmp(&(unsafe { cstr_to_str(classname) }), "func_usable") == 0 {
-        if (eFlags & EF_SHADER_ANIM) == 0 && (spawnflags & 8) == 0 && !targetname.is_null() {
+    let targetname = ent.targetname_str();
+    if Q_stricmp(&classname, "func_usable") == 0 {
+        if (eFlags & EF_SHADER_ANIM) == 0 && (spawnflags & 8) == 0 && targetname.is_some() {
             // not just a shader-animator and not ALWAYS_ON, so it must be removable somehow
             return qtrue;
         }
@@ -3669,9 +3635,7 @@ pub fn func_usable_use(
             // wrap around
             ctx.entity_mut(self_).s.frame = 0;
         }
-        let target = ctx.entity(self_).target;
-        // Raw C-string deref of the engine-owned target name (seam).
-        if !target.is_null() && unsafe { *target } != 0 {
+        if ctx.entity(self_).target.as_deref().is_some_and(|s| !s.is_empty()) {
             G_UseTargets(ctx, Some(self_), activator);
         }
     } else if ctx.entity(self_).spawnflags & 8 != 0 {
@@ -3681,8 +3645,7 @@ pub fn func_usable_use(
         // also remove ability to call any use func at all!
         ctx.entity_mut(self_).use_ = FnId::NONE;
 
-        let target = ctx.entity(self_).target;
-        if !target.is_null() && unsafe { *target } != 0 {
+        if ctx.entity(self_).target.as_deref().is_some_and(|s| !s.is_empty()) {
             G_UseTargets(ctx, Some(self_), activator);
         }
 
@@ -3706,8 +3669,7 @@ pub fn func_usable_use(
         ctx.entity_mut(self_).s.eFlags |= EF_NODRAW;
         ctx.entity_mut(self_).count = 0;
 
-        let target = ctx.entity(self_).target;
-        if !target.is_null() && unsafe { *target } != 0 {
+        if ctx.entity(self_).target.as_deref().is_some_and(|s| !s.is_empty()) {
             G_UseTargets(ctx, Some(self_), activator);
         }
         ctx.entity_mut(self_).think = FnId::NONE;

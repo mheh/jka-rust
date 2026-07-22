@@ -30,11 +30,6 @@ pub use mp_qshared::shared::com_parse::{
     SkipBracedSection, SkipRestOfLine, SkipWhitespace,
 };
 
-/// Raven `FOFS(targetname)` — `#define FOFS(x) ((int)&(((gentity_t *)0)->x))`,
-/// specialized to the `targetname` field for `G_Find` call sites.
-///
-/// Source: `oracle/codemp/game/g_local.h:1511`
-pub const FOFS_targetname: c_int = core::mem::offset_of!(gentity_t, targetname) as c_int;
 
 // ---------------------------------------------------------------------
 // Local helpers mirroring libc, faithful to the unchecked C semantics used

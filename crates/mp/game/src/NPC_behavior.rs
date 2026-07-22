@@ -916,19 +916,26 @@ pub fn NPC_BSRemove(ctx: &mut GameContext) {
     ) == 0
     {
         let target3 = ctx.world.entity(npc_id).target3;
-        G_UseTargets2(ctx, Some(npc_id), Some(npc_id), target3);
+        let target3 = if target3.is_null() {
+            None
+        } else {
+            Some(unsafe { cstr_to_str(target3) })
+        };
+        G_UseTargets2(ctx, Some(npc_id), Some(npc_id), target3.as_deref());
         let level_time = ctx.world.level.time;
-        let ent = ctx.world.entity_mut(npc_id);
-        ent.s.eFlags |= EF_NODRAW;
-        ent.s.eType = entityType_t::ET_INVISIBLE as c_int;
-        ent.r.contents = 0;
-        ent.health = 0;
-        ent.targetname = core::ptr::null_mut();
+        let ent = ctx.world.entity_mut(npc_id) as *mut gentity_t;
+        unsafe {
+            (*ent).s.eFlags |= EF_NODRAW;
+            (*ent).s.eType = entityType_t::ET_INVISIBLE as c_int;
+            (*ent).r.contents = 0;
+            (*ent).health = 0;
+            ctx.ent_set(npc_id, PrefixSet::Targetname(None));
 
-        // Disappear in half a second.
-        // (shape mismatch, see BeamOut note above.)
-        ent.think = Some(EntThink::G_FreeEntity).into();
-        ent.nextthink = level_time + FRAMETIME;
+            // Disappear in half a second.
+            // (shape mismatch, see BeamOut note above.)
+            (*ent).think = Some(EntThink::G_FreeEntity).into();
+            (*ent).nextthink = level_time + FRAMETIME;
+        }
     }
 }
 

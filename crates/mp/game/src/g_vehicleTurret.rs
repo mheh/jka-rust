@@ -341,18 +341,18 @@ pub fn VEH_TurretFindEnemies(
                     || ctx.world.entity(target_id).takedamage == qfalse
                     // is a bbrush, but invincible
                     || (!ctx.world.entity(target_id).NPC_targetname.is_empty()
-                        && !ctx.world.entity(parent).targetname.is_null()
+                        && ctx.world.entity(parent).targetname_str().is_some()
                         && Q_stricmp(
                             &ctx.world.entity(target_id).NPC_targetname,
-                            &(unsafe { cstr_to_str(ctx.world.entity(parent).targetname) }),
+                            &ctx.world.entity(parent).targetname_str().unwrap(),
                         ) != 0)
                 {
                     // not in invicible bbrush, but can only be broken by an NPC that is not me
                     if ctx.world.entity(target_id).s.weapon == WP_TURRET
-                        && !ctx.world.entity(target_id).classname.is_null()
+                        && !ctx.world.entity(target_id).classname_str().is_empty()
                         && Q_strncmp(
                             "misc_turret",
-                            &cstr_to_str(ctx.world.entity(target_id).classname),
+                            &ctx.world.entity(target_id).classname_str(),
                             11,
                         ) == 0
                     {

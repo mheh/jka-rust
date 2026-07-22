@@ -629,9 +629,9 @@ pub fn NAVNEW_ResolveEntityCollision(
     // reaches AvoidCollision's `VectorCopy(movedir, info->direction)`.
     let blocker = blocker.unwrap();
     //Doors are ignored
-    let blocker_classname = ctx.world.entity(blocker).classname;
-    if !blocker_classname.is_null()
-        && Q_stricmp(&(unsafe { cstr_to_str(blocker_classname) }), "func_door") == 0
+    let blocker_classname = ctx.world.entity(blocker).classname_str();
+    if !blocker_classname.is_empty()
+        && Q_stricmp(&blocker_classname, "func_door") == 0
     {
         let mut center = [0.0f32; 3];
         CalcTeamDoorCenter(ctx, blocker, &mut center);

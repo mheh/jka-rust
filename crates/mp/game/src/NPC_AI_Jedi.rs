@@ -7353,10 +7353,7 @@ pub fn Jedi_Attack(ctx: &mut GameContext) {
             };
             if !enemy.is_null()
                 && (*enemy).s.weapon == WP_TURRET as c_int
-                && {
-                    let p = (*enemy).classname;
-                    !p.is_null() && Q_stricmp("PAS", &cstr_to_str(p)) == 0
-                }
+                && Q_stricmp("PAS", &(*enemy).classname_str()) == 0
             {
                 if (*enemy).count <= 0 {
                     //it's out of ammo

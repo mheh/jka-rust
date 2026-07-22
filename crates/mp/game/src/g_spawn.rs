@@ -31,6 +31,7 @@ use crate::q_shared::Q_strlen as strlen;
 use std::ffi::{CStr, CString};
 
 use crate::prelude::*;
+use crate::ent_fn_enums::{dispatch_spawn, spawn_for_classname};
 use crate::trap;
 use crate::world::GameContext;
 use native_string::atof_bytes;
@@ -220,9 +221,7 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
         }
 
         let mut item: Option<ItemId> = None;
-        let targetname_ptr = ctx.entity(id).targetname;
-        if !targetname_ptr.is_null() && *targetname_ptr != 0 {
-            let targetname = CStr::from_ptr(targetname_ptr).to_string_lossy();
+        if let Some(targetname) = ctx.entity(id).targetname_str().filter(|s| !s.is_empty()) {
             if team != -1 {
                 if targetname.contains("flag") {
                     item = if team == TEAM_RED {
@@ -241,8 +240,11 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
             }
 
             if let Some(item) = item {
-                ctx.entity_mut(id).targetname = std::ptr::null_mut();
-                ctx.entity_mut(id).classname = item.classname_cstr() as *mut c_char;
+                ctx.ent_set(id, PrefixSet::Targetname(None));
+                // Raven `ent->classname = item->classname`: alias the item table's
+                // `'static` classname pointer (no pool copy).
+                let classname: &'static CStr = CStr::from_ptr(item.classname_cstr());
+                ctx.ent_set(id, PrefixSet::ClassnameStatic(classname));
                 G_SpawnItem(ctx, id, item);
             }
         }
@@ -257,44 +259,42 @@ pub fn SP_gametype_item(ctx: &mut GameContext, id: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_spawn.c:683-714`
 pub fn G_CallSpawn(ctx: &mut GameContext, id: EntityId) -> qboolean {
-    unsafe {
-        if ctx.entity(id).classname.is_null() {
-            G_Printf(ctx, "G_CallSpawn: NULL classname\n");
-            return qfalse;
-        }
+    if ctx.entity(id).classname_str().is_empty() {
+        G_Printf(ctx, "G_CallSpawn: NULL classname\n");
+        return qfalse;
+    }
 
-        // check item spawn functions
-        let ent_classname = CStr::from_ptr(ctx.entity(id).classname);
-        let mut i: c_int = 1;
-        while i < bg_numItems {
-            let item = ItemId::from_modelindex(i).unwrap();
-            // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
-            if item.item().classname.as_bytes() == ent_classname.to_bytes() {
-                G_SpawnItem(ctx, id, item);
-                return qtrue;
-            }
-            i += 1;
-        }
-
-        // check normal spawn functions
-        let classname = std::ffi::CStr::from_ptr(ctx.entity(id).classname).to_string_lossy();
-        if let Some(sp) = crate::ent_fn_enums::spawn_for_classname(&classname) {
-            let healingsound = ctx.entity(id).healingsound.clone();
-            if !healingsound.is_empty() {
-                //yeah...this can be used for anything, so.. precache it if it's there
-                G_SoundIndex(&healingsound);
-            }
-            let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
-            crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent_ptr);
+    // check item spawn functions
+    let ent_classname = ctx.entity(id).classname_str();
+    let mut i: c_int = 1;
+    while i < bg_numItems {
+        let item = ItemId::from_modelindex(i).unwrap();
+        // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
+        if item.item().classname.as_bytes() == ent_classname.as_bytes() {
+            G_SpawnItem(ctx, id, item);
             return qtrue;
         }
-        let classname_disp = CStr::from_ptr(ctx.entity(id).classname).to_string_lossy();
-        G_Printf(
-            ctx,
-            &format!("{} doesn't have a spawn function\n", classname_disp),
-        );
-        qfalse
+        i += 1;
     }
+
+    // check normal spawn functions
+    let classname = ctx.entity(id).classname_str();
+    if let Some(sp) = spawn_for_classname(&classname) {
+        let healingsound = ctx.entity(id).healingsound.clone();
+        if !healingsound.is_empty() {
+            //yeah...this can be used for anything, so.. precache it if it's there
+            G_SoundIndex(&healingsound);
+        }
+        let ent_ptr = ctx.entity_mut(id) as *mut gentity_t;
+        dispatch_spawn(ctx, sp, ent_ptr);
+        return qtrue;
+    }
+    let classname_disp = ctx.entity(id).classname_str();
+    G_Printf(
+        ctx,
+        &format!("{} doesn't have a spawn function\n", classname_disp),
+    );
+    qfalse
 }
 
 /// Raven `G_NewString` — builds a copy of the string, translating `\n` to
@@ -403,16 +403,8 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, speed),
         fieldtype_t::F_FLOAT,
     ),
-    field(
-        c"target",
-        core::mem::offset_of!(gentity_t, target),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"target2",
-        core::mem::offset_of!(gentity_t, target2),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"target", set_target),
+    field_owned(c"target2", set_target2),
     field(
         c"target3",
         core::mem::offset_of!(gentity_t, target3),
@@ -427,11 +419,7 @@ pub static FIELDS: &[BG_field_t] = &[
     field_owned(c"target6", set_target6),
     field_owned(c"NPC_targetname", set_NPC_targetname),
     field_owned(c"NPC_target", set_NPC_target),
-    field(
-        c"NPC_target2",
-        core::mem::offset_of!(gentity_t, target2),
-        fieldtype_t::F_LSTRING,
-    ), // NPC_spawner only
+    field_owned(c"NPC_target2", set_target2), // NPC_spawner only
     field(
         c"NPC_target4",
         core::mem::offset_of!(gentity_t, target4),
@@ -443,16 +431,8 @@ pub static FIELDS: &[BG_field_t] = &[
         core::mem::offset_of!(gentity_t, targetname),
         fieldtype_t::F_LSTRING,
     ),
-    field(
-        c"message",
-        core::mem::offset_of!(gentity_t, message),
-        fieldtype_t::F_LSTRING,
-    ),
-    field(
-        c"team",
-        core::mem::offset_of!(gentity_t, team),
-        fieldtype_t::F_LSTRING,
-    ),
+    field_owned(c"message", set_message),
+    field_owned(c"team", set_team),
     field(
         c"wait",
         core::mem::offset_of!(gentity_t, wait),
@@ -733,6 +713,51 @@ fn set_goaltarget(ent: *mut byte, val: &str) {
 fn set_idealclass(ent: *mut byte, val: &str) {
     unsafe { (*(ent as *mut gentity_t)).idealclass = val.to_owned() };
 }
+// `target`/`target2`/`team` are `Option<String>` (`None` ≡ Raven NULL); a
+// present spawn key — even `""` — is `Some(..)`, matching Raven's non-NULL pool
+// pointer.
+fn set_target(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).target = Some(val.to_owned()) };
+}
+fn set_target2(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).target2 = Some(val.to_owned()) };
+}
+fn set_team(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).team = Some(val.to_owned()) };
+}
+
+// `message` is `Option<String>` too, but its old `F_LSTRING` write ran through
+// `G_NewString`, whose `\n`-escape translation must be reproduced here or
+// multi-line message text regresses (G1 flag).
+fn set_message(ent: *mut byte, val: &str) {
+    unsafe { (*(ent as *mut gentity_t)).message = Some(translate_newlines(val)) };
+}
+
+/// Reproduces `G_NewString`'s `\n`-escape translation as an owned `String`
+/// (no pool allocation): a `\` followed by `n` becomes a real linefeed, any
+/// other `\x` collapses to a lone `\` (the escaped char is dropped), matching
+/// the C copy loop byte-for-byte. Shared by the owned-`String` setters whose
+/// Raven write went through `G_NewString`.
+///
+/// Source: `oracle/codemp/game/g_spawn.c:724-749`
+pub fn translate_newlines(src: &str) -> String {
+    let bytes = src.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == b'\\' && i < bytes.len() - 1 {
+            i += 1;
+            out.push(if bytes[i] == b'n' { b'\n' } else { b'\\' });
+        } else {
+            out.push(c);
+        }
+        i += 1;
+    }
+    // `src` is valid UTF-8 and the translation only ever emits `\n`/`\\`/copied
+    // input bytes, so the result is still valid UTF-8.
+    String::from_utf8(out).unwrap()
+}
 
 /// Raven `G_SpawnGEntityFromSpawnVars` — spawns an entity and fills in all of
 /// the level fields from `level.spawnVars[]`, then calls the class-specific
@@ -838,12 +863,10 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: &mut GameContext, inSubBSP: qboolean) {
         if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(ent.cast())) != qfalse {
             trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(ent.cast()));
 
-            let classname = ctx.entity(id).classname;
-            if !classname.is_null() && *classname != 0 {
-                if Q_strncmp("NPC_", &cstr_to_str(classname), 4) != 0 {
-                    // Not an NPC_spawner (rww - probably don't even care for MP, but whatever)
-                    G_ActivateBehavior(ctx, Some(id), BSET_SPAWN);
-                }
+            let classname = ctx.entity(id).classname_str();
+            if !classname.is_empty() && Q_strncmp("NPC_", &classname, 4) != 0 {
+                // Not an NPC_spawner (rww - probably don't even care for MP, but whatever)
+                G_ActivateBehavior(ctx, Some(id), BSET_SPAWN);
             }
         }
     }
@@ -1194,8 +1217,7 @@ pub fn SP_worldspawn(ctx: &mut GameContext) {
         );
 
         ctx.world.g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
-        ctx.world.g_entities[ENTITYNUM_WORLD as usize].classname =
-            c"worldspawn".as_ptr() as *mut c_char;
+        ctx.ent_set(EntityId(ENTITYNUM_WORLD as u32), PrefixSet::ClassnameStatic(c"worldspawn"));
 
         // see if we want a warmup time
         trap::SetConfigstring(ctx.engine, CS_WARMUP, "");
@@ -1320,22 +1342,22 @@ pub fn G_SpawnEntitiesFromString(ctx: &mut GameContext, inSubBSP: qboolean) {
             G_SpawnGEntityFromSpawnVars(ctx, inSubBSP);
         }
 
-        if !ctx.world.g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
-            .is_null()
-            && *ctx.world.g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize] != 0
-        {
+        let world_bset = ctx.world.g_entities[ENTITYNUM_WORLD as usize]
+            .behavior_set_str(BSET_SPAWN as usize)
+            .filter(|s| !s.is_empty());
+        if let Some(world_bset) = world_bset {
             // World has a spawn script, but we don't want the world in ICARUS and running scripts,
             // so make a scriptrunner and start it going.
             let script_runner_eid = G_Spawn(ctx);
             let script_runner = ctx.entity_mut(script_runner_eid) as *mut gentity_t;
             if !script_runner.is_null() {
                 let id = script_runner_eid;
-                let world_bset =
-                    ctx.world.g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize];
                 let next_think = ctx.world.level.time + 100;
+                // Raven aliased the world's spawn-script pointer into the runner's
+                // BSET_USESCRIPT (`behaviorSet[1]`) slot; the set copy is content-identical.
+                ctx.ent_set(id, PrefixSet::BehaviorSet(1, Some(&world_bset)));
                 {
                     let e = ctx.world.entity_mut(id);
-                    e.behaviorSet[1] = world_bset;
                     e.count = 1;
                     e.think = Some(EntThink::scriptrunner_run).into();
                     e.nextthink = next_think;

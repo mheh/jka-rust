@@ -5,6 +5,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use core::ffi::CStr;
 
 use crate::client::gclient::gclient_t;
 use mp_bg::bg_misc::{
@@ -669,8 +670,8 @@ pub fn PlaceShield(ctx: &mut GameContext, playerent: EntityId) -> qboolean {
 
             ctx.entity_mut(shield).s.eType = ET_SPECIAL as c_int;
             ctx.entity_mut(shield).s.modelindex = HI_SHIELD as c_int; // this'll be used in CG_Useable() for rendering.
-            let classname = shieldItem.classname_cstr() as *mut c_char;
-            ctx.entity_mut(shield).classname = classname;
+            let classname: &'static CStr = unsafe { CStr::from_ptr(shieldItem.classname_cstr()) };
+            ctx.ent_set(shield, PrefixSet::ClassnameStatic(classname));
 
             ctx.entity_mut(shield).r.contents = CONTENTS_TRIGGER;
 
@@ -1282,7 +1283,7 @@ pub fn turret_die(
     ctx.entity_mut(self_).think = FnId::NONE;
     ctx.entity_mut(self_).use_ = FnId::NONE;
 
-    if !ctx.entity(self_).target.is_null() {
+    if ctx.entity(self_).target.is_some() {
         G_UseTargets(ctx, Some(self_), attacker);
     }
 
@@ -1405,7 +1406,7 @@ pub fn ItemUse_Sentry(ctx: &mut GameContext, ent: Option<EntityId>) {
 
     let sentry = G_Spawn(ctx);
 
-    ctx.entity_mut(sentry).classname = c"sentryGun".as_ptr() as *mut c_char;
+    ctx.ent_set(sentry, PrefixSet::ClassnameStatic(c"sentryGun"));
     ctx.entity_mut(sentry).s.modelindex = G_ModelIndex("models/items/psgun.glm"); // replace ASAP
 
     ctx.entity_mut(sentry).s.g2radius = 30;
@@ -1814,8 +1815,8 @@ pub fn ItemUse_UseDisp(ctx: &mut GameContext, ent: EntityId, r#type: c_int) {
     if let Some(item) = item {
         let eItem = G_Spawn(ctx);
         ctx.entity_mut(eItem).r.ownerNum = ctx.entity(ent).s.number;
-        let classname = item.classname_cstr() as *mut c_char;
-        ctx.entity_mut(eItem).classname = classname;
+        let classname: &'static CStr = unsafe { CStr::from_ptr(item.classname_cstr()) };
+        ctx.ent_set(eItem, PrefixSet::ClassnameStatic(classname));
 
         let mut pos = unsafe { (*cl).ps.origin };
         pos[2] += unsafe { (*cl).ps.viewheight } as f32;
@@ -2141,7 +2142,7 @@ pub fn EWebFire(ctx: &mut GameContext, owner: EntityId, eweb: EntityId) {
     // create the missile
     let missile = CreateMissile(ctx, bPoint, d, 1200.0, 10000, owner, false);
 
-    ctx.entity_mut(missile).classname = c"generic_proj".as_ptr() as *mut c_char;
+    ctx.ent_set(missile, PrefixSet::ClassnameStatic(c"generic_proj"));
     ctx.entity_mut(missile).s.weapon = WP_TURRET as c_int;
 
     ctx.entity_mut(missile).damage = EWEB_MISSILE_DAMAGE;
@@ -3053,7 +3054,7 @@ pub fn Pickup_Armor(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_
 pub fn RespawnItem(ctx: &mut GameContext, ent: EntityId) {
     let mut ent = ent;
     // randomly select from teamed entities
-    if !ctx.entity(ent).team.is_null() {
+    if ctx.entity(ent).team.is_some() {
         if ctx.entity(ent).teammaster.is_none() {
             G_Error(ctx, "RespawnItem: bad teammaster");
         }
@@ -3489,7 +3490,11 @@ pub fn LaunchItem(
     }
     e.s.modelindex2 = 1; // This is non-zero is it's a dropped item
 
-    e.classname = item.classname_cstr() as *mut c_char;
+    // Raven `e->classname = item->classname`: alias the item table's `'static`
+    // classname pointer (no pool copy).
+    let classname: &'static CStr = unsafe { CStr::from_ptr(item.classname_cstr()) };
+    ctx.ent_set(dropped, PrefixSet::ClassnameStatic(classname));
+    let e = ctx.entity_mut(dropped);
     e.item = Some(item);
     e.r.mins = [-ITEM_RADIUS, -ITEM_RADIUS, -ITEM_RADIUS];
     e.r.maxs = [ITEM_RADIUS, ITEM_RADIUS, ITEM_RADIUS];
@@ -3749,7 +3754,7 @@ pub fn FinishSpawningItem(ctx: &mut GameContext, ent: EntityId) {
 
     // team slaves and targeted items aren't present at start
     let e = ctx.entity_mut(ent);
-    if (e.flags & FL_TEAMSLAVE) != 0 || !e.targetname.is_null() {
+    if (e.flags & FL_TEAMSLAVE) != 0 || e.targetname_str().is_some() {
         e.s.eFlags |= EF_NODRAW;
         e.r.contents = 0;
         return;

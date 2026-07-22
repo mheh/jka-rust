@@ -12,6 +12,6 @@ pub mod gentity;
 pub mod hit_location;
 pub mod mover_state;
 
-pub use gentity::gentity_t;
+pub use gentity::{gentity_t, PrefixSet, PrefixSlot};
 
 pub use mover_state::moverState_t;

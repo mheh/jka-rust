@@ -584,11 +584,9 @@ pub fn UseSiegeTarget(
     // Raven guards only `if (!target)` (null); an empty name is still searched,
     // so no empty check here.
 
-    let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
-
     let mut t: Option<EntityId> = None;
     loop {
-        let t_raw = G_Find(ctx, t, targetname_ofs, target);
+        let t_raw = G_Find(ctx, t, EntFindField::Targetname, target);
         t = ctx.entity_id_of(t_raw);
         let Some(t_id) = t else {
             break;
@@ -868,11 +866,12 @@ pub fn SiegeRoundComplete(ctx: &mut GameContext, winningteam: c_int, winningclie
                     i += 1;
                 }
             }
+            let teamstr_s = cstr_to_str(teamstr.as_ptr());
             G_UseTargets2(
                 ctx,
                 Some(EntityId(originalWinningClient as u32)),
                 Some(EntityId(originalWinningClient as u32)),
-                teamstr.as_ptr(),
+                Some(&teamstr_s),
             );
         }
 
@@ -1079,11 +1078,12 @@ pub fn SiegeBeginRound(ctx: &mut GameContext, entNum: c_int) {
         ) {
             Q_strncpyzBytes(&mut targname, val.as_bytes(), targname_len);
             if targname[0] != 0 {
+                let targname_s = cstr_to_str(targname.as_ptr());
                 G_UseTargets2(
                     ctx,
                     Some(EntityId(entNum as u32)),
                     Some(EntityId(entNum as u32)),
-                    targname.as_ptr(),
+                    Some(&targname_s),
                 );
             }
         }
@@ -1331,10 +1331,10 @@ pub fn siegeTriggerUse(
                     UseSiegeTarget(ctx, other, activator, &teamstr);
                 }
 
-                let ent_target = ctx.world.entity(ent).target;
-                if !ent_target.is_null() && *ent_target != 0 {
+                let ent_target = ctx.world.entity(ent).target.clone();
+                if ent_target.as_deref().is_some_and(|s| !s.is_empty()) {
                     // use this too
-                    UseSiegeTarget(ctx, other, activator, &cstr_to_str(ent_target));
+                    UseSiegeTarget(ctx, other, activator, ent_target.as_deref().unwrap());
                 }
 
                 let side = ctx.world.entity(ent).side;
@@ -1644,12 +1644,11 @@ pub fn SiegeItemRemoveOwner(ctx: &mut GameContext, ent: EntityId, carrier: Optio
 /// Source: `oracle/codemp/game/g_saga.c:1351-1370`
 pub fn SiegeItemRespawnEffect(ctx: &mut GameContext, ent: EntityId, newOrg: vec3_t) {
     unsafe {
-        // `target5` is now an owned `String` (`""` ≡ absent); materialize a
-        // `CString` for the raw-`c_char` target-firing seam.
+        // `target5` is an owned `String` (`""` ≡ absent); fire it through the
+        // `Option<&str>` target seam.
         let target5 = ctx.world.entity(ent).target5.clone();
         if !target5.is_empty() {
-            let target5_c = cstr(&target5);
-            G_UseTargets2(ctx, Some(ent), Some(ent), target5_c.as_ptr());
+            G_UseTargets2(ctx, Some(ent), Some(ent), Some(&target5));
         }
 
         if ctx.world.entity(ent).genericValue10 == 0 {
@@ -1775,8 +1774,7 @@ pub fn SiegeItemThink(ctx: &mut GameContext, ent: EntityId) {
                 // The carrier died so pop out where he is (unless in nodrop).
                 let target6 = ctx.world.entity(ent).target6.clone();
                 if !target6.is_empty() {
-                    let target6_c = cstr(&target6);
-                    G_UseTargets2(ctx, Some(ent), Some(ent), target6_c.as_ptr());
+                    G_UseTargets2(ctx, Some(ent), Some(ent), Some(&target6));
                 }
 
                 let carrier_origin = (*ccl).ps.origin;
@@ -1911,16 +1909,15 @@ pub fn SiegeItemTouch(
 
         ctx.world.entity_mut(self_).genericValue9 = 0; // So it doesn't think it has to respawn.
 
-        let target2 = ctx.world.entity(self_).target2;
-        if !target2.is_null()
-            && *target2 != 0
+        let target2 = ctx.world.entity(self_).target2.clone();
+        if target2.as_deref().is_some_and(|s| !s.is_empty())
             && (ctx.world.entity(self_).genericValue4 == 0
                 || ctx.world.entity(self_).genericValue5 == 0)
         {
             // fire the target for pickup, if it's set to fire every time, or
             // set to only fire the first time and the first time has not yet
             // occured.
-            G_UseTargets2(ctx, Some(self_), Some(self_), target2 as *const c_char);
+            G_UseTargets2(ctx, Some(self_), Some(self_), target2.as_deref());
             ctx.world.entity_mut(self_).genericValue5 = 1; // mark it as having been picked up
         }
 
@@ -1974,7 +1971,10 @@ pub fn SiegeItemDie(
         // Fire off the death target if we've got one.
         let target4 = ctx.world.entity(self_).target4;
         if !target4.is_null() && *target4 != 0 {
-            G_UseTargets2(ctx, Some(self_), Some(self_), target4 as *const c_char);
+            // `target4` stays a `*mut c_char` slot; decode it for the
+            // `Option<&str>` seam (known non-null here from the guard).
+            let target4_s = cstr_to_str(target4);
+            G_UseTargets2(ctx, Some(self_), Some(self_), Some(&target4_s));
         }
     }
 }
@@ -2027,8 +2027,7 @@ pub fn SiegeItemUse(
         let paintarget = ctx.world.entity(ent).paintarget;
         if !paintarget.is_null() && *paintarget != 0 {
             // want to be on this guy's origin now then
-            let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
-            let targ = G_Find(ctx, None, targetname_ofs, &cstr_to_str(paintarget));
+            let targ = G_Find(ctx, None, EntFindField::Targetname, &cstr_to_str(paintarget));
             let targ = ctx.entity_id_of(targ);
 
             if let Some(targ) = targ {
@@ -2283,17 +2282,17 @@ pub fn SP_misc_siege_item(ctx: &mut GameContext, ent: EntityId) {
             ctx.world.entity_mut(ent).takedamage = qfalse;
         }
 
-        let targetname = ctx.world.entity(ent).targetname;
+        let targetname = ctx.world.entity(ent).targetname_str();
         if ctx.world.entity(ent).spawnflags & SIEGEITEM_STARTOFFRADAR != 0 {
             ctx.world.entity_mut(ent).use_ = Some(EntUse::SiegeItemUse).into();
-        } else if !targetname.is_null() && *targetname != 0 {
+        } else if targetname.as_deref().is_some_and(|s| !s.is_empty()) {
             ctx.world.entity_mut(ent).s.eFlags |= EF_NODRAW; // kind of hacky, but whatever
             ctx.world.entity_mut(ent).genericValue11 = canpickup;
             ctx.world.entity_mut(ent).use_ = Some(EntUse::SiegeItemUse).into();
             ctx.world.entity_mut(ent).s.eFlags &= !EF_RADAROBJECT;
         }
 
-        if (targetname.is_null() || *targetname == 0)
+        if targetname.as_deref().map_or(true, |s| s.is_empty())
             || (ctx.world.entity(ent).spawnflags & SIEGEITEM_STARTOFFRADAR != 0)
         {
             if canpickup != 0 || ctx.world.entity(ent).takedamage == 0 {

@@ -94,7 +94,7 @@ pub fn Debug_NPCPrintf(
 
         let time = ctx.world.level.time;
         let msg: String = cstr_to_str(fmt);
-        let npc_targetname: String = cstr_to_str(ctx.entity(printNPC).targetname);
+        let npc_targetname: String = ctx.entity(printNPC).targetname_str().unwrap_or_default();
 
         // Format: Q_COLOR_ESCAPE ('^') + color char + time + NPC name + message
         let output = format!("^{}{:5} ({}) {}", color, time, npc_targetname, msg);

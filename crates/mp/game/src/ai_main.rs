@@ -1179,11 +1179,9 @@ pub fn CheckForFunc(ctx: &mut GameContext, org: vec3_t, ignore: c_int) -> c_int 
         // Raven `if (!fent)` on `&g_entities[...]` is structurally dead. Raven
         // then `strstr(fent->classname, ...)` and would deref a null classname
         // (UB); guarding null is the one defined behavior here.
-        if !fent.classname.is_null() {
-            let cn = core::ffi::CStr::from_ptr(fent.classname);
-            if cn.to_bytes().windows(5).any(|w| w == b"func_") {
-                return 1; // there's a func brush here
-            }
+        let cn = fent.classname_str();
+        if cn.contains("func_") {
+            return 1; // there's a func brush here
         }
     }
     0
@@ -6129,8 +6127,10 @@ pub fn CTFFlagMovement(ctx: &mut GameContext, bs: *mut bot_state_t) {
                 if (*bs).wpDestination == flagRed
                     && !droppedRedFlag.is_null()
                     && ((*droppedRedFlag).flags & FL_DROPPED_ITEM) != 0
-                    && !(*droppedRedFlag).classname.is_null()
-                    && cstr_to_str((*droppedRedFlag).classname) != "freed"
+                    && {
+                        let cn = (*droppedRedFlag).classname_str();
+                        !cn.is_empty() && cn != "freed"
+                    }
                 {
                     desiredDrop = droppedRedFlag;
                     diddrop = 1;
@@ -6138,8 +6138,10 @@ pub fn CTFFlagMovement(ctx: &mut GameContext, bs: *mut bot_state_t) {
                 if (*bs).wpDestination == flagBlue
                     && !droppedBlueFlag.is_null()
                     && ((*droppedBlueFlag).flags & FL_DROPPED_ITEM) != 0
-                    && !(*droppedBlueFlag).classname.is_null()
-                    && cstr_to_str((*droppedBlueFlag).classname) != "freed"
+                    && {
+                        let cn = (*droppedBlueFlag).classname_str();
+                        !cn.is_empty() && cn != "freed"
+                    }
                 {
                     desiredDrop = droppedBlueFlag;
                     diddrop = 1;
@@ -6186,9 +6188,8 @@ pub fn BotCheckDetPacks(ctx: &mut GameContext, bs: *mut bot_state_t) {
         let enLen: f32;
         let myLen: f32;
 
-        let fofs = core::mem::offset_of!(gentity_t, classname) as c_int;
         loop {
-            dp = G_Find(ctx, ctx.entity_id_of(dp), fofs, "detpack");
+            dp = G_Find(ctx, ctx.entity_id_of(dp), EntFindField::Classname, "detpack");
             if dp.is_null() {
                 break;
             }

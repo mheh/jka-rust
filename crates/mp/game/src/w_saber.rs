@@ -788,14 +788,11 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
         // they belong to this client.
         let check_id = EntityId(i as u32);
         let ce = ctx.world.entity(check_id);
-        // `classname` is a raw C string pointer, not an entity/client handle —
-        // its deref stays raw (seam-ish), Raven's exact match test.
         let matches = ce.inuse != 0
             && ce.neverFree != 0
             && ce.r.ownerNum == ent_number
-            && !ce.classname.is_null()
-            && unsafe { *ce.classname != 0 }
-            && unsafe { Q_stricmp(&cstr_to_str(ce.classname), "lightsaber") == 0 };
+            && !ce.classname_str().is_empty()
+            && Q_stricmp(&ce.classname_str(), "lightsaber") == 0;
 
         if matches {
             if saberent.is_some() {
@@ -835,9 +832,9 @@ pub fn WP_SaberInitBladeData(ctx: &mut GameContext, ent: EntityId) {
         (*ec).ps.saberEntityNum = saber_number;
     }
 
+    ctx.ent_set(saberent, PrefixSet::ClassnameStatic(c"lightsaber"));
     {
         let se = ctx.world.entity_mut(saberent);
-        se.classname = c"lightsaber".as_ptr() as *mut c_char;
         se.neverFree = qtrue; // the saber being removed would be terrible.
         se.r.svFlags = SVF_USE_CURRENT_ORIGIN;
         se.r.ownerNum = ent_number;
@@ -7539,9 +7536,9 @@ pub fn MakeDeadSaber(ctx: &mut GameContext, ent: EntityId) {
     let ent_number = ctx.world.entity(ent).s.number;
     let level_time = ctx.world.level.time;
 
+    ctx.ent_set(saberent, PrefixSet::ClassnameStatic(c"deadsaber"));
     {
         let se = ctx.world.entity_mut(saberent);
-        se.classname = c"deadsaber".as_ptr() as *mut c_char;
         se.r.svFlags = SVF_USE_CURRENT_ORIGIN;
         se.r.ownerNum = ent_number;
         se.clipmask = MASK_PLAYERSOLID;

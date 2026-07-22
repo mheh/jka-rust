@@ -1218,12 +1218,10 @@ pub fn G_FindLocalInterestPoint(ctx: &mut GameContext, self_: EntityId) -> c_int
             .target
             .is_null()
     {
-        G_UseTargets2(
-            ctx,
-            Some(self_),
-            Some(self_),
-            ctx.world.level.interestPoints[best_point as usize].target,
-        );
+        let target = unsafe {
+            cstr_to_str(ctx.world.level.interestPoints[best_point as usize].target)
+        };
+        G_UseTargets2(ctx, Some(self_), Some(self_), Some(&target));
     }
     best_point
 }
@@ -1251,12 +1249,14 @@ pub fn SP_target_interest(ctx: &mut GameContext, self_: EntityId) {
         &mut ctx.world.level.interestPoints[ctx.world.level.numInterestPoints as usize].origin,
     );
 
-    // `target` is a raw `char *` field on `gentity_t`; deref of the C string stays
-    // raw (still-raw string field).
-    let target = ctx.entity(self_).target;
-    if !target.is_null() && unsafe { *target } != 0 {
-        ctx.world.level.interestPoints[ctx.world.level.numInterestPoints as usize].target =
-            G_NewString(ctx, target);
+    // `self->target` is now an owned `Option<String>`; the interest point's
+    // `target` slot stays a `*mut c_char` filled by `G_NewString` (Raven's
+    // `if (self->target && self->target[0])` non-empty guard).
+    let target = ctx.entity(self_).target.clone();
+    if target.as_deref().is_some_and(|s| !s.is_empty()) {
+        let target_c = cstr(target.as_deref().unwrap());
+        let idx = ctx.world.level.numInterestPoints as usize;
+        ctx.world.level.interestPoints[idx].target = G_NewString(ctx, target_c.as_ptr());
     }
 
     ctx.world.level.numInterestPoints += 1;

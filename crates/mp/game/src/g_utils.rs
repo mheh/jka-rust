@@ -263,13 +263,35 @@ pub fn G_TeamCommand(ctx: &mut GameContext, team: team_t, cmd: *mut c_char) {
     }
 }
 
-/// Raven `G_Find`.
+/// Which entity string field `G_Find` walks — replaces Raven's `FOFS(x)` byte
+/// offset (`G_Find`'s `int fieldofs`), covering the fields the ported tree
+/// actually searches by. `Targetname`/`Classname`/`ScriptTargetname` read prefix
+/// `*mut c_char` slots; `Target`/`Target2` read the owned `Option<String>` tail
+/// fields (door triggers scan them).
+///
+/// Source: `oracle/codemp/game/g_utils.c:222-243`
+pub enum EntFindField {
+    /// `targetname` slot (`FOFS(targetname)`).
+    Targetname,
+    /// `classname` slot (`FOFS(classname)`).
+    Classname,
+    /// `script_targetname` slot (`FOFS(script_targetname)`).
+    ScriptTargetname,
+    /// `target` field (`FOFS(target)`).
+    Target,
+    /// `target2` field (`FOFS(target2)`).
+    Target2,
+}
+
+/// Raven `G_Find`. `field` selects the prefix slot to match (was `FOFS(x)`); the
+/// slot is decoded through the entity's `_str` reader — a NULL slot never
+/// matches, preserving the C `if (!s || Q_stricmp(...))` skip.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:222-243`
 pub fn G_Find(
     ctx: &mut GameContext,
     from: Option<EntityId>,
-    fieldofs: c_int,
+    field: EntFindField,
     r#match: &str,
 ) -> *mut gentity_t {
     // STAGE-1: Option param, raw body re-derived verbatim (Stage-2 debt).
@@ -283,8 +305,27 @@ pub fn G_Find(
 
         while cur < base.add(num_entities as usize) {
             if (*cur).inuse != qfalse {
-                let s = *((cur as *mut u8).add(fieldofs as usize) as *mut *mut c_char);
-                if !s.is_null() && Q_stricmp(&cstr_to_str(s), r#match) == 0 {
+                // `classname_str` collapses NULL to `""`; a classname search is
+                // never issued with an empty `match`, so that never spuriously
+                // hits — identical to the C null-skip for every real input.
+                let hit = match field {
+                    EntFindField::Classname => Q_stricmp(&(*cur).classname_str(), r#match) == 0,
+                    EntFindField::Targetname => (*cur)
+                        .targetname_str()
+                        .is_some_and(|s| Q_stricmp(&s, r#match) == 0),
+                    EntFindField::ScriptTargetname => (*cur)
+                        .script_targetname_str()
+                        .is_some_and(|s| Q_stricmp(&s, r#match) == 0),
+                    EntFindField::Target => (*cur)
+                        .target
+                        .as_deref()
+                        .is_some_and(|s| Q_stricmp(s, r#match) == 0),
+                    EntFindField::Target2 => (*cur)
+                        .target2
+                        .as_deref()
+                        .is_some_and(|s| Q_stricmp(s, r#match) == 0),
+                };
+                if hit {
                     return cur;
                 }
             }
@@ -589,25 +630,21 @@ pub fn G_SetAnim(
 /// Raven `G_PickTarget`.
 ///
 /// Source: `oracle/codemp/game/g_utils.c:521-550`
-pub fn G_PickTarget(ctx: &mut GameContext, targetname: *mut c_char) -> *mut gentity_t {
+pub fn G_PickTarget(ctx: &mut GameContext, targetname: Option<&str>) -> *mut gentity_t {
     const MAXCHOICES: usize = 32;
     let mut choice: [*mut gentity_t; MAXCHOICES] = [core::ptr::null_mut(); MAXCHOICES];
     let mut num_choices: usize = 0;
 
-    unsafe {
-        if targetname.is_null() {
-            G_Printf(ctx, "G_PickTarget called with NULL targetname\n");
-            return core::ptr::null_mut();
-        }
+    // `None` ≡ Raven's NULL `targetname` (the `if (!targetname)` guard).
+    let Some(targetname) = targetname else {
+        G_Printf(ctx, "G_PickTarget called with NULL targetname\n");
+        return core::ptr::null_mut();
+    };
 
+    unsafe {
         let mut ent: *mut gentity_t = core::ptr::null_mut();
         loop {
-            ent = G_Find(
-                ctx,
-                ctx.entity_id_of(ent),
-                crate::q_shared::FOFS_targetname,
-                &cstr_to_str(targetname),
-            );
+            ent = G_Find(ctx, ctx.entity_id_of(ent), EntFindField::Targetname, targetname);
             if ent.is_null() {
                 break;
             }
@@ -619,10 +656,7 @@ pub fn G_PickTarget(ctx: &mut GameContext, targetname: *mut c_char) -> *mut gent
         }
 
         if num_choices == 0 {
-            let msg = format!(
-                "G_PickTarget: target {} not found\n",
-                CStr::from_ptr(targetname).to_string_lossy()
-            );
+            let msg = format!("G_PickTarget: target {targetname} not found\n");
             G_Printf(ctx, &msg);
             return core::ptr::null_mut();
         }
@@ -679,10 +713,9 @@ pub fn G_UseTargets2(
     ctx: &mut GameContext,
     ent: Option<EntityId>,
     activator: Option<EntityId>,
-    string: *const c_char,
+    string: Option<&str>,
 ) {
-    // Safe-state 2c: Option handles; `ent`/`t` fields via the accessor. `string`
-    // and the configstring conversion stay raw-`c_char` (seam).
+    // Safe-state 2c: Option handles; `ent`/`t` fields via the accessor.
     let Some(ent_id) = ent else {
         return;
     };
@@ -704,18 +737,15 @@ pub fn G_UseTargets2(
         trap::SetConfigstring(ctx.engine, CS_SHADERSTATE, &config);
     }
 
-    if string.is_null() || unsafe { *string } == 0 {
-        return;
-    }
+    // Raven returns early when `string` is NULL or empty — nothing to search.
+    let string = match string {
+        Some(s) if !s.is_empty() => s,
+        _ => return,
+    };
 
     let mut t: *mut gentity_t = core::ptr::null_mut();
     loop {
-        t = G_Find(
-            ctx,
-            ctx.entity_id_of(t),
-            crate::q_shared::FOFS_targetname,
-            &(unsafe { cstr_to_str(string) }),
-        );
+        t = G_Find(ctx, ctx.entity_id_of(t), EntFindField::Targetname, string);
         if t.is_null() {
             break;
         }
@@ -744,8 +774,8 @@ pub fn G_UseTargets(ctx: &mut GameContext, ent: Option<EntityId>, activator: Opt
     let Some(ent_id) = ent else {
         return;
     };
-    let target = ctx.world.entity(ent_id).target as *const c_char;
-    G_UseTargets2(ctx, Some(ent_id), activator, target);
+    let target = ctx.world.entity(ent_id).target.clone();
+    G_UseTargets2(ctx, Some(ent_id), activator, target.as_deref());
 }
 
 /// Raven `tv`.
@@ -812,7 +842,6 @@ pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
     {
         let ent = ctx.world.entity_mut(e);
         ent.inuse = qtrue;
-        ent.classname = b"noclass\0".as_ptr() as *mut c_char;
         ent.s.number = e.index() as c_int;
         ent.r.ownerNum = mp_qshared::shared::ENTITYNUM_NONE;
         ent.s.modelGhoul2 = 0; // assume not
@@ -820,6 +849,8 @@ pub fn G_InitGentity(ctx: &mut GameContext, e: EntityId) {
 
     // ICARUS information must be added after this point.
     let ent_ptr = ctx.world.entity_mut(e) as *mut gentity_t;
+    // `classname` write through the prefix choke point (literal path).
+    ctx.ent_set(e, PrefixSet::ClassnameStatic(c"noclass"));
     trap::ICARUS_FreeEnt(ctx.engine, GIcarusFreeentArgs::new(ent_ptr.cast()));
 }
 
@@ -864,10 +895,13 @@ pub fn G_SpewEntList(ctx: &mut GameContext) {
                     }
                 }
 
-                let className = if !ent.classname.is_null() && *ent.classname != 0 {
-                    cstr_to_str(ent.classname)
-                } else {
-                    "Unknown".to_string()
+                let className = {
+                    let c = ent.classname_str();
+                    if c.is_empty() {
+                        "Unknown".to_string()
+                    } else {
+                        c
+                    }
                 };
                 let s = format!("ENT {:4}: Classname {}\n", ent.s.number, className);
                 Com_Printf(&s);
@@ -1154,8 +1188,8 @@ pub fn G_FreeEntity(ctx: &mut GameContext, ed: Option<EntityId>) {
     // construction (zero == None, std-guaranteed via Option<NonZeroU8>), matching
     // Raven's NULL fn ptrs.
     let level_time = ctx.world.level.time;
+    ctx.ent_set(ed_id, PrefixSet::ClassnameStatic(c"freed"));
     let ed = ctx.world.entity_mut(ed_id);
-    ed.classname = b"freed\0".as_ptr() as *mut c_char;
     ed.freetime = level_time;
     ed.inuse = qfalse;
 }
@@ -1169,10 +1203,10 @@ pub fn G_TempEntity(ctx: &mut GameContext, origin: vec3_t, event: c_int) -> Enti
     {
         let ent = ctx.world.entity_mut(e_id);
         ent.s.eType = mp_bg::public::entity_type::entityType_t::ET_EVENTS as c_int + event;
-        ent.classname = b"tempEntity\0".as_ptr() as *mut c_char;
         ent.eventTime = level_time;
         ent.freeAfterEvent = qtrue;
     }
+    ctx.ent_set(e_id, PrefixSet::ClassnameStatic(c"tempEntity"));
 
     let mut snapped = origin;
     snap_vector(&mut snapped); // save network bandwidth

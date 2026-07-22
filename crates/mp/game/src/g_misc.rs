@@ -16,7 +16,7 @@ use crate::g_client::SetClientViewAngle;
 use crate::g_combat::AddScore;
 use crate::g_exphysics::G_RunExPhys;
 use crate::g_local_consts::{START_TIME_FIND_LINKS, START_TIME_LINK_ENTS};
-use crate::g_main::{G_Printf, LogExit};
+use crate::g_main::{Com_Printf, G_Printf, LogExit};
 use crate::g_mover::G_FindDoorTrigger;
 use crate::g_object::G_RunObject;
 use crate::g_spawn::{G_SpawnFloat, G_SpawnInt};
@@ -199,7 +199,7 @@ pub fn misc_dlight_use(
 ///
 /// Source: `oracle/codemp/game/g_misc.c:142-166`
 pub fn SP_light(ctx: &mut GameContext, self_: EntityId) {
-    if ctx.world.entity(self_).targetname.is_null() {
+    if ctx.world.entity(self_).targetname_str().is_none() {
         // if i don't have a light style switch, then i go away
         G_FreeEntity(ctx, Some(self_));
         return;
@@ -350,8 +350,8 @@ pub fn SP_misc_G2model(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:305-349`
 pub fn locateCamera(ctx: &mut GameContext, ent: EntityId) {
-    let ent_target = ctx.world.entity(ent).target;
-    let owner = G_PickTarget(ctx, ent_target);
+    let ent_target = ctx.world.entity(ent).target.clone();
+    let owner = G_PickTarget(ctx, ent_target.as_deref());
     if owner.is_null() {
         G_Printf(ctx, "Couldn't find target for misc_partal_surface\n");
         G_FreeEntity(ctx, Some(ent));
@@ -385,8 +385,8 @@ pub fn locateCamera(ctx: &mut GameContext, ent: EntityId) {
     ctx.world.entity_mut(ent).s.origin2 = owner_origin;
 
     // see if the portal_camera has a target
-    let owner_target = ctx.world.entity(owner_id).target;
-    let target = G_PickTarget(ctx, owner_target);
+    let owner_target = ctx.world.entity(owner_id).target.clone();
+    let target = G_PickTarget(ctx, owner_target.as_deref());
     let mut dir: vec3_t = [0.0, 0.0, 0.0];
     if !target.is_null() {
         let target_id = ctx.entity_id_of(target).unwrap();
@@ -420,7 +420,7 @@ pub fn SP_misc_portal_surface(ctx: &mut GameContext, ent: EntityId) {
     e.r.svFlags = SVF_PORTAL;
     e.s.eType = entityType_t::ET_PORTAL as c_int;
 
-    if e.target.is_null() {
+    if e.target.is_none() {
         e.s.origin2 = e.s.origin;
     } else {
         e.think = Some(EntThink::locateCamera).into();
@@ -1269,8 +1269,8 @@ pub fn Use_Shooter(
 ///
 /// Source: `oracle/codemp/game/g_misc.c:1142-1146`
 pub fn InitShooter_Finish(ctx: &mut GameContext, ent: EntityId) {
-    let target = ctx.world.entity(ent).target;
-    let picked = G_PickTarget(ctx, target);
+    let target = ctx.world.entity(ent).target.clone();
+    let picked = G_PickTarget(ctx, target.as_deref());
     let enemy = ctx.entity_id_of(picked);
     let e = ctx.world.entity_mut(ent);
     e.enemy = enemy;
@@ -1307,7 +1307,7 @@ pub fn InitShooter(ctx: &mut GameContext, ent: EntityId, weapon: c_int) {
     let random = ctx.world.entity(ent).random;
     ctx.world.entity_mut(ent).random = (std::f64::consts::PI * random as f64 / 180.0).sin() as f32;
     // target might be a moving object, so we can't set movedir for it
-    if !ctx.world.entity(ent).target.is_null() {
+    if ctx.world.entity(ent).target.is_some() {
         let time = ctx.world.level.time;
         let e = ctx.world.entity_mut(ent);
         e.think = Some(EntThink::InitShooter_Finish).into();
@@ -2307,10 +2307,10 @@ pub fn fx_runner_think(ctx: &mut GameContext, ent: EntityId) {
         );
     }
 
-    let target2 = ctx.world.entity(ent).target2;
-    if !target2.is_null() && unsafe { *target2 } != 0 {
+    let target2 = ctx.world.entity(ent).target2.clone();
+    if target2.as_deref().is_some_and(|s| !s.is_empty()) {
         // let our target know that we have spawned an effect
-        G_UseTargets2(ctx, Some(ent), Some(ent), target2);
+        G_UseTargets2(ctx, Some(ent), Some(ent), target2.as_deref());
     }
 
     if ctx.world.entity(ent).spawnflags & 2 == 0 && ctx.world.entity(ent).s.loopSound == 0 {
@@ -2354,10 +2354,10 @@ pub fn fx_runner_use(
             ctx.world.entity_mut(self_).s.modelindex2 = FX_STATE_ONE_SHOT;
         }
 
-        let target2 = ctx.world.entity(self_).target2;
-        if !target2.is_null() {
+        let target2 = ctx.world.entity(self_).target2.clone();
+        if target2.is_some() {
             // let our target know that we have spawned an effect
-            G_UseTargets2(ctx, Some(self_), Some(self_), target2);
+            G_UseTargets2(ctx, Some(self_), Some(self_), target2.as_deref());
         }
 
         let sound_set = ctx.world.entity(self_).soundSet;
@@ -2423,24 +2423,18 @@ pub fn fx_runner_use(
 pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
     let mut dir: vec3_t;
 
-    let target_field = ctx.world.entity(ent).target;
-    if !target_field.is_null() && unsafe { *target_field } != 0 {
+    let target_field = ctx.world.entity(ent).target.clone();
+    if target_field.as_deref().is_some_and(|s| !s.is_empty()) {
         // try to use the target to override the orientation
-        let target = G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(target_field) }),
-        );
+        let target = G_Find(ctx, None, EntFindField::Targetname, target_field.as_deref().unwrap());
 
         if target.is_null() {
             // Bah, no good, dump a warning, but continue on and use the UP vector
-            let targetname = ctx.world.entity(ent).target;
-            crate::g_main::Com_Printf(&format!(
+            Com_Printf(&format!(
                 "fx_runner_link: target specified but not found: {}\n",
-                unsafe { cstr_to_str(targetname) }
+                target_field.as_deref().unwrap()
             ));
-            crate::g_main::Com_Printf("  -assuming UP orientation.\n");
+            Com_Printf("  -assuming UP orientation.\n");
         } else {
             // Our target is valid so let's override the default UP vector
             let target_id = ctx.entity_id_of(target).unwrap();
@@ -2454,21 +2448,16 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
     }
 
     // don't really do anything with this right now other than do a check to warn the designers if the target2 is bogus
-    let target2_field = ctx.world.entity(ent).target2;
-    if !target2_field.is_null() && unsafe { *target2_field } != 0 {
-        let target = G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(target2_field) }),
-        );
+    let target2_field = ctx.world.entity(ent).target2.clone();
+    if target2_field.as_deref().is_some_and(|s| !s.is_empty()) {
+        let target =
+            G_Find(ctx, None, EntFindField::Targetname, target2_field.as_deref().unwrap());
 
         if target.is_null() {
             // Target2 is bogus, but we can still continue
-            let target2 = ctx.world.entity(ent).target2;
-            crate::g_main::Com_Printf(&format!(
+            Com_Printf(&format!(
                 "fx_runner_link: target2 was specified but is not valid: {}\n",
-                unsafe { cstr_to_str(target2) }
+                target2_field.as_deref().unwrap()
             ));
         }
     }
@@ -2498,8 +2487,8 @@ pub fn fx_runner_link(ctx: &mut GameContext, ent: EntityId) {
     }
 
     // make us useable if we can be targeted
-    let targetname = ctx.world.entity(ent).targetname;
-    if !targetname.is_null() && unsafe { *targetname } != 0 {
+    let targetname = ctx.world.entity(ent).targetname_str();
+    if targetname.as_deref().is_some_and(|s| !s.is_empty()) {
         ctx.world.entity_mut(ent).use_ = Some(EntUse::fx_runner_use).into();
     }
 }
@@ -2542,11 +2531,11 @@ pub fn SP_fx_runner(ctx: &mut GameContext, ent: EntityId) {
     }
 
     if fx_file.is_empty() {
-        let targetname = ctx.world.entity(ent).targetname;
+        let targetname = ctx.world.entity(ent).targetname_str();
         let origin = ctx.world.entity(ent).s.origin;
-        crate::g_main::Com_Printf(&format!(
+        Com_Printf(&format!(
             "^1ERROR: fx_runner {} at {} has no fxFile specified\n",
-            unsafe { cstr_to_str(targetname) },
+            targetname.as_deref().unwrap_or(""),
             vtos(ctx, origin)
         ));
         G_FreeEntity(ctx, Some(ent));
@@ -2830,8 +2819,7 @@ pub fn maglock_link(ctx: &mut GameContext, self_: EntityId) {
     }
     let trace_ent = EntityId(trace.entityNum as u32);
     let is_bad = trace.entityNum >= (ENTITYNUM_WORLD as c_int) as i16 || {
-        let classname = ctx.world.entity(trace_ent).classname;
-        classname.is_null() || Q_stricmp("func_door", &(unsafe { cstr_to_str(classname) })) != 0
+        Q_stricmp("func_door", &ctx.world.entity(trace_ent).classname_str()) != 0
     };
     if is_bad {
         let level_time = ctx.world.level.time;
@@ -3058,8 +3046,8 @@ pub fn SP_misc_faller(ctx: &mut GameContext, ent: EntityId) {
     G_SpawnInt(ctx, c"fudgefactor".as_ptr(), c"0".as_ptr(), &mut fudge);
     ctx.world.entity_mut(ent).genericValue2 = fudge;
 
-    let targetname = ctx.world.entity(ent).targetname;
-    if targetname.is_null() || unsafe { *targetname } == 0 {
+    let targetname = ctx.world.entity(ent).targetname_str();
+    if targetname.as_deref().map_or(true, |s| s.is_empty()) {
         let level_time = ctx.world.level.time;
         let gv1 = ctx.world.entity(ent).genericValue1;
         let gv2 = ctx.world.entity(ent).genericValue2;
@@ -3393,15 +3381,10 @@ pub fn TAG_GetFlags(ctx: &mut GameContext, owner: *const c_char, name: *const c_
 pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
     use crate::q_math::vectoangles;
 
-    let target_field = ctx.world.entity(ent).target;
-    if !target_field.is_null() {
+    let target_field = ctx.world.entity(ent).target.clone();
+    if target_field.is_some() {
         //TODO: Find the target and set our angles to that direction
-        let target = G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(target_field) }),
-        );
+        let target = G_Find(ctx, None, EntFindField::Targetname, target_field.as_deref().unwrap());
         let mut dir: vec3_t = [0.0, 0.0, 0.0];
 
         if !target.is_null() {
@@ -3414,23 +3397,26 @@ pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
             vectoangles(dir, &mut ctx.world.entity_mut(ent).s.angles);
             //FIXME: Does pitch get flipped?
         } else {
-            let targetname = ctx.world.entity(ent).targetname;
-            let target = ctx.world.entity(ent).target;
-            crate::g_main::Com_Printf(&format!(
+            let targetname = ctx.world.entity(ent).targetname_str();
+            Com_Printf(&format!(
                 "^1ERROR: ref_tag ({}) has invalid target ({})",
-                unsafe { cstr_to_str(targetname) },
-                unsafe { cstr_to_str(target) }
+                targetname.as_deref().unwrap_or(""),
+                target_field.as_deref().unwrap()
             ));
         }
     }
 
     // Add the tag
-    let targetname = ctx.world.entity(ent).targetname;
+    let targetname = ctx.world.entity(ent).targetname_str();
+    let targetname_c = targetname.as_deref().map(cstr);
+    let targetname_ptr = targetname_c
+        .as_ref()
+        .map_or(core::ptr::null(), |c| c.as_ptr());
     let ownername = ctx.world.entity(ent).ownername.clone();
     let ownername_c = cstr(&ownername);
     let origin = ctx.world.entity(ent).s.origin;
     let angles = ctx.world.entity(ent).s.angles;
-    TAG_Add(ctx, targetname, ownername_c.as_ptr(), origin, angles, 16, 0);
+    TAG_Add(ctx, targetname_ptr, ownername_c.as_ptr(), origin, angles, 16, 0);
 
     // Delete immediately, cannot be refered to as an entity again
     // NOTE: this means if you wanted to link them in a chain for, say, a path, you can't
@@ -3441,7 +3427,7 @@ pub fn ref_link(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_misc.c:3300-3312`
 pub fn SP_reference_tag(ctx: &mut GameContext, ent: EntityId) {
-    if !ctx.world.entity(ent).target.is_null() {
+    if ctx.world.entity(ent).target.is_some() {
         // Init cannot occur until all entities have been spawned
         let level_time = ctx.world.level.time;
         let e = ctx.world.entity_mut(ent);
@@ -3546,14 +3532,9 @@ pub fn misc_weapon_shooter_aim(ctx: &mut GameContext, self_: EntityId) {
     use crate::q_math::vectoangles;
 
     // update my aim
-    let target_field = ctx.world.entity(self_).target;
-    if !target_field.is_null() {
-        let targ = G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(target_field) }),
-        );
+    let target_field = ctx.world.entity(self_).target.clone();
+    if target_field.is_some() {
+        let targ = G_Find(ctx, None, EntFindField::Targetname, target_field.as_deref().unwrap());
         if !targ.is_null() {
             let targ_id = ctx.entity_id_of(targ).unwrap();
             ctx.world.entity_mut(self_).enemy = Some(targ_id);
@@ -3624,7 +3605,7 @@ pub fn SP_misc_weapon_shooter(ctx: &mut GameContext, self_: EntityId) {
     //self->client->renderInfo.mPCalcTime = Q3_INFINITE;
 
     // set up to link
-    if !ctx.world.entity(self_).target.is_null() {
+    if ctx.world.entity(self_).target.is_some() {
         let level_time = ctx.world.level.time;
         let e = ctx.world.entity_mut(self_);
         e.think = Some(EntThink::misc_weapon_shooter_aim).into();

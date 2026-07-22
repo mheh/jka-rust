@@ -356,8 +356,8 @@ pub fn Remote_Fire(ctx: &mut GameContext) {
         forward,
     );
 
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"briar"));
     let m = ctx.world.entity_mut(missile_id);
-    m.classname = c"briar".as_ptr() as *mut c_char;
     m.s.weapon = WP_BRYAR_PISTOL as c_int;
 
     m.damage = 10;

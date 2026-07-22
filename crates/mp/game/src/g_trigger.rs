@@ -39,7 +39,7 @@ use crate::g_utils::{
 use crate::q_math::vec3_origin;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
-use native_string::Q_stricmp;
+use native_string::{atoi_bytes, Q_stricmp};
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
@@ -142,9 +142,11 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
         let target3 = ctx.world.entity(ent).target3;
         let target4 = ctx.world.entity(ent).target4;
         if gv4 == SIEGETEAM_TEAM1 && !target3.is_null() && unsafe { *target3 } != 0 {
-            G_UseTargets2(ctx, Some(ent), activator, target3);
+            let target3 = unsafe { cstr_to_str(target3) };
+            G_UseTargets2(ctx, Some(ent), activator, Some(&target3));
         } else if gv4 == SIEGETEAM_TEAM2 && !target4.is_null() && unsafe { *target4 } != 0 {
-            G_UseTargets2(ctx, Some(ent), activator, target4);
+            let target4 = unsafe { cstr_to_str(target4) };
+            G_UseTargets2(ctx, Some(ent), activator, Some(&target4));
         }
 
         ctx.world.entity_mut(ent).genericValue4 = 0;
@@ -156,9 +158,9 @@ pub fn multi_trigger_run(ctx: &mut GameContext, ent: EntityId) {
         G_Sound(ctx, activator, CHAN_AUTO, ni);
     }
 
-    let target2 = ctx.world.entity(ent).target2;
+    let target2 = ctx.world.entity(ent).target2.clone();
     let wait = ctx.world.entity(ent).wait;
-    if !target2.is_null() && unsafe { *target2 } != 0 && wait >= 0.0 {
+    if target2.as_deref().is_some_and(|s| !s.is_empty()) && wait >= 0.0 {
         ctx.world.entity_mut(ent).think = Some(EntThink::trigger_cleared_fire).into();
         let nt = ctx.world.level.time + ctx.world.entity(ent).speed as c_int;
         ctx.world.entity_mut(ent).nextthink = nt;
@@ -295,20 +297,17 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
             Some(a) => ctx.world.entity(a).client,
             None => core::ptr::null_mut(),
         };
-        let targetname = ctx.world.entity(ent_id).targetname;
+        let targetname = ctx.world.entity(ent_id).targetname_str();
         if !ac.is_null()
             && unsafe { (*ac).holdingObjectiveItem } != 0
-            && !targetname.is_null()
-            && unsafe { *targetname } != 0
+            && targetname.as_deref().is_some_and(|s| !s.is_empty())
         {
             let obj_item = EntityId(unsafe { (*ac).holdingObjectiveItem } as u32);
 
             if ctx.world.entity(obj_item).inuse != 0 {
                 let goaltarget = ctx.world.entity(obj_item).goaltarget.clone();
-                let goaltarget_c = cstr(&goaltarget);
-                if !goaltarget.is_empty()
-                    && q_shared::Q_stricmp(targetname, goaltarget_c.as_ptr()) == 0
-                {
+                let targetname = targetname.as_deref().unwrap();
+                if !goaltarget.is_empty() && Q_stricmp(targetname, &goaltarget) == 0 {
                     let sess_team = unsafe { (*ac).sess.sessionTeam };
                     if ctx.world.entity(obj_item).genericValue7 != sess_team {
                         // The carrier of the item is not on the team which
@@ -316,11 +315,12 @@ pub fn multi_trigger(ctx: &mut GameContext, ent_id: EntityId, activator_id: Opti
                         let obj_target3 = ctx.world.entity(obj_item).target3;
                         if !obj_target3.is_null() && unsafe { *obj_target3 } != 0 {
                             // if it has a target3, fire it off instead of using the trigger
-                            G_UseTargets2(ctx, Some(obj_item), Some(obj_item), obj_target3);
+                            let obj_target3 = unsafe { cstr_to_str(obj_target3) };
+                            G_UseTargets2(ctx, Some(obj_item), Some(obj_item), Some(&obj_target3));
 
                             //3-24-03 - want to fire off the target too I guess, if we have one.
-                            let tn = ctx.world.entity(ent_id).targetname;
-                            if !tn.is_null() && unsafe { *tn } != 0 {
+                            let tn = ctx.world.entity(ent_id).targetname_str();
+                            if tn.as_deref().is_some_and(|s| !s.is_empty()) {
                                 halt_trigger = false;
                             }
                         } else {
@@ -552,9 +552,9 @@ pub fn Touch_Multi(
 
         let npc_targetname = ctx.world.entity(self_id).NPC_targetname.clone();
         if !npc_targetname.is_empty() {
-            let script_targetname = ctx.world.entity(other).script_targetname;
-            if !script_targetname.is_null() && unsafe { *script_targetname } != 0 {
-                if Q_stricmp(&npc_targetname, &(unsafe { cstr_to_str(script_targetname) })) != 0 {
+            let script_targetname = ctx.world.entity(other).script_targetname_str();
+            if script_targetname.as_deref().is_some_and(|s| !s.is_empty()) {
+                if Q_stricmp(&npc_targetname, script_targetname.as_deref().unwrap()) != 0 {
                     // not the right guy to fire me off
                     return;
                 }
@@ -732,8 +732,8 @@ pub fn Touch_Multi(
 /// Source: `oracle/codemp/game/g_trigger.c:549-558`
 pub fn trigger_cleared_fire(ctx: &mut GameContext, self_: EntityId) {
     let activator = ctx.world.entity(self_).activator;
-    let target2 = ctx.world.entity(self_).target2;
-    G_UseTargets2(ctx, Some(self_), activator, target2);
+    let target2 = ctx.world.entity(self_).target2.clone();
+    G_UseTargets2(ctx, Some(self_), activator, target2.as_deref());
     ctx.world.entity_mut(self_).think = FnId::NONE;
     // should start the wait timer now, because the trigger's just been
     // cleared, so we must "wait" from this point
@@ -784,8 +784,8 @@ pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
     }
 
     ctx.world.entity_mut(ent_id).delay *= 1000; // 1 = 1 msec, 1000 = 1 sec
-    let target2 = ctx.world.entity(ent_id).target2;
-    if ctx.world.entity(ent_id).speed == 0.0 && !target2.is_null() && unsafe { *target2 } != 0 {
+    let target2 = ctx.world.entity(ent_id).target2.clone();
+    if ctx.world.entity(ent_id).speed == 0.0 && target2.as_deref().is_some_and(|s| !s.is_empty()) {
         ctx.world.entity_mut(ent_id).speed = 1000.0;
     } else {
         ctx.world.entity_mut(ent_id).speed *= 1000.0;
@@ -794,10 +794,11 @@ pub fn SP_trigger_multiple(ctx: &mut GameContext, ent_id: EntityId) {
     ctx.world.entity_mut(ent_id).touch = Some(EntTouch::Touch_Multi).into();
     ctx.world.entity_mut(ent_id).use_ = Some(EntUse::Use_Multi).into();
 
-    let team = ctx.world.entity(ent_id).team;
-    if !team.is_null() && unsafe { *team } != 0 {
-        ctx.world.entity_mut(ent_id).alliedTeam = atoi(team);
-        ctx.world.entity_mut(ent_id).team = core::ptr::null_mut();
+    let team = ctx.world.entity(ent_id).team.clone();
+    if team.as_deref().is_some_and(|s| !s.is_empty()) {
+        let team = team.as_deref().unwrap();
+        ctx.world.entity_mut(ent_id).alliedTeam = atoi_bytes(team.as_bytes());
+        ctx.world.entity_mut(ent_id).team = None;
     }
 
     InitTrigger(ctx, ent_id);
@@ -836,10 +837,11 @@ pub fn SP_trigger_once(ctx: &mut GameContext, ent_id: EntityId) {
     ctx.world.entity_mut(ent_id).touch = Some(EntTouch::Touch_Multi).into();
     ctx.world.entity_mut(ent_id).use_ = Some(EntUse::Use_Multi).into();
 
-    let team = ctx.world.entity(ent_id).team;
-    if !team.is_null() && unsafe { *team } != 0 {
-        ctx.world.entity_mut(ent_id).alliedTeam = atoi(team);
-        ctx.world.entity_mut(ent_id).team = core::ptr::null_mut();
+    let team = ctx.world.entity(ent_id).team.clone();
+    if team.as_deref().is_some_and(|s| !s.is_empty()) {
+        let team = team.as_deref().unwrap();
+        ctx.world.entity_mut(ent_id).alliedTeam = atoi_bytes(team.as_bytes());
+        ctx.world.entity_mut(ent_id).team = None;
     }
 
     ctx.world.entity_mut(ent_id).delay *= 1000; // 1 = 1 msec, 1000 = 1 sec
@@ -1174,18 +1176,16 @@ pub fn AimAtTarget(ctx: &mut GameContext, self_: EntityId) {
     ];
     origin = [origin[0] * 0.5, origin[1] * 0.5, origin[2] * 0.5];
 
-    let target = ctx.world.entity(self_).target;
-    let ent = G_PickTarget(ctx, target);
+    let target = ctx.world.entity(self_).target.clone();
+    let ent = G_PickTarget(ctx, target.as_deref());
     if ent.is_null() {
         G_FreeEntity(ctx, Some(self_));
         return;
     }
     let ent_id = ctx.entity_id_of(ent).unwrap();
 
-    let classname = ctx.world.entity(self_).classname;
-    if !classname.is_null()
-        && Q_stricmp("trigger_push", &(unsafe { cstr_to_str(classname) })) == 0
-    {
+    let classname = ctx.world.entity(self_).classname_str();
+    if Q_stricmp("trigger_push", &classname) == 0 {
         if ctx.world.entity(self_).spawnflags & PUSH_RELATIVE != 0 {
             // relative, not an arc or linear
             let co = ctx.world.entity(ent_id).r.currentOrigin;
@@ -1201,10 +1201,8 @@ pub fn AimAtTarget(ctx: &mut GameContext, self_: EntityId) {
         }
     }
 
-    let classname = ctx.world.entity(self_).classname;
-    if !classname.is_null()
-        && Q_stricmp("target_push", &(unsafe { cstr_to_str(classname) })) == 0
-    {
+    let classname = ctx.world.entity(self_).classname_str();
+    if Q_stricmp("target_push", &classname) == 0 {
         if ctx.world.entity(self_).spawnflags & PUSH_CONSTANT != 0 {
             let eo = ctx.world.entity(ent_id).s.origin;
             let so = ctx.world.entity(self_).s.origin;
@@ -1340,7 +1338,7 @@ pub fn SP_target_push(ctx: &mut GameContext, self_: EntityId) {
         // G_SoundIndex("sound/misc/windfly.wav");
         ctx.world.entity_mut(self_).noise_index = 0;
     }
-    if !ctx.world.entity(self_).target.is_null() {
+    if ctx.world.entity(self_).target.is_some() {
         let origin = ctx.world.entity(self_).s.origin;
         ctx.world.entity_mut(self_).r.absmin = origin;
         ctx.world.entity_mut(self_).r.absmax = origin;
@@ -1384,8 +1382,8 @@ pub fn trigger_teleporter_touch(
         return;
     }
 
-    let target = ctx.world.entity(self_).target;
-    let dest = G_PickTarget(ctx, target);
+    let target = ctx.world.entity(self_).target.clone();
+    let dest = G_PickTarget(ctx, target.as_deref());
     if dest.is_null() {
         G_Printf(ctx, "Couldn't find teleporter destination\n");
         return;
@@ -1473,12 +1471,11 @@ pub fn hurt_touch(
         None => return,
     };
 
-    let team_str = ctx.world.entity(self_).team;
+    let team_str = ctx.world.entity(self_).team.clone();
     if ctx.world.cvars.g_gametype.integer == GT_SIEGE
-        && !team_str.is_null()
-        && unsafe { *team_str } != 0
+        && team_str.as_deref().is_some_and(|s| !s.is_empty())
     {
-        let team = atoi(team_str);
+        let team = atoi_bytes(team_str.as_deref().unwrap().as_bytes());
         // FLAG: pool `gclient_t` deref — read the raw pointer via the safe
         // entity borrow, as Raven does.
         let oc = ctx.world.entity(other).client;
@@ -1803,16 +1800,10 @@ pub fn shipboundary_touch(
 
     // A NULL `target` never matches in Raven's G_Find; keep that by not searching
     // rather than reading NULL as a string.
-    let target = ctx.world.entity(self_).target;
-    let ent = if target.is_null() {
-        core::ptr::null_mut()
-    } else {
-        G_Find(
-            ctx,
-            None,
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            &(unsafe { cstr_to_str(target) }),
-        )
+    let target = ctx.world.entity(self_).target.clone();
+    let ent = match target.as_deref() {
+        Some(target) => G_Find(ctx, None, EntFindField::Targetname, target),
+        None => core::ptr::null_mut(),
     };
     let ent_id = ctx.entity_id_of(ent);
     if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
@@ -1918,8 +1909,8 @@ pub fn SP_trigger_shipboundary(ctx: &mut GameContext, self_id: EntityId) {
     InitTrigger(ctx, self_id);
     ctx.world.entity_mut(self_id).r.contents = CONTENTS_TRIGGER;
 
-    let target = ctx.world.entity(self_id).target;
-    if target.is_null() || unsafe { *target } == 0 {
+    let target = ctx.world.entity(self_id).target.clone();
+    if !target.as_deref().is_some_and(|s| !s.is_empty()) {
         G_Error(ctx, "trigger_shipboundary without a target.");
     }
     let mut gv1: c_int = 0;
@@ -1982,16 +1973,10 @@ pub fn hyperspace_touch(
                 // Get the offset from the local position
                 // A NULL `target` never matches in Raven's G_Find; keep that by
                 // not searching rather than reading NULL as a string.
-                let target = ctx.world.entity(self_).target;
-                let ent = if target.is_null() {
-                    core::ptr::null_mut()
-                } else {
-                    G_Find(
-                        ctx,
-                        None,
-                        core::mem::offset_of!(gentity_t, targetname) as c_int,
-                        &(unsafe { cstr_to_str(target) }),
-                    )
+                let target = ctx.world.entity(self_).target.clone();
+                let ent = match target.as_deref() {
+                    Some(target) => G_Find(ctx, None, EntFindField::Targetname, target),
+                    None => core::ptr::null_mut(),
                 };
                 let ent_id = ctx.entity_id_of(ent);
                 if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
@@ -2019,16 +2004,10 @@ pub fn hyperspace_touch(
                 // Now get the base position of the destination
                 // A NULL `target2` never matches in Raven's G_Find; keep that by
                 // not searching rather than reading NULL as a string.
-                let target2 = ctx.world.entity(self_).target2;
-                let ent = if target2.is_null() {
-                    core::ptr::null_mut()
-                } else {
-                    G_Find(
-                        ctx,
-                        None,
-                        core::mem::offset_of!(gentity_t, targetname) as c_int,
-                        &(unsafe { cstr_to_str(target2) }),
-                    )
+                let target2 = ctx.world.entity(self_).target2.clone();
+                let ent = match target2.as_deref() {
+                    Some(target2) => G_Find(ctx, None, EntFindField::Targetname, target2),
+                    None => core::ptr::null_mut(),
                 };
                 let ent_id = ctx.entity_id_of(ent);
                 if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
@@ -2091,16 +2070,10 @@ pub fn hyperspace_touch(
     } else {
         // A NULL `target` never matches in Raven's G_Find; keep that by not
         // searching rather than reading NULL as a string.
-        let target = ctx.world.entity(self_).target;
-        let ent = if target.is_null() {
-            core::ptr::null_mut()
-        } else {
-            G_Find(
-                ctx,
-                None,
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                &(unsafe { cstr_to_str(target) }),
-            )
+        let target = ctx.world.entity(self_).target.clone();
+        let ent = match target.as_deref() {
+            Some(target) => G_Find(ctx, None, EntFindField::Targetname, target),
+            None => core::ptr::null_mut(),
         };
         let ent_id = ctx.entity_id_of(ent);
         if ent_id.is_none() || ctx.world.entity(ent_id.unwrap()).inuse == 0 {
@@ -2155,12 +2128,12 @@ pub fn SP_trigger_hyperspace(ctx: &mut GameContext, self_id: EntityId) {
     InitTrigger(ctx, self_id);
     ctx.world.entity_mut(self_id).r.contents = CONTENTS_TRIGGER;
 
-    let target = ctx.world.entity(self_id).target;
-    if target.is_null() || unsafe { *target } == 0 {
+    let target = ctx.world.entity(self_id).target.clone();
+    if !target.as_deref().is_some_and(|s| !s.is_empty()) {
         G_Error(ctx, "trigger_hyperspace without a target.");
     }
-    let target2 = ctx.world.entity(self_id).target2;
-    if target2.is_null() || unsafe { *target2 } == 0 {
+    let target2 = ctx.world.entity(self_id).target2.clone();
+    if !target2.as_deref().is_some_and(|s| !s.is_empty()) {
         G_Error(ctx, "trigger_hyperspace without a target2.");
     }
 
@@ -2260,22 +2233,12 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
     let mut t: *mut gentity_t = core::ptr::null_mut();
     // A NULL `target` never matches in Raven's G_Find; read it as `Option<String>`
     // so a NULL target yields no matches instead of dereferencing NULL.
-    let target_ptr = ctx.world.entity(self_).target;
-    let target = if target_ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { cstr_to_str(target_ptr) })
-    };
+    let target = ctx.world.entity(self_).target.clone();
 
     loop {
         let t_id = ctx.entity_id_of(t);
         t = match &target {
-            Some(target) => G_Find(
-                ctx,
-                t_id,
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                target,
-            ),
+            Some(target) => G_Find(ctx, t_id, EntFindField::Targetname, target),
             None => core::ptr::null_mut(),
         };
         if t.is_null() {
@@ -2292,12 +2255,7 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
 
     if t_count == 1 {
         return match &target {
-            Some(target) => G_Find(
-                ctx,
-                None,
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                target,
-            ),
+            Some(target) => G_Find(ctx, None, EntFindField::Targetname, target),
             None => core::ptr::null_mut(),
         };
     }
@@ -2309,12 +2267,7 @@ pub fn asteroid_pick_random_asteroid(ctx: &mut GameContext, self_: EntityId) -> 
     loop {
         let t_id = ctx.entity_id_of(t);
         t = match &target {
-            Some(target) => G_Find(
-                ctx,
-                t_id,
-                core::mem::offset_of!(gentity_t, targetname) as c_int,
-                target,
-            ),
+            Some(target) => G_Find(ctx, t_id, EntFindField::Targetname, target),
             None => core::ptr::null_mut(),
         };
         if t.is_null() {
@@ -2472,7 +2425,7 @@ pub fn asteroid_field_think(ctx: &mut GameContext, self_id: EntityId) {
                 G_SetOrigin(ctx.world.entity_mut(new_id), c_origin);
                 let c_angles = ctx.world.entity(copy_id).s.angles;
                 G_SetAngles(ctx.world.entity_mut(new_id), c_angles);
-                ctx.world.entity_mut(new_id).classname = c"func_rotating".as_ptr() as *mut c_char;
+                ctx.ent_set(new_id, PrefixSet::ClassnameStatic(c"func_rotating"));
 
                 SP_func_rotating(ctx, new_id);
 

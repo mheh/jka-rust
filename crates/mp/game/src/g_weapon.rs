@@ -280,8 +280,8 @@ pub fn WP_FireBryarPistol(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
     );
 
     {
+        ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"bryar_proj"));
         let m = ctx.world.entity_mut(mid);
-        m.classname = c"bryar_proj".as_ptr() as *mut c_char;
         m.s.weapon = WP_BRYAR_PISTOL;
     }
 
@@ -343,9 +343,9 @@ pub fn WP_FireTurretMissile(
     ignore: Option<EntityId>,
 ) {
     let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"generic_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"generic_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_TURRET;
 
     m.damage = damage;
@@ -379,9 +379,9 @@ pub fn WP_FireGenericBlasterMissile(
     r#mod: c_int,
 ) {
     let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"generic_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"generic_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_BRYAR_PISTOL;
 
     m.damage = damage;
@@ -412,9 +412,9 @@ pub fn WP_FireBlasterMissile(
     }
 
     let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"blaster_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"blaster_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_BLASTER;
 
     m.damage = damage;
@@ -444,13 +444,13 @@ pub fn WP_FireTurboLaserMissile(ctx: &mut GameContext, ent: EntityId, start: vec
     let e_number = e.s.number;
     let now = ctx.world.level.time;
 
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"turbo_proj"));
     let m = ctx.world.entity_mut(mid);
 
     // use a custom shot effect / custom impact effect
     m.s.otherEntityNum2 = gv14;
     m.s.emplacedOwner = gv15;
 
-    m.classname = c"turbo_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_TURRET;
 
     m.damage = e_damage;
@@ -487,9 +487,9 @@ pub fn WP_FireEmplacedMissile(
     let damage: c_int = BLASTER_DAMAGE;
 
     let mid = CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"emplaced_gun_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"emplaced_gun_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_TURRET; //WP_EMPLACED_GUN;
 
     m.activator = ignore;
@@ -1101,9 +1101,9 @@ pub fn WP_BowcasterAltFire(ctx: &mut GameContext, ent: EntityId) {
         ent,
         false,
     );
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"bowcaster_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"bowcaster_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_BOWCASTER;
 
     m.r.maxs = [
@@ -1188,9 +1188,9 @@ pub fn WP_BowcasterMainFire(ctx: &mut GameContext, ent: EntityId) {
 
         let muzzle = ctx.world.globals.muzzle;
         let mid = CreateMissile(ctx, muzzle, dir, vel, 10000, ent, true);
+        ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"bowcaster_alt_proj"));
         let m = ctx.world.entity_mut(mid);
 
-        m.classname = c"bowcaster_alt_proj".as_ptr() as *mut c_char;
         m.s.weapon = WP_BOWCASTER;
 
         m.r.maxs = [
@@ -1239,9 +1239,9 @@ pub fn WP_RepeaterMainFire(ctx: &mut GameContext, ent: EntityId, dir: vec3_t) {
         ent,
         false,
     );
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"repeater_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"repeater_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_REPEATER;
 
     m.damage = damage;
@@ -1272,9 +1272,9 @@ pub fn WP_RepeaterAltFire(ctx: &mut GameContext, ent: EntityId) {
     );
     // Read the gametype cvar before taking the missile borrow.
     let siege = ctx.world.cvars.g_gametype.integer == GT_SIEGE;
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"repeater_alt_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"repeater_alt_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_REPEATER;
 
     m.r.maxs = [
@@ -1346,9 +1346,9 @@ pub fn WP_DEMP2_MainFire(ctx: &mut GameContext, ent: EntityId) {
         ent,
         false,
     );
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"demp2_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"demp2_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_DEMP2;
 
     m.r.maxs = [
@@ -1647,12 +1647,12 @@ pub fn WP_DEMP2_AltFire(ctx: &mut GameContext, ent: EntityId) {
     // just going to be instant. -rww
 
     let now = ctx.world.level.time;
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"demp2_alt_proj"));
     let m = ctx.world.entity_mut(mid);
     m.pos1 = tr.plane.normal;
 
     m.count = count;
 
-    m.classname = c"demp2_alt_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_DEMP2;
 
     m.think = Some(EntThink::DEMP2_AltDetonate).into();
@@ -1709,9 +1709,9 @@ pub fn WP_FlechetteMainFire(ctx: &mut GameContext, ent: EntityId) {
 
         let muzzle = ctx.world.globals.muzzle;
         let mid = CreateMissile(ctx, muzzle, fwd, FLECHETTE_VEL as f32, 10000, ent, false);
+        ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"flech_proj"));
         let m = ctx.world.entity_mut(mid);
 
-        m.classname = c"flech_proj".as_ptr() as *mut c_char;
         m.s.weapon = WP_FLECHETTE;
 
         m.r.maxs = [
@@ -1889,6 +1889,7 @@ pub fn WP_CreateFlechetteBouncyThing(
     let vel = 700.0 + ctx.world.bg_state.rng.random() * 700.0;
     let life = 1500.0 + ctx.world.bg_state.rng.random() * 2000.0;
     let mid = CreateMissile(ctx, start, fwd, vel, life as c_int, self_, true);
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"flech_alt"));
     let m = ctx.world.entity_mut(mid);
 
     m.think = Some(EntThink::WP_flechette_alt_blow).into();
@@ -1896,7 +1897,6 @@ pub fn WP_CreateFlechetteBouncyThing(
     m.activator = Some(self_);
 
     m.s.weapon = WP_FLECHETTE;
-    m.classname = c"flech_alt".as_ptr() as *mut c_char;
     m.mass = (4) as f32;
 
     // How 'bout we give this thing a size...
@@ -2245,8 +2245,8 @@ pub fn WP_FireRocket(ctx: &mut GameContext, ent: EntityId, altFire: bool) {
         }
     }
 
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"rocket_proj"));
     let m = ctx.world.entity_mut(mid);
-    m.classname = c"rocket_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_ROCKET_LAUNCHER;
 
     // Make it easier to hit things
@@ -2378,10 +2378,10 @@ pub fn WP_FireThermalDetonator(
     let now = ctx.world.level.time;
 
     {
+        ctx.ent_set(bid, PrefixSet::ClassnameStatic(c"thermal_detonator"));
         let b = ctx.world.entity_mut(bid);
         b.physicsObject = qtrue;
 
-        b.classname = c"thermal_detonator".as_ptr() as *mut c_char;
         b.think = Some(EntThink::thermalThinkStandard).into();
         b.nextthink = now;
         b.touch = Some(EntTouch::touch_NULL).into();
@@ -3012,8 +3012,8 @@ pub fn CreateLaserTrap(ctx: &mut GameContext, laserTrap: EntityId, start: vec3_t
     let now = ctx.world.level.time;
     let modelidx = G_ModelIndex("models/weapons2/laser_trap/laser_trap_w.glm");
     {
+        ctx.ent_set(laserTrap, PrefixSet::ClassnameStatic(c"laserTrap"));
         let lt = ctx.world.entity_mut(laserTrap);
-        lt.classname = c"laserTrap".as_ptr() as *mut c_char;
         lt.flags |= FL_BOUNCE_HALF;
         lt.s.eFlags |= EF_MISSILE_STICK;
         lt.splashDamage = LT_SPLASH_DAM;
@@ -3079,8 +3079,6 @@ pub fn CreateLaserTrap(ctx: &mut GameContext, laserTrap: EntityId, start: vec3_t
 pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
     let dir: vec3_t = ctx.world.globals.forward;
     let start: vec3_t = ctx.world.globals.muzzle;
-    // `FOFS(classname)` — byte offset of `gentity_t::classname` (Raven macro, `g_local.h`).
-    let fofs_classname = core::mem::offset_of!(gentity_t, classname) as c_int;
 
     let mut foundLaserTraps: [c_int; MAX_GENTITIES] = [ENTITYNUM_NONE as c_int; MAX_GENTITIES];
     let mut trapcount: c_int = 0;
@@ -3094,7 +3092,7 @@ pub fn WP_PlaceLaserTrap(ctx: &mut GameContext, ent: EntityId, alt_fire: bool) {
         found = G_Find(
             ctx,
             ctx.entity_id_of(found),
-            fofs_classname,
+            EntFindField::Classname,
             "laserTrap",
         );
         if found.is_null() {
@@ -3435,8 +3433,8 @@ pub fn drop_charge(ctx: &mut GameContext, self_: EntityId, start: vec3_t, dir: v
     let mut angles: vec3_t = [0.0; 3];
     vectoangles(dir, &mut angles);
     {
+        ctx.ent_set(bid, PrefixSet::ClassnameStatic(c"detpack"));
         let b = ctx.world.entity_mut(bid);
-        b.classname = c"detpack".as_ptr() as *mut c_char;
         b.nextthink = now + FRAMETIME;
         b.think = Some(EntThink::G_RunObject).into();
         b.s.eType = (ET_GENERAL) as i32;
@@ -3515,7 +3513,6 @@ pub fn drop_charge(ctx: &mut GameContext, self_: EntityId, start: vec3_t, dir: v
 ///
 /// Source: `oracle/codemp/game/g_weapon.c:2851-2869`
 pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
-    let fofs_classname = core::mem::offset_of!(gentity_t, classname) as c_int;
     // FLAG: firing ent may be an NPC (pool client); deref the client value raw.
     let ent_client = ctx.world.entity(ent).client;
     if unsafe { (*ent_client).ps.hasDetPackPlanted } != qfalse {
@@ -3524,7 +3521,7 @@ pub fn BlowDetpacks(ctx: &mut GameContext, ent: EntityId) {
             found = G_Find(
                 ctx,
                 ctx.entity_id_of(found),
-                fofs_classname,
+                EntFindField::Classname,
                 "detpack",
             );
             if found.is_null() {
@@ -3580,7 +3577,6 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: bo
         return;
     }
 
-    let fofs_classname = core::mem::offset_of!(gentity_t, classname) as c_int;
     let mut foundDetPacks: [c_int; MAX_GENTITIES] = [ENTITYNUM_NONE as c_int; MAX_GENTITIES];
     let mut trapcount: c_int = 0;
 
@@ -3591,7 +3587,7 @@ pub fn WP_DropDetPack(ctx: &mut GameContext, ent: Option<EntityId>, alt_fire: bo
         found = G_Find(
             ctx,
             ctx.entity_id_of(found),
-            fofs_classname,
+            EntFindField::Classname,
             "detpack",
         );
         if found.is_null() {
@@ -3798,8 +3794,8 @@ pub fn WP_FireConcussionAlt(ctx: &mut GameContext, ent: EntityId) {
                     if (tr.entityNum < ENTITYNUM_WORLD as i16
                         && ctx.world.entity(traceEnt_id).takedamage != 0)
                         || {
-                            let cn = ctx.world.entity(traceEnt_id).classname;
-                            !cn.is_null() && Q_stricmp(&cstr_to_str(cn), "misc_model_breakable") == 0
+                            let cn = ctx.world.entity(traceEnt_id).classname_str();
+                            Q_stricmp(&cn, "misc_model_breakable") == 0
                         }
                         || ctx.world.entity(traceEnt_id).s.eType == (ET_MOVER) as i32
                     {
@@ -3950,9 +3946,9 @@ pub fn WP_FireConcussion(ctx: &mut GameContext, ent: EntityId) {
     let forward = ctx.world.globals.forward;
 
     let mid = CreateMissile(ctx, start, forward, vel, 10000, ent, false);
+    ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"conc_proj"));
     let m = ctx.world.entity_mut(mid);
 
-    m.classname = c"conc_proj".as_ptr() as *mut c_char;
     m.s.weapon = WP_CONCUSSION;
     m.mass = (10) as f32;
 
@@ -4502,7 +4498,7 @@ pub fn WP_FireVehicleWeapon(
             let mid = CreateMissile(ctx, start, dir, (*vehWeapon).fSpeed, 10000, ent, false);
             missile = ctx.entity_mut(mid);
 
-            (*missile).classname = c"vehicle_proj".as_ptr() as *mut c_char;
+            ctx.ent_set(mid, PrefixSet::ClassnameStatic(c"vehicle_proj"));
 
             (*missile).s.genericenemyindex = ent_num + MAX_GENTITIES as c_int;
             (*missile).damage = (*vehWeapon).iDamage;

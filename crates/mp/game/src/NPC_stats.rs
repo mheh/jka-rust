@@ -1590,8 +1590,8 @@ pub fn NPC_ParseParms(ctx: &mut GameContext, NPCName_in: &str, NPC: EntityId) ->
                 {
                     continue;
                 }
-                let full_name = crate::g_spawn::G_NewString(ctx, value);
-                ctx.world.entity_mut(NPC).fullName = full_name;
+                let full_name = unsafe { cstr_to_str(value) };
+                ctx.ent_set(NPC, PrefixSet::FullName(Some(&full_name)));
                 continue;
             }
 

@@ -84,7 +84,6 @@ pub fn G_Error(ctx: &mut GameContext, msg: &str) {
 ///
 /// Source: `oracle/codemp/game/g_main.c:736-781`
 pub fn G_FindTeams(ctx: &mut GameContext) {
-    use std::ffi::CStr;
     // Raw-pointer walk (audited unsafe seam helper for the
     // disjoint-but-aliasing-shaped `e`/`e2` double loop over the same array).
     unsafe {
@@ -94,7 +93,7 @@ pub fn G_FindTeams(ctx: &mut GameContext) {
         while i < num_entities {
             let e = &mut *base.add(i as usize);
             if e.inuse != qfalse
-                && !e.team.is_null()
+                && e.team.is_some()
                 && e.flags & FL_TEAMSLAVE == 0
                 && e.r.contents != mp_qshared::shared::surface_flags::CONTENTS_TRIGGER
             {
@@ -103,18 +102,23 @@ pub fn G_FindTeams(ctx: &mut GameContext) {
                 while j < num_entities {
                     let e2 = &mut *base.add(j as usize);
                     if e2.inuse != qfalse
-                        && !e2.team.is_null()
+                        && e2.team.is_some()
                         && e2.flags & FL_TEAMSLAVE == 0
-                        && CStr::from_ptr(e.team).to_bytes() == CStr::from_ptr(e2.team).to_bytes()
+                        && e.team == e2.team
                     {
                         e2.teamchain = e.teamchain;
                         e.teamchain = Some(ent_id(base, e2 as *const gentity_t));
                         e2.teammaster = Some(ent_id(base, e as *const gentity_t));
                         e2.flags |= FL_TEAMSLAVE;
-                        // make sure that targets only point at the master
-                        if !e2.targetname.is_null() {
-                            e.targetname = e2.targetname;
-                            e2.targetname = std::ptr::null_mut();
+                        // make sure that targets only point at the master: the
+                        // master inherits the slave's `targetname` allocation and
+                        // the slave relinquishes it (Raven's pointer move).
+                        if e2.targetname_str().is_some() {
+                            e.alias_from(e2, PrefixSlot::Targetname);
+                            ctx.ent_set(
+                                ent_id(base, e2 as *const gentity_t),
+                                PrefixSet::Targetname(None),
+                            );
                         }
                     }
                     j += 1;
@@ -1254,7 +1258,6 @@ pub fn MoveClientToIntermission(ctx: &mut GameContext, id: EntityId) {
 pub fn FindIntermissionPoint(ctx: &mut GameContext) {
     unsafe {
         let mut ent: *mut gentity_t = std::ptr::null_mut();
-        let classname_ofs = core::mem::offset_of!(gentity_t, classname) as c_int;
 
         if ctx.world.cvars.g_gametype.integer == GT_SIEGE
             && ctx.world.level.intermissiontime != 0
@@ -1266,26 +1269,28 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
                 ent = G_Find(
                     ctx,
                     search_start,
-                    classname_ofs,
+                    EntFindField::Classname,
                     "info_player_intermission_red",
                 );
-                if !ent.is_null() && !(*ent).target2.is_null() {
+                if !ent.is_null() && (*ent).target2.is_some() {
                     let ent_id = ctx.entity_id_of(ent);
                     let activator_id = ctx.entity_id_of(ent);
-                    G_UseTargets2(ctx, ent_id, activator_id, (*ent).target2);
+                    let target2 = (*ent).target2.clone();
+                    G_UseTargets2(ctx, ent_id, activator_id, target2.as_deref());
                 }
             } else if ctx.world.globals.gSiegeRoundWinningTeam == SIEGETEAM_TEAM2 as qboolean {
                 let search_start = ctx.entity_id_of(std::ptr::null_mut());
                 ent = G_Find(
                     ctx,
                     search_start,
-                    classname_ofs,
+                    EntFindField::Classname,
                     "info_player_intermission_blue",
                 );
-                if !ent.is_null() && !(*ent).target2.is_null() {
+                if !ent.is_null() && (*ent).target2.is_some() {
                     let ent_id = ctx.entity_id_of(ent);
                     let activator_id = ctx.entity_id_of(ent);
-                    G_UseTargets2(ctx, ent_id, activator_id, (*ent).target2);
+                    let target2 = (*ent).target2.clone();
+                    G_UseTargets2(ctx, ent_id, activator_id, target2.as_deref());
                 }
             }
         }
@@ -1294,7 +1299,7 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
             ent = G_Find(
                 ctx,
                 search_start,
-                classname_ofs,
+                EntFindField::Classname,
                 "info_player_intermission",
             );
         }
@@ -1315,8 +1320,9 @@ pub fn FindIntermissionPoint(ctx: &mut GameContext) {
             crate::q_math::_VectorCopy((*ent).s.origin, &mut ctx.world.level.intermission_origin);
             crate::q_math::_VectorCopy((*ent).s.angles, &mut ctx.world.level.intermission_angle);
             // if it has a target, look towards it
-            if !(*ent).target.is_null() {
-                let target = G_PickTarget(ctx, (*ent).target);
+            if (*ent).target.is_some() {
+                let ent_target = (*ent).target.clone();
+                let target = G_PickTarget(ctx, ent_target.as_deref());
                 if !target.is_null() {
                     let mut dir: vec3_t = [0.0; 3];
                     crate::q_math::_VectorSubtract(
@@ -2692,8 +2698,7 @@ pub fn G_RunThink(ctx: &mut GameContext, id: EntityId) {
     }
 
     if ctx.entity(id).inuse != qfalse {
-        let number = ctx.entity(id).s.number;
-        trap::ICARUS_MaintainTaskManager(
+        let number = ctx.entity(id).s.number;        trap::ICARUS_MaintainTaskManager(
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new(number),
         );
@@ -3233,14 +3238,9 @@ pub fn G_RunFrame(ctx: &mut GameContext, levelTime: c_int) {
         if ctx.world.cvars.g_listEntity.integer != 0 {
             let mut i: c_int = 0;
             while (i as usize) < MAX_GENTITIES {
-                let classname = ctx.world.g_entities[i as usize].classname;
                 // §19: oracle passes a possibly-NULL classname to %s (UB); we
-                // print "" for unused slots.
-                let name = if classname.is_null() {
-                    String::new()
-                } else {
-                    cstr_to_str(classname)
-                };
+                // print "" for unused slots (`classname_str` collapses NULL to "").
+                let name = ctx.world.g_entities[i as usize].classname_str();
                 G_Printf(ctx, &format!("{:4}: {}\n", i, name));
                 i += 1;
             }

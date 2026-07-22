@@ -249,7 +249,7 @@ pub use mp_qshared::common::mp::botlib::print_type::{
     PRT_ERROR, PRT_EXIT, PRT_FATAL, PRT_MESSAGE, PRT_WARNING,
 };
 // `gentity_t` moved to `mp_game` (DEC-26); its constants/typedefs stay in qshared.
-pub use crate::entity::gentity_t;
+pub use crate::entity::{gentity_t, PrefixSet, PrefixSlot};
 pub use mp_qshared::common::mp::gentity::{
     material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
     MAT_ELEC_METAL, MAT_GLASS, MAT_GLASS_METAL, MAT_GRATE1, MAT_GREY_STONE, MAT_LT_STONE,
@@ -311,9 +311,9 @@ pub use crate::g_nav::{FlyingCreature, NAV_HitNavGoal, NPC_SetMoveGoal};
 pub use crate::g_spawn::{G_NewString, G_SpawnFloat, G_SpawnInt, G_SpawnString, G_SpawnVector};
 pub use crate::g_timer::TIMER_Done;
 pub use crate::g_utils::{
-    G_AddEvent, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_ScaleNetHealth, G_SetAnim,
-    G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TeamCommand,
-    G_TempEntity, G_UseTargets2, TryHeal,
+    EntFindField, G_AddEvent, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_ScaleNetHealth,
+    G_SetAnim, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_SoundSetIndex, G_Spawn,
+    G_TeamCommand, G_TempEntity, G_UseTargets2, TryHeal,
 };
 pub use crate::g_weapon::{laserTrapStick, LogAccuracyHit};
 pub use crate::q_math::{

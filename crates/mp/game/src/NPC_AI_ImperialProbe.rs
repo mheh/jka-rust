@@ -384,7 +384,7 @@ pub fn ImperialProbe_FireBlaster(ctx: &mut GameContext) {
 
     let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
 
-    ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bryar_proj"));
     ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
 
     if ctx.world.cvars.g_spskill.integer <= 1 {

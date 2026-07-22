@@ -1456,14 +1456,14 @@ pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c
             return 0;
         }
 
-        let cn = ctx.world.g_entities[tr.entityNum as usize].classname;
-        // Raven derefs `testdoor->classname` unconditionally; a slot with a
-        // null classname would crash there — the one defined behavior here is
+        let cn = ctx.world.g_entities[tr.entityNum as usize].classname_str();
+        // Raven derefs `testdoor->classname` unconditionally; a NULL classname
+        // (now `""`) would crash there — the one defined behavior here is
         // "no `func_` match" (returns 0). (§19)
-        if cn.is_null() {
+        if cn.is_empty() {
             return 0;
         }
-        if !c_str_contains(cn, b"func_") {
+        if !cn.contains("func_") {
             return 0;
         }
 
@@ -1490,15 +1490,6 @@ pub fn DoorBlockingSection(ctx: &mut GameContext, start: c_int, end: c_int) -> c
 
         0
     }
-}
-
-/// `strstr`-style substring test on a NUL-terminated C string.
-unsafe fn c_str_contains(s: *const c_char, needle: &[u8]) -> bool {
-    if s.is_null() {
-        return false;
-    }
-    let bytes = core::ffi::CStr::from_ptr(s).to_bytes();
-    bytes.windows(needle.len()).any(|w| w == needle)
 }
 
 /// Raven `RepairPaths`.
@@ -1767,21 +1758,13 @@ pub fn CalculatePaths(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/ai_wpnav.c:1715-1732`
 pub fn GetObjectThatTargets(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
-    let targetname = ctx.entity(ent).targetname;
-    if targetname.is_null() {
+    let Some(targetname) = ctx.entity(ent).targetname_str() else {
         return core::ptr::null_mut();
-    }
+    };
 
-    // `FOFS(target)` — byte offset of `gentity_t::target` — is the field
-    // this scan matches against.
-    let fieldofs = core::mem::offset_of!(gentity_t, target) as c_int;
-    let next = G_Find(ctx, None, fieldofs, &(unsafe { cstr_to_str(targetname) }));
-
-    if !next.is_null() {
-        return next;
-    }
-
-    core::ptr::null_mut()
+    // Raven `G_Find(NULL, FOFS(target), ent->targetname)`: find the entity whose
+    // `target` matches this ent's `targetname`.
+    G_Find(ctx, None, EntFindField::Target, &targetname)
 }
 
 /// Raven `CalculateSiegeGoals`.
@@ -1796,9 +1779,7 @@ pub fn CalculateSiegeGoals(ctx: &mut GameContext) {
 
             let mut tent: Option<EntityId> = None;
 
-            if !ctx.entity(ent_id).classname.is_null()
-                && c_str_eq(ctx.entity(ent_id).classname, b"info_siege_objective")
-            {
+            if ctx.entity(ent_id).classname_str() == "info_siege_objective" {
                 tent = Some(ent_id);
                 let raw = GetObjectThatTargets(ctx, tent.unwrap());
                 let mut t2ent = ctx.entity_id_of(raw);
@@ -1933,26 +1914,26 @@ pub fn CalculateWeightGoals(ctx: &mut GameContext) {
 
             let mut weight: f32 = 0.0;
 
-            let classname = ctx.entity(ent_id).classname;
+            let classname = ctx.entity(ent_id).classname_str();
             let item = ctx.entity(ent_id).item;
-            if !classname.is_null() {
-                if c_str_eq(classname, b"item_seeker") {
+            if !classname.is_empty() {
+                if classname == "item_seeker" {
                     weight = 2.0;
-                } else if c_str_eq(classname, b"item_shield") {
+                } else if classname == "item_shield" {
                     weight = 2.0;
-                } else if c_str_eq(classname, b"item_medpac") {
+                } else if classname == "item_medpac" {
                     weight = 2.0;
-                } else if c_str_eq(classname, b"item_sentry_gun") {
+                } else if classname == "item_sentry_gun" {
                     weight = 2.0;
-                } else if c_str_eq(classname, b"item_force_enlighten_dark") {
+                } else if classname == "item_force_enlighten_dark" {
                     weight = 5.0;
-                } else if c_str_eq(classname, b"item_force_enlighten_light") {
+                } else if classname == "item_force_enlighten_light" {
                     weight = 5.0;
-                } else if c_str_eq(classname, b"item_force_boon") {
+                } else if classname == "item_force_boon" {
                     weight = 5.0;
-                } else if c_str_eq(classname, b"item_ysalimari") {
+                } else if classname == "item_ysalimari" {
                     weight = 2.0;
-                } else if c_str_contains(classname, b"weapon_") && item.is_some() {
+                } else if classname.contains("weapon_") && item.is_some() {
                     let ItemKind::Weapon(tag) = item.unwrap().item().kind else {
                         unreachable!("weapon_-classnamed item is not a Weapon");
                     };
@@ -2294,11 +2275,11 @@ pub fn FlagObjects(ctx: &mut GameContext) {
 
         while i < ctx.world.level.num_entities {
             let ent_id = EntityId(i as u32);
-            let classname = ctx.entity(ent_id).classname;
-            if ctx.entity(ent_id).inuse != 0 && !classname.is_null() {
-                if flag_red.is_none() && c_str_eq(classname, b"team_CTF_redflag") {
+            let classname = ctx.entity(ent_id).classname_str();
+            if ctx.entity(ent_id).inuse != 0 && !classname.is_empty() {
+                if flag_red.is_none() && classname == "team_CTF_redflag" {
                     flag_red = Some(ent_id);
-                } else if flag_blue.is_none() && c_str_eq(classname, b"team_CTF_blueflag") {
+                } else if flag_blue.is_none() && classname == "team_CTF_blueflag" {
                     flag_blue = Some(ent_id);
                 }
 
@@ -2384,14 +2365,6 @@ pub fn FlagObjects(ctx: &mut GameContext) {
             ctx.world.globals.eFlagBlue = fb_ptr;
         }
     }
-}
-
-/// `strcmp(s, needle) == 0` on a NUL-terminated C string (exact, case-sensitive).
-unsafe fn c_str_eq(s: *const c_char, needle: &[u8]) -> bool {
-    if s.is_null() {
-        return false;
-    }
-    core::ffi::CStr::from_ptr(s).to_bytes() == needle
 }
 
 /// Raven `SavePathData`.
@@ -2849,7 +2822,7 @@ pub fn G_RMGPathing(ctx: &mut GameContext) {
         let terrain = G_Find(
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
-            core::mem::offset_of!(gentity_t, classname) as c_int,
+            EntFindField::Classname,
             "terrain",
         );
 
@@ -3064,13 +3037,12 @@ pub fn BeginAutoPathRoutine(ctx: &mut GameContext) {
         while i < ctx.world.level.num_entities {
             let ent_id = EntityId(i as u32);
             let inuse = ctx.entity(ent_id).inuse;
-            let classname = ctx.entity(ent_id).classname;
+            let classname = ctx.entity(ent_id).classname_str();
             let item = ctx.entity(ent_id).item;
 
             if inuse != 0
-                && !classname.is_null()
-                && *classname != 0
-                && Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0
+                && !classname.is_empty()
+                && Q_stricmp(&classname, "info_player_deathmatch") == 0
             {
                 if ctx.entity(ent_id).s.origin[2] < 1280.0 {
                     // h4x
@@ -3189,15 +3161,14 @@ pub fn LoadPath_ThisLevel(ctx: &mut GameContext) {
         // set the flag entities
         while i < ctx.world.level.num_entities {
             let ent_id = EntityId(i as u32);
-            let classname = ctx.entity(ent_id).classname;
+            let classname = ctx.entity(ent_id).classname_str();
 
-            if ctx.entity(ent_id).inuse != 0 && !classname.is_null() {
-                if ctx.world.globals.eFlagRed.is_null() && c_str_eq(classname, b"team_CTF_redflag")
-                {
+            if ctx.entity(ent_id).inuse != 0 && !classname.is_empty() {
+                if ctx.world.globals.eFlagRed.is_null() && classname == "team_CTF_redflag" {
                     let ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(ent_id));
                     ctx.world.globals.eFlagRed = ptr;
                 } else if ctx.world.globals.eFlagBlue.is_null()
-                    && c_str_eq(classname, b"team_CTF_blueflag")
+                    && classname == "team_CTF_blueflag"
                 {
                     let ptr = ent_id::resolve(ctx.world.g_entities.as_mut_ptr(), Some(ent_id));
                     ctx.world.globals.eFlagBlue = ptr;
@@ -3227,11 +3198,11 @@ pub fn GetClosestSpawn(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
 
         while i < ctx.world.level.num_entities {
             let spawn_id = EntityId(i as u32);
-            let classname = ctx.entity(spawn_id).classname;
+            let classname = ctx.entity(spawn_id).classname_str();
             if ctx.entity(spawn_id).inuse != 0
-                && !classname.is_null()
-                && (Q_stricmp(&cstr_to_str(classname), "info_player_start") == 0
-                    || Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0)
+                && !classname.is_empty()
+                && (Q_stricmp(&classname, "info_player_start") == 0
+                    || Q_stricmp(&classname, "info_player_deathmatch") == 0)
             {
                 // §2b: player pool client; deref raw as Raven does.
                 let cl = ctx.entity(ent).client;
@@ -3265,11 +3236,11 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
 
         while i < ctx.world.level.num_entities {
             let spawn_id = EntityId(i as u32);
-            let classname = ctx.entity(spawn_id).classname;
+            let classname = ctx.entity(spawn_id).classname_str();
             if ctx.entity(spawn_id).inuse != 0
-                && !classname.is_null()
-                && (Q_stricmp(&cstr_to_str(classname), "info_player_start") == 0
-                    || Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0)
+                && !classname.is_empty()
+                && (Q_stricmp(&classname, "info_player_start") == 0
+                    || Q_stricmp(&classname, "info_player_deathmatch") == 0)
             {
                 next_index = Some(spawn_id);
                 break;
@@ -3282,11 +3253,11 @@ pub fn GetNextSpawnInIndex(ctx: &mut GameContext, currentSpawn: EntityId) -> *mu
             i = MAX_CLIENTS as c_int;
             while i < ctx.world.level.num_entities {
                 let spawn_id = EntityId(i as u32);
-                let classname = ctx.entity(spawn_id).classname;
+                let classname = ctx.entity(spawn_id).classname_str();
                 if ctx.entity(spawn_id).inuse != 0
-                    && !classname.is_null()
-                    && (Q_stricmp(&cstr_to_str(classname), "info_player_start") == 0
-                        || Q_stricmp(&cstr_to_str(classname), "info_player_deathmatch") == 0)
+                    && !classname.is_empty()
+                    && (Q_stricmp(&classname, "info_player_start") == 0
+                        || Q_stricmp(&classname, "info_player_deathmatch") == 0)
                 {
                     next_index = Some(spawn_id);
                     break;

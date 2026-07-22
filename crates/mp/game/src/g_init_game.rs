@@ -175,11 +175,23 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         G_InitWorldSession(ctx);
 
-        // initialize all entities for this game
-        core::ptr::write_bytes(ctx.world.g_entities.as_mut_ptr(), 0, MAX_GENTITIES);
-        // The byte-wise zero above (Raven `memset(g_entities, 0, ...)`, g_main.c)
-        // leaves every entity's FnId<EntXxx> handler fields as None by
-        // construction (zero == None, std-guaranteed via Option<NonZeroU8>).
+        // initialize all entities for this game — Raven `memset(g_entities, 0,
+        // ...)` (g_main.c). The owned `String`/`Option<String>` fields must be
+        // dropped before the byte-zero and re-seated after: their all-zero byte
+        // image is an INVALID value, not `None`/`""` (the `Option<String>`
+        // niche is Vec's capacity invariant, not the null pointer — zeroed
+        // bytes decode as a null-pointer `Some`). `FnId<EntXxx>` handler fields
+        // stay zero == `None` (`Option<NonZeroU8>`, std-guaranteed).
+        {
+            let base = ctx.world.g_entities.as_mut_ptr();
+            for i in 0..MAX_GENTITIES {
+                (*base.add(i)).take_owned_strings();
+            }
+            core::ptr::write_bytes(base, 0, MAX_GENTITIES);
+            for i in 0..MAX_GENTITIES {
+                gentity_t::seat_owned_strings(base.add(i));
+            }
+        }
         ctx.world.level.gentities = ctx.world.g_entities.as_mut_ptr();
 
         // initialize all clients for this game
@@ -233,6 +245,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
         // reserve some spots for dead player bodies
         InitBodyQue(ctx);
 
+
         ClearRegisteredItems(ctx);
 
         //make sure saber data is loaded before this! (so we can precache the appropriate hilts)
@@ -261,6 +274,7 @@ pub fn g_init_game(ctx: &mut GameContext, args: GameInitArgs) {
 
         // parse the key/value pairs and spawn gentities
         G_SpawnEntitiesFromString(ctx, qfalse);
+
 
         // general initialization
         G_FindTeams(ctx);

@@ -33,9 +33,9 @@ use crate::ent_fn_enums::dispatch_die;
 use crate::g_ICARUScb::G_DebugPrint;
 use crate::g_ICARUScb::Q3_SetParm;
 use crate::g_public_consts::SVF_NOCLIENT;
-use crate::q_shared::FOFS_targetname;
 use crate::NPC_stats::TeamTable;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
+use native_string::atoi_bytes;
 use native_string::Q_stricmp;
 use native_string::Q_strncmp;
 use native_string::strncpyz_string;
@@ -603,12 +603,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                     } else {
                         cstr_to_str(target3 as *const c_char)
                     };
-                    let targetname = ctx.world.entity(ent).targetname;
-                    let tn = if targetname.is_null() {
-                        String::new()
-                    } else {
-                        cstr_to_str(targetname as *const c_char)
-                    };
+                    let tn = ctx.world.entity(ent).targetname_str().unwrap_or_default();
                     G_DebugPrint(
                         ctx,
                         WL_DEBUG as i32,
@@ -618,22 +613,17 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
                         ),
                     );
                     let t3ptr = ctx.world.entity(ent).target3;
-                    crate::g_utils::G_UseTargets2(
-                        ctx,
-                        Some(ent),
-                        Some(ent),
-                        t3ptr as *const c_char,
-                    );
+                    let t3s = if t3ptr.is_null() {
+                        None
+                    } else {
+                        Some(unsafe { cstr_to_str(t3ptr) })
+                    };
+                    G_UseTargets2(ctx, Some(ent), Some(ent), t3s.as_deref());
                     ctx.world.entity_mut(ent).think = Some(EntThink::G_FreeEntity).into();
                     let nt = ctx.world.level.time + 100;
                     ctx.world.entity_mut(ent).nextthink = nt;
                 } else {
-                    let targetname = ctx.world.entity(ent).targetname;
-                    let tn = if targetname.is_null() {
-                        String::new()
-                    } else {
-                        cstr_to_str(targetname as *const c_char)
-                    };
+                    let tn = ctx.world.entity(ent).targetname_str().unwrap_or_default();
                     let wait = ctx.world.entity(ent).wait;
                     G_DebugPrint(
                         ctx,
@@ -732,7 +722,7 @@ pub fn NPC_Begin(ctx: &mut GameContext, ent: EntityId) {
         ctx.world.entity_mut(ent).mass = 10.0;
         ctx.world.entity_mut(ent).takedamage = qtrue;
         ctx.world.entity_mut(ent).inuse = qtrue;
-        ctx.world.entity_mut(ent).classname = c"NPC".as_ptr() as *mut c_char;
+        ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"NPC"));
         if ctx.world.entity(ent).spawnflags & SFB_NOTSOLID == 0 {
             ctx.world.entity_mut(ent).r.contents = CONTENTS_BODY;
             ctx.world.entity_mut(ent).clipmask = MASK_NPCSOLID;
@@ -1097,7 +1087,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             return core::ptr::null_mut();
         }
 
-        (*newent).fullName = (*ent).fullName;
+        // Raven aliased the one `fullName` pool allocation into both entities.
+        (*newent).alias_from(&*ent, PrefixSlot::FullName);
 
         (*newent).NPC = New_NPC_t(ctx, (*newent).s.number);
         if (*newent).NPC.is_null() {
@@ -1133,7 +1124,7 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             ctx.world.g_entities.as_mut_ptr(),
             (*((*newent).NPC)).tempGoal,
         );
-        (*temp_goal).classname = c"NPC_goal".as_ptr() as *mut c_char;
+        ctx.ent_set(ctx.entity_id_of(temp_goal).unwrap(), PrefixSet::ClassnameStatic(c"NPC_goal"));
         (*temp_goal).parent = Some(ent_id(ctx.world.g_entities.as_mut_ptr(), newent));
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
 
@@ -1182,15 +1173,14 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
             (*newent).r.svFlags |= SVF_NO_EXTRA_SOUNDS;
         }
 
-        if !(*ent).message.is_null() {
-            (*newent).message = (*ent).message;
+        if (*ent).message.is_some() {
+            // Raven aliased the one `message` allocation; the owned `String`
+            // clone is content-identical (no pointer-identity compares exist).
+            (*newent).message = (*ent).message.clone();
             (*newent).flags |= FL_NO_KNOCKBACK;
         }
 
-        if {
-            let p = (*ent).classname as *const c_char;
-            !p.is_null() && Q_stricmp(&cstr_to_str(p), "NPC_Vehicle") == 0
-        } {
+        if Q_stricmp(&(*ent).classname_str(), "NPC_Vehicle") == 0 {
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                 // SEAM-BG-REENTRY (DEC-28, sanctioned) — GameCallbacksImpl.world is a `*mut GameWorld`
                 // field aliasing bg_state; a raw store is required (bg-seam re-entry).
@@ -1333,58 +1323,53 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
                 }
                 (*((*newent).NPC)).defaultBehavior = bState_t::BS_WAIT;
                 (*((*newent).NPC)).behaviorState = bState_t::BS_WAIT;
-                (*newent).classname = c"NPC".as_ptr() as *mut c_char;
+                ctx.ent_set(__teid16, PrefixSet::ClassnameStatic(c"NPC"));
             }
         }
 
         if (*newent).health == 0 {
             (*newent).health = (*ent).health;
         }
-        // `NPC_targetname` is now an owned `String` (`""` ≡ absent); `targetname`
-        // and `script_targetname` are PREFIX `*mut c_char` slots the engine reads.
-        // Raven aliased one pool allocation into both; two G_NewString copies are
-        // content-identical (no pointer-identity compare exists — verified), and
-        // G_NewString restores the `\n` translation the old F_LSTRING carried.
-        // Empty → NULL, matching Raven's NULL-pointer alias when unset.
+        // `NPC_targetname` is an owned `String` (`""` ≡ absent); `targetname` and
+        // `script_targetname` are PREFIX slots the engine reads. Raven aliased one
+        // pool allocation into both; the two `set` writes are content-identical
+        // (no pointer-identity compare exists — verified). Empty → NULL, matching
+        // Raven's NULL-pointer alias when unset.
         {
             let npc_targetname = (*ent).NPC_targetname.clone();
             if npc_targetname.is_empty() {
-                (*newent).script_targetname = core::ptr::null_mut();
-                (*newent).targetname = core::ptr::null_mut();
+                ctx.ent_set(__teid16, PrefixSet::ScriptTargetname(None));
+                ctx.ent_set(__teid16, PrefixSet::Targetname(None));
             } else {
-                let npc_targetname_c = cstr(&npc_targetname);
-                (*newent).script_targetname = G_NewString(ctx, npc_targetname_c.as_ptr());
-                (*newent).targetname = G_NewString(ctx, npc_targetname_c.as_ptr());
+                ctx.ent_set(__teid16, PrefixSet::ScriptTargetname(Some(&npc_targetname)));
+                ctx.ent_set(__teid16, PrefixSet::Targetname(Some(&npc_targetname)));
             }
         }
-        // `NPC_target` is now an owned `String` (`""` ≡ absent); `target` stays a
-        // G_Alloc-pool `*mut c_char` this batch. Materialize a pool copy via
-        // G_NewString (which also restores the `\n` translation the old
-        // `F_LSTRING` NPC_target carried), so `target` ends up identical to Raven's
-        // aliased value; empty → NULL, matching the old NULL-pointer alias.
+        // `NPC_target` and `target` are both owned `String`/`Option<String>` now
+        // (`""`/`None` ≡ absent); the copy is a plain owned move (ruling C: only
+        // `message` translates `\n` — NPC target names carry no escapes).
         (*newent).target = {
             let npc_target = (*ent).NPC_target.clone();
             if npc_target.is_empty() {
-                core::ptr::null_mut()
+                None
             } else {
-                let npc_target_c = cstr(&npc_target);
-                G_NewString(ctx, npc_target_c.as_ptr())
+                Some(npc_target)
             }
         };
-        (*newent).target2 = (*ent).target2;
+        (*newent).target2 = (*ent).target2.clone();
         (*newent).target3 = (*ent).target3;
         (*newent).target4 = (*ent).target4;
         (*newent).wait = (*ent).wait;
 
         let mut index = BSET_FIRST;
         while index < NUM_BSETS {
-            if !(*ent).behaviorSet[index as usize].is_null() {
-                (*newent).behaviorSet[index as usize] = (*ent).behaviorSet[index as usize];
+            if (*ent).behavior_set_str(index as usize).is_some() {
+                (*newent).alias_from(&*ent, PrefixSlot::BehaviorSet(index as usize));
             }
             index += 1;
         }
 
-        (*newent).classname = c"NPC".as_ptr() as *mut c_char;
+        ctx.ent_set(__teid16, PrefixSet::ClassnameStatic(c"NPC"));
         (*newent).NPC_type = (*ent).NPC_type.clone();
         trap::UnlinkEntity(
             ctx.engine,
@@ -1451,8 +1436,8 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         (*newent).s.teamowner = (*ent).s.teamowner;
         (*newent).alliedTeam = (*ent).alliedTeam;
         (*newent).teamnodmg = (*ent).teamnodmg;
-        if !(*ent).team.is_null() && *(*ent).team != 0 {
-            (*((*newent).client)).sess.sessionTeam = atoi((*ent).team as *const c_char);
+        if let Some(team) = (*ent).team.as_deref().filter(|s| !s.is_empty()) {
+            (*((*newent).client)).sess.sessionTeam = atoi_bytes(team.as_bytes());
         } else if (*newent).s.teamowner != TEAM_FREE {
             (*((*newent).client)).sess.sessionTeam = (*newent).s.teamowner;
         } else if (*newent).alliedTeam != TEAM_FREE {
@@ -1471,13 +1456,15 @@ pub fn NPC_Spawn_Do(ctx: &mut GameContext, ent: EntityId) -> *mut gentity_t {
         );
 
         if (*ent).use_.is_none() {
-            if !(*ent).target.is_null() {
+            if (*ent).target.is_some() {
                 crate::g_utils::G_UseTargets(ctx, ctx.entity_id_of(ent), ctx.entity_id_of(ent));
             }
             if !(*ent).closetarget.is_null() {
-                (*newent).target = (*ent).closetarget;
+                // `closetarget` stays a `*mut c_char` (G4); decode into the owned
+                // `target` (its spawn value was already `\n`-translated).
+                (*newent).target = Some(cstr_to_str((*ent).closetarget));
             }
-            (*ent).targetname = core::ptr::null_mut();
+            ctx.ent_set(ctx.entity_id_of(ent).unwrap(), PrefixSet::Targetname(None));
             crate::g_utils::G_FreeEntity(ctx, ctx.entity_id_of(ent));
         }
 
@@ -1577,9 +1564,13 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
         ctx.world.entity_mut(self_).nextthink = time;
         return;
     }
-    let full_name = ctx.world.entity(self_).fullName;
-    if full_name.is_null() || unsafe { *full_name == 0 } {
-        ctx.world.entity_mut(self_).fullName = c"Humanoid Lifeform".as_ptr() as *mut c_char;
+    if ctx
+        .world
+        .entity(self_)
+        .fullname_str()
+        .map_or(true, |s| s.is_empty())
+    {
+        ctx.ent_set(self_, PrefixSet::FullName(Some("Humanoid Lifeform")));
     }
 
     if ctx.world.entity(self_).count == 0 {
@@ -1623,7 +1614,7 @@ pub fn SP_NPC_spawner(ctx: &mut GameContext, self_: EntityId) {
 
     crate::NPC_stats::NPC_Precache(ctx, self_);
 
-    if !ctx.world.entity(self_).targetname.is_null() {
+    if ctx.world.entity(self_).targetname_str().is_some() {
         ctx.world.entity_mut(self_).use_ = Some(EntUse::NPC_Spawn).into();
     } else {
         ctx.world.entity_mut(self_).think = Some(EntThink::NPC_Spawn_Go).into();
@@ -1777,8 +1768,8 @@ pub fn SP_NPC_Vehicle(ctx: &mut GameContext, self_: EntityId) {
         ctx.world.entity_mut(self_).NPC_type = Some("swoop".to_owned());
     }
 
-    if ctx.world.entity(self_).classname.is_null() {
-        ctx.world.entity_mut(self_).classname = c"NPC_Vehicle".as_ptr() as *mut c_char;
+    if ctx.world.entity(self_).classname_str().is_empty() {
+        ctx.ent_set(self_, PrefixSet::ClassnameStatic(c"NPC_Vehicle"));
     }
 
     if ctx.world.entity(self_).wait == (0) as f32 {
@@ -1807,7 +1798,7 @@ pub fn SP_NPC_Vehicle(ctx: &mut GameContext, self_: EntityId) {
         ctx.world.entity_mut(self_).s.shouldtarget = qtrue;
     }
 
-    if !ctx.world.entity(self_).targetname.is_null() {
+    if ctx.world.entity(self_).targetname_str().is_some() {
         if NPC_VehiclePrecache(ctx, self_) == qfalse {
             crate::g_utils::G_FreeEntity(ctx, Some(self_));
             return;
@@ -2776,7 +2767,7 @@ pub fn NPC_SpawnType(
         (*npc_spawner).delay = 0;
 
         if isVehicle != 0 {
-            (*npc_spawner).classname = G_NewString(ctx, c"NPC_Vehicle".as_ptr() as *const c_char);
+            ctx.ent_set(npc_spawner_eid, PrefixSet::Classname("NPC_Vehicle"));
         }
     }
 
@@ -2942,7 +2933,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         &format!(
                             "Killing NPC {} named {}\n",
                             player.NPC_type.as_deref().unwrap_or(""),
-                            unsafe { cstr_to_str(player.targetname as *const c_char) }
+                            player.targetname_str().unwrap_or_default()
                         ),
                     );
                     player.health = 0;
@@ -2963,24 +2954,21 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         }
                     }
                 }
-            } else if player.NPC_type.is_some() && !player.classname.is_null() {
-                unsafe {
-                    if (*player.classname) != b'\0' as c_char
-                        && Q_stricmp("NPC_starfleet", &cstr_to_str(player.classname)) != 0
-                    {
-                        Com_Printf(
-                            &format!(
-                                "Removing NPC spawner {} with NPC named {}\n",
-                                player.NPC_type.as_deref().unwrap_or(""),
-                                player.NPC_targetname.clone()
-                            ),
-                        );
-                        // STAGE-1: raw pointer cast ends the `player` borrow before
-                        // re-entering `ctx` (Stage-2 debt).
-                        let player_ptr = player as *mut gentity_t;
-                        G_FreeEntity(ctx, ctx.entity_id_of(player_ptr));
-                    }
-                }
+            } else if player.NPC_type.is_some()
+                && !player.classname_str().is_empty()
+                && Q_stricmp("NPC_starfleet", &player.classname_str()) != 0
+            {
+                Com_Printf(
+                    &format!(
+                        "Removing NPC spawner {} with NPC named {}\n",
+                        player.NPC_type.as_deref().unwrap_or(""),
+                        player.NPC_targetname.clone()
+                    ),
+                );
+                // STAGE-1: raw pointer cast ends the `player` borrow before
+                // re-entering `ctx` (Stage-2 debt).
+                let player_ptr = player as *mut gentity_t;
+                G_FreeEntity(ctx, ctx.entity_id_of(player_ptr));
             }
         } else if !player.NPC.is_null() && !player.client.is_null() {
             if kill_team != TEAM_FREE {
@@ -2989,7 +2977,7 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         &format!(
                             "Killing NPC {} named {}\n",
                             player.NPC_type.as_deref().unwrap_or(""),
-                            unsafe { cstr_to_str(player.targetname as *const c_char) }
+                            player.targetname_str().unwrap_or_default()
                         ),
                     );
                     player.health = 0;
@@ -3007,16 +2995,15 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
                         );
                     }
                 }
-            } else if (!player.targetname.is_null()
-                && q_shared::Q_stricmp(name.as_ptr() as *const c_char, player.targetname)
-                    == 0)
-                || Q_stricmp("all", &(unsafe { cstr_to_str(name.as_ptr() as *const c_char) })) == 0
+            } else if player.targetname_str().as_deref().is_some_and(|tn| {
+                Q_stricmp(&(unsafe { cstr_to_str(name.as_ptr() as *const c_char) }), tn) == 0
+            }) || Q_stricmp("all", &(unsafe { cstr_to_str(name.as_ptr() as *const c_char) })) == 0
             {
                 Com_Printf(
                     &format!(
                         "Killing NPC {} named {}\n",
                         player.NPC_type.as_deref().unwrap_or(""),
-                        unsafe { cstr_to_str(player.targetname as *const c_char) }
+                        player.targetname_str().unwrap_or_default()
                     ),
                 );
                 player.health = 0;
@@ -3036,17 +3023,11 @@ pub fn NPC_Kill_f(ctx: &mut GameContext) {
 ///
 /// Source: `oracle/codemp/game/NPC_spawn.c:4172-4175`
 pub fn NPC_PrintScore(ctx: &mut GameContext, ent: EntityId) {
-    let targetname = ctx.world.entity(ent).targetname;
+    let targetname = ctx.world.entity(ent).targetname_str().unwrap_or_default();
     // Pool client deref stays raw (recipe 2b): copied pointer value, tight unsafe.
     let client = ctx.world.entity(ent).client;
     let score = unsafe { (*client).ps.persistant[PERS_SCORE as usize] };
-    Com_Printf(
-        &format!(
-            "{}: {}\n",
-            unsafe { cstr_to_str(targetname as *const c_char) },
-            score
-        ),
-    );
+    Com_Printf(&format!("{targetname}: {score}\n"));
 }
 
 /// Raven `Cmd_NPC_f`.
@@ -3094,7 +3075,7 @@ pub fn Cmd_NPC_f(ctx: &mut GameContext, ent: EntityId) {
             let found_ent = G_Find(
                 ctx,
                 ctx.entity_id_of(std::ptr::null_mut()),
-                FOFS_targetname,
+                EntFindField::Targetname,
                 &cmd2,
             );
             if !found_ent.is_null() && !unsafe { (*found_ent).client.is_null() } {

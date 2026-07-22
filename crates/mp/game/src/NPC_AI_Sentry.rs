@@ -232,7 +232,7 @@ pub fn Sentry_Fire(ctx: &mut GameContext) {
 
         let missile_id = CreateMissile(ctx, muzzle, forward, 1600.0, 10000, npc_id, false);
 
-        ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+        ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bryar_proj"));
         ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL;
 
         ctx.world.entity_mut(missile_id).dflags = DAMAGE_DEATH_KNOCKBACK;
@@ -700,7 +700,7 @@ pub fn NPC_BSSentry_Default(ctx: &mut GameContext) {
     let NPCInfo = ctx.world.globals.NPCInfo;
     let npc_id = ctx.entity_id_of(NPC).unwrap();
 
-    if !ctx.world.entity(npc_id).targetname.is_null() {
+    if ctx.world.entity(npc_id).targetname_str().is_some() {
         ctx.world.entity_mut(npc_id).use_ = Some(crate::ent_fn_enums::EntUse::sentry_use).into();
     }
 

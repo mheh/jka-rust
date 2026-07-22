@@ -955,8 +955,7 @@ pub fn HaveWeapon(ctx: &mut GameContext, weapon: c_int) -> qboolean {
 ///
 /// Source: `oracle/codemp/game/NPC_combat.c:1114-1124`
 pub fn EntIsGlass(check: &gentity_t) -> qboolean {
-    if !check.classname.is_null()
-        && Q_stricmp("func_breakable", &(unsafe { cstr_to_str(check.classname) })) == 0
+    if Q_stricmp("func_breakable", &check.classname_str()) == 0
         && check.count == 1
         && check.health <= 100
     {
@@ -1416,13 +1415,14 @@ pub fn NPC_PickEnemy(
                                 } else {
                                     let name_str = vtos(ctx, (*newenemy_client).hiddenDir);
                                     let name_str_2 = vtos(ctx, normDiff);
-                                    let npc_targetname = ctx.world.entity(npc_id).targetname;
+                                    let npc_targetname =
+                                        ctx.world.entity(npc_id).targetname_str();
                                     let newenemy_targetname =
-                                        ctx.world.entity(newenemy_id).targetname;
+                                        ctx.world.entity(newenemy_id).targetname_str();
                                     let s = format!(
                                         "{} saw {} trying to hide - hiddenDir {} targetDir {} dot {}\n",
-                                        cstr_to_str(npc_targetname as *const c_char),
-                                        cstr_to_str(newenemy_targetname as *const c_char), name_str, name_str_2,
+                                        npc_targetname.as_deref().unwrap_or_default(),
+                                        newenemy_targetname.as_deref().unwrap_or_default(), name_str, name_str_2,
                                         dot
                                     );
                                     let cs = cstr(&s);
@@ -1440,12 +1440,12 @@ pub fn NPC_PickEnemy(
                                 failed = true;
                             }
                         } else {
-                            let npc_targetname = ctx.world.entity(npc_id).targetname;
-                            let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
+                            let npc_targetname = ctx.world.entity(npc_id).targetname_str();
+                            let newenemy_targetname = ctx.world.entity(newenemy_id).targetname_str();
                             let s = format!(
                                 "{} saw {} trying to hide - hiddenDist {}\n",
-                                cstr_to_str(npc_targetname as *const c_char),
-                                cstr_to_str(newenemy_targetname as *const c_char),
+                                npc_targetname.as_deref().unwrap_or_default(),
+                                newenemy_targetname.as_deref().unwrap_or_default(),
                                 (*newenemy_client).hiddenDist
                             );
                             let cs = cstr(&s);
@@ -1593,12 +1593,12 @@ pub fn NPC_PickEnemy(
                         } else {
                             let name_str = vtos(ctx, (*newenemy_client).hiddenDir);
                             let name_str_2 = vtos(ctx, normDiff);
-                            let npc_targetname = ctx.world.entity(npc_id).targetname;
-                            let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
+                            let npc_targetname = ctx.world.entity(npc_id).targetname_str();
+                            let newenemy_targetname = ctx.world.entity(newenemy_id).targetname_str();
                             let s = format!(
                                 "{} saw {} trying to hide - hiddenDir {} targetDir {} dot {}\n",
-                                cstr_to_str(npc_targetname as *const c_char),
-                                cstr_to_str(newenemy_targetname as *const c_char),
+                                npc_targetname.as_deref().unwrap_or_default(),
+                                newenemy_targetname.as_deref().unwrap_or_default(),
                                 name_str,
                                 name_str_2,
                                 dot
@@ -1618,12 +1618,12 @@ pub fn NPC_PickEnemy(
                         continue;
                     }
                 } else {
-                    let npc_targetname = ctx.world.entity(npc_id).targetname;
-                    let newenemy_targetname = ctx.world.entity(newenemy_id).targetname;
+                    let npc_targetname = ctx.world.entity(npc_id).targetname_str();
+                    let newenemy_targetname = ctx.world.entity(newenemy_id).targetname_str();
                     let s = format!(
                         "{} saw {} trying to hide - hiddenDist {}\n",
-                        cstr_to_str(npc_targetname as *const c_char),
-                        cstr_to_str(newenemy_targetname as *const c_char),
+                        npc_targetname.as_deref().unwrap_or_default(),
+                        newenemy_targetname.as_deref().unwrap_or_default(),
                         (*newenemy_client).hiddenDist
                     );
                     let cs = cstr(&s);

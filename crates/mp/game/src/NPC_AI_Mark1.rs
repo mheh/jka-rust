@@ -224,7 +224,7 @@ pub fn Mark1Dead_FireRocket(ctx: &mut GameContext) {
         false,
     );
 
-    ctx.world.entity_mut(missile_id).classname = c"bowcaster_proj".as_ptr().cast_mut();
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bowcaster_proj"));
     ctx.world.entity_mut(missile_id).s.weapon = WP_BOWCASTER as c_int;
 
     ctx.world.entity_mut(missile_id).r.maxs[0] = BOWCASTER_SIZE as f32;
@@ -298,7 +298,7 @@ pub fn Mark1Dead_FireBlaster(ctx: &mut GameContext) {
         G_SoundIndex("sound/chars/mark1/misc/mark1_fire"),
     );
 
-    ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bryar_proj"));
     ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
 
     ctx.world.entity_mut(missile_id).damage = 1;
@@ -672,7 +672,7 @@ pub fn Mark1_FireBlaster(ctx: &mut GameContext) {
 
     let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
 
-    ctx.world.entity_mut(missile_id).classname = c"bryar_proj".as_ptr().cast_mut();
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bryar_proj"));
     ctx.world.entity_mut(missile_id).s.weapon = WP_BRYAR_PISTOL as c_int;
 
     ctx.world.entity_mut(missile_id).damage = 1;
@@ -829,7 +829,7 @@ pub fn Mark1_FireRocket(ctx: &mut GameContext) {
         false,
     );
 
-    ctx.world.entity_mut(missile_id).classname = c"bowcaster_proj".as_ptr().cast_mut();
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bowcaster_proj"));
     ctx.world.entity_mut(missile_id).s.weapon = WP_BOWCASTER as c_int;
 
     ctx.world.entity_mut(missile_id).r.maxs[0] = BOWCASTER_SIZE as f32;

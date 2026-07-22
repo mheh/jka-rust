@@ -976,7 +976,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
             let npc_lock_count = ctx.world.entity(npc_id).lockCount;
             let npc_loc_dmg = ctx.world.entity(npc_id).locationDamage[HL_GENERIC1 as usize];
             let enemy_weapon = ctx.world.entity(enemy_id).s.weapon;
-            let enemy_classname = ctx.world.entity(enemy_id).classname;
+            let enemy_classname = ctx.world.entity(enemy_id).classname_str();
             if ctx.world.globals.enemyDist4 < MELEE_DIST_SQUARED
                 && InFront(enemy_origin, npc_origin, (*client).ps.viewangles, 0.3) != 0
                 && enemy_anim_index <= 1
@@ -1020,8 +1020,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                 NPC_GM_StartLaser(ctx);
             } else if ctx.world.globals.enemyDist4 < MIN_LOB_DIST_SQUARED
                 && (enemy_weapon != WP_TURRET as c_int
-                    || enemy_classname.is_null()
-                    || Q_stricmp("PAS", &cstr_to_str(enemy_classname)) != 0)
+                    || Q_stricmp("PAS", &enemy_classname) != 0)
                 && crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"noRapid".as_ptr()) != 0
             {
                 // enemy within 256
@@ -1035,8 +1034,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
                 }
             } else if (ctx.world.globals.enemyDist4 > MAX_LOB_DIST_SQUARED
                 || (enemy_weapon == WP_TURRET as c_int
-                    && !enemy_classname.is_null()
-                    && Q_stricmp("PAS", &cstr_to_str(enemy_classname)) == 0))
+                    && Q_stricmp("PAS", &enemy_classname) == 0))
                 && crate::g_timer::TIMER_Done(ctx, Some(npc_id), c"noLob".as_ptr()) != 0
             {
                 // enemy more than 448 away and we are ready to try lob fire again
@@ -1358,10 +1356,7 @@ pub fn NPC_BSGM_Attack(ctx: &mut GameContext) {
 
         // also:
         if ctx.world.entity(enemy_id).s.weapon == WP_TURRET as c_int
-            && {
-                let p = ctx.world.entity(enemy_id).classname;
-                !p.is_null() && Q_stricmp("PAS", &cstr_to_str(p)) == 0
-            }
+            && Q_stricmp("PAS", &ctx.world.entity(enemy_id).classname_str()) == 0
         {
             // crush turrets
             if crate::NPC_goal::G_BoundsOverlap(

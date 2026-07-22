@@ -104,13 +104,6 @@ pub static playerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2 as vec_t];
 /// Source: `oracle/codemp/game/g_client.c:10`
 pub static playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2 as vec_t];
 
-/// `FOFS(x)` — byte offset of field `x` within `gentity_t` (Raven macro,
-/// `g_local.h`). Used as the `fieldofs` argument to `G_Find`.
-#[inline]
-fn fofs_classname() -> c_int {
-    core::mem::offset_of!(gentity_t, classname) as c_int
-}
-
 /// Raven `SP_info_player_duel`.
 ///
 /// Source: `oracle/codemp/game/g_client.c:27-39`
@@ -215,7 +208,7 @@ pub fn SP_info_player_deathmatch(ctx: &mut GameContext, ent: EntityId) {
 ///
 /// Source: `oracle/codemp/game/g_client.c:105-108`
 pub fn SP_info_player_start(ctx: &mut GameContext, ent: EntityId) {
-    ctx.world.entity_mut(ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
+    ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"info_player_deathmatch"));
     SP_info_player_deathmatch(ctx, ent);
 }
 
@@ -252,7 +245,7 @@ pub fn SP_info_player_siegeteam1(ctx: &mut GameContext, ent: EntityId) {
     let mut soff: c_int = 0;
     if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
         // turn into a DM spawn if not in siege game mode
-        ctx.world.entity_mut(ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
+        ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"info_player_deathmatch"));
         SP_info_player_deathmatch(ctx, ent);
         return;
     }
@@ -281,7 +274,7 @@ pub fn SP_info_player_siegeteam2(ctx: &mut GameContext, ent: EntityId) {
     let mut soff: c_int = 0;
     if ctx.world.cvars.g_gametype.integer != GT_SIEGE {
         // turn into a DM spawn if not in siege game mode
-        ctx.world.entity_mut(ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
+        ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"info_player_deathmatch"));
         SP_info_player_deathmatch(ctx, ent);
         return;
     }
@@ -737,7 +730,7 @@ pub fn SelectNearestDeathmatchSpawnPoint(ctx: &mut GameContext, from: vec3_t) ->
             spot = G_Find(
                 ctx,
                 ctx.entity_id_of(spot),
-                fofs_classname(),
+                EntFindField::Classname,
                 "info_player_deathmatch",
             );
             if spot.is_null() {
@@ -771,7 +764,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: &mut GameContext) -> *mut gentity_t
         spot = G_Find(
             ctx,
             ctx.entity_id_of(spot),
-            fofs_classname(),
+            EntFindField::Classname,
             "info_player_deathmatch",
         );
         if spot.is_null() {
@@ -789,7 +782,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: &mut GameContext) -> *mut gentity_t
         return G_Find(
             ctx,
             ctx.entity_id_of(core::ptr::null_mut()),
-            fofs_classname(),
+            EntFindField::Classname,
             "info_player_deathmatch",
         );
     }
@@ -832,7 +825,7 @@ pub fn SelectRandomFurthestSpawnPoint(
                 spot = G_Find(
                     ctx,
                     ctx.entity_id_of(spot),
-                    fofs_classname(),
+                    EntFindField::Classname,
                     classname,
                 );
                 if spot.is_null() {
@@ -883,7 +876,7 @@ pub fn SelectRandomFurthestSpawnPoint(
                 spot = G_Find(
                     ctx,
                     ctx.entity_id_of(spot),
-                    fofs_classname(),
+                    EntFindField::Classname,
                     "info_player_deathmatch",
                 );
                 if spot.is_null() {
@@ -929,7 +922,7 @@ pub fn SelectRandomFurthestSpawnPoint(
                 spot = G_Find(
                     ctx,
                     ctx.entity_id_of(core::ptr::null_mut()),
-                    fofs_classname(),
+                    EntFindField::Classname,
                     "info_player_deathmatch",
                 );
                 if spot.is_null() {
@@ -993,7 +986,7 @@ pub fn SelectDuelSpawnPoint(
 
             loop {
                 spot =
-                    G_Find(ctx, ctx.entity_id_of(spot), fofs_classname(), spotName);
+                    G_Find(ctx, ctx.entity_id_of(spot), EntFindField::Classname, spotName);
                 if spot.is_null() {
                     break;
                 }
@@ -1044,7 +1037,7 @@ pub fn SelectDuelSpawnPoint(
                 spot = G_Find(
                     ctx,
                     ctx.entity_id_of(core::ptr::null_mut()),
-                    fofs_classname(),
+                    EntFindField::Classname,
                     "info_player_deathmatch",
                 );
                 if spot.is_null() {
@@ -1104,7 +1097,7 @@ pub fn SelectInitialSpawnPoint(
             spot = G_Find(
                 ctx,
                 ctx.entity_id_of(spot),
-                fofs_classname(),
+                EntFindField::Classname,
                 "info_player_deathmatch",
             );
             if spot.is_null() {
@@ -1154,7 +1147,7 @@ pub fn InitBodyQue(ctx: &mut GameContext) {
         for i in 0..BODY_QUEUE_SIZE {
             let ent_eid = crate::g_utils::G_Spawn(ctx);
             let ent = ctx.entity_mut(ent_eid) as *mut gentity_t;
-            (*ent).classname = b"bodyque\0".as_ptr() as *mut c_char;
+            ctx.ent_set(ent_eid, PrefixSet::ClassnameStatic(c"bodyque"));
             (*ent).neverFree = qtrue;
             ctx.world.level.bodyQue[i] = ent;
         }
@@ -2758,7 +2751,8 @@ pub fn ClientSpawn(ctx: &mut GameContext, ent: EntityId) {
         (*ent).playerState = &mut (*((*ent).client)).ps;
         (*ent).takedamage = qtrue;
         (*ent).inuse = qtrue;
-        (*ent).classname = b"player\0".as_ptr() as *mut c_char;
+        let ent_eid = ctx.entity_id_of(ent).unwrap();
+        ctx.ent_set(ent_eid, PrefixSet::ClassnameStatic(c"player"));
         (*ent).r.contents = CONTENTS_BODY;
         (*ent).clipmask = MASK_PLAYERSOLID;
         (*ent).die = Some(EntDie::player_die).into();
@@ -3328,7 +3322,8 @@ pub fn ClientDisconnect(ctx: &mut GameContext, clientNum: c_int) {
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent.cast()));
         (*ent).s.modelindex = 0;
         (*ent).inuse = qfalse;
-        (*ent).classname = b"disconnected\0".as_ptr() as *mut c_char;
+        let ent_eid = ctx.entity_id_of(ent).unwrap();
+        ctx.ent_set(ent_eid, PrefixSet::ClassnameStatic(c"disconnected"));
         (*((*ent).client)).pers.connected = CON_DISCONNECTED as _;
         (*((*ent).client)).ps.persistant[PERS_TEAM as usize] = TEAM_FREE as c_int;
         (*((*ent).client)).sess.sessionTeam = TEAM_FREE;

@@ -268,8 +268,8 @@ pub fn Mark2_FireBlaster(ctx: &mut GameContext, advance: qboolean) {
     );
 
     let missile_id = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_id, false);
+    ctx.ent_set(missile_id, PrefixSet::ClassnameStatic(c"bryar_proj"));
     let m = ctx.world.entity_mut(missile_id);
-    m.classname = b"bryar_proj\0".as_ptr() as *mut c_char;
     m.s.weapon = WP_BRYAR_PISTOL as c_int;
     m.damage = 1;
     m.dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;

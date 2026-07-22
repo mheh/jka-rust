@@ -30,6 +30,7 @@ use crate::prelude::*;
 use crate::q_math::{
     vectoangles, AngleNormalize180, AngleSubtract, AngleVectors, VectorLengthSquared, PITCH, YAW,
 };
+use native_string::atoi_bytes;
 use native_string::Q_stricmp;
 use crate::trap;
 use crate::NPC_combat::G_SetEnemy;
@@ -187,7 +188,7 @@ pub fn auto_turret_die(
             e.s.apos.trDelta[2] = 0.0;
         }
 
-        if !ctx.world.entity(self_).target.is_null() {
+        if ctx.world.entity(self_).target.is_some() {
             G_UseTargets(ctx, Some(self_), attacker);
         }
     } else {
@@ -256,7 +257,6 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
     b.s.otherEntityNum2 = ent_gv14;
     b.s.emplacedOwner = ent_gv15;
 
-    b.classname = c"turret_proj".as_ptr() as *mut c_char;
     b.nextthink = level_time + 10000;
     b.think = Some(EntThink::G_FreeEntity).into();
     b.s.eType = ET_MISSILE as c_int;
@@ -301,6 +301,11 @@ pub fn turret_fire(ctx: &mut GameContext, ent: EntityId, start: vec3_t, dir: vec
     b.r.currentOrigin[2] = start[2];
 
     b.parent = Some(ent);
+
+    // Prefix write routes through the single `set()` choke point (Raven
+    // `bolt->classname = "turret_proj"`); the raw-ptr-into-ctx seam mirrors the
+    // dispatch code, since `set()` needs `ctx` while the entity is borrowed.
+    ctx.ent_set(bolt_id, PrefixSet::ClassnameStatic(c"turret_proj"));
 }
 
 pub const START_DIS: f32 = 15.0;
@@ -720,9 +725,9 @@ pub fn turret_find_enemies(ctx: &mut GameContext, self_: EntityId) -> qboolean {
 
     if found != 0 {
         G_SetEnemy(ctx, self_, bestTarget);
-        let target2 = ctx.world.entity(self_).target2;
-        if unsafe { VALIDSTRING(target2) } {
-            G_UseTargets2(ctx, Some(self_), Some(self_), target2);
+        let target2 = ctx.world.entity(self_).target2.clone();
+        if target2.as_deref().is_some_and(|s| !s.is_empty()) {
+            G_UseTargets2(ctx, Some(self_), Some(self_), target2.as_deref());
         }
     }
 
@@ -951,14 +956,15 @@ pub fn turret_base_spawn_top(ctx: &mut GameContext, base: EntityId) -> qboolean 
     let base_number = ctx.world.entity(base).s.number;
     ctx.world.entity_mut(top_id).r.ownerNum = base_number;
 
-    let team = ctx.world.entity(base).team;
+    let team = ctx.world.entity(base).team.clone();
     let base_teamnodmg0 = ctx.world.entity(base).teamnodmg;
-    // FLAG: `team` is a C string; the byte check derefs it raw.
-    if !team.is_null() && unsafe { *team != 0 } && base_teamnodmg0 == 0 {
-        let v = atoi(team);
-        ctx.world.entity_mut(base).teamnodmg = v;
+    if let Some(team_s) = team.as_deref() {
+        if !team_s.is_empty() && base_teamnodmg0 == 0 {
+            let v = atoi_bytes(team_s.as_bytes());
+            ctx.world.entity_mut(base).teamnodmg = v;
+        }
     }
-    ctx.world.entity_mut(base).team = std::ptr::null_mut();
+    ctx.world.entity_mut(base).team = None;
     let base_teamnodmg = ctx.world.entity(base).teamnodmg;
     ctx.world.entity_mut(top_id).teamnodmg = base_teamnodmg;
     let base_alliedTeam = ctx.world.entity(base).alliedTeam;

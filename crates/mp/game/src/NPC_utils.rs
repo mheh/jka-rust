@@ -710,17 +710,17 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
         None => return qfalse,
     };
 
-    let bs_name = ctx.world.entity(self_id).behaviorSet[bset as usize];
-
-    if !unsafe { VALIDSTRING(bs_name) } {
-        return qfalse;
-    }
+    let bs_name = match ctx.world.entity(self_id).behavior_set_str(bset as usize) {
+        Some(s) if !s.is_empty() => s,
+        _ => return qfalse,
+    };
 
     let mut bSID: c_int = -1;
     // FLAG: gNPC_t (NPC) deref stays raw (recipe 2c).
     let npc = ctx.world.entity(self_id).NPC;
     if !npc.is_null() {
-        bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
+        let bs_name_c = cstr(&bs_name);
+        bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name_c.as_ptr());
     }
 
     if bSID > -1 {
@@ -734,7 +734,7 @@ pub fn G_ActivateBehavior(ctx: &mut GameContext, self_: Option<EntityId>, bset: 
             format!(
                 "{}/{}",
                 cstr_to_str(Q3_SCRIPT_DIR.as_ptr()),
-                cstr_to_str(bs_name)
+                bs_name
             )
         };
         let self_ptr = ctx.world.entity_mut(self_id) as *mut gentity_t;

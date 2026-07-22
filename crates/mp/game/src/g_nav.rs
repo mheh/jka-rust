@@ -199,7 +199,7 @@ pub fn NPC_SetMoveGoal(
     ctx.entity_mut(temp_goal_id).r.mins = ent_mins;
     ctx.entity_mut(temp_goal_id).r.maxs = ent_mins;
 
-    ctx.entity_mut(temp_goal_id).target = core::ptr::null_mut();
+    ctx.entity_mut(temp_goal_id).target = None;
     let ent_clipmask = ctx.entity(ent).clipmask;
     ctx.entity_mut(temp_goal_id).clipmask = ent_clipmask;
     ctx.entity_mut(temp_goal_id).flags &= !FL_NAVGOAL;
@@ -721,10 +721,10 @@ pub fn NAV_CheckAhead(
     // Do a special check for doors
     if (unsafe { (*trace).entityNum } as c_int) < ENTITYNUM_WORLD {
         let blocker_idx = unsafe { (*trace).entityNum } as usize;
-        let classname = ctx.world.g_entities[blocker_idx].classname;
+        let classname = ctx.world.g_entities[blocker_idx].classname_str();
         let blocker_number = ctx.world.g_entities[blocker_idx].s.number;
 
-        if !classname.is_null() && unsafe { *classname } != 0 {
+        if !classname.is_empty() {
             if G_EntIsUnlockedDoor(ctx, blocker_number) != 0 {
                 // We're too close, try and avoid the door (most likely stuck on a lip)
                 if DistanceSquared(self_origin, unsafe { (*trace).endpos })
@@ -1453,9 +1453,9 @@ pub fn NAV_TestBestNode(
     // Do a special check for doors
     if (trace.entityNum as c_int) < ENTITYNUM_WORLD {
         let blocker_idx = trace.entityNum as usize;
-        let classname = ctx.world.g_entities[blocker_idx].classname;
+        let classname = ctx.world.g_entities[blocker_idx].classname_str();
 
-        if !classname.is_null() && unsafe { *classname } != 0 {
+        if !classname.is_empty() {
             let blocker_number = ctx.world.g_entities[blocker_idx].s.number;
             // special case: doors are architecture, but are dynamic, like entities
             if G_EntIsUnlockedDoor(ctx, blocker_number) != 0 {
@@ -1491,10 +1491,10 @@ pub fn NAV_TestBestNode(
                     );
                 }
             } else {
-                let targetname = ctx.world.g_entities[blocker_idx].targetname;
+                let targetname = ctx.world.g_entities[blocker_idx].targetname_str();
                 let solid = ctx.world.g_entities[blocker_idx].s.solid;
                 let contents = ctx.world.g_entities[blocker_idx].r.contents;
-                if !targetname.is_null()
+                if targetname.is_some()
                     && solid == SOLID_BMODEL as c_int
                     && ((contents & CONTENTS_MONSTERCLIP) != 0
                         || (contents & CONTENTS_BOTCLIP) != 0)
@@ -1782,17 +1782,17 @@ pub fn SP_waypoint(ctx: &mut GameContext, ent: EntityId) {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 
         ctx.entity_mut(ent).count = -1;
-        ctx.entity_mut(ent).classname = c"waypoint".as_ptr() as *mut c_char;
+        ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"waypoint"));
 
         if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qtrue) != 0 {
             // if not SOLID_OK, and in solid
             ctx.entity_mut(ent).r.maxs[2] = CROUCH_MAXS_2;
             if G_CheckInSolid(ctx, ent, qtrue) != 0 {
-                let targetname = ctx.entity(ent).targetname;
+                let targetname = ctx.entity(ent).targetname_str();
                 let ent_origin = ctx.entity(ent).r.currentOrigin;
                 let s = format!(
                     "ERROR: Waypoint {} at {} in solid!\n",
-                    unsafe { cstr_to_str(targetname) },
+                    targetname.as_deref().unwrap_or_default(),
                     vtos(ctx, ent_origin)
                 );
                 Com_Printf(&s);
@@ -1838,16 +1838,16 @@ pub fn SP_waypoint_small(ctx: &mut GameContext, ent: EntityId) {
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent_ptr.cast()));
 
         ctx.entity_mut(ent).count = -1;
-        ctx.entity_mut(ent).classname = c"waypoint".as_ptr() as *mut c_char;
+        ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"waypoint"));
 
         if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qtrue) != 0 {
             ctx.entity_mut(ent).r.maxs[2] = CROUCH_MAXS_2;
             if G_CheckInSolid(ctx, ent, qtrue) != 0 {
-                let targetname = ctx.entity(ent).targetname;
+                let targetname = ctx.entity(ent).targetname_str();
                 let ent_origin = ctx.entity(ent).r.currentOrigin;
                 let s = format!(
                     "ERROR: Waypoint_small {} at {} in solid!\n",
-                    unsafe { cstr_to_str(targetname) },
+                    targetname.as_deref().unwrap_or_default(),
                     vtos(ctx, ent_origin)
                 );
                 Com_Printf(&s);
@@ -1886,22 +1886,23 @@ pub fn SP_waypoint_navgoal(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.maxs = [16.0, 16.0, 32.0];
     ctx.entity_mut(ent).s.origin[2] += 0.125;
     if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-        let targetname = ctx.entity(ent).targetname;
+        let targetname = ctx.entity(ent).targetname_str();
         let ent_origin = ctx.entity(ent).r.currentOrigin;
         let s = format!(
             "ERROR: Waypoint_navgoal {} at {} in solid!\n",
-            unsafe { cstr_to_str(targetname) },
+            targetname.as_deref().unwrap_or_default(),
             vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
     }
-    let targetname = ctx.entity(ent).targetname;
+    let targetname = ctx.entity(ent).targetname_str();
+    let targetname_c = targetname.as_deref().map(cstr);
     let ent_origin = ctx.entity(ent).s.origin;
     let ent_angles = ctx.entity(ent).s.angles;
     TAG_Add(
         ctx,
-        targetname,
+        targetname_c.as_ref().map_or(core::ptr::null(), |c| c.as_ptr()),
         core::ptr::null(),
         ent_origin,
         ent_angles,
@@ -1909,7 +1910,7 @@ pub fn SP_waypoint_navgoal(ctx: &mut GameContext, ent: EntityId) {
         RTF_NAVGOAL,
     );
 
-    ctx.entity_mut(ent).classname = c"navgoal".as_ptr() as *mut c_char;
+    ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"navgoal"));
     G_FreeEntity(ctx, Some(ent)); // can't do this, they need to be found later by some functions, though those could be fixed, maybe?
 }
 
@@ -1921,23 +1922,24 @@ pub fn SP_waypoint_navgoal_8(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.maxs = [8.0, 8.0, 32.0];
     ctx.entity_mut(ent).s.origin[2] += 0.125;
     if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-        let targetname = ctx.entity(ent).targetname;
+        let targetname = ctx.entity(ent).targetname_str();
         let ent_origin = ctx.entity(ent).r.currentOrigin;
         let s = format!(
             "ERROR: Waypoint_navgoal_8 {} at {} in solid!\n",
-            unsafe { cstr_to_str(targetname) },
+            targetname.as_deref().unwrap_or_default(),
             vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
     }
 
-    let targetname = ctx.entity(ent).targetname;
+    let targetname = ctx.entity(ent).targetname_str();
+    let targetname_c = targetname.as_deref().map(cstr);
     let ent_origin = ctx.entity(ent).s.origin;
     let ent_angles = ctx.entity(ent).s.angles;
     TAG_Add(
         ctx,
-        targetname,
+        targetname_c.as_ref().map_or(core::ptr::null(), |c| c.as_ptr()),
         core::ptr::null(),
         ent_origin,
         ent_angles,
@@ -1945,7 +1947,7 @@ pub fn SP_waypoint_navgoal_8(ctx: &mut GameContext, ent: EntityId) {
         RTF_NAVGOAL,
     );
 
-    ctx.entity_mut(ent).classname = c"navgoal".as_ptr() as *mut c_char;
+    ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"navgoal"));
     G_FreeEntity(ctx, Some(ent));
 }
 
@@ -1957,23 +1959,24 @@ pub fn SP_waypoint_navgoal_4(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.maxs = [4.0, 4.0, 32.0];
     ctx.entity_mut(ent).s.origin[2] += 0.125;
     if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-        let targetname = ctx.entity(ent).targetname;
+        let targetname = ctx.entity(ent).targetname_str();
         let ent_origin = ctx.entity(ent).r.currentOrigin;
         let s = format!(
             "ERROR: Waypoint_navgoal_4 {} at {} in solid!\n",
-            unsafe { cstr_to_str(targetname) },
+            targetname.as_deref().unwrap_or_default(),
             vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
     }
 
-    let targetname = ctx.entity(ent).targetname;
+    let targetname = ctx.entity(ent).targetname_str();
+    let targetname_c = targetname.as_deref().map(cstr);
     let ent_origin = ctx.entity(ent).s.origin;
     let ent_angles = ctx.entity(ent).s.angles;
     TAG_Add(
         ctx,
-        targetname,
+        targetname_c.as_ref().map_or(core::ptr::null(), |c| c.as_ptr()),
         core::ptr::null(),
         ent_origin,
         ent_angles,
@@ -1981,7 +1984,7 @@ pub fn SP_waypoint_navgoal_4(ctx: &mut GameContext, ent: EntityId) {
         RTF_NAVGOAL,
     );
 
-    ctx.entity_mut(ent).classname = c"navgoal".as_ptr() as *mut c_char;
+    ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"navgoal"));
     G_FreeEntity(ctx, Some(ent));
 }
 
@@ -1993,23 +1996,24 @@ pub fn SP_waypoint_navgoal_2(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.maxs = [2.0, 2.0, 32.0];
     ctx.entity_mut(ent).s.origin[2] += 0.125;
     if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-        let targetname = ctx.entity(ent).targetname;
+        let targetname = ctx.entity(ent).targetname_str();
         let ent_origin = ctx.entity(ent).r.currentOrigin;
         let s = format!(
             "ERROR: Waypoint_navgoal_2 {} at {} in solid!\n",
-            unsafe { cstr_to_str(targetname) },
+            targetname.as_deref().unwrap_or_default(),
             vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
     }
 
-    let targetname = ctx.entity(ent).targetname;
+    let targetname = ctx.entity(ent).targetname_str();
+    let targetname_c = targetname.as_deref().map(cstr);
     let ent_origin = ctx.entity(ent).s.origin;
     let ent_angles = ctx.entity(ent).s.angles;
     TAG_Add(
         ctx,
-        targetname,
+        targetname_c.as_ref().map_or(core::ptr::null(), |c| c.as_ptr()),
         core::ptr::null(),
         ent_origin,
         ent_angles,
@@ -2017,7 +2021,7 @@ pub fn SP_waypoint_navgoal_2(ctx: &mut GameContext, ent: EntityId) {
         RTF_NAVGOAL,
     );
 
-    ctx.entity_mut(ent).classname = c"navgoal".as_ptr() as *mut c_char;
+    ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"navgoal"));
     G_FreeEntity(ctx, Some(ent));
 }
 
@@ -2029,23 +2033,24 @@ pub fn SP_waypoint_navgoal_1(ctx: &mut GameContext, ent: EntityId) {
     ctx.entity_mut(ent).r.maxs = [1.0, 1.0, 32.0];
     ctx.entity_mut(ent).s.origin[2] += 0.125;
     if (ctx.entity(ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-        let targetname = ctx.entity(ent).targetname;
+        let targetname = ctx.entity(ent).targetname_str();
         let ent_origin = ctx.entity(ent).r.currentOrigin;
         let s = format!(
             "ERROR: Waypoint_navgoal_1 {} at {} in solid!\n",
-            unsafe { cstr_to_str(targetname) },
+            targetname.as_deref().unwrap_or_default(),
             vtos(ctx, ent_origin)
         );
         Com_Printf(&s);
         debug_assert!(false);
     }
 
-    let targetname = ctx.entity(ent).targetname;
+    let targetname = ctx.entity(ent).targetname_str();
+    let targetname_c = targetname.as_deref().map(cstr);
     let ent_origin = ctx.entity(ent).s.origin;
     let ent_angles = ctx.entity(ent).s.angles;
     TAG_Add(
         ctx,
-        targetname,
+        targetname_c.as_ref().map_or(core::ptr::null(), |c| c.as_ptr()),
         core::ptr::null(),
         ent_origin,
         ent_angles,
@@ -2053,7 +2058,7 @@ pub fn SP_waypoint_navgoal_1(ctx: &mut GameContext, ent: EntityId) {
         RTF_NAVGOAL,
     );
 
-    ctx.entity_mut(ent).classname = c"navgoal".as_ptr() as *mut c_char;
+    ctx.ent_set(ent, PrefixSet::ClassnameStatic(c"navgoal"));
     G_FreeEntity(ctx, Some(ent));
 }
 
@@ -2139,32 +2144,32 @@ pub fn NAV_WaypointsTooFar(ctx: &mut GameContext, wp1: EntityId, wp2: EntityId) 
     if Distance(wp1_origin, wp2_origin) > 1024.0 {
         ctx.world.globals.fatalErrors += 1;
 
-        let wp1_targetname = ctx.entity(wp1).targetname;
-        let wp2_targetname = ctx.entity(wp2).targetname;
-        let temp = if wp1_targetname.is_null() && wp2_targetname.is_null() {
+        let wp1_targetname = ctx.entity(wp1).targetname_str();
+        let wp2_targetname = ctx.entity(wp2).targetname_str();
+        let temp = if wp1_targetname.is_none() && wp2_targetname.is_none() {
             format!(
                 "Waypoint conn {}->{} > 1024\n",
                 vtos(ctx, wp1_origin),
                 vtos(ctx, wp2_origin)
             )
-        } else if wp1_targetname.is_null() {
+        } else if wp1_targetname.is_none() {
             format!(
                 "Waypoint conn {}->{} > 1024\n",
                 vtos(ctx, wp1_origin),
-                unsafe { cstr_to_str(wp2_targetname) }
+                wp2_targetname.as_deref().unwrap()
             )
-        } else if wp2_targetname.is_null() {
+        } else if wp2_targetname.is_none() {
             format!(
                 "Waypoint conn {}->{} > 1024\n",
-                unsafe { cstr_to_str(wp1_targetname) },
+                wp1_targetname.as_deref().unwrap(),
                 vtos(ctx, wp2_origin)
             )
         } else {
             // they both have valid targetnames
             format!(
                 "Waypoint conn {}->{} > 1024\n",
-                unsafe { cstr_to_str(wp1_targetname) },
-                unsafe { cstr_to_str(wp2_targetname) }
+                wp1_targetname.as_deref().unwrap(),
+                wp2_targetname.as_deref().unwrap()
             )
         };
 
@@ -2212,28 +2217,29 @@ pub fn NAV_StoreWaypoint(ctx: &mut GameContext, ent: EntityId) {
     // `ent`'s string fields are `*mut c_char` into the arena (disjoint from
     // `globals`); snapshot the pointer values so the `globals` write borrow
     // does not conflict — `Q_strncpyz` reads through them at the seam.
-    let targetname = ctx.entity(ent).targetname;
-    let target = ctx.entity(ent).target;
-    let target2 = ctx.entity(ent).target2;
+    let targetname = ctx.entity(ent).targetname_str();
+    let target = ctx.entity(ent).target.clone();
+    let target2 = ctx.entity(ent).target2.clone();
     let target3 = ctx.entity(ent).target3;
     let target4 = ctx.entity(ent).target4;
     let health = ctx.entity(ent).health;
 
-    // `targetname`..`target4` are `*mut c_char` into the entity arena; read each
-    // through the seam and `Q_strncpyz`-bound it (`MAX_QPATH-1` bytes) into the
-    // now-`String` waypoint field. A null source leaves the field at its cleared
-    // (empty) value, matching Raven's skipped copy over zeroed storage.
-    if !targetname.is_null() {
+    // `targetname`/`target`/`target2` decode through the accessors (`None` ≡
+    // Raven NULL); `target3`/`target4` stay `*mut c_char` into the entity arena.
+    // Each is `Q_strncpyz`-bound (`MAX_QPATH-1` bytes) into the now-`String`
+    // waypoint field; an absent source leaves the field at its cleared (empty)
+    // value, matching Raven's skipped copy over zeroed storage.
+    if let Some(targetname) = targetname {
         ctx.world.globals.tempWaypointList[i].targetname =
-            strncpyz_string(unsafe { CStr::from_ptr(targetname) }.to_bytes(), MAX_QPATH as usize);
+            strncpyz_string(targetname.as_bytes(), MAX_QPATH as usize);
     }
-    if !target.is_null() {
+    if let Some(target) = target {
         ctx.world.globals.tempWaypointList[i].target =
-            strncpyz_string(unsafe { CStr::from_ptr(target) }.to_bytes(), MAX_QPATH as usize);
+            strncpyz_string(target.as_bytes(), MAX_QPATH as usize);
     }
-    if !target2.is_null() {
+    if let Some(target2) = target2 {
         ctx.world.globals.tempWaypointList[i].target2 =
-            strncpyz_string(unsafe { CStr::from_ptr(target2) }.to_bytes(), MAX_QPATH as usize);
+            strncpyz_string(target2.as_bytes(), MAX_QPATH as usize);
     }
     if !target3.is_null() {
         ctx.world.globals.tempWaypointList[i].target3 =

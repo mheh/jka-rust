@@ -5,8 +5,9 @@
 
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int, c_void, CStr};
 
+use mp_bg::cstr_util::{cstr, cstr_to_str};
 use mp_bg::public::item_id::ItemId;
 use mp_bg::vehicles::vehicle_s::Vehicle_t;
 use mp_qshared::common::mp::ent_fn_ids::{
@@ -20,7 +21,9 @@ use mp_qshared::common::mp::qcommon::{entityState_t, parms_t, playerState_t};
 use mp_qshared::shared::{entityShared_t, qboolean, vec3_t};
 
 use crate::client::gclient::gclient_t;
+use crate::g_spawn::G_NewString;
 use crate::npc::g_npc_t::gNPC_t;
+use crate::world::game_context::GameContext;
 
 /// Raven MP `gentity_t`.
 ///
@@ -222,18 +225,24 @@ pub struct gentity_t {
     /// For NPCs.
     /// Raven field source: `oracle/codemp/game/g_local.h:247`
     pub pos3: vec3_t,
+    /// Owned copy of the QuakeEd message text (`\n` escapes translated to real
+    /// linefeeds on write); `None` ≡ Raven NULL (readers distinguish an unset
+    /// message from an empty one).
     /// Raven field source: `oracle/codemp/game/g_local.h:249`
-    pub message: *mut c_char,
+    pub message: Option<String>,
     /// Body queue sinking, etc.
     /// Raven field source: `oracle/codemp/game/g_local.h:251`
     pub timestamp: c_int,
     /// Set in editor, -1 = up, -2 = down.
     /// Raven field source: `oracle/codemp/game/g_local.h:253`
     pub angle: f32,
+    /// Owned copy of the QuakeEd target name; `None` ≡ Raven NULL (readers
+    /// distinguish an unset target from an empty one).
     /// Raven field source: `oracle/codemp/game/g_local.h:254`
-    pub target: *mut c_char,
+    pub target: Option<String>,
+    /// Owned copy of the QuakeEd secondary target name; `None` ≡ Raven NULL.
     /// Raven field source: `oracle/codemp/game/g_local.h:255`
-    pub target2: *mut c_char,
+    pub target2: Option<String>,
     /// Raven field source: `oracle/codemp/game/g_local.h:256`
     pub target3: *mut c_char,
     /// Raven field source: `oracle/codemp/game/g_local.h:257`
@@ -246,8 +255,10 @@ pub struct gentity_t {
     /// Mainly added for siege items.
     /// Raven field source: `oracle/codemp/game/g_local.h:259`
     pub target6: String,
+    /// Owned copy of the QuakeEd team tag; `None` ≡ Raven NULL (readers
+    /// distinguish an unset team from an empty one).
     /// Raven field source: `oracle/codemp/game/g_local.h:261`
-    pub team: *mut c_char,
+    pub team: Option<String>,
     /// Owned copy of the shader-remap source name; `""` ≡ absent.
     /// Raven field source: `oracle/codemp/game/g_local.h:262`
     pub targetShaderName: String,
@@ -437,7 +448,99 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
 
+/// Write payload for [`gentity_t::set`] — one variant per writable prefix
+/// string slot, so a single choke point owns the pool-pointer transaction for
+/// every prefix write in game code. `Option` payloads carry Raven's NULL (`None`
+/// → NULL slot); `str` payloads are copied through `G_NewString` (`\n`
+/// translation, pool allocation) exactly as the C `x = G_NewString(...)` did.
+pub enum PrefixSet<'a> {
+    /// `classname` slot. Always present in Raven (`x = G_NewString(...)`).
+    Classname(&'a str),
+    /// `targetname` slot; `None` ≡ Raven NULL.
+    Targetname(Option<&'a str>),
+    /// `fullName` slot; `None` ≡ Raven NULL.
+    FullName(Option<&'a str>),
+    /// `script_targetname` slot; `None` ≡ Raven NULL.
+    ScriptTargetname(Option<&'a str>),
+    /// `behaviorSet[i]` slot; `None` ≡ Raven NULL.
+    BehaviorSet(usize, Option<&'a str>),
+    /// `classname` slot written straight from a `'static` C literal (Raven's
+    /// `x = "noclass"` / `"freed"` path), bypassing the `G_NewString` pool copy.
+    ClassnameStatic(&'static CStr),
+}
+
+/// Selects a prefix pool-pointer slot for [`gentity_t::alias_from`] — the sites
+/// that faithfully copy Raven's shared allocation (one pool buffer reachable
+/// from two entities' slots) rather than materializing a fresh copy.
+pub enum PrefixSlot {
+    /// `targetname` slot.
+    Targetname,
+    /// `fullName` slot.
+    FullName,
+    /// `behaviorSet[i]` slot.
+    BehaviorSet(usize),
+}
+
 impl gentity_t {
+    /// The single choke point for every prefix string write in game code: stores
+    /// the payload into the addressed `*mut c_char` slot as a pointer
+    /// REPLACEMENT (never an in-place edit of the pooled bytes), so the slot is
+    /// valid at every trap boundary. `Some`/`str` payloads route through
+    /// `G_NewString` (pool copy + `\n` translation); `None` writes a NULL slot;
+    /// the `ClassnameStatic` arm stores a `'static` literal pointer directly.
+    /// Prefix slots keep their `*mut c_char` layout permanently (drop-in engine
+    /// ABI); a later batch swaps this interior for an ownership ledger without
+    /// touching call sites.
+
+    /// Aliases a prefix pool pointer from `src`'s slot into `self`'s same slot —
+    /// a raw pointer copy preserving Raven's shared-allocation semantics (the C
+    /// `dst->x = src->x` left both slots pointing at the one `G_Alloc` buffer).
+    /// Prefix slots stay `*mut c_char` (drop-in ABI), so a pointer copy is the
+    /// faithful port. Used by `G_FindTeams` (master inherits the slave's
+    /// `targetname`) and `NPC_Spawn_Do` (spawner clones its template's slots).
+    ///
+    /// # Safety
+    /// `src` must outlive the aliased pointer (both entities live in the same
+    /// arena, so the pool buffer persists until entity free).
+    pub unsafe fn alias_from(&mut self, src: &gentity_t, slot: PrefixSlot) {
+        match slot {
+            PrefixSlot::Targetname => self.targetname = src.targetname,
+            PrefixSlot::FullName => self.fullName = src.fullName,
+            PrefixSlot::BehaviorSet(i) => self.behaviorSet[i] = src.behaviorSet[i],
+        }
+    }
+
+    /// Decodes the live `classname` slot (NULL → `""`). The slot is the truth —
+    /// the engine (ICARUS) writes it — so it is decoded fresh every call, never
+    /// cached.
+    pub fn classname_str(&self) -> String {
+        if self.classname.is_null() {
+            String::new()
+        } else {
+            unsafe { cstr_to_str(self.classname) }
+        }
+    }
+
+    /// Decodes the live `targetname` slot; `None` ≡ Raven NULL.
+    pub fn targetname_str(&self) -> Option<String> {
+        prefix_slot_str(self.targetname)
+    }
+
+    /// Decodes the live `fullName` slot; `None` ≡ Raven NULL.
+    pub fn fullname_str(&self) -> Option<String> {
+        prefix_slot_str(self.fullName)
+    }
+
+    /// Decodes the live `script_targetname` slot; `None` ≡ Raven NULL.
+    pub fn script_targetname_str(&self) -> Option<String> {
+        prefix_slot_str(self.script_targetname)
+    }
+
+    /// Decodes the live `behaviorSet[i]` slot; `None` ≡ Raven NULL.
+    pub fn behavior_set_str(&self, i: usize) -> Option<String> {
+        prefix_slot_str(self.behaviorSet[i])
+    }
+
     /// Drops every owned-`String` tail field (`mem::take` → empty `String`),
     /// leaving the byte image safe to wholesale-zero. Paired with
     /// [`Self::seat_owned_strings`] to bracket the `memset`-equivalent
@@ -457,6 +560,10 @@ impl gentity_t {
         let _ = core::mem::take(&mut self.targetShaderNewName);
         let _ = core::mem::take(&mut self.goaltarget);
         let _ = core::mem::take(&mut self.idealclass);
+        let _ = core::mem::take(&mut self.target);
+        let _ = core::mem::take(&mut self.target2);
+        let _ = core::mem::take(&mut self.team);
+        let _ = core::mem::take(&mut self.message);
     }
 
     /// Seats a fresh empty `String` into every owned-`String` tail field of a
@@ -482,6 +589,70 @@ impl gentity_t {
         core::ptr::write(core::ptr::addr_of_mut!((*p).targetShaderNewName), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).goaltarget), String::new());
         core::ptr::write(core::ptr::addr_of_mut!((*p).idealclass), String::new());
+        core::ptr::write(core::ptr::addr_of_mut!((*p).target), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).target2), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).team), None);
+        core::ptr::write(core::ptr::addr_of_mut!((*p).message), None);
+    }
+}
+
+/// Pool copy of `name` (Raven `G_NewString`: `\n` translation) when present, or
+/// a NULL slot when absent — the shared body behind [`PrefixSet`]'s `Option`
+/// arms, mirroring Raven's `x = value ? G_NewString(value) : NULL`.
+impl GameContext<'_> {
+    /// The single prefix-slot write choke point (design §4d-bis). One borrow at
+    /// a time: the pool copy is made first (`G_NewString` — pure bump alloc, no
+    /// trap), then the slot is written through a fresh entity borrow, so the
+    /// slot is never observable in a partial state at any trap boundary and no
+    /// `&mut` into the arena coexists with the world borrow.
+    pub fn ent_set(&mut self, id: EntityId, field: PrefixSet) {
+        match field {
+            PrefixSet::Classname(name) => {
+                let name_c = cstr(name);
+                let s = G_NewString(self, name_c.as_ptr());
+                self.entity_mut(id).classname = s;
+            }
+            PrefixSet::ClassnameStatic(name) => {
+                self.entity_mut(id).classname = name.as_ptr() as *mut c_char;
+            }
+            PrefixSet::Targetname(name) => {
+                let s = new_string_or_null(self, name);
+                self.entity_mut(id).targetname = s;
+            }
+            PrefixSet::FullName(name) => {
+                let s = new_string_or_null(self, name);
+                self.entity_mut(id).fullName = s;
+            }
+            PrefixSet::ScriptTargetname(name) => {
+                let s = new_string_or_null(self, name);
+                self.entity_mut(id).script_targetname = s;
+            }
+            PrefixSet::BehaviorSet(i, name) => {
+                let s = new_string_or_null(self, name);
+                self.entity_mut(id).behaviorSet[i] = s;
+            }
+        }
+    }
+}
+
+fn new_string_or_null(ctx: &mut GameContext, name: Option<&str>) -> *mut c_char {
+    match name {
+        Some(s) => {
+            let s_c = cstr(s);
+            G_NewString(ctx, s_c.as_ptr())
+        }
+        None => core::ptr::null_mut(),
+    }
+}
+
+/// Decodes a live prefix `*mut c_char` slot into an owned `String`; NULL → `None`
+/// (Raven distinguishes an unset slot from an empty one). Shared by the
+/// `Option`-returning `_str` readers.
+fn prefix_slot_str(slot: *mut c_char) -> Option<String> {
+    if slot.is_null() {
+        None
+    } else {
+        Some(unsafe { cstr_to_str(slot) })
     }
 }
 

@@ -657,7 +657,8 @@ pub fn NPC_Pain(ctx: &mut GameContext, self_: EntityId, attacker: Option<EntityI
     // Attempt to fire any paintargets we might have
     let paintarget = ctx.world.entity(self_).paintarget;
     if !paintarget.is_null() && unsafe { *paintarget } != 0 {
-        G_UseTargets2(ctx, Some(self_), Some(other_id), paintarget);
+        let paintarget = unsafe { cstr_to_str(paintarget) };
+        G_UseTargets2(ctx, Some(self_), Some(other_id), Some(&paintarget));
     }
 
     RestoreNPCGlobals(ctx);
@@ -689,7 +690,7 @@ pub fn NPC_Touch(
     let other_id = other.unwrap();
 
     // I am dead and carrying a key
-    if !ctx.world.entity(self_).message.is_null() && ctx.world.entity(self_).health <= 0 {
+    if ctx.world.entity(self_).message.is_some() && ctx.world.entity(self_).health <= 0 {
         // Player touched me
         // FLAG: pool client (gClPtrs) deref stays raw (recipe 2b).
         let other_client = ctx.world.entity(other_id).client;
@@ -1177,7 +1178,7 @@ pub fn NPC_Use(
             // empty body — not a port gap.
         }
 
-        if !ctx.world.entity(self_).behaviorSet[BSET_USE as usize].is_null() {
+        if ctx.world.entity(self_).behavior_set_str(BSET_USE as usize).is_some() {
             NPC_UseResponse(ctx, self_, other, 1);
         } else if !npc.is_null()
             && ctx.world.entity(self_).enemy.is_none()

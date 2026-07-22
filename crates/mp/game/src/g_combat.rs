@@ -161,7 +161,7 @@ pub fn ObjectDie(
     damage: c_int,
     meansOfDeath: c_int,
 ) {
-    if !ctx.entity(self_).target.is_null() {
+    if ctx.entity(self_).target.is_some() {
         G_UseTargets(ctx, Some(self_), attacker);
     }
 
@@ -1832,8 +1832,8 @@ pub fn G_BroadcastObit(
             ctx.entity_mut(ent).s.otherEntityNum2 = killer;
         }
         if let Some(inflictor) = inflictor {
-            let cn = ctx.entity(inflictor).classname;
-            if !cn.is_null() && Q_stricmp("vehicle_proj", &(unsafe { cstr_to_str(cn) })) == 0 {
+            let cn = ctx.entity(inflictor).classname_str();
+            if Q_stricmp("vehicle_proj", &cn) == 0 {
                 // a vehicle missile
                 ctx.entity_mut(ent).s.eventParm = meansOfDeath_t::MOD_VEHICLE as c_int;
                 // store index into g_vehWeaponInfo
@@ -1855,8 +1855,8 @@ pub fn G_BroadcastObit(
                 let v = ctx.entity(attacker).s.m_iVehicleNum;
                 ctx.entity_mut(ent).s.brokenLimbs = v;
             } else if ctx.entity(ent).s.lookTarget != 0 && {
-                let cn = ctx.entity(attacker).classname;
-                !cn.is_null() && Q_stricmp("func_rotating", &(unsafe { cstr_to_str(cn) })) == 0
+                let cn = ctx.entity(attacker).classname_str();
+                Q_stricmp("func_rotating", &cn) == 0
             } {
                 // my vehicle was killed by a func_rotating, probably an asteroid
                 ctx.entity_mut(ent).s.saberInFlight = qtrue;
@@ -2707,8 +2707,7 @@ unsafe fn player_die_vehicle_cascade(
                             if !tempInflictorEnt.is_null() {
                                 // fake up the inflictor
                                 tempInflictor = qtrue;
-                                (*tempInflictorEnt).classname =
-                                    c"vehicle_proj".as_ptr() as *mut c_char;
+                                ctx.ent_set(__teid14, PrefixSet::ClassnameStatic(c"vehicle_proj"));
                                 (*tempInflictorEnt).s.otherEntityNum2 =
                                     (*cl).otherKillerVehWeapon - 1;
                                 (*tempInflictorEnt).s.weapon = (*cl).otherKillerWeaponType;
@@ -3080,7 +3079,7 @@ pub fn player_die(
                 tempInflictorEnt = ctx.entity_mut(__teid15);
                 if !tempInflictorEnt.is_null() {
                     tempInflictor = qtrue;
-                    (*tempInflictorEnt).classname = c"vehicle_proj".as_ptr() as *mut c_char;
+                    ctx.ent_set(__teid15, PrefixSet::ClassnameStatic(c"vehicle_proj"));
                     (*tempInflictorEnt).s.otherEntityNum2 = (*cl).otherKillerVehWeapon - 1;
                     (*tempInflictorEnt).s.weapon = (*cl).otherKillerWeaponType;
                 }
@@ -3156,11 +3155,17 @@ pub fn player_die(
             {
                 //deathScript = qtrue;
             }
+            let target4 = (*self_).target4;
+            let target4 = if target4.is_null() {
+                None
+            } else {
+                Some(cstr_to_str(target4))
+            };
             crate::g_utils::G_UseTargets2(
                 ctx,
                 ctx.entity_id_of(self_),
                 ctx.entity_id_of(self_),
-                (*self_).target4,
+                target4.as_deref(),
             );
         }
 
@@ -3744,8 +3749,8 @@ pub fn G_Dismember(
             ctx.entity(ent).s.pos.trDelta
         };
 
+        ctx.ent_set(limb, PrefixSet::ClassnameStatic(c"playerlimb"));
         let e = ctx.entity_mut(limb);
-        e.classname = c"playerlimb".as_ptr() as *mut c_char;
 
         crate::g_utils::G_SetOrigin(e, newPoint);
         e.s.pos.trBase = newPoint;
@@ -4760,8 +4765,8 @@ pub fn G_ApplyVehicleOtherKiller(
         (*targClient).ps.otherKillerDebounceTime = ctx.world.level.time + 25000;
         (*targClient).otherKillerMOD = r#mod;
         if inflictor.is_some_and(|inf| {
-            let cn = ctx.entity(inf).classname;
-            !cn.is_null() && Q_stricmp("vehicle_proj", &cstr_to_str(cn)) == 0
+            let cn = ctx.entity(inf).classname_str();
+            Q_stricmp("vehicle_proj", &cn) == 0
         }) {
             let inf = inflictor.unwrap();
             (*targClient).otherKillerVehWeapon = ctx.entity(inf).s.otherEntityNum2 + 1;
@@ -5937,8 +5942,7 @@ pub fn G_DamageFromKiller(
                 if let Some(inflictor_id) = inflictor {
                     // fake up the inflictor
                     tempInflictor = qtrue;
-                    ctx.entity_mut(inflictor_id).classname =
-                        c"vehicle_proj".as_ptr() as *mut c_char;
+                    ctx.ent_set(inflictor_id, PrefixSet::ClassnameStatic(c"vehicle_proj"));
                     let vw = unsafe { (*vc).otherKillerVehWeapon };
                     ctx.entity_mut(inflictor_id).s.otherEntityNum2 = vw - 1;
                     let wt = unsafe { (*vc).otherKillerWeaponType };

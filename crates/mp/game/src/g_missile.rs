@@ -852,9 +852,9 @@ pub fn G_MissileImpact(ctx: &mut GameContext, ent: EntityId, trace: &mut trace_t
                     && unsafe { !(*other_vehicle).m_pVehicleInfo.is_null() }
                     && (unsafe { (*(*other_vehicle).m_pVehicleInfo).r#type } == VH_SPEEDER
                         || (unsafe { (*(*other_vehicle).m_pVehicleInfo).r#type } == VH_FIGHTER
-                            && !ctx.entity(ent).classname.is_null()
+                            && !ctx.entity(ent).classname_str().is_empty()
                             && Q_stricmp(
-                                &(unsafe { cstr_to_str(ctx.entity(ent).classname) }),
+                                &ctx.entity(ent).classname_str(),
                                 "vehicle_proj",
                             ) == 0))
                     && unsafe {

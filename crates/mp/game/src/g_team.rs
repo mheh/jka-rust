@@ -7,8 +7,6 @@
 
 use crate::prelude::*;
 
-use core::ffi::CStr;
-
 use crate::ent_id::resolve;
 use crate::entity::flags::{FL_DROPPED_ITEM, FL_FORCE_GESTURE};
 use crate::g_combat::AddScore;
@@ -79,12 +77,6 @@ const CTF_FLAG_DEFENSE_BONUS: c_int = 10;
 const CTF_RETURN_FLAG_ASSIST_BONUS: c_int = 10;
 const CTF_FRAG_CARRIER_ASSIST_BONUS: c_int = 10;
 
-/// `FOFS(x)` — byte offset of field `x` within `gentity_t` (Raven macro,
-/// `g_local.h`). Used as the `fieldofs` argument to `G_Find`.
-#[inline]
-fn fofs_classname() -> c_int {
-    core::mem::offset_of!(gentity_t, classname) as c_int
-}
 
 /// Raven `Team_InitGame`.
 ///
@@ -580,7 +572,7 @@ pub fn Team_FragBonuses(
 
         let mut flag: Option<EntityId> = None;
         loop {
-            let f = G_Find(ctx, flag, fofs_classname(), c);
+            let f = G_Find(ctx, flag, EntFindField::Classname, c);
             flag = ctx.entity_id_of(f);
             if f.is_null() {
                 break;
@@ -746,7 +738,7 @@ pub fn Team_ResetFlag(ctx: &mut GameContext, team: c_int) -> Option<EntityId> {
     let mut ent: Option<EntityId> = None;
     let mut rent: Option<EntityId> = None;
     loop {
-        let e = G_Find(ctx, ent, fofs_classname(), classname);
+        let e = G_Find(ctx, ent, EntFindField::Classname, classname);
         ent = ctx.entity_id_of(e);
         if e.is_null() {
             break;
@@ -1081,15 +1073,13 @@ pub fn Team_TouchEnemyFlag(
 ///
 /// Source: `oracle/codemp/game/g_team.c:848-871`
 pub fn Pickup_Team(ctx: &mut GameContext, ent: EntityId, other: EntityId) -> c_int {
-    // FLAG (task #7): `.classname` is a `*mut c_char` (bg/spawn string), read raw
-    // via the safe entity borrow. (recipe 2c)
-    let classname_ptr = ctx.world.entity(ent).classname;
-    let classname = unsafe { CStr::from_ptr(classname_ptr) };
-    let team = if classname == c"team_CTF_redflag" {
+    // Read the live `classname` slot through the accessor (`""` when NULL).
+    let classname = ctx.world.entity(ent).classname_str();
+    let team = if classname == "team_CTF_redflag" {
         TEAM_RED
-    } else if classname == c"team_CTF_blueflag" {
+    } else if classname == "team_CTF_blueflag" {
         TEAM_BLUE
-    } else if classname == c"team_CTF_neutralflag" {
+    } else if classname == "team_CTF_neutralflag" {
         TEAM_FREE
     } else {
         // PrintMsg(other, "Don't know what team the flag is on.\n") — dead.
@@ -1162,10 +1152,9 @@ pub fn Team_GetLocationMsg(
         return qfalse;
     };
 
-    // FLAG (task #7): `.message` is a `*mut c_char` (spawn string), read raw via
-    // the safe entity borrow. (recipe 2c)
-    let message_ptr = ctx.world.entity(best).message;
-    let message = unsafe { CStr::from_ptr(message_ptr) }.to_string_lossy();
+    // `message` is now an owned `Option<String>` (`None` ≡ Raven NULL); locations
+    // always carry one, so decode with an empty-string fallback for the absent case.
+    let message = ctx.world.entity(best).message.clone().unwrap_or_default();
 
     // Oracle gates on the original `best->count`, then clamps and writes the
     // clamped value back into the entity (g_team.c:928-933).
@@ -1236,7 +1225,7 @@ pub fn SelectRandomTeamSpawnPoint(
         // Oracle's `while ((spot = G_Find(...)) != NULL)` — break on null before
         // taking an id (the STAGE-1 body unwrapped pre-null-check, which would
         // panic on the terminating iteration; oracle just exits the loop).
-        let s = G_Find(ctx, spot, fofs_classname(), classname);
+        let s = G_Find(ctx, spot, EntFindField::Classname, classname);
         spot = ctx.entity_id_of(s);
         if s.is_null() {
             break;
@@ -1259,7 +1248,7 @@ pub fn SelectRandomTeamSpawnPoint(
     }
 
     if count == 0 {
-        let s = G_Find(ctx, None, fofs_classname(), classname);
+        let s = G_Find(ctx, None, EntFindField::Classname, classname);
         return ctx.entity_id_of(s);
     }
 

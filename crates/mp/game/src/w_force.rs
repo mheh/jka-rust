@@ -3571,7 +3571,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
             if ctx.world.entity(ent_id).s.eType != ET_MISSILE as c_int {
                 if ctx.world.entity(ent_id).s.eType != ET_ITEM as c_int {
                     //FIXME: need pushable objects
-                    let classname = cstr_to_str(ctx.world.entity(ent_id).classname);
+                    let classname = ctx.world.entity(ent_id).classname_str();
                     if classname.eq_ignore_ascii_case("func_button") {
                         //we might push it
                         if pull || ctx.world.entity(ent_id).spawnflags & SPF_BUTTON_FPUSHABLE == 0 {
@@ -3986,7 +3986,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                     } else {
                         G_ReflectMissile(ctx, self_, push_list[x], forward);
                     }
-                } else if cstr_to_str(ctx.world.entity(push_list[x]).classname)
+                } else if ctx.world.entity(push_list[x]).classname_str()
                     .eq_ignore_ascii_case("func_static")
                 {
                     //force-usable func_static
@@ -3995,7 +3995,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                     } else if pull && ctx.world.entity(push_list[x]).spawnflags & 2 != 0 {
                         GEntity_UseFunc(ctx, push_list[x], Some(self_), Some(self_));
                     }
-                } else if cstr_to_str(ctx.world.entity(push_list[x]).classname)
+                } else if ctx.world.entity(push_list[x]).classname_str()
                     .eq_ignore_ascii_case("func_door")
                     && ctx.world.entity(push_list[x]).spawnflags & 2 != 0
                 {
@@ -4118,7 +4118,7 @@ pub fn ForceThrow(ctx: &mut GameContext, self_: EntityId, pull: bool) {
                         }
                     }
                     GEntity_UseFunc(ctx, push_list[x], Some(self_), Some(self_));
-                } else if cstr_to_str(ctx.world.entity(push_list[x]).classname)
+                } else if ctx.world.entity(push_list[x]).classname_str()
                     .eq_ignore_ascii_case("func_button")
                 {
                     //pretend you pushed it
